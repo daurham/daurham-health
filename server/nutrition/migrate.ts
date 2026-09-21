@@ -1,5 +1,6 @@
 import { NUTRITION_CONFIG, NUTRITION_ENTRY_ENTITY, NUTRITION_FOOD_ENTITY, planLegacyImport } from '../../src/domain/nutrition/index.js'
 import type { LegacyImportPlan, LegacyNutritionDump } from '../../src/domain/nutrition/legacy.js'
+import { HttpError } from '../http.js'
 import {
   existingLegacyLinks,
   insertImportJob,
@@ -10,6 +11,35 @@ import {
   updateImportJob,
 } from './queries.js'
 import { loadLegacyNutritionDump } from './legacy-source.js'
+
+export type LegacyImportOptions = {
+  excludeFoodLogIds?: readonly number[]
+}
+
+export function parseLegacyImportOptions(body: unknown): LegacyImportOptions {
+  if (body == null) {
+    return {}
+  }
+  if (typeof body !== 'object' || Array.isArray(body)) {
+    throw new HttpError(400, 'Invalid import options')
+  }
+  const raw = (body as { excludeFoodLogIds?: unknown }).excludeFoodLogIds
+  if (raw == null) {
+    return {}
+  }
+  if (!Array.isArray(raw)) {
+    throw new HttpError(400, 'excludeFoodLogIds must be an array of positive integers')
+  }
+  const excludeFoodLogIds: number[] = []
+  for (const value of raw) {
+    const parsed = typeof value === 'number' ? value : Number(value)
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+      throw new HttpError(400, 'excludeFoodLogIds must be an array of positive integers')
+    }
+    excludeFoodLogIds.push(parsed)
+  }
+  return { excludeFoodLogIds }
+}
 
 export type NutritionLegacyPreview = {
   source: {
@@ -45,14 +75,30 @@ function previewNotes(dump: LegacyNutritionDump, plan: LegacyImportPlan): string
     dump.logs.some((log) => log.display_name.toUpperCase() === 'BANANA' && log.calories > 200)
       ? 'Unusual: BANANA log is 312 kcal at 32 g — preserved exactly, not corrected.'
       : '',
+    plan.entriesExcluded.length > 0
+      ? `Explicit source-row exclusion: food_log ids ${plan.entriesExcluded.map((row) => row.externalId).join(', ')} (${plan.entriesExcluded[0]?.reason}). Recorded in import reporting; source DB is unchanged.`
+      : '',
   ].filter((note) => note.length > 0)
 }
 
-export async function previewLegacyNutrition(dump?: LegacyNutritionDump): Promise<NutritionLegacyPreview> {
+function planFromDump(
+  source: LegacyNutritionDump,
+  fingerprints: ReadonlySet<string>,
+  options: LegacyImportOptions = {},
+): LegacyImportPlan {
+  return planLegacyImport(source, fingerprints, NUTRITION_CONFIG.calendarTimeZone, {
+    excludeFoodLogIds: options.excludeFoodLogIds,
+  })
+}
+
+export async function previewLegacyNutrition(
+  dump?: LegacyNutritionDump,
+  options: LegacyImportOptions = {},
+): Promise<NutritionLegacyPreview> {
   const source = dump ?? (await loadLegacyNutritionDump())
   const sourceId = await legacySourceId()
   const links = await existingLegacyLinks(sourceId)
-  const plan = planLegacyImport(source, new Set(links.keys()), NUTRITION_CONFIG.calendarTimeZone)
+  const plan = planFromDump(source, new Set(links.keys()), options)
   return {
     source: {
       ingredients: source.ingredients.length,
@@ -70,11 +116,14 @@ export async function previewLegacyNutrition(dump?: LegacyNutritionDump): Promis
   }
 }
 
-export async function commitLegacyNutrition(dump?: LegacyNutritionDump): Promise<NutritionLegacyPreview & { importJobId: string }> {
+export async function commitLegacyNutrition(
+  dump?: LegacyNutritionDump,
+  options: LegacyImportOptions = {},
+): Promise<NutritionLegacyPreview & { importJobId: string }> {
   const source = dump ?? (await loadLegacyNutritionDump())
   const sourceId = await legacySourceId()
   const links = await existingLegacyLinks(sourceId)
-  const plan = planLegacyImport(source, new Set(links.keys()), NUTRITION_CONFIG.calendarTimeZone)
+  const plan = planFromDump(source, new Set(links.keys()), options)
   const importJobId = await insertImportJob([
     sourceId,
     'calorie-tracker',
@@ -85,7 +134,7 @@ export async function commitLegacyNutrition(dump?: LegacyNutritionDump): Promise
     plan.foodsSkipped.length,
     plan.summary.duplicatesSkipped,
     plan.summary.validationFailures,
-    JSON.stringify({ preview: plan.summary }),
+    JSON.stringify({ preview: plan.summary, entriesExcluded: plan.entriesExcluded }),
   ])
 
   const foodIdByFingerprint = new Map<string, string>()
@@ -133,7 +182,7 @@ export async function commitLegacyNutrition(dump?: LegacyNutritionDump): Promise
     plan.foodsSkipped.length,
     plan.summary.duplicatesSkipped,
     plan.summary.validationFailures,
-    JSON.stringify({ summary: plan.summary }),
+    JSON.stringify({ summary: plan.summary, entriesExcluded: plan.entriesExcluded }),
   ])
 
   return {

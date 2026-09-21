@@ -134,10 +134,34 @@ export const LIST_FOODS_SQL = `SELECT ${FOOD_COLUMNS}
          FROM nutrition_foods
          WHERE archived = false
            AND ($1::text IS NULL OR lower(name) LIKE '%' || lower($1) || '%' OR (brand IS NOT NULL AND lower(brand) LIKE '%' || lower($1) || '%'))
-         ORDER BY name ASC, catalog_kind ASC, id ASC
+         ORDER BY
+           CASE
+             WHEN $1::text IS NOT NULL AND lower(name) = lower($1) THEN 0
+             WHEN $1::text IS NOT NULL AND lower(name) LIKE lower($1) || '%' THEN 1
+             WHEN $1::text IS NOT NULL AND brand IS NOT NULL AND lower(brand) = lower($1) THEN 2
+             WHEN $1::text IS NOT NULL AND brand IS NOT NULL AND lower(brand) LIKE lower($1) || '%' THEN 3
+             ELSE 4
+           END,
+           name ASC, catalog_kind ASC, id ASC
          LIMIT $2`
 
 export const GET_FOOD_SQL = `SELECT ${FOOD_COLUMNS} FROM nutrition_foods WHERE id = $1`
+
+export const GET_FOOD_BY_BARCODES_SQL = `SELECT ${FOOD_COLUMNS}
+         FROM nutrition_foods
+         WHERE archived = false
+           AND barcode IS NOT NULL
+           AND (
+             barcode = ANY($1::text[])
+             OR regexp_replace(barcode, '[^0-9]', '', 'g') = ANY($1::text[])
+             OR CASE
+               WHEN length(regexp_replace(barcode, '[^0-9]', '', 'g')) = 12
+                 THEN '0' || regexp_replace(barcode, '[^0-9]', '', 'g')
+               ELSE regexp_replace(barcode, '[^0-9]', '', 'g')
+             END = ANY($1::text[])
+           )
+         ORDER BY updated_at DESC, id ASC
+         LIMIT 1`
 
 export const INSERT_FOOD_SQL = `INSERT INTO nutrition_foods (
            name, brand, barcode, catalog_kind, serving_quantity, serving_unit, serving_grams,
@@ -205,6 +229,42 @@ export const TARGET_FOR_DATE_SQL = `SELECT id, effective_from, calories_target, 
          ORDER BY effective_from DESC
          LIMIT 1`
 
+export const UPSERT_TARGET_SQL = `INSERT INTO nutrition_targets (
+           effective_from, calories_target, protein_target, carbs_target, fat_target, fiber_target
+         ) VALUES ($1,$2,$3,$4,$5,$6)
+         ON CONFLICT (effective_from) DO UPDATE SET
+           calories_target = EXCLUDED.calories_target,
+           protein_target = EXCLUDED.protein_target,
+           carbs_target = EXCLUDED.carbs_target,
+           fat_target = EXCLUDED.fat_target,
+           fiber_target = EXCLUDED.fiber_target,
+           updated_at = now()
+         RETURNING id, effective_from, calories_target, protein_target, carbs_target, fat_target, fiber_target, created_at, updated_at`
+
+export const LIST_STAPLES_SQL = `SELECT ${FOOD_COLUMNS}
+         FROM nutrition_foods
+         WHERE archived = false AND is_staple = true
+         ORDER BY name ASC, id ASC
+         LIMIT $1`
+
+export const LIST_RECIPES_SQL = `SELECT ${FOOD_COLUMNS}
+         FROM nutrition_foods
+         WHERE archived = false AND catalog_kind = 'recipe'
+         ORDER BY name ASC, id ASC
+         LIMIT $1`
+
+export const LIST_RECENTS_SQL = `SELECT ${FOOD_COLUMNS}
+         FROM nutrition_foods f
+         JOIN (
+           SELECT food_id, MAX(COALESCE(consumed_at, created_at)) AS last_at
+           FROM nutrition_entries
+           WHERE food_id IS NOT NULL
+           GROUP BY food_id
+         ) r ON r.food_id = f.id
+         WHERE f.archived = false
+         ORDER BY r.last_at DESC
+         LIMIT $1`
+
 export const LEGACY_SOURCE_SQL = `SELECT id FROM data_sources WHERE key = 'legacy_nutrition' LIMIT 1`
 
 export const EXISTING_FINGERPRINTS_SQL = `SELECT external_fingerprint, entity_type, entity_id
@@ -238,6 +298,17 @@ export async function getFood(id: string): Promise<NutritionFood | null> {
   return queryOrUnavailable(async () => {
     const sql = await getSql()
     const rows = (await sql.query(GET_FOOD_SQL, [id])) as FoodRow[]
+    return rows[0] ? mapFoodRow(rows[0]) : null
+  })
+}
+
+export async function getFoodByBarcodeKeys(keys: string[]): Promise<NutritionFood | null> {
+  if (keys.length === 0) {
+    return null
+  }
+  return queryOrUnavailable(async () => {
+    const sql = await getSql()
+    const rows = (await sql.query(GET_FOOD_BY_BARCODES_SQL, [keys])) as FoodRow[]
     return rows[0] ? mapFoodRow(rows[0]) : null
   })
 }
@@ -309,6 +380,41 @@ export async function targetForDate(date: string): Promise<NutritionTarget | nul
     const sql = await getSql()
     const rows = (await sql.query(TARGET_FOR_DATE_SQL, [date])) as TargetRow[]
     return rows[0] ? mapTargetRow(rows[0]) : null
+  })
+}
+
+export async function upsertTarget(values: unknown[]): Promise<NutritionTarget> {
+  return queryOrUnavailable(async () => {
+    const sql = await getSql()
+    const rows = (await sql.query(UPSERT_TARGET_SQL, values)) as TargetRow[]
+    if (!rows[0]) {
+      throw new HttpError(500, 'Target save failed')
+    }
+    return mapTargetRow(rows[0])
+  })
+}
+
+export async function listStapleFoods(limit: number): Promise<NutritionFood[]> {
+  return queryOrUnavailable(async () => {
+    const sql = await getSql()
+    const rows = (await sql.query(LIST_STAPLES_SQL, [limit])) as FoodRow[]
+    return rows.map(mapFoodRow)
+  })
+}
+
+export async function listRecipeFoods(limit: number): Promise<NutritionFood[]> {
+  return queryOrUnavailable(async () => {
+    const sql = await getSql()
+    const rows = (await sql.query(LIST_RECIPES_SQL, [limit])) as FoodRow[]
+    return rows.map(mapFoodRow)
+  })
+}
+
+export async function listRecentFoods(limit: number): Promise<NutritionFood[]> {
+  return queryOrUnavailable(async () => {
+    const sql = await getSql()
+    const rows = (await sql.query(LIST_RECENTS_SQL, [limit])) as FoodRow[]
+    return rows.map(mapFoodRow)
   })
 }
 

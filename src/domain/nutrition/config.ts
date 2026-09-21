@@ -5,7 +5,10 @@ export const NUTRITION_CONFIG = {
   barcodeMax: 64,
   servingUnitMax: 80,
   notesMax: 2000,
-  foodQueryLimit: 50,
+  foodQueryLimit: 80,
+  recentsLimit: 12,
+  staplesLimit: 48,
+  recipesLimit: 60,
 } as const
 
 export type NutritionConfig = typeof NUTRITION_CONFIG

@@ -6,15 +6,40 @@ export {
   servingMultiplier,
   scaledGrams,
   snapshotFromDefinition,
+  rescaleLoggedSnapshot,
 } from './servings.js'
 export type { NutrientAmount } from './servings.js'
+export { recentsFromEntries, rankFoodsForQuery } from './catalog.js'
 export { nutritionDayTotals } from './totals.js'
 export type { NutritionDayTotals, NutrientTotal, NutritionTotable } from './totals.js'
+export {
+  normalizeBarcode,
+  barcodeDigits,
+  barcodesEquivalent,
+  canonicalRetailBarcode,
+  expandUpcEToUpcA,
+  shouldIgnoreDuplicateScan,
+} from './barcode.js'
+export type { NormalizedBarcode } from './barcode.js'
+export {
+  candidateFromProviderSnapshot,
+  validatePackagedReview,
+  applyHundredGramServing,
+  applyGramServing,
+  deriveServingFromPer100g,
+} from './packaged.js'
+export type {
+  PackagedFoodCandidate,
+  PackagedProviderSnapshot,
+  PackagedFoodProviderId,
+  NutrientBasis,
+} from './packaged.js'
 export {
   nutritionFoodCreateSchema,
   nutritionFoodPatchSchema,
   nutritionEntryCreateSchema,
   nutritionEntryPatchSchema,
+  nutritionTargetCreateSchema,
   resolveEntryLogDate,
 } from './types.js'
 export type {
@@ -25,6 +50,7 @@ export type {
   NutritionFoodPatch,
   NutritionEntryCreate,
   NutritionEntryPatch,
+  NutritionTargetCreate,
 } from './types.js'
 export {
   planLegacyImport,

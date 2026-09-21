@@ -49,6 +49,12 @@ describe('splitSqlStatements', () => {
     expect(nutrition[0]).toMatch(/^CREATE TABLE nutrition_foods/)
     expect(nutrition[4]).toMatch(/^CREATE TABLE nutrition_entries/)
     expect(nutrition[7]).toMatch(/^CREATE TABLE nutrition_targets/)
+    const barcodeIndex = splitSqlStatements(
+      readFileSync(path.join('migrations', '0009_nutrition_barcode_normalized.sql'), 'utf8'),
+    )
+    expect(barcodeIndex).toHaveLength(2)
+    expect(barcodeIndex[0]).toMatch(/^UPDATE nutrition_foods/)
+    expect(barcodeIndex[1]).toMatch(/^CREATE UNIQUE INDEX nutrition_foods_barcode_normalized_uidx/)
     const analytics = splitSqlStatements(
       readFileSync(path.join('migrations', '0005_exercise_analytics.sql'), 'utf8'),
     )

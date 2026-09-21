@@ -9,15 +9,29 @@ import {
   nutritionDayTotals,
   nutritionEntryCreateSchema,
   nutritionFoodCreateSchema,
+  nutritionTargetCreateSchema,
   parseOptionalGramsFromServingText,
   planLegacyImport,
+  rankFoodsForQuery,
+  recentsFromEntries,
+  rescaleLoggedSnapshot,
   resolveEntryLogDate,
   scaleNutrients,
   servingMultiplier,
   snapshotFromDefinition,
   type LegacyNutritionDump,
+  type NutritionEntry,
+  type NutritionFood,
 } from '../src/domain/nutrition/index.ts'
-import { DELETE_ENTRY_SQL, INSERT_ENTRY_SQL, INSERT_FOOD_SQL, UPDATE_FOOD_SQL } from '../server/nutrition/queries.ts'
+import {
+  DELETE_ENTRY_SQL,
+  INSERT_ENTRY_SQL,
+  INSERT_FOOD_SQL,
+  LIST_FOODS_SQL,
+  LIST_RECENTS_SQL,
+  UPDATE_FOOD_SQL,
+  UPSERT_TARGET_SQL,
+} from '../server/nutrition/queries.ts'
 import { matchHealthApiRoute } from '../server/dispatch.ts'
 
 function dump(partial?: Partial<LegacyNutritionDump>): LegacyNutritionDump {
@@ -284,6 +298,9 @@ describe('nutrition API routing', () => {
       'nutrition-entry-detail',
     )
     expect(matchHealthApiRoute('/api/nutrition/foods')).toBe('nutrition-foods')
+    expect(matchHealthApiRoute('/api/nutrition/targets')).toBe('nutrition-targets')
+    expect(matchHealthApiRoute('/api/nutrition/barcode/034000470693')).toBe('nutrition-barcode')
+    expect(matchHealthApiRoute('/api/nutrition/barcode/save')).toBe('nutrition-barcode')
     expect(matchHealthApiRoute('/api/nutrition/import/legacy/preview')).toBe('nutrition-legacy-import')
     expect(matchHealthApiRoute('/api/nutrition/import/legacy/commit')).toBe('nutrition-legacy-import')
     const sql = readFileSync('migrations/0008_nutrition.sql', 'utf8')
@@ -292,3 +309,153 @@ describe('nutrition API routing', () => {
     expect(sql).not.toMatch(/\buser_id\b/)
   })
 })
+
+function food(partial: Partial<NutritionFood> & Pick<NutritionFood, 'id' | 'name'>): NutritionFood {
+  return {
+    brand: null,
+    barcode: null,
+    catalogKind: 'ingredient',
+    servingQuantity: 1,
+    servingUnit: 'serving',
+    servingGrams: null,
+    calories: 100,
+    protein: 10,
+    carbs: 5,
+    fat: 2,
+    fiber: null,
+    sourceKind: 'manual',
+    isStaple: false,
+    archived: false,
+    notes: null,
+    createdAt: '2026-09-20T00:00:00.000Z',
+    updatedAt: '2026-09-20T00:00:00.000Z',
+    ...partial,
+  }
+}
+
+function entry(partial: Partial<NutritionEntry> & Pick<NutritionEntry, 'id' | 'foodName'>): NutritionEntry {
+  return {
+    logDate: '2026-09-21',
+    consumedAt: null,
+    timezone: 'America/Los_Angeles',
+    meal: null,
+    foodId: null,
+    brand: null,
+    servingQuantity: 1,
+    servingUnit: 'serving',
+    grams: null,
+    calories: 100,
+    protein: 10,
+    carbs: 5,
+    fat: 2,
+    fiber: null,
+    sourceKind: 'manual',
+    notes: null,
+    createdAt: '2026-09-21T00:00:00.000Z',
+    updatedAt: '2026-09-21T00:00:00.000Z',
+    ...partial,
+  }
+}
+
+describe('nutrition recents, staples, search', () => {
+  it('derives recents from entries, dedupes by food_id, and skips manual rows without food_id', () => {
+    const chicken = food({ id: '11111111-1111-4111-8111-111111111111', name: 'Chicken & rice', catalogKind: 'recipe' })
+    const egg = food({ id: '22222222-2222-4222-8222-222222222222', name: 'Egg', isStaple: true })
+    const recents = recentsFromEntries(
+      [
+        entry({
+          id: 'a',
+          foodName: 'Homemade chili',
+          foodId: null,
+          createdAt: '2026-09-21T18:00:00.000Z',
+        }),
+        entry({
+          id: 'b',
+          foodName: 'Chicken & rice',
+          foodId: chicken.id,
+          createdAt: '2026-09-21T17:00:00.000Z',
+        }),
+        entry({
+          id: 'c',
+          foodName: 'Chicken & rice again',
+          foodId: chicken.id,
+          createdAt: '2026-09-21T12:00:00.000Z',
+        }),
+        entry({
+          id: 'd',
+          foodName: 'Egg',
+          foodId: egg.id,
+          createdAt: '2026-09-21T08:00:00.000Z',
+        }),
+      ],
+      [chicken, egg],
+    )
+    expect(recents.map((item) => item.name)).toEqual(['Chicken & rice', 'Egg'])
+    expect(LIST_RECENTS_SQL).toContain('FROM nutrition_entries')
+    expect(LIST_RECENTS_SQL).not.toContain('CREATE TABLE')
+  })
+
+  it('ranks exact and prefix name matches ahead of contains', () => {
+    const ranked = rankFoodsForQuery(
+      [
+        food({ id: '11111111-1111-4111-8111-111111111111', name: 'Chicken rice bowl', catalogKind: 'recipe' }),
+        food({ id: '22222222-2222-4222-8222-222222222222', name: 'Chicken' }),
+        food({ id: '33333333-3333-4333-8333-333333333333', name: 'Broth', brand: 'Chicken' }),
+      ],
+      'chicken',
+    )
+    expect(ranked.map((item) => item.name)).toEqual(['Chicken', 'Chicken rice bowl', 'Broth'])
+    expect(LIST_FOODS_SQL).toContain("lower(name) = lower($1)")
+    expect(LIST_FOODS_SQL).toContain("lower(name) LIKE lower($1) || '%'")
+  })
+})
+
+describe('nutrition targets', () => {
+  it('accepts calorie and protein targets with optional macros', () => {
+    const first = nutritionTargetCreateSchema.parse({
+      effectiveFrom: '2026-09-21',
+      caloriesTarget: 2100,
+      proteinTarget: 160,
+    })
+    expect(first.carbsTarget).toBeNull()
+    const later = nutritionTargetCreateSchema.parse({
+      effectiveFrom: '2026-09-22',
+      caloriesTarget: 2000,
+      proteinTarget: 150,
+      fiberTarget: 30,
+    })
+    expect(later.effectiveFrom).toBe('2026-09-22')
+    expect(UPSERT_TARGET_SQL).toContain('ON CONFLICT (effective_from)')
+    expect(UPSERT_TARGET_SQL).toContain('INSERT INTO nutrition_targets')
+  })
+})
+
+describe('legacy source-row exclusion', () => {
+  it('excludes explicit food_log ids and remains idempotent', () => {
+    const first = planLegacyImport(dump(), new Set(), 'America/Los_Angeles', { excludeFoodLogIds: [5] })
+    expect(first.summary.entriesExcluded).toBe(1)
+    expect(first.entriesExcluded).toEqual([{ externalId: '5', reason: 'explicit_source_row_exclusion' }])
+    expect(first.summary.entriesImported).toBe(1)
+    expect(first.summary.entriesFound).toBe(2)
+    const fingerprints = new Set(
+      first.foodsToInsert.map((item) => item.fingerprint).concat(first.entriesToInsert.map((item) => item.fingerprint)),
+    )
+    const second = planLegacyImport(dump(), fingerprints, 'America/Los_Angeles', { excludeFoodLogIds: [5] })
+    expect(second.summary.foodsCreated).toBe(0)
+    expect(second.summary.entriesImported).toBe(0)
+    expect(second.summary.entriesExcluded).toBe(1)
+  })
+})
+
+describe('logged snapshot rescale', () => {
+  it('scales an existing log to a fractional quantity without using a later food definition', () => {
+    const next = rescaleLoggedSnapshot(
+      { calories: 540, protein: 42, carbs: 40, fat: 12, fiber: null, servingQuantity: 1, grams: 300 },
+      { quantity: 1.5 },
+    )
+    expect(next.calories).toBe(810)
+    expect(next.protein).toBe(63)
+    expect(next.grams).toBe(450)
+  })
+})
+

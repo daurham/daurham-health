@@ -381,6 +381,7 @@ export type LegacyImportPlan = {
   foodsSkipped: PlannedFood[]
   entriesToInsert: PlannedEntry[]
   entriesSkipped: PlannedEntry[]
+  entriesExcluded: Array<{ externalId: string; reason: string }>
   invalid: InvalidLegacyRow[]
   summary: {
     foodsFound: number
@@ -390,6 +391,7 @@ export type LegacyImportPlan = {
     foodsCreated: number
     entriesImported: number
     duplicatesSkipped: number
+    entriesExcluded: number
     unsupportedRows: number
     validationFailures: number
   }
@@ -399,7 +401,9 @@ export function planLegacyImport(
   dump: LegacyNutritionDump,
   existingFingerprints: ReadonlySet<string>,
   timeZone = NUTRITION_CONFIG.calendarTimeZone,
+  options: { excludeFoodLogIds?: readonly number[] } = {},
 ): LegacyImportPlan {
+  const excludedIds = new Set((options.excludeFoodLogIds ?? []).map((id) => String(id)))
   const mappedFoods = mapLegacyFoods(dump)
   const mappedEntries = mapLegacyEntries(dump.logs, timeZone)
   const foodsToInsert: PlannedFood[] = []
@@ -413,19 +417,31 @@ export function planLegacyImport(
   }
   const entriesToInsert: PlannedEntry[] = []
   const entriesSkipped: PlannedEntry[] = []
+  const entriesExcluded: Array<{ externalId: string; reason: string }> = []
   for (const entry of mappedEntries.entries) {
+    if (excludedIds.has(entry.externalId)) {
+      entriesExcluded.push({
+        externalId: entry.externalId,
+        reason: 'explicit_source_row_exclusion',
+      })
+      continue
+    }
     if (existingFingerprints.has(entry.fingerprint)) {
       entriesSkipped.push(entry)
     } else {
       entriesToInsert.push(entry)
     }
   }
-  const dates = mappedEntries.entries.map((entry) => entry.logDate).sort()
+  const dates = mappedEntries.entries
+    .filter((entry) => !excludedIds.has(entry.externalId))
+    .map((entry) => entry.logDate)
+    .sort()
   return {
     foodsToInsert,
     foodsSkipped,
     entriesToInsert,
     entriesSkipped,
+    entriesExcluded,
     invalid: [...mappedFoods.invalid, ...mappedEntries.invalid],
     summary: {
       foodsFound: mappedFoods.foods.length,
@@ -438,6 +454,7 @@ export function planLegacyImport(
       foodsCreated: foodsToInsert.length,
       entriesImported: entriesToInsert.length,
       duplicatesSkipped: foodsSkipped.length + entriesSkipped.length,
+      entriesExcluded: entriesExcluded.length,
       unsupportedRows: 0,
       validationFailures: mappedFoods.invalid.length + mappedEntries.invalid.length,
     },

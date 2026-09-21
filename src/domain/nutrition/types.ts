@@ -275,7 +275,18 @@ export function resolveEntryLogDate(input: {
   return { logDate: input.logDate, consumedAt: null }
 }
 
-export type NutritionFoodCreate = z.infer<typeof nutritionFoodCreateSchema>
+export type NutritionFoodCreate = z.input<typeof nutritionFoodCreateSchema>
 export type NutritionFoodPatch = z.infer<typeof nutritionFoodPatchSchema>
-export type NutritionEntryCreate = z.infer<typeof nutritionEntryCreateSchema>
+export type NutritionEntryCreate = z.input<typeof nutritionEntryCreateSchema>
 export type NutritionEntryPatch = z.infer<typeof nutritionEntryPatchSchema>
+
+export const nutritionTargetCreateSchema = z.object({
+  effectiveFrom: calendarDateSchema,
+  caloriesTarget: finiteNumber({ min: 0, allowZero: false, label: 'caloriesTarget' }),
+  proteinTarget: finiteNumber({ min: 0, label: 'proteinTarget' }),
+  carbsTarget: optionalFinite('carbsTarget').optional().default(null),
+  fatTarget: optionalFinite('fatTarget').optional().default(null),
+  fiberTarget: optionalFinite('fiberTarget').optional().default(null),
+})
+
+export type NutritionTargetCreate = z.input<typeof nutritionTargetCreateSchema>

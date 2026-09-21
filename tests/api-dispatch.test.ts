@@ -225,6 +225,22 @@ describe('api/index after Vercel nested rewrite', () => {
     const foods = await hit('GET', '/api/nutrition/foods?query=chicken')
     expect(isDeniedPrivate(foods.status())).toBe(true)
 
+    const targets = await hit('GET', '/api/nutrition/targets?date=2026-09-21')
+    expect(targets.status()).not.toBe(404)
+    expect(isDeniedPrivate(targets.status())).toBe(true)
+
+    const saveTarget = await hit('POST', '/api/nutrition/targets')
+    expect(saveTarget.status()).not.toBe(404)
+    expect(isDeniedPrivate(saveTarget.status())).toBe(true)
+
+    const barcode = await hit('GET', '/api/nutrition/barcode/034000470693')
+    expect(barcode.status()).not.toBe(404)
+    expect(isDeniedPrivate(barcode.status())).toBe(true)
+
+    const saveBarcode = await hit('POST', '/api/nutrition/barcode/save')
+    expect(saveBarcode.status()).not.toBe(404)
+    expect(isDeniedPrivate(saveBarcode.status())).toBe(true)
+
     const preview = await hit('POST', '/api/nutrition/import/legacy/preview')
     expect(preview.status()).not.toBe(404)
     expect(isDeniedPrivate(preview.status())).toBe(true)

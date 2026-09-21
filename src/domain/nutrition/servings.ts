@@ -104,3 +104,25 @@ export function snapshotFromDefinition(
     multiplier,
   }
 }
+
+export function rescaleLoggedSnapshot(
+  existing: NutrientAmount & { servingQuantity: number; grams: number | null },
+  next: { quantity: number; grams?: number | null },
+): NutrientAmount & { grams: number | null; multiplier: number } {
+  const quantity = asFinite(existing.servingQuantity, 'servingQuantity')
+  if (quantity <= 0) {
+    throw new Error('servingQuantity must be > 0')
+  }
+  const perServing = 1 / quantity
+  return snapshotFromDefinition(
+    {
+      calories: existing.calories * perServing,
+      protein: existing.protein == null ? null : existing.protein * perServing,
+      carbs: existing.carbs == null ? null : existing.carbs * perServing,
+      fat: existing.fat == null ? null : existing.fat * perServing,
+      fiber: existing.fiber == null ? null : existing.fiber * perServing,
+      servingGrams: existing.grams == null ? null : existing.grams * perServing,
+    },
+    { quantity: next.quantity, grams: next.grams },
+  )
+}

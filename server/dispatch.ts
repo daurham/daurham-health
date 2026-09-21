@@ -23,6 +23,8 @@ import nutritionEntryDetailHandler from './handlers/nutrition-entry-detail.js'
 import nutritionFoodsHandler from './handlers/nutrition-foods.js'
 import nutritionFoodDetailHandler from './handlers/nutrition-food-detail.js'
 import nutritionLegacyImportHandler from './handlers/nutrition-legacy-import.js'
+import nutritionTargetsHandler from './handlers/nutrition-targets.js'
+import nutritionBarcodeHandler from './handlers/nutrition-barcode.js'
 
 export type HealthApiRoute =
   | 'health'
@@ -49,6 +51,8 @@ export type HealthApiRoute =
   | 'nutrition-foods'
   | 'nutrition-food-detail'
   | 'nutrition-legacy-import'
+  | 'nutrition-targets'
+  | 'nutrition-barcode'
 
 type HealthApiHandler = (req: ApiRequest, res: ApiResponse) => unknown | Promise<unknown>
 
@@ -77,6 +81,8 @@ const HANDLERS: Record<HealthApiRoute, HealthApiHandler> = {
   'nutrition-foods': nutritionFoodsHandler,
   'nutrition-food-detail': nutritionFoodDetailHandler,
   'nutrition-legacy-import': nutritionLegacyImportHandler,
+  'nutrition-targets': nutritionTargetsHandler,
+  'nutrition-barcode': nutritionBarcodeHandler,
 }
 
 function isSingleSegmentAfter(pathname: string, prefix: string): boolean {
@@ -123,6 +129,10 @@ export function matchHealthApiRoute(pathname: string): HealthApiRoute | null {
       return 'nutrition-entries'
     case '/api/nutrition/foods':
       return 'nutrition-foods'
+    case '/api/nutrition/targets':
+      return 'nutrition-targets'
+    case '/api/nutrition/barcode/save':
+      return 'nutrition-barcode'
     case '/api/nutrition/import/legacy/preview':
     case '/api/nutrition/import/legacy/commit':
       return 'nutrition-legacy-import'
@@ -146,6 +156,9 @@ export function matchHealthApiRoute(pathname: string): HealthApiRoute | null {
   }
   if (isSingleSegmentAfter(pathname, '/api/nutrition/foods/')) {
     return 'nutrition-food-detail'
+  }
+  if (isSingleSegmentAfter(pathname, '/api/nutrition/barcode/')) {
+    return 'nutrition-barcode'
   }
   return null
 }

@@ -127,9 +127,12 @@ describe('Vercel function module specifiers', () => {
         'server/handlers/nutrition-foods.ts',
         'server/handlers/nutrition-food-detail.ts',
         'server/handlers/nutrition-legacy-import.ts',
+        'server/handlers/nutrition-targets.ts',
+        'server/handlers/nutrition-barcode.ts',
         'server/nutrition/service.ts',
         'server/nutrition/queries.ts',
         'server/nutrition/migrate.ts',
+        'server/nutrition/providers/open-food-facts.ts',
         'src/domain/nutrition/index.ts',
       ]),
     )
