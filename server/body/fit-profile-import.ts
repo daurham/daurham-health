@@ -260,20 +260,55 @@ export async function commitFitProfileImport(input: {
 
   try {
     await sql.transaction(queries)
-  } catch {
+  } catch (error) {
+    const message = formatDatabaseError(error)
+    console.error('fit-profile-commit-failed', {
+      candidateCount: candidates.length,
+      selectedCount: selectedCandidates.length,
+      reason: message.includes('does not exist') ? 'missing_relation' : 'transaction_failed',
+    })
+    if (message.includes('does not exist')) {
+      throw new HttpError(
+        503,
+        'Body measurement tables are not available. Apply pending migrations.',
+      )
+    }
     throw new HttpError(500, 'Import could not be completed')
   }
 
   const [job] = (await sql.query(
-    `SELECT inserted_count, matched_count, skipped_count, error_count
-     FROM import_jobs WHERE id = $1`,
+    `SELECT
+       job.inserted_count,
+       job.matched_count,
+       job.skipped_count,
+       job.error_count,
+       (SELECT COUNT(*)::int FROM source_record_links WHERE import_job_id = job.id) AS claimed_count,
+       (SELECT COUNT(*)::int
+          FROM body_metrics AS metric
+          JOIN body_measurement_sessions AS session
+            ON session.id = metric.measurement_session_id
+         WHERE session.import_job_id = job.id) AS metric_count
+     FROM import_jobs AS job
+     WHERE job.id = $1`,
     [jobId],
   )) as Array<{
     inserted_count: number
     matched_count: number
     skipped_count: number
     error_count: number
+    claimed_count: number
+    metric_count: number
   }>
+
+  console.info('fit-profile-commit', {
+    candidateCount: candidates.length,
+    selectedCount: selectedCandidates.length,
+    claimedCount: job?.claimed_count ?? 0,
+    insertedSessionCount: job?.inserted_count ?? 0,
+    insertedMetricCount: job?.metric_count ?? 0,
+    matchedCount: job?.matched_count ?? 0,
+    skippedCount: job?.skipped_count ?? 0,
+  })
 
   return fitProfileCommitResponseSchema.parse({
     importJobId: jobId,

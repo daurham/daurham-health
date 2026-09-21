@@ -11,6 +11,7 @@ import {
   fetchBodyMeasurements,
   previewFitProfile,
 } from './api'
+import { selectedFingerprints, selectionFromPreview } from './import-state'
 
 function browserTimeZone(): string {
   try {
@@ -61,6 +62,7 @@ export function BodyPage() {
   const [preview, setPreview] = useState<FitProfilePreviewResponse | null>(null)
   const [selected, setSelected] = useState<Record<string, boolean>>({})
   const [busy, setBusy] = useState<'preview' | 'commit' | null>(null)
+  const [importNotice, setImportNotice] = useState<string | null>(null)
 
   async function reloadHistory() {
     const next = await fetchBodyMeasurements()
@@ -90,24 +92,21 @@ export function BodyPage() {
     }
   }, [])
 
-  const selectedFingerprints = useMemo(
-    () => Object.entries(selected).filter(([, value]) => value).map(([key]) => key),
+  const selectedFingerprintList = useMemo(
+    () => selectedFingerprints(selected),
     [selected],
   )
 
   async function onPreview(nextFile: File) {
     setError(null)
+    setImportNotice(null)
     setPreview(null)
     setFile(nextFile)
     setBusy('preview')
     try {
       const result = await previewFitProfile(nextFile, timezone)
       setPreview(result)
-      const initial: Record<string, boolean> = {}
-      for (const candidate of result.candidates) {
-        initial[candidate.fingerprint] = candidate.selectedByDefault
-      }
-      setSelected(initial)
+      setSelected(selectionFromPreview(result.candidates))
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Preview failed')
     } finally {
@@ -116,17 +115,23 @@ export function BodyPage() {
   }
 
   async function onCommit() {
-    if (!file || selectedFingerprints.length === 0) {
+    if (!file || selectedFingerprintList.length === 0) {
       return
     }
     setError(null)
+    setImportNotice(null)
     setBusy('commit')
     try {
-      await commitFitProfile(file, timezone, selectedFingerprints)
+      const result = await commitFitProfile(file, timezone, selectedFingerprintList)
       setPreview(null)
       setFile(null)
       setSelected({})
       await reloadHistory()
+      setImportNotice(
+        result.insertedCount > 0
+          ? `Saved ${result.insertedCount} measurement${result.insertedCount === 1 ? '' : 's'} to Body history.`
+          : 'No new measurements were saved. Selected rows were duplicates or unmatched.',
+      )
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Import failed')
     } finally {
@@ -157,7 +162,7 @@ export function BodyPage() {
         onCommit={() => {
           void onCommit()
         }}
-        canCommit={selectedFingerprints.length > 0 && busy == null}
+        canCommit={selectedFingerprintList.length > 0 && busy == null}
       />
 
       {error ? (
@@ -166,13 +171,21 @@ export function BodyPage() {
         </p>
       ) : null}
 
+      {importNotice && !error ? (
+        <p className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+          {importNotice}
+        </p>
+      ) : null}
+
       <div>
-        <h2 className="text-lg font-semibold tracking-tight">Measurement history</h2>
+        <h2 className="text-lg font-semibold tracking-tight">Saved measurements</h2>
         {loading ? (
           <p className="mt-3 text-sm text-zinc-600">Loading measurements…</p>
         ) : sessions.length === 0 ? (
           <p className="mt-3 text-sm text-zinc-600">
-            {error ? 'History is unavailable until Body tables are migrated.' : 'No measurements yet.'}
+            {error
+              ? 'History is unavailable until Body tables are migrated.'
+              : 'No saved measurements yet. Choosing a file only previews it — click Import to write to Neon.'}
           </p>
         ) : (
           <ul className="mt-4 space-y-3">
@@ -209,7 +222,8 @@ function ImportPanel({
     <div className="rounded-lg border border-zinc-200 bg-white p-4">
       <h2 className="text-lg font-semibold tracking-tight">Import Scale Data</h2>
       <p className="mt-1 text-sm text-zinc-600">
-        Fit Profile XLSX. Times are interpreted in {timezone}.
+        Fit Profile XLSX. Times are interpreted in {timezone}. Choosing a file only
+        previews rows — it does not save Body history.
       </p>
       <label className="mt-4 block">
         <span className="sr-only">Choose Fit Profile XLSX</span>
@@ -230,8 +244,12 @@ function ImportPanel({
       ) : null}
 
       {preview ? (
-        <div className="mt-5 space-y-3">
-          <p className="text-sm font-medium text-zinc-800">Fit Profile Import</p>
+        <div className="mt-5 space-y-3 rounded-md border border-dashed border-amber-300 bg-amber-50/60 p-3">
+          <p className="text-sm font-medium text-amber-900">Preview — not saved</p>
+          <p className="text-sm text-amber-800">
+            Select the rows to keep, then click Import to write them to Neon. Refreshing
+            the page discards this preview.
+          </p>
           {preview.candidates.map((candidate) => (
             <PreviewRow
               key={candidate.fingerprint}
@@ -251,7 +269,7 @@ function ImportPanel({
             disabled={!canCommit}
             onClick={onCommit}
           >
-            {busy === 'commit' ? 'Importing…' : 'Import'}
+            {busy === 'commit' ? 'Importing…' : 'Import selected to Body history'}
           </button>
         </div>
       ) : null}
@@ -285,8 +303,8 @@ function PreviewRow({
           <p className="font-medium">
             {formatWhen(new Date(candidate.measuredAt), candidate.timezone)}
           </p>
-          <p className={cn('text-xs font-medium', candidate.duplicate ? 'text-amber-700' : 'text-emerald-700')}>
-            {candidate.duplicate ? 'Already imported' : 'New'}
+          <p className={cn('text-xs font-medium', candidate.duplicate ? 'text-amber-700' : 'text-amber-900')}>
+            {candidate.duplicate ? 'Already imported' : 'Preview · not saved'}
           </p>
         </div>
         <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-sm sm:grid-cols-4">

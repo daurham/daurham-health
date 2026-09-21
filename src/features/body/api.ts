@@ -49,7 +49,7 @@ export async function commitFitProfile(
   file: File,
   timezone: string,
   fingerprints: string[],
-): Promise<{ insertedCount: number; matchedCount: number }> {
+) {
   const form = new FormData()
   form.set('file', file)
   form.set('timezone', timezone)

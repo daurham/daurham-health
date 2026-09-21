@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { BODY_MEASUREMENT_SESSION_ENTITY } from '../src/domain/body-metrics.ts'
 import { buildCandidateCommitStatements } from '../server/body/fit-profile-import.ts'
@@ -20,6 +22,15 @@ function candidateAt(measureTime: string) {
 }
 
 describe('duplicate-safe claim SQL', () => {
+  it('can claim source_record_links before the session exists because entity_id is not a foreign key', () => {
+    const foundation = readFileSync(path.join('migrations', '0001_health_foundation.sql'), 'utf8')
+    expect(foundation).toMatch(/entity_id UUID NOT NULL/)
+    expect(foundation).not.toMatch(/entity_id UUID NOT NULL\s+REFERENCES/)
+    expect(CLAIM_AND_INSERT_SESSION_SQL.indexOf('INSERT INTO source_record_links')).toBeLessThan(
+      CLAIM_AND_INSERT_SESSION_SQL.indexOf('INSERT INTO body_measurement_sessions'),
+    )
+  })
+
   it('claims the fingerprint before inserting a session, and uses the claimed entity_id', () => {
     expect(CLAIM_AND_INSERT_SESSION_SQL).toMatch(
       /INSERT INTO source_record_links[\s\S]*ON CONFLICT \(source_id, external_fingerprint\) DO NOTHING[\s\S]*RETURNING entity_id/,
