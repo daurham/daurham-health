@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { getTranscriptionJob } from '../../../../server/training/transcription.js'
 import { HOME_AI_JOB_ID_RE } from '../../../../src/domain/training-transcription.js'
+import { withOwnerAuth } from '../../../../server/auth/with-owner.js'
 import {
   handleApiError,
   pathParamAfter,
@@ -16,7 +17,7 @@ export function transcriptionJobIdFromRequest(req: ApiRequest): string | null {
   return queryStringParam(req, 'id') ?? pathParamAfter(req, JOB_PATH_PREFIX)
 }
 
-export default async function handler(req: ApiRequest, res: ApiResponse) {
+export default withOwnerAuth(async function transcriptionJobHandler(req: ApiRequest, res: ApiResponse) {
   try {
     if (req.method !== 'GET') {
       res.setHeader('Allow', 'GET')
@@ -32,4 +33,4 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
   } catch (error) {
     handleApiError(res, error)
   }
-}
+})

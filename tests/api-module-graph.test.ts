@@ -57,7 +57,13 @@ describe('Vercel function module specifiers', () => {
     const files = graph.map((entry) => entry.file)
     expect(files).toEqual(
       expect.arrayContaining([
-        'api/health.ts',
+        'api/session.ts',
+        'api/auth/[...path].ts',
+        'server/auth/config.ts',
+        'server/auth/owner.ts',
+        'server/auth/with-owner.ts',
+        'server/auth/proxy.ts',
+        'server/auth/node-request.ts',
         'api/body/measurements.ts',
         'api/body/import/fit-profile/preview.ts',
         'api/body/import/fit-profile/commit.ts',

@@ -1,4 +1,5 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { LockedScreen, useAuth } from '@/auth'
 import { cn } from '@/lib'
 import type { NavItem } from '@/types'
 
@@ -11,11 +12,28 @@ const navItems: NavItem[] = [
 ]
 
 export function Layout() {
+  const { status, signOut } = useAuth()
+  const location = useLocation()
+  const onSignIn = location.pathname === '/sign-in'
+
   return (
     <div className="min-h-screen bg-zinc-50 text-zinc-900">
       <header className="border-b border-zinc-200 bg-white">
         <div className="mx-auto max-w-5xl px-4 py-3">
-          <p className="text-sm font-semibold tracking-tight">Daurham Health</p>
+          <div className="flex items-start justify-between gap-3">
+            <p className="text-sm font-semibold tracking-tight">Daurham Health</p>
+            {status === 'owner' || status === 'unauthorized' ? (
+              <button
+                type="button"
+                onClick={() => {
+                  void signOut()
+                }}
+                className="text-sm text-zinc-500 hover:text-zinc-900"
+              >
+                Sign out
+              </button>
+            ) : null}
+          </div>
           <nav className="mt-3 flex flex-wrap gap-1">
             {navItems.map((item) => (
               <NavLink
@@ -38,7 +56,30 @@ export function Layout() {
         </div>
       </header>
       <main className="mx-auto max-w-5xl px-4 py-8">
-        <Outlet />
+        {status === 'loading' ? (
+          <p className="text-zinc-600">Loading…</p>
+        ) : status === 'anonymous' && onSignIn ? (
+          <Outlet />
+        ) : status === 'anonymous' ? (
+          <LockedScreen
+            title="Private Health data"
+            body="This is a personal Health app. Sign in as the owner to view and record real data."
+            action={{ to: '/sign-in', label: 'Owner Sign In' }}
+          />
+        ) : status === 'unauthorized' ? (
+          <LockedScreen
+            title="This account is not authorized"
+            body="You are signed in, but this Health app only serves its owner. Sign out and use the owner account."
+            action={{
+              onClick: () => {
+                void signOut()
+              },
+              label: 'Sign out',
+            }}
+          />
+        ) : (
+          <Outlet />
+        )}
       </main>
     </div>
   )

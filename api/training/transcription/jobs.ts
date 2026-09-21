@@ -1,4 +1,5 @@
 import { createTranscriptionJob } from '../../../server/training/transcription.js'
+import { withOwnerAuth } from '../../../server/auth/with-owner.js'
 import { handleApiError, sendJson, type ApiRequest, type ApiResponse } from '../../../server/http.js'
 
 export const config = {
@@ -7,7 +8,7 @@ export const config = {
   },
 }
 
-export default async function handler(req: ApiRequest, res: ApiResponse) {
+export default withOwnerAuth(async function transcriptionJobsHandler(req: ApiRequest, res: ApiResponse) {
   try {
     if (req.method !== 'POST') {
       res.setHeader('Allow', 'POST')
@@ -18,4 +19,4 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
   } catch (error) {
     handleApiError(res, error)
   }
-}
+})

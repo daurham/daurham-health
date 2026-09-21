@@ -1,7 +1,8 @@
 import { listBodyMeasurements } from '../../server/body/fit-profile-import.js'
+import { withOwnerAuth } from '../../server/auth/with-owner.js'
 import { handleApiError, sendJson, type ApiRequest, type ApiResponse } from '../../server/http.js'
 
-export default async function handler(req: ApiRequest, res: ApiResponse) {
+async function measurementsHandler(req: ApiRequest, res: ApiResponse) {
   try {
     if (req.method !== 'GET') {
       res.setHeader('Allow', 'GET')
@@ -14,3 +15,5 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     handleApiError(res, error)
   }
 }
+
+export default withOwnerAuth(measurementsHandler)

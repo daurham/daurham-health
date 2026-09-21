@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { createImportedSession } from '../../../server/training/service.js'
 import { HOME_AI_JOB_ID_RE } from '../../../src/domain/training-transcription.js'
+import { withOwnerAuth } from '../../../server/auth/with-owner.js'
 import {
   handleApiError,
   readJsonBody,
@@ -15,7 +16,7 @@ const commitEnvelopeSchema = z
   })
   .passthrough()
 
-export default async function handler(req: ApiRequest, res: ApiResponse) {
+export default withOwnerAuth(async function transcriptionCommitHandler(req: ApiRequest, res: ApiResponse) {
   try {
     if (req.method !== 'POST') {
       res.setHeader('Allow', 'POST')
@@ -33,4 +34,4 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
   } catch (error) {
     handleApiError(res, error)
   }
-}
+})

@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { getSession } from '../../../server/training/service.js'
+import { withOwnerAuth } from '../../../server/auth/with-owner.js'
 import {
   handleApiError,
   pathParamAfter,
@@ -17,7 +18,7 @@ export function sessionIdFromRequest(req: ApiRequest): string | null {
   return queryStringParam(req, 'id') ?? pathParamAfter(req, SESSION_PATH_PREFIX)
 }
 
-export default async function handler(req: ApiRequest, res: ApiResponse) {
+export default withOwnerAuth(async function sessionDetailHandler(req: ApiRequest, res: ApiResponse) {
   try {
     if (req.method !== 'GET') {
       res.setHeader('Allow', 'GET')
@@ -33,4 +34,4 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
   } catch (error) {
     handleApiError(res, error)
   }
-}
+})

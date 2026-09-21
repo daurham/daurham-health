@@ -21,7 +21,7 @@ function apiFileFromUrl(root: string, url: string): string | null {
   if (!pathname.startsWith('/api/')) {
     return null
   }
-  const exact = safeApiFile(root, `${pathname.slice(1)}.ts`)
+      const exact = safeApiFile(root, `${pathname.slice(1)}.ts`)
   if (exact) {
     return exact
   }
@@ -30,7 +30,17 @@ function apiFileFromUrl(root: string, url: string): string | null {
     return null
   }
   const dynamicRelative = `${[...parts.slice(0, -1), '[id]'].join('/')}.ts`
-  return safeApiFile(root, dynamicRelative)
+  const dynamic = safeApiFile(root, dynamicRelative)
+  if (dynamic) {
+    return dynamic
+  }
+  for (let index = parts.length - 1; index >= 1; index -= 1) {
+    const catchAll = safeApiFile(root, `${[...parts.slice(0, index), '[...path]'].join('/')}.ts`)
+    if (catchAll) {
+      return catchAll
+    }
+  }
+  return null
 }
 
 export function healthApiDevPlugin(): Plugin {

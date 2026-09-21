@@ -8,22 +8,12 @@ import {
   type FitProfilePreviewResponse,
 } from '@/domain/body'
 
-async function readError(response: Response): Promise<string> {
-  try {
-    const body = (await response.json()) as { error?: unknown }
-    if (typeof body.error === 'string' && body.error.length > 0) {
-      return body.error
-    }
-  } catch {
-    // Fall through to a generic message.
-  }
-  return 'Request failed'
-}
+import { healthFetch, readApiError } from '@/lib'
 
 export async function fetchBodyMeasurements(): Promise<BodyMeasurementSession[]> {
-  const response = await fetch('/api/body/measurements')
+  const response = await healthFetch('/api/body/measurements')
   if (!response.ok) {
-    throw new Error(await readError(response))
+    throw new Error(await readApiError(response))
   }
   return bodyHistoryResponseSchema.parse(await response.json()).sessions
 }
@@ -35,12 +25,12 @@ export async function previewFitProfile(
   const form = new FormData()
   form.set('file', file)
   form.set('timezone', timezone)
-  const response = await fetch('/api/body/import/fit-profile/preview', {
+  const response = await healthFetch('/api/body/import/fit-profile/preview', {
     method: 'POST',
     body: form,
   })
   if (!response.ok) {
-    throw new Error(await readError(response))
+    throw new Error(await readApiError(response))
   }
   return fitProfilePreviewResponseSchema.parse(await response.json())
 }
@@ -54,12 +44,12 @@ export async function commitFitProfile(
   form.set('file', file)
   form.set('timezone', timezone)
   form.set('fingerprints', JSON.stringify(fingerprints))
-  const response = await fetch('/api/body/import/fit-profile/commit', {
+  const response = await healthFetch('/api/body/import/fit-profile/commit', {
     method: 'POST',
     body: form,
   })
   if (!response.ok) {
-    throw new Error(await readError(response))
+    throw new Error(await readApiError(response))
   }
   return fitProfileCommitResponseSchema.parse(await response.json())
 }

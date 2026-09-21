@@ -9,6 +9,10 @@ import {
   type WorkoutDraft,
 } from './draft'
 import {
+  WorkoutPhotoPrepareError,
+  prepareWorkoutPhoto,
+} from './prepare-workout-photo'
+import {
   clearStoredTranscriptionJobId,
   readStoredTranscriptionJobId,
   storeTranscriptionJobId,
@@ -28,6 +32,7 @@ export function ImportWorkoutPage() {
   const [error, setError] = useState<string | null>(null)
   const [pollError, setPollError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [preparing, setPreparing] = useState(false)
   const [uploading, setUploading] = useState(false)
   const incomingFile = (location.state as { file?: File } | null)?.file
 
@@ -98,9 +103,23 @@ export function ImportWorkoutPage() {
   async function startJob(file: File) {
     setError(null)
     setFailure(null)
+    setPreparing(true)
+    let preparedFile: File
+    try {
+      preparedFile = (await prepareWorkoutPhoto(file)).file
+    } catch (caught) {
+      setPreparing(false)
+      setError(
+        caught instanceof WorkoutPhotoPrepareError
+          ? caught.message
+          : 'Could not prepare that photo. Try another JPEG or PNG.',
+      )
+      return
+    }
+    setPreparing(false)
     setUploading(true)
     try {
-      const created = await createTranscriptionJob(file)
+      const created = await createTranscriptionJob(preparedFile)
       storeTranscriptionJobId(created.id)
       setJobId(created.id)
       setStatus(created.status)
@@ -141,6 +160,20 @@ export function ImportWorkoutPage() {
   }
 
   const analyzing = jobId != null && draft == null && failure == null
+  const heading = analyzing
+    ? 'Analyzing workout'
+    : preparing
+      ? 'Preparing photo…'
+      : uploading
+        ? 'Uploading…'
+        : 'Import Workout Photo'
+  const blurb = analyzing
+    ? 'Your home AI is reading the workout sheet. This usually takes a few minutes.'
+    : preparing
+      ? 'Getting the photo ready to send.'
+      : uploading
+        ? 'Sending the photo to your home AI.'
+        : 'Take a photo of a completed A/B/C sheet. Health will send it to your home AI for review — nothing is saved until you confirm.'
 
   return (
     <section className="space-y-6">
@@ -176,14 +209,8 @@ export function ImportWorkoutPage() {
       ) : (
         <>
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">
-              {analyzing ? 'Analyzing workout' : 'Import Workout Photo'}
-            </h1>
-            <p className="mt-2 text-zinc-600">
-              {analyzing
-                ? 'Your home AI is reading the workout sheet. This usually takes a few minutes.'
-                : 'Take a photo of a completed A/B/C sheet. Health will send it to your home AI for review — nothing is saved until you confirm.'}
-            </p>
+            <h1 className="text-2xl font-semibold tracking-tight">{heading}</h1>
+            <p className="mt-2 text-zinc-600">{blurb}</p>
           </div>
 
           {error ? (
@@ -225,10 +252,10 @@ export function ImportWorkoutPage() {
               <button
                 type="button"
                 className="inline-flex min-h-11 items-center justify-center rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:bg-zinc-300"
-                disabled={uploading}
+                disabled={preparing || uploading}
                 onClick={() => fileInputRef.current?.click()}
               >
-                {uploading ? 'Uploading…' : 'Choose photo'}
+                {preparing ? 'Preparing photo…' : uploading ? 'Uploading…' : 'Choose photo'}
               </button>
               {failure ? (
                 <button

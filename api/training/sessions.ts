@@ -1,13 +1,8 @@
 import { createManualSession, listSessions } from '../../server/training/service.js'
-import {
-  handleApiError,
-  readJsonBody,
-  sendJson,
-  type ApiRequest,
-  type ApiResponse,
-} from '../../server/http.js'
+import { withOwnerAuth } from '../../server/auth/with-owner.js'
+import { handleApiError, readJsonBody, sendJson, type ApiRequest, type ApiResponse } from '../../server/http.js'
 
-export default async function handler(req: ApiRequest, res: ApiResponse) {
+async function sessionsHandler(req: ApiRequest, res: ApiResponse) {
   try {
     if (req.method === 'GET') {
       sendJson(res, 200, await listSessions())
@@ -24,3 +19,5 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     handleApiError(res, error)
   }
 }
+
+export default withOwnerAuth(sessionsHandler)
