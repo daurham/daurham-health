@@ -12,6 +12,7 @@ import trainingTemplatesHandler from './handlers/training-templates.js'
 import transcriptionCommitHandler from './handlers/transcription-commit.js'
 import transcriptionJobDetailHandler from './handlers/transcription-job-detail.js'
 import transcriptionJobsHandler from './handlers/transcription-jobs.js'
+import progressOverviewHandler from './handlers/progress-overview.js'
 
 export type HealthApiRoute =
   | 'health'
@@ -27,6 +28,7 @@ export type HealthApiRoute =
   | 'transcription-jobs'
   | 'transcription-job-detail'
   | 'transcription-commit'
+  | 'progress-overview'
 
 type HealthApiHandler = (req: ApiRequest, res: ApiResponse) => unknown | Promise<unknown>
 
@@ -44,6 +46,7 @@ const HANDLERS: Record<HealthApiRoute, HealthApiHandler> = {
   'transcription-jobs': transcriptionJobsHandler,
   'transcription-job-detail': transcriptionJobDetailHandler,
   'transcription-commit': transcriptionCommitHandler,
+  'progress-overview': progressOverviewHandler,
 }
 
 function isSingleSegmentAfter(pathname: string, prefix: string): boolean {
@@ -76,6 +79,8 @@ export function matchHealthApiRoute(pathname: string): HealthApiRoute | null {
       return 'transcription-jobs'
     case '/api/training/transcription/commit':
       return 'transcription-commit'
+    case '/api/progress/overview':
+      return 'progress-overview'
     default:
       break
   }

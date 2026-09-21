@@ -96,6 +96,7 @@ describe('Vercel nested API routing', () => {
     expect(matchHealthApiRoute('/api/body/import/fit-profile/preview')).toBe('fit-profile-preview')
     expect(matchHealthApiRoute(`/api/training/sessions/${SESSION_ID}`)).toBe('training-session-detail')
     expect(matchHealthApiRoute('/api/training/transcription/jobs')).toBe('transcription-jobs')
+    expect(matchHealthApiRoute('/api/progress/overview')).toBe('progress-overview')
     expect(matchHealthApiRoute(`/api/training/transcription/jobs/${JOB_ID}`)).toBe(
       'transcription-job-detail',
     )
@@ -168,6 +169,13 @@ describe('api/index after Vercel nested rewrite', () => {
 
     const commit = await hit('POST', '/api/training/transcription/commit')
     expect(isDeniedPrivate(commit.status())).toBe(true)
+  })
+
+  it('protects GET /api/progress/overview', async () => {
+    const captured = await hit('GET', '/api/progress/overview?range=30d')
+    expect(captured.status()).not.toBe(404)
+    expect(captured.status()).not.toBe(405)
+    expect(isDeniedPrivate(captured.status())).toBe(true)
   })
 
   it('returns 404 for unknown API routes and 405 for unsupported methods', async () => {

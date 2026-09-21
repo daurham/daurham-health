@@ -109,11 +109,29 @@ export function pathParamAfter(req: ApiRequest, prefix: string): string | null {
 /** Single string query value. Arrays, blanks, and non-strings are ignored. */
 export function queryStringParam(req: ApiRequest, name: string): string | null {
   const value = req.query?.[name]
-  if (typeof value !== 'string') {
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if (trimmed.length > 0) {
+      return trimmed
+    }
+  }
+  return null
+}
+
+/** Query value from Vercel req.query or the request URL (Vite local `/api/...?...`). */
+export function requestQueryValue(req: ApiRequest, name: string): string | null {
+  const fromQuery = queryStringParam(req, name)
+  if (fromQuery) {
+    return fromQuery
+  }
+  const url = req.url ?? ''
+  const question = url.indexOf('?')
+  if (question < 0) {
     return null
   }
-  const trimmed = value.trim()
-  return trimmed.length > 0 ? trimmed : null
+  const params = new URLSearchParams(url.slice(question + 1))
+  const value = params.get(name)?.trim()
+  return value && value.length > 0 ? value : null
 }
 
 export async function readJsonBody(req: ApiRequest, maxBytes = MAX_UPLOAD_BYTES): Promise<unknown> {

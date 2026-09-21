@@ -109,10 +109,16 @@ describe('Vercel function module specifiers', () => {
         'server/handlers/transcription-jobs.ts',
         'server/handlers/transcription-job-detail.ts',
         'server/handlers/transcription-commit.ts',
+        'server/handlers/progress-overview.ts',
+        'server/progress/service.ts',
+        'server/progress/queries.ts',
+        'src/domain/progress/index.ts',
+        'src/domain/progress/overview.ts',
       ]),
     )
     expect(files).not.toContain('server/dev-api-plugin.ts')
     expect(files).not.toContain('server/migrate.ts')
+    expect(files).not.toContain('server/progress/inspect.ts')
   })
 
   it('uses Node ESM .js specifiers so compiled functions do not import .ts paths', () => {
