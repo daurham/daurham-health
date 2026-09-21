@@ -3,13 +3,7 @@ import { handleApiError, sendJson, type ApiRequest, type ApiResponse } from '../
 import { getNeonAuthProxyConfig } from './config.js'
 import { authProxyPath, incomingToWebRequest, writeWebResponse } from './node-request.js'
 
-const BLOCKED_AUTH_PATHS = new Set([
-  'sign-up',
-  'sign-up/email',
-  'forget-password',
-  'request-password-reset',
-  'reset-password',
-])
+const BLOCKED_AUTH_PATHS = new Set(['sign-up', 'sign-up/email', 'forget-password'])
 
 export async function proxyNeonAuth(req: ApiRequest, res: ApiResponse): Promise<void> {
   try {

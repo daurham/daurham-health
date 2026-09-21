@@ -231,6 +231,33 @@ describe('auth proxy blocks public registration', () => {
     )
     expect(captured.status()).toBe(404)
   })
+
+  it('forwards password-reset operations through the existing /api/auth proxy', async () => {
+    const { proxyNeonAuth } = await import('../server/auth/proxy.ts')
+    const requestReset = captureResponse()
+    await proxyNeonAuth(
+      {
+        method: 'POST',
+        url: '/api/auth/request-password-reset',
+        headers: {},
+        async *[Symbol.asyncIterator]() {},
+      } as ApiRequest,
+      requestReset.res,
+    )
+    expect(requestReset.status()).not.toBe(404)
+
+    const reset = captureResponse()
+    await proxyNeonAuth(
+      {
+        method: 'POST',
+        url: '/api/auth/reset-password',
+        headers: {},
+        async *[Symbol.asyncIterator]() {},
+      } as ApiRequest,
+      reset.res,
+    )
+    expect(reset.status()).not.toBe(404)
+  })
 })
 
 describe('client auth sources do not embed server secrets', () => {
@@ -241,6 +268,8 @@ describe('client auth sources do not embed server secrets', () => {
       'src/auth/client.ts',
       'src/auth/AuthProvider.tsx',
       'src/auth/SignInPage.tsx',
+      'src/auth/ResetPasswordPage.tsx',
+      'src/auth/password.ts',
       'src/lib/health-api.ts',
     ]
     for (const file of files) {

@@ -1,5 +1,5 @@
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
-import { SignInPage } from '@/auth'
+import { ResetPasswordPage, SignInPage } from '@/auth'
 import { Layout } from '@/components'
 import { BodyPage } from '@/features/body'
 import { NutritionPage } from '@/features/nutrition'
@@ -21,6 +21,7 @@ const router = createBrowserRouter([
       { path: 'body', element: <BodyPage /> },
       { path: 'progress', element: <ProgressPage /> },
       { path: 'sign-in', element: <SignInPage /> },
+      { path: 'reset-password', element: <ResetPasswordPage /> },
     ],
   },
 ])

@@ -90,7 +90,9 @@ describe('Vercel nested API routing', () => {
     expect(matchHealthApiRoute('/api/auth/sign-in/email')).toBe('auth')
     expect(matchHealthApiRoute('/api/auth/get-session')).toBe('auth')
     expect(matchHealthApiRoute('/api/auth/sign-out')).toBe('auth')
-    expect(matchHealthApiRoute('/api/auth/send-verification-email')).toBe('auth')
+    expect(matchHealthApiRoute('/api/auth/request-password-reset')).toBe('auth')
+    expect(matchHealthApiRoute('/api/auth/reset-password')).toBe('auth')
+    expect(matchHealthApiRoute('/api/auth/reset-password/reset-token')).toBe('auth')
     expect(matchHealthApiRoute('/api/body/import/fit-profile/preview')).toBe('fit-profile-preview')
     expect(matchHealthApiRoute(`/api/training/sessions/${SESSION_ID}`)).toBe('training-session-detail')
     expect(matchHealthApiRoute(`/api/training/transcription/jobs/${JOB_ID}`)).toBe(
@@ -123,6 +125,15 @@ describe('api/index after Vercel nested rewrite', () => {
 
     const verify = await hit('POST', '/api/auth/send-verification-email')
     expect(verify.status()).not.toBe(404)
+
+    const requestReset = await hit('POST', '/api/auth/request-password-reset')
+    expect(requestReset.status()).not.toBe(404)
+
+    const reset = await hit('POST', '/api/auth/reset-password')
+    expect(reset.status()).not.toBe(404)
+
+    const callback = await hit('GET', '/api/auth/reset-password/reset-token')
+    expect(callback.status()).not.toBe(404)
   })
 
   it('protects nested Body import routes', async () => {

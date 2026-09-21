@@ -14,7 +14,7 @@ const navItems: NavItem[] = [
 export function Layout() {
   const { status, signOut } = useAuth()
   const location = useLocation()
-  const onSignIn = location.pathname === '/sign-in'
+  const publicAuthRoute = location.pathname === '/sign-in' || location.pathname === '/reset-password'
 
   return (
     <div className="min-h-screen bg-zinc-50 text-zinc-900">
@@ -56,10 +56,10 @@ export function Layout() {
         </div>
       </header>
       <main className="mx-auto max-w-5xl px-4 py-8">
-        {status === 'loading' ? (
-          <p className="text-zinc-600">Loading…</p>
-        ) : status === 'anonymous' && onSignIn ? (
+        {publicAuthRoute ? (
           <Outlet />
+        ) : status === 'loading' ? (
+          <p className="text-zinc-600">Loading…</p>
         ) : status === 'anonymous' ? (
           <LockedScreen
             title="Private Health data"
