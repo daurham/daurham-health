@@ -1,9 +1,9 @@
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import { Layout } from '@/components'
 import { BodyPage } from '@/features/body'
-import { DashboardPage } from '@/features/dashboard'
-import { InsightsPage } from '@/features/insights'
 import { NutritionPage } from '@/features/nutrition'
+import { ProgressPage } from '@/features/progress'
+import { TodayPage } from '@/features/today'
 import { TrainingPage } from '@/features/training'
 
 const router = createBrowserRouter([
@@ -11,11 +11,11 @@ const router = createBrowserRouter([
     path: '/',
     element: <Layout />,
     children: [
-      { index: true, element: <DashboardPage /> },
+      { index: true, element: <TodayPage /> },
       { path: 'nutrition', element: <NutritionPage /> },
       { path: 'training', element: <TrainingPage /> },
       { path: 'body', element: <BodyPage /> },
-      { path: 'insights', element: <InsightsPage /> },
+      { path: 'progress', element: <ProgressPage /> },
     ],
   },
 ])

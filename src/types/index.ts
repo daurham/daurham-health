@@ -1,9 +1,9 @@
 export type FeatureId =
-  | 'dashboard'
+  | 'today'
   | 'nutrition'
   | 'training'
   | 'body'
-  | 'insights'
+  | 'progress'
 
 export type NavItem = {
   id: FeatureId

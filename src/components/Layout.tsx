@@ -3,11 +3,11 @@ import { cn } from '@/lib'
 import type { NavItem } from '@/types'
 
 const navItems: NavItem[] = [
-  { id: 'dashboard', to: '/', label: 'Dashboard' },
+  { id: 'today', to: '/', label: 'Today' },
   { id: 'nutrition', to: '/nutrition', label: 'Nutrition' },
   { id: 'training', to: '/training', label: 'Training' },
   { id: 'body', to: '/body', label: 'Body' },
-  { id: 'insights', to: '/insights', label: 'Insights' },
+  { id: 'progress', to: '/progress', label: 'Progress' },
 ]
 
 export function Layout() {
