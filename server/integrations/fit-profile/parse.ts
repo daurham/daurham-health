@@ -8,9 +8,9 @@ import {
   FIT_PROFILE_VENDOR_HEADERS,
   displayValueForMetric,
   normalizeFitProfileMetric,
-} from '../../../src/domain/body-metrics.ts'
-import { parseWallClockInTimeZone } from '../../../src/domain/time.ts'
-import { fitProfileFingerprint } from './fingerprint.ts'
+} from '../../../src/domain/body-metrics.js'
+import { parseWallClockInTimeZone } from '../../../src/domain/time.js'
+import { fitProfileFingerprint } from './fingerprint.js'
 
 export class FitProfileParseError extends Error {
   readonly statusCode: number

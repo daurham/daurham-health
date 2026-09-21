@@ -1,14 +1,14 @@
-import { assertIanaTimeZone } from '../../src/domain/time.ts'
+import { assertIanaTimeZone } from '../../src/domain/time.js'
 import {
   commitFitProfileImport,
   previewFitProfileImport,
-} from './fit-profile-import.ts'
+} from './fit-profile-import.js'
 import {
   HttpError,
   isXlsxUpload,
   parseMultipart,
   type ApiRequest,
-} from '../http.ts'
+} from '../http.js'
 
 export async function readFitProfileForm(req: ApiRequest): Promise<{
   bytes: Uint8Array

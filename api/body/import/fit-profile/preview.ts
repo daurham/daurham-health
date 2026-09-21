@@ -1,6 +1,6 @@
-import { previewFitProfileImport } from '../../../../server/body/fit-profile-import.ts'
-import { readFitProfileForm } from '../../../../server/body/upload.ts'
-import { handleApiError, sendJson, type ApiRequest, type ApiResponse } from '../../../../server/http.ts'
+import { previewFitProfileImport } from '../../../../server/body/fit-profile-import.js'
+import { readFitProfileForm } from '../../../../server/body/upload.js'
+import { handleApiError, sendJson, type ApiRequest, type ApiResponse } from '../../../../server/http.js'
 
 export const config = {
   api: {

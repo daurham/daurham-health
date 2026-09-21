@@ -3,7 +3,7 @@ import {
   BODY_MEASUREMENT_SESSION_ENTITY,
   FIT_PROFILE_SOURCE_KEY,
   displayValueForMetric,
-} from '../../src/domain/body-metrics.ts'
+} from '../../src/domain/body-metrics.js'
 import {
   bodyHistoryResponseSchema,
   bodyMeasurementSessionSchema,
@@ -14,19 +14,19 @@ import {
   type BodyHistoryResponse,
   type FitProfileCommitResponse,
   type FitProfilePreviewResponse,
-} from '../../src/domain/body.ts'
-import { classifyFingerprint } from '../../src/domain/duplicates.ts'
-import { getSql, formatDatabaseError } from '../db.ts'
-import { HttpError } from '../http.ts'
+} from '../../src/domain/body.js'
+import { classifyFingerprint } from '../../src/domain/duplicates.js'
+import { getSql, formatDatabaseError } from '../db.js'
+import { HttpError } from '../http.js'
 import {
   parseFitProfileWorkbook,
   type FitProfileCandidate,
-} from '../integrations/fit-profile/parse.ts'
+} from '../integrations/fit-profile/parse.js'
 import {
   CLAIM_AND_INSERT_SESSION_SQL,
   UPDATE_IMPORT_JOB_COUNTS_SQL,
   buildMetricsInsertSql,
-} from './commit-sql.ts'
+} from './commit-sql.js'
 
 function fileSha256(bytes: Uint8Array): string {
   return createHash('sha256').update(bytes).digest('hex')

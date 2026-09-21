@@ -1,4 +1,4 @@
-import { kilogramsToPounds, poundsToKilograms } from './units'
+import { kilogramsToPounds, poundsToKilograms } from './units.js'
 
 export const FIT_PROFILE_SOURCE_KEY = 'fit_profile_xlsx' as const
 export const BODY_MEASUREMENT_SESSION_ENTITY = 'body_measurement_session' as const

@@ -3,11 +3,12 @@
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.server.tsbuildinfo",
     "target": "ES2022",
     "lib": ["ES2023"],
-    "module": "ESNext",
+    // Vercel compiles api/*.ts to .js without rewriting specifiers. Node ESM
+    // then resolves those strings as-is, so relative imports must use .js.
+    "module": "NodeNext",
     "skipLibCheck": true,
     "types": ["node"],
-    "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
+    "moduleResolution": "NodeNext",
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",
     "noEmit": true,

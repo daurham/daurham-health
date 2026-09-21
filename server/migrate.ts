@@ -2,8 +2,8 @@ import { readdir, readFile } from 'node:fs/promises'
 import path from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
-import { formatDatabaseError, getSql } from './db.ts'
-import { splitSqlStatements } from './sql.ts'
+import { formatDatabaseError, getSql } from './db.js'
+import { splitSqlStatements } from './sql.js'
 
 const MIGRATION_FILENAME = /^\d{4}_.+\.sql$/
 const HISTORY_TABLE_SQL = `

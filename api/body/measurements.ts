@@ -1,5 +1,5 @@
-import { listBodyMeasurements } from '../../server/body/fit-profile-import.ts'
-import { handleApiError, sendJson, type ApiRequest, type ApiResponse } from '../../server/http.ts'
+import { listBodyMeasurements } from '../../server/body/fit-profile-import.js'
+import { handleApiError, sendJson, type ApiRequest, type ApiResponse } from '../../server/http.js'
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
   try {

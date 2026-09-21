@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { FIT_PROFILE_SOURCE_KEY } from '../../../src/domain/body-metrics.ts'
+import { FIT_PROFILE_SOURCE_KEY } from '../../../src/domain/body-metrics.js'
 
 export type FingerprintMetric = {
   key: string

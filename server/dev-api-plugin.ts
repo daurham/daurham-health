@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Plugin, ViteDevServer } from 'vite'
-import { wrapNodeResponse } from './http.ts'
+import { wrapNodeResponse } from './http.js'
 
 function apiFileFromUrl(root: string, url: string): string | null {
   const pathname = url.split('?')[0] ?? ''

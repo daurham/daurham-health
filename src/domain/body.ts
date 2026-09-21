@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { BODY_VALUE_KINDS, CANONICAL_UNITS } from './body-metrics'
+import { BODY_VALUE_KINDS, CANONICAL_UNITS } from './body-metrics.js'
 
 const uuidSchema = z.uuid()
 const timestamptzSchema = z.coerce.date()
