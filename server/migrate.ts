@@ -81,7 +81,7 @@ export async function inspectMigrations(): Promise<
 
 async function applyMigrations(): Promise<void> {
   await loadLocalEnv()
-  const sql = getSql()
+  const sql = await getSql()
   const migrations = await inspectMigrations()
 
   await sql.query(HISTORY_TABLE_SQL)

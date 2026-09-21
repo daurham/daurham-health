@@ -1,4 +1,5 @@
 import { neon, type NeonQueryFunction } from '@neondatabase/serverless'
+import { loadLocalEnv } from './env.ts'
 
 export type Sql = NeonQueryFunction<false, false>
 
@@ -10,7 +11,8 @@ function redactSecrets(text: string): string {
   return text.split(url).join('[DATABASE_URL]')
 }
 
-export function getDatabaseUrl(): string {
+export async function getDatabaseUrl(): Promise<string> {
+  await loadLocalEnv()
   const url = process.env.DATABASE_URL
   if (typeof url !== 'string' || url.trim() === '') {
     throw new Error('Missing required environment variable: DATABASE_URL')
@@ -18,8 +20,8 @@ export function getDatabaseUrl(): string {
   return url
 }
 
-export function getSql(): Sql {
-  return neon(getDatabaseUrl())
+export async function getSql(): Promise<Sql> {
+  return neon(await getDatabaseUrl())
 }
 
 export function formatDatabaseError(error: unknown): string {
