@@ -584,11 +584,11 @@ export function isDraftSetUntouched(set: DraftSetFields): boolean {
 
 export function draftSetToManualInput(
   setNumber: number,
-  set: DraftSetFields,
+  set: DraftSetFields & { setType?: SetType },
 ): ManualWorkoutSetInputDraft {
   return {
     setNumber,
-    setType: 'working',
+    setType: set.setType ?? 'working',
     loadState: set.loadState,
     weightLb: parseOptionalNumber(set.weightLb),
     reps: parseOptionalInt(set.reps),

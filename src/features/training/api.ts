@@ -10,6 +10,11 @@ import {
   type WorkoutSessionSummary,
   type WorkoutTemplate,
 } from '@/domain/training'
+import {
+  createTranscriptionJobResponseSchema,
+  transcriptionJobResponseSchema,
+  type TranscriptionJobResponse,
+} from '@/domain/training-transcription'
 
 async function readError(response: Response): Promise<string> {
   try {
@@ -60,6 +65,42 @@ export async function createSession(request: ManualWorkoutRequest): Promise<Work
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(request),
+  })
+  if (!response.ok) {
+    throw new Error(await readError(response))
+  }
+  return createSessionResponseSchema.parse(await response.json()).session
+}
+
+export async function createTranscriptionJob(file: File): Promise<{ id: string; status: 'queued' }> {
+  const form = new FormData()
+  form.set('image', file)
+  const response = await fetch('/api/training/transcription/jobs', {
+    method: 'POST',
+    body: form,
+  })
+  if (!response.ok) {
+    throw new Error(await readError(response))
+  }
+  return createTranscriptionJobResponseSchema.parse(await response.json()).job
+}
+
+export async function fetchTranscriptionJob(jobId: string): Promise<TranscriptionJobResponse> {
+  const response = await fetch(`/api/training/transcription/jobs/${jobId}`)
+  if (!response.ok) {
+    throw new Error(await readError(response))
+  }
+  return transcriptionJobResponseSchema.parse(await response.json())
+}
+
+export async function commitImportedSession(
+  jobId: string,
+  request: ManualWorkoutRequest,
+): Promise<WorkoutSession> {
+  const response = await fetch('/api/training/transcription/commit', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ jobId, ...request }),
   })
   if (!response.ok) {
     throw new Error(await readError(response))

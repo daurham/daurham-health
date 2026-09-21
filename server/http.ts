@@ -150,7 +150,10 @@ function parseContentDisposition(value: string): { name: string; filename: strin
   }
 }
 
-export async function parseMultipart(req: ApiRequest): Promise<MultipartBody> {
+export async function parseMultipart(
+  req: ApiRequest,
+  maxBytes = MAX_UPLOAD_BYTES,
+): Promise<MultipartBody> {
   const contentType = req.headers['content-type']
   if (typeof contentType !== 'string' || !contentType.toLowerCase().includes('multipart/form-data')) {
     throw new HttpError(400, 'Expected multipart form data')
@@ -161,7 +164,7 @@ export async function parseMultipart(req: ApiRequest): Promise<MultipartBody> {
     throw new HttpError(400, 'Missing multipart boundary')
   }
 
-  const buffer = await readRequestBuffer(req)
+  const buffer = await readRequestBuffer(req, maxBytes)
   const delimiter = Buffer.from(`--${boundary}`)
   const parts: Buffer[] = []
   let offset = 0

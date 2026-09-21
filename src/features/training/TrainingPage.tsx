@@ -39,12 +39,20 @@ export function TrainingPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Training</h1>
           <p className="mt-2 text-zinc-600">Log sessions against your current templates.</p>
         </div>
-        <Link
-          to="/training/new"
-          className="inline-flex min-h-11 items-center justify-center rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white"
-        >
-          Start Workout
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            to="/training/new"
+            className="inline-flex min-h-11 items-center justify-center rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white"
+          >
+            Start Workout
+          </Link>
+          <Link
+            to="/training/import"
+            className="inline-flex min-h-11 items-center justify-center rounded-md border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-900"
+          >
+            Import Workout Photo
+          </Link>
+        </div>
       </div>
 
       {error ? (

@@ -80,6 +80,15 @@ describe('Vercel function module specifiers', () => {
         'src/domain/units.ts',
         'src/domain/training.ts',
         'server/training/service.ts',
+        'server/training/transcription.ts',
+        'server/training/commit-sql.ts',
+        'server/integrations/home-ai/client.ts',
+        'server/integrations/home-ai/config.ts',
+        'src/domain/training.ts',
+        'src/domain/training-transcription.ts',
+        'api/training/transcription/jobs.ts',
+        'api/training/transcription/jobs/[id].ts',
+        'api/training/transcription/commit.ts',
       ]),
     )
     expect(files).not.toContain('server/dev-api-plugin.ts')

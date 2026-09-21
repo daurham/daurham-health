@@ -7,6 +7,7 @@ import {
   type LoadState,
   type ManualWorkoutRequest,
   type MeasurementKind,
+  type SetType,
   type TemplatePrescription,
   type WorkoutTemplate,
 } from '@/domain/training'
@@ -14,6 +15,7 @@ import { localIsoDate } from './format'
 
 export type DraftSet = DraftSetFields & {
   setNumber: number
+  setType: SetType
 }
 
 export type DraftExercise = {
@@ -41,6 +43,7 @@ export type WorkoutDraft = {
 export function emptyDraftSet(setNumber: number): DraftSet {
   return {
     setNumber,
+    setType: 'working',
     loadState: 'external',
     weightLb: '',
     reps: '',
@@ -50,6 +53,30 @@ export function emptyDraftSet(setNumber: number): DraftSet {
     leftDurationSec: '',
     rightDurationSec: '',
     notes: '',
+  }
+}
+
+export function draftFromTranscription(
+  draft: {
+    workoutDate: string
+    durationMin: string
+    effort: number | null
+    painLevel: number | null
+    bodyweightLb: string
+    notes: string
+    exercises: DraftExercise[]
+  },
+  template: WorkoutTemplate | null,
+): WorkoutDraft {
+  return {
+    template,
+    workoutDate: draft.workoutDate,
+    durationMin: draft.durationMin,
+    effort: draft.effort,
+    painLevel: draft.painLevel,
+    bodyweightLb: draft.bodyweightLb,
+    notes: draft.notes,
+    exercises: draft.exercises,
   }
 }
 

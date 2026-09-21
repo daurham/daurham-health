@@ -24,14 +24,26 @@ import {
   type ManualWorkoutRequest,
   type SessionDetailResponse,
   type SessionListResponse,
+  type SessionSourceKind,
   type TemplateListResponse,
   type WorkoutSession,
   type WorkoutTemplate,
   type WorkoutTemplateExercise,
 } from '../../src/domain/training.js'
+import {
+  HOME_AI_PIPELINE,
+  HOME_AI_SOURCE_KEY,
+  WORKOUT_IMAGE_SOURCE_KEY,
+  WORKOUT_SESSION_ENTITY,
+  homeAiJobFingerprint,
+  provenancePayload,
+} from '../../src/domain/training-transcription.js'
 import { poundsToKilograms } from '../../src/domain/units.js'
 import { formatDatabaseError, getSql } from '../db.js'
 import { HttpError } from '../http.js'
+import type { HomeAiClient } from '../integrations/home-ai/client.js'
+import { getHomeAiClient } from '../integrations/home-ai/client.js'
+import { CLAIM_AND_INSERT_WORKOUT_SQL } from './commit-sql.js'
 
 const TABLES_UNAVAILABLE = 'Training tables are not available. Apply pending migrations.'
 
@@ -215,8 +227,8 @@ export type PreparedManualSession = {
   painLevel: number | null
   bodyweightKg: number | null
   notes: string | null
-  sourceKind: 'manual'
-  metadata: { entry_mass_unit: 'lb' }
+  sourceKind: SessionSourceKind
+  metadata: Record<string, unknown>
   exercises: Array<{
     id: string
     exerciseDefinitionId: string
@@ -234,6 +246,8 @@ export function prepareManualSession(input: {
   exercisesById: Map<string, ExerciseDefinition>
   template: WorkoutTemplate | null
   sessionId?: string
+  sourceKind?: SessionSourceKind
+  metadata?: Record<string, unknown>
 }): PreparedManualSession {
   const { request, exercisesById, template } = input
   if (request.workoutTemplateId != null) {
@@ -301,8 +315,8 @@ export function prepareManualSession(input: {
     bodyweightKg:
       request.bodyweightLb == null ? null : poundsToKilograms(request.bodyweightLb),
     notes: request.notes ?? null,
-    sourceKind: 'manual',
-    metadata: { entry_mass_unit: 'lb' },
+    sourceKind: input.sourceKind ?? 'manual',
+    metadata: { entry_mass_unit: 'lb', ...(input.metadata ?? {}) },
     exercises,
   }
 }
@@ -412,6 +426,149 @@ export async function createManualSession(body: unknown): Promise<SessionDetailR
   }
 
   return getSession(prepared.sessionId)
+}
+
+async function homeAiSourceId(): Promise<string> {
+  const sql = await getSql()
+  const rows = await queryOrUnavailable(() =>
+    sql.query('SELECT id FROM data_sources WHERE key = $1 LIMIT 1', [HOME_AI_SOURCE_KEY]),
+  )
+  const sourceId = (rows[0] as { id?: string } | undefined)?.id
+  if (!sourceId) {
+    throw new HttpError(500, 'Home AI data source is not configured')
+  }
+  return sourceId
+}
+
+export async function findSessionIdByHomeAiJob(jobId: string): Promise<string | null> {
+  const sql = await getSql()
+  const sourceId = await homeAiSourceId()
+  const rows = await queryOrUnavailable(() =>
+    sql.query(
+      `SELECT entity_id
+       FROM source_record_links
+       WHERE source_id = $1
+         AND entity_type = $2
+         AND external_fingerprint = $3
+       LIMIT 1`,
+      [sourceId, WORKOUT_SESSION_ENTITY, homeAiJobFingerprint(jobId)],
+    ),
+  )
+  const entityId = (rows[0] as { entity_id?: string } | undefined)?.entity_id
+  return entityId ?? null
+}
+
+export async function createImportedSession(
+  body: unknown,
+  jobId: string,
+  client?: HomeAiClient,
+): Promise<SessionDetailResponse> {
+  const existingId = await findSessionIdByHomeAiJob(jobId)
+  if (existingId) {
+    return getSession(existingId)
+  }
+
+  const homeAi = client ?? (await getHomeAiClient())
+  const job = await homeAi.getWorkoutTranscriptionJob(jobId)
+  if (job.status !== 'completed' || !job.candidate) {
+    throw new HttpError(409, 'Transcription result is no longer available. Import the photo again.')
+  }
+
+  const request = parseManualWorkoutRequest(body)
+  const exercisesById = await loadExercisesById(
+    request.exercises.map((exercise) => exercise.exerciseDefinitionId),
+  )
+  const template =
+    request.workoutTemplateId == null ? null : await loadTemplateById(request.workoutTemplateId)
+  const provenance = provenancePayload({
+    jobId,
+    candidate: job.candidate,
+    review: job.review,
+  })
+  const prepared = prepareManualSession({
+    request,
+    exercisesById,
+    template,
+    sourceKind: 'imported_candidate',
+    metadata: {
+      transcription: {
+        originating_source: WORKOUT_IMAGE_SOURCE_KEY,
+        interpreter: HOME_AI_SOURCE_KEY,
+        pipeline: HOME_AI_PIPELINE,
+        home_ai_job_id: jobId,
+        transcription_status: job.candidate.transcription_status,
+        review_status: job.review?.review_status ?? job.review?.status ?? null,
+        save_ready: job.review?.save_ready ?? null,
+      },
+    },
+  })
+
+  const sql = await getSql()
+  const sourceId = await homeAiSourceId()
+  const importJobId = randomUUID()
+  const linkId = randomUUID()
+
+  try {
+    await sql.transaction([
+      sql.query(
+        `INSERT INTO import_jobs (
+           id, source_id, imported_at, source_filename, format_version, status,
+           record_count, inserted_count, matched_count, skipped_count, error_count, content_hash, metadata
+         ) VALUES (
+           $1::uuid, $2::uuid, now(), NULL, $3, 'completed',
+           1, 1, 0, 0, 0, NULL, $4::jsonb
+         )`,
+        [
+          importJobId,
+          sourceId,
+          HOME_AI_PIPELINE,
+          JSON.stringify({
+            originating_source: WORKOUT_IMAGE_SOURCE_KEY,
+            home_ai_job_id: jobId,
+            pipeline: HOME_AI_PIPELINE,
+            transcription_status: job.candidate.transcription_status,
+            review_status: job.review?.review_status ?? job.review?.status ?? null,
+            save_ready: job.review?.save_ready ?? null,
+          }),
+        ],
+      ),
+      sql.query(CLAIM_AND_INSERT_WORKOUT_SQL, [
+        linkId,
+        sourceId,
+        importJobId,
+        jobId,
+        homeAiJobFingerprint(jobId),
+        WORKOUT_SESSION_ENTITY,
+        prepared.sessionId,
+        JSON.stringify(provenance),
+        prepared.workoutDate,
+        prepared.workoutTemplateId,
+        prepared.routineCode,
+        prepared.templateVersion,
+        prepared.templateName,
+        prepared.durationMin == null ? null : decimalString(prepared.durationMin),
+        prepared.effort,
+        prepared.painLevel,
+        prepared.bodyweightKg == null ? null : decimalString(prepared.bodyweightKg),
+        prepared.notes,
+        prepared.sourceKind,
+        JSON.stringify(prepared.metadata),
+      ]),
+      ...buildSessionInsertQueries(sql, prepared).slice(1),
+    ])
+  } catch (error) {
+    if (asMissingRelation(error)) {
+      throw new HttpError(503, TABLES_UNAVAILABLE)
+    }
+    const raced = await findSessionIdByHomeAiJob(jobId)
+    if (raced) {
+      return getSession(raced)
+    }
+    throw new HttpError(500, 'Workout could not be saved')
+  }
+
+  const claimedId = (await findSessionIdByHomeAiJob(jobId)) ?? prepared.sessionId
+  return getSession(claimedId)
 }
 
 export async function listSessions(): Promise<SessionListResponse> {
