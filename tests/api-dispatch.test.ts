@@ -103,6 +103,11 @@ describe('Vercel nested API routing', () => {
     expect(matchHealthApiRoute('/api/progress/checkpoints/11111111-1111-4111-8111-111111111111')).toBe(
       'progress-checkpoint-detail',
     )
+    expect(matchHealthApiRoute('/api/nutrition/day')).toBe('nutrition-day')
+    expect(matchHealthApiRoute('/api/nutrition/entries')).toBe('nutrition-entries')
+    expect(matchHealthApiRoute(`/api/nutrition/entries/${SESSION_ID}`)).toBe('nutrition-entry-detail')
+    expect(matchHealthApiRoute('/api/nutrition/foods')).toBe('nutrition-foods')
+    expect(matchHealthApiRoute('/api/nutrition/import/legacy/preview')).toBe('nutrition-legacy-import')
     expect(matchHealthApiRoute(`/api/training/transcription/jobs/${JOB_ID}`)).toBe(
       'transcription-job-detail',
     )
@@ -206,6 +211,23 @@ describe('api/index after Vercel nested rewrite', () => {
     const detail = await hit('DELETE', `/api/progress/checkpoints/${SESSION_ID}`)
     expect(detail.status()).not.toBe(404)
     expect(isDeniedPrivate(detail.status())).toBe(true)
+  })
+
+  it('protects Nutrition day, entries, foods, and legacy import routes', async () => {
+    const day = await hit('GET', '/api/nutrition/day?date=2026-09-20')
+    expect(day.status()).not.toBe(404)
+    expect(isDeniedPrivate(day.status())).toBe(true)
+
+    const create = await hit('POST', '/api/nutrition/entries')
+    expect(create.status()).not.toBe(404)
+    expect(isDeniedPrivate(create.status())).toBe(true)
+
+    const foods = await hit('GET', '/api/nutrition/foods?query=chicken')
+    expect(isDeniedPrivate(foods.status())).toBe(true)
+
+    const preview = await hit('POST', '/api/nutrition/import/legacy/preview')
+    expect(preview.status()).not.toBe(404)
+    expect(isDeniedPrivate(preview.status())).toBe(true)
   })
 
   it('returns 404 for unknown API routes and 405 for unsupported methods', async () => {

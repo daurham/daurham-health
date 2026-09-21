@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "migrate": "tsx server/migrate.ts",
+    "nutrition:legacy-preview": "tsx server/nutrition/legacy-cli.ts",
     "test": "vitest run"
   },
   "dependencies": {

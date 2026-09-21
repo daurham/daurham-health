@@ -17,6 +17,12 @@ import progressTimelineHandler from './handlers/progress-timeline.js'
 import progressCompareHandler from './handlers/progress-compare.js'
 import progressCheckpointsHandler from './handlers/progress-checkpoints.js'
 import progressCheckpointDetailHandler from './handlers/progress-checkpoint-detail.js'
+import nutritionDayHandler from './handlers/nutrition-day.js'
+import nutritionEntriesHandler from './handlers/nutrition-entries.js'
+import nutritionEntryDetailHandler from './handlers/nutrition-entry-detail.js'
+import nutritionFoodsHandler from './handlers/nutrition-foods.js'
+import nutritionFoodDetailHandler from './handlers/nutrition-food-detail.js'
+import nutritionLegacyImportHandler from './handlers/nutrition-legacy-import.js'
 
 export type HealthApiRoute =
   | 'health'
@@ -37,6 +43,12 @@ export type HealthApiRoute =
   | 'progress-compare'
   | 'progress-checkpoints'
   | 'progress-checkpoint-detail'
+  | 'nutrition-day'
+  | 'nutrition-entries'
+  | 'nutrition-entry-detail'
+  | 'nutrition-foods'
+  | 'nutrition-food-detail'
+  | 'nutrition-legacy-import'
 
 type HealthApiHandler = (req: ApiRequest, res: ApiResponse) => unknown | Promise<unknown>
 
@@ -59,6 +71,12 @@ const HANDLERS: Record<HealthApiRoute, HealthApiHandler> = {
   'progress-compare': progressCompareHandler,
   'progress-checkpoints': progressCheckpointsHandler,
   'progress-checkpoint-detail': progressCheckpointDetailHandler,
+  'nutrition-day': nutritionDayHandler,
+  'nutrition-entries': nutritionEntriesHandler,
+  'nutrition-entry-detail': nutritionEntryDetailHandler,
+  'nutrition-foods': nutritionFoodsHandler,
+  'nutrition-food-detail': nutritionFoodDetailHandler,
+  'nutrition-legacy-import': nutritionLegacyImportHandler,
 }
 
 function isSingleSegmentAfter(pathname: string, prefix: string): boolean {
@@ -99,6 +117,15 @@ export function matchHealthApiRoute(pathname: string): HealthApiRoute | null {
       return 'progress-compare'
     case '/api/progress/checkpoints':
       return 'progress-checkpoints'
+    case '/api/nutrition/day':
+      return 'nutrition-day'
+    case '/api/nutrition/entries':
+      return 'nutrition-entries'
+    case '/api/nutrition/foods':
+      return 'nutrition-foods'
+    case '/api/nutrition/import/legacy/preview':
+    case '/api/nutrition/import/legacy/commit':
+      return 'nutrition-legacy-import'
     default:
       break
   }
@@ -113,6 +140,12 @@ export function matchHealthApiRoute(pathname: string): HealthApiRoute | null {
   }
   if (isSingleSegmentAfter(pathname, '/api/progress/checkpoints/')) {
     return 'progress-checkpoint-detail'
+  }
+  if (isSingleSegmentAfter(pathname, '/api/nutrition/entries/')) {
+    return 'nutrition-entry-detail'
+  }
+  if (isSingleSegmentAfter(pathname, '/api/nutrition/foods/')) {
+    return 'nutrition-food-detail'
   }
   return null
 }

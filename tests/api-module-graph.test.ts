@@ -121,6 +121,16 @@ describe('Vercel function module specifiers', () => {
         'src/domain/progress/timeline.ts',
         'src/domain/progress/compare.ts',
         'src/domain/progress/checkpoints.ts',
+        'server/handlers/nutrition-day.ts',
+        'server/handlers/nutrition-entries.ts',
+        'server/handlers/nutrition-entry-detail.ts',
+        'server/handlers/nutrition-foods.ts',
+        'server/handlers/nutrition-food-detail.ts',
+        'server/handlers/nutrition-legacy-import.ts',
+        'server/nutrition/service.ts',
+        'server/nutrition/queries.ts',
+        'server/nutrition/migrate.ts',
+        'src/domain/nutrition/index.ts',
       ]),
     )
     expect(files).not.toContain('server/dev-api-plugin.ts')

@@ -51,7 +51,7 @@ describe('progress query and classification', () => {
     }
   })
 
-  it('reserves future Health domains without implementing nutrition or Apple Health tables', () => {
+  it('reserves Health domains and keeps Apple Health out of Nutrition schema', () => {
     expect(HEALTH_DOMAINS).toEqual(['training', 'body', 'nutrition', 'activity', 'sleep'])
     const sql = readFileSync('migrations/0005_exercise_analytics.sql', 'utf8')
     expect(sql).not.toContain('nutrition')
@@ -63,5 +63,10 @@ describe('progress query and classification', () => {
     expect(checkpoints).toContain('progress_checkpoints')
     expect(checkpoints).not.toContain('nutrition')
     expect(checkpoints).not.toContain('user_id')
+    const nutrition = readFileSync('migrations/0008_nutrition.sql', 'utf8')
+    expect(nutrition).toContain('nutrition_foods')
+    expect(nutrition).toContain('nutrition_entries')
+    expect(nutrition).not.toMatch(/\buser_id\b/)
+    expect(nutrition).not.toContain('apple_health')
   })
 })

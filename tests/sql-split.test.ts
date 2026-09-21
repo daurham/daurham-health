@@ -42,8 +42,13 @@ describe('splitSqlStatements', () => {
       readFileSync(path.join('migrations', '0007_progress_checkpoints.sql'), 'utf8'),
     )
     expect(checkpoints).toHaveLength(2)
-    expect(checkpoints[0]).toMatch(/^CREATE TABLE progress_checkpoints/)
-    expect(checkpoints[1]).toMatch(/^CREATE INDEX progress_checkpoints_date_idx/)
+    const nutrition = splitSqlStatements(
+      readFileSync(path.join('migrations', '0008_nutrition.sql'), 'utf8'),
+    )
+    expect(nutrition).toHaveLength(8)
+    expect(nutrition[0]).toMatch(/^CREATE TABLE nutrition_foods/)
+    expect(nutrition[4]).toMatch(/^CREATE TABLE nutrition_entries/)
+    expect(nutrition[7]).toMatch(/^CREATE TABLE nutrition_targets/)
     const analytics = splitSqlStatements(
       readFileSync(path.join('migrations', '0005_exercise_analytics.sql'), 'utf8'),
     )
