@@ -12,7 +12,7 @@ import {
   validateNewPasswords,
 } from './password'
 
-const fieldClass = 'mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm'
+const fieldClass = 'mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-base md:text-sm'
 
 export function ResetPasswordPage() {
   const navigate = useNavigate()

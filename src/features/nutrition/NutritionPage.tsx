@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   NUTRITION_CONFIG,
@@ -8,7 +8,8 @@ import {
   type NutritionFood,
   type PendingNutritionCapture,
 } from '@/domain/nutrition'
-import { cn } from '@/lib'
+import { cn, PendingLoadRegion, useAtomicKeyedResource } from '@/lib'
+import type { NutrientTotal } from '@/domain/nutrition'
 import {
   createNutritionEntry,
   deleteNutritionEntry,
@@ -18,17 +19,22 @@ import {
   type NutritionDayPayload,
 } from './api'
 import { LabelCaptureSheet } from './LabelCapture'
-import { formatNutritionDayLabel, parseNutritionDateParam, shiftNutritionDate, todayNutritionDate } from './date'
 import {
-  caloriesHeadline,
+  adjacentNutritionDates,
+  formatNutritionDayLabel,
+  nutritionLoadErrorMessage,
+  parseNutritionDateParam,
+  shiftNutritionDate,
+  todayNutritionDate,
+} from './date'
+import {
   formatGrams,
   formatKcal,
   formatQuantity,
   groupedEntries,
-  nutrientText,
-  overTargetDelta,
+  macroHeadline,
   progressRatio,
-  proteinHeadline,
+  remainingHeadline,
 } from './format'
 import { AddFoodSheet, EntryEditorSheet, FoodEditorSheet, TargetSheet } from './panels'
 
@@ -41,47 +47,44 @@ type Panel =
 
 export function NutritionPage() {
   const [params, setParams] = useSearchParams()
-  const date = parseNutritionDateParam(params.get('date'))
+  const urlDate = parseNutritionDateParam(params.get('date'))
+  const [intentDate, setIntentDate] = useState(urlDate)
+  const urlDateRef = useRef(urlDate)
   const today = todayNutritionDate()
-  const [day, setDay] = useState<NutritionDayPayload | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const loadDay = useCallback((date: string, signal: AbortSignal) => fetchNutritionDay(date, signal), [])
+  const resource = useAtomicKeyedResource({
+    requestedKey: intentDate,
+    load: loadDay,
+    prefetchKeys: adjacentNutritionDates,
+  })
+  const day = resource.data
+  const date = resource.committedKey ?? intentDate
+  const pending = resource.isPending
   const [panel, setPanel] = useState<Panel | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [undo, setUndo] = useState<NutritionEntry | null>(null)
   const [captures, setCaptures] = useState<PendingNutritionCapture[]>([])
 
   useEffect(() => {
-    if (params.get('date') !== date) {
-      setParams({ date }, { replace: true })
+    if (urlDate !== urlDateRef.current) {
+      urlDateRef.current = urlDate
+      setIntentDate(urlDate)
     }
-  }, [date, params, setParams])
+  }, [urlDate])
 
   useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    setError(null)
-    fetchNutritionDay(date)
-      .then((next) => {
-        if (!cancelled) {
-          setDay(next)
-        }
-      })
-      .catch((caught: unknown) => {
-        if (!cancelled) {
-          setDay(null)
-          setError(caught instanceof Error ? caught.message : 'Could not load nutrition')
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoading(false)
-        }
-      })
-    return () => {
-      cancelled = true
+    if (!resource.committedKey || params.get('date') === resource.committedKey) {
+      return
     }
-  }, [date])
+    urlDateRef.current = resource.committedKey
+    setParams({ date: resource.committedKey }, { replace: true })
+  }, [params, resource.committedKey, setParams])
+
+  useEffect(() => {
+    if (resource.error && resource.committedKey && intentDate !== resource.committedKey) {
+      setIntentDate(resource.committedKey)
+    }
+  }, [intentDate, resource.committedKey, resource.error])
 
   useEffect(() => {
     let cancelled = false
@@ -115,28 +118,21 @@ export function NutritionPage() {
     }
   }, [date, panel])
 
-  function setDate(next: string) {
-    setParams({ date: next }, { replace: true })
+  function requestDate(next: string) {
+    setIntentDate(next)
   }
 
   function replaceEntries(entries: NutritionEntry[], extra?: Partial<NutritionDayPayload>) {
-    setDay((current) =>
-      current
-        ? {
-            ...current,
-            ...extra,
-            entries,
-            totals: nutritionDayTotals(entries),
-          }
-        : current,
-    )
+    resource.replaceData((current) => ({
+      ...current,
+      ...extra,
+      entries,
+      totals: nutritionDayTotals(entries),
+    }))
   }
 
   function prependRecent(food: NutritionFood) {
-    setDay((current) => {
-      if (!current) {
-        return current
-      }
+    resource.replaceData((current) => {
       const recents = [food, ...current.quickAdd.recents.filter((item) => item.id !== food.id)].slice(0, 12)
       return { ...current, quickAdd: { ...current.quickAdd, recents } }
     })
@@ -190,22 +186,16 @@ export function NutritionPage() {
         foodId: food.id,
         servingQuantity: 1,
       })
-      setDay((current) => {
-        if (!current) {
-          return current
-        }
+      resource.replaceData((current) => {
         const entries = current.entries.map((entry) => (entry.id === optimisticId ? created : entry))
         return { ...current, entries, totals: nutritionDayTotals(entries) }
       })
     } catch (caught) {
-      setDay((current) => {
-        if (!current) {
-          return current
-        }
+      resource.replaceData((current) => {
         const entries = current.entries.filter((entry) => entry.id !== optimisticId)
         return { ...current, entries, totals: nutritionDayTotals(entries) }
       })
-      setError(caught instanceof Error ? caught.message : 'Quick log failed')
+      setNotice(caught instanceof Error ? caught.message : 'Quick log failed')
     }
   }
 
@@ -223,7 +213,7 @@ export function NutritionPage() {
     } catch (caught) {
       replaceEntries(previous)
       setUndo(null)
-      setError(caught instanceof Error ? caught.message : 'Could not delete entry')
+      setNotice(caught instanceof Error ? caught.message : 'Could not delete entry')
     }
   }
 
@@ -253,26 +243,27 @@ export function NutritionPage() {
         notes: restored.notes,
         sourceKind: restored.sourceKind,
       })
-      setDay((current) => {
-        if (!current) {
-          return current
-        }
+      resource.replaceData((current) => {
         const entries = [...current.entries, created]
         return { ...current, entries, totals: nutritionDayTotals(entries) }
       })
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Could not undo delete')
+      setNotice(caught instanceof Error ? caught.message : 'Could not undo delete')
     }
   }
 
-  const targets = day?.targets ?? null
-  const calorieOver = overTargetDelta(day?.totals.calories.value ?? null, targets?.caloriesTarget ?? null)
-  const calorieRatio = progressRatio(day?.totals.calories.value ?? null, targets?.caloriesTarget ?? null)
   const groups = useMemo(() => groupedEntries(day?.entries ?? []), [day?.entries])
+  const navBase = resource.pendingKey ?? intentDate
 
   return (
     <section className="space-y-4">
-      <DayNav date={date} today={today} onDate={setDate} />
+      <DayNav
+        date={date}
+        today={today}
+        pendingVisible={resource.pendingVisible}
+        onDate={requestDate}
+        onShift={(days) => requestDate(shiftNutritionDate(navBase, days))}
+      />
 
       <div className="flex items-start justify-between gap-3">
         <div>
@@ -288,8 +279,20 @@ export function NutritionPage() {
         </button>
       </div>
 
-      {error ? (
-        <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>
+      {resource.error ? (
+        <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+          {nutritionLoadErrorMessage(resource.error.key)}
+          <button
+            type="button"
+            className="ml-3 underline"
+            onClick={() => {
+              setIntentDate(resource.error!.key)
+              resource.retry()
+            }}
+          >
+            Retry
+          </button>
+        </p>
       ) : null}
       {notice ? (
         <p className="rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-700">
@@ -306,32 +309,25 @@ export function NutritionPage() {
         <PendingCapturesCard jobs={captures} onOpen={(jobId) => setPanel({ kind: 'label', jobId })} />
       ) : null}
 
-      {loading && !day ? (
-        <p className="text-sm text-zinc-600">Loading…</p>
+      {!day ? (
+        resource.error ? null : <p className="text-sm text-zinc-600">Loading…</p>
       ) : (
-        <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_22rem] md:items-start">
-          <aside className="space-y-4 md:order-2 md:sticky md:top-4">
-            {day ? (
-              <SummaryCard
-                day={day}
-                calorieRatio={calorieRatio}
-                calorieOver={calorieOver}
-                onSetTargets={() => setPanel({ kind: 'targets' })}
-              />
-            ) : null}
-            {day ? (
-              <QuickAddCard
-                recents={day.quickAdd.recents}
-                staples={day.quickAdd.staples}
+        <PendingLoadRegion pending={pending} pendingVisible={resource.pendingVisible}>
+          <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_22rem] md:items-start">
+            <aside className="space-y-4 md:order-2 md:sticky md:top-4">
+              <SummaryCard day={day} onSetTargets={() => setPanel({ kind: 'targets' })} />
+              <QuickAddCard recents={day.quickAdd.recents} onAdd={() => setPanel({ kind: 'add' })} onQuickLog={(food) => void quickLog(food)} />
+            </aside>
+            <div className="space-y-4 md:order-1">
+              <EntryList
+                groups={groups}
+                empty={day.entries.length === 0}
                 onAdd={() => setPanel({ kind: 'add' })}
-                onQuickLog={(food) => void quickLog(food)}
+                onOpen={(entry) => setPanel({ kind: 'entry', entry })}
               />
-            ) : null}
-          </aside>
-          <div className="space-y-4 md:order-1">
-            <EntryList groups={groups} empty={!day || day.entries.length === 0} onAdd={() => setPanel({ kind: 'add' })} onOpen={(entry) => setPanel({ kind: 'entry', entry })} />
+            </div>
           </div>
-        </div>
+        </PendingLoadRegion>
       )}
 
       <button
@@ -349,13 +345,9 @@ export function NutritionPage() {
           quickAdd={day.quickAdd}
           onClose={() => setPanel(null)}
           onLogged={(entry, food) => {
-            setDay((current) => {
-              if (!current) {
-                return current
-              }
+            resource.replaceData((current) => {
               const entries = [...current.entries.filter((item) => item.id !== entry.id), entry]
-              const next = { ...current, entries, totals: nutritionDayTotals(entries) }
-              return next
+              return { ...current, entries, totals: nutritionDayTotals(entries) }
             })
             if (food) {
               prependRecent(food)
@@ -374,10 +366,7 @@ export function NutritionPage() {
           entry={panel.entry}
           onClose={() => setPanel(null)}
           onSaved={(entry) => {
-            setDay((current) => {
-              if (!current) {
-                return current
-              }
+            resource.replaceData((current) => {
               const entries = current.entries.map((item) => (item.id === entry.id ? entry : item))
               return { ...current, entries, totals: nutritionDayTotals(entries) }
             })
@@ -387,7 +376,7 @@ export function NutritionPage() {
             void fetchNutritionFood(foodId)
               .then((food) => setPanel({ kind: 'food', food }))
               .catch((caught: unknown) => {
-                setError(caught instanceof Error ? caught.message : 'Could not load food')
+                setNotice(caught instanceof Error ? caught.message : 'Could not load food')
               })
           }}
         />
@@ -397,7 +386,7 @@ export function NutritionPage() {
           date={date}
           onClose={() => setPanel(null)}
           onSaved={() => {
-            void fetchNutritionDay(date).then(setDay)
+            void fetchNutritionDay(date).then((next) => resource.replaceData(() => next))
           }}
         />
       ) : null}
@@ -406,10 +395,7 @@ export function NutritionPage() {
           food={panel.food}
           onClose={() => setPanel(null)}
           onSaved={(food) => {
-            setDay((current) => {
-              if (!current) {
-                return current
-              }
+            resource.replaceData((current) => {
               const replace = (list: NutritionFood[]) => list.map((item) => (item.id === food.id ? food : item))
               return {
                 ...current,
@@ -432,10 +418,7 @@ export function NutritionPage() {
           onClose={() => setPanel(null)}
           onBack={() => setPanel(null)}
           onLogged={(entry, food) => {
-            setDay((current) => {
-              if (!current) {
-                return current
-              }
+            resource.replaceData((current) => {
               const entries = [...current.entries.filter((item) => item.id !== entry.id), entry]
               return { ...current, entries, totals: nutritionDayTotals(entries) }
             })
@@ -479,23 +462,40 @@ function PendingCapturesCard({
   )
 }
 
-function DayNav({ date, today, onDate }: { date: string; today: string; onDate: (date: string) => void }) {
+function DayNav({
+  date,
+  today,
+  pendingVisible,
+  onDate,
+  onShift,
+}: {
+  date: string
+  today: string
+  pendingVisible: boolean
+  onDate: (date: string) => void
+  onShift: (days: number) => void
+}) {
   return (
     <div className="sticky top-0 z-10 -mx-4 flex items-center justify-between gap-2 border-b border-zinc-200 bg-zinc-50/95 px-4 py-2 backdrop-blur">
       <button
         type="button"
         aria-label="Previous day"
         className="min-h-11 min-w-11 rounded-md text-lg text-zinc-700 hover:bg-zinc-100"
-        onClick={() => onDate(shiftNutritionDate(date, -1))}
+        onClick={() => onShift(-1)}
       >
         ‹
       </button>
       <label className="flex min-w-0 flex-1 flex-col items-center">
-        <span className="text-sm font-medium">{formatNutritionDayLabel(date, today)}</span>
+        <span className="flex items-center gap-2 text-sm font-medium">
+          {formatNutritionDayLabel(date, today)}
+          {pendingVisible ? (
+            <span className="inline-block h-3.5 w-3.5 animate-pulse rounded-full border-2 border-zinc-300 border-t-zinc-700" aria-hidden />
+          ) : null}
+        </span>
         <input
           type="date"
           aria-label="Nutrition date"
-          className="mt-0.5 w-full max-w-40 rounded-md border border-zinc-300 bg-white px-2 py-1 text-center text-sm"
+          className="mt-0.5 w-full max-w-40 rounded-md border border-zinc-300 bg-white px-2 py-1 text-center text-base md:text-sm"
           value={date}
           onChange={(event) => {
             if (event.target.value) {
@@ -508,7 +508,7 @@ function DayNav({ date, today, onDate }: { date: string; today: string; onDate: 
         type="button"
         aria-label="Next day"
         className="min-h-11 min-w-11 rounded-md text-lg text-zinc-700 hover:bg-zinc-100"
-        onClick={() => onDate(shiftNutritionDate(date, 1))}
+        onClick={() => onShift(1)}
       >
         ›
       </button>
@@ -516,50 +516,23 @@ function DayNav({ date, today, onDate }: { date: string; today: string; onDate: 
   )
 }
 
-function SummaryCard({
-  day,
-  calorieRatio,
-  calorieOver,
-  onSetTargets,
-}: {
-  day: NutritionDayPayload
-  calorieRatio: number | null
-  calorieOver: number | null
-  onSetTargets: () => void
-}) {
+function SummaryCard({ day, onSetTargets }: { day: NutritionDayPayload; onSetTargets: () => void }) {
   const target = day.targets
   return (
     <section className="rounded-xl border border-zinc-200 bg-white p-4">
-      <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Calories</p>
-      <p className="mt-1 text-2xl font-semibold tracking-tight">{caloriesHeadline(day.totals.calories, target?.caloriesTarget ?? null)}</p>
-      {calorieRatio != null ? (
-        <div className="mt-3">
-          <div
-            className="h-2 overflow-hidden rounded-full bg-zinc-100"
-            role="progressbar"
-            aria-label="Calories consumed versus target"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={Math.round(calorieRatio * 100)}
-            aria-valuetext={caloriesHeadline(day.totals.calories, target?.caloriesTarget ?? null)}
-          >
-            <div className="h-full rounded-full bg-zinc-800" style={{ width: `${Math.round(calorieRatio * 100)}%` }} />
-          </div>
-          {calorieOver != null ? <p className="mt-1 text-sm text-zinc-500">+{Math.round(calorieOver)}</p> : null}
-        </div>
-      ) : null}
-
-      <div className="mt-4">
-        <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Protein</p>
-        <p className="mt-1 text-lg font-medium">{proteinHeadline(day.totals.protein, target?.proteinTarget ?? null)}</p>
+      <MacroProgressRow
+        label="Calories"
+        total={day.totals.calories}
+        target={target?.caloriesTarget ?? null}
+        unit="kcal"
+        emphasize
+      />
+      <div className="mt-4 space-y-4">
+        <MacroProgressRow label="Protein" total={day.totals.protein} target={target?.proteinTarget ?? null} unit="g" />
+        <MacroProgressRow label="Carbs" total={day.totals.carbs} target={target?.carbsTarget ?? null} unit="g" />
+        <MacroProgressRow label="Fat" total={day.totals.fat} target={target?.fatTarget ?? null} unit="g" />
+        <MacroProgressRow label="Fiber" total={day.totals.fiber} target={target?.fiberTarget ?? null} unit="g" secondary />
       </div>
-
-      <dl className="mt-4 grid grid-cols-3 gap-2 text-sm">
-        <MacroStat label="Carbs" total={day.totals.carbs} />
-        <MacroStat label="Fat" total={day.totals.fat} />
-        <MacroStat label="Fiber" total={day.totals.fiber} />
-      </dl>
-
       <button type="button" onClick={onSetTargets} className="mt-4 text-sm font-medium text-zinc-800 underline">
         {target ? 'Update targets' : 'Set targets'}
       </button>
@@ -567,11 +540,47 @@ function SummaryCard({
   )
 }
 
-function MacroStat({ label, total }: { label: string; total: NutritionDayPayload['totals']['carbs'] }) {
+function MacroProgressRow({
+  label,
+  total,
+  target,
+  unit,
+  emphasize = false,
+  secondary = false,
+}: {
+  label: string
+  total: NutrientTotal
+  target: number | null
+  unit: 'kcal' | 'g'
+  emphasize?: boolean
+  secondary?: boolean
+}) {
+  const available = total.status === 'available' ? total.value : null
+  const ratio = progressRatio(available, target)
+  const remaining = remainingHeadline(total, target, unit)
   return (
-    <div>
-      <dt className="text-zinc-500">{label}</dt>
-      <dd className="font-medium">{nutrientText(total, 'g')}</dd>
+    <div className={secondary ? 'opacity-90' : undefined}>
+      <div className="flex items-baseline justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{label}</p>
+          <p className={emphasize ? 'mt-1 text-2xl font-semibold tracking-tight' : 'mt-1 text-lg font-medium'}>
+            {macroHeadline(total, target, unit)}
+          </p>
+        </div>
+        {remaining ? <p className="shrink-0 text-sm text-zinc-500">{remaining}</p> : null}
+      </div>
+      {ratio != null && !secondary ? (
+        <div
+          className="mt-2 h-2 overflow-hidden rounded-full bg-zinc-100"
+          role="progressbar"
+          aria-label={`${label} versus target`}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(ratio * 100)}
+        >
+          <div className="h-full rounded-full bg-zinc-800" style={{ width: `${Math.round(ratio * 100)}%` }} />
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -636,30 +645,26 @@ function EntryList({
 
 function QuickAddCard({
   recents,
-  staples,
   onAdd,
   onQuickLog,
 }: {
   recents: NutritionFood[]
-  staples: NutritionFood[]
   onAdd: () => void
   onQuickLog: (food: NutritionFood) => void
 }) {
-  const foods = recents.length > 0 ? recents.slice(0, 6) : staples.slice(0, 6)
-  const title = recents.length > 0 ? 'Recent' : 'Staples'
   return (
     <section className="hidden rounded-xl border border-zinc-200 bg-white p-4 md:block">
       <div className="flex items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold">{title}</h2>
+        <h2 className="text-sm font-semibold">Recent</h2>
         <button type="button" onClick={onAdd} className="text-sm text-zinc-600 underline">
-          Browse
+          Add food
         </button>
       </div>
-      {foods.length === 0 ? (
+      {recents.length === 0 ? (
         <p className="mt-2 text-sm text-zinc-600">Add food to start logging.</p>
       ) : (
         <ul className="mt-2 divide-y divide-zinc-100">
-          {foods.map((food) => (
+          {recents.slice(0, 6).map((food) => (
             <li key={food.id} className="flex items-center gap-2 py-1">
               <span className="min-w-0 flex-1 truncate text-sm">{food.name}</span>
               <button

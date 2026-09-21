@@ -34,17 +34,19 @@ async function parseOk<T>(response: Response): Promise<T> {
   return (await response.json()) as T
 }
 
-export async function fetchNutritionDay(date: string): Promise<NutritionDayPayload> {
-  return parseOk(await healthFetch(`/api/nutrition/day?date=${encodeURIComponent(date)}`))
+export async function fetchNutritionDay(date: string, signal?: AbortSignal): Promise<NutritionDayPayload> {
+  return parseOk(await healthFetch(`/api/nutrition/day?date=${encodeURIComponent(date)}`, { signal }))
 }
 
-export async function searchNutritionFoods(query: string): Promise<NutritionFood[]> {
+export async function searchNutritionFoods(query: string, signal?: AbortSignal): Promise<NutritionFood[]> {
   const params = new URLSearchParams()
   if (query.trim().length > 0) {
     params.set('query', query.trim())
   }
   const suffix = params.size > 0 ? `?${params.toString()}` : ''
-  const body = await parseOk<{ foods: NutritionFood[] }>(await healthFetch(`/api/nutrition/foods${suffix}`))
+  const body = await parseOk<{ foods: NutritionFood[] }>(
+    await healthFetch(`/api/nutrition/foods${suffix}`, { signal }),
+  )
   return body.foods
 }
 

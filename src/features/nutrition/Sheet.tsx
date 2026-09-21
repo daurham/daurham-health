@@ -6,18 +6,20 @@ type NutritionSheetProps = {
   onClose: () => void
   children: React.ReactNode
   footer?: React.ReactNode
+  stickyHeader?: React.ReactNode
 }
 
-export function NutritionSheet({ title, onClose, children, footer }: NutritionSheetProps) {
+export function NutritionSheet({ title, onClose, children, footer, stickyHeader }: NutritionSheetProps) {
   const headingId = useId()
   const panelRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const previous = document.activeElement
     const root = panelRef.current
-    const focusable = root?.querySelector<HTMLElement>(
-      'input, button, textarea, select, [tabindex]:not([tabindex="-1"])',
-    )
+    const focusable =
+      root?.querySelector<HTMLElement>(
+        'input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]), textarea, select',
+      ) ?? root?.querySelector<HTMLElement>('button, [tabindex]:not([tabindex="-1"])')
     focusable?.focus()
     function onKey(event: KeyboardEvent) {
       if (event.key === 'Escape') {
@@ -64,6 +66,7 @@ export function NutritionSheet({ title, onClose, children, footer }: NutritionSh
             Close
           </button>
         </div>
+        {stickyHeader ? <div className="shrink-0 border-b border-zinc-200 px-4 py-3">{stickyHeader}</div> : null}
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">{children}</div>
         {footer ? <div className="border-t border-zinc-200 px-4 py-3">{footer}</div> : null}
       </div>

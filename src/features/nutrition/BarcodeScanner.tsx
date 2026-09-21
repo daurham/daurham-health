@@ -188,7 +188,7 @@ export function BarcodeScanner({ onDetect, onClose, disabled = false }: BarcodeS
           setManualError(null)
         }}
         className={cn(
-          'min-h-11 w-full rounded-md border bg-white px-3 text-sm outline-none',
+          'min-h-11 w-full rounded-md border bg-white px-3 text-base outline-none md:text-sm',
           manualError ? 'border-red-500' : 'border-zinc-300',
         )}
       />

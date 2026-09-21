@@ -416,7 +416,7 @@ function SetRow({
         <div className="flex gap-1">
           <select
             className={cn(
-              'min-h-11 rounded-md border bg-white px-1 text-sm',
+              'min-h-11 rounded-md border bg-white px-1 text-base md:text-sm',
               loadMessage ? 'border-red-500 bg-red-50' : 'border-zinc-300',
               inherited && 'text-zinc-500',
             )}

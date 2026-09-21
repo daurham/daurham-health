@@ -34,3 +34,21 @@ export function formatNutritionDayLabel(date: string, today = todayNutritionDate
     timeZone: 'UTC',
   }).format(utc)
 }
+
+export function formatNutritionDateShort(date: string): string {
+  const [year, month, day] = date.split('-').map(Number)
+  const utc = new Date(Date.UTC(year, (month ?? 1) - 1, day ?? 1))
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  }).format(utc)
+}
+
+export function nutritionLoadErrorMessage(date: string): string {
+  return `Couldn't load ${formatNutritionDateShort(date)}.`
+}
+
+export function adjacentNutritionDates(date: string): [string, string] {
+  return [shiftNutritionDate(date, -1), shiftNutritionDate(date, 1)]
+}

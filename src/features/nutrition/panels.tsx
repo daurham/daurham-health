@@ -4,6 +4,7 @@ import {
   NUTRITION_MEALS,
   applyGramServing,
   applyHundredGramServing,
+  rankFoodsForQuery,
   snapshotFromDefinition,
   validatePackagedReview,
   type NutritionEntry,
@@ -30,7 +31,7 @@ import { catalogKindLabel, formatGrams, formatKcal, formatQuantity, mealLabel, p
 import { NutritionSheet } from './Sheet'
 
 const inputClass =
-  'min-h-11 w-full rounded-md border border-zinc-300 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-zinc-500'
+  'min-h-11 w-full rounded-md border border-zinc-300 bg-white px-3 text-base text-zinc-900 outline-none focus:border-zinc-500 md:text-sm'
 const labelClass = 'mb-1 block text-sm font-medium text-zinc-700'
 const primaryClass =
   'inline-flex min-h-11 w-full items-center justify-center rounded-md bg-zinc-900 px-4 text-sm font-medium text-white disabled:opacity-50'
@@ -77,20 +78,29 @@ export function AddFoodSheet({ date, quickAdd, onClose, onLogged, onQuickLog, on
       return
     }
     setSearching(true)
+    const controller = new AbortController()
     const timer = window.setTimeout(() => {
-      searchNutritionFoods(needle)
+      searchNutritionFoods(needle, controller.signal)
         .then((foods) => {
-          setResults(foods)
+          setResults(rankFoodsForQuery(foods, needle, { recentIds: quickAdd.recents.map((item) => item.id) }))
         })
         .catch(() => {
+          if (controller.signal.aborted) {
+            return
+          }
           setResults([])
         })
         .finally(() => {
-          setSearching(false)
+          if (!controller.signal.aborted) {
+            setSearching(false)
+          }
         })
     }, 150)
-    return () => window.clearTimeout(timer)
-  }, [query])
+    return () => {
+      controller.abort()
+      window.clearTimeout(timer)
+    }
+  }, [query, quickAdd.recents])
 
   async function onBarcode(raw: string) {
     if (lookupLock.current) {
@@ -247,72 +257,58 @@ export function AddFoodSheet({ date, quickAdd, onClose, onLogged, onQuickLog, on
   }
 
   return (
-    <NutritionSheet title="Add food" onClose={onClose}>
-      <div className="space-y-5">
-        <div>
-          <label className={labelClass} htmlFor="nutrition-food-search">
-            Search foods
-          </label>
-          <input
-            id="nutrition-food-search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search foods…"
-            className={inputClass}
-            autoComplete="off"
-          />
+    <NutritionSheet
+      title="Add food"
+      onClose={onClose}
+      stickyHeader={
+        <div className="space-y-3">
+          <div>
+            <label className={labelClass} htmlFor="nutrition-food-search">
+              Search foods
+            </label>
+            <input
+              id="nutrition-food-search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search foods…"
+              className={inputClass}
+              autoComplete="off"
+            />
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <button type="button" className={secondaryClass + ' px-2 text-center text-xs leading-tight'} onClick={() => setScan(true)}>
+              Scan barcode
+            </button>
+            <button type="button" className={secondaryClass + ' px-2 text-center text-xs leading-tight'} onClick={() => setLabel(true)}>
+              Scan nutrition label
+            </button>
+            <button type="button" className={secondaryClass + ' px-2 text-center text-xs leading-tight'} onClick={() => setManual(true)}>
+              Manual entry
+            </button>
+          </div>
         </div>
-
-        {query.trim().length > 0 ? (
-          <FoodSection
-            title="Search"
-            foods={results ?? []}
-            empty={searching ? 'Searching…' : 'No matching foods.'}
-            onSelect={setConfirmFood}
-            onQuickLog={onQuickLog}
-            onOpenFood={onOpenFood}
-            showKind
-          />
-        ) : (
-          <>
-            <FoodSection
-              title="Recent"
-              foods={quickAdd.recents}
-              empty="No recents yet. Logged catalog foods will appear here."
-              onSelect={setConfirmFood}
-              onQuickLog={onQuickLog}
-              onOpenFood={onOpenFood}
-            />
-            <FoodSection
-              title="Staples"
-              foods={quickAdd.staples}
-              empty="No staples in the catalog."
-              onSelect={setConfirmFood}
-              onQuickLog={onQuickLog}
-              onOpenFood={onOpenFood}
-            />
-            <FoodSection
-              title="Recipes / meals"
-              foods={quickAdd.recipes}
-              empty="No recipes in the catalog."
-              onSelect={setConfirmFood}
-              onQuickLog={onQuickLog}
-              onOpenFood={onOpenFood}
-              showKind
-            />
-          </>
-        )}
-
-        <button type="button" className={primaryClass} onClick={() => setScan(true)}>
-          Scan barcode
-        </button>
-        <button type="button" className={secondaryClass + ' w-full'} onClick={() => setLabel(true)}>
-          Scan nutrition label
-        </button>
-        <button type="button" className={secondaryClass + ' w-full'} onClick={() => setManual(true)}>
-          Manual entry
-        </button>
-      </div>
+      }
+    >
+      {query.trim().length > 0 ? (
+        <FoodSection
+          title="Search"
+          foods={results ?? []}
+          empty={searching ? 'Searching…' : 'No matching foods.'}
+          onSelect={setConfirmFood}
+          onQuickLog={onQuickLog}
+          onOpenFood={onOpenFood}
+          showKind
+        />
+      ) : (
+        <FoodSection
+          title="Recent"
+          foods={quickAdd.recents}
+          empty="No recents yet. Logged catalog foods will appear here."
+          onSelect={setConfirmFood}
+          onQuickLog={onQuickLog}
+          onOpenFood={onOpenFood}
+        />
+      )}
     </NutritionSheet>
   )
 }
@@ -350,7 +346,13 @@ function FoodSection({
               >
                 <span className="truncate font-medium">{food.name}</span>
                 <span className="truncate text-sm text-zinc-500">
-                  {[food.brand, showKind ? catalogKindLabel(food.catalogKind) : null, formatKcal(food.calories)]
+                  {[
+                    food.brand,
+                    showKind ? catalogKindLabel(food.catalogKind) : null,
+                    formatQuantity(food.servingQuantity, food.servingUnit),
+                    formatKcal(food.calories),
+                    formatGrams(food.protein) ? `${formatGrams(food.protein)} protein` : null,
+                  ]
                     .filter(Boolean)
                     .join(' · ')}
                 </span>

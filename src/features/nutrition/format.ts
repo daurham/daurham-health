@@ -90,6 +90,34 @@ export function progressRatio(consumed: number | null, target: number | null): n
   return Math.min(consumed / target, 1)
 }
 
+export function remainingHeadline(
+  consumed: NutrientTotal,
+  target: number | null,
+  unit: 'kcal' | 'g',
+): string | null {
+  if (target == null || consumed.status !== 'available' || consumed.value == null) {
+    return null
+  }
+  const delta = target - consumed.value
+  if (delta >= 0) {
+    return unit === 'kcal' ? `${formatNumber(delta, 0)} remaining` : `${formatNumber(delta)} left`
+  }
+  return unit === 'kcal' ? `+${formatNumber(-delta, 0)}` : `+${formatNumber(-delta)} g`
+}
+
+export function macroHeadline(consumed: NutrientTotal, target: number | null, unit: 'kcal' | 'g'): string {
+  if (unit === 'kcal') {
+    return caloriesHeadline(consumed, target)
+  }
+  if (consumed.status !== 'available' || consumed.value == null) {
+    return target == null ? '—' : `— / ${formatNumber(target)} g`
+  }
+  if (target == null) {
+    return `${formatNumber(consumed.value)} g recorded`
+  }
+  return `${formatNumber(consumed.value)} / ${formatNumber(target)} g`
+}
+
 export function catalogKindLabel(kind: NutritionCatalogKind): string {
   return KIND_LABELS[kind]
 }

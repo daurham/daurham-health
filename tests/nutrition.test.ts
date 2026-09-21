@@ -413,6 +413,30 @@ describe('nutrition recents, staples, search', () => {
     expect(LIST_FOODS_SQL).toContain("lower(name) = lower($1)")
     expect(LIST_FOODS_SQL).toContain("lower(name) LIKE lower($1) || '%'")
   })
+
+  it('boosts recent usage after strong name matches without inventing a type filter', () => {
+    const chickenRice = food({
+      id: '11111111-1111-4111-8111-111111111111',
+      name: 'Chicken rice',
+      catalogKind: 'recipe',
+    })
+    const beefRice = food({
+      id: '22222222-2222-4222-8222-222222222222',
+      name: 'Beef rice',
+      catalogKind: 'custom',
+    })
+    const yogurt = food({
+      id: '33333333-3333-4333-8333-333333333333',
+      name: 'Greek yogurt',
+      catalogKind: 'packaged',
+      isStaple: true,
+    })
+    const ranked = rankFoodsForQuery([beefRice, chickenRice, yogurt], 'rice', {
+      recentIds: [chickenRice.id],
+    })
+    expect(ranked.map((item) => item.name)).toEqual(['Chicken rice', 'Beef rice', 'Greek yogurt'])
+    expect(yogurt.isStaple).toBe(true)
+  })
 })
 
 describe('nutrition targets', () => {

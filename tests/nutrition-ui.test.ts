@@ -3,10 +3,19 @@ import { describe, expect, it } from 'vitest'
 import {
   caloriesHeadline,
   groupedEntries,
+  macroHeadline,
   proteinHeadline,
   overTargetDelta,
+  remainingHeadline,
 } from '../src/features/nutrition/format.ts'
-import { parseNutritionDateParam, shiftNutritionDate, nutritionDateSearch, formatNutritionDayLabel } from '../src/features/nutrition/date.ts'
+import {
+  parseNutritionDateParam,
+  shiftNutritionDate,
+  nutritionDateSearch,
+  formatNutritionDayLabel,
+  nutritionLoadErrorMessage,
+  adjacentNutritionDates,
+} from '../src/features/nutrition/date.ts'
 import type { NutritionEntry } from '../src/domain/nutrition/index.ts'
 
 describe('nutrition day URL and labels', () => {
@@ -18,6 +27,8 @@ describe('nutrition day URL and labels', () => {
     expect(nutritionDateSearch('2026-09-21')).toBe('?date=2026-09-21')
     expect(formatNutritionDayLabel('2026-09-21', '2026-09-21')).toBe('Today')
     expect(formatNutritionDayLabel('2026-09-20', '2026-09-21')).toContain('Sep')
+    expect(nutritionLoadErrorMessage('2026-09-20')).toBe("Couldn't load Sep 20.")
+    expect(adjacentNutritionDates('2026-09-21')).toEqual(['2026-09-20', '2026-09-22'])
   })
 })
 
@@ -32,6 +43,12 @@ describe('nutrition summary copy', () => {
     expect(proteinHeadline(unavailable, 160)).toBe('— / 160 g')
     expect(overTargetDelta(2240, 2100)).toBe(140)
     expect(overTargetDelta(1540, 2100)).toBeNull()
+    expect(remainingHeadline(calories, 2100, 'kcal')).toBe('560 remaining')
+    expect(remainingHeadline(protein, 160, 'g')).toBe('68 left')
+    expect(remainingHeadline({ status: 'available', value: 172, observations: 1, missing: 0 }, 160, 'g')).toBe('+12 g')
+    expect(remainingHeadline(unavailable, 160, 'g')).toBeNull()
+    expect(macroHeadline(protein, null, 'g')).toBe('92 g recorded')
+    expect(macroHeadline(unavailable, null, 'g')).toBe('—')
   })
 })
 
@@ -56,18 +73,41 @@ describe('nutrition daily UX source', () => {
     expect(page).toContain('md:grid-cols-[minmax(0,1fr)_22rem]')
     expect(page).toContain("bottom: 'calc(4.5rem + env(safe-area-inset-bottom))'")
     expect(page).toContain('useSearchParams')
-    expect(page).toContain('setParams({ date')
-    expect(panels).toContain('Recent')
-    expect(panels).toContain('Staples')
-    expect(panels).toContain('Recipes / meals')
+    expect(page).toContain('setParams({ date: resource.committedKey }')
+    expect(page).toContain('useAtomicKeyedResource')
+    expect(page).toContain('prefetchKeys: adjacentNutritionDates')
+    expect(page).toContain('PendingLoadRegion')
+    expect(panels).toContain('Search foods')
+    expect(panels).toContain('stickyHeader')
     expect(panels).toContain('Scan barcode')
     expect(panels).toContain('Scan nutrition label')
     expect(panels).toContain('Manual entry')
     expect(panels).toContain('Save & Log')
+    expect(panels).toContain('title="Recent"')
+    expect(panels).not.toContain('title="Staples"')
+    expect(panels).not.toContain('Recipes / meals')
+    expect(panels).toContain('Staple')
+    expect(panels).toContain('rankFoodsForQuery')
+    expect(panels).toContain('aria-label={`Quick log 1 serving of ${food.name}`}')
     expect(layout).toContain('grid-cols-5')
     expect(layout).toContain("to: '/nutrition'")
     expect(page).not.toContain('ocr')
     expect(page).not.toContain('Apple Health')
     expect(page).toContain('Pending captures')
+  })
+})
+
+describe('mobile form controls', () => {
+  it('uses 16px mobile text and does not disable zoom', () => {
+    const css = readFileSync('src/index.css', 'utf8')
+    const html = readFileSync('index.html', 'utf8')
+    expect(css).toContain('font-size: 1rem')
+    expect(css).toContain('max-width: 767px')
+    expect(html).not.toContain('maximum-scale')
+    expect(html).not.toContain('user-scalable=no')
+    expect(html).toContain('viewport-fit=cover')
+    expect(readFileSync('src/features/nutrition/panels.tsx', 'utf8')).toContain('text-base')
+    expect(readFileSync('src/features/nutrition/LabelCapture.tsx', 'utf8')).toContain('text-base')
+    expect(readFileSync('src/auth/SignInPage.tsx', 'utf8')).toContain('text-base')
   })
 })

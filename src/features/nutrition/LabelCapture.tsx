@@ -26,7 +26,7 @@ import { NutritionSheet } from './Sheet'
 
 const POLL_MS = 4000
 const inputClass =
-  'min-h-11 w-full rounded-md border border-zinc-300 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-zinc-500'
+  'min-h-11 w-full rounded-md border border-zinc-300 bg-white px-3 text-base text-zinc-900 outline-none focus:border-zinc-500 md:text-sm'
 const labelClass = 'mb-1 block text-sm font-medium text-zinc-700'
 const primaryClass =
   'inline-flex min-h-11 w-full items-center justify-center rounded-md bg-zinc-900 px-4 text-sm font-medium text-white disabled:opacity-50'
