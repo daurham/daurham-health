@@ -200,61 +200,56 @@ export function PerformanceFrontierChart({
   )
 }
 
+function tightAxisDomain(values: number[]): [number, number] {
+  const min = Math.min(...values)
+  const max = Math.max(...values)
+  const spread = max - min
+  const pad = spread > 0 ? Math.max(1, spread * 0.2) : 2
+  return [min - pad, max + pad]
+}
+
 export function WeightHistoryChart({
   points,
+  trendAvailable = false,
 }: {
   points: Array<{ date: string; valueLb: number }>
+  trendAvailable?: boolean
 }) {
-  if (points.length === 0) {
-    return (
-      <ChartFrame title="Recorded weight" caption="No weight measurements in this history yet.">
-        <p className="text-sm text-zinc-600">Import or record a measurement to see it here.</p>
-      </ChartFrame>
-    )
+  if (points.length < 2) {
+    return null
   }
+  const domain = tightAxisDomain(points.map((point) => point.valueLb))
   return (
     <ChartFrame
       title="Recorded weight"
       caption={
-        points.length === 1
-          ? 'A single recorded measurement. A trend is shown only after enough history exists.'
-          : 'Actual recorded measurements. No interpolated values are shown.'
+        trendAvailable
+          ? 'Actual recorded measurements. No interpolated values are shown.'
+          : 'Recorded history only. A derived trend is not claimed until the required measurements and span are met.'
       }
     >
       <ResponsiveContainer width="100%" height="100%">
-        {points.length === 1 ? (
-          <ScatterChart margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
-            <CartesianGrid stroke="#e4e4e7" strokeDasharray="3 3" />
-            <XAxis dataKey="date" tickFormatter={formatCalendarDate} tick={{ fill: '#71717a', fontSize: 11 }} />
-            <YAxis dataKey="valueLb" unit=" lb" tick={{ fill: '#71717a', fontSize: 11 }} width={56} />
-            <Tooltip
-              content={({ payload }) => {
-                const item = payload?.[0]?.payload as { date: string; valueLb: number } | undefined
-                if (!item) {
-                  return null
-                }
-                return tooltipBox(`${formatCalendarDate(item.date)} · ${item.valueLb} lb`)
-              }}
-            />
-            <Scatter data={points} fill="#18181b" />
-          </ScatterChart>
-        ) : (
-          <LineChart data={points} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
-            <CartesianGrid stroke="#e4e4e7" strokeDasharray="3 3" />
-            <XAxis dataKey="date" tickFormatter={formatCalendarDate} tick={{ fill: '#71717a', fontSize: 11 }} />
-            <YAxis dataKey="valueLb" unit=" lb" tick={{ fill: '#71717a', fontSize: 11 }} width={56} />
-            <Tooltip
-              content={({ payload }) => {
-                const item = payload?.[0]?.payload as { date: string; valueLb: number } | undefined
-                if (!item) {
-                  return null
-                }
-                return tooltipBox(`${formatCalendarDate(item.date)} · ${item.valueLb} lb`)
-              }}
-            />
-            <Line type="linear" dataKey="valueLb" stroke="#18181b" strokeWidth={2} dot={{ r: 3 }} connectNulls={false} />
-          </LineChart>
-        )}
+        <LineChart data={points} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+          <CartesianGrid stroke="#e4e4e7" strokeDasharray="3 3" />
+          <XAxis dataKey="date" tickFormatter={formatCalendarDate} tick={{ fill: '#71717a', fontSize: 11 }} />
+          <YAxis
+            dataKey="valueLb"
+            unit=" lb"
+            domain={domain}
+            tick={{ fill: '#71717a', fontSize: 11 }}
+            width={56}
+          />
+          <Tooltip
+            content={({ payload }) => {
+              const item = payload?.[0]?.payload as { date: string; valueLb: number } | undefined
+              if (!item) {
+                return null
+              }
+              return tooltipBox(`${formatCalendarDate(item.date)} · ${item.valueLb} lb`)
+            }}
+          />
+          <Line type="linear" dataKey="valueLb" stroke="#18181b" strokeWidth={2} dot={{ r: 3 }} connectNulls={false} />
+        </LineChart>
       </ResponsiveContainer>
     </ChartFrame>
   )

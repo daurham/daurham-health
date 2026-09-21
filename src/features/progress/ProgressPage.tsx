@@ -71,10 +71,12 @@ export function ProgressPage() {
       : null
 
   return (
-    <section className="space-y-6">
+    <section className="space-y-4 md:space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Progress</h1>
-        <p className="mt-2 text-zinc-600">What changed in training and body — from recorded work, not guesses.</p>
+        <h1 className="text-xl font-semibold tracking-tight md:text-2xl">Progress</h1>
+        <p className="mt-1 hidden text-zinc-600 md:mt-2 md:block">
+          What changed in training and body — from recorded work, not guesses.
+        </p>
       </div>
 
       <div className="flex gap-1 overflow-x-auto pb-1" role="group" aria-label="Progress range">

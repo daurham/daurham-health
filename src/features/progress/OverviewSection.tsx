@@ -9,8 +9,8 @@ import {
   findingDate,
   findingHeadline,
   findingTitle,
-  progressBriefLines,
   strengthOverviewCopy,
+  workoutActivityByDate,
 } from './copy'
 import type { EvidenceTopic } from './EvidencePanel'
 import {
@@ -99,7 +99,6 @@ export function OverviewSection({
   overview: ProgressOverview
   onEvidence: (topic: EvidenceTopic) => void
 }) {
-  const brief = progressBriefLines(overview)
   const strength = strengthOverviewCopy(overview)
   const workouts = overview.training.workouts.status === 'available' ? overview.training.workouts.value.count : null
   const consistency = overview.training.consistency
@@ -107,11 +106,11 @@ export function OverviewSection({
   const findings = overview.findings
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5 md:space-y-8">
       <section>
         <h2 className="text-lg font-semibold tracking-tight">Your progress</h2>
         <p className="mt-1 text-sm text-zinc-600">{RANGE_HEADINGS[overview.period.range]}</p>
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <div className="mt-3 grid gap-2 sm:grid-cols-3 sm:gap-3">
           <Card
             title="Body"
             onOpen={
@@ -134,24 +133,28 @@ export function OverviewSection({
                 : undefined
             }
           >
-            <p className="text-xl font-semibold tracking-tight">
+            <p className="text-lg font-semibold tracking-tight md:text-xl">
               {weight.latest ? formatBodyCanonical(weight.latest.unit, weight.latest.value) : 'No weight yet'}
             </p>
-            <p className="mt-1 text-sm text-zinc-600">{bodyTrendCopy(overview)}</p>
+            <p className="mt-1 text-sm text-zinc-600">
+              {weight.trend.status === 'available'
+                ? bodyTrendCopy(overview)
+                : weight.latest
+                  ? formatCalendarDate(weight.latest.calendarDate)
+                  : 'No measurements yet'}
+            </p>
           </Card>
           <Card title="Strength">
             {strength.improving + strength.stable + strength.decreasing === 0 ? (
               <>
-                <p className="text-xl font-semibold tracking-tight">Building your trend</p>
+                <p className="text-lg font-semibold tracking-tight md:text-xl">Building history</p>
                 <p className="mt-1 text-sm text-zinc-600">
-                  {strength.building} exercise{strength.building === 1 ? '' : 's'} with history, none with 6 appearances yet.
+                  {strength.building} exercise{strength.building === 1 ? '' : 's'} recorded
                 </p>
               </>
             ) : (
               <>
-                <p className="text-xl font-semibold tracking-tight">
-                  {strength.improving} improving
-                </p>
+                <p className="text-lg font-semibold tracking-tight md:text-xl">{strength.improving} improving</p>
                 <p className="mt-1 text-sm text-zinc-600">
                   {strength.stable} stable · {strength.decreasing} decreasing
                 </p>
@@ -159,7 +162,7 @@ export function OverviewSection({
             )}
           </Card>
           <Card title="Training">
-            <p className="text-xl font-semibold tracking-tight">
+            <p className="text-lg font-semibold tracking-tight md:text-xl">
               {workouts == null ? '—' : `${workouts} workout${workouts === 1 ? '' : 's'}`}
             </p>
             {consistency.status === 'available' ? (
@@ -175,19 +178,6 @@ export function OverviewSection({
             )}
           </Card>
         </div>
-      </section>
-
-      <section>
-        <h2 className="text-lg font-semibold tracking-tight">Progress brief</h2>
-        {brief.length === 0 ? (
-          <p className="mt-2 text-sm text-zinc-600">Not enough recorded change to summarize this period.</p>
-        ) : (
-          <ul className="mt-3 space-y-1 text-sm text-zinc-800">
-            {brief.map((line) => (
-              <li key={line}>{line}</li>
-            ))}
-          </ul>
-        )}
       </section>
 
       <section>
@@ -226,7 +216,7 @@ export function OverviewSection({
 
 function ConsistencyBlock({ overview }: { overview: ProgressOverview }) {
   const consistency = overview.training.consistency
-  const dates = [...new Set(overview.training.sessions.map((item) => item.sessionDate))].sort()
+  const activity = workoutActivityByDate(overview.training.sessions)
   return (
     <section>
       <h2 className="text-lg font-semibold tracking-tight">Training consistency</h2>
@@ -258,17 +248,18 @@ function ConsistencyBlock({ overview }: { overview: ProgressOverview }) {
               </dd>
             </div>
           </dl>
-          {dates.length > 0 ? (
+          {activity.length > 0 ? (
             <div className="mt-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Activity</p>
               <div className="mt-2 flex flex-wrap gap-1">
-                {dates.map((date) => (
+                {activity.map((item) => (
                   <span
-                    key={date}
-                    title={date}
+                    key={item.date}
+                    title={`${item.count} workout${item.count === 1 ? '' : 's'} on ${item.date}`}
                     className="rounded-sm bg-zinc-900 px-2 py-1 text-[11px] text-white"
                   >
-                    {formatCalendarDate(date)}
+                    {formatCalendarDate(item.date)}
+                    {item.count > 1 ? ` ×${item.count}` : ''}
                   </span>
                 ))}
               </div>

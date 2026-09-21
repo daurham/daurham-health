@@ -25,6 +25,18 @@ export const RANGE_HEADINGS: Record<ProgressRange, string> = {
   all: 'All time',
 }
 
+export function workoutActivityByDate(
+  sessions: Array<{ sessionId: string; sessionDate: string }>,
+): Array<{ date: string; count: number }> {
+  const counts = new Map<string, number>()
+  for (const session of sessions) {
+    counts.set(session.sessionDate, (counts.get(session.sessionDate) ?? 0) + 1)
+  }
+  return [...counts.entries()]
+    .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+    .map(([date, count]) => ({ date, count }))
+}
+
 export function remainingCount(result: MetricResult<unknown>): number | null {
   if (result.status !== 'insufficient_data' || result.required == null) {
     return null

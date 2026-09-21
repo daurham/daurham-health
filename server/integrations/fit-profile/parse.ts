@@ -8,6 +8,7 @@ import {
   FIT_PROFILE_VENDOR_HEADERS,
   displayValueForMetric,
   normalizeFitProfileMetric,
+  parseOptionalNumericCell,
 } from '../../../src/domain/body-metrics.js'
 import { parseWallClockInTimeZone } from '../../../src/domain/time.js'
 import { fitProfileFingerprint } from './fingerprint.js'
@@ -63,24 +64,14 @@ function cellString(value: unknown): string {
 }
 
 function parseNumeric(value: unknown, header: string): number | null {
-  if (value == null || value === '') {
+  const parsed = parseOptionalNumericCell(value)
+  if (parsed.kind === 'missing') {
     return null
   }
-  if (typeof value === 'number') {
-    if (!Number.isFinite(value)) {
-      throw new FitProfileParseError(`Invalid numeric value for ${header}`)
-    }
-    return value
-  }
-  const text = String(value).trim()
-  if (text.length === 0) {
-    return null
-  }
-  const parsed = Number(text)
-  if (!Number.isFinite(parsed)) {
+  if (parsed.kind === 'invalid') {
     throw new FitProfileParseError(`Invalid numeric value for ${header}`)
   }
-  return parsed
+  return parsed.value
 }
 
 function jsonSafeRow(row: FitProfileRawRow): FitProfileRawRow {

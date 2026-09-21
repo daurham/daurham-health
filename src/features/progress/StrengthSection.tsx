@@ -35,7 +35,7 @@ export function StrengthSection({
     <div className="space-y-6">
       <div>
         <h2 className="text-lg font-semibold tracking-tight">Strength</h2>
-        <p className="mt-1 text-sm text-zinc-600">
+        <p className="mt-1 hidden text-sm text-zinc-600 md:block">
           Latest performed work, demonstrated bests, and estimated-strength trends when history is sufficient.
         </p>
       </div>
@@ -47,7 +47,7 @@ export function StrengthSection({
           <ul className="space-y-2 md:hidden">
             {exercises.map((exercise) => (
               <li key={exercise.exerciseId}>
-                <ExerciseCard exercise={exercise} range={range} onEvidence={onEvidence} />
+                <ExerciseCard exercise={exercise} range={range} />
               </li>
             ))}
           </ul>
@@ -117,11 +117,8 @@ function ExerciseNotes({
   if (exercise.recentPrs.length > 0) {
     bits.push(`${exercise.recentPrs.length} recent best${exercise.recentPrs.length === 1 ? '' : 's'}`)
   }
-  if (exercise.frontier.length > 0) {
-    bits.push('Frontier available')
-  }
   if (exercise.performanceType === 'timed') {
-    bits.push('No estimated 1RM')
+    bits.push('Timed')
   }
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -156,40 +153,35 @@ function ExerciseNotes({
 function ExerciseCard({
   exercise,
   range,
-  onEvidence,
 }: {
   exercise: ProgressOverview['exercises'][number]
   range: ProgressRange
-  onEvidence: (topic: EvidenceTopic) => void
 }) {
   return (
-    <div className="rounded-lg border border-zinc-200 bg-white p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <Link
-            to={`/progress/strength/${exercise.exerciseId}${progressSearch(range)}`}
-            className="font-medium hover:underline"
-          >
-            {exercise.name}
-          </Link>
-          <p className="mt-1 text-xs uppercase tracking-wide text-zinc-500">
-            {performanceTypeLabel(exercise.performanceType)}
-          </p>
-        </div>
-        {exercise.recentPrs.length > 0 ? (
-          <span className="rounded-full bg-zinc-100 px-2 py-1 text-[11px] font-medium text-zinc-700">Recent best</span>
-        ) : null}
+    <Link
+      to={`/progress/strength/${exercise.exerciseId}${progressSearch(range)}`}
+      className="flex min-h-14 items-center justify-between gap-3 rounded-lg border border-zinc-200 bg-white px-3 py-2.5"
+    >
+      <div className="min-w-0">
+        <p className="truncate font-medium">{exercise.name}</p>
+        <p className="mt-0.5 text-sm text-zinc-700">{formatLatestPerformance(exercise.latestPerformance)}</p>
       </div>
-      <p className="mt-3 text-lg font-semibold tracking-tight">{formatLatestPerformance(exercise.latestPerformance)}</p>
-      <p className="mt-1 text-sm text-zinc-600">{trendCell(exercise)}</p>
-      <p className="mt-1 text-sm text-zinc-500">
-        {exercise.latestPerformance ? formatCalendarDate(exercise.latestPerformance.date) : 'Not performed yet'}
-      </p>
-      <div className="mt-3">
-        <ExerciseNotes exercise={exercise} onEvidence={onEvidence} />
+      <div className="shrink-0 text-right text-xs text-zinc-500">
+        <p>{compactTrend(exercise)}</p>
+        {exercise.recentPrs.length > 0 ? <p className="mt-0.5 font-medium text-zinc-700">Best</p> : null}
       </div>
-    </div>
+    </Link>
   )
+}
+
+function compactTrend(exercise: ProgressOverview['exercises'][number]): string {
+  if (exercise.trend.status === 'not_applicable') {
+    return 'Timed'
+  }
+  if (exercise.trend.status === 'insufficient_data') {
+    return appearanceProgressCopy(exercise.appearanceCount, exercise.trend.required)
+  }
+  return trendStatusCopy(exercise.trend)
 }
 
 export function StrengthLab({

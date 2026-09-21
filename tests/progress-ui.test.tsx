@@ -7,7 +7,13 @@ import { BodySection } from '../src/features/progress/BodySection.tsx'
 import { OverviewSection } from '../src/features/progress/OverviewSection.tsx'
 import { ProgressPage } from '../src/features/progress/ProgressPage.tsx'
 import { StrengthLab, StrengthSection } from '../src/features/progress/StrengthSection.tsx'
-import { bodyTrendCopy, progressBriefLines, trendStatusCopy } from '../src/features/progress/copy.ts'
+import { WeightHistoryChart } from '../src/features/progress/ProgressCharts.tsx'
+import {
+  bodyTrendCopy,
+  progressBriefLines,
+  trendStatusCopy,
+  workoutActivityByDate,
+} from '../src/features/progress/copy.ts'
 import { formatKgAsLb, formatPerformed } from '../src/features/progress/format.ts'
 import { parseProgressRangeParam, progressSearch } from '../src/features/progress/range.ts'
 
@@ -392,6 +398,36 @@ function sparseOverview(): ProgressOverview {
   }
 }
 
+function withWeightHistory(count: number, trendStatus: 'insufficient_data' | 'available' = 'insufficient_data'): ProgressOverview {
+  const overview = sparseOverview()
+  const first = overview.body.weight.observations[0]!
+  const observations = Array.from({ length: count }, (_, index) => ({
+    ...first,
+    measurementId: `m${index + 1}`,
+    calendarDate: `2026-09-${String(20 - (count - 1 - index)).padStart(2, '0')}`,
+    measuredAt: `2026-09-${String(20 - (count - 1 - index)).padStart(2, '0')}T08:00:00.000Z`,
+    value: first.value - index * 0.2,
+  }))
+  overview.body.weight.observations = observations
+  overview.body.weight.latest = observations[observations.length - 1]!
+  overview.body.weight.trend =
+    trendStatus === 'available'
+      ? {
+          status: 'available',
+          value: {
+            slopePerDay: -0.02,
+            slopePerWeek: -0.14,
+            measurementCount: count,
+            spanDays: 20,
+            latest: observations[observations.length - 1]!,
+          },
+          observations: count,
+          basis: 'theil_sen',
+        }
+      : { status: 'insufficient_data', observations: count, required: 5 }
+  return overview
+}
+
 describe('progress range URL helpers', () => {
   it('defaults to 30d and persists explicit range search params', () => {
     expect(parseProgressRangeParam(null)).toBe('30d')
@@ -455,14 +491,16 @@ describe('Progress UI states', () => {
         <OverviewSection overview={sparseOverview()} onEvidence={() => undefined} />
       </MemoryRouter>,
     )
-    expect(html).toContain('Building your trend')
+    expect(html).toContain('Building history')
     expect(html).toContain('Performance best')
     expect(html).toContain('Cable Row')
     expect(html).toContain('Farmer Carry')
-    expect(html).toContain('Not enough weight history')
+    expect(html).toContain('Sep 20 ×2')
+    expect(html).toContain('Sep 21')
     expect(html).not.toContain('Strength trend: 0%')
     expect(html).not.toContain('Weight trend: 0')
     expect(html).not.toContain('Box Squat')
+    expect(html).not.toContain('Progress brief')
   })
 
   it('keeps baseline historical bests from rendering as PRs', () => {
@@ -488,15 +526,16 @@ describe('Progress UI states', () => {
       </MemoryRouter>,
     )
     expect(html).toContain('Cable Row')
-    expect(html).toContain('Recent best')
+    expect(html).toContain('Best')
     expect(html).toContain('Farmer Carry')
-    expect(html).toContain('No estimated 1RM')
+    expect(html).toContain('Timed')
     expect(html).toContain('45s')
     expect(html).toContain('Reverse Lunge')
     expect(html).toContain('L 6')
     expect(html).toContain('R 9')
     expect(html).toContain('1 / 6 appearances')
     expect(html).toContain('md:hidden')
+    expect(html).not.toContain('Frontier available')
   })
 
   it('renders estimated strength in the loaded-rep lab and grouped PR achievements', () => {
@@ -532,15 +571,67 @@ describe('Progress UI states', () => {
     expect(html).not.toContain('Estimated Strength')
   })
 
-  it('renders body measurements without a fake 0 trend', () => {
+  it('renders body measurements without a fake 0 trend or a one-point chart', () => {
     const html = renderToStaticMarkup(
       <MemoryRouter>
         <BodySection overview={sparseOverview()} onEvidence={() => undefined} />
       </MemoryRouter>,
     )
-    expect(html).toContain('Not ready')
-    expect(html).toContain('Not enough weight history')
-    expect(html).toContain('Recorded weight')
+    expect(html).toContain('History building')
+    expect(html).toContain('one recorded measurement')
+    expect(html).toContain('Period comparison unavailable')
+    expect(html).not.toContain('Recorded weight')
+    expect(html).not.toContain('h-56')
     expect(html).not.toContain('0 lb/week')
+    expect(html).not.toContain('Not applicable')
+  })
+
+  it('shows 2–4 observations as recorded history without a derived trend claim', () => {
+    const html = renderToStaticMarkup(
+      <MemoryRouter>
+        <BodySection overview={withWeightHistory(3)} onEvidence={() => undefined} />
+      </MemoryRouter>,
+    )
+    expect(html).toContain('Recorded weight')
+    expect(html).toContain('Recorded history only')
+    expect(html).toContain('derived trend is not claimed')
+    expect(html).not.toContain('Derived trend')
+    expect(html).not.toContain('lb/week')
+  })
+
+  it('keeps unavailable period comparison compact and other metrics dense', () => {
+    const overview = withWeightHistory(1)
+    overview.body.metrics = [
+      {
+        key: 'body_fat_percentage',
+        comparison: { status: 'insufficient_data', observations: 1, required: 2 },
+      },
+    ]
+    const html = renderToStaticMarkup(
+      <MemoryRouter>
+        <BodySection overview={overview} onEvidence={() => undefined} />
+      </MemoryRouter>,
+    )
+    expect(html).toContain('Period comparison unavailable until a previous measurement exists.')
+    expect(html).toContain('Body fat')
+    expect(html).toContain('1 recorded')
+    expect(html).not.toContain('Need a comparison point in the previous window.')
+  })
+
+  it('does not render a weight chart for a single observation', () => {
+    const html = renderToStaticMarkup(
+      <WeightHistoryChart points={[{ date: '2026-09-20', valueLb: 191 }]} />,
+    )
+    expect(html).toBe('')
+  })
+})
+
+describe('training activity counts', () => {
+  it('keeps duplicate same-day workouts visible', () => {
+    const activity = workoutActivityByDate(sparseOverview().training.sessions)
+    expect(activity).toEqual([
+      { date: '2026-09-20', count: 2 },
+      { date: '2026-09-21', count: 1 },
+    ])
   })
 })

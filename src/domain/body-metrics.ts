@@ -198,3 +198,51 @@ export function displayValueForMetric(
   }
   return { value: canonicalValue, unit }
 }
+
+export const FIT_PROFILE_XLSX_ACCEPT =
+  '.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+
+const MISSING_NUMERIC_SENTINELS = new Set([
+  '',
+  '-',
+  '--',
+  '- -',
+  '–',
+  '—',
+  'n/a',
+  'na',
+])
+
+export type OptionalNumericCell =
+  | { kind: 'missing' }
+  | { kind: 'number'; value: number }
+  | { kind: 'invalid' }
+
+/** Normalize Fit Profile optional numeric cells. Does not treat signed numbers as missing. */
+export function parseOptionalNumericCell(value: unknown): OptionalNumericCell {
+  if (value == null) {
+    return { kind: 'missing' }
+  }
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? { kind: 'number', value } : { kind: 'invalid' }
+  }
+  if (typeof value === 'boolean') {
+    return { kind: 'invalid' }
+  }
+  const text = String(value).trim()
+  if (text.length === 0) {
+    return { kind: 'missing' }
+  }
+  const collapsed = text.replace(/\s+/g, ' ')
+  if (MISSING_NUMERIC_SENTINELS.has(collapsed.toLowerCase())) {
+    return { kind: 'missing' }
+  }
+  if (/^[\s\-–—]+$/.test(text)) {
+    return { kind: 'missing' }
+  }
+  const parsed = Number(text)
+  if (!Number.isFinite(parsed)) {
+    return { kind: 'invalid' }
+  }
+  return { kind: 'number', value: parsed }
+}

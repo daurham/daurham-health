@@ -1,9 +1,10 @@
 import { readdirSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { FIT_PROFILE_REQUIRED_HEADERS } from '../src/domain/body-metrics.ts'
+import { FIT_PROFILE_REQUIRED_HEADERS, parseOptionalNumericCell } from '../src/domain/body-metrics.ts'
 import { kilogramsToPounds, poundsToKilograms } from '../src/domain/units.ts'
 import { FitProfileParseError, parseFitProfileWorkbook } from '../server/integrations/fit-profile/parse.ts'
+import { buildCandidateCommitStatements } from '../server/body/fit-profile-import.ts'
 import { fitProfileWorkbookBytes, sanitizedFitProfileRow } from './helpers/fit-profile-workbook.ts'
 
 function localFitProfilePath(): string | null {
@@ -64,6 +65,62 @@ describe('Fit Profile parser', () => {
     const second = parseFitProfileWorkbook(bytes, 'America/Phoenix')
     expect(first[0]?.fingerprint).toMatch(/^[a-f0-9]{64}$/)
     expect(first[0]?.fingerprint).toBe(second[0]?.fingerprint)
+  })
+
+  it('treats known missing-value sentinels as omitted optional metrics', () => {
+    expect(parseOptionalNumericCell(null).kind).toBe('missing')
+    expect(parseOptionalNumericCell(undefined).kind).toBe('missing')
+    expect(parseOptionalNumericCell('').kind).toBe('missing')
+    expect(parseOptionalNumericCell('   ').kind).toBe('missing')
+    expect(parseOptionalNumericCell('-').kind).toBe('missing')
+    expect(parseOptionalNumericCell('--').kind).toBe('missing')
+    expect(parseOptionalNumericCell('- -').kind).toBe('missing')
+    expect(parseOptionalNumericCell('–').kind).toBe('missing')
+    expect(parseOptionalNumericCell('—').kind).toBe('missing')
+    expect(parseOptionalNumericCell('N/A').kind).toBe('missing')
+    expect(parseOptionalNumericCell('NA').kind).toBe('missing')
+  })
+
+  it('keeps legitimate negative numbers numeric', () => {
+    expect(parseOptionalNumericCell(-35.2)).toEqual({ kind: 'number', value: -35.2 })
+    expect(parseOptionalNumericCell('-35.2')).toEqual({ kind: 'number', value: -35.2 })
+    expect(parseOptionalNumericCell('-3')).toEqual({ kind: 'number', value: -3 })
+  })
+
+  it('imports a partial Fit Profile row with "- -" composition cells as missing', () => {
+    const bytes = fitProfileWorkbookBytes([
+      sanitizedFitProfileRow({
+        'Weight(lb)': 191,
+        'Body Fat(%)': '- -',
+        BMI: 27.3,
+        'Muscle Mass(lb)': '- -',
+        'Fat-free Body Weight(lb)': '-35.2',
+      }),
+    ])
+    const [candidate] = parseFitProfileWorkbook(bytes, 'America/Phoenix')
+    expect(candidate).toBeDefined()
+    const keys = new Set(candidate.metrics.map((metric) => metric.key))
+    const weight = candidate.metrics.find((metric) => metric.key === 'weight')
+    const bmi = candidate.metrics.find((metric) => metric.key === 'bmi')
+    const fatFree = candidate.metrics.find((metric) => metric.key === 'fat_free_mass')
+    expect(kilogramsToPounds(weight?.value ?? 0)).toBeCloseTo(191, 5)
+    expect(bmi?.value).toBeCloseTo(27.3, 5)
+    expect(keys.has('body_fat_percentage')).toBe(false)
+    expect(keys.has('muscle_mass')).toBe(false)
+    expect(fatFree?.value).toBeCloseTo(poundsToKilograms(-35.2), 10)
+
+    const statements = buildCandidateCommitStatements({
+      sourceId: '33333333-3333-4333-8333-333333333333',
+      jobId: '44444444-4444-4444-8444-444444444444',
+      candidate,
+      sessionId: '11111111-1111-4111-8111-111111111111',
+      linkId: '22222222-2222-4222-8222-222222222222',
+    })
+    const metricKeys = statements.metrics?.params.filter((_, index) => index % 6 === 2)
+    expect(metricKeys).toContain('weight')
+    expect(metricKeys).toContain('bmi')
+    expect(metricKeys).not.toContain('body_fat_percentage')
+    expect(metricKeys).not.toContain('muscle_mass')
   })
 })
 

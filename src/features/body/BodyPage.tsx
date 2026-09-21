@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { displayValueForMetric } from '@/domain/body-metrics'
+import { displayValueForMetric, FIT_PROFILE_XLSX_ACCEPT } from '@/domain/body-metrics'
 import type {
   BodyMeasurementSession,
   FitProfilePreviewCandidate,
@@ -148,6 +148,7 @@ export function BodyPage() {
 
       <ImportPanel
         timezone={timezone}
+        file={file}
         busy={busy}
         preview={preview}
         selected={selected}
@@ -185,7 +186,7 @@ export function BodyPage() {
           <p className="mt-3 text-sm text-zinc-600">
             {error
               ? 'History is unavailable until Body tables are migrated.'
-              : 'No saved measurements yet. Choosing a file only previews it — click Import to write to Neon.'}
+              : 'No saved measurements yet. Import a Fit Profile XLSX to preview, then confirm to save.'}
           </p>
         ) : (
           <ul className="mt-4 space-y-3">
@@ -199,8 +200,9 @@ export function BodyPage() {
   )
 }
 
-function ImportPanel({
+export function ImportPanel({
   timezone,
+  file,
   busy,
   preview,
   selected,
@@ -210,6 +212,7 @@ function ImportPanel({
   canCommit,
 }: {
   timezone: string
+  file: File | null
   busy: 'preview' | 'commit' | null
   preview: FitProfilePreviewResponse | null
   selected: Record<string, boolean>
@@ -220,17 +223,26 @@ function ImportPanel({
 }) {
   return (
     <div className="rounded-lg border border-zinc-200 bg-white p-4">
-      <h2 className="text-lg font-semibold tracking-tight">Import Scale Data</h2>
-      <p className="mt-1 text-sm text-zinc-600">
-        Fit Profile XLSX. Times are interpreted in {timezone}. Choosing a file only
-        previews rows — it does not save Body history.
+      <h2 className="text-lg font-semibold tracking-tight">Import Fit Profile XLSX</h2>
+      <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-zinc-600">
+        <li>In the scale app, Export the Fit Profile workbook.</li>
+        <li>Share → Save to Files.</li>
+        <li>Choose that XLSX here. Times are interpreted in {timezone}.</li>
+      </ol>
+      <p className="mt-2 text-sm text-zinc-600">
+        Choosing a file only previews rows. Nothing is saved until you confirm.
       </p>
-      <label className="mt-4 block">
-        <span className="sr-only">Choose Fit Profile XLSX</span>
+      <label className="mt-4 flex cursor-pointer flex-wrap items-center gap-3">
+        <span className="rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white">
+          Import Fit Profile XLSX
+        </span>
+        <span className="text-sm text-zinc-600">
+          {file ? file.name : 'No file selected'}
+        </span>
         <input
           type="file"
-          accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-          className="block w-full text-sm text-zinc-700 file:mr-3 file:rounded-md file:border-0 file:bg-zinc-900 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white"
+          accept={FIT_PROFILE_XLSX_ACCEPT}
+          className="sr-only"
           disabled={busy != null}
           onChange={(event) => {
             onSelectFile(event.target.files?.[0] ?? null)
@@ -239,16 +251,21 @@ function ImportPanel({
         />
       </label>
 
+      {file && busy !== 'preview' && !preview ? (
+        <p className="mt-3 text-sm text-zinc-600">Selected file ready: {file.name}</p>
+      ) : null}
+
       {busy === 'preview' ? (
-        <p className="mt-4 text-sm text-zinc-600">Reading workbook…</p>
+        <p className="mt-4 text-sm text-zinc-600">Reading {file?.name ?? 'workbook'}…</p>
       ) : null}
 
       {preview ? (
         <div className="mt-5 space-y-3 rounded-md border border-dashed border-amber-300 bg-amber-50/60 p-3">
-          <p className="text-sm font-medium text-amber-900">Preview — not saved</p>
+          <p className="text-sm font-medium text-amber-900">
+            Preview of {file?.name ?? 'workbook'} — not saved
+          </p>
           <p className="text-sm text-amber-800">
-            Select the rows to keep, then click Import to write them to Neon. Refreshing
-            the page discards this preview.
+            Confirm the rows to keep, then import. Refreshing the page discards this preview.
           </p>
           {preview.candidates.map((candidate) => (
             <PreviewRow
@@ -269,7 +286,7 @@ function ImportPanel({
             disabled={!canCommit}
             onClick={onCommit}
           >
-            {busy === 'commit' ? 'Importing…' : 'Import selected to Body history'}
+            {busy === 'commit' ? 'Importing…' : 'Confirm import to Body history'}
           </button>
         </div>
       ) : null}
@@ -277,7 +294,7 @@ function ImportPanel({
   )
 }
 
-function PreviewRow({
+export function PreviewRow({
   candidate,
   checked,
   onToggle,
@@ -287,11 +304,11 @@ function PreviewRow({
   onToggle: (fingerprint: string, value: boolean) => void
 }) {
   const weight = metricByKey(candidate, 'weight')
+  const bmi = metricByKey(candidate, 'bmi')
   const fat = metricByKey(candidate, 'body_fat_percentage')
   const muscle = metricByKey(candidate, 'muscle_mass')
-  const water = metricByKey(candidate, 'body_water_percentage')
   return (
-    <label className="flex gap-3 rounded-md border border-zinc-200 p-3">
+    <label className="flex gap-3 rounded-md border border-zinc-200 bg-white p-3">
       <input
         type="checkbox"
         className="mt-1"
@@ -309,9 +326,9 @@ function PreviewRow({
         </div>
         <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-sm sm:grid-cols-4">
           <Metric label="Weight" value={weight ? `${formatNumber(weight.displayValue, 1)} lb` : '—'} note="measured" />
+          <Metric label="BMI" value={bmi ? formatNumber(bmi.displayValue, 1) : '—'} note="vendor" />
           <Metric label="Body Fat" value={fat ? `${formatNumber(fat.displayValue, 1)} %` : '—'} note="BIA" />
           <Metric label="Muscle Mass" value={muscle ? `${formatNumber(muscle.displayValue, 1)} lb` : '—'} note="BIA" />
-          <Metric label="Body Water" value={water ? `${formatNumber(water.displayValue, 1)} %` : '—'} note="BIA" />
         </dl>
       </div>
     </label>
@@ -368,13 +385,18 @@ function Metric({
 }: {
   label: string
   value: string
-  note: 'measured' | 'BIA'
+  note: 'measured' | 'BIA' | 'vendor'
 }) {
+  const noteLabel = note === 'measured' ? 'scale' : note === 'vendor' ? 'vendor' : 'BIA estimated'
   return (
     <div>
       <dt className="text-xs uppercase tracking-wide text-zinc-500">{label}</dt>
-      <dd className="font-medium">{value}</dd>
-      <p className="text-[11px] text-zinc-400">{note === 'measured' ? 'scale' : 'BIA estimated'}</p>
+      <dd className={cn('font-medium', value === '—' ? 'text-zinc-400' : undefined)}>{value}</dd>
+      {value === '—' ? (
+        <p className="text-[11px] text-zinc-400">unavailable</p>
+      ) : (
+        <p className="text-[11px] text-zinc-400">{noteLabel}</p>
+      )}
     </div>
   )
 }
