@@ -1,14 +1,14 @@
 import { z } from 'zod'
-import { createImportedSession } from '../../../server/training/service.js'
-import { HOME_AI_JOB_ID_RE } from '../../../src/domain/training-transcription.js'
-import { withOwnerAuth } from '../../../server/auth/with-owner.js'
+import { createImportedSession } from '../training/service.js'
+import { HOME_AI_JOB_ID_RE } from '../../src/domain/training-transcription.js'
+import { withOwnerAuth } from '../auth/with-owner.js'
 import {
   handleApiError,
   readJsonBody,
   sendJson,
   type ApiRequest,
   type ApiResponse,
-} from '../../../server/http.js'
+} from '../http.js'
 
 const commitEnvelopeSchema = z
   .object({

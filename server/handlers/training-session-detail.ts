@@ -1,6 +1,6 @@
 import { z } from 'zod'
-import { getSession } from '../../../server/training/service.js'
-import { withOwnerAuth } from '../../../server/auth/with-owner.js'
+import { getSession } from '../training/service.js'
+import { withOwnerAuth } from '../auth/with-owner.js'
 import {
   handleApiError,
   pathParamAfter,
@@ -8,7 +8,7 @@ import {
   sendJson,
   type ApiRequest,
   type ApiResponse,
-} from '../../../server/http.js'
+} from '../http.js'
 
 const sessionIdSchema = z.uuid()
 

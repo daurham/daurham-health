@@ -9,8 +9,8 @@ import {
 import { withOwnerAuth } from '../server/auth/with-owner.ts'
 import { authProxyPath } from '../server/auth/node-request.ts'
 import { wrapNodeResponse, type ApiRequest, type ApiResponse } from '../server/http.ts'
-import healthHandler from '../api/health.ts'
-import transcriptionJobsHandler from '../api/training/transcription/jobs.ts'
+import healthHandler from '../server/handlers/health.ts'
+import transcriptionJobsHandler from '../server/handlers/transcription-jobs.ts'
 import type { HealthOwnerConfig } from '../server/auth/config.ts'
 import { IncomingMessage, ServerResponse } from 'node:http'
 import { Socket } from 'node:net'
@@ -186,17 +186,24 @@ describe('production handlers stay wrapped', () => {
 })
 
 describe('auth proxy path', () => {
-  it('joins Vercel catch-all query.path then falls back to the pathname', () => {
+  it('uses /api/auth remainder, including a Vercel catch-all query.path rewrite', () => {
     expect(
       authProxyPath({
-        url: '/api/auth/ignored',
-        query: { path: ['sign-in', 'email'] },
+        url: '/api/auth/get-session',
+        headers: {},
+      } as ApiRequest),
+    ).toBe('get-session')
+    expect(
+      authProxyPath({
+        url: '/api/auth/sign-in/email',
+        query: { path: ['auth', 'sign-in', 'email'] },
         headers: {},
       } as ApiRequest),
     ).toBe('sign-in/email')
     expect(
       authProxyPath({
-        url: '/api/auth/get-session',
+        url: '/internal',
+        query: { path: ['auth', 'get-session'] },
         headers: {},
       } as ApiRequest),
     ).toBe('get-session')

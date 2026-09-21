@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { sessionIdFromRequest } from '../api/training/sessions/[id].ts'
+import { sessionIdFromRequest } from '../server/handlers/training-session-detail.ts'
 import type { ApiRequest } from '../server/http.ts'
 
 const QUERY_ID = '11111111-1111-4111-8111-111111111111'
@@ -47,5 +47,13 @@ describe('training session id from Vercel query or pathname', () => {
     ).toBe(PATH_ID)
     expect(sessionIdFromRequest(request({ url: '/api/training/sessions/' }))).toBeNull()
     expect(sessionIdFromRequest(request({}))).toBeNull()
+    expect(
+      sessionIdFromRequest(
+        request({
+          url: '/internal',
+          query: { path: ['training', 'sessions', PATH_ID] },
+        }),
+      ),
+    ).toBe(PATH_ID)
   })
 })

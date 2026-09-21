@@ -53,8 +53,28 @@ export function requestPathname(req: ApiRequest): string {
   return url.split('?')[0] ?? ''
 }
 
-export function pathParamAfter(req: ApiRequest, prefix: string): string | null {
+function catchAllApiPathname(req: ApiRequest): string | null {
+  const query = req.query?.path
+  if (Array.isArray(query) && query.length > 0 && query.every((part) => typeof part === 'string')) {
+    return `/api/${query.join('/')}`
+  }
+  if (typeof query === 'string' && query.trim().length > 0) {
+    return `/api/${query.replace(/^\/+/, '')}`
+  }
+  return null
+}
+
+/** Original /api/... pathname, or Vercel catch-all query.path when url is rewritten. */
+export function requestApiPathname(req: ApiRequest): string {
   const pathname = requestPathname(req)
+  if (pathname.startsWith('/api/')) {
+    return pathname
+  }
+  return catchAllApiPathname(req) ?? pathname
+}
+
+export function pathParamAfter(req: ApiRequest, prefix: string): string | null {
+  const pathname = requestApiPathname(req)
   const normalizedPrefix = prefix.endsWith('/') ? prefix.slice(0, -1) : prefix
   if (!pathname.startsWith(`${normalizedPrefix}/`)) {
     return null

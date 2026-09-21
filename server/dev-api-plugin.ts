@@ -4,43 +4,15 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Plugin, ViteDevServer } from 'vite'
 import { wrapNodeResponse } from './http.js'
 
-function safeApiFile(root: string, relative: string): string | null {
-  const filePath = path.resolve(root, relative)
+const API_ENTRY = 'api/[...path].ts'
+
+function healthApiEntrypoint(root: string): string | null {
+  const filePath = path.resolve(root, API_ENTRY)
   const relativeToRoot = path.relative(root, filePath)
   if (relativeToRoot.startsWith('..') || path.isAbsolute(relativeToRoot)) {
     return null
   }
-  if (!relativeToRoot.startsWith(`api${path.sep}`) && relativeToRoot !== 'api') {
-    return null
-  }
   return fs.existsSync(filePath) ? filePath : null
-}
-
-function apiFileFromUrl(root: string, url: string): string | null {
-  const pathname = url.split('?')[0] ?? ''
-  if (!pathname.startsWith('/api/')) {
-    return null
-  }
-      const exact = safeApiFile(root, `${pathname.slice(1)}.ts`)
-  if (exact) {
-    return exact
-  }
-  const parts = pathname.slice(1).split('/').filter((part) => part.length > 0)
-  if (parts.length < 2) {
-    return null
-  }
-  const dynamicRelative = `${[...parts.slice(0, -1), '[id]'].join('/')}.ts`
-  const dynamic = safeApiFile(root, dynamicRelative)
-  if (dynamic) {
-    return dynamic
-  }
-  for (let index = parts.length - 1; index >= 1; index -= 1) {
-    const catchAll = safeApiFile(root, `${[...parts.slice(0, index), '[...path]'].join('/')}.ts`)
-    if (catchAll) {
-      return catchAll
-    }
-  }
-  return null
 }
 
 export function healthApiDevPlugin(): Plugin {
@@ -48,7 +20,12 @@ export function healthApiDevPlugin(): Plugin {
     name: 'health-api-dev',
     configureServer(server: ViteDevServer) {
       server.middlewares.use(async (req: IncomingMessage, res: ServerResponse, next) => {
-        const filePath = apiFileFromUrl(server.config.root, req.url ?? '')
+        const pathname = (req.url ?? '').split('?')[0] ?? ''
+        if (!pathname.startsWith('/api/')) {
+          next()
+          return
+        }
+        const filePath = healthApiEntrypoint(server.config.root)
         if (!filePath) {
           next()
           return

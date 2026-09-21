@@ -1,13 +1,7 @@
-import { commitFitProfileImport } from '../../../../server/body/fit-profile-import.js'
-import { readFitProfileForm } from '../../../../server/body/upload.js'
-import { withOwnerAuth } from '../../../../server/auth/with-owner.js'
-import { handleApiError, sendJson, type ApiRequest, type ApiResponse } from '../../../../server/http.js'
-
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-}
+import { commitFitProfileImport } from '../body/fit-profile-import.js'
+import { readFitProfileForm } from '../body/upload.js'
+import { withOwnerAuth } from '../auth/with-owner.js'
+import { handleApiError, sendJson, type ApiRequest, type ApiResponse } from '../http.js'
 
 export default withOwnerAuth(async function fitProfileCommitHandler(req: ApiRequest, res: ApiResponse) {
   try {

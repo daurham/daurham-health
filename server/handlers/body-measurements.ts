@@ -1,6 +1,6 @@
-import { listBodyMeasurements } from '../../server/body/fit-profile-import.js'
-import { withOwnerAuth } from '../../server/auth/with-owner.js'
-import { handleApiError, sendJson, type ApiRequest, type ApiResponse } from '../../server/http.js'
+import { listBodyMeasurements } from '../body/fit-profile-import.js'
+import { withOwnerAuth } from '../auth/with-owner.js'
+import { handleApiError, sendJson, type ApiRequest, type ApiResponse } from '../http.js'
 
 async function measurementsHandler(req: ApiRequest, res: ApiResponse) {
   try {

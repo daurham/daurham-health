@@ -1,6 +1,6 @@
-import { createManualSession, listSessions } from '../../server/training/service.js'
-import { withOwnerAuth } from '../../server/auth/with-owner.js'
-import { handleApiError, readJsonBody, sendJson, type ApiRequest, type ApiResponse } from '../../server/http.js'
+import { createManualSession, listSessions } from '../training/service.js'
+import { withOwnerAuth } from '../auth/with-owner.js'
+import { handleApiError, readJsonBody, sendJson, type ApiRequest, type ApiResponse } from '../http.js'
 
 async function sessionsHandler(req: ApiRequest, res: ApiResponse) {
   try {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { transcriptionJobIdFromRequest } from '../api/training/transcription/jobs/[id].ts'
+import { transcriptionJobIdFromRequest } from '../server/handlers/transcription-job-detail.ts'
 import type { ApiRequest } from '../server/http.ts'
 
 const QUERY_ID = '11111111-1111-4111-8111-111111111111'

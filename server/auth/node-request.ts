@@ -1,4 +1,4 @@
-import { readRequestBuffer, type ApiRequest, type ApiResponse } from '../http.js'
+import { readRequestBuffer, requestApiPathname, type ApiRequest, type ApiResponse } from '../http.js'
 
 export function requestOrigin(req: ApiRequest): string {
   const forwarded = headerString(req, 'x-forwarded-proto')
@@ -85,17 +85,10 @@ export async function writeWebResponse(res: ApiResponse, response: Response): Pr
 }
 
 export function authProxyPath(req: ApiRequest): string {
-  const query = req.query?.path
-  if (Array.isArray(query) && query.every((part) => typeof part === 'string')) {
-    return query.join('/')
-  }
-  if (typeof query === 'string' && query.trim().length > 0) {
-    return query.replace(/^\/+/, '')
-  }
-  const pathname = (req.url ?? '').split('?')[0] ?? ''
+  const pathname = requestApiPathname(req)
   const prefix = '/api/auth/'
-  if (!pathname.startsWith(prefix)) {
-    return ''
+  if (pathname.startsWith(prefix)) {
+    return pathname.slice(prefix.length)
   }
-  return pathname.slice(prefix.length)
+  return ''
 }

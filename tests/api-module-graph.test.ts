@@ -53,24 +53,32 @@ function walkApiGraph(): { file: string; specifiers: string[] }[] {
 describe('Vercel function module specifiers', () => {
   const graph = walkApiGraph()
 
+  it('exposes a single Hobby-safe Serverless Function entrypoint', () => {
+    const apiFiles = listFiles(path.join(ROOT, 'api')).map((file) => path.relative(ROOT, file))
+    expect(apiFiles).toEqual(['api/[...path].ts'])
+  })
+
   it('reaches every api handler and its server/domain dependencies', () => {
     const files = graph.map((entry) => entry.file)
     expect(files).toEqual(
       expect.arrayContaining([
-        'api/session.ts',
-        'api/auth/[...path].ts',
+        'api/[...path].ts',
+        'server/dispatch.ts',
+        'server/handlers/health.ts',
+        'server/handlers/session.ts',
+        'server/handlers/auth.ts',
         'server/auth/config.ts',
         'server/auth/owner.ts',
         'server/auth/with-owner.ts',
         'server/auth/proxy.ts',
         'server/auth/node-request.ts',
-        'api/body/measurements.ts',
-        'api/body/import/fit-profile/preview.ts',
-        'api/body/import/fit-profile/commit.ts',
-        'api/training/exercises.ts',
-        'api/training/templates.ts',
-        'api/training/sessions.ts',
-        'api/training/sessions/[id].ts',
+        'server/handlers/body-measurements.ts',
+        'server/handlers/fit-profile-preview.ts',
+        'server/handlers/fit-profile-commit.ts',
+        'server/handlers/training-exercises.ts',
+        'server/handlers/training-templates.ts',
+        'server/handlers/training-sessions.ts',
+        'server/handlers/training-session-detail.ts',
         'server/body/fit-profile-import.ts',
         'server/body/upload.ts',
         'server/body/commit-sql.ts',
@@ -90,11 +98,10 @@ describe('Vercel function module specifiers', () => {
         'server/training/commit-sql.ts',
         'server/integrations/home-ai/client.ts',
         'server/integrations/home-ai/config.ts',
-        'src/domain/training.ts',
         'src/domain/training-transcription.ts',
-        'api/training/transcription/jobs.ts',
-        'api/training/transcription/jobs/[id].ts',
-        'api/training/transcription/commit.ts',
+        'server/handlers/transcription-jobs.ts',
+        'server/handlers/transcription-job-detail.ts',
+        'server/handlers/transcription-commit.ts',
       ]),
     )
     expect(files).not.toContain('server/dev-api-plugin.ts')

@@ -1,12 +1,6 @@
-import { createTranscriptionJob } from '../../../server/training/transcription.js'
-import { withOwnerAuth } from '../../../server/auth/with-owner.js'
-import { handleApiError, sendJson, type ApiRequest, type ApiResponse } from '../../../server/http.js'
-
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-}
+import { createTranscriptionJob } from '../training/transcription.js'
+import { withOwnerAuth } from '../auth/with-owner.js'
+import { handleApiError, sendJson, type ApiRequest, type ApiResponse } from '../http.js'
 
 export default withOwnerAuth(async function transcriptionJobsHandler(req: ApiRequest, res: ApiResponse) {
   try {
