@@ -14,6 +14,9 @@ import transcriptionJobDetailHandler from './handlers/transcription-job-detail.j
 import transcriptionJobsHandler from './handlers/transcription-jobs.js'
 import progressOverviewHandler from './handlers/progress-overview.js'
 import progressTimelineHandler from './handlers/progress-timeline.js'
+import progressCompareHandler from './handlers/progress-compare.js'
+import progressCheckpointsHandler from './handlers/progress-checkpoints.js'
+import progressCheckpointDetailHandler from './handlers/progress-checkpoint-detail.js'
 
 export type HealthApiRoute =
   | 'health'
@@ -31,6 +34,9 @@ export type HealthApiRoute =
   | 'transcription-commit'
   | 'progress-overview'
   | 'progress-timeline'
+  | 'progress-compare'
+  | 'progress-checkpoints'
+  | 'progress-checkpoint-detail'
 
 type HealthApiHandler = (req: ApiRequest, res: ApiResponse) => unknown | Promise<unknown>
 
@@ -50,6 +56,9 @@ const HANDLERS: Record<HealthApiRoute, HealthApiHandler> = {
   'transcription-commit': transcriptionCommitHandler,
   'progress-overview': progressOverviewHandler,
   'progress-timeline': progressTimelineHandler,
+  'progress-compare': progressCompareHandler,
+  'progress-checkpoints': progressCheckpointsHandler,
+  'progress-checkpoint-detail': progressCheckpointDetailHandler,
 }
 
 function isSingleSegmentAfter(pathname: string, prefix: string): boolean {
@@ -86,6 +95,10 @@ export function matchHealthApiRoute(pathname: string): HealthApiRoute | null {
       return 'progress-overview'
     case '/api/progress/timeline':
       return 'progress-timeline'
+    case '/api/progress/compare':
+      return 'progress-compare'
+    case '/api/progress/checkpoints':
+      return 'progress-checkpoints'
     default:
       break
   }
@@ -97,6 +110,9 @@ export function matchHealthApiRoute(pathname: string): HealthApiRoute | null {
   }
   if (isSingleSegmentAfter(pathname, '/api/training/transcription/jobs/')) {
     return 'transcription-job-detail'
+  }
+  if (isSingleSegmentAfter(pathname, '/api/progress/checkpoints/')) {
+    return 'progress-checkpoint-detail'
   }
   return null
 }

@@ -111,11 +111,16 @@ describe('Vercel function module specifiers', () => {
         'server/handlers/transcription-commit.ts',
         'server/handlers/progress-overview.ts',
         'server/handlers/progress-timeline.ts',
+        'server/handlers/progress-compare.ts',
+        'server/handlers/progress-checkpoints.ts',
+        'server/handlers/progress-checkpoint-detail.ts',
         'server/progress/service.ts',
         'server/progress/queries.ts',
         'src/domain/progress/index.ts',
         'src/domain/progress/overview.ts',
         'src/domain/progress/timeline.ts',
+        'src/domain/progress/compare.ts',
+        'src/domain/progress/checkpoints.ts',
       ]),
     )
     expect(files).not.toContain('server/dev-api-plugin.ts')

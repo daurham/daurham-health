@@ -29,6 +29,22 @@ export {
 } from './types.js'
 export { trailingPeriod, isProgressRange, dateInInclusiveRange } from './periods.js'
 export {
+  comparePeriod,
+  buildProgressCompare,
+  buildSinceCheckpointCompare,
+  nearestBodyObservationWithinDays,
+  latestExerciseAppearanceOnOrBefore,
+  type ComparePeriod,
+  type ProgressCompare,
+  type CompareExercise,
+  type CompareFinding,
+} from './compare.js'
+export {
+  checkpointCreateSchema,
+  checkpointPatchSchema,
+  type ProgressCheckpoint,
+} from './checkpoints.js'
+export {
   epleyEstimated1RmKg,
   sessionStrengthPoint,
   asAnalyzableLoadedRepSet,
@@ -61,6 +77,7 @@ export {
   type TimelineFocus,
   type TimelinePerformanceBestEvent,
   type TimelineTrainingSessionEvent,
+  type TimelineCheckpointEvent,
 } from './timeline.js'
 export { classificationForExternalId, supportsTimedExternal } from './exercise-classification.js'
 export { calendarDateFromInstant, utcCalendarDateFromNow } from './dates.js'

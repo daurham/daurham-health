@@ -2,6 +2,7 @@ import { formatDatabaseError, getSql } from '../db.js'
 import { HttpError } from '../http.js'
 import { calendarDateFromInstant } from '../../src/domain/progress/dates.js'
 import { classificationForExternalId } from '../../src/domain/progress/exercise-classification.js'
+import type { ProgressCheckpoint } from '../../src/domain/progress/checkpoints.js'
 import type {
   BodyObservation,
   CanonicalSetRecord,
@@ -60,16 +61,46 @@ function asInt(value: unknown): number | null {
   return parsed == null || !Number.isInteger(parsed) ? null : parsed
 }
 
+export const LIST_CHECKPOINTS_SQL = `SELECT id, checkpoint_date, label, notes, created_at, updated_at
+         FROM progress_checkpoints
+         ORDER BY checkpoint_date ASC, created_at ASC, id ASC`
+
+export const INSERT_CHECKPOINT_SQL = `INSERT INTO progress_checkpoints (checkpoint_date, label, notes)
+         VALUES ($1, $2, $3)
+         RETURNING id, checkpoint_date, label, notes, created_at, updated_at`
+
+export const UPDATE_CHECKPOINT_SQL = `UPDATE progress_checkpoints
+         SET checkpoint_date = COALESCE($2, checkpoint_date),
+             label = COALESCE($3, label),
+             notes = CASE WHEN $4::boolean THEN $5 ELSE notes END,
+             updated_at = now()
+         WHERE id = $1
+         RETURNING id, checkpoint_date, label, notes, created_at, updated_at`
+
+export const DELETE_CHECKPOINT_SQL = `DELETE FROM progress_checkpoints WHERE id = $1 RETURNING id`
+
 export type ProgressCanonicalRows = {
   exercises: ProgressExerciseDefinition[]
   workouts: ProgressWorkoutSummary[]
   sets: CanonicalSetRecord[]
   bodyObservations: BodyObservation[]
+  checkpoints: ProgressCheckpoint[]
+}
+
+export function mapCheckpointRow(row: Record<string, unknown>): ProgressCheckpoint {
+  return {
+    id: String(row.id),
+    checkpointDate: asCalendarDate(row.checkpoint_date),
+    label: String(row.label),
+    notes: typeof row.notes === 'string' ? row.notes : null,
+    createdAt: asIso(row.created_at),
+    updatedAt: asIso(row.updated_at),
+  }
 }
 
 export async function loadProgressCanonicalRows(): Promise<ProgressCanonicalRows> {
   const sql = await getSql()
-  const [exerciseRows, sessionRows, setRows, bodyRows] = await queryOrUnavailable(() =>
+  const [exerciseRows, sessionRows, setRows, bodyRows, checkpointRows] = await queryOrUnavailable(() =>
     Promise.all([
       sql.query(
         `SELECT id, external_id, name, measurement_kind, unilateral, performance_type, analytics_load_type, analytics_rep_mode
@@ -124,6 +155,7 @@ export async function loadProgressCanonicalRows(): Promise<ProgressCanonicalRows
            ON sessions.id = metrics.measurement_session_id
          ORDER BY sessions.measured_at ASC, metrics.id ASC`,
       ),
+      sql.query(LIST_CHECKPOINTS_SQL),
     ]),
   )
 
@@ -196,5 +228,11 @@ export async function loadProgressCanonicalRows(): Promise<ProgressCanonicalRows
     }
   })
 
-  return { exercises, workouts, sets, bodyObservations }
+  return {
+    exercises,
+    workouts,
+    sets,
+    bodyObservations,
+    checkpoints: (checkpointRows as Record<string, unknown>[]).map(mapCheckpointRow),
+  }
 }

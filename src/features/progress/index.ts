@@ -5,4 +5,5 @@ export {
   ProgressStrengthLabRoute,
   ProgressBodyRoute,
   ProgressTimelineRoute,
+  ProgressCompareRoute,
 } from './ProgressPage'

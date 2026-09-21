@@ -16,6 +16,15 @@ export const PROGRESS_ANALYTICS_CONFIG = {
   relativeStrength: {
     maxBodyWeightDistanceDays: 3,
   },
+  checkpoint: {
+    bodyNearestDays: 3,
+    exerciseLookbackDays: 14,
+    labelMaxLength: 80,
+    notesMaxLength: 2000,
+  },
+  compare: {
+    workoutsPerWeekMinDays: 7,
+  },
 } as const
 
 export type ProgressAnalyticsConfig = typeof PROGRESS_ANALYTICS_CONFIG

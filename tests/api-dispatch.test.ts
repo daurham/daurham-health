@@ -98,6 +98,11 @@ describe('Vercel nested API routing', () => {
     expect(matchHealthApiRoute('/api/training/transcription/jobs')).toBe('transcription-jobs')
     expect(matchHealthApiRoute('/api/progress/overview')).toBe('progress-overview')
     expect(matchHealthApiRoute('/api/progress/timeline')).toBe('progress-timeline')
+    expect(matchHealthApiRoute('/api/progress/compare')).toBe('progress-compare')
+    expect(matchHealthApiRoute('/api/progress/checkpoints')).toBe('progress-checkpoints')
+    expect(matchHealthApiRoute('/api/progress/checkpoints/11111111-1111-4111-8111-111111111111')).toBe(
+      'progress-checkpoint-detail',
+    )
     expect(matchHealthApiRoute(`/api/training/transcription/jobs/${JOB_ID}`)).toBe(
       'transcription-job-detail',
     )
@@ -184,6 +189,23 @@ describe('api/index after Vercel nested rewrite', () => {
     expect(captured.status()).not.toBe(404)
     expect(captured.status()).not.toBe(405)
     expect(isDeniedPrivate(captured.status())).toBe(true)
+  })
+
+  it('protects Compare and checkpoint routes', async () => {
+    const compare = await hit('GET', '/api/progress/compare?startA=2026-06-01&endA=2026-06-30&startB=2026-09-01&endB=2026-09-30')
+    expect(compare.status()).not.toBe(404)
+    expect(isDeniedPrivate(compare.status())).toBe(true)
+
+    const list = await hit('GET', '/api/progress/checkpoints')
+    expect(isDeniedPrivate(list.status())).toBe(true)
+
+    const create = await hit('POST', '/api/progress/checkpoints')
+    expect(create.status()).not.toBe(404)
+    expect(isDeniedPrivate(create.status())).toBe(true)
+
+    const detail = await hit('DELETE', `/api/progress/checkpoints/${SESSION_ID}`)
+    expect(detail.status()).not.toBe(404)
+    expect(isDeniedPrivate(detail.status())).toBe(true)
   })
 
   it('returns 404 for unknown API routes and 405 for unsupported methods', async () => {

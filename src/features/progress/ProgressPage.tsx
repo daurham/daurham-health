@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { NavLink, Outlet, useOutletContext, useParams, useSearchParams } from 'react-router-dom'
+import { NavLink, Outlet, useLocation, useOutletContext, useParams, useSearchParams } from 'react-router-dom'
 import type { ProgressOverview, ProgressRange, ProgressTimeline } from '@/domain/progress'
 import { cn } from '@/lib'
 import { fetchProgressOverview, fetchProgressTimeline } from './api'
@@ -9,6 +9,7 @@ import { EvidencePanel, type EvidenceTopic } from './EvidencePanel'
 import { OverviewSection } from './OverviewSection'
 import { parseProgressRangeParam, progressSearch } from './range'
 import { StrengthLab, StrengthSection } from './StrengthSection'
+import { CompareSection } from './CompareSection'
 import { TimelineSection } from './TimelineSection'
 
 type ProgressOutletContext = {
@@ -22,11 +23,14 @@ const TABS = [
   { to: '/progress/strength', label: 'Strength', end: false },
   { to: '/progress/body', label: 'Body', end: false },
   { to: '/progress/timeline', label: 'Timeline', end: false },
+  { to: '/progress/compare', label: 'Compare', end: false },
 ] as const
 
 export function ProgressPage() {
   const [params, setParams] = useSearchParams()
+  const location = useLocation()
   const range = parseProgressRangeParam(params.get('range'))
+  const compareView = location.pathname.endsWith('/compare')
   const [overview, setOverview] = useState<ProgressOverview | null>(null)
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [error, setError] = useState<string | null>(null)
@@ -80,23 +84,28 @@ export function ProgressPage() {
       </div>
 
       <div className="rounded-lg border border-zinc-200 bg-white px-2 py-2 md:px-3">
-        <div className="flex gap-1 overflow-x-auto" role="group" aria-label="Progress range">
-          {RANGE_OPTIONS.map((option) => (
-            <button
-              key={option.id}
-              type="button"
-              onClick={() => setRange(option.id)}
-              className={cn(
-                'min-h-10 shrink-0 rounded-md px-3 py-1.5 text-sm font-medium md:min-h-9',
-                option.id === range ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900',
-              )}
-              aria-pressed={option.id === range}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-        <nav className="mt-2 flex flex-wrap gap-1 border-t border-zinc-100 pt-2" aria-label="Progress sections">
+        {compareView ? null : (
+          <div className="flex gap-1 overflow-x-auto" role="group" aria-label="Progress range">
+            {RANGE_OPTIONS.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() => setRange(option.id)}
+                className={cn(
+                  'min-h-10 shrink-0 rounded-md px-3 py-1.5 text-sm font-medium md:min-h-9',
+                  option.id === range ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900',
+                )}
+                aria-pressed={option.id === range}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        )}
+        <nav
+          className={cn('flex flex-wrap gap-1', compareView ? '' : 'mt-2 border-t border-zinc-100 pt-2')}
+          aria-label="Progress sections"
+        >
           {TABS.map((tab) => (
             <NavLink
               key={tab.to}
@@ -205,4 +214,9 @@ export function ProgressTimelineRoute() {
     )
   }
   return <TimelineSection timeline={timeline} range={range} onEvidence={onEvidence} />
+}
+
+export function ProgressCompareRoute() {
+  const { onEvidence } = useOutletContext<ProgressOutletContext>()
+  return <CompareSection onEvidence={onEvidence} />
 }

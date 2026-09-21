@@ -1,11 +1,12 @@
-import { HEALTH_DOMAINS, type CanonicalEvidence, type HealthDomain, type PrAchievement } from './types.js'
+import { HEALTH_DOMAINS, type CanonicalEvidence, type PrAchievement } from './types.js'
 import { dateInInclusiveRange, type TrailingPeriod } from './periods.js'
 import { buildProgressOverview, type ProgressCanonicalInput } from './overview.js'
+import type { ProgressCheckpoint } from './checkpoints.js'
 
-export const TIMELINE_DOMAINS = HEALTH_DOMAINS
-export type TimelineDomain = HealthDomain
+export const TIMELINE_DOMAINS = [...HEALTH_DOMAINS, 'annotation'] as const
+export type TimelineDomain = (typeof TIMELINE_DOMAINS)[number]
 
-export const TIMELINE_EVENT_KINDS = ['training_session', 'body_measurement', 'performance_best'] as const
+export const TIMELINE_EVENT_KINDS = ['training_session', 'body_measurement', 'performance_best', 'checkpoint'] as const
 export type TimelineEventKind = (typeof TIMELINE_EVENT_KINDS)[number]
 
 export const TIMELINE_FOCUSES = ['all', 'training', 'body', 'bests'] as const
@@ -57,6 +58,11 @@ export type TimelineBodyMeasurementData = {
   partial: boolean
 }
 
+export type TimelineCheckpointData = {
+  checkpointId: string
+  notes: string | null
+}
+
 export type TimelineEventBase = {
   id: string
   domain: TimelineDomain
@@ -89,10 +95,18 @@ export type TimelineBodyMeasurementEvent = TimelineEventBase & {
   data: TimelineBodyMeasurementData
 }
 
+export type TimelineCheckpointEvent = TimelineEventBase & {
+  domain: 'annotation'
+  kind: 'checkpoint'
+  timePrecision: 'date'
+  data: TimelineCheckpointData
+}
+
 export type TimelineEvent =
   | TimelineTrainingSessionEvent
   | TimelinePerformanceBestEvent
   | TimelineBodyMeasurementEvent
+  | TimelineCheckpointEvent
 
 export type ProgressTimeline = {
   period: TrailingPeriod
@@ -114,6 +128,11 @@ export type ProgressTimeline = {
       eventId: string
       sessionId: string | null
       exerciseName: string
+    }>
+    checkpoints: Array<{
+      date: string
+      eventId: string
+      label: string
     }>
   }
   events: TimelineEvent[]
@@ -152,9 +171,10 @@ function compareEvents(left: TimelineEvent, right: TimelineEvent): number {
     }
   }
   const kindRank: Record<TimelineEventKind, number> = {
-    body_measurement: 0,
-    training_session: 1,
-    performance_best: 2,
+    checkpoint: 0,
+    body_measurement: 1,
+    training_session: 2,
+    performance_best: 3,
   }
   if (kindRank[left.kind] !== kindRank[right.kind]) {
     return kindRank[left.kind] - kindRank[right.kind]
@@ -166,7 +186,9 @@ export function isTimelineFocus(value: string): value is TimelineFocus {
   return (TIMELINE_FOCUSES as readonly string[]).includes(value)
 }
 
-export function buildProgressTimeline(input: ProgressCanonicalInput): ProgressTimeline {
+export function buildProgressTimeline(
+  input: ProgressCanonicalInput & { checkpoints?: readonly ProgressCheckpoint[] },
+): ProgressTimeline {
   const overview = buildProgressOverview(input)
   const period = overview.period
   const inPeriod = (date: string) => dateInInclusiveRange(date, period.start, period.end)
@@ -292,7 +314,23 @@ export function buildProgressTimeline(input: ProgressCanonicalInput): ProgressTi
     }
   })
 
-  const events = [...trainingEvents, ...performanceBestEvents, ...bodyEvents].sort(compareEvents)
+  const checkpointEvents: TimelineCheckpointEvent[] = (input.checkpoints ?? [])
+    .filter((item) => inPeriod(item.checkpointDate))
+    .map((item) => ({
+      id: `checkpoint:${item.id}`,
+      domain: 'annotation',
+      kind: 'checkpoint',
+      date: item.checkpointDate,
+      timePrecision: 'date',
+      title: item.label,
+      evidence: [],
+      data: {
+        checkpointId: item.id,
+        notes: item.notes,
+      },
+    }))
+
+  const events = [...trainingEvents, ...performanceBestEvents, ...bodyEvents, ...checkpointEvents].sort(compareEvents)
 
   return {
     period,
@@ -316,6 +354,11 @@ export function buildProgressTimeline(input: ProgressCanonicalInput): ProgressTi
         eventId: event.id,
         sessionId: event.data.sessionId,
         exerciseName: event.data.exerciseName,
+      })),
+      checkpoints: checkpointEvents.map((event) => ({
+        date: event.date,
+        eventId: event.id,
+        label: event.title,
       })),
     },
     events,
@@ -371,5 +414,6 @@ export function timelineSeriesForFocus(
     bodyWeight: focus === 'all' || focus === 'body' ? timeline.series.bodyWeight : [],
     workouts: focus === 'all' || focus === 'training' ? timeline.series.workouts : [],
     performanceBests: focus === 'all' || focus === 'bests' ? timeline.series.performanceBests : [],
+    checkpoints: focus === 'all' ? timeline.series.checkpoints : [],
   }
 }

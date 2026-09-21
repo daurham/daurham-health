@@ -10,6 +10,7 @@ export type EvidenceTopic = {
   facts: Array<{ label: string; value: string }>
   evidence: CanonicalEvidence[]
   workoutSessionId?: string
+  actions?: Array<{ label: string; to: string }>
 }
 
 export function EvidencePanel({
@@ -105,6 +106,19 @@ export function EvidencePanel({
           >
             Open workout
           </Link>
+        ) : null}
+        {topic.actions && topic.actions.length > 0 ? (
+          <div className="mt-5 flex flex-wrap gap-2">
+            {topic.actions.map((action) => (
+              <Link
+                key={`${action.label}-${action.to}`}
+                to={action.to}
+                className="inline-flex min-h-11 items-center rounded-md border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-800 hover:bg-zinc-50"
+              >
+                {action.label}
+              </Link>
+            ))}
+          </div>
         ) : null}
       </div>
     </div>

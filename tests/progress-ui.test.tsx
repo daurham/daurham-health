@@ -695,6 +695,7 @@ function sampleTimeline(): ProgressTimeline {
         { date: '2026-09-21', eventId: 'performance_best:cable-pr', sessionId: 'w3', exerciseName: 'Cable Row' },
         { date: '2026-09-20', eventId: 'performance_best:farmer-pr', sessionId: 'w2', exerciseName: 'Farmer Carry' },
       ],
+      checkpoints: [],
     },
     events: [
       {
@@ -866,5 +867,44 @@ describe('progress timeline presentation', () => {
     expect(html).not.toContain('timeline-weight-line')
     expect(html).not.toContain('Workouts')
     expect(html).not.toContain('Bests')
+  })
+})
+
+describe('compare and checkpoint presentation', () => {
+  it('adds Compare to Progress navigation without changing mobile bottom nav destinations', () => {
+    const html = renderToStaticMarkup(
+      <MemoryRouter initialEntries={['/progress?range=all']}>
+        <Routes>
+          <Route path="/progress" element={<ProgressPage />}>
+            <Route index element={<div />} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    )
+    expect(html).toContain('Compare')
+    expect(html).toContain('Timeline')
+  })
+
+  it('shows date-only checkpoint markers on the timeline feed', () => {
+    const timeline = sampleTimeline()
+    timeline.series.checkpoints = [{ date: '2026-09-20', eventId: 'checkpoint:cp1', label: 'Started cut' }]
+    timeline.events.unshift({
+      id: 'checkpoint:cp1',
+      domain: 'annotation',
+      kind: 'checkpoint',
+      date: '2026-09-20',
+      timePrecision: 'date',
+      title: 'Started cut',
+      evidence: [],
+      data: { checkpointId: 'cp1', notes: null },
+    })
+    const html = renderToStaticMarkup(
+      <MemoryRouter initialEntries={['/progress/timeline?range=all']}>
+        <TimelineSection timeline={timeline} range="all" onEvidence={() => undefined} />
+      </MemoryRouter>,
+    )
+    expect(html).toContain('Started cut')
+    expect(html).toContain('Checkpoint')
+    expect(html).toContain('timeline-checkpoint-checkpoint:cp1')
   })
 })

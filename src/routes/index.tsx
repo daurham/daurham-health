@@ -3,7 +3,7 @@ import { ResetPasswordPage, SignInPage } from '@/auth'
 import { Layout } from '@/components'
 import { BodyPage } from '@/features/body'
 import { NutritionPage } from '@/features/nutrition'
-import { ProgressPage, ProgressOverviewRoute, ProgressStrengthRoute, ProgressStrengthLabRoute, ProgressBodyRoute, ProgressTimelineRoute } from '@/features/progress'
+import { ProgressPage, ProgressOverviewRoute, ProgressStrengthRoute, ProgressStrengthLabRoute, ProgressBodyRoute, ProgressTimelineRoute, ProgressCompareRoute } from '@/features/progress'
 import { TodayPage } from '@/features/today'
 import { ImportWorkoutPage, StartWorkoutPage, TrainingPage, WorkoutDetailPage } from '@/features/training'
 
@@ -28,6 +28,7 @@ const router = createBrowserRouter([
           { path: 'strength/:exerciseId', element: <ProgressStrengthLabRoute /> },
           { path: 'body', element: <ProgressBodyRoute /> },
           { path: 'timeline', element: <ProgressTimelineRoute /> },
+          { path: 'compare', element: <ProgressCompareRoute /> },
         ],
       },
       { path: 'sign-in', element: <SignInPage /> },

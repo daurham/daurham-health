@@ -35,11 +35,13 @@ export function TimelineLanes({
   series: ProgressTimeline['series']
   onSelect: (eventId: string) => void
 }) {
+  const checkpoints = series.checkpoints ?? []
   const lanes = [
     series.bodyWeight.length > 0 ? 'body' : null,
     series.workouts.length > 0 ? 'workouts' : null,
     series.performanceBests.length > 0 ? 'bests' : null,
-  ].filter((lane): lane is 'body' | 'workouts' | 'bests' => lane != null)
+    checkpoints.length > 0 ? 'checkpoints' : null,
+  ].filter((lane): lane is 'body' | 'workouts' | 'bests' | 'checkpoints' => lane != null)
 
   if (lanes.length === 0) {
     return null
@@ -90,11 +92,12 @@ export function TimelineLanes({
         viewBox={`0 0 800 ${height}`}
         className="h-auto w-full min-w-[20rem]"
         role="img"
-        aria-label="Progress timeline lanes for body weight, workouts, and performance bests"
+        aria-label="Progress timeline lanes for body weight, workouts, performance bests, and checkpoints"
       >
         {lanes.map((lane, index) => {
           const y = index * laneHeight + laneHeight / 2
-          const label = lane === 'body' ? 'Body weight' : lane === 'workouts' ? 'Workouts' : 'Bests'
+          const label =
+            lane === 'body' ? 'Body weight' : lane === 'workouts' ? 'Workouts' : lane === 'bests' ? 'Bests' : 'Notes'
           return (
             <g key={lane}>
               <text x="0" y={y + 4} className="fill-zinc-500" fontSize="11">
@@ -236,6 +239,35 @@ export function TimelineLanes({
               }),
             )
           : null}
+        {lanes.includes('checkpoints')
+          ? checkpoints.map((item) => {
+              const laneIndex = lanes.indexOf('checkpoints')
+              const x = xForDate(item.date, start, end, plotLeft, plotWidth)
+              const y = laneIndex * laneHeight + laneHeight / 2
+              return (
+                <g key={item.eventId} data-testid={`timeline-checkpoint-${item.eventId}`}>
+                  <line
+                    x1={x}
+                    x2={x}
+                    y1={0}
+                    y2={lanes.length * laneHeight}
+                    className="stroke-zinc-400"
+                    strokeDasharray="3 3"
+                    strokeWidth="1"
+                  />
+                  <rect x={x - 3} y={y - 6} width="6" height="12" className="fill-zinc-500" />
+                  <foreignObject x={x - 10} y={y - 10} width="20" height="20">
+                    <button
+                      type="button"
+                      className="h-5 w-5 cursor-pointer rounded-full bg-transparent"
+                      aria-label={`${item.label} checkpoint on ${formatCalendarDate(item.date)}`}
+                      onClick={() => onSelect(item.eventId)}
+                    />
+                  </foreignObject>
+                </g>
+              )
+            })
+          : null}
       </svg>
     </div>
   )
@@ -250,6 +282,7 @@ export function TimelineLaneLegend({
     series.bodyWeight.length > 0 ? { shape: '●', label: 'Body weight' } : null,
     series.workouts.length > 0 ? { shape: '◆', label: 'Workouts' } : null,
     series.performanceBests.length > 0 ? { shape: '★', label: 'Performance bests' } : null,
+    (series.checkpoints?.length ?? 0) > 0 ? { shape: '|', label: 'Checkpoints' } : null,
   ].filter((item): item is { shape: string; label: string } => item != null)
   if (items.length === 0) {
     return null

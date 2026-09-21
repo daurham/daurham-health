@@ -7,6 +7,7 @@ import {
   type ProgressRange,
   type ProgressTimeline,
   type TimelineBodyMeasurementEvent,
+  type TimelineCheckpointEvent,
   type TimelineEvent,
   type TimelineFocus,
   type TimelinePerformanceBestEvent,
@@ -148,6 +149,9 @@ function TimelineEventCard({
   }
   if (event.kind === 'body_measurement') {
     return <BodyEventCard event={event} onEvidence={onEvidence} />
+  }
+  if (event.kind === 'checkpoint') {
+    return <CheckpointEventCard event={event} />
   }
   return <PerformanceBestCard event={event} range={range} onEvidence={onEvidence} standalone />
 }
@@ -345,6 +349,25 @@ function BodyEventCard({
           >
             View evidence
           </button>
+        </div>
+      </div>
+    </article>
+  )
+}
+
+function CheckpointEventCard({ event }: { event: TimelineCheckpointEvent }) {
+  return (
+    <article
+      id={event.id}
+      tabIndex={-1}
+      className="rounded-lg border border-dashed border-zinc-300 bg-zinc-50 px-3 py-3 outline-none focus:ring-2 focus:ring-zinc-400 md:px-4"
+    >
+      <div className="md:grid md:grid-cols-[7.5rem_minmax(0,1fr)] md:items-start md:gap-4">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Checkpoint</p>
+        <div>
+          <p className="font-medium tracking-tight">{event.title}</p>
+          <p className="mt-0.5 text-sm text-zinc-600">{formatCalendarDate(event.date)}</p>
+          {event.data.notes ? <p className="mt-1 text-sm text-zinc-600">{event.data.notes}</p> : null}
         </div>
       </div>
     </article>

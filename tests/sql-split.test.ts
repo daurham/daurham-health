@@ -38,6 +38,12 @@ describe('splitSqlStatements', () => {
     expect(jobs).toHaveLength(2)
     expect(jobs[0]).toMatch(/^CREATE TABLE workout_transcription_jobs/)
     expect(jobs[1]).toMatch(/^CREATE INDEX workout_transcription_jobs_pending_idx/)
+    const checkpoints = splitSqlStatements(
+      readFileSync(path.join('migrations', '0007_progress_checkpoints.sql'), 'utf8'),
+    )
+    expect(checkpoints).toHaveLength(2)
+    expect(checkpoints[0]).toMatch(/^CREATE TABLE progress_checkpoints/)
+    expect(checkpoints[1]).toMatch(/^CREATE INDEX progress_checkpoints_date_idx/)
     const analytics = splitSqlStatements(
       readFileSync(path.join('migrations', '0005_exercise_analytics.sql'), 'utf8'),
     )
