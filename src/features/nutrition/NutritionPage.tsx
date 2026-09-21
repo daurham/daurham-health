@@ -6,6 +6,7 @@ import {
   snapshotFromDefinition,
   type NutritionEntry,
   type NutritionFood,
+  type PendingNutritionCapture,
 } from '@/domain/nutrition'
 import { cn } from '@/lib'
 import {
@@ -13,8 +14,10 @@ import {
   deleteNutritionEntry,
   fetchNutritionDay,
   fetchNutritionFood,
+  fetchNutritionLabelJobs,
   type NutritionDayPayload,
 } from './api'
+import { LabelCaptureSheet } from './LabelCapture'
 import { formatNutritionDayLabel, parseNutritionDateParam, shiftNutritionDate, todayNutritionDate } from './date'
 import {
   caloriesHeadline,
@@ -34,6 +37,7 @@ type Panel =
   | { kind: 'entry'; entry: NutritionEntry }
   | { kind: 'targets' }
   | { kind: 'food'; food: NutritionFood }
+  | { kind: 'label'; jobId: string }
 
 export function NutritionPage() {
   const [params, setParams] = useSearchParams()
@@ -45,6 +49,7 @@ export function NutritionPage() {
   const [panel, setPanel] = useState<Panel | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [undo, setUndo] = useState<NutritionEntry | null>(null)
+  const [captures, setCaptures] = useState<PendingNutritionCapture[]>([])
 
   useEffect(() => {
     if (params.get('date') !== date) {
@@ -77,6 +82,38 @@ export function NutritionPage() {
       cancelled = true
     }
   }, [date])
+
+  useEffect(() => {
+    let cancelled = false
+    let timer: number | undefined
+
+    async function loadCaptures() {
+      try {
+        const next = await fetchNutritionLabelJobs()
+        if (cancelled) {
+          return
+        }
+        setCaptures(next)
+        if (next.some((job) => job.status === 'queued' || job.status === 'processing')) {
+          timer = window.setTimeout(() => {
+            void loadCaptures()
+          }, 4000)
+        }
+      } catch {
+        if (!cancelled) {
+          setCaptures([])
+        }
+      }
+    }
+
+    void loadCaptures()
+    return () => {
+      cancelled = true
+      if (timer) {
+        window.clearTimeout(timer)
+      }
+    }
+  }, [date, panel])
 
   function setDate(next: string) {
     setParams({ date: next }, { replace: true })
@@ -265,6 +302,10 @@ export function NutritionPage() {
         </p>
       ) : null}
 
+      {captures.length > 0 ? (
+        <PendingCapturesCard jobs={captures} onOpen={(jobId) => setPanel({ kind: 'label', jobId })} />
+      ) : null}
+
       {loading && !day ? (
         <p className="text-sm text-zinc-600">Loading…</p>
       ) : (
@@ -384,6 +425,56 @@ export function NutritionPage() {
           }}
         />
       ) : null}
+      {panel?.kind === 'label' ? (
+        <LabelCaptureSheet
+          date={date}
+          jobId={panel.jobId}
+          onClose={() => setPanel(null)}
+          onBack={() => setPanel(null)}
+          onLogged={(entry, food) => {
+            setDay((current) => {
+              if (!current) {
+                return current
+              }
+              const entries = [...current.entries.filter((item) => item.id !== entry.id), entry]
+              return { ...current, entries, totals: nutritionDayTotals(entries) }
+            })
+            prependRecent(food)
+            setCaptures((current) => current.filter((job) => job.id !== panel.jobId))
+            setPanel(null)
+          }}
+        />
+      ) : null}
+    </section>
+  )
+}
+
+function PendingCapturesCard({
+  jobs,
+  onOpen,
+}: {
+  jobs: PendingNutritionCapture[]
+  onOpen: (jobId: string) => void
+}) {
+  return (
+    <section className="rounded-lg border border-zinc-200 bg-white px-3 py-2">
+      <h2 className="text-sm font-semibold">Pending captures</h2>
+      <ul className="mt-1">
+        {jobs.map((job) => (
+          <li key={job.id}>
+            <button
+              type="button"
+              onClick={() => onOpen(job.id)}
+              className="flex min-h-11 w-full items-center justify-between gap-2 text-left text-sm"
+            >
+              <span className="truncate">Label photo</span>
+              <span className="shrink-0 text-zinc-500">
+                {job.status === 'completed' ? 'Ready to review' : job.status === 'failed' ? 'Failed' : 'Analyzing...'}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
     </section>
   )
 }

@@ -202,6 +202,13 @@ export const INSERT_ENTRY_SQL = `INSERT INTO nutrition_entries (
          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
          RETURNING ${ENTRY_COLUMNS}`
 
+export const INSERT_ENTRY_WITH_ID_SQL = `INSERT INTO nutrition_entries (
+           id, log_date, consumed_at, timezone, meal, food_id, food_name, brand,
+           serving_quantity, serving_unit, grams, calories, protein, carbs, fat, fiber,
+           source_kind, notes
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+         RETURNING ${ENTRY_COLUMNS}`
+
 export const UPDATE_ENTRY_SQL = `UPDATE nutrition_entries SET
            log_date = COALESCE($2, log_date),
            consumed_at = CASE WHEN $3::boolean THEN $4 ELSE consumed_at END,
@@ -352,6 +359,17 @@ export async function insertEntry(values: unknown[]): Promise<NutritionEntry> {
   return queryOrUnavailable(async () => {
     const sql = await getSql()
     const rows = (await sql.query(INSERT_ENTRY_SQL, values)) as EntryRow[]
+    if (!rows[0]) {
+      throw new HttpError(500, 'Entry insert failed')
+    }
+    return mapEntryRow(rows[0])
+  })
+}
+
+export async function insertEntryWithId(values: unknown[]): Promise<NutritionEntry> {
+  return queryOrUnavailable(async () => {
+    const sql = await getSql()
+    const rows = (await sql.query(INSERT_ENTRY_WITH_ID_SQL, values)) as EntryRow[]
     if (!rows[0]) {
       throw new HttpError(500, 'Entry insert failed')
     }

@@ -301,6 +301,11 @@ describe('nutrition API routing', () => {
     expect(matchHealthApiRoute('/api/nutrition/targets')).toBe('nutrition-targets')
     expect(matchHealthApiRoute('/api/nutrition/barcode/034000470693')).toBe('nutrition-barcode')
     expect(matchHealthApiRoute('/api/nutrition/barcode/save')).toBe('nutrition-barcode')
+    expect(matchHealthApiRoute('/api/nutrition/label/jobs')).toBe('nutrition-label-jobs')
+    expect(matchHealthApiRoute('/api/nutrition/label/commit')).toBe('nutrition-label-commit')
+    expect(matchHealthApiRoute('/api/nutrition/label/jobs/11111111-1111-4111-8111-111111111111')).toBe(
+      'nutrition-label-job-detail',
+    )
     expect(matchHealthApiRoute('/api/nutrition/import/legacy/preview')).toBe('nutrition-legacy-import')
     expect(matchHealthApiRoute('/api/nutrition/import/legacy/commit')).toBe('nutrition-legacy-import')
     const sql = readFileSync('migrations/0008_nutrition.sql', 'utf8')

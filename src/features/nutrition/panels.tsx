@@ -25,6 +25,7 @@ import {
   searchNutritionFoods,
 } from './api'
 import { BarcodeScanner } from './BarcodeScanner'
+import { LabelCaptureSheet } from './LabelCapture'
 import { catalogKindLabel, formatGrams, formatKcal, formatQuantity, mealLabel, provenanceLabel } from './format'
 import { NutritionSheet } from './Sheet'
 
@@ -57,6 +58,7 @@ export function AddFoodSheet({ date, quickAdd, onClose, onLogged, onQuickLog, on
   const [searching, setSearching] = useState(false)
   const [manual, setManual] = useState(false)
   const [scan, setScan] = useState(false)
+  const [label, setLabel] = useState(false)
   const [confirmFood, setConfirmFood] = useState<NutritionFood | null>(null)
   const [candidate, setCandidate] = useState<PackagedFoodCandidate | null>(null)
   const [lookupError, setLookupError] = useState<{
@@ -216,6 +218,20 @@ export function AddFoodSheet({ date, quickAdd, onClose, onLogged, onQuickLog, on
     )
   }
 
+  if (label) {
+    return (
+      <LabelCaptureSheet
+        date={date}
+        onClose={onClose}
+        onBack={() => setLabel(false)}
+        onLogged={(entry, food) => {
+          onLogged(entry, food)
+          onClose()
+        }}
+      />
+    )
+  }
+
   if (manual) {
     return (
       <ManualEntrySheet
@@ -289,6 +305,9 @@ export function AddFoodSheet({ date, quickAdd, onClose, onLogged, onQuickLog, on
 
         <button type="button" className={primaryClass} onClick={() => setScan(true)}>
           Scan barcode
+        </button>
+        <button type="button" className={secondaryClass + ' w-full'} onClick={() => setLabel(true)}>
+          Scan nutrition label
         </button>
         <button type="button" className={secondaryClass + ' w-full'} onClick={() => setManual(true)}>
           Manual entry

@@ -25,6 +25,9 @@ import nutritionFoodDetailHandler from './handlers/nutrition-food-detail.js'
 import nutritionLegacyImportHandler from './handlers/nutrition-legacy-import.js'
 import nutritionTargetsHandler from './handlers/nutrition-targets.js'
 import nutritionBarcodeHandler from './handlers/nutrition-barcode.js'
+import nutritionLabelJobsHandler from './handlers/nutrition-label-jobs.js'
+import nutritionLabelJobDetailHandler from './handlers/nutrition-label-job-detail.js'
+import nutritionLabelCommitHandler from './handlers/nutrition-label-commit.js'
 
 export type HealthApiRoute =
   | 'health'
@@ -53,6 +56,9 @@ export type HealthApiRoute =
   | 'nutrition-legacy-import'
   | 'nutrition-targets'
   | 'nutrition-barcode'
+  | 'nutrition-label-jobs'
+  | 'nutrition-label-job-detail'
+  | 'nutrition-label-commit'
 
 type HealthApiHandler = (req: ApiRequest, res: ApiResponse) => unknown | Promise<unknown>
 
@@ -83,6 +89,9 @@ const HANDLERS: Record<HealthApiRoute, HealthApiHandler> = {
   'nutrition-legacy-import': nutritionLegacyImportHandler,
   'nutrition-targets': nutritionTargetsHandler,
   'nutrition-barcode': nutritionBarcodeHandler,
+  'nutrition-label-jobs': nutritionLabelJobsHandler,
+  'nutrition-label-job-detail': nutritionLabelJobDetailHandler,
+  'nutrition-label-commit': nutritionLabelCommitHandler,
 }
 
 function isSingleSegmentAfter(pathname: string, prefix: string): boolean {
@@ -133,6 +142,10 @@ export function matchHealthApiRoute(pathname: string): HealthApiRoute | null {
       return 'nutrition-targets'
     case '/api/nutrition/barcode/save':
       return 'nutrition-barcode'
+    case '/api/nutrition/label/jobs':
+      return 'nutrition-label-jobs'
+    case '/api/nutrition/label/commit':
+      return 'nutrition-label-commit'
     case '/api/nutrition/import/legacy/preview':
     case '/api/nutrition/import/legacy/commit':
       return 'nutrition-legacy-import'
@@ -159,6 +172,12 @@ export function matchHealthApiRoute(pathname: string): HealthApiRoute | null {
   }
   if (isSingleSegmentAfter(pathname, '/api/nutrition/barcode/')) {
     return 'nutrition-barcode'
+  }
+  if (pathname.startsWith('/api/nutrition/label/jobs/')) {
+    const rest = pathname.slice('/api/nutrition/label/jobs/'.length)
+    if (rest.length > 0 && (rest.split('/').length === 1 || rest.endsWith('/image'))) {
+      return 'nutrition-label-job-detail'
+    }
   }
   return null
 }

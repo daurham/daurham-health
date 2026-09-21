@@ -273,6 +273,16 @@ describe('Health transcription GET mapping', () => {
         review: null,
         error: null,
       }),
+      createNutritionLabelJob: async () => ({ id: JOB_ID, status: 'queued' }),
+      getNutritionLabelJob: async () => ({
+        id: JOB_ID,
+        status: 'queued',
+        elapsedMs: null,
+        imageAvailable: false,
+        candidate: null,
+        error: null,
+      }),
+      getNutritionLabelImage: async () => null,
     }
     const body = await getTranscriptionJob(JOB_ID, mock, { templates: templates(), exercises: library() })
     const serialized = JSON.stringify(body)
@@ -294,6 +304,16 @@ describe('Health transcription GET mapping', () => {
         review: null,
         error: { code: 'PIPELINE_INTERRUPTED', message: 'Analysis was interrupted on the home server. Try the photo again.' },
       }),
+      createNutritionLabelJob: async () => ({ id: JOB_ID, status: 'queued' }),
+      getNutritionLabelJob: async () => ({
+        id: JOB_ID,
+        status: 'failed',
+        elapsedMs: null,
+        imageAvailable: false,
+        candidate: null,
+        error: null,
+      }),
+      getNutritionLabelImage: async () => null,
     }
     const body = await getTranscriptionJob(JOB_ID, mock, { templates: templates(), exercises: library() })
     expect(body.job.status).toBe('failed')

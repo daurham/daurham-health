@@ -63,6 +63,44 @@ export {
   foodLogFingerprint,
   catalogFingerprintForLog,
 } from './legacy.js'
+export {
+  NUTRITION_LABEL_SCHEMA_VERSION,
+  NUTRITION_LABEL_PIPELINE,
+  NUTRITION_LABEL_SOURCE_KEY,
+  NUTRITION_LABEL_CAPTURE_KIND,
+  sanitizeLabelCandidate,
+  validateAndFlagCandidate,
+  validateLabelReview,
+  planLabelCommitFood,
+  draftFromCandidate,
+  emptyLabelCandidate,
+  macroEnergyWarning,
+  labelFailureMessage,
+  nutritionLabelJobFingerprint,
+  missingField,
+  okField,
+  uncertainField,
+  isHomeAiJobId,
+  HOME_AI_JOB_ID_RE,
+} from './label.js'
+export type {
+  NutritionLabelCandidate,
+  NutritionLabelFields,
+  LabelReviewDraft,
+  LabelBasis,
+  ExtractedField,
+  PendingNutritionCapture,
+  NutritionLabelJobResponse,
+  NutritionLabelComparison,
+  CommitNutritionLabelRequest,
+} from './label.js'
+export {
+  nutritionLabelCandidateSchema,
+  nutritionLabelJobResponseSchema,
+  nutritionLabelJobListResponseSchema,
+  commitNutritionLabelRequestSchema,
+  pendingNutritionCaptureSchema,
+} from './label.js'
 export type {
   LegacyNutritionDump,
   LegacyIngredient,

@@ -1,0 +1,20 @@
+import { createNutritionLabelJob, listNutritionLabelJobs } from '../nutrition/label.js'
+import { withOwnerAuth } from '../auth/with-owner.js'
+import { handleApiError, sendJson, type ApiRequest, type ApiResponse } from '../http.js'
+
+export default withOwnerAuth(async function nutritionLabelJobsHandler(req: ApiRequest, res: ApiResponse) {
+  try {
+    if (req.method === 'GET') {
+      sendJson(res, 200, await listNutritionLabelJobs())
+      return
+    }
+    if (req.method !== 'POST') {
+      res.setHeader('Allow', 'GET, POST')
+      sendJson(res, 405, { error: 'Method not allowed' })
+      return
+    }
+    sendJson(res, 202, await createNutritionLabelJob(req))
+  } catch (error) {
+    handleApiError(res, error)
+  }
+})
