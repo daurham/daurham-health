@@ -4,12 +4,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Plugin, ViteDevServer } from 'vite'
 import { wrapNodeResponse } from './http.js'
 
-function apiFileFromUrl(root: string, url: string): string | null {
-  const pathname = url.split('?')[0] ?? ''
-  if (!pathname.startsWith('/api/')) {
-    return null
-  }
-  const relative = `${pathname.slice(1)}.ts`
+function safeApiFile(root: string, relative: string): string | null {
   const filePath = path.resolve(root, relative)
   const relativeToRoot = path.relative(root, filePath)
   if (relativeToRoot.startsWith('..') || path.isAbsolute(relativeToRoot)) {
@@ -19,6 +14,23 @@ function apiFileFromUrl(root: string, url: string): string | null {
     return null
   }
   return fs.existsSync(filePath) ? filePath : null
+}
+
+function apiFileFromUrl(root: string, url: string): string | null {
+  const pathname = url.split('?')[0] ?? ''
+  if (!pathname.startsWith('/api/')) {
+    return null
+  }
+  const exact = safeApiFile(root, `${pathname.slice(1)}.ts`)
+  if (exact) {
+    return exact
+  }
+  const parts = pathname.slice(1).split('/').filter((part) => part.length > 0)
+  if (parts.length < 2) {
+    return null
+  }
+  const dynamicRelative = `${[...parts.slice(0, -1), '[id]'].join('/')}.ts`
+  return safeApiFile(root, dynamicRelative)
 }
 
 export function healthApiDevPlugin(): Plugin {

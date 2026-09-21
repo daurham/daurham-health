@@ -61,6 +61,10 @@ describe('Vercel function module specifiers', () => {
         'api/body/measurements.ts',
         'api/body/import/fit-profile/preview.ts',
         'api/body/import/fit-profile/commit.ts',
+        'api/training/exercises.ts',
+        'api/training/templates.ts',
+        'api/training/sessions.ts',
+        'api/training/sessions/[id].ts',
         'server/body/fit-profile-import.ts',
         'server/body/upload.ts',
         'server/body/commit-sql.ts',
@@ -74,6 +78,8 @@ describe('Vercel function module specifiers', () => {
         'src/domain/duplicates.ts',
         'src/domain/time.ts',
         'src/domain/units.ts',
+        'src/domain/training.ts',
+        'server/training/service.ts',
       ]),
     )
     expect(files).not.toContain('server/dev-api-plugin.ts')

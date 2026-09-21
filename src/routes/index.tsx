@@ -4,7 +4,7 @@ import { BodyPage } from '@/features/body'
 import { NutritionPage } from '@/features/nutrition'
 import { ProgressPage } from '@/features/progress'
 import { TodayPage } from '@/features/today'
-import { TrainingPage } from '@/features/training'
+import { StartWorkoutPage, TrainingPage, WorkoutDetailPage } from '@/features/training'
 
 const router = createBrowserRouter([
   {
@@ -14,6 +14,8 @@ const router = createBrowserRouter([
       { index: true, element: <TodayPage /> },
       { path: 'nutrition', element: <NutritionPage /> },
       { path: 'training', element: <TrainingPage /> },
+      { path: 'training/new', element: <StartWorkoutPage /> },
+      { path: 'training/:sessionId', element: <WorkoutDetailPage /> },
       { path: 'body', element: <BodyPage /> },
       { path: 'progress', element: <ProgressPage /> },
     ],

@@ -26,10 +26,17 @@ describe('splitSqlStatements', () => {
     const body = splitSqlStatements(
       readFileSync(path.join('migrations', '0002_body_measurements.sql'), 'utf8'),
     )
+    const training = splitSqlStatements(
+      readFileSync(path.join('migrations', '0003_training.sql'), 'utf8'),
+    )
     expect(foundation).toHaveLength(7)
     expect(body).toHaveLength(5)
-    expect(foundation.every((statement) => !statement.includes('$tag$'))).toBe(true)
-    expect(body[0]).toMatch(/^CREATE TABLE body_measurement_sessions/)
-    expect(body[3]).toMatch(/^CREATE TABLE body_metrics/)
+    expect(training).toHaveLength(10)
+    expect(training.every((statement) => !statement.includes('$tag$'))).toBe(true)
+    expect(training[0]).toMatch(/^CREATE TABLE exercise_definitions/)
+    expect(training[7]).toMatch(/^INSERT INTO exercise_definitions/)
+    expect(training[9]).toContain('A01')
+    expect(training[9]).toContain('B07')
+    expect(training[9]).toContain('C07')
   })
 })

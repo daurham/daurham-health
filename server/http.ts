@@ -6,6 +6,7 @@ export type ApiRequest = IncomingMessage & {
   method?: string
   url?: string
   body?: unknown
+  query?: Record<string, string | string[] | undefined>
 }
 
 export type ApiResponse = ServerResponse & {
@@ -45,6 +46,55 @@ export function handleApiError(res: ApiResponse, error: unknown): void {
     }
   }
   sendError(res, 500, 'Unexpected server error')
+}
+
+export function requestPathname(req: ApiRequest): string {
+  const url = req.url ?? ''
+  return url.split('?')[0] ?? ''
+}
+
+export function pathParamAfter(req: ApiRequest, prefix: string): string | null {
+  const pathname = requestPathname(req)
+  const normalizedPrefix = prefix.endsWith('/') ? prefix.slice(0, -1) : prefix
+  if (!pathname.startsWith(`${normalizedPrefix}/`)) {
+    return null
+  }
+  const rest = pathname.slice(normalizedPrefix.length + 1)
+  if (rest.length === 0 || rest.includes('/')) {
+    return null
+  }
+  return decodeURIComponent(rest)
+}
+
+/** Single string query value. Arrays, blanks, and non-strings are ignored. */
+export function queryStringParam(req: ApiRequest, name: string): string | null {
+  const value = req.query?.[name]
+  if (typeof value !== 'string') {
+    return null
+  }
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed : null
+}
+
+export async function readJsonBody(req: ApiRequest, maxBytes = MAX_UPLOAD_BYTES): Promise<unknown> {
+  const contentType = req.headers['content-type']
+  if (typeof contentType === 'string' && !contentType.toLowerCase().includes('application/json')) {
+    throw new HttpError(400, 'Expected JSON body')
+  }
+
+  if (req.body != null && typeof req.body === 'object' && !Buffer.isBuffer(req.body)) {
+    return req.body
+  }
+
+  const buffer = await readRequestBuffer(req, maxBytes)
+  if (buffer.length === 0) {
+    throw new HttpError(400, 'Expected JSON body')
+  }
+  try {
+    return JSON.parse(buffer.toString('utf8')) as unknown
+  } catch {
+    throw new HttpError(400, 'Invalid JSON')
+  }
 }
 
 export async function readRequestBuffer(
