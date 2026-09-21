@@ -1,4 +1,4 @@
-import type { MetricResult, ProgressFinding, ProgressOverview, ProgressRange } from '@/domain/progress'
+import type { MetricResult, ProgressFinding, ProgressOverview, ProgressRange, TimelineFocus } from '@/domain/progress'
 import { kilogramsToPounds } from '@/domain/units'
 import {
   ACHIEVEMENT_LABELS,
@@ -15,6 +15,13 @@ export const RANGE_OPTIONS: Array<{ id: ProgressRange; label: string }> = [
   { id: '6m', label: '6M' },
   { id: '1y', label: '1Y' },
   { id: 'all', label: 'ALL' },
+]
+
+export const TIMELINE_FOCUS_OPTIONS: Array<{ id: TimelineFocus; label: string }> = [
+  { id: 'all', label: 'All' },
+  { id: 'training', label: 'Training' },
+  { id: 'body', label: 'Body' },
+  { id: 'bests', label: 'Performance Bests' },
 ]
 
 export const RANGE_HEADINGS: Record<ProgressRange, string> = {

@@ -184,6 +184,10 @@ export type ProgressWorkoutSummary = {
   sessionId: string
   sessionDate: string
   createdAt: string
+  templateName?: string | null
+  routineCode?: string | null
+  effort?: number | null
+  durationMin?: number | null
 }
 
 export const PR_ACHIEVEMENTS = [

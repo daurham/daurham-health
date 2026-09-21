@@ -43,5 +43,24 @@ export { bodyWeightTrend, compareSparseBodyMetric, latestBodyObservation } from 
 export { relativeStrength } from './relative-strength.js'
 export { trainingConsistency } from './consistency.js'
 export { buildProgressOverview, type ProgressCanonicalInput, type ProgressOverview } from './overview.js'
+export {
+  TIMELINE_DOMAINS,
+  TIMELINE_EVENT_KINDS,
+  TIMELINE_FOCUSES,
+  buildProgressTimeline,
+  groupedTimelineDays,
+  isTimelineFocus,
+  performanceBestsForSession,
+  timelineEventsForFocus,
+  timelineSeriesForFocus,
+  type ProgressTimeline,
+  type TimelineBodyMeasurementEvent,
+  type TimelineDomain,
+  type TimelineEvent,
+  type TimelineEventKind,
+  type TimelineFocus,
+  type TimelinePerformanceBestEvent,
+  type TimelineTrainingSessionEvent,
+} from './timeline.js'
 export { classificationForExternalId, supportsTimedExternal } from './exercise-classification.js'
 export { calendarDateFromInstant, utcCalendarDateFromNow } from './dates.js'

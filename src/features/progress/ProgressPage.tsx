@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useOutletContext, useParams, useSearchParams } from 'react-router-dom'
-import type { ProgressOverview, ProgressRange } from '@/domain/progress'
+import type { ProgressOverview, ProgressRange, ProgressTimeline } from '@/domain/progress'
 import { cn } from '@/lib'
-import { fetchProgressOverview } from './api'
+import { fetchProgressOverview, fetchProgressTimeline } from './api'
 import { RANGE_OPTIONS } from './copy'
 import { BodySection } from './BodySection'
 import { EvidencePanel, type EvidenceTopic } from './EvidencePanel'
@@ -166,6 +166,43 @@ export function ProgressBodyRoute() {
 }
 
 export function ProgressTimelineRoute() {
-  const { overview } = useOutletContext<ProgressOutletContext>()
-  return <TimelineSection overview={overview} />
+  const { range, onEvidence } = useOutletContext<ProgressOutletContext>()
+  const [timeline, setTimeline] = useState<ProgressTimeline | null>(null)
+  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    setStatus('loading')
+    setError(null)
+    fetchProgressTimeline(range)
+      .then((next) => {
+        if (!cancelled) {
+          setTimeline(next)
+          setStatus('ready')
+        }
+      })
+      .catch((caught: unknown) => {
+        if (!cancelled) {
+          setTimeline(null)
+          setStatus('error')
+          setError(caught instanceof Error ? caught.message : 'Could not load Timeline')
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [range])
+
+  if (status === 'loading') {
+    return <div className="h-40 animate-pulse rounded-lg bg-zinc-200" aria-busy="true" aria-label="Loading timeline" />
+  }
+  if (status === 'error' || !timeline) {
+    return (
+      <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+        {error ?? 'Timeline is unavailable.'} Values are not shown as zero when a request fails.
+      </p>
+    )
+  }
+  return <TimelineSection timeline={timeline} range={range} onEvidence={onEvidence} />
 }

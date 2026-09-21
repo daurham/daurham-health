@@ -15,7 +15,10 @@ import {
   workoutActivityByDate,
 } from '../src/features/progress/copy.ts'
 import { bodyMetricLabel, formatBodyCanonical, formatBodyMetricChange, formatKgAsLb, formatPerformed } from '../src/features/progress/format.ts'
-import { parseProgressRangeParam, progressSearch } from '../src/features/progress/range.ts'
+import { parseProgressRangeParam, parseTimelineFocusParam, progressSearch } from '../src/features/progress/range.ts'
+import { TimelineSection } from '../src/features/progress/TimelineSection.tsx'
+import { TimelineLanes } from '../src/features/progress/TimelineLanes.tsx'
+import type { ProgressTimeline } from '../src/domain/progress/timeline.ts'
 
 const CABLE_ID = '11111111-1111-4111-8111-111111111111'
 const FARMER_ID = '22222222-2222-4222-8222-222222222222'
@@ -435,6 +438,9 @@ describe('progress range URL helpers', () => {
     expect(parseProgressRangeParam('90d')).toBe('90d')
     expect(parseProgressRangeParam('all')).toBe('all')
     expect(progressSearch('90d')).toBe('?range=90d')
+    expect(parseTimelineFocusParam('bests')).toBe('bests')
+    expect(parseTimelineFocusParam('nope')).toBe('all')
+    expect(progressSearch('30d', 'training')).toBe('?range=30d&focus=training')
   })
 })
 
@@ -657,5 +663,208 @@ describe('training activity counts', () => {
       { date: '2026-09-20', count: 2 },
       { date: '2026-09-21', count: 1 },
     ])
+  })
+})
+
+function sampleTimeline(): ProgressTimeline {
+  return {
+    period: {
+      range: 'all',
+      start: '2026-09-20',
+      end: '2026-09-21',
+      dayCount: 2,
+      comparisonStart: null,
+      comparisonEnd: null,
+    },
+    series: {
+      bodyWeight: [
+        {
+          date: '2026-09-21',
+          valueKg: 86.64,
+          measurementId: 'm-weight',
+          measurementSessionId: 'ms1',
+          occurredAt: '2026-09-21T16:16:00.000Z',
+        },
+      ],
+      workouts: [
+        { date: '2026-09-20', sessionId: 'w1', templateName: 'Full Body A' },
+        { date: '2026-09-20', sessionId: 'w2', templateName: 'Full Body C' },
+        { date: '2026-09-21', sessionId: 'w3', templateName: 'Full Body B' },
+      ],
+      performanceBests: [
+        { date: '2026-09-21', eventId: 'performance_best:cable-pr', sessionId: 'w3', exerciseName: 'Cable Row' },
+        { date: '2026-09-20', eventId: 'performance_best:farmer-pr', sessionId: 'w2', exerciseName: 'Farmer Carry' },
+      ],
+    },
+    events: [
+      {
+        id: 'body_measurement:ms1',
+        domain: 'body',
+        kind: 'body_measurement',
+        date: '2026-09-21',
+        timePrecision: 'timestamp',
+        occurredAt: '2026-09-21T16:16:00.000Z',
+        title: 'Body measurement',
+        evidence: [{ domain: 'body', measurementId: 'm-weight', measurementSessionId: 'ms1', date: '2026-09-21' }],
+        data: {
+          measurementSessionId: 'ms1',
+          timezone: 'America/Los_Angeles',
+          weightKg: 86.64,
+          partial: true,
+          metrics: [
+            { key: 'weight', value: 86.64, unit: 'kg', measurementId: 'm-weight' },
+            { key: 'bmi', value: 27.3, unit: 'index', measurementId: 'm-bmi' },
+          ],
+        },
+      },
+      {
+        id: 'training_session:w3',
+        domain: 'training',
+        kind: 'training_session',
+        date: '2026-09-21',
+        timePrecision: 'date',
+        title: 'Full Body B',
+        evidence: [{ domain: 'training', sessionId: 'w3', date: '2026-09-21' }],
+        data: {
+          sessionId: 'w3',
+          templateName: 'Full Body B',
+          routineCode: null,
+          effort: 1,
+          durationMinutes: 50,
+          exerciseCount: 6,
+          workingSetCount: 17,
+          performanceBestIds: ['performance_best:cable-pr'],
+          createdAt: '2026-09-21T18:00:00.000Z',
+        },
+      },
+      {
+        id: 'performance_best:cable-pr',
+        domain: 'training',
+        kind: 'performance_best',
+        date: '2026-09-21',
+        timePrecision: 'date',
+        title: 'Cable Row',
+        evidence: [{ domain: 'training', sessionId: 'w3', setId: 'cable-pr', date: '2026-09-21', loadKg: 26.76, reps: 9 }],
+        data: {
+          sessionId: 'w3',
+          sessionTitle: 'Full Body B',
+          exerciseId: CABLE_ID,
+          exerciseName: 'Cable Row',
+          performed: { loadKg: 26.76, reps: 9 },
+          achievements: ['load', 'frontier', 'estimated_strength'],
+        },
+      },
+      {
+        id: 'training_session:w1',
+        domain: 'training',
+        kind: 'training_session',
+        date: '2026-09-20',
+        timePrecision: 'date',
+        title: 'Full Body A',
+        evidence: [{ domain: 'training', sessionId: 'w1', date: '2026-09-20' }],
+        data: {
+          sessionId: 'w1',
+          templateName: 'Full Body A',
+          routineCode: null,
+          effort: 3,
+          durationMinutes: 55,
+          exerciseCount: 6,
+          workingSetCount: 18,
+          performanceBestIds: [],
+          createdAt: '2026-09-20T19:00:00.000Z',
+        },
+      },
+      {
+        id: 'training_session:w2',
+        domain: 'training',
+        kind: 'training_session',
+        date: '2026-09-20',
+        timePrecision: 'date',
+        title: 'Full Body C',
+        evidence: [{ domain: 'training', sessionId: 'w2', date: '2026-09-20' }],
+        data: {
+          sessionId: 'w2',
+          templateName: 'Full Body C',
+          routineCode: null,
+          effort: 4,
+          durationMinutes: 48,
+          exerciseCount: 5,
+          workingSetCount: 12,
+          performanceBestIds: ['performance_best:farmer-pr'],
+          createdAt: '2026-09-20T23:00:00.000Z',
+        },
+      },
+      {
+        id: 'performance_best:farmer-pr',
+        domain: 'training',
+        kind: 'performance_best',
+        date: '2026-09-20',
+        timePrecision: 'date',
+        title: 'Farmer Carry',
+        evidence: [{ domain: 'training', sessionId: 'w2', setId: 'farmer-pr', date: '2026-09-20', loadKg: 22.68, durationSec: 45 }],
+        data: {
+          sessionId: 'w2',
+          sessionTitle: 'Full Body C',
+          exerciseId: FARMER_ID,
+          exerciseName: 'Farmer Carry',
+          performed: { loadKg: 22.68, durationSec: 45 },
+          achievements: ['load', 'frontier'],
+        },
+      },
+    ],
+  }
+}
+
+describe('progress timeline presentation', () => {
+  it('nests performance bests under source workouts and excludes period-level workout frequency', () => {
+    const html = renderToStaticMarkup(
+      <MemoryRouter initialEntries={['/progress/timeline?range=all']}>
+        <TimelineSection timeline={sampleTimeline()} range="all" onEvidence={() => undefined} />
+      </MemoryRouter>,
+    )
+    expect(html).toContain('Full Body B')
+    expect(html).toContain('Cable Row')
+    expect(html).toContain('Full Body A')
+    expect(html).toContain('Full Body C')
+    expect(html).toContain('Farmer Carry')
+    expect(html).toContain('Partial measurement')
+    expect(html).toContain('BMI')
+    expect(html).toContain('—')
+    expect(html).toContain('Open workout')
+    expect(html).toContain('View evidence')
+    expect(html).not.toContain('Workout frequency')
+    expect(html).not.toContain('3 workouts')
+    expect(html).not.toContain('timeline-weight-line')
+    expect(html).toContain('timeline-lane-body')
+    expect(html).toContain('timeline-workout-w1')
+    expect(html).toContain('timeline-workout-w2')
+  })
+
+  it('filters the chronological feed and lanes together', () => {
+    const html = renderToStaticMarkup(
+      <MemoryRouter initialEntries={['/progress/timeline?range=all&focus=body']}>
+        <TimelineSection timeline={sampleTimeline()} range="all" onEvidence={() => undefined} />
+      </MemoryRouter>,
+    )
+    expect(html).toContain('Body')
+    expect(html).toContain('Partial measurement')
+    expect(html).toContain('191 lb')
+    expect(html).not.toContain('Full Body A')
+    expect(html).not.toContain('Cable Row')
+    expect(html).not.toContain('timeline-workout-w1')
+  })
+
+  it('hides empty lanes and does not draw a fake weight trend from one point', () => {
+    const timeline = sampleTimeline()
+    timeline.series.bodyWeight = [timeline.series.bodyWeight[0]!]
+    timeline.series.workouts = []
+    timeline.series.performanceBests = []
+    const html = renderToStaticMarkup(
+      <TimelineLanes timeline={timeline} series={timeline.series} onSelect={() => undefined} />,
+    )
+    expect(html).toContain('timeline-lane-body')
+    expect(html).not.toContain('timeline-weight-line')
+    expect(html).not.toContain('Workouts')
+    expect(html).not.toContain('Bests')
   })
 })

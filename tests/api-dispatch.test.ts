@@ -97,6 +97,7 @@ describe('Vercel nested API routing', () => {
     expect(matchHealthApiRoute(`/api/training/sessions/${SESSION_ID}`)).toBe('training-session-detail')
     expect(matchHealthApiRoute('/api/training/transcription/jobs')).toBe('transcription-jobs')
     expect(matchHealthApiRoute('/api/progress/overview')).toBe('progress-overview')
+    expect(matchHealthApiRoute('/api/progress/timeline')).toBe('progress-timeline')
     expect(matchHealthApiRoute(`/api/training/transcription/jobs/${JOB_ID}`)).toBe(
       'transcription-job-detail',
     )
@@ -173,6 +174,13 @@ describe('api/index after Vercel nested rewrite', () => {
 
   it('protects GET /api/progress/overview', async () => {
     const captured = await hit('GET', '/api/progress/overview?range=30d')
+    expect(captured.status()).not.toBe(404)
+    expect(captured.status()).not.toBe(405)
+    expect(isDeniedPrivate(captured.status())).toBe(true)
+  })
+
+  it('protects GET /api/progress/timeline', async () => {
+    const captured = await hit('GET', '/api/progress/timeline?range=30d')
     expect(captured.status()).not.toBe(404)
     expect(captured.status()).not.toBe(405)
     expect(isDeniedPrivate(captured.status())).toBe(true)

@@ -1,10 +1,12 @@
 import { isCalendarDate } from '../../src/domain/training.js'
 import {
   buildProgressOverview,
+  buildProgressTimeline,
   isProgressRange,
   utcCalendarDateFromNow,
   type ProgressOverview,
   type ProgressRange,
+  type ProgressTimeline,
 } from '../../src/domain/progress/index.js'
 import { HttpError } from '../http.js'
 import { loadProgressCanonicalRows } from './queries.js'
@@ -35,6 +37,23 @@ export async function getProgressOverview(input: {
   const query = parseProgressQuery(input)
   const rows = await loadProgressCanonicalRows()
   return buildProgressOverview({
+    asOf: query.asOf,
+    range: query.range,
+    exercises: rows.exercises,
+    workouts: rows.workouts,
+    sets: rows.sets,
+    bodyObservations: rows.bodyObservations,
+  })
+}
+
+export async function getProgressTimeline(input: {
+  range: string | null
+  asOf: string | null
+  now?: Date
+}): Promise<ProgressTimeline> {
+  const query = parseProgressQuery(input)
+  const rows = await loadProgressCanonicalRows()
+  return buildProgressTimeline({
     asOf: query.asOf,
     range: query.range,
     exercises: rows.exercises,

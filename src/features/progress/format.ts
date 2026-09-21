@@ -29,6 +29,25 @@ export function formatCalendarDate(isoDate: string): string {
   return formatWorkoutDate(isoDate)
 }
 
+export function formatTimelineDayHeading(isoDate: string): string {
+  return formatCalendarDate(isoDate).toUpperCase()
+}
+
+export function formatClockTime(iso: string, timeZone: string | null): string {
+  const options: Intl.DateTimeFormatOptions = {
+    hour: 'numeric',
+    minute: '2-digit',
+  }
+  try {
+    return new Intl.DateTimeFormat('en-US', {
+      ...options,
+      timeZone: timeZone && timeZone.trim() !== '' ? timeZone.trim() : undefined,
+    }).format(new Date(iso))
+  } catch {
+    return new Intl.DateTimeFormat('en-US', options).format(new Date(iso))
+  }
+}
+
 export function formatSigned(value: number, digits = 1, unit = ''): string {
   const formatted = value.toLocaleString('en-US', {
     maximumFractionDigits: digits,

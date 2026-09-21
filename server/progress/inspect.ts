@@ -1,4 +1,4 @@
-import { getProgressOverview } from './service.js'
+import { getProgressOverview, getProgressTimeline } from './service.js'
 import { loadProgressCanonicalRows } from './queries.js'
 import { exclusionReasonForSet } from '../../src/domain/progress/exercise-performance.js'
 import { supportsLoadedRepStrength, supportsTimedExternal } from '../../src/domain/progress/exercise-classification.js'
@@ -14,6 +14,10 @@ function countBy<T extends string>(items: T[]): Record<string, number> {
 async function main(): Promise<void> {
   const rows = await loadProgressCanonicalRows()
   const overview = await getProgressOverview({
+    range: 'all',
+    asOf: null,
+  })
+  const timeline = await getProgressTimeline({
     range: 'all',
     asOf: null,
   })
@@ -77,6 +81,52 @@ async function main(): Promise<void> {
     bodyWeightTrendStatus: overview.body.weight.trend.status,
     findingKinds: countBy(overview.findings.map((item) => item.kind)),
     findingDomains: countBy(overview.findings.map((item) => item.domain)),
+    timeline: {
+      period: timeline.period,
+      eventCounts: countBy(timeline.events.map((event) => `${event.domain}:${event.kind}`)),
+      days: [...new Set(timeline.events.map((event) => event.date))],
+      trainingTitles: timeline.events
+        .filter((event) => event.kind === 'training_session')
+        .map((event) => ({
+          date: event.date,
+          title: event.title,
+          sessionId: event.kind === 'training_session' ? event.data.sessionId : null,
+          performanceBestIds: event.kind === 'training_session' ? event.data.performanceBestIds : [],
+          timePrecision: event.timePrecision,
+          occurredAt: event.occurredAt ?? null,
+        })),
+      performanceBests: timeline.events
+        .filter((event) => event.kind === 'performance_best')
+        .map((event) =>
+          event.kind === 'performance_best'
+            ? {
+                date: event.date,
+                exerciseName: event.data.exerciseName,
+                sessionId: event.data.sessionId,
+                sessionTitle: event.data.sessionTitle,
+                achievements: event.data.achievements,
+              }
+            : null,
+        ),
+      bodyEvents: timeline.events
+        .filter((event) => event.kind === 'body_measurement')
+        .map((event) =>
+          event.kind === 'body_measurement'
+            ? {
+                date: event.date,
+                occurredAt: event.occurredAt,
+                weightKg: event.data.weightKg,
+                metricKeys: event.data.metrics.map((item) => item.key),
+                partial: event.data.partial,
+              }
+            : null,
+        ),
+      seriesCounts: {
+        bodyWeight: timeline.series.bodyWeight.length,
+        workouts: timeline.series.workouts.length,
+        performanceBests: timeline.series.performanceBests.length,
+      },
+    },
     loadedRepEligible: rows.exercises.filter(supportsLoadedRepStrength).map((exercise) => exercise.name),
     timedEligible: rows.exercises.filter(supportsTimedExternal).map((exercise) => exercise.name),
   }

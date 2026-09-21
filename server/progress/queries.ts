@@ -78,7 +78,7 @@ export async function loadProgressCanonicalRows(): Promise<ProgressCanonicalRows
          ORDER BY name, id`,
       ),
       sql.query(
-        `SELECT id, workout_date, created_at
+        `SELECT id, workout_date, created_at, template_name, routine_code, effort, duration_min
          FROM workout_sessions
          ORDER BY workout_date ASC, created_at ASC, id ASC`,
       ),
@@ -154,6 +154,10 @@ export async function loadProgressCanonicalRows(): Promise<ProgressCanonicalRows
     sessionId: String(row.id),
     sessionDate: asCalendarDate(row.workout_date),
     createdAt: asIso(row.created_at),
+    templateName: typeof row.template_name === 'string' ? row.template_name : null,
+    routineCode: typeof row.routine_code === 'string' ? row.routine_code : null,
+    effort: asInt(row.effort),
+    durationMin: asNumber(row.duration_min),
   }))
 
   const sets: CanonicalSetRecord[] = (setRows as Record<string, unknown>[]).map((row) => ({
