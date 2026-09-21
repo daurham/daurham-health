@@ -18,7 +18,6 @@ export const WORKOUT_IMAGE_SOURCE_KEY = 'workout_image'
 export const WORKOUT_SESSION_ENTITY = 'workout_session'
 export const HOME_AI_PIPELINE = 'workout-v1.3.1'
 export const WORKOUT_PHOTO_MAX_BYTES = 12 * 1024 * 1024
-export const TRANSCRIPTION_JOB_STORAGE_KEY = 'health.training.transcriptionJobId'
 
 export const HOME_AI_JOB_ID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -166,6 +165,8 @@ export const transcriptionDraftSetSchema = z.object({
   leftDurationSec: z.string(),
   rightDurationSec: z.string(),
   notes: z.string(),
+  transcribedLoadState: loadStateSchema.optional(),
+  transcribedWeightLb: z.string().optional(),
 })
 
 export const transcriptionDraftExerciseSchema = z.object({
@@ -211,6 +212,21 @@ export const createTranscriptionJobResponseSchema = z.object({
   }),
 })
 export type CreateTranscriptionJobResponse = z.infer<typeof createTranscriptionJobResponseSchema>
+
+export const pendingTranscriptionJobSchema = z.object({
+  id: z.string().regex(HOME_AI_JOB_ID_RE),
+  status: z.enum(['queued', 'processing', 'completed', 'failed']),
+  filename: z.string().nullable(),
+  failureMessage: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+})
+export type PendingTranscriptionJob = z.infer<typeof pendingTranscriptionJobSchema>
+
+export const transcriptionJobListResponseSchema = z.object({
+  jobs: z.array(pendingTranscriptionJobSchema),
+})
+export type TranscriptionJobListResponse = z.infer<typeof transcriptionJobListResponseSchema>
 
 export const transcriptionJobResponseSchema = z.object({
   job: transcriptionJobSummarySchema,
@@ -459,6 +475,8 @@ function emptySet(setNumber: number): TranscriptionDraft['exercises'][number]['s
     leftDurationSec: '',
     rightDurationSec: '',
     notes: '',
+    transcribedLoadState: 'external',
+    transcribedWeightLb: '',
   }
 }
 
@@ -480,7 +498,7 @@ function mapLoadState(value: string | null | undefined): LoadState {
   if (value === 'bodyweight' || value === 'unknown' || value === 'external') {
     return value
   }
-  return 'unknown'
+  return 'external'
 }
 
 export type LibraryExercise = {
@@ -653,11 +671,12 @@ function overlaySets(
   for (const candidate of candidateSets) {
     const current = byNumber.get(candidate.set_number) ?? emptySet(candidate.set_number)
     const loadState = mapLoadState(candidate.load_state)
+    const weightLb = loadState === 'external' ? stringifyNumber(candidate.weight_lb) : ''
     byNumber.set(candidate.set_number, {
       ...current,
       setType: mapSetType(candidate.type),
       loadState,
-      weightLb: loadState === 'external' ? stringifyNumber(candidate.weight_lb) : '',
+      weightLb,
       reps: stringifyNumber(candidate.reps),
       durationSec: stringifyNumber(candidate.duration_sec),
       leftReps: stringifyNumber(candidate.left_reps),
@@ -665,6 +684,8 @@ function overlaySets(
       leftDurationSec: stringifyNumber(candidate.left_duration_sec),
       rightDurationSec: stringifyNumber(candidate.right_duration_sec),
       notes: candidate.notes ?? '',
+      transcribedLoadState: loadState,
+      transcribedWeightLb: weightLb,
     })
   }
   return [...byNumber.values()].sort((a, b) => a.setNumber - b.setNumber)

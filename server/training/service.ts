@@ -5,6 +5,7 @@ import {
   exerciseDefinitionRowSchema,
   exerciseListResponseSchema,
   manualWorkoutRequestSchema,
+  manualWorkoutRequestValuesSchema,
   measurementFamilyOf,
   sessionDetailResponseSchema,
   sessionListResponseSchema,
@@ -39,10 +40,16 @@ import {
   provenancePayload,
 } from '../../src/domain/training-transcription.js'
 import { poundsToKilograms } from '../../src/domain/units.js'
+import {
+  applyPaperInheritanceToManualRequest,
+  fieldErrorCountSummary,
+  fieldErrorsForPaperExercises,
+} from '../../src/domain/paper-load.js'
 import { formatDatabaseError, getSql } from '../db.js'
 import { HttpError } from '../http.js'
 import type { HomeAiClient } from '../integrations/home-ai/client.js'
 import { getHomeAiClient } from '../integrations/home-ai/client.js'
+import { recordTranscriptionJobCommitted } from './job-store.js'
 import { CLAIM_AND_INSERT_WORKOUT_SQL } from './commit-sql.js'
 
 const TABLES_UNAVAILABLE = 'Training tables are not available. Apply pending migrations.'
@@ -55,7 +62,16 @@ function decimalString(value: number): string {
 }
 
 export function parseManualWorkoutRequest(body: unknown): ManualWorkoutRequest {
-  const parsed = manualWorkoutRequestSchema.safeParse(body)
+  const loose = manualWorkoutRequestValuesSchema.safeParse(body)
+  if (!loose.success) {
+    throw new HttpError(400, firstZodMessage(loose.error))
+  }
+  const fieldErrors = fieldErrorsForPaperExercises(loose.data.exercises)
+  if (fieldErrors.length > 0) {
+    throw new HttpError(400, fieldErrorCountSummary(fieldErrors.length), fieldErrors)
+  }
+  const inherited = applyPaperInheritanceToManualRequest(loose.data)
+  const parsed = manualWorkoutRequestSchema.safeParse(inherited)
   if (!parsed.success) {
     throw new HttpError(400, firstZodMessage(parsed.error))
   }
@@ -465,6 +481,7 @@ export async function createImportedSession(
 ): Promise<SessionDetailResponse> {
   const existingId = await findSessionIdByHomeAiJob(jobId)
   if (existingId) {
+    await recordTranscriptionJobCommitted(jobId, existingId).catch(() => undefined)
     return getSession(existingId)
   }
 
@@ -562,12 +579,14 @@ export async function createImportedSession(
     }
     const raced = await findSessionIdByHomeAiJob(jobId)
     if (raced) {
+      await recordTranscriptionJobCommitted(jobId, raced).catch(() => undefined)
       return getSession(raced)
     }
     throw new HttpError(500, 'Workout could not be saved')
   }
 
   const claimedId = (await findSessionIdByHomeAiJob(jobId)) ?? prepared.sessionId
+  await recordTranscriptionJobCommitted(jobId, claimedId).catch(() => undefined)
   return getSession(claimedId)
 }
 

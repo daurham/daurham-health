@@ -100,6 +100,8 @@ describe('Vercel function module specifiers', () => {
         'src/domain/training.ts',
         'server/training/service.ts',
         'server/training/transcription.ts',
+        'server/training/job-store.ts',
+        'src/domain/paper-load.ts',
         'server/training/commit-sql.ts',
         'server/integrations/home-ai/client.ts',
         'server/integrations/home-ai/config.ts',

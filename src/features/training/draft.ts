@@ -1,8 +1,8 @@
 import {
   draftSetToManualInput,
+  isCalendarDate,
   isDraftSetUntouched,
   manualWorkoutRequestSchema,
-  omitUntouchedDraftSets,
   type DraftSetFields,
   type LoadState,
   type ManualWorkoutRequest,
@@ -11,7 +11,25 @@ import {
   type TemplatePrescription,
   type WorkoutTemplate,
 } from '@/domain/training'
+import {
+  fieldErrorCountSummary,
+  interpretPaperSets,
+  resolvedLoadState,
+  resolvedWeightLb,
+  validateInterpretedPaperSets,
+  type ReviewFieldError,
+} from '@/domain/paper-load'
 import { localIsoDate } from './format'
+
+export class DraftValidationError extends Error {
+  readonly fields: ReviewFieldError[]
+
+  constructor(fields: ReviewFieldError[]) {
+    super(fieldErrorCountSummary(fields.length))
+    this.name = 'DraftValidationError'
+    this.fields = fields
+  }
+}
 
 export type DraftSet = DraftSetFields & {
   setNumber: number
@@ -53,6 +71,8 @@ export function emptyDraftSet(setNumber: number): DraftSet {
     leftDurationSec: '',
     rightDurationSec: '',
     notes: '',
+    transcribedLoadState: 'external',
+    transcribedWeightLb: '',
   }
 }
 
@@ -116,9 +136,31 @@ function parseOptionalPositive(value: string): number | null {
   return Number.isFinite(parsed) ? parsed : Number.NaN
 }
 
+export function validateWorkoutDraft(draft: WorkoutDraft): ReviewFieldError[] {
+  const errors: ReviewFieldError[] = []
+  if (draft.workoutDate.trim() === '' || !isCalendarDate(draft.workoutDate)) {
+    errors.push({ path: 'workoutDate', message: 'Date is required.' })
+  }
+  let performed = 0
+  draft.exercises.forEach((exercise, exerciseIndex) => {
+    const interpreted = interpretPaperSets(exercise.sets)
+    performed += interpreted.filter((item) => !item.omitted).length
+    errors.push(...validateInterpretedPaperSets(exerciseIndex, exercise.measurementKind, interpreted))
+  })
+  if (performed === 0) {
+    errors.push({ path: 'exercises', message: 'Log at least one set.' })
+  }
+  return errors
+}
+
 export function buildManualWorkoutPayload(draft: WorkoutDraft): ManualWorkoutRequest {
+  const errors = validateWorkoutDraft(draft)
+  if (errors.length > 0) {
+    throw new DraftValidationError(errors)
+  }
   const exercises = draft.exercises.flatMap((exercise) => {
-    const kept = omitUntouchedDraftSets(exercise.sets)
+    const interpreted = interpretPaperSets(exercise.sets)
+    const kept = interpreted.filter((item) => !item.omitted)
     if (kept.length === 0) {
       return []
     }
@@ -127,7 +169,14 @@ export function buildManualWorkoutPayload(draft: WorkoutDraft): ManualWorkoutReq
         exerciseDefinitionId: exercise.exerciseDefinitionId,
         slotId: exercise.slotId,
         notes: exercise.notes.trim() === '' ? null : exercise.notes.trim(),
-        sets: kept.map((set) => draftSetToManualInput(set.setNumber, set)),
+        sets: kept.map((item) =>
+          draftSetToManualInput(item.set.setNumber, {
+            ...item.set,
+            loadState: resolvedLoadState(item.resolvedLoad),
+            weightLb:
+              resolvedWeightLb(item.resolvedLoad) == null ? '' : String(resolvedWeightLb(item.resolvedLoad)),
+          }),
+        ),
       },
     ]
   })

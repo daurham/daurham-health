@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import type { ReviewFieldError } from '../src/domain/paper-load.js'
 
 export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024
 
@@ -16,11 +17,13 @@ export type ApiResponse = ServerResponse & {
 
 export class HttpError extends Error {
   readonly statusCode: number
+  readonly fields?: ReviewFieldError[]
 
-  constructor(statusCode: number, message: string) {
+  constructor(statusCode: number, message: string, fields?: ReviewFieldError[]) {
     super(message)
     this.name = 'HttpError'
     this.statusCode = statusCode
+    this.fields = fields
   }
 }
 
@@ -28,13 +31,22 @@ export function sendJson(res: ApiResponse, statusCode: number, body: unknown): v
   res.status(statusCode).json(body)
 }
 
-export function sendError(res: ApiResponse, statusCode: number, message: string): void {
+export function sendError(
+  res: ApiResponse,
+  statusCode: number,
+  message: string,
+  fields?: ReviewFieldError[],
+): void {
+  if (fields && fields.length > 0) {
+    sendJson(res, statusCode, { error: message, fields })
+    return
+  }
   sendJson(res, statusCode, { error: message })
 }
 
 export function handleApiError(res: ApiResponse, error: unknown): void {
   if (error instanceof HttpError) {
-    sendError(res, error.statusCode, error.message)
+    sendError(res, error.statusCode, error.message, error.fields)
     return
   }
   if (error && typeof error === 'object' && 'statusCode' in error && 'message' in error) {

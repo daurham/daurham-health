@@ -32,6 +32,12 @@ describe('splitSqlStatements', () => {
     expect(foundation).toHaveLength(7)
     expect(body).toHaveLength(5)
     expect(training).toHaveLength(10)
+    const jobs = splitSqlStatements(
+      readFileSync(path.join('migrations', '0004_transcription_jobs.sql'), 'utf8'),
+    )
+    expect(jobs).toHaveLength(2)
+    expect(jobs[0]).toMatch(/^CREATE TABLE workout_transcription_jobs/)
+    expect(jobs[1]).toMatch(/^CREATE INDEX workout_transcription_jobs_pending_idx/)
     expect(training.every((statement) => !statement.includes('$tag$'))).toBe(true)
     expect(training[0]).toMatch(/^CREATE TABLE exercise_definitions/)
     expect(training[7]).toMatch(/^INSERT INTO exercise_definitions/)

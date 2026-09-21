@@ -1,35 +1,38 @@
-import { useEffect, useRef, useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import type { ReviewFieldError } from '@/domain/paper-load'
 import type { TranscriptionGuidance, TranscriptionJobResponse } from '@/domain/training-transcription'
+import { isHomeAiJobId } from '@/domain/training-transcription'
 import { commitImportedSession, createTranscriptionJob, fetchTranscriptionJob } from './api'
 import { WorkoutEditor } from './WorkoutEditor'
 import {
+  DraftValidationError,
   buildManualWorkoutPayload,
   draftFromTranscription,
+  validateWorkoutDraft,
   type WorkoutDraft,
 } from './draft'
 import {
   WorkoutPhotoPrepareError,
   prepareWorkoutPhoto,
 } from './prepare-workout-photo'
-import {
-  clearStoredTranscriptionJobId,
-  readStoredTranscriptionJobId,
-  storeTranscriptionJobId,
-} from './transcription-state'
 
 const POLL_MS = 4000
 
 export function ImportWorkoutPage() {
   const navigate = useNavigate()
   const location = useLocation()
+  const [searchParams] = useSearchParams()
+  const jobParam = searchParams.get('job')
+  const jobId = jobParam && isHomeAiJobId(jobParam) ? jobParam : null
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const [jobId, setJobId] = useState<string | null>(readStoredTranscriptionJobId())
   const [status, setStatus] = useState<'queued' | 'processing' | 'completed' | 'failed' | null>(null)
   const [draft, setDraft] = useState<WorkoutDraft | null>(null)
   const [guidance, setGuidance] = useState<TranscriptionGuidance[]>([])
   const [failure, setFailure] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<ReviewFieldError[]>([])
+  const [errorFocusKey, setErrorFocusKey] = useState(0)
   const [pollError, setPollError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [preparing, setPreparing] = useState(false)
@@ -37,23 +40,62 @@ export function ImportWorkoutPage() {
   const incomingFile = (location.state as { file?: File } | null)?.file
 
   useEffect(() => {
+    setDraft(null)
+    setStatus(null)
+    setGuidance([])
+    setFailure(null)
+    setFieldErrors([])
+    setPollError(null)
+  }, [jobId])
+
+  const startJob = useCallback(async (file: File) => {
+    setError(null)
+    setFailure(null)
+    setPreparing(true)
+    let preparedFile: File
+    try {
+      preparedFile = (await prepareWorkoutPhoto(file)).file
+    } catch (caught) {
+      setPreparing(false)
+      setError(
+        caught instanceof WorkoutPhotoPrepareError
+          ? caught.message
+          : 'Could not prepare that photo. Try another JPEG or PNG.',
+      )
+      return
+    }
+    setPreparing(false)
+    setUploading(true)
+    try {
+      const created = await createTranscriptionJob(preparedFile)
+      navigate(`/training/import?job=${created.id}`, { replace: true })
+      setStatus(created.status)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Could not start analysis')
+    } finally {
+      setUploading(false)
+    }
+  }, [navigate])
+
+  useEffect(() => {
     if (!incomingFile || jobId) {
       return
     }
     void startJob(incomingFile)
     navigate('.', { replace: true, state: {} })
-  }, [incomingFile, jobId, navigate])
+  }, [incomingFile, jobId, navigate, startJob])
 
   useEffect(() => {
-    if (!jobId || draft || status === 'failed') {
+    if (!jobId || draft || status === 'failed' || failure) {
       return
     }
+    const pollJobId = jobId
     let cancelled = false
     let timer: number | undefined
 
     async function poll() {
       try {
-        const result = await fetchTranscriptionJob(jobId!)
+        const result = await fetchTranscriptionJob(pollJobId)
         if (cancelled) {
           return
         }
@@ -82,7 +124,7 @@ export function ImportWorkoutPage() {
         window.clearTimeout(timer)
       }
     }
-  }, [jobId, draft, status])
+  }, [jobId, draft, status, failure])
 
   function applyJob(result: TranscriptionJobResponse) {
     setStatus(result.job.status)
@@ -100,48 +142,31 @@ export function ImportWorkoutPage() {
     }
   }
 
-  async function startJob(file: File) {
-    setError(null)
-    setFailure(null)
-    setPreparing(true)
-    let preparedFile: File
-    try {
-      preparedFile = (await prepareWorkoutPhoto(file)).file
-    } catch (caught) {
-      setPreparing(false)
-      setError(
-        caught instanceof WorkoutPhotoPrepareError
-          ? caught.message
-          : 'Could not prepare that photo. Try another JPEG or PNG.',
-      )
-      return
-    }
-    setPreparing(false)
-    setUploading(true)
-    try {
-      const created = await createTranscriptionJob(preparedFile)
-      storeTranscriptionJobId(created.id)
-      setJobId(created.id)
-      setStatus(created.status)
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Could not start analysis')
-    } finally {
-      setUploading(false)
-    }
-  }
-
   async function onCommit() {
     if (!draft || !jobId) {
       return
     }
+    const nextErrors = validateWorkoutDraft(draft)
+    if (nextErrors.length > 0) {
+      setFieldErrors(nextErrors)
+      setErrorFocusKey((current) => current + 1)
+      setError(null)
+      return
+    }
+    setFieldErrors([])
     setError(null)
     setSaving(true)
     try {
       const payload = buildManualWorkoutPayload(draft)
       const session = await commitImportedSession(jobId, payload)
-      clearStoredTranscriptionJobId()
       navigate(`/training/${session.id}`, { replace: true })
     } catch (caught) {
+      if (caught instanceof DraftValidationError) {
+        setFieldErrors(caught.fields)
+        setErrorFocusKey((current) => current + 1)
+        setError(null)
+        return
+      }
       setError(caught instanceof Error ? caught.message : 'Could not save workout')
     } finally {
       setSaving(false)
@@ -149,14 +174,7 @@ export function ImportWorkoutPage() {
   }
 
   function resetFlow() {
-    clearStoredTranscriptionJobId()
-    setJobId(null)
-    setStatus(null)
-    setDraft(null)
-    setGuidance([])
-    setFailure(null)
-    setError(null)
-    setPollError(null)
+    navigate('/training/import', { replace: true })
   }
 
   const analyzing = jobId != null && draft == null && failure == null
@@ -185,6 +203,12 @@ export function ImportWorkoutPage() {
         Import Workout Photo
       </p>
 
+      {jobParam && !jobId ? (
+        <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+          That analysis job id is invalid.
+        </p>
+      ) : null}
+
       {draft ? (
         <WorkoutEditor
           title="Review Workout"
@@ -194,7 +218,10 @@ export function ImportWorkoutPage() {
               : 'Imported from photo'
           }
           draft={draft}
-          onChange={setDraft}
+          onChange={(next) => {
+            setDraft(next)
+            setFieldErrors((current) => (current.length > 0 ? validateWorkoutDraft(next) : current))
+          }}
           onCommit={() => {
             void onCommit()
           }}
@@ -203,6 +230,8 @@ export function ImportWorkoutPage() {
           commitLabel="Save Workout"
           saving={saving}
           error={error}
+          fieldErrors={fieldErrors}
+          errorFocusKey={errorFocusKey}
           guidance={guidance}
           disclaimer="Review every field. Home AI can still be wrong, even when there is no warning."
         />
@@ -231,7 +260,8 @@ export function ImportWorkoutPage() {
                 {status === 'queued' ? 'Queued…' : 'Processing…'}
               </p>
               <p className="mt-2 text-sm text-zinc-600">
-                You can leave this page and come back. Analysis will keep running on your home server.
+                You can leave this page and come back from Training on this device or another. Analysis will keep
+                running on your home server. Completed sheets still need a human review before they are saved.
               </p>
             </div>
           ) : (

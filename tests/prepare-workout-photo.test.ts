@@ -227,7 +227,7 @@ describe('client source does not hold home-ai credentials', () => {
       'src/features/training/prepare-workout-photo.ts',
       'src/features/training/ImportWorkoutPage.tsx',
       'src/features/training/api.ts',
-      'src/features/training/transcription-state.ts',
+      'src/features/training/TrainingPage.tsx',
     ]
     for (const file of files) {
       const source = readFileSync(path.join(root, file), 'utf8')

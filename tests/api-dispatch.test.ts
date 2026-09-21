@@ -95,6 +95,7 @@ describe('Vercel nested API routing', () => {
     expect(matchHealthApiRoute('/api/auth/reset-password/reset-token')).toBe('auth')
     expect(matchHealthApiRoute('/api/body/import/fit-profile/preview')).toBe('fit-profile-preview')
     expect(matchHealthApiRoute(`/api/training/sessions/${SESSION_ID}`)).toBe('training-session-detail')
+    expect(matchHealthApiRoute('/api/training/transcription/jobs')).toBe('transcription-jobs')
     expect(matchHealthApiRoute(`/api/training/transcription/jobs/${JOB_ID}`)).toBe(
       'transcription-job-detail',
     )
@@ -151,10 +152,15 @@ describe('api/index after Vercel nested rewrite', () => {
     expect(isDeniedPrivate(detail.status())).toBe(true)
   })
 
-  it('protects transcription job POST, dynamic GET, and commit', async () => {
+  it('protects transcription job POST, list GET, dynamic GET, and commit', async () => {
     const create = await hit('POST', '/api/training/transcription/jobs')
     expect(isDeniedPrivate(create.status())).toBe(true)
     expect(JSON.stringify(create.body() ?? {})).not.toContain('HOME_AI')
+
+    const list = await hit('GET', '/api/training/transcription/jobs')
+    expect(list.status()).not.toBe(404)
+    expect(list.status()).not.toBe(405)
+    expect(isDeniedPrivate(list.status())).toBe(true)
 
     const poll = await hit('GET', `/api/training/transcription/jobs/${JOB_ID}`)
     expect(poll.status()).not.toBe(404)

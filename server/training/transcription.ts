@@ -5,12 +5,18 @@ import {
   createTranscriptionJobResponseSchema,
   homeAiFailureMessage,
   isHomeAiJobId,
+  transcriptionJobListResponseSchema,
   transcriptionJobResponseSchema,
   type TranscriptionJobResponse,
 } from '../../src/domain/training-transcription.js'
 import { HttpError, parseMultipart, type ApiRequest } from '../http.js'
 import type { HomeAiClient } from '../integrations/home-ai/client.js'
 import { getHomeAiClient } from '../integrations/home-ai/client.js'
+import {
+  recordTranscriptionJobCreated,
+  recordTranscriptionJobStatus,
+  refreshOutstandingTranscriptionJobs,
+} from './job-store.js'
 import { listExercises, listTemplates } from './service.js'
 
 const JPEG_MAGIC = Buffer.from([0xff, 0xd8])
@@ -81,8 +87,30 @@ export async function createTranscriptionJob(
   const photo = await readWorkoutPhotoForm(req)
   const homeAi = client ?? (await getHomeAiClient())
   const job = await homeAi.createWorkoutTranscriptionJob(photo)
+  await recordTranscriptionJobCreated({ jobId: job.id, filename: photo.filename })
   return createTranscriptionJobResponseSchema.parse({
     job: { id: job.id, status: 'queued' },
+  })
+}
+
+export async function listTranscriptionJobs(client?: HomeAiClient) {
+  const jobs = await refreshOutstandingTranscriptionJobs(client)
+  return transcriptionJobListResponseSchema.parse({
+    jobs: jobs.flatMap((job) => {
+      if (job.status === 'committed') {
+        return []
+      }
+      return [
+        {
+          id: job.id,
+          status: job.status,
+          filename: job.filename,
+          failureMessage: job.failureMessage,
+          createdAt: job.createdAt,
+          updatedAt: job.updatedAt,
+        },
+      ]
+    }),
   })
 }
 
@@ -99,6 +127,11 @@ export async function getTranscriptionJob(
   }
   const homeAi = client ?? (await getHomeAiClient())
   const job = await homeAi.getWorkoutTranscriptionJob(jobId)
+  await recordTranscriptionJobStatus({
+    jobId: job.id,
+    status: job.status,
+    failureMessage: job.error?.message ?? null,
+  }).catch(() => undefined)
 
   if (job.status === 'failed') {
     return transcriptionJobResponseSchema.parse({

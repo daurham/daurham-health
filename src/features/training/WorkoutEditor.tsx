@@ -1,11 +1,21 @@
+import { useEffect } from 'react'
 import { formatPrescription } from '@/domain/training'
 import type { LoadState, MeasurementKind } from '@/domain/training'
 import type { TranscriptionGuidance } from '@/domain/training-transcription'
+import {
+  interpretPaperSets,
+  resolvedLoadState,
+  resolvedWeightLb,
+  type InterpretedPaperSet,
+  type ReviewFieldError,
+} from '@/domain/paper-load'
 import { cn } from '@/lib'
-import { addDraftSet, draftHasLoggedSets, type DraftExercise, type DraftSet, type WorkoutDraft } from './draft'
+import { addDraftSet, type DraftExercise, type DraftSet, type WorkoutDraft } from './draft'
 
 const inputClass =
   'min-h-11 w-full rounded-md border border-zinc-300 bg-white px-2.5 py-2 text-base text-zinc-900 disabled:bg-zinc-100'
+
+const errorInputClass = 'border-red-500 bg-red-50'
 
 export function WorkoutEditor({
   title,
@@ -18,6 +28,8 @@ export function WorkoutEditor({
   commitLabel,
   saving,
   error,
+  fieldErrors = [],
+  errorFocusKey = 0,
   guidance = [],
   disclaimer,
 }: {
@@ -31,11 +43,34 @@ export function WorkoutEditor({
   commitLabel: string
   saving: boolean
   error: string | null
+  fieldErrors?: ReviewFieldError[]
+  errorFocusKey?: number
   guidance?: TranscriptionGuidance[]
   disclaimer?: string
 }) {
   const highlightDate = guidance.some((item) => item.path === 'workoutDate')
-  const dateMissing = draft.workoutDate.trim() === ''
+  const dateError = fieldError(fieldErrors, 'workoutDate')
+  const firstErrorPath = fieldErrors[0]?.path
+
+  useEffect(() => {
+    if (!firstErrorPath || errorFocusKey === 0) {
+      return
+    }
+    const root = document.querySelector(`[data-field-path="${CSS.escape(firstErrorPath)}"]`)
+    if (!(root instanceof HTMLElement)) {
+      return
+    }
+    root.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    const focusable = root.matches('input,select,textarea,button')
+      ? root
+      : root.querySelector('input:not([disabled]),select:not([disabled]),textarea,button')
+    if (focusable instanceof HTMLElement) {
+      focusable.focus()
+      return
+    }
+    root.focus()
+  }, [errorFocusKey, firstErrorPath])
+
   return (
     <section className="space-y-6 pb-28">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -64,18 +99,37 @@ export function WorkoutEditor({
         </ul>
       ) : null}
 
+      {fieldErrors.length > 0 ? (
+        <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+          {fieldErrors.length === 1 ? '1 field needs attention' : `${fieldErrors.length} fields need attention`}
+        </p>
+      ) : null}
+
       {error ? (
         <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>
       ) : null}
 
-      <SessionMeta draft={draft} highlightDate={highlightDate} onChange={onChange} />
+      <SessionMeta
+        draft={draft}
+        highlightDate={highlightDate}
+        dateError={dateError}
+        onChange={onChange}
+      />
+
+      {fieldError(fieldErrors, 'exercises') ? (
+        <p data-field-path="exercises" tabIndex={-1} className="text-sm text-red-700 outline-none">
+          {fieldError(fieldErrors, 'exercises')}
+        </p>
+      ) : null}
 
       <div className="space-y-4">
         {draft.exercises.map((exercise, exerciseIndex) => (
           <ExerciseCard
             key={exercise.slotId ?? exercise.exerciseDefinitionId}
             exercise={exercise}
+            exerciseIndex={exerciseIndex}
             highlighted={guidance.some((item) => item.path === `exercises.${exercise.slotId}`)}
+            fieldErrors={fieldErrors}
             onChange={(next) => {
               onChange({
                 ...draft,
@@ -91,7 +145,7 @@ export function WorkoutEditor({
           <button
             type="button"
             className="min-h-11 flex-1 rounded-md bg-zinc-900 px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-zinc-300"
-            disabled={saving || !draftHasLoggedSets(draft) || dateMissing}
+            disabled={saving}
             onClick={onCommit}
           >
             {saving ? 'Saving…' : commitLabel}
@@ -102,29 +156,44 @@ export function WorkoutEditor({
   )
 }
 
+function fieldError(errors: ReviewFieldError[], path: string): string | undefined {
+  return errors.find((item) => item.path === path)?.message
+}
+
 function SessionMeta({
   draft,
   highlightDate,
+  dateError,
   onChange,
 }: {
   draft: WorkoutDraft
   highlightDate: boolean
+  dateError?: string
   onChange: (draft: WorkoutDraft) => void
 }) {
+  const dateInvalid = Boolean(dateError)
+  const dateNeedsConfirm = highlightDate || draft.workoutDate.trim() === ''
   return (
     <div className="rounded-lg border border-zinc-200 bg-white p-4">
       <label className="block text-sm font-medium text-zinc-700">
         Date
-        {highlightDate || draft.workoutDate.trim() === '' ? (
+        {dateNeedsConfirm && !dateInvalid ? (
           <span className="ml-2 text-xs font-normal text-amber-800">Needs a complete date</span>
         ) : null}
         <input
           type="date"
           required
-          className={cn(inputClass, 'mt-1', (highlightDate || draft.workoutDate.trim() === '') && 'border-amber-400 bg-amber-50')}
+          data-field-path="workoutDate"
+          className={cn(
+            inputClass,
+            'mt-1',
+            dateInvalid && errorInputClass,
+            !dateInvalid && dateNeedsConfirm && 'border-amber-400 bg-amber-50',
+          )}
           value={draft.workoutDate}
           onChange={(event) => onChange({ ...draft, workoutDate: event.target.value })}
         />
+        {dateError ? <p className="mt-1 text-xs text-red-700">{dateError}</p> : null}
       </label>
       <div className="mt-4 grid grid-cols-2 gap-3">
         <label className="block text-sm font-medium text-zinc-700">
@@ -221,13 +290,18 @@ function ScoreRow({
 
 function ExerciseCard({
   exercise,
+  exerciseIndex,
   highlighted,
+  fieldErrors,
   onChange,
 }: {
   exercise: DraftExercise
+  exerciseIndex: number
   highlighted: boolean
+  fieldErrors: ReviewFieldError[]
   onChange: (exercise: DraftExercise) => void
 }) {
+  const interpreted = interpretPaperSets(exercise.sets)
   return (
     <article
       className={cn(
@@ -241,15 +315,19 @@ function ExerciseCard({
       </p>
       <div className="mt-4 space-y-3">
         <SetHeader measurementKind={exercise.measurementKind} />
-        {exercise.sets.map((set, setIndex) => (
+        {interpreted.map((item, setIndex) => (
           <SetRow
-            key={set.setNumber}
-            set={set}
+            key={item.set.setNumber}
+            set={item.set}
+            exerciseIndex={exerciseIndex}
+            setIndex={setIndex}
+            interpretation={item}
             measurementKind={exercise.measurementKind}
+            fieldErrors={fieldErrors}
             onChange={(next) => {
               onChange({
                 ...exercise,
-                sets: exercise.sets.map((item, index) => (index === setIndex ? next : item)),
+                sets: exercise.sets.map((row, index) => (index === setIndex ? next : row)),
               })
             }}
           />
@@ -286,13 +364,40 @@ function SetHeader({ measurementKind }: { measurementKind: MeasurementKind }) {
 
 function SetRow({
   set,
+  exerciseIndex,
+  setIndex,
+  interpretation,
   measurementKind,
+  fieldErrors,
   onChange,
 }: {
   set: DraftSet
+  exerciseIndex: number
+  setIndex: number
+  interpretation: InterpretedPaperSet<DraftSet>
   measurementKind: MeasurementKind
+  fieldErrors: ReviewFieldError[]
   onChange: (set: DraftSet) => void
 }) {
+  const loadPath = `exercises.${exerciseIndex}.sets.${setIndex}.weightLb`
+  const measurementPath =
+    measurementKind === 'duration'
+      ? `exercises.${exerciseIndex}.sets.${setIndex}.durationSec`
+      : measurementKind === 'reps_per_side'
+        ? `exercises.${exerciseIndex}.sets.${setIndex}.leftReps`
+        : measurementKind === 'duration_per_side'
+          ? `exercises.${exerciseIndex}.sets.${setIndex}.leftDurationSec`
+          : `exercises.${exerciseIndex}.sets.${setIndex}.reps`
+  const loadMessage = fieldError(fieldErrors, loadPath)
+  const measurementMessage = fieldError(fieldErrors, measurementPath)
+  const inherited = interpretation.source === 'inherited' && interpretation.resolvedLoad != null
+  const displayLoadState = inherited ? resolvedLoadState(interpretation.resolvedLoad) : set.loadState
+  const resolvedWeight = resolvedWeightLb(interpretation.resolvedLoad)
+  const displayWeight =
+    inherited && interpretation.resolvedLoad?.kind === 'external' && set.weightLb.trim() === ''
+      ? String(resolvedWeight)
+      : set.weightLb
+
   function patch(partial: Partial<DraftSet>) {
     onChange({ ...set, ...partial })
   }
@@ -305,32 +410,48 @@ function SetRow({
   }
 
   return (
-    <div className="grid grid-cols-[2.5rem_minmax(0,1fr)_minmax(0,1.2fr)] items-center gap-2">
-      <span className="text-sm font-medium text-zinc-700">{set.setNumber}</span>
-      <div className="flex gap-1">
-        <select
-          className="min-h-11 rounded-md border border-zinc-300 bg-white px-1 text-sm"
-          value={set.loadState}
-          onChange={(event) => onLoadState(event.target.value as LoadState)}
-          aria-label={`Set ${set.setNumber} load`}
-        >
-          <option value="external">lb</option>
-          <option value="bodyweight">BW</option>
-          <option value="unknown">?</option>
-        </select>
-        <input
-          type="number"
-          min={0}
-          step="0.5"
-          inputMode="decimal"
-          disabled={set.loadState !== 'external'}
-          className={inputClass}
-          value={set.weightLb}
-          aria-label={`Set ${set.setNumber} weight`}
-          onChange={(event) => patch({ weightLb: event.target.value })}
-        />
+    <div className="grid grid-cols-[2.5rem_minmax(0,1fr)_minmax(0,1.2fr)] items-start gap-2">
+      <span className="mt-3 text-sm font-medium text-zinc-700">{set.setNumber}</span>
+      <div data-field-path={loadPath} tabIndex={-1} className="min-w-0 outline-none">
+        <div className="flex gap-1">
+          <select
+            className={cn(
+              'min-h-11 rounded-md border bg-white px-1 text-sm',
+              loadMessage ? 'border-red-500 bg-red-50' : 'border-zinc-300',
+              inherited && 'text-zinc-500',
+            )}
+            value={displayLoadState}
+            onChange={(event) => onLoadState(event.target.value as LoadState)}
+            aria-label={`Set ${set.setNumber} load`}
+          >
+            <option value="external">lb</option>
+            <option value="bodyweight">BW</option>
+            <option value="unknown">?</option>
+          </select>
+          <input
+            type="number"
+            min={0}
+            step="0.5"
+            inputMode="decimal"
+            disabled={displayLoadState !== 'external'}
+            className={cn(inputClass, loadMessage && errorInputClass, inherited && 'text-zinc-500')}
+            value={displayWeight}
+            aria-label={`Set ${set.setNumber} weight`}
+            onChange={(event) => patch({ loadState: 'external', weightLb: event.target.value })}
+          />
+        </div>
+        {inherited ? <p className="mt-0.5 text-[11px] leading-tight text-zinc-500">inherited</p> : null}
+        {loadMessage ? <p className="mt-0.5 text-xs text-red-700">{loadMessage}</p> : null}
       </div>
-      <MeasurementInputs set={set} measurementKind={measurementKind} onChange={onChange} />
+      <div data-field-path={measurementPath} tabIndex={-1} className="min-w-0 outline-none">
+        <MeasurementInputs
+          set={set}
+          measurementKind={measurementKind}
+          invalid={Boolean(measurementMessage)}
+          onChange={onChange}
+        />
+        {measurementMessage ? <p className="mt-0.5 text-xs text-red-700">{measurementMessage}</p> : null}
+      </div>
     </div>
   )
 }
@@ -338,19 +459,22 @@ function SetRow({
 function MeasurementInputs({
   set,
   measurementKind,
+  invalid,
   onChange,
 }: {
   set: DraftSet
   measurementKind: MeasurementKind
+  invalid: boolean
   onChange: (set: DraftSet) => void
 }) {
+  const fieldClass = cn(inputClass, invalid && errorInputClass)
   if (measurementKind === 'reps') {
     return (
       <input
         type="number"
         min={0}
         inputMode="numeric"
-        className={inputClass}
+        className={fieldClass}
         value={set.reps}
         aria-label={`Set ${set.setNumber} reps`}
         onChange={(event) => onChange({ ...set, reps: event.target.value })}
@@ -363,7 +487,7 @@ function MeasurementInputs({
         type="number"
         min={0}
         inputMode="numeric"
-        className={inputClass}
+        className={fieldClass}
         value={set.durationSec}
         aria-label={`Set ${set.setNumber} seconds`}
         onChange={(event) => onChange({ ...set, durationSec: event.target.value })}
@@ -377,7 +501,7 @@ function MeasurementInputs({
           type="number"
           min={0}
           inputMode="numeric"
-          className={inputClass}
+          className={fieldClass}
           value={set.leftReps}
           aria-label={`Set ${set.setNumber} left reps`}
           onChange={(event) => onChange({ ...set, leftReps: event.target.value })}
@@ -386,7 +510,7 @@ function MeasurementInputs({
           type="number"
           min={0}
           inputMode="numeric"
-          className={inputClass}
+          className={fieldClass}
           value={set.rightReps}
           aria-label={`Set ${set.setNumber} right reps`}
           onChange={(event) => onChange({ ...set, rightReps: event.target.value })}
@@ -400,7 +524,7 @@ function MeasurementInputs({
         type="number"
         min={0}
         inputMode="numeric"
-        className={inputClass}
+        className={fieldClass}
         value={set.leftDurationSec}
         aria-label={`Set ${set.setNumber} left seconds`}
         onChange={(event) => onChange({ ...set, leftDurationSec: event.target.value })}
@@ -409,7 +533,7 @@ function MeasurementInputs({
         type="number"
         min={0}
         inputMode="numeric"
-        className={inputClass}
+        className={fieldClass}
         value={set.rightDurationSec}
         aria-label={`Set ${set.setNumber} right seconds`}
         onChange={(event) => onChange({ ...set, rightDurationSec: event.target.value })}

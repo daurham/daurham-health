@@ -12,7 +12,9 @@ import {
 } from '@/domain/training'
 import {
   createTranscriptionJobResponseSchema,
+  transcriptionJobListResponseSchema,
   transcriptionJobResponseSchema,
+  type PendingTranscriptionJob,
   type TranscriptionJobResponse,
 } from '@/domain/training-transcription'
 
@@ -73,6 +75,14 @@ export async function createTranscriptionJob(file: File): Promise<{ id: string; 
     throw new Error(await readApiError(response))
   }
   return createTranscriptionJobResponseSchema.parse(await response.json()).job
+}
+
+export async function fetchTranscriptionJobs(): Promise<PendingTranscriptionJob[]> {
+  const response = await healthFetch('/api/training/transcription/jobs')
+  if (!response.ok) {
+    throw new Error(await readApiError(response))
+  }
+  return transcriptionJobListResponseSchema.parse(await response.json()).jobs
 }
 
 export async function fetchTranscriptionJob(jobId: string): Promise<TranscriptionJobResponse> {

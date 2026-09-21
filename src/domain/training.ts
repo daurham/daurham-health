@@ -449,39 +449,46 @@ function addSetInvariantIssues(set: SetMeasurementFields, ctx: z.RefinementCtx, 
 const nullableNonnegativeNumber = z.number().nonnegative().nullable()
 const nullableNonnegativeInt = z.int().nonnegative().nullable()
 
-export const manualWorkoutSetInputSchema = z
-  .object({
-    setNumber: z.int().positive(),
-    setType: setTypeSchema.default('working'),
-    loadState: loadStateSchema,
-    weightLb: nullableNonnegativeNumber,
-    reps: nullableNonnegativeInt,
-    durationSec: nullableNonnegativeInt,
-    leftReps: nullableNonnegativeInt,
-    rightReps: nullableNonnegativeInt,
-    leftDurationSec: nullableNonnegativeInt,
-    rightDurationSec: nullableNonnegativeInt,
-    notes: optionalNotesSchema,
-  })
-  .superRefine((set, ctx) =>
-    addSetInvariantIssues(
-      {
-        loadState: set.loadState,
-        weightLb: set.weightLb,
-        reps: set.reps,
-        durationSec: set.durationSec,
-        leftReps: set.leftReps,
-        rightReps: set.rightReps,
-        leftDurationSec: set.leftDurationSec,
-        rightDurationSec: set.rightDurationSec,
-      },
-      ctx,
-      'weightLb',
-    ),
-  )
+export const manualWorkoutSetValuesSchema = z.object({
+  setNumber: z.int().positive(),
+  setType: setTypeSchema.default('working'),
+  loadState: loadStateSchema,
+  weightLb: nullableNonnegativeNumber,
+  reps: nullableNonnegativeInt,
+  durationSec: nullableNonnegativeInt,
+  leftReps: nullableNonnegativeInt,
+  rightReps: nullableNonnegativeInt,
+  leftDurationSec: nullableNonnegativeInt,
+  rightDurationSec: nullableNonnegativeInt,
+  notes: optionalNotesSchema,
+})
+
+export const manualWorkoutSetInputSchema = manualWorkoutSetValuesSchema.superRefine((set, ctx) =>
+  addSetInvariantIssues(
+    {
+      loadState: set.loadState,
+      weightLb: set.weightLb,
+      reps: set.reps,
+      durationSec: set.durationSec,
+      leftReps: set.leftReps,
+      rightReps: set.rightReps,
+      leftDurationSec: set.leftDurationSec,
+      rightDurationSec: set.rightDurationSec,
+    },
+    ctx,
+    'weightLb',
+  ),
+)
 
 export type ManualWorkoutSetInput = z.infer<typeof manualWorkoutSetInputSchema>
 export type ManualWorkoutSetInputDraft = z.input<typeof manualWorkoutSetInputSchema>
+
+export const manualWorkoutExerciseValuesSchema = z.object({
+  exerciseDefinitionId: uuidSchema,
+  slotId: z.string().trim().min(1).nullable(),
+  notes: optionalNotesSchema,
+  sets: z.array(manualWorkoutSetValuesSchema).min(1, 'Each exercise needs at least one set'),
+})
 
 export const manualWorkoutExerciseInputSchema = z.object({
   exerciseDefinitionId: uuidSchema,
@@ -505,6 +512,19 @@ export const manualWorkoutRequestSchema = z.object({
 
 export type ManualWorkoutRequest = z.infer<typeof manualWorkoutRequestSchema>
 export type ManualWorkoutRequestInput = z.input<typeof manualWorkoutRequestSchema>
+
+export const manualWorkoutRequestValuesSchema = z.object({
+  workoutDate: isoDateSchema,
+  workoutTemplateId: uuidSchema.nullable(),
+  durationMin: z.number().positive().nullable(),
+  effort: effortSchema.nullable(),
+  painLevel: painLevelSchema.nullable(),
+  bodyweightLb: z.number().positive().nullable(),
+  notes: optionalNotesSchema,
+  exercises: z.array(manualWorkoutExerciseValuesSchema).min(1, 'Log at least one exercise'),
+})
+
+export type ManualWorkoutRequestValues = z.infer<typeof manualWorkoutRequestValuesSchema>
 
 export type CanonicalWorkoutSetInsert = {
   setNumber: number
@@ -546,6 +566,8 @@ export type DraftSetFields = {
   leftDurationSec: string
   rightDurationSec: string
   notes: string
+  transcribedLoadState?: LoadState
+  transcribedWeightLb?: string
 }
 
 function parseOptionalNumber(value: string): number | null {
