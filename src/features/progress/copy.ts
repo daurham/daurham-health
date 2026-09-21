@@ -51,6 +51,23 @@ export function appearanceProgressCopy(observations: number, required: number | 
   return `${observations} / ${required} appearances`
 }
 
+export function appearanceFractionCopy(observations: number, required: number | undefined): string {
+  if (required == null) {
+    return String(observations)
+  }
+  return `${observations} / ${required}`
+}
+
+export function compactTrendCopy(exercise: ProgressOverview['exercises'][number]): string {
+  if (exercise.trend.status === 'not_applicable') {
+    return '—'
+  }
+  if (exercise.trend.status === 'insufficient_data') {
+    return `Building · ${appearanceFractionCopy(exercise.appearanceCount, exercise.trend.required)}`
+  }
+  return trendStatusCopy(exercise.trend)
+}
+
 export function trendStatusCopy(trend: ProgressOverview['exercises'][number]['trend']): string {
   if (trend.status === 'not_applicable') {
     return 'Not applicable'
@@ -141,6 +158,43 @@ export function findingHeadline(finding: ProgressFinding, overview: ProgressOver
   return findingTitle(finding.kind)
 }
 
+export function findingEventName(finding: ProgressFinding, overview: ProgressOverview): string {
+  if (finding.exerciseId) {
+    return overview.exercises.find((item) => item.exerciseId === finding.exerciseId)?.name ?? findingTitle(finding.kind)
+  }
+  return findingTitle(finding.kind)
+}
+
+export function findingResult(finding: ProgressFinding, overview: ProgressOverview): string | null {
+  if (finding.kind === 'performance_best') {
+    const exercise = overview.exercises.find((item) => item.exerciseId === finding.exerciseId)
+    const event = exercise?.recentPrs.find((item) => item.date === finding.evidence[0]?.date)
+    if (event) {
+      return formatPerformed(event.performed)
+    }
+    if (finding.evidence[0]) {
+      return formatPerformed({
+        loadKg: finding.evidence[0].loadKg,
+        reps: finding.evidence[0].reps ?? finding.evidence[0].strengthReps,
+        durationSec: finding.evidence[0].durationSec,
+        leftReps: finding.evidence[0].leftReps,
+        rightReps: finding.evidence[0].rightReps,
+      })
+    }
+    return null
+  }
+  if ((finding.kind === 'exercise_improved' || finding.kind === 'exercise_decreased') && finding.changePercent != null) {
+    return formatPercent(finding.changePercent)
+  }
+  if (finding.kind === 'body_weight_trend' && finding.slopePerWeek != null) {
+    return `${formatSigned(kilogramsToPounds(finding.slopePerWeek), 2, 'lb')}/week`
+  }
+  if (finding.kind === 'training_frequency_change' && finding.currentWorkouts != null) {
+    return `${finding.currentWorkouts} workout${finding.currentWorkouts === 1 ? '' : 's'}`
+  }
+  return null
+}
+
 export function findingDate(finding: ProgressFinding): string | null {
   const date = finding.evidence.find((item) => item.date)?.date
   return date ? formatCalendarDate(date) : null
@@ -169,7 +223,7 @@ export function progressBriefLines(overview: ProgressOverview): string[] {
 
   const prs = overview.findings.filter((item) => item.kind === 'performance_best')
   if (prs.length > 0) {
-    lines.push(`${prs.length} new performance best${prs.length === 1 ? '' : 's'}`)
+    lines.push(`${prs.length} performance best${prs.length === 1 ? '' : 's'}`)
   }
 
   const improving = overview.exercises.filter(
@@ -178,6 +232,8 @@ export function progressBriefLines(overview: ProgressOverview): string[] {
   const enoughHistory = overview.exercises.filter((exercise) => exercise.trend.status === 'available')
   if (enoughHistory.length > 0) {
     lines.push(`${improving.length} of ${enoughHistory.length} tracked exercises improved`)
+  } else if (overview.exercises.some((exercise) => exercise.latestPerformance && exercise.trend.status === 'insufficient_data')) {
+    lines.push('Strength trends building')
   }
 
   const weightTrend = overview.body.weight.trend

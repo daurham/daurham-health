@@ -1,5 +1,5 @@
 import { PROGRESS_ANALYTICS_CONFIG } from './config.js'
-import { bodyWeightTrend, bodyWeightTrendEvidence, compareSparseBodyMetric } from './body-trend.js'
+import { bodyWeightTrend, bodyWeightTrendEvidence, compareSparseBodyMetric, latestBodyObservation } from './body-trend.js'
 import { compareCounts } from './comparison.js'
 import { trainingConsistency } from './consistency.js'
 import { supportsLoadedRepStrength, supportsTimedExternal } from './exercise-classification.js'
@@ -75,6 +75,7 @@ export type ProgressOverview = {
     }
     metrics: Array<{
       key: string
+      latest: BodyObservation | null
       comparison: ReturnType<typeof compareSparseBodyMetric>
     }>
     comparison: {
@@ -219,6 +220,7 @@ export function buildProgressOverview(input: ProgressCanonicalInput): ProgressOv
   const metricKeys = [...new Set(asOfBody.map((item) => item.key).filter((key) => key !== 'weight'))].sort()
   const bodyMetrics = metricKeys.map((key) => ({
     key,
+    latest: latestBodyObservation(asOfBody, key),
     comparison: compareSparseBodyMetric(asOfBody, key, period.start, period.end),
   }))
 

@@ -27,10 +27,10 @@ function renderLayout() {
 describe('mobile application shell', () => {
   it('uses a five-column bottom nav that cannot wrap primary destinations', () => {
     const html = renderLayout()
+    expect(html).toContain('max-w-[1200px]')
     expect(html).toContain('grid-cols-5')
     expect(html).toContain('whitespace-nowrap')
     expect(html).toContain('md:hidden')
-    expect(html).toContain('mx-auto hidden max-w-5xl px-4 pb-3 md:block')
     expect(html).toContain('flex-nowrap')
     expect(html).toContain('Today')
     expect(html).toContain('Nutrition')

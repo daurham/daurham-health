@@ -14,7 +14,7 @@ import {
   trendStatusCopy,
   workoutActivityByDate,
 } from '../src/features/progress/copy.ts'
-import { formatKgAsLb, formatPerformed } from '../src/features/progress/format.ts'
+import { bodyMetricLabel, formatBodyCanonical, formatBodyMetricChange, formatKgAsLb, formatPerformed } from '../src/features/progress/format.ts'
 import { parseProgressRangeParam, progressSearch } from '../src/features/progress/range.ts'
 
 const CABLE_ID = '11111111-1111-4111-8111-111111111111'
@@ -449,7 +449,8 @@ describe('progress presentation copy', () => {
     expect(bodyTrendCopy(overview)).not.toMatch(/^0/)
     const brief = progressBriefLines(overview)
     expect(brief.some((line) => line.includes('3 workouts'))).toBe(true)
-    expect(brief.some((line) => line.includes('2 new performance bests'))).toBe(true)
+    expect(brief.some((line) => line.includes('2 performance bests'))).toBe(true)
+    expect(brief).toContain('Strength trends building')
     expect(brief.join(' ')).not.toMatch(/0 of /)
   })
 
@@ -457,6 +458,10 @@ describe('progress presentation copy', () => {
     expect(formatKgAsLb(22.6796185)).toMatch(/lb/)
     expect(formatPerformed({ loadKg: 22.68, durationSec: 45 })).toMatch(/45s/)
     expect(formatPerformed({ loadKg: 4.536, leftReps: 6, rightReps: 9 })).toMatch(/L 6/)
+    expect(formatBodyCanonical('percent', 29.6)).toBe('29.6%')
+    expect(formatBodyMetricChange('percent', null)).toBe('—')
+    expect(formatBodyMetricChange('percent', 0)).not.toBe('—')
+    expect(bodyMetricLabel('body_fat_percentage')).toBe('Body fat')
   })
 })
 
@@ -497,6 +502,10 @@ describe('Progress UI states', () => {
     expect(html).toContain('Farmer Carry')
     expect(html).toContain('Sep 20 ×2')
     expect(html).toContain('Sep 21')
+    expect(html).toContain('3 workouts')
+    expect(html).toContain('2 performance bests')
+    expect(html).toContain('Strength trends building')
+    expect(html).toContain('grid-cols-[5.5rem_8.75rem')
     expect(html).not.toContain('Strength trend: 0%')
     expect(html).not.toContain('Weight trend: 0')
     expect(html).not.toContain('Box Squat')
@@ -533,7 +542,9 @@ describe('Progress UI states', () => {
     expect(html).toContain('Reverse Lunge')
     expect(html).toContain('L 6')
     expect(html).toContain('R 9')
-    expect(html).toContain('1 / 6 appearances')
+    expect(html).toContain('Building · 1 / 6')
+    expect(html).toContain('Status / Best')
+    expect(html).toContain('1 recent best')
     expect(html).toContain('md:hidden')
     expect(html).not.toContain('Frontier available')
   })
@@ -577,8 +588,9 @@ describe('Progress UI states', () => {
         <BodySection overview={sparseOverview()} onEvidence={() => undefined} />
       </MemoryRouter>,
     )
-    expect(html).toContain('History building')
-    expect(html).toContain('one recorded measurement')
+    expect(html).toContain('Building weight history')
+    expect(html).toContain('1 of 5 measurements')
+    expect(html).toContain('14 days')
     expect(html).toContain('Period comparison unavailable')
     expect(html).not.toContain('Recorded weight')
     expect(html).not.toContain('h-56')
@@ -601,9 +613,18 @@ describe('Progress UI states', () => {
 
   it('keeps unavailable period comparison compact and other metrics dense', () => {
     const overview = withWeightHistory(1)
+    const sample = overview.body.weight.latest!
     overview.body.metrics = [
       {
         key: 'body_fat_percentage',
+        latest: {
+          ...sample,
+          measurementId: 'fat-1',
+          key: 'body_fat_percentage',
+          value: 29.6,
+          unit: 'percent',
+          valueKind: 'device_estimated',
+        },
         comparison: { status: 'insufficient_data', observations: 1, required: 2 },
       },
     ]
@@ -614,7 +635,10 @@ describe('Progress UI states', () => {
     )
     expect(html).toContain('Period comparison unavailable until a previous measurement exists.')
     expect(html).toContain('Body fat')
-    expect(html).toContain('1 recorded')
+    expect(html).toContain('29.6%')
+    expect(html).toContain('—')
+    expect(html).not.toContain('1 recorded')
+    expect(html).not.toContain('0%')
     expect(html).not.toContain('Need a comparison point in the previous window.')
   })
 

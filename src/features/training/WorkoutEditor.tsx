@@ -9,7 +9,7 @@ import {
   type InterpretedPaperSet,
   type ReviewFieldError,
 } from '@/domain/paper-load'
-import { cn } from '@/lib'
+import { cn, SHELL_MAX_WIDTH_CLASS } from '@/lib'
 import { addDraftSet, type DraftExercise, type DraftSet, type WorkoutDraft } from './draft'
 
 const inputClass =
@@ -141,7 +141,7 @@ export function WorkoutEditor({
       </div>
 
       <div className="fixed inset-x-0 bottom-0 border-t border-zinc-200 bg-white/95 px-4 py-3 backdrop-blur">
-        <div className="mx-auto flex max-w-5xl gap-3">
+        <div className={cn('mx-auto flex gap-3', SHELL_MAX_WIDTH_CLASS)}>
           <button
             type="button"
             className="min-h-11 flex-1 rounded-md bg-zinc-900 px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-zinc-300"

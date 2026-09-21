@@ -73,62 +73,31 @@ export function EstimatedStrengthChart({
     loadLb: asLb(point.loadKg),
     reps: point.reps,
   }))
-  if (data.length === 0) {
-    return (
-      <ChartFrame title="Estimated Strength" caption="No high-confidence estimated-strength points yet.">
-        <p className="text-sm text-zinc-600">Record working sets to establish a baseline.</p>
-      </ChartFrame>
-    )
+  if (data.length < 2) {
+    return null
   }
-  const caption =
-    data.length === 1
-      ? 'Baseline estimated strength from the first valid performance. This is not a tested 1RM.'
-      : 'Session estimated strength from Epley. This is not a tested 1RM.'
+  const domain = paddedDomain(data.map((item) => item.estimatedLb))
+  const caption = 'Session estimated strength from Epley. This is not a tested 1RM.'
   return (
     <ChartFrame title="Estimated Strength" caption={caption}>
       <ResponsiveContainer width="100%" height="100%">
-        {data.length === 1 ? (
-          <ScatterChart margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
-            <CartesianGrid stroke="#e4e4e7" strokeDasharray="3 3" />
-            <XAxis dataKey="date" tickFormatter={formatCalendarDate} tick={{ fill: '#71717a', fontSize: 11 }} />
-            <YAxis
-              dataKey="estimatedLb"
-              unit=" lb"
-              tick={{ fill: '#71717a', fontSize: 11 }}
-              width={56}
-            />
-            <Tooltip
-              content={({ payload }) => {
-                const item = payload?.[0]?.payload as StrengthPoint | undefined
-                if (!item) {
-                  return null
-                }
-                return tooltipBox(
-                  `${formatCalendarDate(item.date)} · ${item.estimatedLb} lb estimated from ${item.loadLb} lb × ${item.reps}`,
-                )
-              }}
-            />
-            <Scatter data={data} fill="#18181b" />
-          </ScatterChart>
-        ) : (
-          <LineChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
-            <CartesianGrid stroke="#e4e4e7" strokeDasharray="3 3" />
-            <XAxis dataKey="date" tickFormatter={formatCalendarDate} tick={{ fill: '#71717a', fontSize: 11 }} />
-            <YAxis dataKey="estimatedLb" unit=" lb" tick={{ fill: '#71717a', fontSize: 11 }} width={56} />
-            <Tooltip
-              content={({ payload }) => {
-                const item = payload?.[0]?.payload as StrengthPoint | undefined
-                if (!item) {
-                  return null
-                }
-                return tooltipBox(
-                  `${formatCalendarDate(item.date)} · ${item.estimatedLb} lb estimated from ${item.loadLb} lb × ${item.reps}`,
-                )
-              }}
-            />
-            <Line type="linear" dataKey="estimatedLb" stroke="#18181b" strokeWidth={2} dot={{ r: 3 }} />
-          </LineChart>
-        )}
+        <LineChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+          <CartesianGrid stroke="#e4e4e7" strokeDasharray="3 3" />
+          <XAxis dataKey="date" tickFormatter={formatCalendarDate} tick={{ fill: '#71717a', fontSize: 11 }} />
+          <YAxis dataKey="estimatedLb" unit=" lb" domain={domain} tick={{ fill: '#71717a', fontSize: 11 }} width={56} />
+          <Tooltip
+            content={({ payload }) => {
+              const item = payload?.[0]?.payload as StrengthPoint | undefined
+              if (!item) {
+                return null
+              }
+              return tooltipBox(
+                `${formatCalendarDate(item.date)} · ${item.estimatedLb} lb estimated from ${item.loadLb} lb × ${item.reps}`,
+              )
+            }}
+          />
+          <Line type="linear" dataKey="estimatedLb" stroke="#18181b" strokeWidth={2} dot={{ r: 3 }} />
+        </LineChart>
       </ResponsiveContainer>
     </ChartFrame>
   )
@@ -159,6 +128,9 @@ export function PerformanceFrontierChart({
   const historyData = toFrontierData(history, 'history', mode)
   const frontierData = toFrontierData(frontier, 'frontier', mode)
   const yLabel = mode === 'reps' ? 'Reps' : 'Duration (s)'
+  const all = [...historyData, ...frontierData]
+  const xDomain = all.length > 0 ? paddedDomain(all.map((item) => item.loadLb)) : undefined
+  const yDomain = all.length > 0 ? paddedDomain(all.map((item) => item.y)) : undefined
   return (
     <ChartFrame
       title="Performance frontier"
@@ -176,9 +148,10 @@ export function PerformanceFrontierChart({
             dataKey="loadLb"
             name="Load"
             unit=" lb"
+            domain={xDomain}
             tick={{ fill: '#71717a', fontSize: 11 }}
           />
-          <YAxis type="number" dataKey="y" name={yLabel} tick={{ fill: '#71717a', fontSize: 11 }} width={40} />
+          <YAxis type="number" dataKey="y" name={yLabel} domain={yDomain} tick={{ fill: '#71717a', fontSize: 11 }} width={40} />
           <Tooltip
             content={({ payload }) => {
               const item = payload?.[0]?.payload as FrontierDatum | undefined
@@ -200,11 +173,12 @@ export function PerformanceFrontierChart({
   )
 }
 
-function tightAxisDomain(values: number[]): [number, number] {
+function paddedDomain(values: number[]): [number, number] {
   const min = Math.min(...values)
   const max = Math.max(...values)
+  const mid = (min + max) / 2
   const spread = max - min
-  const pad = spread > 0 ? Math.max(1, spread * 0.2) : 2
+  const pad = Math.max(spread * 0.2, Math.abs(mid) * 0.02, 2)
   return [min - pad, max + pad]
 }
 
@@ -218,7 +192,7 @@ export function WeightHistoryChart({
   if (points.length < 2) {
     return null
   }
-  const domain = tightAxisDomain(points.map((point) => point.valueLb))
+  const domain = paddedDomain(points.map((point) => point.valueLb))
   return (
     <ChartFrame
       title="Recorded weight"

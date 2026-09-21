@@ -71,48 +71,49 @@ export function ProgressPage() {
       : null
 
   return (
-    <section className="space-y-4 md:space-y-6">
+    <section className="space-y-3 md:space-y-4">
       <div>
         <h1 className="text-xl font-semibold tracking-tight md:text-2xl">Progress</h1>
-        <p className="mt-1 hidden text-zinc-600 md:mt-2 md:block">
+        <p className="mt-1 hidden text-sm text-zinc-600 md:block">
           What changed in training and body — from recorded work, not guesses.
         </p>
       </div>
 
-      <div className="flex gap-1 overflow-x-auto pb-1" role="group" aria-label="Progress range">
-        {RANGE_OPTIONS.map((option) => (
-          <button
-            key={option.id}
-            type="button"
-            onClick={() => setRange(option.id)}
-            className={cn(
-              'min-h-11 shrink-0 rounded-md px-3 py-2 text-sm font-medium',
-              option.id === range ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900',
-            )}
-            aria-pressed={option.id === range}
-          >
-            {option.label}
-          </button>
-        ))}
+      <div className="rounded-lg border border-zinc-200 bg-white px-2 py-2 md:px-3">
+        <div className="flex gap-1 overflow-x-auto" role="group" aria-label="Progress range">
+          {RANGE_OPTIONS.map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              onClick={() => setRange(option.id)}
+              className={cn(
+                'min-h-10 shrink-0 rounded-md px-3 py-1.5 text-sm font-medium md:min-h-9',
+                option.id === range ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900',
+              )}
+              aria-pressed={option.id === range}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+        <nav className="mt-2 flex flex-wrap gap-1 border-t border-zinc-100 pt-2" aria-label="Progress sections">
+          {TABS.map((tab) => (
+            <NavLink
+              key={tab.to}
+              to={`${tab.to}${progressSearch(range)}`}
+              end={tab.end}
+              className={({ isActive }) =>
+                cn(
+                  'rounded-md px-3 py-1.5 text-sm font-medium',
+                  isActive ? 'bg-zinc-100 text-zinc-900' : 'text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900',
+                )
+              }
+            >
+              {tab.label}
+            </NavLink>
+          ))}
+        </nav>
       </div>
-
-      <nav className="flex flex-wrap gap-1 border-b border-zinc-200 pb-1">
-        {TABS.map((tab) => (
-          <NavLink
-            key={tab.to}
-            to={`${tab.to}${progressSearch(range)}`}
-            end={tab.end}
-            className={({ isActive }) =>
-              cn(
-                'rounded-md px-3 py-2 text-sm font-medium',
-                isActive ? 'bg-zinc-100 text-zinc-900' : 'text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900',
-              )
-            }
-          >
-            {tab.label}
-          </NavLink>
-        ))}
-      </nav>
 
       {status === 'loading' ? <ProgressSkeleton /> : null}
       {status === 'error' ? (

@@ -110,6 +110,26 @@ function nearestToDate(observations: readonly BodyObservation[], date: string): 
   })[0]!
 }
 
+export function latestBodyObservation(
+  observations: readonly BodyObservation[],
+  key: string,
+): BodyObservation | null {
+  const series = observations.filter((item) => item.key === key)
+  if (series.length === 0) {
+    return null
+  }
+  const ordered = [...series].sort((left, right) => {
+    if (left.calendarDate !== right.calendarDate) {
+      return left.calendarDate < right.calendarDate ? -1 : 1
+    }
+    if (left.measuredAt !== right.measuredAt) {
+      return left.measuredAt < right.measuredAt ? -1 : 1
+    }
+    return left.measurementId < right.measurementId ? -1 : 1
+  })
+  return ordered[ordered.length - 1] ?? null
+}
+
 export function compareSparseBodyMetric(
   observations: readonly BodyObservation[],
   key: string,

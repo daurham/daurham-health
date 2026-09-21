@@ -7,8 +7,11 @@ import {
   achievementList,
   bodyTrendCopy,
   findingDate,
+  findingEventName,
   findingHeadline,
+  findingResult,
   findingTitle,
+  progressBriefLines,
   strengthOverviewCopy,
   workoutActivityByDate,
 } from './copy'
@@ -29,19 +32,19 @@ function Card({
   children: ReactNode
   onOpen?: () => void
 }) {
-  const className = 'rounded-lg border border-zinc-200 bg-white p-4 text-left'
+  const className = 'rounded-lg border border-zinc-200 bg-white p-3 text-left md:p-4'
   if (onOpen) {
     return (
-      <button type="button" onClick={onOpen} className={cn(className, 'w-full hover:border-zinc-400')}>
+      <button type="button" onClick={onOpen} className={cn(className, 'w-full hover:border-zinc-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900')}>
         <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{title}</h3>
-        <div className="mt-2">{children}</div>
+        <div className="mt-1.5 md:mt-2">{children}</div>
       </button>
     )
   }
   return (
     <div className={className}>
       <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{title}</h3>
-      <div className="mt-2">{children}</div>
+      <div className="mt-1.5 md:mt-2">{children}</div>
     </div>
   )
 }
@@ -104,12 +107,13 @@ export function OverviewSection({
   const consistency = overview.training.consistency
   const weight = overview.body.weight
   const findings = overview.findings
+  const brief = progressBriefLines(overview)
 
   return (
-    <div className="space-y-5 md:space-y-8">
+    <div className="space-y-5 md:space-y-6">
       <section>
-        <h2 className="text-lg font-semibold tracking-tight">Your progress</h2>
-        <p className="mt-1 text-sm text-zinc-600">{RANGE_HEADINGS[overview.period.range]}</p>
+        <h2 className="text-lg font-semibold tracking-tight md:sr-only">Your progress</h2>
+        <p className="mt-1 text-sm text-zinc-600 md:hidden">{RANGE_HEADINGS[overview.period.range]}</p>
         <div className="mt-3 grid gap-2 sm:grid-cols-3 sm:gap-3">
           <Card
             title="Body"
@@ -136,11 +140,18 @@ export function OverviewSection({
             <p className="text-lg font-semibold tracking-tight md:text-xl">
               {weight.latest ? formatBodyCanonical(weight.latest.unit, weight.latest.value) : 'No weight yet'}
             </p>
-            <p className="mt-1 text-sm text-zinc-600">
+            <p className="mt-1 text-sm text-zinc-600 md:hidden">
               {weight.trend.status === 'available'
                 ? bodyTrendCopy(overview)
                 : weight.latest
                   ? formatCalendarDate(weight.latest.calendarDate)
+                  : 'No measurements yet'}
+            </p>
+            <p className="mt-1 hidden text-sm text-zinc-600 md:block">
+              {weight.trend.status === 'available'
+                ? bodyTrendCopy(overview)
+                : weight.latest
+                  ? 'Building history'
                   : 'No measurements yet'}
             </p>
           </Card>
@@ -178,6 +189,15 @@ export function OverviewSection({
             )}
           </Card>
         </div>
+        {brief.length > 0 ? (
+          <p className="mt-3 hidden text-sm text-zinc-600 md:block">
+            <span className="font-medium text-zinc-800">{RANGE_HEADINGS[overview.period.range]}</span>
+            <span className="text-zinc-400"> · </span>
+            {brief.join('  •  ')}
+          </p>
+        ) : (
+          <p className="mt-3 hidden text-sm text-zinc-500 md:block">{RANGE_HEADINGS[overview.period.range]}</p>
+        )}
       </section>
 
       <section>
@@ -187,30 +207,79 @@ export function OverviewSection({
             No new performance bests or trend changes in this period. First performances establish a baseline rather than a PR.
           </p>
         ) : (
-          <ul className="mt-3 space-y-2">
-            {findings.map((finding, index) => (
-              <li key={`${finding.kind}-${finding.exerciseId ?? 'na'}-${index}`}>
-                <button
-                  type="button"
-                  onClick={() => onEvidence(findingTopic(finding, overview))}
-                  className="w-full rounded-lg border border-zinc-200 bg-white px-4 py-3 text-left hover:border-zinc-400"
-                >
-                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-                    {findingTitle(finding.kind)}
-                  </p>
-                  <p className="mt-1 font-medium">{findingHeadline(finding, overview)}</p>
-                  <p className="mt-1 text-sm text-zinc-600">
-                    {[achievementList(finding)[0], findingDate(finding)].filter(Boolean).join(' · ')}
-                  </p>
-                </button>
-              </li>
-            ))}
-          </ul>
+          <FindingFeed findings={findings} overview={overview} onEvidence={onEvidence} />
         )}
       </section>
 
       <ConsistencyBlock overview={overview} />
     </div>
+  )
+}
+
+function FindingFeed({
+  findings,
+  overview,
+  onEvidence,
+}: {
+  findings: ProgressFinding[]
+  overview: ProgressOverview
+  onEvidence: (topic: EvidenceTopic) => void
+}) {
+  return (
+    <>
+      <ul className="mt-3 space-y-2 md:hidden">
+        {findings.map((finding, index) => (
+          <li key={`${finding.kind}-${finding.exerciseId ?? 'na'}-${index}`}>
+            <button
+              type="button"
+              onClick={() => onEvidence(findingTopic(finding, overview))}
+              className="w-full rounded-lg border border-zinc-200 bg-white px-4 py-3 text-left hover:border-zinc-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
+            >
+              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                {findingTitle(finding.kind)}
+              </p>
+              <p className="mt-1 font-medium">{findingHeadline(finding, overview)}</p>
+              <p className="mt-1 text-sm text-zinc-600">
+                {[achievementList(finding)[0], findingDate(finding)].filter(Boolean).join(' · ')}
+              </p>
+            </button>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-3 hidden overflow-hidden rounded-lg border border-zinc-200 bg-white md:block">
+        <div
+          className="grid grid-cols-[5.5rem_8.75rem_minmax(8rem,1.3fr)_minmax(7rem,1fr)_minmax(7rem,0.9fr)_1rem] gap-3 border-b border-zinc-100 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-zinc-500"
+          aria-hidden="true"
+        >
+          <span>Date</span>
+          <span>Type</span>
+          <span>Event</span>
+          <span>Result</span>
+          <span>Detail</span>
+          <span />
+        </div>
+        <ul>
+          {findings.map((finding, index) => (
+            <li key={`${finding.kind}-${finding.exerciseId ?? 'na'}-${index}`} className="border-b border-zinc-100 last:border-b-0">
+              <button
+                type="button"
+                onClick={() => onEvidence(findingTopic(finding, overview))}
+                className="grid w-full grid-cols-[5.5rem_8.75rem_minmax(8rem,1.3fr)_minmax(7rem,1fr)_minmax(7rem,0.9fr)_1rem] items-center gap-3 px-3 py-2.5 text-left hover:bg-zinc-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-zinc-900"
+              >
+                <span className="text-sm text-zinc-600">{findingDate(finding) ?? '—'}</span>
+                <span className="text-xs text-zinc-500">{findingTitle(finding.kind)}</span>
+                <span className="truncate font-medium">{findingEventName(finding, overview)}</span>
+                <span className="text-sm text-zinc-800">{findingResult(finding, overview) ?? '—'}</span>
+                <span className="truncate text-sm text-zinc-600">{achievementList(finding)[0] ?? '—'}</span>
+                <span className="text-right text-zinc-400" aria-hidden="true">
+                  →
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </>
   )
 }
 
@@ -223,40 +292,40 @@ function ConsistencyBlock({ overview }: { overview: ProgressOverview }) {
       {consistency.status !== 'available' ? (
         <p className="mt-2 text-sm text-zinc-600">No workouts to describe yet.</p>
       ) : (
-        <div className="mt-3 rounded-lg border border-zinc-200 bg-white p-4">
-          <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+        <div className="mt-3 rounded-lg border border-zinc-200 bg-white px-4 py-3">
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm md:grid-cols-4 md:gap-8">
             <div>
               <dt className="text-xs uppercase tracking-wide text-zinc-500">Workouts</dt>
-              <dd className="font-medium">{consistency.value.workoutCount}</dd>
+              <dd className="mt-0.5 font-medium">{consistency.value.workoutCount}</dd>
             </div>
             <div>
               <dt className="text-xs uppercase tracking-wide text-zinc-500">Per week</dt>
-              <dd className="font-medium">
+              <dd className="mt-0.5 font-medium">
                 {consistency.value.workoutsPerWeek.toLocaleString('en-US', { maximumFractionDigits: 1 })}
               </dd>
             </div>
             <div>
               <dt className="text-xs uppercase tracking-wide text-zinc-500">Median gap</dt>
-              <dd className="font-medium">
+              <dd className="mt-0.5 font-medium">
                 {consistency.value.medianGapDays == null ? '—' : `${consistency.value.medianGapDays}d`}
               </dd>
             </div>
             <div>
               <dt className="text-xs uppercase tracking-wide text-zinc-500">Longest gap</dt>
-              <dd className="font-medium">
+              <dd className="mt-0.5 font-medium">
                 {consistency.value.longestGapDays == null ? '—' : `${consistency.value.longestGapDays}d`}
               </dd>
             </div>
           </dl>
           {activity.length > 0 ? (
-            <div className="mt-4">
+            <div className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t border-zinc-100 pt-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Activity</p>
-              <div className="mt-2 flex flex-wrap gap-1">
+              <div className="flex flex-wrap gap-1">
                 {activity.map((item) => (
                   <span
                     key={item.date}
                     title={`${item.count} workout${item.count === 1 ? '' : 's'} on ${item.date}`}
-                    className="rounded-sm bg-zinc-900 px-2 py-1 text-[11px] text-white"
+                    className="text-sm text-zinc-800"
                   >
                     {formatCalendarDate(item.date)}
                     {item.count > 1 ? ` ×${item.count}` : ''}

@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { LockedScreen, useAuth } from '@/auth'
-import { cn } from '@/lib'
+import { cn, SHELL_MAX_WIDTH_CLASS } from '@/lib'
 import type { NavItem } from '@/types'
 
 const navItems: NavItem[] = [
@@ -20,7 +20,7 @@ export function Layout() {
   return (
     <div className="min-h-dvh bg-zinc-50 text-zinc-900">
       <header className="border-b border-zinc-200 bg-white pt-[env(safe-area-inset-top)]">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
+        <div className={cn('mx-auto flex items-center justify-between gap-3 px-4 py-3', SHELL_MAX_WIDTH_CLASS)}>
           <p className="text-sm font-semibold tracking-tight">Daurham Health</p>
           {showOwnerChrome ? (
             <>
@@ -53,7 +53,7 @@ export function Layout() {
           ) : null}
         </div>
         {publicAuthRoute ? null : (
-          <div className="mx-auto hidden max-w-5xl px-4 pb-3 md:block">
+          <div className={cn('mx-auto hidden px-4 pb-3 md:block', SHELL_MAX_WIDTH_CLASS)}>
             <nav className="flex flex-nowrap gap-1 overflow-x-auto" aria-label="Primary">
               {navItems.map((item) => (
                 <NavLink
@@ -76,7 +76,12 @@ export function Layout() {
           </div>
         )}
       </header>
-      <main className="mx-auto max-w-5xl px-4 py-6 pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:py-8 md:pb-8">
+      <main
+        className={cn(
+          'mx-auto px-4 py-6 pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:py-8 md:pb-8',
+          SHELL_MAX_WIDTH_CLASS,
+        )}
+      >
         {publicAuthRoute ? (
           <Outlet />
         ) : status === 'loading' ? (
@@ -107,7 +112,7 @@ export function Layout() {
           aria-label="Primary"
           className="fixed inset-x-0 bottom-0 z-20 border-t border-zinc-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
         >
-          <div className="mx-auto grid max-w-5xl grid-cols-5">
+          <div className={cn('mx-auto grid grid-cols-5', SHELL_MAX_WIDTH_CLASS)}>
             {navItems.map((item) => (
               <NavLink
                 key={item.id}

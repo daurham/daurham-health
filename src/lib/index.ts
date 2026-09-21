@@ -3,3 +3,4 @@ export function cn(...classes: Array<string | false | null | undefined>) {
 }
 
 export { healthFetch, readApiError } from './health-api'
+export { SHELL_MAX_WIDTH_CLASS } from './shell'

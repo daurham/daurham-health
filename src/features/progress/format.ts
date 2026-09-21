@@ -1,6 +1,7 @@
 import { displayValueForMetric } from '@/domain/body-metrics'
 import type { CanonicalUnit } from '@/domain/body-metrics'
 import type { CanonicalEvidence, LatestPerformance, PrAchievement } from '@/domain/progress'
+import { kilogramsToPounds } from '@/domain/units'
 import { formatPounds, formatWorkoutDate } from '@/features/training/format'
 
 export function formatKgAsLb(kg: number | null | undefined): string {
@@ -47,10 +48,30 @@ export function formatPercent(value: number): string {
 
 export function formatBodyCanonical(unit: string, value: number, digits = 1): string {
   const display = displayValueForMetric(unit as CanonicalUnit, value)
-  return `${display.value.toLocaleString('en-US', {
+  const formatted = display.value.toLocaleString('en-US', {
     maximumFractionDigits: digits,
     minimumFractionDigits: 0,
-  })} ${display.unit}`
+  })
+  if (display.unit === '%') {
+    return `${formatted}%`
+  }
+  if (display.unit === 'ratio' || display.unit === 'index') {
+    return formatted
+  }
+  return `${formatted} ${display.unit}`
+}
+
+export function formatBodyMetricChange(unit: string, change: number | null | undefined): string {
+  if (change == null) {
+    return '—'
+  }
+  if (unit === 'kg') {
+    return formatSigned(kilogramsToPounds(change), 1, 'lb')
+  }
+  if (unit === 'percent') {
+    return formatSigned(change, 1, '%')
+  }
+  return formatSigned(change, 1, unit === 'ratio' || unit === 'index' ? '' : unit)
 }
 
 export function formatPerformed(input: {
@@ -117,10 +138,15 @@ export function bodyMetricLabel(key: string): string {
     body_water_percentage: 'Body water',
     skeletal_muscle_percentage: 'Skeletal muscle',
     bmi: 'BMI',
+    bmr: 'BMR',
     visceral_fat: 'Visceral fat',
     bone_mass: 'Bone mass',
     fat_free_mass: 'Fat-free mass',
     waist_hip_ratio: 'Waist-hip ratio',
+    protein_percentage: 'Protein',
+    metabolic_age: 'Metabolic age',
+    skeletal_muscle_mass: 'Skeletal muscle mass',
+    subcutaneous_fat_percentage: 'Subcutaneous fat',
   }
   return labels[key] ?? key.replace(/_/g, ' ')
 }

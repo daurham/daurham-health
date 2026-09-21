@@ -39,7 +39,7 @@ export {
 export { performanceFrontier, expandsFrontier, timedPerformanceFrontier, expandsTimedFrontier } from './frontier.js'
 export { performanceBestsForExercise } from './prs.js'
 export { estimatedStrengthTrend, progressionPattern } from './exercise-trend.js'
-export { bodyWeightTrend, compareSparseBodyMetric } from './body-trend.js'
+export { bodyWeightTrend, compareSparseBodyMetric, latestBodyObservation } from './body-trend.js'
 export { relativeStrength } from './relative-strength.js'
 export { trainingConsistency } from './consistency.js'
 export { buildProgressOverview, type ProgressCanonicalInput, type ProgressOverview } from './overview.js'

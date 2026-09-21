@@ -425,6 +425,23 @@ describe('findings and overview', () => {
     expect(overview.exercises[0]?.appearanceCount).toBeGreaterThan(0)
     expect(overview.body.weight.trend.status).toBe('insufficient_data')
   })
+
+  it('exposes latest body composition without treating missing change as zero', () => {
+    const overview = buildProgressOverview({
+      asOf: '2026-02-01',
+      range: '30d',
+      exercises: [loadedRepExercise()],
+      workouts: [],
+      sets: [],
+      bodyObservations: [
+        bodyWeight('bw1', '2026-01-20', 82),
+        { ...bodyWeight('bf1', '2026-01-20', 29.6), key: 'body_fat_percentage', unit: 'percent' },
+      ],
+    })
+    const fat = overview.body.metrics.find((item) => item.key === 'body_fat_percentage')
+    expect(fat?.latest?.value).toBe(29.6)
+    expect(fat?.comparison.status).toBe('insufficient_data')
+  })
 })
 
 function perSideExercise(): ProgressExerciseDefinition {
