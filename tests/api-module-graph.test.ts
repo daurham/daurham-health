@@ -54,15 +54,20 @@ describe('Vercel function module specifiers', () => {
   const graph = walkApiGraph()
 
   it('exposes a single Hobby-safe Serverless Function entrypoint', () => {
-    const apiFiles = listFiles(path.join(ROOT, 'api')).map((file) => path.relative(ROOT, file))
-    expect(apiFiles).toEqual(['api/[...path].ts'])
+    const apiRoot = path.join(ROOT, 'api')
+    const apiFiles = listFiles(apiRoot).map((file) => path.relative(ROOT, file))
+    expect(apiFiles).toEqual(['api/index.ts'])
+    const leftoverDirs = readdirSync(apiRoot, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name)
+    expect(leftoverDirs).toEqual([])
   })
 
   it('reaches every api handler and its server/domain dependencies', () => {
     const files = graph.map((entry) => entry.file)
     expect(files).toEqual(
       expect.arrayContaining([
-        'api/[...path].ts',
+        'api/index.ts',
         'server/dispatch.ts',
         'server/handlers/health.ts',
         'server/handlers/session.ts',

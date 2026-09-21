@@ -207,6 +207,13 @@ describe('auth proxy path', () => {
         headers: {},
       } as ApiRequest),
     ).toBe('get-session')
+    expect(
+      authProxyPath({
+        url: '/api?path=auth/sign-in/email',
+        query: { path: 'auth/sign-in/email' },
+        headers: {},
+      } as ApiRequest),
+    ).toBe('sign-in/email')
   })
 })
 

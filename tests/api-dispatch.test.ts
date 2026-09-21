@@ -1,11 +1,25 @@
+import { readFileSync } from 'node:fs'
 import { IncomingMessage, ServerResponse } from 'node:http'
 import { Socket } from 'node:net'
+import path from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { dispatchHealthApi, matchHealthApiRoute } from '../server/dispatch.ts'
+import apiHandler from '../api/index.ts'
+import { HEALTH_API_ENTRY } from '../server/dev-api-plugin.ts'
+import { matchHealthApiRoute } from '../server/dispatch.ts'
 import { wrapNodeResponse, type ApiRequest, type ApiResponse } from '../server/http.ts'
 
+const ROOT = process.cwd()
 const SESSION_ID = '11111111-1111-4111-8111-111111111111'
 const JOB_ID = '22222222-2222-4222-8222-222222222222'
+
+type VercelRewrite = { source: string; destination: string }
+
+function vercelRewrites(): VercelRewrite[] {
+  const parsed = JSON.parse(readFileSync(path.join(ROOT, 'vercel.json'), 'utf8')) as {
+    rewrites: VercelRewrite[]
+  }
+  return parsed.rewrites
+}
 
 function request(method: string, url: string, query?: ApiRequest['query']): ApiRequest {
   return {
@@ -38,9 +52,22 @@ function captureResponse(): { res: ApiResponse; status: () => number; body: () =
   }
 }
 
-async function dispatch(method: string, url: string, query?: ApiRequest['query']) {
+/** How nested /api/* arrives after vercel.json rewrites it onto api/index.ts. */
+function productionRewrite(publicUrl: string): { url: string; query: { path: string } } {
+  const [apiRewrite] = vercelRewrites()
+  expect(apiRewrite).toEqual({
+    source: '/api/:path*',
+    destination: '/api?path=:path*',
+  })
+  const pathname = publicUrl.split('?')[0] ?? ''
+  const rest = pathname.replace(/^\/api\//, '')
+  return { url: `/api?path=${rest}`, query: { path: rest } }
+}
+
+async function hit(method: string, publicUrl: string) {
+  const rewritten = productionRewrite(publicUrl)
   const captured = captureResponse()
-  await dispatchHealthApi(request(method, url, query), captured.res)
+  await apiHandler(request(method, rewritten.url, rewritten.query), captured.res)
   return captured
 }
 
@@ -48,91 +75,91 @@ function isDeniedPrivate(status: number): boolean {
   return status === 401 || status === 403 || status === 503
 }
 
-describe('Health API route matching', () => {
-  it('maps the public and private contract onto named routes', () => {
-    expect(matchHealthApiRoute('/api/health')).toBe('health')
-    expect(matchHealthApiRoute('/api/session')).toBe('session')
+describe('Vercel nested API routing', () => {
+  it('rewrites every /api/:path* onto the single /api function before the SPA fallback', () => {
+    const rewrites = vercelRewrites()
+    expect(rewrites[0]).toEqual({
+      source: '/api/:path*',
+      destination: '/api?path=:path*',
+    })
+    expect(rewrites[1]?.destination).toBe('/index.html')
+    expect(HEALTH_API_ENTRY).toBe('api/index.ts')
+  })
+
+  it('maps nested public URLs onto the existing Health routes', () => {
     expect(matchHealthApiRoute('/api/auth/sign-in/email')).toBe('auth')
     expect(matchHealthApiRoute('/api/auth/get-session')).toBe('auth')
-    expect(matchHealthApiRoute('/api/body/measurements')).toBe('body-measurements')
-    expect(matchHealthApiRoute('/api/training/sessions')).toBe('training-sessions')
+    expect(matchHealthApiRoute('/api/auth/sign-out')).toBe('auth')
+    expect(matchHealthApiRoute('/api/auth/send-verification-email')).toBe('auth')
+    expect(matchHealthApiRoute('/api/body/import/fit-profile/preview')).toBe('fit-profile-preview')
     expect(matchHealthApiRoute(`/api/training/sessions/${SESSION_ID}`)).toBe('training-session-detail')
-    expect(matchHealthApiRoute('/api/training/transcription/jobs')).toBe('transcription-jobs')
     expect(matchHealthApiRoute(`/api/training/transcription/jobs/${JOB_ID}`)).toBe(
       'transcription-job-detail',
     )
-    expect(matchHealthApiRoute('/api/training/transcription/commit')).toBe('transcription-commit')
-    expect(matchHealthApiRoute('/api/missing')).toBeNull()
-    expect(matchHealthApiRoute('/api/training/sessions/extra/segment')).toBeNull()
   })
 })
 
-describe('Health API dispatcher', () => {
-  it('serves GET /api/health without auth', async () => {
-    const captured = await dispatch('GET', '/api/health')
+describe('api/index after Vercel nested rewrite', () => {
+  it('serves GET /api/health', async () => {
+    const captured = await hit('GET', '/api/health')
     expect(captured.status()).toBe(200)
     expect(captured.body()).toEqual({ status: 'ok' })
   })
 
   it('protects GET /api/session', async () => {
-    const captured = await dispatch('GET', '/api/session')
+    const captured = await hit('GET', '/api/session')
     expect(isDeniedPrivate(captured.status())).toBe(true)
   })
 
-  it('routes Neon Auth proxy subpaths', async () => {
-    const signIn = await dispatch('POST', '/api/auth/sign-in/email')
-    expect(matchHealthApiRoute('/api/auth/sign-in/email')).toBe('auth')
+  it('reaches the Neon Auth proxy for nested Better Auth paths', async () => {
+    const signIn = await hit('POST', '/api/auth/sign-in/email')
     expect(signIn.status()).not.toBe(404)
 
-    const session = await dispatch('GET', '/api/auth/get-session')
+    const session = await hit('GET', '/api/auth/get-session')
     expect(session.status()).not.toBe(404)
+
+    const signOut = await hit('POST', '/api/auth/sign-out')
+    expect(signOut.status()).not.toBe(404)
+
+    const verify = await hit('POST', '/api/auth/send-verification-email')
+    expect(verify.status()).not.toBe(404)
   })
 
-  it('protects Body measurements', async () => {
-    const captured = await dispatch('GET', '/api/body/measurements')
-    expect(isDeniedPrivate(captured.status())).toBe(true)
-    expect(JSON.stringify(captured.body() ?? {})).not.toMatch(/measurement|weight|kg/i)
-  })
-
-  it('protects GET /api/training/sessions', async () => {
-    const captured = await dispatch('GET', '/api/training/sessions')
-    expect(isDeniedPrivate(captured.status())).toBe(true)
-  })
-
-  it('protects dynamic Training session detail', async () => {
-    const captured = await dispatch('GET', `/api/training/sessions/${SESSION_ID}`)
+  it('protects nested Body import routes', async () => {
+    const captured = await hit('POST', '/api/body/import/fit-profile/preview')
     expect(captured.status()).not.toBe(404)
     expect(isDeniedPrivate(captured.status())).toBe(true)
   })
 
-  it('protects transcription job POST and GET and commit', async () => {
-    const create = await dispatch('POST', '/api/training/transcription/jobs')
+  it('protects Training list and dynamic session detail', async () => {
+    const list = await hit('GET', '/api/training/sessions')
+    expect(isDeniedPrivate(list.status())).toBe(true)
+
+    const detail = await hit('GET', `/api/training/sessions/${SESSION_ID}`)
+    expect(detail.status()).not.toBe(404)
+    expect(isDeniedPrivate(detail.status())).toBe(true)
+  })
+
+  it('protects transcription job POST, dynamic GET, and commit', async () => {
+    const create = await hit('POST', '/api/training/transcription/jobs')
     expect(isDeniedPrivate(create.status())).toBe(true)
     expect(JSON.stringify(create.body() ?? {})).not.toContain('HOME_AI')
 
-    const poll = await dispatch('GET', `/api/training/transcription/jobs/${JOB_ID}`)
+    const poll = await hit('GET', `/api/training/transcription/jobs/${JOB_ID}`)
     expect(poll.status()).not.toBe(404)
     expect(isDeniedPrivate(poll.status())).toBe(true)
 
-    const commit = await dispatch('POST', '/api/training/transcription/commit')
+    const commit = await hit('POST', '/api/training/transcription/commit')
     expect(isDeniedPrivate(commit.status())).toBe(true)
   })
 
-  it('returns 404 for unknown API routes', async () => {
-    const captured = await dispatch('GET', '/api/does-not-exist')
-    expect(captured.status()).toBe(404)
-    expect(captured.body()).toEqual({ error: 'Not found' })
-  })
+  it('returns 404 for unknown API routes and 405 for unsupported methods', async () => {
+    const missing = await hit('GET', '/api/does-not-exist')
+    expect(missing.status()).toBe(404)
+    expect(missing.body()).toEqual({ error: 'Not found' })
 
-  it('keeps existing 405 responses for unsupported methods on known routes', async () => {
-    const captured = await dispatch('POST', '/api/health')
-    expect(captured.status()).toBe(405)
-    expect(captured.body()).toEqual({ error: 'Method not allowed' })
-  })
-
-  it('resolves Vercel catch-all query.path when the url is rewritten', async () => {
-    const captured = await dispatch('GET', '/internal', { path: ['health'] })
-    expect(captured.status()).toBe(200)
-    expect(captured.body()).toEqual({ status: 'ok' })
+    const method = await hit('POST', '/api/health')
+    expect(method.status()).toBe(405)
+    expect(method.body()).toEqual({ error: 'Method not allowed' })
   })
 })

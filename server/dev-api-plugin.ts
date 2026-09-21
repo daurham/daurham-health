@@ -4,10 +4,10 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Plugin, ViteDevServer } from 'vite'
 import { wrapNodeResponse } from './http.js'
 
-const API_ENTRY = 'api/[...path].ts'
+export const HEALTH_API_ENTRY = 'api/index.ts'
 
 function healthApiEntrypoint(root: string): string | null {
-  const filePath = path.resolve(root, API_ENTRY)
+  const filePath = path.resolve(root, HEALTH_API_ENTRY)
   const relativeToRoot = path.relative(root, filePath)
   if (relativeToRoot.startsWith('..') || path.isAbsolute(relativeToRoot)) {
     return null

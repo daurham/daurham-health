@@ -53,13 +53,21 @@ export function requestPathname(req: ApiRequest): string {
   return url.split('?')[0] ?? ''
 }
 
+function decodePathSegment(value: string): string {
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    return value
+  }
+}
+
 function catchAllApiPathname(req: ApiRequest): string | null {
   const query = req.query?.path
   if (Array.isArray(query) && query.length > 0 && query.every((part) => typeof part === 'string')) {
-    return `/api/${query.join('/')}`
+    return `/api/${query.map((part) => decodePathSegment(part)).join('/')}`
   }
   if (typeof query === 'string' && query.trim().length > 0) {
-    return `/api/${query.replace(/^\/+/, '')}`
+    return `/api/${decodePathSegment(query).replace(/^\/+/, '')}`
   }
   return null
 }
