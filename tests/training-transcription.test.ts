@@ -283,6 +283,16 @@ describe('Health transcription GET mapping', () => {
         error: null,
       }),
       getNutritionLabelImage: async () => null,
+      createNutritionMealJob: async () => ({ id: JOB_ID, status: 'queued' }),
+      getNutritionMealJob: async () => ({
+        id: JOB_ID,
+        status: 'queued',
+        elapsedMs: null,
+        imageAvailable: false,
+        candidate: null,
+        error: null,
+      }),
+      getNutritionMealImage: async () => null,
     }
     const body = await getTranscriptionJob(JOB_ID, mock, { templates: templates(), exercises: library() })
     const serialized = JSON.stringify(body)
@@ -314,6 +324,16 @@ describe('Health transcription GET mapping', () => {
         error: null,
       }),
       getNutritionLabelImage: async () => null,
+      createNutritionMealJob: async () => ({ id: JOB_ID, status: 'queued' }),
+      getNutritionMealJob: async () => ({
+        id: JOB_ID,
+        status: 'failed',
+        elapsedMs: null,
+        imageAvailable: false,
+        candidate: null,
+        error: null,
+      }),
+      getNutritionMealImage: async () => null,
     }
     const body = await getTranscriptionJob(JOB_ID, mock, { templates: templates(), exercises: library() })
     expect(body.job.status).toBe('failed')

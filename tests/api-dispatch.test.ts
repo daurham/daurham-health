@@ -112,6 +112,10 @@ describe('Vercel nested API routing', () => {
     expect(matchHealthApiRoute(`/api/nutrition/label/jobs/${JOB_ID}`)).toBe('nutrition-label-job-detail')
     expect(matchHealthApiRoute(`/api/nutrition/label/jobs/${JOB_ID}/image`)).toBe('nutrition-label-job-detail')
     expect(matchHealthApiRoute('/api/nutrition/label/commit')).toBe('nutrition-label-commit')
+    expect(matchHealthApiRoute('/api/nutrition/meal/jobs')).toBe('nutrition-meal-jobs')
+    expect(matchHealthApiRoute(`/api/nutrition/meal/jobs/${JOB_ID}`)).toBe('nutrition-meal-job-detail')
+    expect(matchHealthApiRoute(`/api/nutrition/meal/jobs/${JOB_ID}/image`)).toBe('nutrition-meal-job-detail')
+    expect(matchHealthApiRoute('/api/nutrition/meal/commit')).toBe('nutrition-meal-commit')
     expect(matchHealthApiRoute(`/api/training/transcription/jobs/${JOB_ID}`)).toBe(
       'transcription-job-detail',
     )
@@ -261,6 +265,23 @@ describe('api/index after Vercel nested rewrite', () => {
     const labelCommit = await hit('POST', '/api/nutrition/label/commit')
     expect(labelCommit.status()).not.toBe(404)
     expect(isDeniedPrivate(labelCommit.status())).toBe(true)
+
+    const mealJobs = await hit('POST', '/api/nutrition/meal/jobs')
+    expect(mealJobs.status()).not.toBe(404)
+    expect(isDeniedPrivate(mealJobs.status())).toBe(true)
+    expect(JSON.stringify(mealJobs.body() ?? {})).not.toContain('HOME_AI')
+
+    const mealList = await hit('GET', '/api/nutrition/meal/jobs')
+    expect(mealList.status()).not.toBe(404)
+    expect(isDeniedPrivate(mealList.status())).toBe(true)
+
+    const mealDetail = await hit('GET', `/api/nutrition/meal/jobs/${JOB_ID}`)
+    expect(mealDetail.status()).not.toBe(404)
+    expect(isDeniedPrivate(mealDetail.status())).toBe(true)
+
+    const mealCommit = await hit('POST', '/api/nutrition/meal/commit')
+    expect(mealCommit.status()).not.toBe(404)
+    expect(isDeniedPrivate(mealCommit.status())).toBe(true)
 
     const preview = await hit('POST', '/api/nutrition/import/legacy/preview')
     expect(preview.status()).not.toBe(404)

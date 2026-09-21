@@ -2,7 +2,6 @@
 // not in Neon. They are pruned after ~24h. Health proxies them for review while available.
 // Commit stores reviewed numbers only and does not require the source image to remain.
 import { HOME_AI_JOB_ID_RE, isHomeAiJobId, homeAiLabelJobStatusSchema } from '../../src/domain/nutrition/label.js'
-import type { NutritionLabelCandidate } from '../../src/domain/nutrition/label.js'
 import { NUTRITION_LABEL_CAPTURE_KIND } from '../../src/domain/nutrition/label.js'
 import { formatDatabaseError, getSql } from '../db.js'
 import { HttpError } from '../http.js'
@@ -14,12 +13,15 @@ const TABLES_UNAVAILABLE = 'Nutrition tables are not available. Apply pending mi
 export const CAPTURE_JOB_STATUSES = ['queued', 'processing', 'completed', 'failed', 'committed'] as const
 export type CaptureJobRecordStatus = (typeof CAPTURE_JOB_STATUSES)[number]
 
+export type NutritionCaptureKind = 'nutrition_label' | 'meal_photo'
+
 export type NutritionCaptureJobRecord = {
   id: string
   status: CaptureJobRecordStatus
+  captureKind: NutritionCaptureKind
   filename: string | null
   failureMessage: string | null
-  candidate: NutritionLabelCandidate | null
+  candidate: unknown | null
   createdAt: string
   updatedAt: string
   committedAt: string | null
@@ -44,9 +46,10 @@ function mapRow(row: Record<string, unknown>): NutritionCaptureJobRecord {
   return {
     id: String(row.home_ai_job_id),
     status: row.status as CaptureJobRecordStatus,
+    captureKind: (row.capture_kind as NutritionCaptureKind) ?? 'nutrition_label',
     filename: typeof row.source_filename === 'string' ? row.source_filename : null,
     failureMessage: typeof row.failure_message === 'string' ? row.failure_message : null,
-    candidate: (row.candidate_json as NutritionLabelCandidate | null) ?? null,
+    candidate: row.candidate_json ?? null,
     createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at),
     updatedAt: row.updated_at instanceof Date ? row.updated_at.toISOString() : String(row.updated_at),
     committedAt:
@@ -58,7 +61,11 @@ function mapRow(row: Record<string, unknown>): NutritionCaptureJobRecord {
   }
 }
 
-export async function recordLabelJobCreated(input: { jobId: string; filename: string | null }): Promise<void> {
+export async function recordLabelJobCreated(input: {
+  jobId: string
+  filename: string | null
+  captureKind?: NutritionCaptureKind
+}): Promise<void> {
   if (!isHomeAiJobId(input.jobId)) {
     throw new HttpError(400, 'That analysis job id is invalid.')
   }
@@ -74,7 +81,7 @@ export async function recordLabelJobCreated(input: { jobId: string; filename: st
          END,
          source_filename = COALESCE(EXCLUDED.source_filename, nutrition_capture_jobs.source_filename),
          updated_at = now()`,
-      [input.jobId, NUTRITION_LABEL_CAPTURE_KIND, input.filename],
+      [input.jobId, input.captureKind ?? NUTRITION_LABEL_CAPTURE_KIND, input.filename],
     ),
   )
 }
@@ -83,7 +90,7 @@ export async function recordLabelJobStatus(input: {
   jobId: string
   status: 'queued' | 'processing' | 'completed' | 'failed'
   failureMessage?: string | null
-  candidate?: NutritionLabelCandidate | null
+  candidate?: unknown | null
 }): Promise<void> {
   if (!isHomeAiJobId(input.jobId)) {
     return
@@ -129,15 +136,20 @@ export async function recordLabelJobCommitted(jobId: string, foodId: string, ent
   )
 }
 
-export async function listOutstandingLabelJobs(): Promise<NutritionCaptureJobRecord[]> {
+const CAPTURE_JOB_COLUMNS = `home_ai_job_id, capture_kind, status, source_filename, failure_message, candidate_json, created_at, updated_at, committed_at`
+
+export async function listOutstandingLabelJobs(
+  captureKind: NutritionCaptureKind = 'nutrition_label',
+): Promise<NutritionCaptureJobRecord[]> {
   const sql = await getSql()
   const rows = await queryOrUnavailable(() =>
     sql.query(
-      `SELECT home_ai_job_id, status, source_filename, failure_message, candidate_json, created_at, updated_at, committed_at
+      `SELECT ${CAPTURE_JOB_COLUMNS}
        FROM nutrition_capture_jobs
-       WHERE status <> 'committed'
+       WHERE status <> 'committed' AND capture_kind = $1
        ORDER BY created_at DESC
        LIMIT 20`,
+      [captureKind],
     ),
   )
   return (rows as Record<string, unknown>[]).map(mapRow)
@@ -147,7 +159,7 @@ export async function getLabelJobRecord(jobId: string): Promise<NutritionCapture
   const sql = await getSql()
   const rows = await queryOrUnavailable(() =>
     sql.query(
-      `SELECT home_ai_job_id, status, source_filename, failure_message, candidate_json, created_at, updated_at, committed_at
+      `SELECT ${CAPTURE_JOB_COLUMNS}
        FROM nutrition_capture_jobs WHERE home_ai_job_id = $1`,
       [jobId],
     ),
@@ -173,7 +185,7 @@ export async function refreshOutstandingLabelJobs(client?: HomeAiClient): Promis
         jobId: job.id,
         status,
         failureMessage: live.error?.message ?? null,
-        candidate: live.candidate,
+        candidate: live.candidate ?? null,
       })
     } catch {
       // Keep last known Health status if Home-AI is unreachable.

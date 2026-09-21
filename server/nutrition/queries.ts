@@ -105,6 +105,7 @@ export function mapEntryRow(row: EntryRow): NutritionEntry {
     fiber: asNumber(row.fiber),
     sourceKind: row.source_kind as NutritionEntry['sourceKind'],
     notes: row.notes == null || row.notes === '' ? null : String(row.notes),
+    mealGroupId: row.meal_group_id == null ? null : String(row.meal_group_id),
     createdAt: asIso(row.created_at),
     updatedAt: asIso(row.updated_at),
   }
@@ -128,7 +129,7 @@ const FOOD_COLUMNS = `id, name, brand, barcode, catalog_kind, serving_quantity, 
          calories, protein, carbs, fat, fiber, source_kind, is_staple, archived, notes, created_at, updated_at`
 
 const ENTRY_COLUMNS = `id, log_date, consumed_at, timezone, meal, food_id, food_name, brand, serving_quantity,
-         serving_unit, grams, calories, protein, carbs, fat, fiber, source_kind, notes, created_at, updated_at`
+         serving_unit, grams, calories, protein, carbs, fat, fiber, source_kind, notes, meal_group_id, created_at, updated_at`
 
 export const LIST_FOODS_SQL = `SELECT ${FOOD_COLUMNS}
          FROM nutrition_foods
@@ -193,6 +194,10 @@ export const LIST_ENTRIES_FOR_DATE_SQL = `SELECT ${ENTRY_COLUMNS}
          WHERE log_date = $1
          ORDER BY consumed_at NULLS LAST, created_at ASC, id ASC`
 
+export const LIST_ENTRIES_BY_MEAL_GROUP_SQL = `SELECT ${ENTRY_COLUMNS} FROM nutrition_entries
+         WHERE meal_group_id = $1
+         ORDER BY created_at ASC, id ASC`
+
 export const GET_ENTRY_SQL = `SELECT ${ENTRY_COLUMNS} FROM nutrition_entries WHERE id = $1`
 
 export const INSERT_ENTRY_SQL = `INSERT INTO nutrition_entries (
@@ -205,8 +210,8 @@ export const INSERT_ENTRY_SQL = `INSERT INTO nutrition_entries (
 export const INSERT_ENTRY_WITH_ID_SQL = `INSERT INTO nutrition_entries (
            id, log_date, consumed_at, timezone, meal, food_id, food_name, brand,
            serving_quantity, serving_unit, grams, calories, protein, carbs, fat, fiber,
-           source_kind, notes
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+           source_kind, notes, meal_group_id
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
          RETURNING ${ENTRY_COLUMNS}`
 
 export const UPDATE_ENTRY_SQL = `UPDATE nutrition_entries SET
@@ -352,6 +357,14 @@ export async function getEntry(id: string): Promise<NutritionEntry | null> {
     const sql = await getSql()
     const rows = (await sql.query(GET_ENTRY_SQL, [id])) as EntryRow[]
     return rows[0] ? mapEntryRow(rows[0]) : null
+  })
+}
+
+export async function listEntriesByMealGroup(mealGroupId: string): Promise<NutritionEntry[]> {
+  return queryOrUnavailable(async () => {
+    const sql = await getSql()
+    const rows = (await sql.query(LIST_ENTRIES_BY_MEAL_GROUP_SQL, [mealGroupId])) as EntryRow[]
+    return rows.map(mapEntryRow)
   })
 }
 

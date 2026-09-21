@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   caloriesHeadline,
   groupedEntries,
+  clusterMealLogItems,
   macroHeadline,
   proteinHeadline,
   overTargetDelta,
@@ -62,6 +63,18 @@ describe('nutrition entry grouping', () => {
       { key: 'today', label: 'Today', entries },
     ])
   })
+
+  it('clusters photo-meal entries under a group without collapsing snapshots', () => {
+    const entries = [
+      { id: '1', foodName: 'Chicken', calories: 250, protein: 40, mealGroupId: 'g1', meal: 'dinner' },
+      { id: '2', foodName: 'Rice', calories: 200, protein: 4, mealGroupId: 'g1', meal: 'dinner' },
+      { id: '3', foodName: 'Yogurt', calories: 100, protein: 10, mealGroupId: null, meal: 'dinner' },
+    ] as NutritionEntry[]
+    const clustered = clusterMealLogItems(entries)
+    expect(clustered[0]).toMatchObject({ kind: 'meal', label: 'Photo meal', calories: 450 })
+    expect(clustered[0]?.kind === 'meal' && clustered[0].entries).toHaveLength(2)
+    expect(clustered[1]).toMatchObject({ kind: 'entry', entry: { id: '3' } })
+  })
 })
 
 describe('nutrition daily UX source', () => {
@@ -81,6 +94,7 @@ describe('nutrition daily UX source', () => {
     expect(panels).toContain('stickyHeader')
     expect(panels).toContain('Scan barcode')
     expect(panels).toContain('Scan nutrition label')
+    expect(panels).toContain('Meal photo')
     expect(panels).toContain('Manual entry')
     expect(panels).toContain('Save & Log')
     expect(panels).toContain('title="Recent"')
@@ -108,6 +122,7 @@ describe('mobile form controls', () => {
     expect(html).toContain('viewport-fit=cover')
     expect(readFileSync('src/features/nutrition/panels.tsx', 'utf8')).toContain('text-base')
     expect(readFileSync('src/features/nutrition/LabelCapture.tsx', 'utf8')).toContain('text-base')
+    expect(readFileSync('src/features/nutrition/MealCapture.tsx', 'utf8')).toContain('text-base')
     expect(readFileSync('src/auth/SignInPage.tsx', 'utf8')).toContain('text-base')
   })
 })

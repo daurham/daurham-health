@@ -130,6 +130,48 @@ export function provenanceLabel(kind: NutritionSourceKind): string {
   return SOURCE_LABELS[kind]
 }
 
+export type NutritionLogRow =
+  | { kind: 'entry'; key: string; entry: NutritionEntry }
+  | {
+      kind: 'meal'
+      key: string
+      groupId: string
+      label: string
+      entries: NutritionEntry[]
+      calories: number
+      protein: number | null
+    }
+
+export function clusterMealLogItems(entries: readonly NutritionEntry[]): NutritionLogRow[] {
+  const rows: NutritionLogRow[] = []
+  const seen = new Set<string>()
+  for (const entry of entries) {
+    if (!entry.mealGroupId) {
+      rows.push({ kind: 'entry', key: entry.id, entry })
+      continue
+    }
+    if (seen.has(entry.mealGroupId)) {
+      continue
+    }
+    seen.add(entry.mealGroupId)
+    const group = entries.filter((item) => item.mealGroupId === entry.mealGroupId)
+    const calories = group.reduce((sum, item) => sum + item.calories, 0)
+    const protein = group.every((item) => item.protein != null)
+      ? group.reduce((sum, item) => sum + (item.protein ?? 0), 0)
+      : null
+    rows.push({
+      kind: 'meal',
+      key: entry.mealGroupId,
+      groupId: entry.mealGroupId,
+      label: 'Photo meal',
+      entries: group,
+      calories,
+      protein,
+    })
+  }
+  return rows
+}
+
 export function groupedEntries(entries: readonly NutritionEntry[]): Array<{
   key: NutritionMeal | 'today'
   label: string

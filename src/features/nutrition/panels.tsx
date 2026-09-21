@@ -27,6 +27,7 @@ import {
 } from './api'
 import { BarcodeScanner } from './BarcodeScanner'
 import { LabelCaptureSheet } from './LabelCapture'
+import { MealCaptureSheet } from './MealCapture'
 import { catalogKindLabel, formatGrams, formatKcal, formatQuantity, mealLabel, provenanceLabel } from './format'
 import { NutritionSheet } from './Sheet'
 
@@ -49,17 +50,19 @@ type AddFoodSheetProps = {
   quickAdd: QuickAdd
   onClose: () => void
   onLogged: (entry: NutritionEntry, food?: NutritionFood) => void
+  onMealLogged?: (entries: NutritionEntry[]) => void
   onQuickLog: (food: NutritionFood) => void
   onOpenFood: (food: NutritionFood) => void
 }
 
-export function AddFoodSheet({ date, quickAdd, onClose, onLogged, onQuickLog, onOpenFood }: AddFoodSheetProps) {
+export function AddFoodSheet({ date, quickAdd, onClose, onLogged, onMealLogged, onQuickLog, onOpenFood }: AddFoodSheetProps) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<NutritionFood[] | null>(null)
   const [searching, setSearching] = useState(false)
   const [manual, setManual] = useState(false)
   const [scan, setScan] = useState(false)
   const [label, setLabel] = useState(false)
+  const [mealPhoto, setMealPhoto] = useState(false)
   const [confirmFood, setConfirmFood] = useState<NutritionFood | null>(null)
   const [candidate, setCandidate] = useState<PackagedFoodCandidate | null>(null)
   const [lookupError, setLookupError] = useState<{
@@ -242,6 +245,28 @@ export function AddFoodSheet({ date, quickAdd, onClose, onLogged, onQuickLog, on
     )
   }
 
+  if (mealPhoto) {
+    return (
+      <MealCaptureSheet
+        date={date}
+        recents={quickAdd.recents}
+        recipes={quickAdd.recipes}
+        onClose={onClose}
+        onBack={() => setMealPhoto(false)}
+        onLogged={(entries) => {
+          if (onMealLogged) {
+            onMealLogged(entries)
+          } else {
+            for (const entry of entries) {
+              onLogged(entry)
+            }
+          }
+          onClose()
+        }}
+      />
+    )
+  }
+
   if (manual) {
     return (
       <ManualEntrySheet
@@ -275,12 +300,15 @@ export function AddFoodSheet({ date, quickAdd, onClose, onLogged, onQuickLog, on
               autoComplete="off"
             />
           </div>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2">
             <button type="button" className={secondaryClass + ' px-2 text-center text-xs leading-tight'} onClick={() => setScan(true)}>
               Scan barcode
             </button>
             <button type="button" className={secondaryClass + ' px-2 text-center text-xs leading-tight'} onClick={() => setLabel(true)}>
               Scan nutrition label
+            </button>
+            <button type="button" className={secondaryClass + ' px-2 text-center text-xs leading-tight'} onClick={() => setMealPhoto(true)}>
+              Meal photo
             </button>
             <button type="button" className={secondaryClass + ' px-2 text-center text-xs leading-tight'} onClick={() => setManual(true)}>
               Manual entry

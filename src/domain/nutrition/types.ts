@@ -53,6 +53,7 @@ export type NutritionEntry = {
   fiber: number | null
   sourceKind: NutritionSourceKind
   notes: string | null
+  mealGroupId: string | null
   createdAt: string
   updatedAt: string
 }

@@ -68,6 +68,24 @@ describe('home-ai client', () => {
     expect(created).toEqual({ id: JOB_ID, status: 'queued' })
   })
 
+  it('POSTs nutrition meal jobs to a distinct Home-AI path', async () => {
+    const fetchImpl = vi.fn(async (url: string, init?: RequestInit) => {
+      expect(url).toBe('https://ai.example.invalid/api/nutrition/meal/jobs')
+      expect(init?.method).toBe('POST')
+      const headers = new Headers(init?.headers)
+      expect(headers.get('x-api-key')).toBe('secret-home-ai-key')
+      return new Response(JSON.stringify({ ok: true, job: { id: JOB_ID, status: 'queued' } }), {
+        status: 202,
+      })
+    }) as unknown as typeof fetch
+    const created = await client(fetchImpl).createNutritionMealJob({
+      bytes: JPEG,
+      filename: 'meal.jpg',
+      mimeType: 'image/jpeg',
+    })
+    expect(created).toEqual({ id: JOB_ID, status: 'queued' })
+  })
+
   it('parses queued, processing, completed, and failed jobs', async () => {
     const payloads = [
       { job: { id: JOB_ID, status: 'queued' } },

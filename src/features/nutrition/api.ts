@@ -11,6 +11,8 @@ import type {
   PackagedFoodCandidate,
   PendingNutritionCapture,
   NutritionLabelJobResponse,
+  NutritionMealJobResponse,
+  CommitNutritionMealRequest,
 } from '@/domain/nutrition'
 import { healthFetch, readApiError } from '@/lib'
 import type { ReviewFieldError } from '@/domain/paper-load'
@@ -234,6 +236,47 @@ export async function commitNutritionLabelReview(input: {
 }): Promise<{ food: NutritionFood; entry: NutritionEntry }> {
   return parseBarcodeResponse(
     await healthFetch('/api/nutrition/label/commit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    }),
+  )
+}
+
+export async function createNutritionMealJob(file: File): Promise<{ id: string; status: 'queued' }> {
+  const form = new FormData()
+  form.set('image', file)
+  const response = await healthFetch('/api/nutrition/meal/jobs', { method: 'POST', body: form })
+  const body = await parseBarcodeResponse<{ job: { id: string; status: 'queued' } }>(response)
+  return body.job
+}
+
+export async function fetchNutritionMealJobs(): Promise<PendingNutritionCapture[]> {
+  const body = await parseOk<{ jobs: PendingNutritionCapture[] }>(await healthFetch('/api/nutrition/meal/jobs'))
+  return body.jobs
+}
+
+export async function fetchPendingNutritionCaptures(): Promise<PendingNutritionCapture[]> {
+  const [labels, meals] = await Promise.all([
+    fetchNutritionLabelJobs().catch(() => [] as PendingNutritionCapture[]),
+    fetchNutritionMealJobs().catch(() => [] as PendingNutritionCapture[]),
+  ])
+  return [...labels, ...meals].sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+}
+
+export async function fetchNutritionMealJob(jobId: string): Promise<NutritionMealJobResponse> {
+  return parseBarcodeResponse(await healthFetch(`/api/nutrition/meal/jobs/${jobId}`))
+}
+
+export function nutritionMealImageUrl(jobId: string): string {
+  return `/api/nutrition/meal/jobs/${jobId}/image`
+}
+
+export async function commitNutritionMealReview(
+  input: CommitNutritionMealRequest,
+): Promise<{ entries: NutritionEntry[]; mealGroupId: string }> {
+  return parseBarcodeResponse(
+    await healthFetch('/api/nutrition/meal/commit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input),

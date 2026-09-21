@@ -120,6 +120,7 @@ export async function listNutritionLabelJobs(client?: HomeAiClient) {
         {
           id: job.id,
           status: job.status,
+          captureKind: job.captureKind,
           filename: job.filename,
           failureMessage: job.failureMessage,
           createdAt: job.createdAt,
@@ -222,7 +223,7 @@ export async function getNutritionLabelJob(
       })
     } catch (error) {
       if (stored?.candidate && stored.status === 'completed') {
-        const comparison = await comparisonForCandidate(stored.candidate)
+        const comparison = await comparisonForCandidate(stored.candidate as NutritionLabelCandidate)
         return nutritionLabelJobResponseSchema.parse({
           job: { id: stored.id, status: 'completed', elapsedMs: null, imageAvailable: false },
           candidate: stored.candidate,
@@ -248,7 +249,7 @@ export async function getNutritionLabelJob(
     })
   }
   if (stored?.candidate) {
-    const comparison = await comparisonForCandidate(stored.candidate)
+    const comparison = await comparisonForCandidate(stored.candidate as NutritionLabelCandidate)
     return nutritionLabelJobResponseSchema.parse({
       job: { id: stored.id, status: stored.status === 'committed' ? 'completed' : stored.status, elapsedMs: null, imageAvailable: false },
       candidate: stored.candidate,
@@ -522,6 +523,7 @@ export async function commitNutritionLabel(body: unknown): Promise<{ food: Nutri
     snapshot.fat,
     snapshot.fiber,
     'photo_ai',
+    null,
     null,
   ])
   if (jobId) {

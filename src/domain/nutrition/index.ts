@@ -101,6 +101,42 @@ export {
   commitNutritionLabelRequestSchema,
   pendingNutritionCaptureSchema,
 } from './label.js'
+export {
+  NUTRITION_MEAL_SCHEMA_VERSION,
+  NUTRITION_MEAL_PIPELINE,
+  NUTRITION_MEAL_SOURCE_KEY,
+  NUTRITION_MEAL_CAPTURE_KIND,
+  NUTRITION_MEAL_GROUP_ENTITY,
+  sanitizeMealCandidate,
+  emptyMealCandidate,
+  matchMealComponent,
+  recipeCandidatesForComponents,
+  draftFromMealCandidate,
+  applyRecipeSelection,
+  mealReviewTotals,
+  mealComponentSnapshot,
+  validateMealReview,
+  mealFailureMessage,
+  nutritionMealJobFingerprint,
+  roundVisualGrams,
+  looksLikeHiddenFat,
+} from './meal.js'
+export type {
+  MealPhotoCandidate,
+  MealComponent,
+  MealReviewDraft,
+  MealReviewComponent,
+  MealFoodMatch,
+  CommitNutritionMealRequest,
+  NutritionMealJobResponse,
+} from './meal.js'
+export {
+  mealPhotoCandidateSchema,
+  commitNutritionMealRequestSchema,
+  homeAiMealJobSchema,
+  homeAiMealCreatedJobSchema,
+  homeAiMealJobStatusSchema,
+} from './meal.js'
 export type {
   LegacyNutritionDump,
   LegacyIngredient,

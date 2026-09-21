@@ -78,6 +78,14 @@ describe('splitSqlStatements', () => {
     expect(repMode[0]).toContain('analytics_rep_mode')
     expect(repMode[1]).toMatch(/^UPDATE exercise_definitions/)
     expect(repMode[1]).toContain('EX11')
+    const mealPhoto = splitSqlStatements(
+      readFileSync(path.join('migrations', '0011_nutrition_meal_photo.sql'), 'utf8'),
+    )
+    expect(mealPhoto).toHaveLength(5)
+    expect(mealPhoto[0]).toMatch(/^INSERT INTO data_sources/)
+    expect(mealPhoto[0]).toContain('meal_photo')
+    expect(mealPhoto[2]).toContain('meal_photo')
+    expect(mealPhoto[3]).toContain('meal_group_id')
     expect(training.every((statement) => !statement.includes('$tag$'))).toBe(true)
     expect(training[0]).toMatch(/^CREATE TABLE exercise_definitions/)
     expect(training[7]).toMatch(/^INSERT INTO exercise_definitions/)

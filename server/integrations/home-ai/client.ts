@@ -15,6 +15,13 @@ import {
   sanitizeLabelCandidate,
   type NutritionLabelCandidate,
 } from '../../../src/domain/nutrition/label.js'
+import {
+  homeAiMealCreatedJobSchema,
+  homeAiMealJobSchema,
+  mealFailureMessage,
+  sanitizeMealCandidate,
+  type MealPhotoCandidate,
+} from '../../../src/domain/nutrition/meal.js'
 import { HttpError } from '../../http.js'
 import { getHomeAiConfig, type HomeAiConfig } from './config.js'
 
@@ -45,6 +52,15 @@ export type HomeAiLabelJobState = {
   error: { code: string; message: string } | null
 }
 
+export type HomeAiMealJobState = {
+  id: string
+  status: 'queued' | 'processing' | 'completed' | 'failed'
+  elapsedMs: number | null
+  imageAvailable: boolean
+  candidate: MealPhotoCandidate | null
+  error: { code: string; message: string } | null
+}
+
 export type HomeAiClient = {
   createWorkoutTranscriptionJob: (input: {
     bytes: Uint8Array
@@ -59,6 +75,13 @@ export type HomeAiClient = {
   }) => Promise<CreatedHomeAiJob>
   getNutritionLabelJob: (jobId: string) => Promise<HomeAiLabelJobState>
   getNutritionLabelImage: (jobId: string) => Promise<{ bytes: Uint8Array; mimeType: string } | null>
+  createNutritionMealJob: (input: {
+    bytes: Uint8Array
+    filename: string
+    mimeType: string
+  }) => Promise<CreatedHomeAiJob>
+  getNutritionMealJob: (jobId: string) => Promise<HomeAiMealJobState>
+  getNutritionMealImage: (jobId: string) => Promise<{ bytes: Uint8Array; mimeType: string } | null>
 }
 
 function headersWithKey(apiKey: string, extra?: Record<string, string>): Record<string, string> {
@@ -90,6 +113,26 @@ function throwMappedFailure(status: number, body: unknown): never {
     throw new HttpError(400, homeAiFailureMessage(code))
   }
   throw new HttpError(502, homeAiFailureMessage(code || 'PIPELINE_FAILED'))
+}
+
+function throwMappedMealFailure(status: number, body: unknown): never {
+  const code =
+    body && typeof body === 'object' && 'error' in body && body.error && typeof body.error === 'object' && 'code' in body.error
+      ? String((body.error as { code?: unknown }).code ?? '')
+      : ''
+  if (status === 404) {
+    throw new HttpError(404, mealFailureMessage('JOB_NOT_FOUND'))
+  }
+  if (status === 400 && code === 'INVALID_JOB_ID') {
+    throw new HttpError(400, mealFailureMessage('INVALID_JOB_ID'))
+  }
+  if (status === 413) {
+    throw new HttpError(413, mealFailureMessage('UPLOAD_TOO_LARGE'))
+  }
+  if (status === 400 && (code === 'MISSING_IMAGE' || code === 'UNSUPPORTED_IMAGE' || code === 'INVALID_IMAGE')) {
+    throw new HttpError(400, mealFailureMessage(code))
+  }
+  throw new HttpError(502, mealFailureMessage(code || 'PIPELINE_FAILED'))
 }
 
 function throwMappedLabelFailure(status: number, body: unknown): never {
@@ -275,6 +318,97 @@ export function createHomeAiClient(options: {
       let response: Response
       try {
         response = await fetchImpl(homeAiUrl(baseUrl, `/api/nutrition/label/jobs/${jobId}/image`), {
+          method: 'GET',
+          headers: headersWithKey(apiKey),
+          signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        })
+      } catch {
+        return null
+      }
+      if (!response.ok) {
+        return null
+      }
+      const mimeType = response.headers.get('content-type') || 'image/jpeg'
+      const bytes = new Uint8Array(await response.arrayBuffer())
+      return { bytes, mimeType }
+    },
+
+    async createNutritionMealJob(input) {
+      const form = new FormData()
+      form.set('image', new Blob([input.bytes], { type: input.mimeType }), input.filename)
+      let response: Response
+      try {
+        response = await fetchImpl(homeAiUrl(baseUrl, '/api/nutrition/meal/jobs'), {
+          method: 'POST',
+          headers: headersWithKey(apiKey),
+          body: form,
+          signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        })
+      } catch {
+        throw new HttpError(502, mealFailureMessage('HOME_AI_UNAVAILABLE'))
+      }
+      const body = await readJson(response)
+      if (!response.ok) {
+        throwMappedMealFailure(response.status, body)
+      }
+      const parsed = homeAiMealCreatedJobSchema.safeParse(body)
+      if (!parsed.success) {
+        throw new HttpError(502, 'Home AI returned an invalid response')
+      }
+      return { id: parsed.data.job.id, status: 'queued' }
+    },
+
+    async getNutritionMealJob(jobId) {
+      if (!isHomeAiJobId(jobId)) {
+        throw new HttpError(400, mealFailureMessage('INVALID_JOB_ID'))
+      }
+      let response: Response
+      try {
+        response = await fetchImpl(homeAiUrl(baseUrl, `/api/nutrition/meal/jobs/${jobId}`), {
+          method: 'GET',
+          headers: headersWithKey(apiKey),
+          signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        })
+      } catch {
+        throw new HttpError(502, mealFailureMessage('HOME_AI_UNAVAILABLE'))
+      }
+      const body = await readJson(response)
+      if (!response.ok) {
+        throwMappedMealFailure(response.status, body)
+      }
+      const parsed = homeAiMealJobSchema.safeParse(body)
+      if (!parsed.success) {
+        throw new HttpError(502, 'Home AI returned an invalid response')
+      }
+      const job = parsed.data.job
+      let candidate: MealPhotoCandidate | null = null
+      if (job.status === 'completed') {
+        try {
+          candidate = sanitizeMealCandidate(job.candidate)
+        } catch {
+          throw new HttpError(502, 'Home AI returned an invalid response')
+        }
+      }
+      return {
+        id: job.id,
+        status: job.status,
+        elapsedMs: job.elapsed_ms ?? null,
+        imageAvailable: job.image_available === true,
+        candidate,
+        error:
+          job.status === 'failed' && job.error
+            ? { code: job.error.code, message: mealFailureMessage(job.error.code) }
+            : null,
+      }
+    },
+
+    async getNutritionMealImage(jobId) {
+      if (!isHomeAiJobId(jobId)) {
+        throw new HttpError(400, mealFailureMessage('INVALID_JOB_ID'))
+      }
+      let response: Response
+      try {
+        response = await fetchImpl(homeAiUrl(baseUrl, `/api/nutrition/meal/jobs/${jobId}/image`), {
           method: 'GET',
           headers: headersWithKey(apiKey),
           signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),

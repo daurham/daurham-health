@@ -431,6 +431,7 @@ export function labelFailureMessage(code: string): string {
 export const pendingNutritionCaptureSchema = z.object({
   id: z.string().regex(HOME_AI_JOB_ID_RE),
   status: z.enum(['queued', 'processing', 'completed', 'failed']),
+  captureKind: z.enum(['nutrition_label', 'meal_photo']).default('nutrition_label'),
   filename: z.string().nullable(),
   failureMessage: z.string().nullable(),
   createdAt: z.string(),

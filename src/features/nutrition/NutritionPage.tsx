@@ -15,10 +15,11 @@ import {
   deleteNutritionEntry,
   fetchNutritionDay,
   fetchNutritionFood,
-  fetchNutritionLabelJobs,
+  fetchPendingNutritionCaptures,
   type NutritionDayPayload,
 } from './api'
 import { LabelCaptureSheet } from './LabelCapture'
+import { MealCaptureSheet } from './MealCapture'
 import {
   adjacentNutritionDates,
   formatNutritionDayLabel,
@@ -32,6 +33,7 @@ import {
   formatKcal,
   formatQuantity,
   groupedEntries,
+  clusterMealLogItems,
   macroHeadline,
   progressRatio,
   remainingHeadline,
@@ -44,6 +46,7 @@ type Panel =
   | { kind: 'targets' }
   | { kind: 'food'; food: NutritionFood }
   | { kind: 'label'; jobId: string }
+  | { kind: 'meal'; jobId: string }
 
 export function NutritionPage() {
   const [params, setParams] = useSearchParams()
@@ -92,7 +95,7 @@ export function NutritionPage() {
 
     async function loadCaptures() {
       try {
-        const next = await fetchNutritionLabelJobs()
+        const next = await fetchPendingNutritionCaptures()
         if (cancelled) {
           return
         }
@@ -173,6 +176,7 @@ export function NutritionPage() {
       fiber: snapshot.fiber,
       sourceKind: 'manual',
       notes: null,
+      mealGroupId: null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }
@@ -306,7 +310,10 @@ export function NutritionPage() {
       ) : null}
 
       {captures.length > 0 ? (
-        <PendingCapturesCard jobs={captures} onOpen={(jobId) => setPanel({ kind: 'label', jobId })} />
+        <PendingCapturesCard
+          jobs={captures}
+          onOpen={(job) => setPanel({ kind: job.captureKind === 'meal_photo' ? 'meal' : 'label', jobId: job.id })}
+        />
       ) : null}
 
       {!day ? (
@@ -352,6 +359,14 @@ export function NutritionPage() {
             if (food) {
               prependRecent(food)
             }
+            setPanel(null)
+          }}
+          onMealLogged={(entries) => {
+            resource.replaceData((current) => {
+              const ids = new Set(entries.map((item) => item.id))
+              const next = [...current.entries.filter((item) => !ids.has(item.id)), ...entries]
+              return { ...current, entries: next, totals: nutritionDayTotals(next) }
+            })
             setPanel(null)
           }}
           onQuickLog={(food) => {
@@ -428,6 +443,25 @@ export function NutritionPage() {
           }}
         />
       ) : null}
+      {panel?.kind === 'meal' ? (
+        <MealCaptureSheet
+          date={date}
+          jobId={panel.jobId}
+          recents={day?.quickAdd.recents}
+          recipes={day?.quickAdd.recipes}
+          onClose={() => setPanel(null)}
+          onBack={() => setPanel(null)}
+          onLogged={(entries) => {
+            resource.replaceData((current) => {
+              const ids = new Set(entries.map((item) => item.id))
+              const next = [...current.entries.filter((item) => !ids.has(item.id)), ...entries]
+              return { ...current, entries: next, totals: nutritionDayTotals(next) }
+            })
+            setCaptures((current) => current.filter((job) => job.id !== panel.jobId))
+            setPanel(null)
+          }}
+        />
+      ) : null}
     </section>
   )
 }
@@ -437,7 +471,7 @@ function PendingCapturesCard({
   onOpen,
 }: {
   jobs: PendingNutritionCapture[]
-  onOpen: (jobId: string) => void
+  onOpen: (job: PendingNutritionCapture) => void
 }) {
   return (
     <section className="rounded-lg border border-zinc-200 bg-white px-3 py-2">
@@ -447,10 +481,10 @@ function PendingCapturesCard({
           <li key={job.id}>
             <button
               type="button"
-              onClick={() => onOpen(job.id)}
+              onClick={() => onOpen(job)}
               className="flex min-h-11 w-full items-center justify-between gap-2 text-left text-sm"
             >
-              <span className="truncate">Label photo</span>
+              <span className="truncate">{job.captureKind === 'meal_photo' ? 'Meal photo' : 'Label photo'}</span>
               <span className="shrink-0 text-zinc-500">
                 {job.status === 'completed' ? 'Ready to review' : job.status === 'failed' ? 'Failed' : 'Analyzing...'}
               </span>
@@ -616,30 +650,75 @@ function EntryList({
         <section key={group.key}>
           <h2 className="text-sm font-semibold text-zinc-700">{group.label}</h2>
           <ul className="mt-2 divide-y divide-zinc-100 overflow-hidden rounded-xl border border-zinc-200 bg-white">
-            {group.entries.map((entry) => (
-              <li key={entry.id}>
-                <button
-                  type="button"
-                  onClick={() => onOpen(entry)}
-                  className="flex min-h-14 w-full items-center justify-between gap-3 px-4 py-3 text-left"
-                >
-                  <span className="min-w-0">
-                    <span className="block truncate font-medium">{entry.foodName}</span>
-                    <span className="block truncate text-sm text-zinc-500">
-                      {[entry.brand, formatQuantity(entry.servingQuantity, entry.servingUnit)].filter(Boolean).join(' · ')}
-                    </span>
-                  </span>
-                  <span className="shrink-0 text-right text-sm text-zinc-700">
-                    <span className="block">{formatKcal(entry.calories)}</span>
-                    {formatGrams(entry.protein) ? <span className="block text-zinc-500">{formatGrams(entry.protein)} protein</span> : null}
-                  </span>
-                </button>
-              </li>
-            ))}
+            {clusterMealLogItems(group.entries).map((row) =>
+              row.kind === 'meal' ? (
+                <MealGroupRow key={row.key} row={row} onOpen={onOpen} />
+              ) : (
+                <li key={row.key}>
+                  <EntryRowButton entry={row.entry} onOpen={onOpen} />
+                </li>
+              ),
+            )}
           </ul>
         </section>
       ))}
     </div>
+  )
+}
+
+function EntryRowButton({ entry, onOpen }: { entry: NutritionEntry; onOpen: (entry: NutritionEntry) => void }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(entry)}
+      className="flex min-h-14 w-full items-center justify-between gap-3 px-4 py-3 text-left"
+    >
+      <span className="min-w-0">
+        <span className="block truncate font-medium">{entry.foodName}</span>
+        <span className="block truncate text-sm text-zinc-500">
+          {[entry.brand, formatQuantity(entry.servingQuantity, entry.servingUnit)].filter(Boolean).join(' · ')}
+        </span>
+      </span>
+      <span className="shrink-0 text-right text-sm text-zinc-700">
+        <span className="block">{formatKcal(entry.calories)}</span>
+        {formatGrams(entry.protein) ? <span className="block text-zinc-500">{formatGrams(entry.protein)} protein</span> : null}
+      </span>
+    </button>
+  )
+}
+
+function MealGroupRow({
+  row,
+  onOpen,
+}: {
+  row: Extract<ReturnType<typeof clusterMealLogItems>[number], { kind: 'meal' }>
+  onOpen: (entry: NutritionEntry) => void
+}) {
+  const [open, setOpen] = useState(false)
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        className="flex min-h-14 w-full items-center justify-between gap-3 px-4 py-3 text-left"
+      >
+        <span className="min-w-0">
+          <span className="block truncate font-medium">{row.label}</span>
+          <span className="block truncate text-sm text-zinc-500">
+            {formatKcal(row.calories)}
+            {row.protein != null ? ` · ${formatGrams(row.protein)} protein` : ''}
+          </span>
+        </span>
+        <span className="shrink-0 text-sm text-zinc-500">{open ? 'Hide' : 'Show'}</span>
+      </button>
+      {open
+        ? row.entries.map((entry) => (
+            <div key={entry.id} className="border-t border-zinc-100 pl-4">
+              <EntryRowButton entry={entry} onOpen={onOpen} />
+            </div>
+          ))
+        : null}
+    </li>
   )
 }
 

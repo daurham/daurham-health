@@ -306,6 +306,8 @@ describe('nutrition API routing', () => {
     expect(matchHealthApiRoute('/api/nutrition/label/jobs/11111111-1111-4111-8111-111111111111')).toBe(
       'nutrition-label-job-detail',
     )
+    expect(matchHealthApiRoute('/api/nutrition/meal/jobs')).toBe('nutrition-meal-jobs')
+    expect(matchHealthApiRoute('/api/nutrition/meal/commit')).toBe('nutrition-meal-commit')
     expect(matchHealthApiRoute('/api/nutrition/import/legacy/preview')).toBe('nutrition-legacy-import')
     expect(matchHealthApiRoute('/api/nutrition/import/legacy/commit')).toBe('nutrition-legacy-import')
     const sql = readFileSync('migrations/0008_nutrition.sql', 'utf8')
@@ -356,6 +358,7 @@ function entry(partial: Partial<NutritionEntry> & Pick<NutritionEntry, 'id' | 'f
     fiber: null,
     sourceKind: 'manual',
     notes: null,
+    mealGroupId: null,
     createdAt: '2026-09-21T00:00:00.000Z',
     updatedAt: '2026-09-21T00:00:00.000Z',
     ...partial,
