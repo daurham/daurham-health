@@ -13,6 +13,8 @@ import transcriptionCommitHandler from './handlers/transcription-commit.js'
 import transcriptionJobDetailHandler from './handlers/transcription-job-detail.js'
 import transcriptionJobsHandler from './handlers/transcription-jobs.js'
 import progressOverviewHandler from './handlers/progress-overview.js'
+import progressActivityHandler from './handlers/progress-activity.js'
+import progressSleepHandler from './handlers/progress-sleep.js'
 import progressTimelineHandler from './handlers/progress-timeline.js'
 import progressCompareHandler from './handlers/progress-compare.js'
 import progressCheckpointsHandler from './handlers/progress-checkpoints.js'
@@ -50,6 +52,8 @@ export type HealthApiRoute =
   | 'transcription-job-detail'
   | 'transcription-commit'
   | 'progress-overview'
+  | 'progress-activity'
+  | 'progress-sleep'
   | 'progress-timeline'
   | 'progress-compare'
   | 'progress-checkpoints'
@@ -89,6 +93,8 @@ const HANDLERS: Record<HealthApiRoute, HealthApiHandler> = {
   'transcription-job-detail': transcriptionJobDetailHandler,
   'transcription-commit': transcriptionCommitHandler,
   'progress-overview': progressOverviewHandler,
+  'progress-activity': progressActivityHandler,
+  'progress-sleep': progressSleepHandler,
   'progress-timeline': progressTimelineHandler,
   'progress-compare': progressCompareHandler,
   'progress-checkpoints': progressCheckpointsHandler,
@@ -144,6 +150,10 @@ export function matchHealthApiRoute(pathname: string): HealthApiRoute | null {
       return 'transcription-commit'
     case '/api/progress/overview':
       return 'progress-overview'
+    case '/api/progress/activity':
+      return 'progress-activity'
+    case '/api/progress/sleep':
+      return 'progress-sleep'
     case '/api/progress/timeline':
       return 'progress-timeline'
     case '/api/progress/compare':

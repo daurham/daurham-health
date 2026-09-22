@@ -21,6 +21,7 @@ export type ActivityDailyRow = {
 
 export type ActivityCoverage = {
   calendarDays: number
+  completedCalendarDays: number
   observedDays: number
   coveragePct: number
 }
@@ -28,6 +29,7 @@ export type ActivityCoverage = {
 export type ActivityMetricSummary = MetricResult<number> & {
   metric: ActivityMetricKey | 'walking_running_distance_m'
   calendarDays: number
+  completedCalendarDays: number
   observedDays: number
   coveragePct: number
   basis?: 'observed_average' | 'observed_median'
@@ -38,6 +40,7 @@ export type ActivityRangeSummary = {
   end: string
   timezone: string
   calendarDays: number
+  completedCalendarDays: number
   steps: ActivityMetricSummary
   activeEnergy: ActivityMetricSummary
   exercise: ActivityMetricSummary
@@ -78,19 +81,39 @@ const METRIC_FIELD: Record<ActivityMetricKey, keyof ActivityDailyRow> = {
   resting_heart_rate_bpm: 'restingHeartRateBpm',
 }
 
-function coverage(calendarDays: number, observedDays: number): ActivityCoverage {
+function coverage(calendarDays: number, completedCalendarDays: number, observedDays: number): ActivityCoverage {
   return {
     calendarDays,
+    completedCalendarDays,
     observedDays,
-    coveragePct: calendarDays === 0 ? 0 : (observedDays / calendarDays) * 100,
+    coveragePct: completedCalendarDays === 0 ? 0 : (observedDays / completedCalendarDays) * 100,
   }
 }
 
-function observedValues(rows: readonly ActivityDailyRow[], start: string, end: string, metric: ActivityMetricKey): number[] {
+function completedWindow(start: string, end: string, today?: string): { aggregateEnd: string; completedCalendarDays: number } {
+  const selected = inclusiveDayCount(start, end)
+  if (!today || today < start || today > end) {
+    return { aggregateEnd: end, completedCalendarDays: selected }
+  }
+  const yesterday = addCalendarDays(today, -1)
+  if (yesterday < start) {
+    return { aggregateEnd: yesterday, completedCalendarDays: 0 }
+  }
+  const aggregateEnd = yesterday < end ? yesterday : end
+  return { aggregateEnd, completedCalendarDays: inclusiveDayCount(start, aggregateEnd) }
+}
+
+function observedValues(
+  rows: readonly ActivityDailyRow[],
+  start: string,
+  end: string,
+  metric: ActivityMetricKey,
+  excludeDate?: string,
+): number[] {
   const field = METRIC_FIELD[metric]
   const values: number[] = []
   for (const row of rows) {
-    if (row.date < start || row.date > end) {
+    if (row.date < start || row.date > end || row.date === excludeDate) {
       continue
     }
     const value = row[field]
@@ -106,10 +129,13 @@ function summarizeMetric(
   rows: readonly ActivityDailyRow[],
   start: string,
   end: string,
+  today?: string,
 ): ActivityMetricSummary {
   const calendarDays = inclusiveDayCount(start, end)
-  const values = observedValues(rows, start, end, metric)
-  const observed = coverage(calendarDays, values.length)
+  const completed = completedWindow(start, end, today)
+  const excludeDate = today && today >= start && today <= end ? today : undefined
+  const values = observedValues(rows, start, completed.aggregateEnd, metric, excludeDate)
+  const observed = coverage(calendarDays, completed.completedCalendarDays, values.length)
   if (values.length === 0) {
     return {
       metric,
@@ -134,11 +160,12 @@ function summarizeMetric(
   }
 }
 
-function unsupportedDistance(calendarDays: number): ActivityMetricSummary {
+function unsupportedDistance(calendarDays: number, completedCalendarDays: number): ActivityMetricSummary {
   return {
     metric: 'walking_running_distance_m',
     ...unsupportedMetric(0),
     calendarDays,
+    completedCalendarDays,
     observedDays: 0,
     coveragePct: 0,
   }
@@ -149,18 +176,21 @@ export function activityRangeSummary(
   start: string,
   end: string,
   timezone = ACTIVITY_TIMEZONE,
+  today?: string,
 ): ActivityRangeSummary {
   const calendarDays = inclusiveDayCount(start, end)
+  const completed = completedWindow(start, end, today)
   return {
     start,
     end,
     timezone,
     calendarDays,
-    steps: summarizeMetric('steps_count', rows, start, end),
-    activeEnergy: summarizeMetric('active_energy_kcal', rows, start, end),
-    exercise: summarizeMetric('exercise_minutes', rows, start, end),
-    restingHeartRate: summarizeMetric('resting_heart_rate_bpm', rows, start, end),
-    walkingRunningDistance: unsupportedDistance(calendarDays),
+    completedCalendarDays: completed.completedCalendarDays,
+    steps: summarizeMetric('steps_count', rows, start, end, today),
+    activeEnergy: summarizeMetric('active_energy_kcal', rows, start, end, today),
+    exercise: summarizeMetric('exercise_minutes', rows, start, end, today),
+    restingHeartRate: summarizeMetric('resting_heart_rate_bpm', rows, start, end, today),
+    walkingRunningDistance: unsupportedDistance(calendarDays, completed.completedCalendarDays),
   }
 }
 
@@ -176,8 +206,8 @@ function changeForMetric(
   const previousDays = inclusiveDayCount(previousStart, previousEnd)
   const currentValues = observedValues(rows, currentStart, currentEnd, metric)
   const previousValues = observedValues(rows, previousStart, previousEnd, metric)
-  const currentCoverage = coverage(currentDays, currentValues.length)
-  const previousCoverage = coverage(previousDays, previousValues.length)
+  const currentCoverage = coverage(currentDays, currentDays, currentValues.length)
+  const previousCoverage = coverage(previousDays, previousDays, previousValues.length)
   if (currentValues.length < ACTIVITY_SHORT_TERM_MIN_OBSERVED || previousValues.length < ACTIVITY_SHORT_TERM_MIN_OBSERVED) {
     return {
       metric,
@@ -211,9 +241,13 @@ function changeForMetric(
   }
 }
 
-export function activityShortTermChange(rows: readonly ActivityDailyRow[], asOf: string): ActivityShortTermChange {
-  const currentEnd = asOf
-  const currentStart = addCalendarDays(asOf, -(ACTIVITY_SHORT_TERM_DAYS - 1))
+export function activityShortTermChange(
+  rows: readonly ActivityDailyRow[],
+  asOf: string,
+  today?: string,
+): ActivityShortTermChange {
+  const currentEnd = today && asOf === today ? addCalendarDays(asOf, -1) : asOf
+  const currentStart = addCalendarDays(currentEnd, -(ACTIVITY_SHORT_TERM_DAYS - 1))
   const previousEnd = addCalendarDays(currentStart, -1)
   const previousStart = addCalendarDays(previousEnd, -(ACTIVITY_SHORT_TERM_DAYS - 1))
   return {

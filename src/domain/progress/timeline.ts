@@ -8,6 +8,13 @@ import {
   nutritionDayEventData,
   type NutritionDayEventData,
 } from './nutrition.js'
+import {
+  activityDayInProgress,
+  activityDaysInRange,
+  activityWorkoutLabel,
+  activityWorkoutsInRange,
+  sleepObservationsInRange,
+} from './health-timeline.js'
 
 export const TIMELINE_DOMAINS = [...HEALTH_DOMAINS, 'annotation'] as const
 export type TimelineDomain = (typeof TIMELINE_DOMAINS)[number]
@@ -18,10 +25,13 @@ export const TIMELINE_EVENT_KINDS = [
   'performance_best',
   'checkpoint',
   'nutrition_day',
+  'activity_day',
+  'activity_workout',
+  'sleep_night',
 ] as const
 export type TimelineEventKind = (typeof TIMELINE_EVENT_KINDS)[number]
 
-export const TIMELINE_FOCUSES = ['all', 'training', 'body', 'bests', 'nutrition'] as const
+export const TIMELINE_FOCUSES = ['all', 'training', 'body', 'nutrition', 'activity', 'sleep', 'bests'] as const
 export type TimelineFocus = (typeof TIMELINE_FOCUSES)[number]
 
 export type TimelineTimePrecision = 'date' | 'timestamp'
@@ -77,6 +87,32 @@ export type TimelineCheckpointData = {
 
 export type TimelineNutritionDayData = NutritionDayEventData
 
+export type TimelineActivityDayData = {
+  provisional: boolean
+  stepsCount: number | null
+  activeEnergyKcal: number | null
+  exerciseMinutes: number | null
+  restingHeartRateBpm: number | null
+}
+
+export type TimelineActivityWorkoutData = {
+  workoutId: string
+  activityType: string
+  label: string
+  startAt: string
+  endAt: string
+  durationMinutes: number | null
+  energyKcal: number | null
+}
+
+export type TimelineSleepNightData = {
+  sourceName: string
+  startAt: string
+  endAt: string
+  totalSleepMinutes: number | null
+  status: 'analysis_eligible' | 'partial_observation'
+}
+
 export type TimelineEventBase = {
   id: string
   domain: TimelineDomain
@@ -123,12 +159,38 @@ export type TimelineNutritionDayEvent = TimelineEventBase & {
   data: TimelineNutritionDayData
 }
 
+export type TimelineActivityDayEvent = TimelineEventBase & {
+  domain: 'activity'
+  kind: 'activity_day'
+  timePrecision: 'date'
+  data: TimelineActivityDayData
+}
+
+export type TimelineActivityWorkoutEvent = TimelineEventBase & {
+  domain: 'activity'
+  kind: 'activity_workout'
+  timePrecision: 'timestamp'
+  occurredAt: string
+  data: TimelineActivityWorkoutData
+}
+
+export type TimelineSleepNightEvent = TimelineEventBase & {
+  domain: 'sleep'
+  kind: 'sleep_night'
+  timePrecision: 'timestamp'
+  occurredAt: string
+  data: TimelineSleepNightData
+}
+
 export type TimelineEvent =
   | TimelineTrainingSessionEvent
   | TimelinePerformanceBestEvent
   | TimelineBodyMeasurementEvent
   | TimelineCheckpointEvent
   | TimelineNutritionDayEvent
+  | TimelineActivityDayEvent
+  | TimelineActivityWorkoutEvent
+  | TimelineSleepNightEvent
 
 export type ProgressTimeline = {
   period: TrailingPeriod
@@ -202,8 +264,11 @@ function compareEvents(left: TimelineEvent, right: TimelineEvent): number {
     checkpoint: 0,
     body_measurement: 1,
     nutrition_day: 2,
-    training_session: 3,
-    performance_best: 4,
+    sleep_night: 3,
+    activity_day: 4,
+    activity_workout: 5,
+    training_session: 6,
+    performance_best: 7,
   }
   if (kindRank[left.kind] !== kindRank[right.kind]) {
     return kindRank[left.kind] - kindRank[right.kind]
@@ -383,12 +448,78 @@ export function buildProgressTimeline(
     }
   })
 
+  const activityEvents: TimelineActivityDayEvent[] = activityDaysInRange(input.activityDays ?? [], period.start, period.end).map(
+    (row) => ({
+      id: `activity_day:${row.date}`,
+      domain: 'activity',
+      kind: 'activity_day',
+      date: row.date,
+      timePrecision: 'date',
+      title: 'Activity',
+      evidence: [{ domain: 'activity', date: row.date }],
+      data: {
+        provisional: activityDayInProgress(row.date, input.today),
+        stepsCount: row.stepsCount,
+        activeEnergyKcal: row.activeEnergyKcal,
+        exerciseMinutes: row.exerciseMinutes,
+        restingHeartRateBpm: row.restingHeartRateBpm,
+      },
+    }),
+  )
+  const workoutEvents: TimelineActivityWorkoutEvent[] = activityWorkoutsInRange(
+    input.activityWorkouts ?? [],
+    period.start,
+    period.end,
+  ).map((workout) => ({
+    id: `activity_workout:${workout.id}`,
+    domain: 'activity',
+    kind: 'activity_workout',
+    date: workout.date,
+    timePrecision: 'timestamp',
+    occurredAt: workout.startAt,
+    title: activityWorkoutLabel(workout.activityType),
+    evidence: [{ domain: 'activity', date: workout.date }],
+    data: {
+      workoutId: workout.id,
+      activityType: workout.activityType,
+      label: activityWorkoutLabel(workout.activityType),
+      startAt: workout.startAt,
+      endAt: workout.endAt,
+      durationMinutes: workout.durationMinutes,
+      energyKcal: workout.energyKcal,
+    },
+  }))
+  const sleepEvents: TimelineSleepNightEvent[] = sleepObservationsInRange(
+    input.sleepNights ?? [],
+    period.start,
+    period.end,
+  ).map((night) => ({
+    id: `sleep_night:${night.sleepDate}`,
+    domain: 'sleep',
+    kind: 'sleep_night',
+    date: night.sleepDate,
+    timePrecision: 'timestamp',
+    occurredAt: night.startAt,
+    title: night.observationStatus === 'analysis_eligible' ? 'Sleep' : 'Sleep observation',
+    evidence: [{ domain: 'sleep', date: night.sleepDate }],
+    data: {
+      sourceName: night.sourceName,
+      startAt: night.startAt,
+      endAt: night.endAt,
+      totalSleepMinutes: night.totalSleepMinutes,
+      status: night.observationStatus === 'analysis_eligible' ? 'analysis_eligible' : 'partial_observation',
+    },
+  }))
+
   const events = [
     ...trainingEvents,
     ...performanceBestEvents,
     ...bodyEvents,
     ...checkpointEvents,
     ...nutritionEvents,
+    ...activityEvents,
+    ...workoutEvents,
+    ...sleepEvents,
   ].sort(compareEvents)
 
   return {
@@ -443,9 +574,19 @@ export function timelineEventsForFocus(timeline: ProgressTimeline, focus: Timeli
   if (focus === 'nutrition') {
     return timeline.events.filter((event) => event.kind === 'nutrition_day')
   }
+  if (focus === 'activity') {
+    return timeline.events.filter((event) => event.kind === 'activity_day' || event.kind === 'activity_workout')
+  }
+  if (focus === 'sleep') {
+    return timeline.events.filter((event) => event.kind === 'sleep_night')
+  }
   return timeline.events.filter((event) => {
     if (event.kind === 'performance_best') {
       return event.data.sessionId == null
+    }
+    // Apple activity workouts stay under the Activity filter. A year of walks would crowd All.
+    if (event.kind === 'activity_workout') {
+      return false
     }
     return true
   })

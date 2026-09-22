@@ -1,4 +1,5 @@
 import type { SleepIntervalRow, SleepNightlySummary, SleepObservationStatus, SleepSelectionReason } from '../../src/domain/sleep/index.js'
+import type { ProgressSleepObservation } from '../../src/domain/progress/health-timeline.js'
 import { getSql } from '../db.js'
 
 export const LIST_SLEEP_INTERVALS_SQL = `SELECT id::text,
@@ -178,6 +179,44 @@ export async function upsertSleepNightlySummaries(
     written += chunk.length
   }
   return written
+}
+
+export const LIST_SLEEP_OBSERVATIONS_SQL = `SELECT sleep_date::text AS sleep_date,
+           timezone,
+           source_name,
+           start_at,
+           end_at,
+           total_sleep_minutes,
+           time_in_bed_minutes,
+           core_minutes,
+           deep_minutes,
+           rem_minutes,
+           unspecified_sleep_minutes,
+           analysis_eligible,
+           stage_analysis_eligible,
+           observation_status
+         FROM sleep_nightly_summaries
+         WHERE timezone = $1
+         ORDER BY sleep_date ASC`
+
+export async function listSleepObservationsForProgress(timezone = 'America/Phoenix'): Promise<ProgressSleepObservation[]> {
+  const sql = await getSql()
+  const rows = (await sql.query(LIST_SLEEP_OBSERVATIONS_SQL, [timezone])) as Array<Record<string, unknown>>
+  return rows.map((row) => ({
+    sleepDate: String(row.sleep_date),
+    sourceName: String(row.source_name),
+    startAt: asIso(row.start_at),
+    endAt: asIso(row.end_at),
+    totalSleepMinutes: asNumber(row.total_sleep_minutes),
+    timeInBedMinutes: asNumber(row.time_in_bed_minutes),
+    coreMinutes: asNumber(row.core_minutes),
+    deepMinutes: asNumber(row.deep_minutes),
+    remMinutes: asNumber(row.rem_minutes),
+    unspecifiedSleepMinutes: asNumber(row.unspecified_sleep_minutes),
+    analysisEligible: Boolean(row.analysis_eligible),
+    stageAnalysisEligible: Boolean(row.stage_analysis_eligible),
+    observationStatus: String(row.observation_status) as SleepObservationStatus,
+  }))
 }
 
 export async function listSleepNightlySummaries(): Promise<SleepNightlySummary[]> {

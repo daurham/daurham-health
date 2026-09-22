@@ -95,6 +95,9 @@ export {
   type TimelineTrainingSessionEvent,
   type TimelineCheckpointEvent,
   type TimelineNutritionDayEvent,
+  type TimelineActivityDayEvent,
+  type TimelineActivityWorkoutEvent,
+  type TimelineSleepNightEvent,
 } from './timeline.js'
 export { classificationForExternalId, supportsTimedExternal } from './exercise-classification.js'
 export { calendarDateFromInstant, utcCalendarDateFromNow } from './dates.js'

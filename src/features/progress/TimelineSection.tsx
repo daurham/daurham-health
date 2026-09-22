@@ -12,12 +12,16 @@ import {
   type TimelineCheckpointEvent,
   type TimelineEvent,
   type TimelineFocus,
+  type TimelineActivityDayEvent,
+  type TimelineActivityWorkoutEvent,
   type TimelineNutritionDayEvent,
   type TimelinePerformanceBestEvent,
+  type TimelineSleepNightEvent,
   type TimelineTrainingSessionEvent,
 } from '@/domain/progress'
 import { cn } from '@/lib'
 import { formatGrams, formatKcal, formatQuantity, mealLabel } from '@/features/nutrition/format'
+import { formatSleepDuration } from './activity-sleep-copy'
 import { TIMELINE_FOCUS_OPTIONS } from './copy'
 import type { EvidenceTopic } from './EvidencePanel'
 import {
@@ -73,7 +77,7 @@ export function TimelineSection({
       <div>
         <h2 className="text-lg font-semibold tracking-tight">Timeline</h2>
         <p className="mt-1 text-sm text-zinc-600">
-          Recorded training, body measurements, nutrition days, and performance bests in chronological order.
+          Recorded training, body, nutrition, activity, sleep, and performance bests in chronological order.
         </p>
       </div>
 
@@ -159,6 +163,15 @@ function TimelineEventCard({
   }
   if (event.kind === 'nutrition_day') {
     return <NutritionEventCard event={event} onEvidence={onEvidence} />
+  }
+  if (event.kind === 'activity_day') {
+    return <ActivityDayCard event={event} />
+  }
+  if (event.kind === 'activity_workout') {
+    return <ActivityWorkoutCard event={event} />
+  }
+  if (event.kind === 'sleep_night') {
+    return <SleepNightCard event={event} />
   }
   return <PerformanceBestCard event={event} range={range} onEvidence={onEvidence} standalone />
 }
@@ -356,6 +369,86 @@ function BodyEventCard({
           >
             View evidence
           </button>
+        </div>
+      </div>
+    </article>
+  )
+}
+
+function observedActivityParts(event: TimelineActivityDayEvent): string[] {
+  const parts: string[] = []
+  if (event.data.stepsCount != null) {
+    parts.push(`${Math.round(event.data.stepsCount).toLocaleString('en-US')} steps`)
+  }
+  if (event.data.activeEnergyKcal != null) {
+    parts.push(`${Math.round(event.data.activeEnergyKcal).toLocaleString('en-US')} active kcal`)
+  }
+  if (event.data.exerciseMinutes != null) {
+    parts.push(`${Math.round(event.data.exerciseMinutes).toLocaleString('en-US')} exercise min`)
+  }
+  if (event.data.restingHeartRateBpm != null) {
+    parts.push(`RHR ${Math.round(event.data.restingHeartRateBpm)} bpm`)
+  }
+  return parts
+}
+
+function ActivityDayCard({ event }: { event: TimelineActivityDayEvent }) {
+  const parts = observedActivityParts(event)
+  return (
+    <article id={event.id} tabIndex={-1} className="rounded-lg border border-zinc-200 bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-zinc-400 md:px-4">
+      <div className="md:grid md:grid-cols-[7.5rem_minmax(0,1fr)] md:items-start md:gap-4">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Activity</p>
+        <div>
+          <p className="font-medium tracking-tight">{event.data.provisional ? 'Today · in progress' : 'Activity'}</p>
+          <p className="mt-0.5 text-sm text-zinc-600">{formatCalendarDate(event.date)}</p>
+          {parts.length > 0 ? <p className="mt-1 text-sm text-zinc-800">{parts.join(' · ')}</p> : null}
+        </div>
+      </div>
+    </article>
+  )
+}
+
+function ActivityWorkoutCard({ event }: { event: TimelineActivityWorkoutEvent }) {
+  const duration = event.data.durationMinutes == null ? null : `${Math.round(event.data.durationMinutes)} min`
+  return (
+    <article id={event.id} tabIndex={-1} className="rounded-lg border border-dashed border-zinc-300 bg-zinc-50 px-3 py-3 outline-none focus:ring-2 focus:ring-zinc-400 md:px-4">
+      <div className="md:grid md:grid-cols-[7.5rem_minmax(0,1fr)] md:items-start md:gap-4">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Activity</p>
+        <div>
+          <p className="font-medium tracking-tight">{event.data.label}</p>
+          <p className="mt-0.5 text-sm text-zinc-600">
+            {formatCalendarDate(event.date)} · {formatClockTime(event.occurredAt, 'America/Phoenix')}
+            {duration ? ` · ${duration}` : ''}
+          </p>
+        </div>
+      </div>
+    </article>
+  )
+}
+
+function SleepNightCard({ event }: { event: TimelineSleepNightEvent }) {
+  const complete = event.data.status === 'analysis_eligible'
+  const duration =
+    event.data.totalSleepMinutes == null
+      ? null
+      : complete
+        ? formatSleepDuration(event.data.totalSleepMinutes)
+        : `${formatSleepDuration(event.data.totalSleepMinutes)} observed`
+  return (
+    <article id={event.id} tabIndex={-1} className="rounded-lg border border-zinc-200 bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-zinc-400 md:px-4">
+      <div className="md:grid md:grid-cols-[7.5rem_minmax(0,1fr)] md:items-start md:gap-4">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Sleep</p>
+        <div>
+          <p className="font-medium tracking-tight">{complete ? 'Sleep' : 'Sleep observation'}</p>
+          <p className="mt-0.5 text-sm text-zinc-600">
+            {formatCalendarDate(event.date)}
+            {duration ? ` · ${duration}` : ''}
+            {event.data.sourceName ? ` · ${event.data.sourceName}` : ''}
+          </p>
+          <p className="mt-1 text-sm text-zinc-700">
+            {formatClockTime(event.data.startAt, 'America/Phoenix')} – {formatClockTime(event.data.endAt, 'America/Phoenix')}
+            {complete ? '' : ' · Partial'}
+          </p>
         </div>
       </div>
     </article>

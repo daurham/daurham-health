@@ -18,3 +18,10 @@ export {
   type ActivityShortTermChange,
   type ActivityShortTermMetric,
 } from './analytics.js'
+export {
+  buildActivityProgressView,
+  type ActivityChartPoint,
+  type ActivityProgressMetricView,
+  type ActivityProgressView,
+  type ActivityProvisionalDay,
+} from './progress-view.js'

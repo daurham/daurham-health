@@ -30,6 +30,7 @@ import { periodExternalVolume } from './volume.js'
 import type { ProgressCheckpoint } from './checkpoints.js'
 import type { ProgressCanonicalInput } from './overview.js'
 import { nutritionCoverageDiffers, nutritionPeriodSummary, type NutritionPeriodSummary } from './nutrition.js'
+import { activitySleepPeriodCompare, type ActivitySleepPeriodCompare } from './health-compare.js'
 
 export type ComparePeriod = {
   start: string
@@ -133,6 +134,7 @@ export type ProgressCompare = {
     b: NutritionPeriodSummary
     coverageDiffers: boolean
   }
+  health: ActivitySleepPeriodCompare
   exercises: CompareExercise[]
   findings: CompareFinding[]
 }
@@ -764,6 +766,13 @@ export function buildProgressCompare(input: {
       metrics: metricKeys.map((key) => bodyMetricForPeriods(canonical.bodyObservations, key, periodA, periodB)),
     },
     nutrition: nutritionCompareSides(nutritionForPeriod(canonical, periodA), nutritionForPeriod(canonical, periodB)),
+    health: activitySleepPeriodCompare({
+      activityDays: canonical.activityDays ?? [],
+      sleepNights: canonical.sleepNights ?? [],
+      periodA,
+      periodB,
+      today: canonical.today,
+    }),
     exercises: buildExercises(
       canonical,
       periodA,
@@ -890,6 +899,14 @@ export function buildSinceCheckpointCompare(input: {
       metrics: bodyMetrics,
     },
     nutrition: nutritionCompareSides(nutritionForPeriod(canonical, periodA), nutritionForPeriod(canonical, periodB)),
+    health: activitySleepPeriodCompare({
+      activityDays: canonical.activityDays ?? [],
+      sleepNights: canonical.sleepNights ?? [],
+      periodA,
+      periodB,
+      today: canonical.today,
+      intervalOnly: true,
+    }),
     exercises,
   }
   return { ...draft, findings: compareFindings(draft) }

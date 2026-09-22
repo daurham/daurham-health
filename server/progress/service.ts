@@ -20,6 +20,10 @@ import {
   type ProgressCheckpoint,
 } from '../../src/domain/progress/checkpoints.js'
 import { healthCalendarDateFromNow } from '../../src/domain/time.js'
+import { buildActivityProgressView, type ActivityProgressView } from '../../src/domain/activity/index.js'
+import { buildSleepProgressView, type SleepProgressView } from '../../src/domain/sleep/index.js'
+import { listActivityDailySummaries, listActivityWorkoutsForProgress } from '../activity/queries.js'
+import { listSleepNightlySummaries, listSleepObservationsForProgress } from '../sleep/queries.js'
 import { HttpError } from '../http.js'
 import { getSql } from '../db.js'
 import {
@@ -110,13 +114,48 @@ export async function getProgressOverview(input: {
   })
 }
 
+export async function getProgressActivity(input: {
+  range: string | null
+  asOf: string | null
+  now?: Date
+}): Promise<ActivityProgressView> {
+  const query = parseProgressQuery(input)
+  return buildActivityProgressView(await listActivityDailySummaries(), {
+    ...query,
+    today: healthCalendarDateFromNow(input.now ?? new Date()),
+  })
+}
+
+export async function getProgressSleep(input: {
+  range: string | null
+  asOf: string | null
+  now?: Date
+}): Promise<SleepProgressView> {
+  const query = parseProgressQuery(input)
+  return buildSleepProgressView(await listSleepNightlySummaries(), query)
+}
+
+async function loadActivitySleepContext(now?: Date) {
+  const [activityDays, sleepNights, activityWorkouts] = await Promise.all([
+    listActivityDailySummaries(),
+    listSleepObservationsForProgress(),
+    listActivityWorkoutsForProgress(),
+  ])
+  return {
+    activityDays,
+    sleepNights,
+    activityWorkouts,
+    today: healthCalendarDateFromNow(now ?? new Date()),
+  }
+}
+
 export async function getProgressTimeline(input: {
   range: string | null
   asOf: string | null
   now?: Date
 }): Promise<ProgressTimeline> {
   const query = parseProgressQuery(input)
-  const rows = await loadProgressCanonicalRows()
+  const [rows, health] = await Promise.all([loadProgressCanonicalRows(), loadActivitySleepContext(input.now)])
   return buildProgressTimeline({
     asOf: query.asOf,
     range: query.range,
@@ -127,6 +166,7 @@ export async function getProgressTimeline(input: {
     checkpoints: rows.checkpoints,
     nutritionEntries: rows.nutritionEntries,
     nutritionTargets: rows.nutritionTargets,
+    ...health,
   })
 }
 
@@ -140,7 +180,7 @@ export async function getProgressCompare(input: {
   now?: Date
 }): Promise<ProgressCompare> {
   const query = parseCompareQuery(input)
-  const rows = await loadProgressCanonicalRows()
+  const [rows, health] = await Promise.all([loadProgressCanonicalRows(), loadActivitySleepContext(input.now)])
   const canonical = {
     asOf: query.mode === 'since_checkpoint' ? query.asOf : query.periodB.end,
     range: 'all' as const,
@@ -150,6 +190,7 @@ export async function getProgressCompare(input: {
     bodyObservations: rows.bodyObservations,
     nutritionEntries: rows.nutritionEntries,
     nutritionTargets: rows.nutritionTargets,
+    ...health,
   }
   if (query.mode === 'since_checkpoint') {
     const checkpoint = rows.checkpoints.find((item) => item.id === query.checkpointId)

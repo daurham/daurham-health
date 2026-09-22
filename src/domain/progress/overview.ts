@@ -22,7 +22,9 @@ import {
 import { performanceFrontier, timedPerformanceFrontier } from './frontier.js'
 import { dateInInclusiveRange, trailingPeriod, type TrailingPeriod } from './periods.js'
 import { nutritionFindings, nutritionPeriodSummary, type NutritionPeriodSummary } from './nutrition.js'
+import type { ActivityDailyRow } from '../activity/analytics.js'
 import type { NutritionEntry, NutritionTarget } from '../nutrition/types.js'
+import type { ProgressActivityWorkout, ProgressSleepObservation } from './health-timeline.js'
 import { performanceBestsForExercise } from './prs.js'
 import { relativeStrength } from './relative-strength.js'
 import {
@@ -52,6 +54,10 @@ export type ProgressCanonicalInput = {
   bodyObservations: BodyObservation[]
   nutritionEntries?: NutritionEntry[]
   nutritionTargets?: NutritionTarget[]
+  activityDays?: ActivityDailyRow[]
+  sleepNights?: ProgressSleepObservation[]
+  activityWorkouts?: ProgressActivityWorkout[]
+  today?: string
 }
 
 export type ProgressOverview = {

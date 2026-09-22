@@ -70,5 +70,14 @@ export {
   sleepShortTermChange,
   type SleepRangeSummary,
   type SleepShortTermChange,
+  type SleepSummaryNight,
 } from './analytics.js'
 export { buildSleepDiagnosticReport, type SleepDiagnosticReport, type SleepSourceReport } from './report.js'
+export {
+  buildSleepProgressView,
+  sleepOverrideExplanation,
+  toSleepProgressNight,
+  type SleepChartPoint,
+  type SleepProgressNight,
+  type SleepProgressView,
+} from './progress-view.js'

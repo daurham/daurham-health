@@ -97,6 +97,8 @@ describe('Vercel nested API routing', () => {
     expect(matchHealthApiRoute(`/api/training/sessions/${SESSION_ID}`)).toBe('training-session-detail')
     expect(matchHealthApiRoute('/api/training/transcription/jobs')).toBe('transcription-jobs')
     expect(matchHealthApiRoute('/api/progress/overview')).toBe('progress-overview')
+    expect(matchHealthApiRoute('/api/progress/activity')).toBe('progress-activity')
+    expect(matchHealthApiRoute('/api/progress/sleep')).toBe('progress-sleep')
     expect(matchHealthApiRoute('/api/progress/timeline')).toBe('progress-timeline')
     expect(matchHealthApiRoute('/api/progress/compare')).toBe('progress-compare')
     expect(matchHealthApiRoute('/api/progress/checkpoints')).toBe('progress-checkpoints')
@@ -199,6 +201,16 @@ describe('api/index after Vercel nested rewrite', () => {
     expect(captured.status()).not.toBe(404)
     expect(captured.status()).not.toBe(405)
     expect(isDeniedPrivate(captured.status())).toBe(true)
+  })
+
+  it('protects activity and sleep progress routes', async () => {
+    const activity = await hit('GET', '/api/progress/activity?range=30d')
+    expect(activity.status()).not.toBe(404)
+    expect(activity.status()).not.toBe(405)
+    expect(isDeniedPrivate(activity.status())).toBe(true)
+    const sleep = await hit('GET', '/api/progress/sleep?range=30d')
+    expect(sleep.status()).not.toBe(404)
+    expect(isDeniedPrivate(sleep.status())).toBe(true)
   })
 
   it('protects GET /api/progress/timeline', async () => {

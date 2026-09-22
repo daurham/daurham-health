@@ -11,6 +11,7 @@ import type {
 } from '@/domain/progress'
 import { cn } from '@/lib'
 import { formatGrams, formatKcal } from '@/features/nutrition/format'
+import { formatSleepDuration } from './activity-sleep-copy'
 import {
   createProgressCheckpoint,
   deleteProgressCheckpoint,
@@ -481,6 +482,7 @@ function CompareResults({
       ) : null}
 
       <NutritionCompareBlock compare={compare} left={left} right={right} onEvidence={onEvidence} />
+      <HealthCompareBlock compare={compare} left={left} right={right} />
 
       <section>
         <h3 className="text-sm font-semibold tracking-tight">Exercises</h3>
@@ -531,6 +533,166 @@ function CompareResults({
           </>
         )}
       </section>
+    </div>
+  )
+}
+
+function metricAverage(metric: { status: string; value?: number }, unit: string): string {
+  if (metric.status !== 'available' || metric.value == null) {
+    return '—'
+  }
+  return `${Math.round(metric.value).toLocaleString('en-US')}${unit}`
+}
+
+function coverageText(observed: number, completed: number): string {
+  const pct = completed === 0 ? 0 : Math.round((observed / completed) * 100)
+  return `${observed} of ${completed} completed days · ${pct}%`
+}
+
+function deltaText(change: MetricResult<{ absolute: number; percentChange: number | null }>, unit: string): string | null {
+  if (change.status !== 'available') {
+    return null
+  }
+  const absolute = `${change.value.absolute > 0 ? '+' : ''}${Math.round(change.value.absolute).toLocaleString('en-US')}${unit}`
+  if (change.value.percentChange == null) {
+    return absolute
+  }
+  const percent = `${change.value.percentChange > 0 ? '+' : ''}${Math.round(change.value.percentChange)}%`
+  return `${absolute} (${percent})`
+}
+
+function HealthCompareBlock({
+  compare,
+  left,
+  right,
+}: {
+  compare: ProgressCompare
+  left: string
+  right: string
+}) {
+  const since = compare.mode === 'since_checkpoint'
+  const activity = since ? compare.health.activity.b : null
+  const sleep = since ? compare.health.sleep.b : null
+  return (
+    <section className="space-y-4">
+      <div>
+        <h3 className="text-sm font-semibold tracking-tight">Activity</h3>
+        {since && activity ? (
+          <div className="mt-2 space-y-1 text-sm text-zinc-700">
+            <p>Steps {metricAverage(activity.steps, '')} avg · {coverageText(activity.steps.observedDays, activity.completedCalendarDays)}</p>
+            <p>Active energy {metricAverage(activity.activeEnergy, ' kcal')} avg · {coverageText(activity.activeEnergy.observedDays, activity.completedCalendarDays)}</p>
+            <p>Exercise {metricAverage(activity.exercise, ' min')} avg · {coverageText(activity.exercise.observedDays, activity.completedCalendarDays)}</p>
+            <p>Resting HR {metricAverage(activity.restingHeartRate, ' bpm')} median · {coverageText(activity.restingHeartRate.observedDays, activity.completedCalendarDays)}</p>
+          </div>
+        ) : (
+          <div className="mt-2 space-y-2 text-sm text-zinc-700">
+            <HealthMetricRow label="Steps" a={compare.health.activity.a.steps} b={compare.health.activity.b.steps} completedA={compare.health.activity.a.completedCalendarDays} completedB={compare.health.activity.b.completedCalendarDays} unit="" change={compare.health.activity.steps} left={left} right={right} />
+            <HealthMetricRow label="Active energy" a={compare.health.activity.a.activeEnergy} b={compare.health.activity.b.activeEnergy} completedA={compare.health.activity.a.completedCalendarDays} completedB={compare.health.activity.b.completedCalendarDays} unit=" kcal" change={compare.health.activity.activeEnergy} left={left} right={right} />
+            <HealthMetricRow label="Exercise" a={compare.health.activity.a.exercise} b={compare.health.activity.b.exercise} completedA={compare.health.activity.a.completedCalendarDays} completedB={compare.health.activity.b.completedCalendarDays} unit=" min" change={compare.health.activity.exercise} left={left} right={right} />
+            <HealthMetricRow label="Resting HR" a={compare.health.activity.a.restingHeartRate} b={compare.health.activity.b.restingHeartRate} completedA={compare.health.activity.a.completedCalendarDays} completedB={compare.health.activity.b.completedCalendarDays} unit=" bpm" change={compare.health.activity.restingHeartRate} left={left} right={right} median />
+          </div>
+        )}
+      </div>
+      <div>
+        <h3 className="text-sm font-semibold tracking-tight">Sleep</h3>
+        {since && sleep ? (
+          <>
+            <SleepIntervalCopy side={sleep} since />
+            {compare.health.sleep.stagesComparable ? (
+              <p className="mt-1 text-sm text-zinc-700">
+                Stages on {sleep.stageEligibleNights} nights with complete stage data. Core {stageCopy(sleep.averageCoreMinutes)}, Deep {stageCopy(sleep.averageDeepMinutes)}, REM {stageCopy(sleep.averageRemMinutes)}.
+              </p>
+            ) : null}
+          </>
+        ) : (
+          <div className="mt-2 space-y-1 text-sm text-zinc-700">
+            <p>
+              {left}: {sleepAverageCopy(compare.health.sleep.a)} · {sleepCoverageCopy(compare.health.sleep.a)}
+            </p>
+            <p>
+              {right}: {sleepAverageCopy(compare.health.sleep.b)} · {sleepCoverageCopy(compare.health.sleep.b)}
+            </p>
+            {deltaText(compare.health.sleep.totalSleep, ' min') ? <p>{deltaText(compare.health.sleep.totalSleep, ' min')} average sleep</p> : null}
+            {compare.health.sleep.stagesComparable ? (
+              <p>
+                Stages on eligible nights — Core {stageCopy(compare.health.sleep.a.averageCoreMinutes)} vs {stageCopy(compare.health.sleep.b.averageCoreMinutes)}, Deep {stageCopy(compare.health.sleep.a.averageDeepMinutes)} vs {stageCopy(compare.health.sleep.b.averageDeepMinutes)}, REM {stageCopy(compare.health.sleep.a.averageRemMinutes)} vs {stageCopy(compare.health.sleep.b.averageRemMinutes)}. Based on {compare.health.sleep.a.stageEligibleNights} and {compare.health.sleep.b.stageEligibleNights} nights.
+              </p>
+            ) : null}
+          </div>
+        )}
+      </div>
+    </section>
+  )
+}
+
+function HealthMetricRow({
+  label,
+  a,
+  b,
+  completedA,
+  completedB,
+  unit,
+  change,
+  left,
+  right,
+  median = false,
+}: {
+  label: string
+  a: { status: string; value?: number; observedDays: number }
+  b: { status: string; value?: number; observedDays: number }
+  completedA: number
+  completedB: number
+  unit: string
+  change: MetricResult<{ absolute: number; percentChange: number | null }>
+  left: string
+  right: string
+  median?: boolean
+}) {
+  const basis = median ? 'median' : 'avg'
+  const delta = deltaText(change, unit)
+  return (
+    <p>
+      {label} {basis}. {left}: {metricAverage(a, unit)} · {coverageText(a.observedDays, completedA)}. {right}: {metricAverage(b, unit)} · {coverageText(b.observedDays, completedB)}
+      {delta ? `. ${delta}` : ''}
+    </p>
+  )
+}
+
+function sleepAverageCopy(side: ProgressCompare['health']['sleep']['a']): string {
+  if (side.averageTotalSleepMinutes.status !== 'available') {
+    return side.analysisEligibleNights === 0 ? 'No complete nights' : '—'
+  }
+  return `${formatSleepDuration(side.averageTotalSleepMinutes.value)} avg`
+}
+
+function sleepCoverageCopy(side: ProgressCompare['health']['sleep']['a']): string {
+  const pct = Math.round(side.coveragePct)
+  return `${side.analysisEligibleNights} of ${side.calendarNights} nights · ${pct}%`
+}
+
+function stageCopy(metric: MetricResult<number>): string {
+  return metric.status === 'available' ? formatSleepDuration(metric.value) : '—'
+}
+
+function SleepIntervalCopy({ side, since }: { side: ProgressCompare['health']['sleep']['b']; since?: boolean }) {
+  if (side.analysisEligibleNights === 0) {
+    return (
+      <div className="mt-2 space-y-1 text-sm text-zinc-700">
+        <p>{since ? 'No complete sleep observations since this checkpoint.' : 'No complete sleep observations in this period.'}</p>
+        {side.partialObservations > 0 ? (
+          <p>
+            {side.partialObservations} partial observation{side.partialObservations === 1 ? '' : 's'} recorded
+          </p>
+        ) : null}
+      </div>
+    )
+  }
+  return (
+    <div className="mt-2 space-y-1 text-sm text-zinc-700">
+      <p>
+        {sleepAverageCopy(side)} · {sleepCoverageCopy(side)}
+      </p>
+      {side.partialObservations > 0 ? <p>{side.partialObservations} partial observations are not in the average.</p> : null}
     </div>
   )
 }

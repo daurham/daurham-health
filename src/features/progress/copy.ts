@@ -23,6 +23,8 @@ export const TIMELINE_FOCUS_OPTIONS: Array<{ id: TimelineFocus; label: string }>
   { id: 'training', label: 'Training' },
   { id: 'body', label: 'Body' },
   { id: 'nutrition', label: 'Nutrition' },
+  { id: 'activity', label: 'Activity' },
+  { id: 'sleep', label: 'Sleep' },
   { id: 'bests', label: 'Performance Bests' },
 ]
 

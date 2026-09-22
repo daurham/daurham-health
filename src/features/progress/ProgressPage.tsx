@@ -3,7 +3,10 @@ import { NavLink, Outlet, useLocation, useOutletContext, useParams, useSearchPar
 import type { ProgressOverview, ProgressRange, ProgressTimeline } from '@/domain/progress'
 import { cn } from '@/lib'
 import { fetchProgressOverview, fetchProgressTimeline } from './api'
-import { RANGE_OPTIONS } from './copy'
+import { ActivityProgressPage } from './ActivitySection'
+import { ActivitySleepOverview } from './ActivitySleepOverview'
+import { ProgressRangeControl } from './ProgressRangeControl'
+import { SleepProgressPage } from './SleepSection'
 import { BodySection } from './BodySection'
 import { EvidencePanel, type EvidenceTopic } from './EvidencePanel'
 import { OverviewSection } from './OverviewSection'
@@ -20,6 +23,8 @@ type ProgressOutletContext = {
 
 const TABS = [
   { to: '/progress', label: 'Overview', end: true },
+  { to: '/progress/activity', label: 'Activity', end: false },
+  { to: '/progress/sleep', label: 'Sleep', end: false },
   { to: '/progress/strength', label: 'Strength', end: false },
   { to: '/progress/body', label: 'Body', end: false },
   { to: '/progress/timeline', label: 'Timeline', end: false },
@@ -31,6 +36,7 @@ export function ProgressPage() {
   const location = useLocation()
   const range = parseProgressRangeParam(params.get('range'))
   const compareView = location.pathname.endsWith('/compare')
+  const healthView = location.pathname === '/progress/activity' || location.pathname === '/progress/sleep'
   const [overview, setOverview] = useState<ProgressOverview | null>(null)
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [error, setError] = useState<string | null>(null)
@@ -84,26 +90,9 @@ export function ProgressPage() {
       </div>
 
       <div className="rounded-lg border border-zinc-200 bg-white px-2 py-2 md:px-3">
-        {compareView ? null : (
-          <div className="flex gap-1 overflow-x-auto" role="group" aria-label="Progress range">
-            {RANGE_OPTIONS.map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                onClick={() => setRange(option.id)}
-                className={cn(
-                  'min-h-10 shrink-0 rounded-md px-3 py-1.5 text-sm font-medium md:min-h-9',
-                  option.id === range ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900',
-                )}
-                aria-pressed={option.id === range}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-        )}
+        {compareView || healthView ? null : <ProgressRangeControl range={range} onChange={setRange} />}
         <nav
-          className={cn('flex flex-wrap gap-1', compareView ? '' : 'mt-2 border-t border-zinc-100 pt-2')}
+          className={cn('flex flex-wrap gap-1', compareView || healthView ? '' : 'mt-2 border-t border-zinc-100 pt-2')}
           aria-label="Progress sections"
         >
           {TABS.map((tab) => (
@@ -124,13 +113,13 @@ export function ProgressPage() {
         </nav>
       </div>
 
-      {status === 'loading' ? <ProgressSkeleton /> : null}
-      {status === 'error' ? (
+      {!healthView && status === 'loading' ? <ProgressSkeleton /> : null}
+      {!healthView && status === 'error' ? (
         <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
           {error ?? 'Progress is unavailable.'} Values are not shown as zero when a request fails.
         </p>
       ) : null}
-      {status === 'ready' && overview && outletContext ? <Outlet context={outletContext} /> : null}
+      {healthView || (status === 'ready' && overview && outletContext) ? <Outlet context={outletContext ?? undefined} /> : null}
       {evidence ? <EvidencePanel topic={evidence} onClose={() => setEvidence(null)} /> : null}
     </section>
   )
@@ -147,8 +136,21 @@ function ProgressSkeleton() {
 }
 
 export function ProgressOverviewRoute() {
-  const { overview, onEvidence } = useOutletContext<ProgressOutletContext>()
-  return <OverviewSection overview={overview} onEvidence={onEvidence} />
+  const { overview, range, onEvidence } = useOutletContext<ProgressOutletContext>()
+  return (
+    <div className="space-y-5 md:space-y-6">
+      <OverviewSection overview={overview} onEvidence={onEvidence} />
+      <ActivitySleepOverview range={range} />
+    </div>
+  )
+}
+
+export function ProgressActivityRoute() {
+  return <ActivityProgressPage />
+}
+
+export function ProgressSleepRoute() {
+  return <SleepProgressPage />
 }
 
 export function ProgressStrengthRoute() {

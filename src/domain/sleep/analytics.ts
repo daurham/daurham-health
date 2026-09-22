@@ -4,6 +4,19 @@ import { availableMetric, insufficientMetric, type MetricResult } from '../progr
 import { SLEEP_SHORT_TERM_MIN_OBSERVED, SLEEP_SHORT_TERM_NIGHTS } from './config.js'
 import type { SleepNightlySummary } from './summarize.js'
 
+export type SleepSummaryNight = Pick<
+  SleepNightlySummary,
+  | 'sleepDate'
+  | 'analysisEligible'
+  | 'totalSleepMinutes'
+  | 'timeInBedMinutes'
+  | 'stageAnalysisEligible'
+  | 'coreMinutes'
+  | 'deepMinutes'
+  | 'remMinutes'
+  | 'unspecifiedSleepMinutes'
+> & { logicalSourceKey?: string; observationStatus?: SleepNightlySummary['observationStatus'] }
+
 export type SleepRangeSummary = {
   start: string
   end: string
@@ -35,15 +48,15 @@ function averageOf(values: readonly number[]): MetricResult<number> {
   return availableMetric(values.reduce((sum, item) => sum + item, 0) / values.length, values.length, 'observed_average')
 }
 
-function eligibleNights(nights: readonly SleepNightlySummary[]): SleepNightlySummary[] {
+function eligibleNights(nights: readonly SleepSummaryNight[]): SleepSummaryNight[] {
   return nights.filter((item) => item.analysisEligible && item.totalSleepMinutes != null)
 }
 
-function stagedNights(nights: readonly SleepNightlySummary[]): SleepNightlySummary[] {
+function stagedNights(nights: readonly SleepSummaryNight[]): SleepSummaryNight[] {
   return nights.filter((item) => item.stageAnalysisEligible)
 }
 
-export function sleepRangeSummary(nights: readonly SleepNightlySummary[], start: string, end: string): SleepRangeSummary {
+export function sleepRangeSummary(nights: readonly SleepSummaryNight[], start: string, end: string): SleepRangeSummary {
   const inRange = nights.filter((item) => item.sleepDate >= start && item.sleepDate <= end)
   const calendarNights = inclusiveDayCount(start, end)
   const observed = eligibleNights(inRange)
@@ -64,9 +77,10 @@ export function sleepRangeSummary(nights: readonly SleepNightlySummary[], start:
   }
 }
 
-export function sleepShortTermChange(nights: readonly SleepNightlySummary[]): SleepShortTermChange {
+export function sleepShortTermChange(nights: readonly SleepSummaryNight[]): SleepShortTermChange {
   const observed = [...eligibleNights(nights)].sort(
-    (left, right) => right.sleepDate.localeCompare(left.sleepDate) || left.logicalSourceKey.localeCompare(right.logicalSourceKey),
+    (left, right) =>
+      right.sleepDate.localeCompare(left.sleepDate) || (left.logicalSourceKey ?? '').localeCompare(right.logicalSourceKey ?? ''),
   )
   const current = observed.slice(0, SLEEP_SHORT_TERM_NIGHTS)
   const previous = observed.slice(SLEEP_SHORT_TERM_NIGHTS, SLEEP_SHORT_TERM_NIGHTS * 2)
