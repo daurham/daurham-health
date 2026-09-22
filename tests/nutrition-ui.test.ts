@@ -102,6 +102,8 @@ describe('nutrition daily UX source', () => {
     expect(page).toContain('Add food')
     expect(page).toContain('md:grid-cols-[minmax(0,1fr)_22rem]')
     expect(page).toContain("bottom: 'calc(var(--shell-nav-offset) + 1rem)'")
+    expect(page).toContain('pb-[var(--shell-action-bar)]')
+    expect(page).not.toContain('backdrop-blur')
     expect(page).toContain('useSearchParams')
     expect(page).toContain('setParams({ date: resource.committedKey }')
     expect(page).toContain('useAtomicKeyedResource')
@@ -136,6 +138,7 @@ describe('mobile form controls', () => {
   it('uses 16px mobile text and does not disable zoom', () => {
     const css = readFileSync('src/index.css', 'utf8')
     const html = readFileSync('index.html', 'utf8')
+    expect(css).toContain('font-synthesis: none')
     expect(css).toContain('font-size: 1rem')
     expect(css).toContain('max-width: 767px')
     expect(html).not.toContain('maximum-scale')

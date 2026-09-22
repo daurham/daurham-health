@@ -14,6 +14,7 @@
     "apple-health:compact-preview": "tsx server/apple-health/compact-cli.ts",
     "apple-health:commit-archive": "tsx server/apple-health/archive-cli.ts",
     "apple-health:hae-import": "tsx server/apple-health/hae-cli.ts",
+    "sleep:analyze": "tsx server/sleep/analyze-cli.ts",
     "test": "vitest run"
   },
   "dependencies": {

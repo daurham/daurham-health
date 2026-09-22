@@ -140,7 +140,7 @@ export function WorkoutEditor({
         ))}
       </div>
 
-      <div className="shell-action-bar border-t border-zinc-200 bg-white/95 px-4 py-3 backdrop-blur">
+      <div className="shell-action-bar border-t border-zinc-200 bg-white px-4 py-3">
         <div className={cn('mx-auto flex gap-3', SHELL_MAX_WIDTH_CLASS)}>
           <button
             type="button"

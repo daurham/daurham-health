@@ -126,7 +126,7 @@ export function Layout() {
       {publicAuthRoute ? null : (
         <nav
           aria-label="Primary"
-          className="fixed inset-x-0 bottom-0 z-20 border-t border-zinc-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
+          className="fixed inset-x-0 bottom-0 z-20 border-t border-zinc-200 bg-white pb-[env(safe-area-inset-bottom)] md:hidden"
         >
           <div className={cn('mx-auto grid grid-cols-5', SHELL_MAX_WIDTH_CLASS)}>
             {navItems.map((item) => (

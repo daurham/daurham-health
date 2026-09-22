@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+/* iOS Safari will paint a second glyph over the first when it synthesizes a
+   missing weight, which reads as doubled letters on every word. */
+html {
+  font-synthesis: none;
+}
+
 /* Mobile shell. Bottom nav height and the home-indicator inset live here so
    pages do not guess them independently. */
 :root {

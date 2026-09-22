@@ -273,7 +273,7 @@ export function NutritionPage() {
   const navBase = resource.pendingKey ?? intentDate
 
   return (
-    <section className="space-y-4">
+    <section className="space-y-4 pb-[var(--shell-action-bar)] md:pb-0">
       <DayNav
         date={date}
         today={today}
@@ -541,7 +541,7 @@ function DayNav({
   onShift: (days: number) => void
 }) {
   return (
-    <div className="sticky top-0 z-10 -mx-4 flex items-center justify-between gap-2 border-b border-zinc-200 bg-zinc-50/95 px-4 py-2 backdrop-blur">
+    <div className="sticky top-0 z-10 -mx-4 flex items-center justify-between gap-2 border-b border-zinc-200 bg-zinc-50 px-4 py-2">
       <button
         type="button"
         aria-label="Previous day"
