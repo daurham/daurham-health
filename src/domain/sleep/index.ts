@@ -1,9 +1,12 @@
 export {
+  MIN_ANALYSIS_SLEEP_MINUTES,
+  MIN_STAGE_COVERAGE_PCT,
   SLEEP_ASLEEP_CATEGORIES,
   SLEEP_ANALYTICS_CATEGORIES,
   SLEEP_CALCULATION_VERSION,
   SLEEP_EXCLUSIVE_STAGES,
   SLEEP_GAP_BOUNDARIES_MINUTES,
+  SLEEP_NIGHT_CALCULATION_VERSION,
   SLEEP_PARTIAL_SOURCE_MIN_DIFF_MINUTES,
   SLEEP_PARTIAL_SOURCE_RATIO,
   SLEEP_SESSION_GAP_MINUTES,
@@ -37,11 +40,29 @@ export {
 } from './episodes.js'
 export { sleepNightCandidates, type SleepNightCandidate } from './nights.js'
 export {
+  classifySleepObservation,
+  isAnalysisEligible,
+  isStageAnalysisEligible,
+  meetsCompletenessOverride,
+  SLEEP_OBSERVATION_STATUSES,
+  SLEEP_SELECTION_REASONS,
+  type SleepObservationStatus,
+  type SleepSelectionReason,
+} from './completeness.js'
+export {
   arbitrateSleepNight,
   arbitrateSleepNights,
   isSuspiciousPartialPreferred,
   type SleepArbitrationDecision,
 } from './arbitration.js'
+export {
+  sleepNightlySummariesFromDecisions,
+  sleepNightlySummaryFromDecision,
+  sleepNightSemanticPayload,
+  type SleepNightAlternativeEvidence,
+  type SleepNightEvidence,
+  type SleepNightlySummary,
+} from './summarize.js'
 export {
   recentSleepWindows,
   sleepRangeSummary,

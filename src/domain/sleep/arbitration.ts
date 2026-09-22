@@ -1,4 +1,11 @@
-import { SLEEP_PARTIAL_SOURCE_MIN_DIFF_MINUTES, SLEEP_PARTIAL_SOURCE_RATIO, SLEEP_SOURCE_PRIORITY } from './config.js'
+import { SLEEP_SOURCE_PRIORITY } from './config.js'
+import {
+  classifySleepObservation,
+  isStageAnalysisEligible,
+  meetsCompletenessOverride,
+  type SleepObservationStatus,
+  type SleepSelectionReason,
+} from './completeness.js'
 import type { SleepNightCandidate } from './nights.js'
 import { compareSleepSourcePriority } from './sources.js'
 
@@ -6,22 +13,22 @@ export type SleepArbitrationDecision = {
   sleepDate: string
   selected: SleepNightCandidate | null
   alternatives: SleepNightCandidate[]
-  reason: 'actual_sleep_priority' | 'in_bed_only' | 'none'
+  observationStatus: SleepObservationStatus | null
+  analysisEligible: boolean
+  stageAnalysisEligible: boolean
+  selectionReason: SleepSelectionReason | 'none'
   topPriorityAbsent: boolean
+  completenessOverride: boolean
   suspiciousPartialPreferred: boolean
   longestAlternativeMinutes: number | null
   chosenRatio: number | null
 }
 
-function usableActual(candidates: readonly SleepNightCandidate[]): SleepNightCandidate[] {
-  return candidates.filter((item) => item.hasActualSleep && item.totalSleepMinutes != null && item.totalSleepMinutes > 0)
+function ofStatus(candidates: readonly SleepNightCandidate[], status: SleepObservationStatus): SleepNightCandidate[] {
+  return candidates.filter((item) => classifySleepObservation(item) === status)
 }
 
-function usableInBed(candidates: readonly SleepNightCandidate[]): SleepNightCandidate[] {
-  return candidates.filter((item) => !item.hasActualSleep && item.timeInBedMinutes != null && item.timeInBedMinutes > 0)
-}
-
-function pickPreferred(candidates: readonly SleepNightCandidate[]): SleepNightCandidate | null {
+function pickBySourcePriority(candidates: readonly SleepNightCandidate[]): SleepNightCandidate | null {
   if (candidates.length === 0) {
     return null
   }
@@ -39,7 +46,28 @@ function pickPreferred(candidates: readonly SleepNightCandidate[]): SleepNightCa
   })[0]!
 }
 
-export function isSuspiciousPartialPreferred(chosen: SleepNightCandidate, alternatives: readonly SleepNightCandidate[]): boolean {
+function pickLongestThenPriority(candidates: readonly SleepNightCandidate[]): SleepNightCandidate | null {
+  if (candidates.length === 0) {
+    return null
+  }
+  return [...candidates].sort((left, right) => {
+    const leftSleep = left.totalSleepMinutes ?? -1
+    const rightSleep = right.totalSleepMinutes ?? -1
+    if (leftSleep !== rightSleep) {
+      return rightSleep - leftSleep
+    }
+    const bySource = compareSleepSourcePriority(left.sourceId, right.sourceId)
+    if (bySource !== 0) {
+      return bySource
+    }
+    return left.startAt.localeCompare(right.startAt)
+  })[0]!
+}
+
+export function isSuspiciousPartialPreferred(
+  chosen: SleepNightCandidate,
+  alternatives: readonly SleepNightCandidate[],
+): boolean {
   const chosenSleep = chosen.totalSleepMinutes
   if (chosenSleep == null) {
     return false
@@ -53,29 +81,80 @@ export function isSuspiciousPartialPreferred(chosen: SleepNightCandidate, altern
   if (longest == null) {
     return false
   }
-  const difference = longest - chosenSleep
-  return chosenSleep < longest * SLEEP_PARTIAL_SOURCE_RATIO && difference > SLEEP_PARTIAL_SOURCE_MIN_DIFF_MINUTES
+  return meetsCompletenessOverride(chosenSleep, longest)
+}
+
+function longestEligibleAlternative(
+  chosen: SleepNightCandidate,
+  eligible: readonly SleepNightCandidate[],
+): SleepNightCandidate | null {
+  const others = eligible.filter((item) => item !== chosen && item.totalSleepMinutes != null)
+  if (others.length === 0) {
+    return null
+  }
+  return pickLongestThenPriority(others)
 }
 
 export function arbitrateSleepNight(candidates: readonly SleepNightCandidate[]): SleepArbitrationDecision {
   const sleepDate = candidates[0]?.sleepDate ?? ''
-  const actual = usableActual(candidates)
-  const selected = pickPreferred(actual) ?? pickPreferred(usableInBed(candidates))
+  const eligible = ofStatus(candidates, 'analysis_eligible')
+  const partial = ofStatus(candidates, 'partial_observation')
+  const inBed = ofStatus(candidates, 'in_bed_only')
+
+  let selected: SleepNightCandidate | null = null
+  let selectionReason: SleepSelectionReason | 'none' = 'none'
+  let completenessOverride = false
+
+  if (eligible.length > 0) {
+    const provisional = pickBySourcePriority(eligible)!
+    const longer = longestEligibleAlternative(provisional, eligible)
+    if (
+      longer?.totalSleepMinutes != null &&
+      provisional.totalSleepMinutes != null &&
+      meetsCompletenessOverride(provisional.totalSleepMinutes, longer.totalSleepMinutes)
+    ) {
+      selected = longer
+      selectionReason = 'completeness_override'
+      completenessOverride = true
+    } else {
+      selected = provisional
+      selectionReason = 'source_priority'
+    }
+  } else if (partial.length > 0) {
+    selected = pickLongestThenPriority(partial)
+    selectionReason = 'partial_only'
+  } else if (inBed.length > 0) {
+    selected = pickBySourcePriority(inBed)
+    selectionReason = 'in_bed_only'
+  }
+
   const alternatives = selected ? candidates.filter((item) => item !== selected) : [...candidates]
-  const topPriorityAbsent = !candidates.some((item) => item.sourceId === SLEEP_SOURCE_PRIORITY[0])
+  const observationStatus = selected ? classifySleepObservation(selected) : null
+  const analysisEligible = observationStatus === 'analysis_eligible'
   const longestAlternativeMinutes = alternatives.reduce<number | null>((current, item) => {
     if (item.totalSleepMinutes == null) {
       return current
     }
     return current == null || item.totalSleepMinutes > current ? item.totalSleepMinutes : current
   }, null)
+
   return {
     sleepDate,
     selected,
     alternatives,
-    reason: selected?.hasActualSleep ? 'actual_sleep_priority' : selected ? 'in_bed_only' : 'none',
-    topPriorityAbsent,
-    suspiciousPartialPreferred: selected ? isSuspiciousPartialPreferred(selected, alternatives) : false,
+    observationStatus,
+    analysisEligible,
+    stageAnalysisEligible: selected
+      ? isStageAnalysisEligible({
+          analysisEligible,
+          stageCoveragePct: selected.stageCoveragePct,
+          stageConflictMinutes: selected.stageConflictMinutes,
+        })
+      : false,
+    selectionReason,
+    topPriorityAbsent: !candidates.some((item) => item.sourceId === SLEEP_SOURCE_PRIORITY[0]),
+    completenessOverride,
+    suspiciousPartialPreferred: completenessOverride || (selected ? isSuspiciousPartialPreferred(selected, alternatives) : false),
     longestAlternativeMinutes,
     chosenRatio:
       selected?.totalSleepMinutes != null && longestAlternativeMinutes != null && longestAlternativeMinutes > 0

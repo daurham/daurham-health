@@ -100,6 +100,7 @@ describe('nutrition daily UX source', () => {
     const panels = readFileSync('src/features/nutrition/panels.tsx', 'utf8')
     const layout = readFileSync('src/components/Layout.tsx', 'utf8')
     expect(page).toContain('Add food')
+    expect(page).toContain('grid-cols-[minmax(0,1fr)]')
     expect(page).toContain('md:grid-cols-[minmax(0,1fr)_22rem]')
     expect(page).toContain("bottom: 'calc(var(--shell-nav-offset) + 1rem)'")
     expect(page).toContain('pb-[var(--shell-action-bar)]')

@@ -8,7 +8,7 @@ export function PendingLoadRegion({
   children: React.ReactNode
 }) {
   return (
-    <div className="relative" aria-busy={pending || undefined}>
+    <div className="relative min-w-0" aria-busy={pending || undefined}>
       {pendingVisible ? (
         <div
           className="absolute inset-x-0 top-0 z-10 h-0.5 overflow-hidden bg-zinc-200"

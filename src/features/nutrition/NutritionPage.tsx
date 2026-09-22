@@ -273,7 +273,7 @@ export function NutritionPage() {
   const navBase = resource.pendingKey ?? intentDate
 
   return (
-    <section className="space-y-4 pb-[var(--shell-action-bar)] md:pb-0">
+    <section className="w-full min-w-0 space-y-4 pb-[var(--shell-action-bar)] md:pb-0">
       <DayNav
         date={date}
         today={today}
@@ -334,12 +334,12 @@ export function NutritionPage() {
         resource.error ? null : <p className="text-sm text-zinc-600">Loading…</p>
       ) : (
         <PendingLoadRegion pending={pending} pendingVisible={resource.pendingVisible}>
-          <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_22rem] md:items-start">
-            <aside className="space-y-4 md:order-2 md:sticky md:top-4">
+          <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-[minmax(0,1fr)_22rem] md:items-start">
+            <aside className="min-w-0 space-y-4 md:order-2 md:sticky md:top-4">
               <SummaryCard day={day} onSetTargets={() => setPanel({ kind: 'targets' })} />
               <QuickAddCard recents={day.quickAdd.recents} onAdd={() => setPanel({ kind: 'add' })} onQuickLog={(food) => void quickLog(food)} />
             </aside>
-            <div className="space-y-4 md:order-1">
+            <div className="min-w-0 space-y-4 md:order-1">
               <EntryList
                 groups={groups}
                 empty={day.entries.length === 0}
@@ -584,7 +584,7 @@ function DayNav({
 function SummaryCard({ day, onSetTargets }: { day: NutritionDayPayload; onSetTargets: () => void }) {
   const target = day.targets
   return (
-    <section className="rounded-xl border border-zinc-200 bg-white p-4">
+    <section className="min-w-0 max-w-full rounded-xl border border-zinc-200 bg-white p-4">
       <MacroProgressRow
         label="Calories"
         total={day.totals.calories}
@@ -626,7 +626,7 @@ function MacroProgressRow({
   return (
     <div className={secondary ? 'opacity-90' : undefined}>
       <div className="flex items-baseline justify-between gap-3">
-        <div>
+        <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{label}</p>
           <p className={emphasize ? 'mt-1 text-2xl font-semibold tracking-tight' : 'mt-1 text-lg font-medium'}>
             {macroHeadline(total, target, unit)}
@@ -702,9 +702,9 @@ function EntryRowButton({ entry, onOpen }: { entry: NutritionEntry; onOpen: (ent
     <button
       type="button"
       onClick={() => onOpen(entry)}
-      className="flex min-h-14 w-full items-center justify-between gap-3 px-4 py-3 text-left"
+      className="flex min-h-14 w-full min-w-0 items-center justify-between gap-3 px-4 py-3 text-left"
     >
-      <span className="min-w-0">
+      <span className="min-w-0 flex-1">
         <span className="block truncate font-medium">{entry.foodName}</span>
         <span className="block truncate text-sm text-zinc-500">
           {[entry.brand, formatQuantity(entry.servingQuantity, entry.servingUnit)].filter(Boolean).join(' · ')}
@@ -731,9 +731,9 @@ function MealGroupRow({
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}
-        className="flex min-h-14 w-full items-center justify-between gap-3 px-4 py-3 text-left"
+        className="flex min-h-14 w-full min-w-0 items-center justify-between gap-3 px-4 py-3 text-left"
       >
-        <span className="min-w-0">
+        <span className="min-w-0 flex-1">
           <span className="block truncate font-medium">{row.label}</span>
           <span className="block truncate text-sm text-zinc-500">
             {formatKcal(row.calories)}

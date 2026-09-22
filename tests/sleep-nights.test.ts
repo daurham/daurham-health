@@ -1,19 +1,28 @@
 import { describe, expect, it } from 'vitest'
 import { parseWallClockInTimeZone } from '../src/domain/time.ts'
+import { UPSERT_SLEEP_NIGHTLY_SUMMARY_SQL } from '../server/sleep/queries.ts'
 import {
+  MIN_ANALYSIS_SLEEP_MINUTES,
+  MIN_STAGE_COVERAGE_PCT,
+  SLEEP_NIGHT_CALCULATION_VERSION,
   SLEEP_SESSION_GAP_MINUTES,
   arbitrateSleepNight,
+  arbitrateSleepNights,
   classifySleepIntervals,
-  isSuspiciousPartialPreferred,
+  classifySleepObservation,
   logicalSleepSource,
+  meetsCompletenessOverride,
   normalizeSleepAnalyticsCategory,
   sessionizeSleepEpisodes,
   sleepDateFromEnd,
   sleepNightCandidates,
+  sleepNightSemanticPayload,
+  sleepNightlySummariesFromDecisions,
   sleepRangeSummary,
   sleepShortTermChange,
   type SleepIntervalRow,
   type SleepNightCandidate,
+  type SleepNightlySummary,
 } from '../src/domain/sleep/index.ts'
 
 function phoenix(monthDayYear: string, clock: string): string {
@@ -39,6 +48,10 @@ function interval(
 
 function nights(rows: SleepIntervalRow[]) {
   return sleepNightCandidates(classifySleepIntervals(rows))
+}
+
+function summaries(rows: SleepIntervalRow[]): SleepNightlySummary[] {
+  return sleepNightlySummariesFromDecisions(arbitrateSleepNights(nights(rows)))
 }
 
 function nightOn(rows: SleepIntervalRow[], date: string, sourceId?: string): SleepNightCandidate {
@@ -235,11 +248,12 @@ describe('sleep source arbitration', () => {
     const candidates = nights(rows)
     expect(candidates).toHaveLength(2)
     const decision = arbitrateSleepNight(candidates)
-    expect(decision.selected?.sourceId).toBe('apple_watch')
-    expect(decision.selected?.totalSleepMinutes).toBe(120)
-    expect(decision.selected?.remMinutes).toBeNull()
+    expect(decision.selected?.sourceId).toBe('circular')
+    expect(decision.selected?.totalSleepMinutes).toBe(480)
+    expect(decision.selected?.coreMinutes).toBeNull()
     expect(decision.alternatives).toHaveLength(1)
-    expect(decision.alternatives[0]?.sourceId).toBe('circular')
+    expect(decision.alternatives[0]?.sourceId).toBe('apple_watch')
+    expect(decision.alternatives[0]?.totalSleepMinutes).toBe(120)
   })
 
   it('selects the preferred source when it has actual sleep', () => {
@@ -266,7 +280,8 @@ describe('sleep source arbitration', () => {
       ]),
     )
     expect(decision.selected?.sourceName).toBe('Apple Watch')
-    expect(decision.reason).toBe('actual_sleep_priority')
+    expect(decision.selectionReason).toBe('source_priority')
+    expect(decision.observationStatus).toBe('analysis_eligible')
     expect(decision.topPriorityAbsent).toBe(false)
   })
 
@@ -288,6 +303,7 @@ describe('sleep source arbitration', () => {
       ]),
     )
     expect(decision.selected?.sourceName).toBe('Circular')
+    expect(decision.selectionReason).toBe('source_priority')
     expect(decision.topPriorityAbsent).toBe(true)
   })
 
@@ -310,46 +326,17 @@ describe('sleep source arbitration', () => {
     )
     expect(decision.selected?.sourceName).toBe('Circular')
     expect(decision.selected?.hasActualSleep).toBe(true)
-    expect(decision.reason).toBe('actual_sleep_priority')
-  })
-
-  it('flags a suspicious partial preferred source without changing the selection', () => {
-    const candidates = nights([
-      interval({
-        startAt: phoenix('09/21/2026', '23:00:00'),
-        endAt: phoenix('09/22/2026', '00:40:00'),
-        stage: 'core',
-        sourceName: "Jacob's Apple Watch",
-      }),
-      interval({
-        startAt: phoenix('09/21/2026', '22:45:00'),
-        endAt: phoenix('09/22/2026', '06:00:00'),
-        stage: 'asleep',
-        sourceName: 'Circular',
-      }),
-    ])
-    const decision = arbitrateSleepNight(candidates)
-    expect(decision.selected?.sourceName).toBe('Apple Watch')
-    expect(decision.selected?.totalSleepMinutes).toBe(100)
-    expect(decision.suspiciousPartialPreferred).toBe(true)
-    expect(decision.longestAlternativeMinutes).toBe(435)
-    expect(decision.chosenRatio).toBeCloseTo(100 / 435)
-    expect(isSuspiciousPartialPreferred(decision.selected!, decision.alternatives)).toBe(true)
+    expect(decision.selectionReason).toBe('source_priority')
+    expect(decision.observationStatus).toBe('analysis_eligible')
   })
 })
 
 describe('sleep range analytics', () => {
   it('averages only nights where the metric is observed and leaves missing NULL', () => {
-    const finalized: SleepNightCandidate[] = [
-      nightOn(
-        [interval({ startAt: phoenix('09/20/2026', '23:00:00'), endAt: phoenix('09/21/2026', '07:00:00'), stage: 'core' })],
-        '2026-09-21',
-      ),
-      nightOn(
-        [interval({ startAt: phoenix('09/21/2026', '23:00:00'), endAt: phoenix('09/22/2026', '07:00:00'), stage: 'in_bed' })],
-        '2026-09-22',
-      ),
-    ]
+    const finalized = summaries([
+      interval({ startAt: phoenix('09/20/2026', '23:00:00'), endAt: phoenix('09/21/2026', '07:00:00'), stage: 'core' }),
+      interval({ startAt: phoenix('09/21/2026', '23:00:00'), endAt: phoenix('09/22/2026', '07:00:00'), stage: 'in_bed' }),
+    ])
     const summary = sleepRangeSummary(finalized, '2026-09-21', '2026-09-22')
     expect(summary.calendarNights).toBe(2)
     expect(summary.observedSleepNights).toBe(1)
@@ -375,7 +362,292 @@ describe('sleep range analytics', () => {
         }),
       )
     }
-    const change = sleepShortTermChange(nights(rows))
+    const change = sleepShortTermChange(summaries(rows))
     expect(change.totalSleep.status).toBe('insufficient_data')
   })
+
+  it('does not count partial nights toward coverage, average sleep, or 7d comparison', () => {
+    const rows = [
+      interval({
+        startAt: phoenix('09/20/2026', '23:00:00'),
+        endAt: phoenix('09/21/2026', '07:00:00'),
+        stage: 'asleep',
+      }),
+      interval({
+        startAt: phoenix('09/21/2026', '23:00:00'),
+        endAt: phoenix('09/22/2026', '01:00:00'),
+        stage: 'asleep',
+      }),
+    ]
+    const finalized = summaries(rows)
+    expect(finalized.map((item) => item.observationStatus)).toEqual(['analysis_eligible', 'partial_observation'])
+    const summary = sleepRangeSummary(finalized, '2026-09-21', '2026-09-22')
+    expect(summary.observedSleepNights).toBe(1)
+    if (summary.averageTotalSleepMinutes.status === 'available') {
+      expect(summary.averageTotalSleepMinutes.value).toBe(480)
+    }
+
+    const windowRows: SleepIntervalRow[] = []
+    for (let day = 1; day <= 8; day += 1) {
+      windowRows.push(
+        interval({
+          startAt: phoenix(`09/${String(day).padStart(2, '0')}/2026`, '23:00:00'),
+          endAt: phoenix(`09/${String(day + 1).padStart(2, '0')}/2026`, day <= 4 ? '01:00:00' : '07:00:00'),
+          stage: 'asleep',
+        }),
+      )
+    }
+    const change = sleepShortTermChange(summaries(windowRows))
+    expect(change.totalSleep.status).toBe('insufficient_data')
+    expect(change.previousDates).toHaveLength(0)
+  })
 })
+
+describe('sleep completeness and frozen arbitration', () => {
+  it('treats under 240 minutes as partial and exactly 240 as analysis eligible', () => {
+    expect(MIN_ANALYSIS_SLEEP_MINUTES).toBe(240)
+    expect(classifySleepObservation({ totalSleepMinutes: 239, timeInBedMinutes: null })).toBe('partial_observation')
+    expect(classifySleepObservation({ totalSleepMinutes: 240, timeInBedMinutes: null })).toBe('analysis_eligible')
+    const partial = summaries([
+      interval({ startAt: phoenix('09/21/2026', '23:00:00'), endAt: phoenix('09/22/2026', '02:59:00'), stage: 'asleep' }),
+    ])[0]
+    const eligible = summaries([
+      interval({ startAt: phoenix('09/21/2026', '23:00:00'), endAt: phoenix('09/22/2026', '03:00:00'), stage: 'asleep' }),
+    ])[0]
+    expect(partial?.observationStatus).toBe('partial_observation')
+    expect(partial?.analysisEligible).toBe(false)
+    expect(partial?.selectionReason).toBe('partial_only')
+    expect(eligible?.observationStatus).toBe('analysis_eligible')
+    expect(eligible?.analysisEligible).toBe(true)
+    expect(eligible?.totalSleepMinutes).toBe(240)
+  })
+
+  it('does not let a partial preferred source beat an eligible alternative', () => {
+    const decision = arbitrateSleepNight(
+      nights([
+        interval({
+          startAt: phoenix('09/21/2026', '23:00:00'),
+          endAt: phoenix('09/22/2026', '00:40:00'),
+          stage: 'core',
+          sourceName: "Jacob's Apple Watch",
+        }),
+        interval({
+          startAt: phoenix('09/21/2026', '22:45:00'),
+          endAt: phoenix('09/22/2026', '06:00:00'),
+          stage: 'asleep',
+          sourceName: 'Circular',
+        }),
+      ]),
+    )
+    expect(decision.selected?.sourceName).toBe('Circular')
+    expect(decision.selected?.totalSleepMinutes).toBe(435)
+    expect(decision.selectionReason).toBe('source_priority')
+    expect(decision.analysisEligible).toBe(true)
+  })
+
+  it('applies completeness override only when both thresholds are met', () => {
+    const override = arbitrateSleepNight(
+      nights([
+        interval({
+          startAt: phoenix('04/01/2021', '23:00:00'),
+          endAt: phoenix('04/02/2021', '04:02:00'),
+          stage: 'asleep',
+          sourceName: "Jacob's Apple Watch",
+        }),
+        interval({
+          startAt: phoenix('04/01/2021', '22:00:00'),
+          endAt: phoenix('04/02/2021', '07:16:00'),
+          stage: 'asleep',
+          sourceName: 'Sleep Cycle',
+        }),
+      ]),
+    )
+    expect(override.selected?.sourceName).toBe('Sleep Cycle')
+    expect(override.selectionReason).toBe('completeness_override')
+    expect(override.completenessOverride).toBe(true)
+    expect(meetsCompletenessOverride(302, 556)).toBe(true)
+
+    const ratioOnly = arbitrateSleepNight(
+      nights([
+        interval({
+          startAt: phoenix('09/21/2026', '23:00:00'),
+          endAt: phoenix('09/22/2026', '05:00:00'),
+          stage: 'asleep',
+          sourceName: "Jacob's Apple Watch",
+        }),
+        interval({
+          startAt: phoenix('09/21/2026', '22:00:00'),
+          endAt: phoenix('09/22/2026', '06:30:00'),
+          stage: 'asleep',
+          sourceName: 'Circular',
+        }),
+      ]),
+    )
+    expect(ratioOnly.selected?.sourceName).toBe('Apple Watch')
+    expect(ratioOnly.selectionReason).toBe('source_priority')
+    expect(meetsCompletenessOverride(360, 510)).toBe(false)
+
+    const diffOnly = arbitrateSleepNight(
+      nights([
+        interval({
+          startAt: phoenix('09/21/2026', '23:00:00'),
+          endAt: phoenix('09/22/2026', '04:20:00'),
+          stage: 'asleep',
+          sourceName: "Jacob's Apple Watch",
+        }),
+        interval({
+          startAt: phoenix('09/21/2026', '23:00:00'),
+          endAt: phoenix('09/22/2026', '05:40:00'),
+          stage: 'asleep',
+          sourceName: 'Circular',
+        }),
+      ]),
+    )
+    expect(diffOnly.selected?.sourceName).toBe('Apple Watch')
+    expect(diffOnly.selectionReason).toBe('source_priority')
+    expect(meetsCompletenessOverride(320, 400)).toBe(false)
+  })
+
+  it('selects the longest partial when no eligible source exists, using source priority on ties', () => {
+    const longest = arbitrateSleepNight(
+      nights([
+        interval({
+          startAt: phoenix('09/21/2026', '23:00:00'),
+          endAt: phoenix('09/22/2026', '01:00:00'),
+          stage: 'asleep',
+          sourceName: "Jacob's Apple Watch",
+        }),
+        interval({
+          startAt: phoenix('09/21/2026', '23:00:00'),
+          endAt: phoenix('09/22/2026', '02:00:00'),
+          stage: 'asleep',
+          sourceName: 'Circular',
+        }),
+      ]),
+    )
+    expect(longest.selected?.sourceName).toBe('Circular')
+    expect(longest.selectionReason).toBe('partial_only')
+    expect(longest.analysisEligible).toBe(false)
+    expect(longest.observationStatus).toBe('partial_observation')
+
+    const tied = arbitrateSleepNight(
+      nights([
+        interval({
+          startAt: phoenix('09/21/2026', '23:00:00'),
+          endAt: phoenix('09/22/2026', '01:00:00'),
+          stage: 'asleep',
+          sourceName: 'Circular',
+        }),
+        interval({
+          startAt: phoenix('09/21/2026', '23:30:00'),
+          endAt: phoenix('09/22/2026', '01:30:00'),
+          stage: 'asleep',
+          sourceName: "Jacob's Apple Watch",
+        }),
+      ]),
+    )
+    expect(tied.selected?.sourceName).toBe('Apple Watch')
+    expect(tied.selectionReason).toBe('partial_only')
+  })
+
+  it('falls back to preferred In-Bed-only when there is no actual sleep', () => {
+    const decision = arbitrateSleepNight(
+      nights([
+        interval({
+          startAt: phoenix('09/21/2026', '23:00:00'),
+          endAt: phoenix('09/22/2026', '07:00:00'),
+          stage: 'in_bed',
+          sourceName: 'iPhone',
+        }),
+        interval({
+          startAt: phoenix('09/21/2026', '23:00:00'),
+          endAt: phoenix('09/22/2026', '06:00:00'),
+          stage: 'in_bed',
+          sourceName: "Jacob's Apple Watch",
+        }),
+      ]),
+    )
+    expect(decision.selected?.sourceName).toBe('Apple Watch')
+    expect(decision.selectionReason).toBe('in_bed_only')
+    expect(decision.observationStatus).toBe('in_bed_only')
+    expect(decision.selected?.totalSleepMinutes).toBeNull()
+    expect(decision.analysisEligible).toBe(false)
+  })
+
+  it('excludes stage coverage below 90% and exclusive-stage conflicts from stage analytics', () => {
+    expect(MIN_STAGE_COVERAGE_PCT).toBe(90)
+    const lowCoverage = summaries([
+      interval({ startAt: phoenix('09/21/2026', '23:00:00'), endAt: phoenix('09/22/2026', '03:00:00'), stage: 'core' }),
+      interval({ startAt: phoenix('09/22/2026', '03:00:00'), endAt: phoenix('09/22/2026', '07:00:00'), stage: 'asleep' }),
+    ])[0]
+    expect(lowCoverage?.analysisEligible).toBe(true)
+    expect(lowCoverage?.stageCoveragePct).toBe(50)
+    expect(lowCoverage?.stageAnalysisEligible).toBe(false)
+
+    const highCoverage = summaries([
+      interval({ startAt: phoenix('09/21/2026', '23:00:00'), endAt: phoenix('09/22/2026', '06:12:00'), stage: 'core' }),
+      interval({ startAt: phoenix('09/22/2026', '06:12:00'), endAt: phoenix('09/22/2026', '07:00:00'), stage: 'asleep' }),
+    ])[0]
+    expect(highCoverage?.stageCoveragePct).toBe(90)
+    expect(highCoverage?.stageAnalysisEligible).toBe(true)
+
+    const conflict = summaries([
+      interval({ startAt: phoenix('09/21/2026', '23:00:00'), endAt: phoenix('09/22/2026', '06:00:00'), stage: 'core' }),
+      interval({ startAt: phoenix('09/22/2026', '05:00:00'), endAt: phoenix('09/22/2026', '07:00:00'), stage: 'deep' }),
+    ])[0]
+    expect(conflict?.analysisEligible).toBe(true)
+    expect(conflict?.stageConflictMinutes).toBeGreaterThan(0)
+    expect(conflict?.stageAnalysisEligible).toBe(false)
+
+    const range = sleepRangeSummary(
+      [lowCoverage, highCoverage, conflict].filter((item): item is SleepNightlySummary => item != null),
+      '2026-09-22',
+      '2026-09-22',
+    )
+    expect(range.averageCoreMinutes.status).toBe('available')
+    if (range.averageCoreMinutes.status === 'available') {
+      expect(range.averageCoreMinutes.observations).toBe(1)
+      expect(range.averageCoreMinutes.value).toBe(highCoverage?.coreMinutes)
+    }
+  })
+
+  it('persists logical source independently of data_sources.id', () => {
+    const night = summaries([
+      interval({
+        startAt: phoenix('09/21/2026', '23:00:00'),
+        endAt: phoenix('09/22/2026', '07:00:00'),
+        stage: 'asleep',
+        sourceId: 'apple_health',
+        sourceName: "Jacob’s Apple Watch",
+        deviceName: '<<HKDevice: 0x999, softwareVersion:12.1>>',
+      }),
+    ])[0]
+    expect(night?.logicalSourceKey).toBe('apple_watch')
+    expect(night?.sourceName).toBe('Apple Watch')
+    expect(night?.evidence.selectedLogicalSource).toBe('apple_watch')
+    expect(night?.calculationVersion).toBe(SLEEP_NIGHT_CALCULATION_VERSION)
+  })
+
+  it('materializes the same nightly payload on a second run', () => {
+    const rows = [
+      interval({
+        startAt: phoenix('09/21/2026', '23:00:00'),
+        endAt: phoenix('09/22/2026', '07:00:00'),
+        stage: 'asleep',
+        sourceName: "Jacob's Apple Watch",
+      }),
+      interval({
+        startAt: phoenix('09/21/2026', '22:00:00'),
+        endAt: phoenix('09/22/2026', '06:00:00'),
+        stage: 'asleep',
+        sourceName: 'Circular',
+      }),
+    ]
+    const first = summaries(rows)
+    const second = summaries(rows)
+    expect(first.map(sleepNightSemanticPayload)).toEqual(second.map(sleepNightSemanticPayload))
+    expect(UPSERT_SLEEP_NIGHTLY_SUMMARY_SQL).toContain('ON CONFLICT (sleep_date, timezone)')
+    expect(first).toHaveLength(1)
+  })
+})
+

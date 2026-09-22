@@ -2,7 +2,7 @@ import { addCalendarDays, inclusiveDayCount } from '../progress/dates.js'
 import { percentChange } from '../progress/statistics.js'
 import { availableMetric, insufficientMetric, type MetricResult } from '../progress/types.js'
 import { SLEEP_SHORT_TERM_MIN_OBSERVED, SLEEP_SHORT_TERM_NIGHTS } from './config.js'
-import type { SleepNightCandidate } from './nights.js'
+import type { SleepNightlySummary } from './summarize.js'
 
 export type SleepRangeSummary = {
   start: string
@@ -35,10 +35,19 @@ function averageOf(values: readonly number[]): MetricResult<number> {
   return availableMetric(values.reduce((sum, item) => sum + item, 0) / values.length, values.length, 'observed_average')
 }
 
-export function sleepRangeSummary(nights: readonly SleepNightCandidate[], start: string, end: string): SleepRangeSummary {
+function eligibleNights(nights: readonly SleepNightlySummary[]): SleepNightlySummary[] {
+  return nights.filter((item) => item.analysisEligible && item.totalSleepMinutes != null)
+}
+
+function stagedNights(nights: readonly SleepNightlySummary[]): SleepNightlySummary[] {
+  return nights.filter((item) => item.stageAnalysisEligible)
+}
+
+export function sleepRangeSummary(nights: readonly SleepNightlySummary[], start: string, end: string): SleepRangeSummary {
   const inRange = nights.filter((item) => item.sleepDate >= start && item.sleepDate <= end)
   const calendarNights = inclusiveDayCount(start, end)
-  const observed = inRange.filter((item) => item.hasActualSleep && item.totalSleepMinutes != null)
+  const observed = eligibleNights(inRange)
+  const staged = stagedNights(inRange)
   return {
     start,
     end,
@@ -49,16 +58,16 @@ export function sleepRangeSummary(nights: readonly SleepNightCandidate[], start:
     averageTimeInBedMinutes: averageOf(
       inRange.filter((item) => item.timeInBedMinutes != null).map((item) => item.timeInBedMinutes!),
     ),
-    averageCoreMinutes: averageOf(inRange.filter((item) => item.coreMinutes != null).map((item) => item.coreMinutes!)),
-    averageDeepMinutes: averageOf(inRange.filter((item) => item.deepMinutes != null).map((item) => item.deepMinutes!)),
-    averageRemMinutes: averageOf(inRange.filter((item) => item.remMinutes != null).map((item) => item.remMinutes!)),
+    averageCoreMinutes: averageOf(staged.filter((item) => item.coreMinutes != null).map((item) => item.coreMinutes!)),
+    averageDeepMinutes: averageOf(staged.filter((item) => item.deepMinutes != null).map((item) => item.deepMinutes!)),
+    averageRemMinutes: averageOf(staged.filter((item) => item.remMinutes != null).map((item) => item.remMinutes!)),
   }
 }
 
-export function sleepShortTermChange(nights: readonly SleepNightCandidate[]): SleepShortTermChange {
-  const observed = [...nights]
-    .filter((item) => item.hasActualSleep && item.totalSleepMinutes != null)
-    .sort((left, right) => right.sleepDate.localeCompare(left.sleepDate) || left.sourceId.localeCompare(right.sourceId))
+export function sleepShortTermChange(nights: readonly SleepNightlySummary[]): SleepShortTermChange {
+  const observed = [...eligibleNights(nights)].sort(
+    (left, right) => right.sleepDate.localeCompare(left.sleepDate) || left.logicalSourceKey.localeCompare(right.logicalSourceKey),
+  )
   const current = observed.slice(0, SLEEP_SHORT_TERM_NIGHTS)
   const previous = observed.slice(SLEEP_SHORT_TERM_NIGHTS, SLEEP_SHORT_TERM_NIGHTS * 2)
   if (current.length < SLEEP_SHORT_TERM_MIN_OBSERVED || previous.length < SLEEP_SHORT_TERM_MIN_OBSERVED) {

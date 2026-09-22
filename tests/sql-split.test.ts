@@ -100,6 +100,15 @@ describe('splitSqlStatements', () => {
     expect(activitySleep[0]).toMatch(/^CREATE TABLE activity_samples/)
     expect(activitySleep[3]).toMatch(/^CREATE TABLE sleep_intervals/)
     expect(activitySleep[6]).toMatch(/^CREATE TABLE activity_workouts/)
+    const nightly = splitSqlStatements(
+      readFileSync(path.join('migrations', '0016_sleep_nightly_summaries.sql'), 'utf8'),
+    )
+    expect(nightly).toHaveLength(3)
+    expect(nightly[0]).toMatch(/^CREATE TABLE sleep_nightly_summaries/)
+    expect(nightly[0]).toContain('logical_source_key TEXT NOT NULL')
+    expect(nightly[0]).toContain('UNIQUE (sleep_date, timezone)')
+    expect(nightly[1]).toMatch(/^CREATE INDEX sleep_nightly_summaries_eligible_date_idx/)
+    expect(nightly[2]).toMatch(/^CREATE INDEX sleep_nightly_summaries_import_job_idx/)
     const daily = splitSqlStatements(
       readFileSync(path.join('migrations', '0013_activity_daily_summaries.sql'), 'utf8'),
     )

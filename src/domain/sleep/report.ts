@@ -166,7 +166,7 @@ export function buildSleepDiagnosticReport(rows: readonly SleepIntervalRow[]): S
       selectedSourceDistribution,
       fallbackSourceDistribution,
       topPriorityAbsent: decisions.filter((item) => item.topPriorityAbsent).length,
-      suspiciousPartialPreferred: decisions.filter((item) => item.suspiciousPartialPreferred).length,
+      suspiciousPartialPreferred: decisions.filter((item) => item.completenessOverride || item.suspiciousPartialPreferred).length,
     },
     stages: {
       coverage,
