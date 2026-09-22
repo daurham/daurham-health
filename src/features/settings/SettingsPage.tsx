@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import { parseAppleHealthFile, previewAppleHealth } from '@/domain/apple-health'
+import { healthCalendarDateFromNow } from '@/domain/time'
+import { healthFetch, readApiError } from '@/lib'
 import type { AppleHealthPreview } from '@/domain/apple-health/preview'
 import {
   commitAppleHealthRecords,
@@ -64,6 +66,7 @@ export function SettingsPage() {
   const [busy, setBusy] = useState<'preview' | 'commit' | null>(null)
   const [progress, setProgress] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [exporting, setExporting] = useState(false)
 
   async function reloadStatus() {
     setStatus(await fetchAppleHealthStatus())
@@ -130,6 +133,29 @@ export function SettingsPage() {
     }
   }
 
+  async function onExport() {
+    setError(null)
+    setExporting(true)
+    try {
+      const response = await healthFetch('/api/backup/export')
+      if (!response.ok) {
+        throw new Error(await readApiError(response))
+      }
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      const profile = response.headers.get('X-Health-Backup-Profile') === 'portable' ? 'portable' : 'full'
+      link.download = `health-${profile}-${healthCalendarDateFromNow()}.health-backup.zip`
+      link.click()
+      URL.revokeObjectURL(url)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Could not export Health data')
+    } finally {
+      setExporting(false)
+    }
+  }
+
   const job = status?.job
 
   return (
@@ -138,6 +164,25 @@ export function SettingsPage() {
         <h1 className="text-xl font-semibold tracking-tight">Settings</h1>
         <p className="mt-1 text-sm text-zinc-600">Owner data sources. Apple Health is not a primary Health destination.</p>
       </div>
+
+      <section className="space-y-3 rounded-lg border border-zinc-200 bg-white p-4">
+        <h2 className="text-base font-semibold">Data & Backup</h2>
+        <p className="text-sm text-zinc-600">This export contains private health information.</p>
+        <p className="text-sm text-zinc-600">
+          The download stays on this device. Passwords and API keys are not included. A very large archive downloads
+          as a portable copy; the command-line backup remains the full recovery file.
+        </p>
+        <button
+          type="button"
+          onClick={() => {
+            void onExport()
+          }}
+          disabled={exporting}
+          className="inline-flex min-h-11 items-center justify-center rounded-md bg-zinc-900 px-4 text-sm font-medium text-white disabled:opacity-50"
+        >
+          {exporting ? 'Preparing export…' : 'Export my Health data'}
+        </button>
+      </section>
 
       <section className="space-y-4 rounded-lg border border-zinc-200 bg-white p-4">
         <div>

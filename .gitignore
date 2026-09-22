@@ -30,6 +30,8 @@ dist-ssr
 .vercel
 .env*.local
 
-# Local personal data — never commit workbooks or copies
+# Local personal data — never commit workbooks, exports, or copies
 fixtures/
 *.xlsx
+*.health-backup.zip
+backups/

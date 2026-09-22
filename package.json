@@ -17,6 +17,9 @@
     "sleep:analyze": "tsx server/sleep/analyze-cli.ts",
     "intelligence:analyze": "tsx server/intelligence/analyze-cli.ts",
     "sleep:backfill": "tsx server/sleep/backfill-cli.ts",
+    "backup:create": "tsx server/backup/cli.ts create",
+    "backup:verify": "tsx server/backup/cli.ts verify",
+    "backup:restore": "tsx server/backup/cli.ts restore",
     "test": "vitest run"
   },
   "dependencies": {
