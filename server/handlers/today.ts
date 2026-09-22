@@ -1,0 +1,16 @@
+import { getTodayView } from '../today/service.js'
+import { withOwnerAuth } from '../auth/with-owner.js'
+import { handleApiError, sendJson, type ApiRequest, type ApiResponse } from '../http.js'
+
+export default withOwnerAuth(async function todayHandler(req: ApiRequest, res: ApiResponse) {
+  try {
+    if (req.method !== 'GET') {
+      res.setHeader('Allow', 'GET')
+      sendJson(res, 405, { error: 'Method not allowed' })
+      return
+    }
+    sendJson(res, 200, await getTodayView())
+  } catch (error) {
+    handleApiError(res, error)
+  }
+})

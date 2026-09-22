@@ -352,10 +352,23 @@ export async function updateFood(values: unknown[]): Promise<NutritionFood | nul
   })
 }
 
+export const LIST_ENTRIES_BETWEEN_SQL = `SELECT ${ENTRY_COLUMNS}
+         FROM nutrition_entries
+         WHERE log_date >= $1 AND log_date <= $2
+         ORDER BY log_date ASC, consumed_at NULLS LAST, created_at ASC, id ASC`
+
 export async function listEntriesForDate(date: string): Promise<NutritionEntry[]> {
   return queryOrUnavailable(async () => {
     const sql = await getSql()
     const rows = (await sql.query(LIST_ENTRIES_FOR_DATE_SQL, [date])) as EntryRow[]
+    return rows.map(mapEntryRow)
+  })
+}
+
+export async function listEntriesBetween(start: string, end: string): Promise<NutritionEntry[]> {
+  return queryOrUnavailable(async () => {
+    const sql = await getSql()
+    const rows = (await sql.query(LIST_ENTRIES_BETWEEN_SQL, [start, end])) as EntryRow[]
     return rows.map(mapEntryRow)
   })
 }
