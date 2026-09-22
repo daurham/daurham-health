@@ -53,7 +53,7 @@ describe('Gemini nutrition interpretation', () => {
     expect(candidate.proteinGrams).toBe(48)
     expect(candidate.status).toBe('review_required')
     expect(schemaMentionsNutrientTotals(GEMINI_MEAL_RESPONSE_SCHEMA)).toBe(true)
-    expect(schemaMentionsNutrientTotals(GEMINI_DESCRIPTION_RESPONSE_SCHEMA)).toBe(false)
+    expect(schemaMentionsNutrientTotals(GEMINI_DESCRIPTION_RESPONSE_SCHEMA)).toBe(true)
     expect(schemaMentionsNutrientTotals(GEMINI_LABEL_RESPONSE_SCHEMA)).toBe(true)
   })
 
@@ -101,24 +101,29 @@ describe('Gemini nutrition interpretation', () => {
     expect(candidate.calories).toBe(520)
   })
 
-  it('extracts a food description without nutrition and preserves ambiguity', () => {
+  it('estimates description components and lets Health sum the totals', () => {
     const candidate = interpretFoodDescriptionResponse(
       JSON.stringify({
-        components: [
-          { proposedName: 'wagyu beef', quantity: 0.5, unit: 'lb', preparation: null, ambiguity: null, calories: 900 },
-          { proposedName: 'onion', quantity: 0.25, unit: 'whole', preparation: 'diced', ambiguity: 'onion size is unspecified' },
-          { proposedName: 'broccoli', quantity: 1, unit: 'cup', preparation: null, ambiguity: null },
+        name: 'Wagyu beef with onion and broccoli',
+        items: [
+          { name: 'ground wagyu beef', quantity: 0.5, unit: 'lb', estimatedGrams: 227, calories: 650, proteinGrams: 45, carbsGrams: 0, fatGrams: 50, fiberGrams: 0 },
+          { name: 'diced onion', quantity: 0.25, unit: 'medium onion', estimatedGrams: 28, calories: 12, proteinGrams: 0, carbsGrams: 3, fatGrams: 0, fiberGrams: 1, assumption: 'quarter medium onion' },
+          { name: 'broccoli', quantity: 1, unit: 'cup', estimatedGrams: 90, calories: 31, proteinGrams: 3, carbsGrams: 6, fatGrams: 0, fiberGrams: 2 },
         ],
+        assumptions: [],
+        calories: 9999,
       }),
-      'half a lb of wagyu beef, a quarter of diced onion and a cup of broccoli',
+      'half a lb of ground wagyu beef, a quarter of diced onion and a cup of broccoli',
     )
-    expect(candidate.components.map((item) => [item.proposedName, item.quantity, item.unit])).toEqual([
-      ['wagyu beef', 0.5, 'lb'],
-      ['onion', 0.25, 'whole'],
+    expect(candidate.items.map((item) => [item.name, item.quantity, item.unit])).toEqual([
+      ['ground wagyu beef', 0.5, 'lb'],
+      ['diced onion', 0.25, 'medium onion'],
       ['broccoli', 1, 'cup'],
     ])
-    expect(candidate.components[1]?.ambiguity).toMatch(/onion size/i)
-    expect(candidate.components[0]).not.toHaveProperty('calories')
+    expect(candidate.items[1]?.assumption).toMatch(/quarter medium onion/i)
+    expect(candidate.calories).toBe(695)
+    expect(candidate.proteinGrams).toBe(48)
+    expect(candidate.calories).not.toBe(9999)
   })
 
   it('keeps visible label numbers when context disagrees and leaves missing fiber null', () => {
@@ -159,7 +164,8 @@ describe('Gemini nutrition interpretation', () => {
   it('includes user context in the Gemini prompt and does not enable search grounding', () => {
     expect(mealPhotoPrompt('cauliflower rice with eggs')).toContain('cauliflower rice with eggs')
     expect(mealPhotoPrompt(null)).toContain('estimate total calories')
-    expect(foodDescriptionPrompt('a cup of broccoli')).toContain('Do not calculate nutrition.')
+    expect(foodDescriptionPrompt('a cup of broccoli')).toContain('Keep recognizable composite foods intact')
+    expect(foodDescriptionPrompt('2 slices supreme pizza')).toContain('not crust, sauce, cheese, and toppings')
     expect(nutritionLabelPrompt('12 oz package')).toContain('Do not infer missing numeric nutrients.')
     const client = readFileSync('server/integrations/gemini/client.ts', 'utf8')
     expect(client).not.toContain('googleSearch')
@@ -260,13 +266,14 @@ describe('Gemini nutrition interpretation', () => {
 
   it('normalizes JSON-mode aliases, numeric strings, and fenced JSON without a second formatter', () => {
     const described = interpretFoodDescriptionResponse(
-      '```json\n{"items":[{"food":"wagyu beef","amount":"0.5","unit":"lb","note":""},{"name":"onion","quantity":"quarter onion","unit":"whole","note":"size unspecified"}]}\n```',
+      '```json\n{"name":"Wagyu and onion","items":[{"food":"wagyu beef","amount":"0.5","unit":"lb","calories":650,"proteinGrams":45,"carbsGrams":0,"fatGrams":50,"fiberGrams":0,"note":""},{"name":"onion","quantity":"quarter onion","unit":"whole","calories":12,"protein":0,"carbs":3,"fat":0,"fiber":1,"note":"size unspecified"}]}\n```',
       'half a lb of wagyu beef and a quarter onion',
     )
-    expect(described.components[0]).toMatchObject({ proposedName: 'wagyu beef', quantity: 0.5, unit: 'lb' })
-    expect(described.components[1]?.proposedName).toBe('onion')
-    expect(described.components[1]?.quantity).toBeNull()
-    expect(described.components[1]?.ambiguity).toMatch(/quarter onion|size unspecified/)
+    expect(described.items[0]).toMatchObject({ name: 'wagyu beef', quantity: 0.5, unit: 'lb', calories: 650 })
+    expect(described.items[1]?.name).toBe('onion')
+    expect(described.items[1]?.quantity).toBeNull()
+    expect(described.items[1]?.assumption).toMatch(/quarter onion|size unspecified/)
+    expect(described.calories).toBe(660)
     const meal = interpretMealPhotoResponse(
       JSON.stringify({
         name: 'Eggs and rice',
@@ -298,9 +305,12 @@ describe('Gemini nutrition interpretation', () => {
       labelModel: 'gemini-3.5-flash',
       generate: async (request) => {
         seen.push(`${request.model}:${request.timeoutMs}`)
-        if (request.prompt.startsWith('Extract food components')) {
+        if (request.prompt.startsWith('Interpret the food description')) {
           return fakeGenerate(
-            JSON.stringify({ components: [{ proposedName: 'broccoli', quantity: 1, unit: 'cup' }] }),
+            JSON.stringify({
+              name: 'Broccoli',
+              items: [{ name: 'broccoli', quantity: 1, unit: 'cup', calories: 31, proteinGrams: 3, carbsGrams: 6, fatGrams: 0, fiberGrams: 2 }],
+            }),
           )(request)
         }
         if (request.prompt.startsWith('Extract the visible label')) {

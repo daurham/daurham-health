@@ -146,8 +146,25 @@ export {
   massGrams,
   descriptionPortion,
   descriptionComponentTotals,
+  sanitizeDescriptionEstimate,
+  sumDescriptionEstimateItems,
+  scaleDescriptionItem,
+  canScaleDescriptionItem,
+  formatDescriptionItemPortion,
+  formatNaturalQuantity,
+  reconstructDescriptionText,
+  descriptionEstimateUserAdjusted,
+  commitNutritionDescriptionEstimateRequestSchema,
 } from './describe.js'
-export type { FoodDescriptionComponent, FoodDescriptionCandidate, FoodDescriptionInterpreter } from './describe.js'
+export type {
+  FoodDescriptionComponent,
+  FoodDescriptionCandidate,
+  FoodDescriptionInterpreter,
+  DescriptionEstimateCandidate,
+  DescriptionEstimateItem,
+  DescriptionEstimateInterpreter,
+  CommitNutritionDescriptionEstimateRequest,
+} from './describe.js'
 export {
   NUTRITION_USER_CONTEXT_MAX,
   GEMINI_NUTRITION_MODEL_DEFAULT,

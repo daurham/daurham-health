@@ -1,6 +1,13 @@
+import { z } from 'zod'
 import type { NutrientAmount } from './servings.js'
 import { snapshotFromDefinition } from './servings.js'
 import type { NutritionFood } from './types.js'
+import {
+  mealEstimateNutrients,
+  mealEstimateUserAdjusted,
+  roundMealGrams,
+  type MealEstimateNutrients,
+} from './meal.js'
 
 export type FoodDescriptionComponent = {
   id: string
@@ -341,3 +348,237 @@ export function descriptionComponentTotals(
   }
   return totals
 }
+
+const MASS_UNITS = new Set(['g', 'gram', 'grams', 'kg', 'oz', 'ounce', 'ounces', 'lb', 'lbs', 'pound', 'pounds'])
+
+export const descriptionEstimateItemSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  quantity: z.number().nullable(),
+  unit: z.string().min(1),
+  estimatedGrams: z.number().nullable(),
+  calories: z.number(),
+  proteinGrams: z.number(),
+  carbsGrams: z.number(),
+  fatGrams: z.number(),
+  fiberGrams: z.number().nullable(),
+  assumption: z.string().nullable(),
+})
+export type DescriptionEstimateItem = z.infer<typeof descriptionEstimateItemSchema>
+
+export const descriptionEstimateCandidateSchema = z.object({
+  original: z.string(),
+  name: z.string().min(1),
+  items: z.array(descriptionEstimateItemSchema),
+  assumptions: z.array(z.string()),
+  calories: z.number(),
+  proteinGrams: z.number(),
+  carbsGrams: z.number(),
+  fatGrams: z.number(),
+  fiberGrams: z.number().nullable(),
+  model: z.string().nullable().optional(),
+})
+export type DescriptionEstimateCandidate = z.infer<typeof descriptionEstimateCandidateSchema>
+
+export type DescriptionEstimateInterpreter = {
+  interpret(text: string): DescriptionEstimateCandidate | Promise<DescriptionEstimateCandidate>
+}
+
+export const commitNutritionDescriptionEstimateRequestSchema = z.object({
+  text: z.string().trim().min(1).max(500),
+  logDate: z.string(),
+  timezone: z.string().optional(),
+  meal: z.enum(['breakfast', 'lunch', 'dinner', 'snack', 'other']).nullable().optional(),
+  name: z.string().trim().min(1).max(120),
+  calories: z.number().min(0),
+  proteinGrams: z.number().min(0),
+  carbsGrams: z.number().min(0),
+  fatGrams: z.number().min(0),
+  fiberGrams: z.number().min(0).nullable(),
+  portionScale: z.number().optional(),
+  items: z.array(descriptionEstimateItemSchema).optional(),
+})
+export type CommitNutritionDescriptionEstimateRequest = z.input<typeof commitNutritionDescriptionEstimateRequestSchema>
+
+function asFiniteNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value
+  }
+  if (typeof value === 'string' && /^-?\d+(?:\.\d+)?$/.test(value.trim())) {
+    const parsed = Number(value.trim())
+    return Number.isFinite(parsed) ? parsed : null
+  }
+  return null
+}
+
+function asTrimmed(value: unknown): string | null {
+  if (typeof value !== 'string') {
+    return null
+  }
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed : null
+}
+
+export function descriptionEstimateItemNutrients(item: DescriptionEstimateItem): MealEstimateNutrients {
+  return mealEstimateNutrients({
+    calories: item.calories,
+    proteinGrams: item.proteinGrams,
+    carbsGrams: item.carbsGrams,
+    fatGrams: item.fatGrams,
+    fiberGrams: item.fiberGrams,
+  })
+}
+
+export function sumDescriptionEstimateItems(items: readonly DescriptionEstimateItem[]): MealEstimateNutrients {
+  let calories = 0
+  let proteinGrams = 0
+  let carbsGrams = 0
+  let fatGrams = 0
+  let fiberGrams: number | null = 0
+  for (const item of items) {
+    calories += item.calories
+    proteinGrams += item.proteinGrams
+    carbsGrams += item.carbsGrams
+    fatGrams += item.fatGrams
+    if (item.fiberGrams == null || fiberGrams == null) {
+      fiberGrams = null
+    } else {
+      fiberGrams += item.fiberGrams
+    }
+  }
+  return mealEstimateNutrients({ calories, proteinGrams, carbsGrams, fatGrams, fiberGrams })
+}
+
+export function canScaleDescriptionItem(baseline: DescriptionEstimateItem, quantity: number | null, unit: string): boolean {
+  return (
+    baseline.quantity != null &&
+    baseline.quantity > 0 &&
+    quantity != null &&
+    quantity > 0 &&
+    baseline.unit.trim().toLowerCase() === unit.trim().toLowerCase()
+  )
+}
+
+export function scaleDescriptionItem(
+  baseline: DescriptionEstimateItem,
+  quantity: number | null,
+  unit: string,
+): DescriptionEstimateItem {
+  if (!canScaleDescriptionItem(baseline, quantity, unit)) {
+    return { ...baseline, quantity, unit }
+  }
+  const factor = (quantity as number) / (baseline.quantity as number)
+  return {
+    ...baseline,
+    quantity,
+    unit,
+    estimatedGrams:
+      baseline.estimatedGrams == null ? null : roundMealGrams(baseline.estimatedGrams * factor),
+    calories: Math.max(0, baseline.calories * factor),
+    proteinGrams: Math.max(0, baseline.proteinGrams * factor),
+    carbsGrams: Math.max(0, baseline.carbsGrams * factor),
+    fatGrams: Math.max(0, baseline.fatGrams * factor),
+    fiberGrams: baseline.fiberGrams == null ? null : Math.max(0, baseline.fiberGrams * factor),
+  }
+}
+
+export function formatNaturalQuantity(value: number): string {
+  const fractions: Array<[number, string]> = [
+    [0.25, '¼'],
+    [1 / 3, '⅓'],
+    [0.5, '½'],
+    [2 / 3, '⅔'],
+    [0.75, '¾'],
+  ]
+  for (const [amount, label] of fractions) {
+    if (Math.abs(value - amount) < 0.02) {
+      return label
+    }
+  }
+  if (Number.isInteger(value)) {
+    return String(value)
+  }
+  return String(Math.round(value * 100) / 100)
+}
+
+export function formatDescriptionItemPortion(item: DescriptionEstimateItem): string {
+  const quantity = item.quantity == null ? '' : formatNaturalQuantity(item.quantity)
+  const unit = item.unit.trim()
+  const amount = [quantity, unit].filter(Boolean).join(' ')
+  if (item.estimatedGrams == null) {
+    return amount
+  }
+  const grams = `~${Math.round(item.estimatedGrams)}g`
+  const estimated = MASS_UNITS.has(unit.toLowerCase()) ? grams : `${grams} estimated`
+  return amount ? `${amount} (${estimated})` : estimated
+}
+
+export function reconstructDescriptionText(items: readonly DescriptionEstimateItem[]): string {
+  return items
+    .map((item) => {
+      const quantity = item.quantity == null ? '' : String(item.quantity)
+      return [quantity, item.unit, item.name].filter((part) => part.trim().length > 0).join(' ')
+    })
+    .filter(Boolean)
+    .join(', ')
+}
+
+export function sanitizeDescriptionEstimate(
+  raw: unknown,
+  options?: { original?: string; model?: string | null },
+): DescriptionEstimateCandidate {
+  const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {}
+  const rawItems = Array.isArray(source.items)
+    ? source.items
+    : Array.isArray(source.components)
+      ? source.components
+      : []
+  const items: DescriptionEstimateItem[] = []
+  for (const item of rawItems) {
+    if (!item || typeof item !== 'object') {
+      continue
+    }
+    const row = item as Record<string, unknown>
+    const name = asTrimmed(row.name) ?? asTrimmed(row.proposedName) ?? asTrimmed(row.food) ?? asTrimmed(row.foodName)
+    if (!name) {
+      continue
+    }
+    items.push(
+      descriptionEstimateItemSchema.parse({
+        id: asTrimmed(row.id) ?? `item-${items.length + 1}`,
+        name,
+        quantity: asFiniteNumber(row.quantity ?? row.amount),
+        unit: asTrimmed(row.unit) ?? 'serving',
+        estimatedGrams: roundMealGrams(asFiniteNumber(row.estimatedGrams ?? row.grams)),
+        assumption: asTrimmed(row.assumption) ?? asTrimmed(row.ambiguity) ?? asTrimmed(row.note),
+        calories: Math.max(0, asFiniteNumber(row.calories) ?? 0),
+        proteinGrams: Math.max(0, asFiniteNumber(row.proteinGrams ?? row.protein) ?? 0),
+        carbsGrams: Math.max(0, asFiniteNumber(row.carbsGrams ?? row.carbs) ?? 0),
+        fatGrams: Math.max(0, asFiniteNumber(row.fatGrams ?? row.fat) ?? 0),
+        fiberGrams: asFiniteNumber(row.fiberGrams ?? row.fiber),
+      }),
+    )
+  }
+  const totals = sumDescriptionEstimateItems(items)
+  const assumptions = Array.isArray(source.assumptions)
+    ? source.assumptions.map(asTrimmed).filter((item): item is string => Boolean(item))
+    : []
+  const original = options?.original ?? asTrimmed(source.original) ?? ''
+  return descriptionEstimateCandidateSchema.parse({
+    original,
+    name: asTrimmed(source.name) ?? items[0]?.name ?? 'Meal',
+    items,
+    assumptions: [...new Set(assumptions)],
+    model: options?.model ?? (typeof source.model === 'string' ? source.model : null),
+    ...totals,
+  })
+}
+
+export function descriptionEstimateUserAdjusted(
+  baseline: MealEstimateNutrients,
+  reviewed: MealEstimateNutrients,
+): boolean {
+  return mealEstimateUserAdjusted(baseline, reviewed)
+}
+
+export { mealEstimateNutrients as descriptionEstimateNutrients }

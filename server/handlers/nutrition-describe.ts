@@ -11,25 +11,6 @@ const previewSchema = z.object({
   provider: z.enum(['gemini', 'home_ai']).optional(),
 })
 
-const commitSchema = z.object({
-  text: z.string().trim().min(1).max(500),
-  logDate: z.string(),
-  timezone: z.string().optional(),
-  meal: z.enum(['breakfast', 'lunch', 'dinner', 'snack', 'other']).nullable().optional(),
-  components: z.array(
-    z.object({
-      id: z.string().min(1),
-      included: z.boolean(),
-      proposedName: z.string(),
-      foodId: z.uuid().nullable(),
-      fdcId: z.number().int().positive().nullable().optional(),
-      quantity: z.number().nullable(),
-      unit: z.string(),
-      grams: z.number().nullable(),
-    }),
-  ),
-})
-
 export default withOwnerAuth(async function nutritionDescribeHandler(req: ApiRequest, res: ApiResponse) {
   try {
     if (req.method !== 'POST') {
@@ -40,12 +21,7 @@ export default withOwnerAuth(async function nutritionDescribeHandler(req: ApiReq
     const pathname = requestApiPathname(req)
     const body = await readJsonBody(req)
     if (pathname?.endsWith('/commit')) {
-      const parsed = commitSchema.safeParse(body)
-      if (!parsed.success) {
-        sendJson(res, 400, { error: parsed.error.issues[0]?.message ?? 'Invalid food description' })
-        return
-      }
-      sendJson(res, 200, await commitFoodDescription(parsed.data))
+      sendJson(res, 200, await commitFoodDescription(body))
       return
     }
     const parsed = previewSchema.safeParse(body)

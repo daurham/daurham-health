@@ -1,19 +1,23 @@
-import { dropInterpreterNutrients, type FoodDescriptionCandidate, type FoodDescriptionInterpreter } from '../../src/domain/nutrition/describe.js'
-import { NutritionInterpretError } from '../../src/domain/nutrition/interpret.js'
+import {
+  sanitizeDescriptionEstimate,
+  type DescriptionEstimateCandidate,
+  type DescriptionEstimateInterpreter,
+} from '../../src/domain/nutrition/describe.js'
+import { NutritionInterpretError, descriptionFailureMessage } from '../../src/domain/nutrition/interpret.js'
 import { getHomeAiConfig } from '../integrations/home-ai/config.js'
 import { createGeminiNutritionInterpreter } from '../integrations/gemini/client.js'
 
-export async function geminiFoodDescriptionInterpreter(): Promise<FoodDescriptionInterpreter> {
+export async function geminiFoodDescriptionInterpreter(): Promise<DescriptionEstimateInterpreter> {
   const gemini = await createGeminiNutritionInterpreter()
   return {
-    async interpret(text: string): Promise<FoodDescriptionCandidate> {
+    async interpret(text: string): Promise<DescriptionEstimateCandidate> {
       const interpreted = await gemini.interpretFoodDescription({ text })
       return interpreted.candidate
     },
   }
 }
 
-export async function homeAiFoodDescriptionInterpreter(): Promise<FoodDescriptionInterpreter> {
+export async function homeAiFoodDescriptionInterpreter(): Promise<DescriptionEstimateInterpreter> {
   let config: Awaited<ReturnType<typeof getHomeAiConfig>>
   try {
     config = await getHomeAiConfig()
@@ -21,7 +25,7 @@ export async function homeAiFoodDescriptionInterpreter(): Promise<FoodDescriptio
     throw new NutritionInterpretError('HOME_AI_UNAVAILABLE', 'Meal analysis is temporarily unavailable.')
   }
   return {
-    async interpret(text: string): Promise<FoodDescriptionCandidate> {
+    async interpret(text: string): Promise<DescriptionEstimateCandidate> {
       let response: Response
       try {
         response = await fetch(`${config.baseUrl}/api/nutrition/describe`, {
@@ -45,7 +49,11 @@ export async function homeAiFoodDescriptionInterpreter(): Promise<FoodDescriptio
         throw new NutritionInterpretError('HOME_AI_UNAVAILABLE', 'Meal analysis is temporarily unavailable.')
       }
       const body = (await response.json().catch(() => null)) as unknown
-      return dropInterpreterNutrients(body && typeof body === 'object' && 'components' in body ? body : { original: text, components: [] })
+      const candidate = sanitizeDescriptionEstimate(body && typeof body === 'object' ? body : {}, { original: text })
+      if (candidate.items.length === 0 || candidate.calories <= 0) {
+        throw new NutritionInterpretError('GEMINI_SEMANTIC', descriptionFailureMessage('GEMINI_SEMANTIC'))
+      }
+      return candidate
     },
   }
 }

@@ -13,6 +13,8 @@ import type {
   NutritionLabelJobResponse,
   NutritionMealJobResponse,
   CommitNutritionMealEstimateRequest,
+  CommitNutritionDescriptionEstimateRequest,
+  DescriptionEstimateCandidate,
 } from '@/domain/nutrition'
 import { healthFetch, readApiError } from '@/lib'
 import type { ReviewFieldError } from '@/domain/paper-load'
@@ -309,43 +311,7 @@ export function nutritionMealImageUrl(jobId: string): string {
   return `/api/nutrition/meal/jobs/${jobId}/image`
 }
 
-export type FoodDescriptionReview = {
-  original: string
-  components: Array<{
-    id: string
-    proposedName: string
-    quantity: number | null
-    unit: string
-    preparation: string | null
-    ambiguity: string | null
-    matches: Array<{
-      foodId: string
-      name: string
-      score: number
-      servingQuantity: number
-      servingUnit: string
-      servingGrams: number | null
-      calories: number
-      protein: number | null
-      carbs: number | null
-      fat: number | null
-      fiber: number | null
-    }>
-    usda: Array<{
-      fdcId: number
-      name: string
-      servingQuantity: number
-      servingUnit: string
-      servingGrams: number
-      calories: number
-      protein: number | null
-      carbs: number | null
-      fat: number | null
-      fiber: number | null
-    }>
-    selectedFoodId: string | null
-  }>
-}
+export type FoodDescriptionReview = DescriptionEstimateCandidate
 
 export async function reanalyzeNutritionMealJob(
   jobId: string,
@@ -382,22 +348,9 @@ export async function describeFoodText(text: string, provider?: 'gemini' | 'home
   return parseMealAction<FoodDescriptionReview>(response)
 }
 
-export async function commitFoodDescription(input: {
-  text: string
-  logDate: string
-  timezone: string
-  meal?: string | null
-  components: Array<{
-    id: string
-    included: boolean
-    proposedName: string
-    foodId: string | null
-    fdcId?: number | null
-    quantity: number | null
-    unit: string
-    grams: number | null
-  }>
-}): Promise<{ entries: NutritionEntry[]; mealGroupId: string }> {
+export async function commitFoodDescription(
+  input: CommitNutritionDescriptionEstimateRequest,
+): Promise<{ entries: NutritionEntry[] }> {
   return parseOk(
     await healthFetch('/api/nutrition/describe/commit', {
       method: 'POST',

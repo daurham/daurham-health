@@ -5,7 +5,7 @@ import {
   type ExtractedField,
   type NutritionLabelCandidate,
 } from './label.js'
-import { dropInterpreterNutrients, type FoodDescriptionCandidate } from './describe.js'
+import { sanitizeDescriptionEstimate, type DescriptionEstimateCandidate } from './describe.js'
 
 export const NUTRITION_USER_CONTEXT_MAX = 2000
 export const GEMINI_NUTRITION_MODEL_DEFAULT = 'gemini-3.5-flash'
@@ -15,7 +15,7 @@ export const GEMINI_LABEL_MODEL_DEFAULT = 'gemini-3.5-flash'
 export const GEMINI_DESCRIPTION_TIMEOUT_MS = 10_000
 export const GEMINI_MEAL_TIMEOUT_MS = 20_000
 export const GEMINI_LABEL_TIMEOUT_MS = 20_000
-export const GEMINI_DESCRIPTION_MAX_OUTPUT_TOKENS = 512
+export const GEMINI_DESCRIPTION_MAX_OUTPUT_TOKENS = 1024
 export const GEMINI_MEAL_MAX_OUTPUT_TOKENS = 1024
 export const GEMINI_LABEL_MAX_OUTPUT_TOKENS = 1024
 export const NUTRITION_PROVIDERS = ['gemini', 'home_ai'] as const
@@ -70,20 +70,27 @@ export type FoodDescriptionInterpretInput = {
 
 export interface NutritionInterpreter {
   interpretMealPhoto(input: MealPhotoInterpretInput): Promise<MealEstimateCandidate>
-  interpretFoodDescription(input: FoodDescriptionInterpretInput): Promise<FoodDescriptionCandidate>
+  interpretFoodDescription(input: FoodDescriptionInterpretInput): Promise<DescriptionEstimateCandidate>
   interpretNutritionLabel(input: NutritionLabelInterpretInput): Promise<NutritionLabelCandidate>
 }
 
 export type GeminiDescriptionItem = {
   name: string
-  amount: number | null
+  quantity: number | null
   unit: string
-  note: string | null
+  estimatedGrams: number | null
+  calories: number
+  proteinGrams: number
+  carbsGrams: number
+  fatGrams: number
+  fiberGrams: number | null
+  assumption: string | null
 }
 
 export type GeminiDescriptionResponse = {
+  name: string
   items: GeminiDescriptionItem[]
-  ambiguities: string[]
+  assumptions: string[]
 }
 
 export type GeminiMealResponse = {
@@ -131,22 +138,29 @@ export const GEMINI_MEAL_RESPONSE_SCHEMA = {
 
 export const GEMINI_DESCRIPTION_RESPONSE_SCHEMA = {
   type: 'object',
-  required: ['items'],
+  required: ['name', 'items'],
   properties: {
+    name: { type: 'string' },
     items: {
       type: 'array',
       items: {
         type: 'object',
-        required: ['name', 'amount', 'unit'],
+        required: ['name', 'quantity', 'unit', 'calories', 'proteinGrams', 'carbsGrams', 'fatGrams'],
         properties: {
           name: { type: 'string' },
-          amount: { type: 'number' },
+          quantity: { type: 'number' },
           unit: { type: 'string' },
-          note: { type: 'string' },
+          estimatedGrams: { type: 'number' },
+          calories: { type: 'number' },
+          proteinGrams: { type: 'number' },
+          carbsGrams: { type: 'number' },
+          fatGrams: { type: 'number' },
+          fiberGrams: { type: 'number' },
+          assumption: { type: 'string' },
         },
       },
     },
-    ambiguities: { type: 'array', items: { type: 'string' } },
+    assumptions: { type: 'array', items: { type: 'string' } },
   },
 } as const
 
@@ -221,14 +235,16 @@ export function mealPhotoPrompt(userContext: string | null): string {
 
 export function foodDescriptionPrompt(text: string): string {
   return [
-    'Extract food components and explicit or approximate quantities.',
+    'Interpret the food description into useful consumed foods and estimate nutrition for each.',
     'Output JSON only. Do not wrap the JSON in markdown.',
-    'Do not calculate nutrition.',
-    'Preserve quantities stated by the user.',
-    'Preserve uncertainty. Do not invent omitted quantities.',
-    'Use this shape: {"items":[{"name":"wagyu beef","amount":0.5,"unit":"lb","note":null}],"ambiguities":[]}',
-    'amount must be a JSON number when the user stated a number. Use null when the amount is not a number.',
-    'note holds leftover uncertainty, such as an unspecified size.',
+    'Keep recognizable composite foods intact. "2 slices supreme pizza" is one component, not crust, sauce, cheese, and toppings.',
+    'Decompose only when the user named distinct foods. "2 slices supreme pizza with a side salad and ranch" is pizza, salad, and ranch.',
+    'Preserve the user\'s natural units. Do not require grams. estimatedGrams is optional supporting evidence.',
+    'Estimate calories, protein, carbs, fat, and fiber for each useful component.',
+    'Health will sum those component estimates. Do not invent a separate authoritative meal total.',
+    'Include major assumptions that materially affect the estimate. Do not pretend estimates are exact.',
+    'Use this shape: {"name":"Wagyu beef with onion and broccoli","items":[{"name":"ground wagyu beef","quantity":0.5,"unit":"lb","estimatedGrams":227,"calories":650,"proteinGrams":45,"carbsGrams":0,"fatGrams":50,"fiberGrams":0,"assumption":null}],"assumptions":[]}',
+    'quantity and macros must be JSON numbers. Use null for quantity only when unknown. Use null for fiber only when it cannot be estimated.',
     '',
     'Food description:',
     text,
@@ -333,17 +349,24 @@ export function normalizeGeminiDescriptionRaw(raw: unknown, original: string): u
   const items = providerItems(source)
   return {
     original,
-    components: items.map((item) => {
+    name: firstString(source, ['name']),
+    assumptions: [...asStringList(source.assumptions), ...asStringList(source.ambiguities)],
+    items: items.map((item) => {
       const row = asRecord(item)
       const amount = firstPresent(row, ['amount', 'quantity'])
       const evidence = quantityEvidence(amount) ?? quantityEvidence(row.amountText)
-      const note = firstString(row, ['ambiguity', 'note'])
+      const note = firstString(row, ['assumption', 'ambiguity', 'note'])
       return {
-        proposedName: firstString(row, ['proposedName', 'name', 'food', 'foodName']),
+        name: firstString(row, ['name', 'proposedName', 'food', 'foodName']),
         quantity: parseSafeNumber(amount),
-        unit: firstString(row, ['unit']) ?? 'whole',
-        preparation: firstString(row, ['preparation']),
-        ambiguity: [note, evidence].filter((value): value is string => Boolean(value)).join('; ') || null,
+        unit: firstString(row, ['unit']) ?? 'serving',
+        estimatedGrams: parseSafeNumber(firstPresent(row, ['estimatedGrams', 'grams'])),
+        calories: firstPresent(row, ['calories']),
+        proteinGrams: firstPresent(row, ['proteinGrams', 'protein']),
+        carbsGrams: firstPresent(row, ['carbsGrams', 'carbs']),
+        fatGrams: firstPresent(row, ['fatGrams', 'fat']),
+        fiberGrams: firstPresent(row, ['fiberGrams', 'fiber']),
+        assumption: [note, evidence].filter((value): value is string => Boolean(value)).join('; ') || null,
       }
     }),
   }
@@ -589,26 +612,18 @@ export function interpretNutritionLabelResponse(
   return candidate
 }
 
-export function interpretFoodDescriptionResponse(text: string, original: string): FoodDescriptionCandidate {
+export function interpretFoodDescriptionResponse(text: string, original: string): DescriptionEstimateCandidate {
   const raw = parseGeminiJson(text)
-  const candidate = dropInterpreterNutrients(normalizeGeminiDescriptionRaw(raw, original))
-  const components = candidate.components.map((component) => ({
-    ...component,
-    preparation: blankToNull(component.preparation),
-    ambiguity: blankToNull(component.ambiguity),
-  }))
-  if (components.length === 0) {
+  let candidate: DescriptionEstimateCandidate
+  try {
+    candidate = sanitizeDescriptionEstimate(normalizeGeminiDescriptionRaw(raw, original), { original })
+  } catch {
+    throw new NutritionInterpretError('GEMINI_SCHEMA', descriptionFailureMessage('GEMINI_SEMANTIC'))
+  }
+  if (candidate.items.length === 0 || candidate.calories <= 0) {
     throw new NutritionInterpretError('GEMINI_SEMANTIC', descriptionFailureMessage('GEMINI_SEMANTIC'))
   }
-  return { ...candidate, components }
-}
-
-function blankToNull(value: string | null): string | null {
-  if (typeof value !== 'string') {
-    return null
-  }
-  const trimmed = value.trim()
-  return trimmed.length > 0 ? trimmed : null
+  return candidate
 }
 
 export function parseGeminiJson(text: string): unknown {
