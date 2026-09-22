@@ -12,6 +12,7 @@ import {
   YAxis,
 } from 'recharts'
 import { kilogramsToPounds } from '@/domain/units'
+import { finiteChartDomain } from './chart-domain'
 import { formatCalendarDate, formatDurationSec, formatReps } from './format'
 
 function asLb(kg: number): number {
@@ -77,7 +78,10 @@ export function EstimatedStrengthChart({
   if (data.length < 2) {
     return null
   }
-  const domain = paddedDomain(data.map((item) => item.estimatedLb))
+  const domain = finiteChartDomain(data.map((item) => item.estimatedLb))
+  if (!domain) {
+    return null
+  }
   const caption = 'Session estimated strength from Epley. This is not a tested 1RM.'
   return (
     <ChartFrame title="Estimated Strength" caption={caption}>
@@ -130,8 +134,8 @@ export function PerformanceFrontierChart({
   const frontierData = toFrontierData(frontier, 'frontier', mode)
   const yLabel = mode === 'reps' ? 'Reps' : 'Duration (s)'
   const all = [...historyData, ...frontierData]
-  const xDomain = all.length > 0 ? paddedDomain(all.map((item) => item.loadLb)) : undefined
-  const yDomain = all.length > 0 ? paddedDomain(all.map((item) => item.y)) : undefined
+  const xDomain = finiteChartDomain(all.map((item) => item.loadLb)) ?? undefined
+  const yDomain = finiteChartDomain(all.map((item) => item.y)) ?? undefined
   return (
     <ChartFrame
       title="Performance frontier"
@@ -182,7 +186,10 @@ export function LoggedCaloriesChart({
   if (points.length < 2) {
     return null
   }
-  const domain = paddedDomain(points.map((item) => item.calories))
+  const domain = finiteChartDomain(points.map((item) => item.calories))
+  if (!domain) {
+    return null
+  }
   const targetValues = [...new Set(points.map((item) => item.targetCalories).filter((value): value is number => value != null))]
   const constantTarget = targetValues.length === 1 ? targetValues[0]! : null
   const varyingTargets =
@@ -236,15 +243,6 @@ export function LoggedCaloriesChart({
   )
 }
 
-function paddedDomain(values: number[]): [number, number] {
-  const min = Math.min(...values)
-  const max = Math.max(...values)
-  const mid = (min + max) / 2
-  const spread = max - min
-  const pad = Math.max(spread * 0.2, Math.abs(mid) * 0.02, 2)
-  return [min - pad, max + pad]
-}
-
 export function WeightHistoryChart({
   points,
   trendAvailable = false,
@@ -255,7 +253,10 @@ export function WeightHistoryChart({
   if (points.length < 2) {
     return null
   }
-  const domain = paddedDomain(points.map((point) => point.valueLb))
+  const domain = finiteChartDomain(points.map((point) => point.valueLb))
+  if (!domain) {
+    return null
+  }
   return (
     <ChartFrame
       title="Recorded weight"

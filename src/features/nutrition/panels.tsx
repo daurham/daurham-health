@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   NUTRITION_CONFIG,
   NUTRITION_MEALS,
@@ -27,13 +27,14 @@ import {
   savePackagedFoodAndLog,
   searchNutritionFoods,
 } from './api'
-import { BarcodeScanner } from './BarcodeScanner'
 import { DescribeFoodSheet } from './DescribeFood'
 import type { FoodDescriptionReview } from './api'
 import { LabelCaptureSheet } from './LabelCapture'
 import { MealCaptureSheet } from './MealCapture'
 import { catalogKindLabel, formatGrams, formatKcal, formatQuantity, mealLabel, provenanceLabel } from './format'
 import { NutritionSheet } from './Sheet'
+
+const BarcodeScanner = lazy(() => import('./BarcodeScanner').then((module) => ({ default: module.BarcodeScanner })))
 
 const inputClass =
   'min-h-11 w-full rounded-md border border-zinc-300 bg-white px-3 text-base text-zinc-900 outline-none focus:border-zinc-500 md:text-sm'
@@ -234,7 +235,9 @@ export function AddFoodSheet({ date, quickAdd, onClose, onLogged, onMealLogged, 
     return (
       <NutritionSheet title="Scan barcode" onClose={onClose}>
         {lookupBusy ? <p className="mb-3 text-sm text-zinc-600">Looking up product…</p> : null}
-        <BarcodeScanner disabled={lookupBusy} onDetect={(code) => void onBarcode(code)} onClose={() => setScan(false)} />
+        <Suspense fallback={<p className="text-sm text-zinc-600">Opening scanner…</p>}>
+          <BarcodeScanner disabled={lookupBusy} onDetect={(code) => void onBarcode(code)} onClose={() => setScan(false)} />
+        </Suspense>
       </NutritionSheet>
     )
   }

@@ -25,11 +25,15 @@ export function ActivityMetricChart({
   }
   const data = points.map((point) => ({
     ...point,
-    completed: point.provisional ? null : point.value,
-    todayValue: point.provisional ? point.value : null,
+    completed: point.provisional || typeof point.value !== 'number' || !Number.isFinite(point.value) ? null : point.value,
+    todayValue: point.provisional && typeof point.value === 'number' && Number.isFinite(point.value) ? point.value : null,
   }))
   return (
-    <div className="mt-4 h-52 w-full min-w-0 md:h-64">
+    <div
+      className="mt-4 h-52 w-full min-w-0 md:h-64"
+      role="img"
+      aria-label="Activity chart. Completed days are connected. Today is a separate point and is still in progress."
+    >
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid stroke="#e4e4e7" strokeDasharray="3 3" />
@@ -59,14 +63,25 @@ export function ActivityMetricChart({
 }
 
 export function SleepDurationChart({ points }: { points: SleepChartPoint[] }) {
-  const observed = points.some((point) => point.eligibleMinutes != null || point.partialMinutes != null)
+  const data = points.map((point) => ({
+    ...point,
+    eligibleMinutes:
+      typeof point.eligibleMinutes === 'number' && Number.isFinite(point.eligibleMinutes) ? point.eligibleMinutes : null,
+    partialMinutes:
+      typeof point.partialMinutes === 'number' && Number.isFinite(point.partialMinutes) ? point.partialMinutes : null,
+  }))
+  const observed = data.some((point) => point.eligibleMinutes != null || point.partialMinutes != null)
   if (!observed) {
     return null
   }
   return (
-    <div className="mt-4 h-52 w-full min-w-0 md:h-64">
+    <div
+      className="mt-4 h-52 w-full min-w-0 md:h-64"
+      role="img"
+      aria-label="Sleep chart. Complete nights are connected. Partial observations are separate points."
+    >
       <ResponsiveContainer width="100%" height="100%">
-        <ComposedChart data={points} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+        <ComposedChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid stroke="#e4e4e7" strokeDasharray="3 3" />
           <XAxis
             dataKey="date"

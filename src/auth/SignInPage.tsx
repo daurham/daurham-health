@@ -8,6 +8,7 @@ import {
   requestOwnerPasswordReset,
   SET_PASSWORD_SEARCH,
 } from './password'
+import { safeReturnPath } from './return-path'
 
 const fieldClass = 'mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-base md:text-sm'
 
@@ -24,9 +25,14 @@ export function SignInPage() {
   const [requestSent, setRequestSent] = useState(false)
   const passwordSet =
     typeof location.state === 'object' && location.state !== null && 'passwordSet' in location.state
+  const returnPath = safeReturnPath(
+    typeof location.state === 'object' && location.state !== null && 'from' in location.state
+      ? location.state.from
+      : null,
+  )
 
   if (status === 'owner' && !requesting) {
-    return <Navigate to="/" replace />
+    return <Navigate to={returnPath ?? '/'} replace />
   }
 
   async function onSignIn(event: FormEvent) {
@@ -44,7 +50,7 @@ export function SignInPage() {
         return
       }
       await refresh()
-      navigate('/', { replace: true })
+      navigate(returnPath ?? '/', { replace: true })
     } catch {
       setError('Could not sign in. Try again.')
     } finally {

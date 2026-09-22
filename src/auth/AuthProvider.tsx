@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { healthFetch } from '@/lib'
+import { OWNER_AUTH_REQUIRED, healthFetch } from '@/lib'
 import { authClient } from './client'
 import { AuthContext } from './context'
 import type { AuthStatus } from './types'
@@ -45,6 +45,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void refresh()
   }, [refresh])
+
+  useEffect(() => {
+    function onAuthRequired() {
+      setEmail(null)
+      setStatus('anonymous')
+    }
+    window.addEventListener(OWNER_AUTH_REQUIRED, onAuthRequired)
+    return () => window.removeEventListener(OWNER_AUTH_REQUIRED, onAuthRequired)
+  }, [])
 
   const value = useMemo(
     () => ({ status, email, refresh, signOut }),

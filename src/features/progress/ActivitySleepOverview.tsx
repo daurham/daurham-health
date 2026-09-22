@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import type { ActivityProgressView } from '@/domain/activity'
 import type { ProgressRange } from '@/domain/progress'
 import type { SleepProgressView } from '@/domain/sleep'
-import { PendingLoadRegion, useAtomicKeyedResource } from '@/lib'
+import { LoadErrorNotice, PendingLoadRegion, useAtomicKeyedResource } from '@/lib'
 import { activityCardCopy, sleepCardCopy } from './activity-sleep-copy'
 import { fetchProgressActivity, fetchProgressSleep } from './api'
 import { progressSearch } from './range'
@@ -63,12 +63,28 @@ export function ActivitySleepOverview({ range }: { range: ProgressRange }) {
   const sleepResource = useAtomicKeyedResource({ requestedKey: range, load: loadSleep })
   const activity = activityResource.data?.range === range ? activityResource.data : null
   const sleep = sleepResource.data?.range === range ? sleepResource.data : null
+  const failed = activityResource.error ?? sleepResource.error
   return (
-    <PendingLoadRegion
-      pending={activityResource.isPending || sleepResource.isPending}
-      pendingVisible={activityResource.pendingVisible || sleepResource.pendingVisible}
-    >
-      <ActivitySleepCards range={range} activity={activity} sleep={sleep} />
-    </PendingLoadRegion>
+    <div className="space-y-3">
+      {failed ? (
+        <LoadErrorNotice
+          message={
+            activity || sleep
+              ? 'Could not refresh activity or sleep. Showing the last loaded range.'
+              : `${failed.message} Values are not shown as zero when a request fails.`
+          }
+          onRetry={() => {
+            activityResource.retry()
+            sleepResource.retry()
+          }}
+        />
+      ) : null}
+      <PendingLoadRegion
+        pending={activityResource.isPending || sleepResource.isPending}
+        pendingVisible={activityResource.pendingVisible || sleepResource.pendingVisible}
+      >
+        <ActivitySleepCards range={range} activity={activity} sleep={sleep} />
+      </PendingLoadRegion>
+    </div>
   )
 }

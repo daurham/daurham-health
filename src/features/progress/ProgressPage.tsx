@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation, useOutletContext, useParams, useSearchParams } from 'react-router-dom'
 import type { ProgressOverview, ProgressRange, ProgressTimeline } from '@/domain/progress'
-import { cn } from '@/lib'
+import { cn, LoadErrorNotice } from '@/lib'
 import { fetchProgressOverview, fetchProgressTimeline } from './api'
 import { ActivityProgressPage } from './ActivitySection'
 import { ActivitySleepOverview } from './ActivitySleepOverview'
@@ -40,30 +40,49 @@ export function ProgressPage() {
   const [overview, setOverview] = useState<ProgressOverview | null>(null)
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [error, setError] = useState<string | null>(null)
+  const [reloadToken, setReloadToken] = useState(0)
   const [evidence, setEvidence] = useState<EvidenceTopic | null>(null)
+  const overviewRef = useRef<ProgressOverview | null>(null)
 
   useEffect(() => {
-    let cancelled = false
-    setStatus('loading')
+    const controller = new AbortController()
+    let active = true
+    const current = overviewRef.current
+    if (current?.period.range !== range) {
+      setStatus('loading')
+    }
     setError(null)
-    fetchProgressOverview(range)
+    fetchProgressOverview(range, controller.signal)
       .then((next) => {
-        if (!cancelled) {
-          setOverview(next)
-          setStatus('ready')
+        if (!active) {
+          return
         }
+        overviewRef.current = next
+        setOverview(next)
+        setStatus('ready')
+        setError(null)
       })
       .catch((caught: unknown) => {
-        if (!cancelled) {
-          setOverview(null)
-          setStatus('error')
-          setError(caught instanceof Error ? caught.message : 'Could not load Progress')
+        if (!active || controller.signal.aborted) {
+          return
         }
+        const message = caught instanceof Error ? caught.message : 'Could not load Progress'
+        const previous = overviewRef.current
+        if (previous?.period.range === range) {
+          setError(message)
+          setStatus('ready')
+          return
+        }
+        overviewRef.current = null
+        setOverview(null)
+        setStatus('error')
+        setError(message)
       })
     return () => {
-      cancelled = true
+      active = false
+      controller.abort()
     }
-  }, [range])
+  }, [range, reloadToken])
 
   function setRange(next: ProgressRange) {
     const copy = new URLSearchParams(params)
@@ -114,10 +133,15 @@ export function ProgressPage() {
       </div>
 
       {!healthView && status === 'loading' ? <ProgressSkeleton /> : null}
-      {!healthView && status === 'error' ? (
-        <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-          {error ?? 'Progress is unavailable.'} Values are not shown as zero when a request fails.
-        </p>
+      {!healthView && error ? (
+        <LoadErrorNotice
+          message={
+            status === 'ready'
+              ? 'Could not refresh Progress. Showing the last loaded range.'
+              : `${error} Values are not shown as zero when a request fails.`
+          }
+          onRetry={() => setReloadToken((value) => value + 1)}
+        />
       ) : null}
       {healthView || (status === 'ready' && overview && outletContext) ? <Outlet context={outletContext ?? undefined} /> : null}
       {evidence ? <EvidencePanel topic={evidence} onClose={() => setEvidence(null)} /> : null}
@@ -181,41 +205,69 @@ export function ProgressTimelineRoute() {
   const [timeline, setTimeline] = useState<ProgressTimeline | null>(null)
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [error, setError] = useState<string | null>(null)
+  const [reloadToken, setReloadToken] = useState(0)
+  const timelineRef = useRef<ProgressTimeline | null>(null)
 
   useEffect(() => {
-    let cancelled = false
-    setStatus('loading')
+    const controller = new AbortController()
+    let active = true
+    if (timelineRef.current?.period.range !== range) {
+      setStatus('loading')
+    }
     setError(null)
-    fetchProgressTimeline(range)
+    fetchProgressTimeline(range, controller.signal)
       .then((next) => {
-        if (!cancelled) {
-          setTimeline(next)
-          setStatus('ready')
+        if (!active) {
+          return
         }
+        timelineRef.current = next
+        setTimeline(next)
+        setStatus('ready')
+        setError(null)
       })
       .catch((caught: unknown) => {
-        if (!cancelled) {
-          setTimeline(null)
-          setStatus('error')
-          setError(caught instanceof Error ? caught.message : 'Could not load Timeline')
+        if (!active || controller.signal.aborted) {
+          return
         }
+        const message = caught instanceof Error ? caught.message : 'Could not load Timeline'
+        if (timelineRef.current?.period.range === range) {
+          setError(message)
+          setStatus('ready')
+          return
+        }
+        timelineRef.current = null
+        setTimeline(null)
+        setStatus('error')
+        setError(message)
       })
     return () => {
-      cancelled = true
+      active = false
+      controller.abort()
     }
-  }, [range])
+  }, [range, reloadToken])
 
   if (status === 'loading') {
     return <div className="h-40 animate-pulse rounded-lg bg-zinc-200" aria-busy="true" aria-label="Loading timeline" />
   }
   if (status === 'error' || !timeline) {
     return (
-      <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-        {error ?? 'Timeline is unavailable.'} Values are not shown as zero when a request fails.
-      </p>
+      <LoadErrorNotice
+        message={`${error ?? 'Timeline is unavailable.'} Values are not shown as zero when a request fails.`}
+        onRetry={() => setReloadToken((value) => value + 1)}
+      />
     )
   }
-  return <TimelineSection timeline={timeline} range={range} onEvidence={onEvidence} />
+  return (
+    <div className="space-y-3">
+      {error ? (
+        <LoadErrorNotice
+          message="Could not refresh Timeline. Showing the last loaded range."
+          onRetry={() => setReloadToken((value) => value + 1)}
+        />
+      ) : null}
+      <TimelineSection timeline={timeline} range={range} onEvidence={onEvidence} />
+    </div>
+  )
 }
 
 export function ProgressCompareRoute() {

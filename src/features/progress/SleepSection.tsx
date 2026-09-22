@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import type { ProgressRange } from '@/domain/progress'
 import type { SleepProgressNight, SleepProgressView } from '@/domain/sleep'
-import { PendingLoadRegion, useAtomicKeyedResource } from '@/lib'
+import { LoadErrorNotice, PendingLoadRegion, useAtomicKeyedResource } from '@/lib'
 import {
   formatSleepDuration,
   rangeHeading,
@@ -127,10 +127,15 @@ export function SleepProgressPage() {
           <div className="h-40 animate-pulse rounded-lg bg-zinc-200" aria-busy="true" aria-label="Loading sleep" />
         )}
       </PendingLoadRegion>
-      {resource.error && !view ? (
-        <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-          {resource.error.message} Values are not shown as zero when a request fails.
-        </p>
+      {resource.error ? (
+        <LoadErrorNotice
+          message={
+            view
+              ? 'Could not refresh Sleep. Showing the last loaded range.'
+              : `${resource.error.message} Values are not shown as zero when a request fails.`
+          }
+          onRetry={() => resource.retry()}
+        />
       ) : null}
     </div>
   )

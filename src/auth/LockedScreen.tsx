@@ -7,7 +7,7 @@ export function LockedScreen({
 }: {
   title: string
   body: string
-  action?: { to: string; label: string } | { onClick: () => void; label: string }
+  action?: { to: string; label: string; state?: unknown } | { onClick: () => void; label: string }
 }) {
   return (
     <section className="mx-auto max-w-lg space-y-4">
@@ -16,6 +16,7 @@ export function LockedScreen({
       {action && 'to' in action ? (
         <Link
           to={action.to}
+          state={action.state}
           className="inline-flex min-h-11 items-center justify-center rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white"
         >
           {action.label}

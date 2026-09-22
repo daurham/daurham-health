@@ -2,7 +2,7 @@ import { useCallback, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import type { NutritionDayTotals } from '@/domain/nutrition'
 import type { TodayViewModel } from '@/domain/today'
-import { PendingLoadRegion, useAtomicKeyedResource } from '@/lib'
+import { LoadErrorNotice, PendingLoadRegion, useAtomicKeyedResource } from '@/lib'
 import { formatSleepDuration } from '@/features/progress/activity-sleep-copy'
 import { formatCalendarDate } from '@/features/progress/format'
 import { macroHeadline, remainingHeadline } from '@/features/nutrition/format'
@@ -48,8 +48,13 @@ export function TodayPage() {
             <div className="h-64 animate-pulse rounded-lg bg-zinc-200" aria-busy="true" aria-label="Loading today" />
           )}
         </PendingLoadRegion>
-        {resource.error && !view ? (
-          <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{resource.error.message}</p>
+        {resource.error ? (
+          <div className="mt-3">
+            <LoadErrorNotice
+              message={view ? 'Could not refresh Today. Showing the last loaded day.' : resource.error.message}
+              onRetry={() => resource.retry()}
+            />
+          </div>
         ) : null}
       </div>
     </section>

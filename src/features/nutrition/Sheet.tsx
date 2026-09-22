@@ -16,11 +16,7 @@ export function NutritionSheet({ title, onClose, children, footer, stickyHeader 
   useEffect(() => {
     const previous = document.activeElement
     const root = panelRef.current
-    const focusable =
-      root?.querySelector<HTMLElement>(
-        'input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]), textarea, select',
-      ) ?? root?.querySelector<HTMLElement>('button, [tabindex]:not([tabindex="-1"])')
-    focusable?.focus()
+    root?.focus()
     function onKey(event: KeyboardEvent) {
       if (event.key === 'Escape') {
         event.preventDefault()
@@ -49,6 +45,7 @@ export function NutritionSheet({ title, onClose, children, footer, stickyHeader 
         role="dialog"
         aria-modal="true"
         aria-labelledby={headingId}
+        tabIndex={-1}
         className={cn(
           'relative z-10 flex max-h-[90dvh] w-full flex-col overflow-hidden bg-white shadow-xl',
           'rounded-t-2xl md:max-w-lg md:rounded-xl',

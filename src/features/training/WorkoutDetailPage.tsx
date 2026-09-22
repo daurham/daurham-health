@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import type { WorkoutSession } from '@/domain/training'
 import { fetchSession } from './api'
@@ -9,6 +9,8 @@ export function WorkoutDetailPage() {
   const [session, setSession] = useState<WorkoutSession | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [reloadToken, setReloadToken] = useState(0)
+  const loadedId = useRef<string | null>(null)
 
   useEffect(() => {
     if (!sessionId) {
@@ -17,9 +19,16 @@ export function WorkoutDetailPage() {
       return
     }
     let cancelled = false
+    const sameWorkout = loadedId.current === sessionId
+    if (!sameWorkout) {
+      setSession(null)
+      setLoading(true)
+    }
+    setError(null)
     fetchSession(sessionId)
       .then((next) => {
         if (!cancelled) {
+          loadedId.current = sessionId
           setSession(next)
         }
       })
@@ -36,7 +45,7 @@ export function WorkoutDetailPage() {
     return () => {
       cancelled = true
     }
-  }, [sessionId])
+  }, [sessionId, reloadToken])
 
   return (
     <section className="space-y-6">
@@ -48,8 +57,13 @@ export function WorkoutDetailPage() {
         Workout
       </p>
       {error ? (
-        <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-          {error}
+        <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+          {session ? 'Could not refresh this workout. Showing the last loaded session.' : error}
+          {sessionId ? (
+            <button type="button" className="ml-3 font-medium underline" onClick={() => setReloadToken((value) => value + 1)}>
+              Retry
+            </button>
+          ) : null}
         </p>
       ) : null}
       {loading ? <p className="text-sm text-zinc-600">Loading workout…</p> : null}

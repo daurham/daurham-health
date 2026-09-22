@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import type { CanonicalEvidence } from '@/domain/progress'
 import { cn } from '@/lib'
@@ -20,14 +20,23 @@ export function EvidencePanel({
   topic: EvidenceTopic
   onClose: () => void
 }) {
+  const panelRef = useRef<HTMLDivElement>(null)
+
   useEffect(() => {
+    const previous = document.activeElement
+    panelRef.current?.focus()
     function onKey(event: KeyboardEvent) {
       if (event.key === 'Escape') {
         onClose()
       }
     }
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      if (previous instanceof HTMLElement) {
+        previous.focus()
+      }
+    }
   }, [onClose])
 
   return (
@@ -39,10 +48,12 @@ export function EvidencePanel({
         onClick={onClose}
       />
       <div
+        ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="progress-evidence-title"
-        className="relative z-50 max-h-[85vh] w-full overflow-y-auto rounded-t-2xl border border-zinc-200 bg-white p-5 shadow-xl sm:max-w-lg sm:rounded-2xl"
+        tabIndex={-1}
+        className="relative z-50 max-h-[85vh] w-full overflow-y-auto rounded-t-2xl border border-zinc-200 bg-white p-5 pb-[calc(1.25rem+var(--shell-safe-bottom))] shadow-xl sm:max-w-lg sm:rounded-2xl"
       >
         <div className="flex items-start justify-between gap-3">
           <div>

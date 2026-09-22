@@ -1,12 +1,26 @@
+import { lazy } from 'react'
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import { ResetPasswordPage, SignInPage } from '@/auth'
 import { Layout } from '@/components'
-import { BodyPage } from '@/features/body'
-import { NutritionPage } from '@/features/nutrition'
-import { ProgressPage, ProgressOverviewRoute, ProgressActivityRoute, ProgressSleepRoute, ProgressStrengthRoute, ProgressStrengthLabRoute, ProgressBodyRoute, ProgressTimelineRoute, ProgressCompareRoute } from '@/features/progress'
+import { NotFoundPage } from '@/components/NotFoundPage'
 import { TodayPage } from '@/features/today'
-import { ImportWorkoutPage, StartWorkoutPage, TrainingPage, WorkoutDetailPage } from '@/features/training'
-import { SettingsPage } from '@/features/settings'
+
+const NutritionPage = lazy(() => import('@/features/nutrition').then((module) => ({ default: module.NutritionPage })))
+const BodyPage = lazy(() => import('@/features/body').then((module) => ({ default: module.BodyPage })))
+const SettingsPage = lazy(() => import('@/features/settings').then((module) => ({ default: module.SettingsPage })))
+const TrainingPage = lazy(() => import('@/features/training').then((module) => ({ default: module.TrainingPage })))
+const StartWorkoutPage = lazy(() => import('@/features/training').then((module) => ({ default: module.StartWorkoutPage })))
+const ImportWorkoutPage = lazy(() => import('@/features/training').then((module) => ({ default: module.ImportWorkoutPage })))
+const WorkoutDetailPage = lazy(() => import('@/features/training').then((module) => ({ default: module.WorkoutDetailPage })))
+const ProgressPage = lazy(() => import('@/features/progress').then((module) => ({ default: module.ProgressPage })))
+const ProgressOverviewRoute = lazy(() => import('@/features/progress').then((module) => ({ default: module.ProgressOverviewRoute })))
+const ProgressActivityRoute = lazy(() => import('@/features/progress').then((module) => ({ default: module.ProgressActivityRoute })))
+const ProgressSleepRoute = lazy(() => import('@/features/progress').then((module) => ({ default: module.ProgressSleepRoute })))
+const ProgressStrengthRoute = lazy(() => import('@/features/progress').then((module) => ({ default: module.ProgressStrengthRoute })))
+const ProgressStrengthLabRoute = lazy(() => import('@/features/progress').then((module) => ({ default: module.ProgressStrengthLabRoute })))
+const ProgressBodyRoute = lazy(() => import('@/features/progress').then((module) => ({ default: module.ProgressBodyRoute })))
+const ProgressTimelineRoute = lazy(() => import('@/features/progress').then((module) => ({ default: module.ProgressTimelineRoute })))
+const ProgressCompareRoute = lazy(() => import('@/features/progress').then((module) => ({ default: module.ProgressCompareRoute })))
 
 const router = createBrowserRouter([
   {
@@ -37,6 +51,7 @@ const router = createBrowserRouter([
       },
       { path: 'sign-in', element: <SignInPage /> },
       { path: 'reset-password', element: <ResetPasswordPage /> },
+      { path: '*', element: <NotFoundPage /> },
     ],
   },
 ])

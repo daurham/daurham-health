@@ -2,7 +2,7 @@ export function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(' ')
 }
 
-export { healthFetch, readApiError } from './health-api'
+export { OWNER_AUTH_REQUIRED, healthFetch, publicErrorMessage, readApiError } from './health-api'
 export { SHELL_MAX_WIDTH_CLASS } from './shell'
 export {
   useAtomicKeyedResource,
@@ -15,3 +15,4 @@ export {
 } from './atomic-resource'
 export type { AtomicTransitionState } from './atomic-resource'
 export { PendingLoadRegion } from './PendingLoad'
+export { LoadErrorNotice } from './LoadErrorNotice'

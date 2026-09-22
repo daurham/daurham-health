@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { LockedScreen, useAuth } from '@/auth'
 import { cn, SHELL_MAX_WIDTH_CLASS } from '@/lib'
@@ -99,14 +100,20 @@ export function Layout() {
         )}
       >
         {publicAuthRoute ? (
-          <Outlet />
+          <Suspense fallback={<p className="text-zinc-600">Loading…</p>}>
+            <Outlet />
+          </Suspense>
         ) : status === 'loading' ? (
           <p className="text-zinc-600">Loading…</p>
         ) : status === 'anonymous' ? (
           <LockedScreen
             title="Private Health data"
             body="This is a personal Health app. Sign in as the owner to view and record real data."
-            action={{ to: '/sign-in', label: 'Owner Sign In' }}
+            action={{
+              to: '/sign-in',
+              label: 'Owner Sign In',
+              state: { from: `${location.pathname}${location.search}` },
+            }}
           />
         ) : status === 'unauthorized' ? (
           <LockedScreen
@@ -120,7 +127,9 @@ export function Layout() {
             }}
           />
         ) : (
-          <Outlet />
+          <Suspense fallback={<p className="text-zinc-600">Loading…</p>}>
+            <Outlet />
+          </Suspense>
         )}
       </main>
       {publicAuthRoute ? null : (
