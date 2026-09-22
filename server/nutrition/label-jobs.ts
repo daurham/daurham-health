@@ -345,6 +345,28 @@ export async function finishCaptureInterpretation(input: {
   )
 }
 
+export const DISMISS_CAPTURE_JOB_SQL = `DELETE FROM nutrition_capture_jobs
+       WHERE home_ai_job_id = $1 AND capture_kind = $2 AND status <> 'committed'
+       RETURNING home_ai_job_id`
+
+export async function dismissCaptureJob(jobId: string, captureKind: NutritionCaptureKind): Promise<void> {
+  if (!isHomeAiJobId(jobId)) {
+    throw new HttpError(400, 'That analysis job id is invalid.')
+  }
+  const stored = await getLabelJobRecord(jobId)
+  if (!stored || stored.captureKind !== captureKind) {
+    throw new HttpError(404, 'That capture was not found.')
+  }
+  if (stored.status === 'committed') {
+    throw new HttpError(409, 'That capture is already saved.')
+  }
+  const sql = await getSql()
+  const rows = await queryOrUnavailable(() => sql.query(DISMISS_CAPTURE_JOB_SQL, [jobId, captureKind]))
+  if ((rows as unknown[]).length === 0) {
+    throw new HttpError(409, 'That capture is already saved.')
+  }
+}
+
 export async function requeueCaptureJob(input: { jobId: string; userContext: string | null }): Promise<boolean> {
   const sql = await getSql()
   const rows = await queryOrUnavailable(() =>

@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { normalizeUserContext, parseNutritionProvider } from '../../src/domain/nutrition/interpret.js'
-import { getNutritionMealImage, getNutritionMealJob, reanalyzeNutritionMeal } from '../nutrition/meal.js'
+import { dismissNutritionMealJob, getNutritionMealImage, getNutritionMealJob, reanalyzeNutritionMeal } from '../nutrition/meal.js'
 import { withOwnerAuth } from '../auth/with-owner.js'
 import {
   handleApiError,
@@ -62,12 +62,12 @@ export default withOwnerAuth(async function nutritionMealJobHandler(req: ApiRequ
       )
       return
     }
-    if (req.method !== 'GET') {
-      res.setHeader('Allow', 'GET')
-      sendJson(res, 405, { error: 'Method not allowed' })
-      return
-    }
     if (pathname.endsWith('/image')) {
+      if (req.method !== 'GET') {
+        res.setHeader('Allow', 'GET')
+        sendJson(res, 405, { error: 'Method not allowed' })
+        return
+      }
       const image = await getNutritionMealImage(parsed)
       if (!image) {
         throw new HttpError(404, 'Meal photo is no longer available.')
@@ -76,6 +76,15 @@ export default withOwnerAuth(async function nutritionMealJobHandler(req: ApiRequ
       res.setHeader('Content-Type', image.mimeType)
       res.setHeader('Cache-Control', 'private, max-age=60')
       res.end(Buffer.from(image.bytes))
+      return
+    }
+    if (req.method === 'DELETE') {
+      sendJson(res, 200, await dismissNutritionMealJob(parsed))
+      return
+    }
+    if (req.method !== 'GET') {
+      res.setHeader('Allow', 'GET, DELETE')
+      sendJson(res, 405, { error: 'Method not allowed' })
       return
     }
     sendJson(res, 200, await getNutritionMealJob(parsed))

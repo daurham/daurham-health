@@ -307,6 +307,22 @@ export async function fetchNutritionMealJob(jobId: string): Promise<NutritionMea
   return parseBarcodeResponse(await healthFetch(`/api/nutrition/meal/jobs/${jobId}`))
 }
 
+export async function dismissNutritionMealJob(jobId: string): Promise<void> {
+  await parseMealAction(await healthFetch(`/api/nutrition/meal/jobs/${jobId}`, { method: 'DELETE' }))
+}
+
+export async function dismissNutritionLabelJob(jobId: string): Promise<void> {
+  await parseMealAction(await healthFetch(`/api/nutrition/label/jobs/${jobId}`, { method: 'DELETE' }))
+}
+
+export async function dismissNutritionCapture(job: PendingNutritionCapture): Promise<void> {
+  if (job.captureKind === 'meal_photo') {
+    await dismissNutritionMealJob(job.id)
+    return
+  }
+  await dismissNutritionLabelJob(job.id)
+}
+
 export function nutritionMealImageUrl(jobId: string): string {
   return `/api/nutrition/meal/jobs/${jobId}/image`
 }

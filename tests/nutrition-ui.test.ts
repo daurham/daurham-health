@@ -127,6 +127,8 @@ describe('nutrition daily UX source', () => {
     expect(page).not.toContain('ocr')
     expect(page).not.toContain('Apple Health')
     expect(page).toContain('Pending captures')
+    expect(page).toContain('Dismiss')
+    expect(page).toContain('onDismiss')
   })
 })
 

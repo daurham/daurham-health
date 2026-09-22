@@ -46,6 +46,7 @@ import {
   recordLabelJobStatus,
   requeueCaptureJob,
   saveCaptureImage,
+  dismissCaptureJob,
 } from './label-jobs.js'
 
 const MEAL_PHOTO_SERVER_MAX_BYTES = 4_500_000
@@ -271,6 +272,14 @@ export async function reanalyzeNutritionMeal(
     throw new HttpError(404, mealFailureMessage('JOB_NOT_FOUND'), undefined, 'JOB_NOT_FOUND')
   }
   return { job: { id: jobId, status: 'queued' as const } }
+}
+
+export async function dismissNutritionMealJob(jobId: string): Promise<{ ok: true }> {
+  if (!isHomeAiJobId(jobId)) {
+    throw new HttpError(400, mealFailureMessage('INVALID_JOB_ID'))
+  }
+  await dismissCaptureJob(jobId, NUTRITION_MEAL_CAPTURE_KIND)
+  return { ok: true }
 }
 
 export async function listNutritionMealJobs(client?: HomeAiClient) {

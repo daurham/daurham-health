@@ -20,6 +20,7 @@ import {
   commitNutritionLabelReview,
   MealClientError,
   createNutritionLabelJob,
+  dismissNutritionLabelJob,
   fetchNutritionLabelJob,
   nutritionLabelImageUrl,
   reanalyzeNutritionLabelJob,
@@ -43,9 +44,10 @@ type LabelCaptureProps = {
   onClose: () => void
   onBack: () => void
   onLogged: (entry: NutritionEntry, food: NutritionFood) => void
+  onDiscarded?: () => void
 }
 
-export function LabelCaptureSheet({ date, jobId, onClose, onBack, onLogged }: LabelCaptureProps) {
+export function LabelCaptureSheet({ date, jobId, onClose, onBack, onLogged, onDiscarded }: LabelCaptureProps) {
   const [phase, setPhase] = useState<'pick' | 'preview' | 'working' | 'review' | 'failed'>(jobId ? 'working' : 'pick')
   const [activeJobId, setActiveJobId] = useState<string | null>(jobId ?? null)
   const [payload, setPayload] = useState<NutritionLabelJobResponse | null>(null)
@@ -188,6 +190,22 @@ export function LabelCaptureSheet({ date, jobId, onClose, onBack, onLogged }: La
     setPhase('preview')
   }
 
+  async function discardCapture() {
+    if (!activeJobId) {
+      onDiscarded?.()
+      onClose()
+      return
+    }
+    setError(null)
+    try {
+      await dismissNutritionLabelJob(activeJobId)
+      onDiscarded?.()
+      onClose()
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Could not dismiss this capture.')
+    }
+  }
+
   if (phase === 'review' || manual) {
     const candidate = payload?.candidate ?? emptyLabelCandidate({ warnings: ['Enter the label values manually.'] })
     return (
@@ -204,6 +222,7 @@ export function LabelCaptureSheet({ date, jobId, onClose, onBack, onLogged }: La
           setManual(false)
           setPhase(jobId ? 'working' : 'pick')
         }}
+        onDiscard={activeJobId ? () => void discardCapture() : undefined}
         onLogged={onLogged}
       />
     )
@@ -241,6 +260,11 @@ export function LabelCaptureSheet({ date, jobId, onClose, onBack, onLogged }: La
           >
             Enter label manually
           </button>
+          {activeJobId ? (
+            <button type="button" className={secondaryClass + ' w-full'} onClick={() => void discardCapture()}>
+              Discard capture
+            </button>
+          ) : null}
           <button type="button" className="text-sm text-zinc-600 underline" onClick={onBack}>
             Back
           </button>
@@ -254,9 +278,16 @@ export function LabelCaptureSheet({ date, jobId, onClose, onBack, onLogged }: La
       <NutritionSheet title="Analyzing label" onClose={onClose}>
         {localPreview ? <img src={localPreview} alt="Nutrition label" className="mb-3 max-h-48 w-full rounded-lg object-contain bg-zinc-100" /> : null}
         <p className="text-sm text-zinc-600">Analyzing Nutrition Facts… You can leave and come back from Pending captures.</p>
-        <button type="button" className={secondaryClass + ' mt-4 w-full'} onClick={onBack}>
-          Back
-        </button>
+        <div className="mt-4 space-y-2">
+          <button type="button" className={secondaryClass + ' w-full'} onClick={onBack}>
+            Back
+          </button>
+          {activeJobId ? (
+            <button type="button" className="text-sm text-zinc-600 underline" onClick={() => void discardCapture()}>
+              Discard capture
+            </button>
+          ) : null}
+        </div>
       </NutritionSheet>
     )
   }
@@ -329,6 +360,7 @@ function LabelReviewSheet({
   onEditContext,
   onClose,
   onBack,
+  onDiscard,
   onLogged,
 }: {
   date: string
@@ -340,6 +372,7 @@ function LabelReviewSheet({
   onEditContext?: () => void
   onClose: () => void
   onBack: () => void
+  onDiscard?: () => void
   onLogged: (entry: NutritionEntry, food: NutritionFood) => void
 }) {
   const [draft, setDraft] = useState(() => draftFromCandidate(candidate))
@@ -435,10 +468,15 @@ function LabelReviewSheet({
       title="Review nutrition label"
       onClose={onClose}
       footer={
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button type="button" className={secondaryClass} onClick={onBack}>
             Back
           </button>
+          {onDiscard ? (
+            <button type="button" className={secondaryClass} onClick={onDiscard}>
+              Discard
+            </button>
+          ) : null}
           <button type="button" className={primaryClass} onClick={() => void saveAndLog()} disabled={busy}>
             {busy ? 'Saving…' : 'Save & Log'}
           </button>

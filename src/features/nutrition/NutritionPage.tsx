@@ -13,6 +13,7 @@ import type { NutrientTotal } from '@/domain/nutrition'
 import {
   createNutritionEntry,
   deleteNutritionEntry,
+  dismissNutritionCapture,
   fetchNutritionDay,
   fetchNutritionFood,
   fetchPendingNutritionCaptures,
@@ -132,6 +133,18 @@ export function NutritionPage() {
       entries,
       totals: nutritionDayTotals(entries),
     }))
+  }
+
+  async function dismissPending(job: PendingNutritionCapture) {
+    try {
+      await dismissNutritionCapture(job)
+      setCaptures((current) => current.filter((item) => item.id !== job.id))
+      if (panel && 'jobId' in panel && panel.jobId === job.id) {
+        setPanel(null)
+      }
+    } catch (caught) {
+      setNotice(caught instanceof Error ? caught.message : 'Could not dismiss that capture.')
+    }
   }
 
   function prependRecent(food: NutritionFood) {
@@ -313,6 +326,7 @@ export function NutritionPage() {
         <PendingCapturesCard
           jobs={captures}
           onOpen={(job) => setPanel({ kind: job.captureKind === 'meal_photo' ? 'meal' : 'label', jobId: job.id })}
+          onDismiss={(job) => void dismissPending(job)}
         />
       ) : null}
 
@@ -432,6 +446,10 @@ export function NutritionPage() {
           jobId={panel.jobId}
           onClose={() => setPanel(null)}
           onBack={() => setPanel(null)}
+          onDiscarded={() => {
+            setCaptures((current) => current.filter((job) => job.id !== panel.jobId))
+            setPanel(null)
+          }}
           onLogged={(entry, food) => {
             resource.replaceData((current) => {
               const entries = [...current.entries.filter((item) => item.id !== entry.id), entry]
@@ -451,6 +469,10 @@ export function NutritionPage() {
           recipes={day?.quickAdd.recipes}
           onClose={() => setPanel(null)}
           onBack={() => setPanel(null)}
+          onDiscarded={() => {
+            setCaptures((current) => current.filter((job) => job.id !== panel.jobId))
+            setPanel(null)
+          }}
           onLogged={(entries) => {
             resource.replaceData((current) => {
               const ids = new Set(entries.map((item) => item.id))
@@ -469,25 +491,34 @@ export function NutritionPage() {
 function PendingCapturesCard({
   jobs,
   onOpen,
+  onDismiss,
 }: {
   jobs: PendingNutritionCapture[]
   onOpen: (job: PendingNutritionCapture) => void
+  onDismiss: (job: PendingNutritionCapture) => void
 }) {
   return (
     <section className="rounded-lg border border-zinc-200 bg-white px-3 py-2">
       <h2 className="text-sm font-semibold">Pending captures</h2>
       <ul className="mt-1">
         {jobs.map((job) => (
-          <li key={job.id}>
+          <li key={job.id} className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => onOpen(job)}
-              className="flex min-h-11 w-full items-center justify-between gap-2 text-left text-sm"
+              className="flex min-h-11 min-w-0 flex-1 items-center justify-between gap-2 text-left text-sm"
             >
               <span className="truncate">{job.captureKind === 'meal_photo' ? 'Meal photo' : 'Label photo'}</span>
               <span className="shrink-0 text-zinc-500">
                 {job.status === 'completed' ? 'Ready to review' : job.status === 'failed' ? 'Failed' : 'Analyzing...'}
               </span>
+            </button>
+            <button
+              type="button"
+              className="shrink-0 px-2 text-sm text-zinc-600 underline"
+              onClick={() => onDismiss(job)}
+            >
+              Dismiss
             </button>
           </li>
         ))}

@@ -20,6 +20,7 @@ import {
   MealClientError,
   commitNutritionMealReview,
   createNutritionMealJob,
+  dismissNutritionMealJob,
   fetchNutritionMealJob,
   reanalyzeNutritionMealJob,
   nutritionMealImageUrl,
@@ -53,9 +54,10 @@ type MealCaptureProps = {
   onClose: () => void
   onBack: () => void
   onLogged: (entries: NutritionEntry[]) => void
+  onDiscarded?: () => void
 }
 
-export function MealCaptureSheet({ date, jobId, onClose, onBack, onLogged }: MealCaptureProps) {
+export function MealCaptureSheet({ date, jobId, onClose, onBack, onLogged, onDiscarded }: MealCaptureProps) {
   const [phase, setPhase] = useState<'pick' | 'preview' | 'working' | 'review' | 'failed'>(jobId ? 'working' : 'pick')
   const [activeJobId, setActiveJobId] = useState<string | null>(jobId ?? null)
   const [payload, setPayload] = useState<NutritionMealJobResponse | null>(null)
@@ -198,6 +200,22 @@ export function MealCaptureSheet({ date, jobId, onClose, onBack, onLogged }: Mea
     setPhase('preview')
   }
 
+  async function discardCapture() {
+    if (!activeJobId) {
+      onDiscarded?.()
+      onClose()
+      return
+    }
+    setError(null)
+    try {
+      await dismissNutritionMealJob(activeJobId)
+      onDiscarded?.()
+      onClose()
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Could not dismiss this capture.')
+    }
+  }
+
   if (phase === 'review' || manual) {
     return (
       <MealEstimateSheet
@@ -212,6 +230,7 @@ export function MealCaptureSheet({ date, jobId, onClose, onBack, onLogged }: Mea
           setManual(false)
           setPhase(jobId ? 'working' : 'pick')
         }}
+        onDiscard={activeJobId ? () => void discardCapture() : undefined}
         onLogged={onLogged}
       />
     )
@@ -243,6 +262,11 @@ export function MealCaptureSheet({ date, jobId, onClose, onBack, onLogged }: Mea
           <button type="button" className={secondaryClass + ' w-full'} onClick={() => setManual(true)}>
             Build meal manually
           </button>
+          {activeJobId ? (
+            <button type="button" className={secondaryClass + ' w-full'} onClick={() => void discardCapture()}>
+              Discard capture
+            </button>
+          ) : null}
           <button type="button" className="text-sm text-zinc-600 underline" onClick={onBack}>
             Back
           </button>
@@ -256,9 +280,16 @@ export function MealCaptureSheet({ date, jobId, onClose, onBack, onLogged }: Mea
       <NutritionSheet title="Estimating meal" onClose={onClose}>
         {localPreview ? <img src={localPreview} alt="Meal" className="mb-3 max-h-48 w-full rounded-lg object-contain bg-zinc-100" /> : null}
         <p className="text-sm text-zinc-600">Estimating nutrition from the photo… You can leave and come back from Pending captures.</p>
-        <button type="button" className={secondaryClass + ' mt-4 w-full'} onClick={onBack}>
-          Back
-        </button>
+        <div className="mt-4 space-y-2">
+          <button type="button" className={secondaryClass + ' w-full'} onClick={onBack}>
+            Back
+          </button>
+          {activeJobId ? (
+            <button type="button" className="text-sm text-zinc-600 underline" onClick={() => void discardCapture()}>
+              Discard capture
+            </button>
+          ) : null}
+        </div>
       </NutritionSheet>
     )
   }
@@ -319,6 +350,7 @@ function MealEstimateSheet({
   onEditContext,
   onClose,
   onBack,
+  onDiscard,
   onLogged,
 }: {
   date: string
@@ -329,6 +361,7 @@ function MealEstimateSheet({
   onEditContext?: () => void
   onClose: () => void
   onBack: () => void
+  onDiscard?: () => void
   onLogged: (entries: NutritionEntry[]) => void
 }) {
   const [name, setName] = useState(candidate.name)
@@ -456,6 +489,11 @@ function MealEstimateSheet({
         {onEditContext ? (
           <button type="button" className={secondaryClass + ' w-full'} onClick={onEditContext}>
             Edit context
+          </button>
+        ) : null}
+        {onDiscard ? (
+          <button type="button" className={secondaryClass + ' w-full'} onClick={onDiscard}>
+            Discard capture
           </button>
         ) : null}
         <button type="button" className="text-sm text-zinc-600 underline" onClick={onBack}>

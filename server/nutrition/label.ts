@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import {
   NUTRITION_CONFIG,
+  NUTRITION_LABEL_CAPTURE_KIND,
   NUTRITION_LABEL_SOURCE_KEY,
   commitNutritionLabelRequestSchema,
   emptyLabelCandidate,
@@ -47,6 +48,7 @@ import {
   refreshOutstandingLabelJobs,
   requeueCaptureJob,
   saveCaptureImage,
+  dismissCaptureJob,
 } from './label-jobs.js'
 
 const LABEL_PHOTO_SERVER_MAX_BYTES = 4_500_000
@@ -185,6 +187,14 @@ export async function reanalyzeNutritionLabel(
     throw new HttpError(404, labelFailureMessage('JOB_NOT_FOUND'), undefined, 'JOB_NOT_FOUND')
   }
   return { job: { id: jobId, status: 'queued' as const } }
+}
+
+export async function dismissNutritionLabelJob(jobId: string): Promise<{ ok: true }> {
+  if (!isHomeAiJobId(jobId)) {
+    throw new HttpError(400, labelFailureMessage('INVALID_JOB_ID'))
+  }
+  await dismissCaptureJob(jobId, NUTRITION_LABEL_CAPTURE_KIND)
+  return { ok: true }
 }
 
 export async function listNutritionLabelJobs(client?: HomeAiClient) {

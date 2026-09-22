@@ -254,6 +254,8 @@ describe('nutrition label jobs routing and provenance', () => {
     expect(readFileSync('src/features/training/prepare-workout-photo.ts', 'utf8')).toContain('2400')
     expect(readFileSync('src/lib/prepare-image.ts', 'utf8')).toContain("imageOrientation: 'from-image'")
     expect(readFileSync('src/features/nutrition/LabelCapture.tsx', 'utf8')).toContain('Enter label manually')
+    expect(readFileSync('src/features/nutrition/LabelCapture.tsx', 'utf8')).toContain('Discard capture')
+    expect(readFileSync('server/handlers/nutrition-label-job-detail.ts', 'utf8')).toContain('dismissNutritionLabelJob')
     expect(readFileSync('src/features/nutrition/LabelCapture.tsx', 'utf8')).toContain('HOME_AI_UNAVAILABLE')
     expect(labelFailureMessage('HOME_AI_UNAVAILABLE')).toMatch(/unavailable/i)
     expect(labelFailureMessage('UNREADABLE_LABEL')).toMatch(/readable Nutrition Facts/i)
