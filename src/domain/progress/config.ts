@@ -25,6 +25,9 @@ export const PROGRESS_ANALYTICS_CONFIG = {
   compare: {
     workoutsPerWeekMinDays: 7,
   },
+  nutrition: {
+    coverageDiffersPct: 20,
+  },
 } as const
 
 export type ProgressAnalyticsConfig = typeof PROGRESS_ANALYTICS_CONFIG

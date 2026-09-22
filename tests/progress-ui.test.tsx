@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
 import type { ProgressOverview } from '../src/domain/progress/overview.ts'
+import { emptyNutritionPeriodSummary } from '../src/domain/progress/nutrition.ts'
 import { BodySection } from '../src/features/progress/BodySection.tsx'
 import { OverviewSection } from '../src/features/progress/OverviewSection.tsx'
 import { ProgressPage } from '../src/features/progress/ProgressPage.tsx'
@@ -362,6 +363,7 @@ function sparseOverview(): ProgressOverview {
         ],
       },
     ],
+    nutrition: emptyNutritionPeriodSummary(2),
     findings: [
       {
         kind: 'performance_best',
@@ -439,6 +441,7 @@ describe('progress range URL helpers', () => {
     expect(parseProgressRangeParam('all')).toBe('all')
     expect(progressSearch('90d')).toBe('?range=90d')
     expect(parseTimelineFocusParam('bests')).toBe('bests')
+    expect(parseTimelineFocusParam('nutrition')).toBe('nutrition')
     expect(parseTimelineFocusParam('nope')).toBe('all')
     expect(progressSearch('30d', 'training')).toBe('?range=30d&focus=training')
   })
@@ -516,6 +519,44 @@ describe('Progress UI states', () => {
     expect(html).not.toContain('Weight trend: 0')
     expect(html).not.toContain('Box Squat')
     expect(html).not.toContain('Progress brief')
+  })
+
+  it('shows a sparse Nutrition section without treating unlogged days as zero', () => {
+    const overview = sparseOverview()
+    overview.nutrition = {
+      ...emptyNutritionPeriodSummary(30),
+      status: 'available',
+      calendarDays: 30,
+      loggedDays: 1,
+      coveragePct: (1 / 30) * 100,
+      calories: { averageOnLoggedDays: 581, observedDays: 1, targetContext: null },
+      protein: { averageOnObservedDays: null, observedDays: 0, targetContext: null },
+      observations: [
+        {
+          date: '2026-09-20',
+          entryCount: 4,
+          calories: { status: 'available', value: 581 },
+          protein: { status: 'unavailable' },
+          carbs: { status: 'unavailable' },
+          fat: { status: 'unavailable' },
+          fiber: { status: 'unavailable' },
+          target: null,
+          evidence: { entryIds: ['e1', 'e2', 'e3', 'e4'], mealGroupIds: [] },
+        },
+      ],
+      evidence: { dates: ['2026-09-20'], entryIds: ['e1', 'e2', 'e3', 'e4'], mealGroupIds: [] },
+    }
+    const html = renderToStaticMarkup(
+      <MemoryRouter>
+        <OverviewSection overview={overview} onEvidence={() => undefined} />
+      </MemoryRouter>,
+    )
+    expect(html).toContain('Nutrition')
+    expect(html).toContain('1 / 30 days')
+    expect(html).toContain('581 kcal')
+    expect(html).toContain('Protein unavailable')
+    expect(html).not.toContain('0 g protein')
+    expect(html).not.toContain('Calories improving')
   })
 
   it('keeps baseline historical bests from rendering as PRs', () => {
@@ -696,6 +737,7 @@ function sampleTimeline(): ProgressTimeline {
         { date: '2026-09-20', eventId: 'performance_best:farmer-pr', sessionId: 'w2', exerciseName: 'Farmer Carry' },
       ],
       checkpoints: [],
+      nutritionCalories: [],
     },
     events: [
       {

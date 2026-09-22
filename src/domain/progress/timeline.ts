@@ -2,14 +2,26 @@ import { HEALTH_DOMAINS, type CanonicalEvidence, type PrAchievement } from './ty
 import { dateInInclusiveRange, type TrailingPeriod } from './periods.js'
 import { buildProgressOverview, type ProgressCanonicalInput } from './overview.js'
 import type { ProgressCheckpoint } from './checkpoints.js'
+import {
+  nutritionCalorieSeries,
+  nutritionDailyObservations,
+  nutritionDayEventData,
+  type NutritionDayEventData,
+} from './nutrition.js'
 
 export const TIMELINE_DOMAINS = [...HEALTH_DOMAINS, 'annotation'] as const
 export type TimelineDomain = (typeof TIMELINE_DOMAINS)[number]
 
-export const TIMELINE_EVENT_KINDS = ['training_session', 'body_measurement', 'performance_best', 'checkpoint'] as const
+export const TIMELINE_EVENT_KINDS = [
+  'training_session',
+  'body_measurement',
+  'performance_best',
+  'checkpoint',
+  'nutrition_day',
+] as const
 export type TimelineEventKind = (typeof TIMELINE_EVENT_KINDS)[number]
 
-export const TIMELINE_FOCUSES = ['all', 'training', 'body', 'bests'] as const
+export const TIMELINE_FOCUSES = ['all', 'training', 'body', 'bests', 'nutrition'] as const
 export type TimelineFocus = (typeof TIMELINE_FOCUSES)[number]
 
 export type TimelineTimePrecision = 'date' | 'timestamp'
@@ -63,6 +75,8 @@ export type TimelineCheckpointData = {
   notes: string | null
 }
 
+export type TimelineNutritionDayData = NutritionDayEventData
+
 export type TimelineEventBase = {
   id: string
   domain: TimelineDomain
@@ -102,11 +116,19 @@ export type TimelineCheckpointEvent = TimelineEventBase & {
   data: TimelineCheckpointData
 }
 
+export type TimelineNutritionDayEvent = TimelineEventBase & {
+  domain: 'nutrition'
+  kind: 'nutrition_day'
+  timePrecision: 'date'
+  data: TimelineNutritionDayData
+}
+
 export type TimelineEvent =
   | TimelineTrainingSessionEvent
   | TimelinePerformanceBestEvent
   | TimelineBodyMeasurementEvent
   | TimelineCheckpointEvent
+  | TimelineNutritionDayEvent
 
 export type ProgressTimeline = {
   period: TrailingPeriod
@@ -133,6 +155,12 @@ export type ProgressTimeline = {
       date: string
       eventId: string
       label: string
+    }>
+    nutritionCalories: Array<{
+      date: string
+      calories: number
+      targetCalories: number | null
+      eventId: string
     }>
   }
   events: TimelineEvent[]
@@ -173,8 +201,9 @@ function compareEvents(left: TimelineEvent, right: TimelineEvent): number {
   const kindRank: Record<TimelineEventKind, number> = {
     checkpoint: 0,
     body_measurement: 1,
-    training_session: 2,
-    performance_best: 3,
+    nutrition_day: 2,
+    training_session: 3,
+    performance_best: 4,
   }
   if (kindRank[left.kind] !== kindRank[right.kind]) {
     return kindRank[left.kind] - kindRank[right.kind]
@@ -330,7 +359,37 @@ export function buildProgressTimeline(
       },
     }))
 
-  const events = [...trainingEvents, ...performanceBestEvents, ...bodyEvents, ...checkpointEvents].sort(compareEvents)
+  const nutritionObservations = nutritionDailyObservations({
+    entries: input.nutritionEntries ?? [],
+    targets: input.nutritionTargets ?? [],
+    start: period.start,
+    end: period.end,
+  })
+  const nutritionEvents: TimelineNutritionDayEvent[] = nutritionObservations.map((observation) => {
+    const data = nutritionDayEventData(observation, input.nutritionEntries ?? [])
+    return {
+      id: `nutrition_day:${observation.date}`,
+      domain: 'nutrition',
+      kind: 'nutrition_day',
+      date: observation.date,
+      timePrecision: 'date',
+      title: 'Nutrition',
+      evidence: observation.evidence.entryIds.map((entryId) => ({
+        domain: 'nutrition' as const,
+        entryId,
+        date: observation.date,
+      })),
+      data,
+    }
+  })
+
+  const events = [
+    ...trainingEvents,
+    ...performanceBestEvents,
+    ...bodyEvents,
+    ...checkpointEvents,
+    ...nutritionEvents,
+  ].sort(compareEvents)
 
   return {
     period,
@@ -360,6 +419,12 @@ export function buildProgressTimeline(
         eventId: event.id,
         label: event.title,
       })),
+      nutritionCalories: nutritionCalorieSeries(nutritionObservations).map((item) => ({
+        date: item.date,
+        calories: item.calories,
+        targetCalories: item.targetCalories,
+        eventId: `nutrition_day:${item.date}`,
+      })),
     },
     events,
   }
@@ -374,6 +439,9 @@ export function timelineEventsForFocus(timeline: ProgressTimeline, focus: Timeli
   }
   if (focus === 'bests') {
     return timeline.events.filter((event) => event.kind === 'performance_best')
+  }
+  if (focus === 'nutrition') {
+    return timeline.events.filter((event) => event.kind === 'nutrition_day')
   }
   return timeline.events.filter((event) => {
     if (event.kind === 'performance_best') {
@@ -415,5 +483,6 @@ export function timelineSeriesForFocus(
     workouts: focus === 'all' || focus === 'training' ? timeline.series.workouts : [],
     performanceBests: focus === 'all' || focus === 'bests' ? timeline.series.performanceBests : [],
     checkpoints: focus === 'all' ? timeline.series.checkpoints : [],
+    nutritionCalories: focus === 'all' || focus === 'nutrition' ? timeline.series.nutritionCalories : [],
   }
 }

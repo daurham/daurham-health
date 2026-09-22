@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react'
-import type { ProgressFinding, ProgressOverview } from '@/domain/progress'
+import type { NutritionPeriodSummary, ProgressFinding, ProgressOverview } from '@/domain/progress'
 import { kilogramsToPounds } from '@/domain/units'
 import { cn } from '@/lib'
+import { formatGrams, formatKcal } from '@/features/nutrition/format'
 import {
   RANGE_HEADINGS,
   achievementList,
@@ -19,9 +20,13 @@ import type { EvidenceTopic } from './EvidencePanel'
 import {
   formatBodyCanonical,
   formatCalendarDate,
+  formatCoverageDays,
+  formatCoveragePct,
   formatKgAsLb,
   formatPerformed,
+  formatTargetDifference,
 } from './format'
+import { LoggedCaloriesChart } from './ProgressCharts'
 
 function Card({
   title,
@@ -86,12 +91,26 @@ function findingTopic(finding: ProgressFinding, overview: ProgressOverview): Evi
   if (finding.previousWorkouts != null) {
     facts.push({ label: 'Previous period', value: String(finding.previousWorkouts) })
   }
+  if (finding.loggedDays != null && finding.calendarDays != null) {
+    facts.push({ label: 'Logged days', value: formatCoverageDays(finding.loggedDays, finding.calendarDays) })
+  }
+  if (finding.coveragePct != null) {
+    facts.push({ label: 'Coverage', value: formatCoveragePct(finding.coveragePct) })
+  }
+  if (finding.kind === 'nutrition_period_average' && finding.average != null) {
+    facts.push({ label: 'Average on logged days', value: formatKcal(finding.average) })
+  }
+  if (finding.observedDays != null && finding.kind === 'nutrition_period_average') {
+    facts.push({ label: 'Observed days', value: String(finding.observedDays) })
+  }
+  const nutritionDate = finding.domain === 'nutrition' ? finding.evidence.find((item) => item.date)?.date : null
   return {
     title: findingTitle(finding.kind),
     subtitle: findingHeadline(finding, overview),
     facts,
     evidence: event?.evidence ?? finding.evidence,
     workoutSessionId: finding.evidence.find((item) => item.sessionId)?.sessionId,
+    actions: nutritionDate ? [{ label: 'Open Nutrition day', to: `/nutrition?date=${nutritionDate}` }] : undefined,
   }
 }
 
@@ -211,6 +230,8 @@ export function OverviewSection({
         )}
       </section>
 
+      <NutritionOverview overview={overview} onEvidence={onEvidence} />
+
       <ConsistencyBlock overview={overview} />
     </div>
   )
@@ -280,6 +301,131 @@ function FindingFeed({
         </ul>
       </div>
     </>
+  )
+}
+
+function nutritionFacts(nutrition: NutritionPeriodSummary): Array<{ label: string; value: string }> {
+  const facts: Array<{ label: string; value: string }> = [
+    { label: 'Logged days', value: formatCoverageDays(nutrition.loggedDays, nutrition.calendarDays) },
+    { label: 'Coverage', value: formatCoveragePct(nutrition.coveragePct) },
+  ]
+  if (nutrition.calories.averageOnLoggedDays != null) {
+    facts.push({
+      label: 'Calories avg on logged days',
+      value: formatKcal(nutrition.calories.averageOnLoggedDays),
+    })
+  }
+  if (nutrition.protein.averageOnObservedDays != null) {
+    facts.push({
+      label: 'Protein avg on observed days',
+      value: formatGrams(nutrition.protein.averageOnObservedDays) ?? '—',
+    })
+    facts.push({ label: 'Protein observed days', value: String(nutrition.protein.observedDays) })
+  } else if (nutrition.loggedDays > 0) {
+    facts.push({ label: 'Protein', value: 'Unavailable' })
+  }
+  if (nutrition.calories.targetContext) {
+    facts.push({
+      label: 'Calories vs target',
+      value: `${formatTargetDifference(nutrition.calories.targetContext.averageDifference, 'kcal')} avg · ${nutrition.calories.targetContext.daysWithTarget} days`,
+    })
+  }
+  if (nutrition.protein.targetContext) {
+    facts.push({
+      label: 'Protein vs target',
+      value: `${formatTargetDifference(nutrition.protein.targetContext.averageDifference, 'g')} avg · ${nutrition.protein.targetContext.daysWithTarget} days`,
+    })
+  }
+  return facts
+}
+
+function NutritionOverview({
+  overview,
+  onEvidence,
+}: {
+  overview: ProgressOverview
+  onEvidence: (topic: EvidenceTopic) => void
+}) {
+  const nutrition = overview.nutrition
+  const latestDate = nutrition.evidence.dates[nutrition.evidence.dates.length - 1]
+  const caloriePoints = nutrition.observations.flatMap((item) =>
+    item.calories.status === 'available' && item.calories.value != null
+      ? [{ date: item.date, calories: item.calories.value, targetCalories: item.target?.calories ?? null }]
+      : [],
+  )
+  const proteinLine =
+    nutrition.protein.averageOnObservedDays != null
+      ? `${formatGrams(nutrition.protein.averageOnObservedDays)} avg · ${nutrition.protein.observedDays} observed day${nutrition.protein.observedDays === 1 ? '' : 's'}`
+      : nutrition.loggedDays > 0
+        ? 'Protein unavailable'
+        : null
+  const calorieLine =
+    nutrition.calories.averageOnLoggedDays != null
+      ? `${formatKcal(nutrition.calories.averageOnLoggedDays)} avg on logged days`
+      : null
+  const targetLines: string[] = []
+  if (nutrition.calories.targetContext) {
+    targetLines.push(`Calories avg ${formatTargetDifference(nutrition.calories.targetContext.averageDifference, 'kcal')}`)
+  }
+  if (nutrition.protein.targetContext) {
+    targetLines.push(`Protein avg ${formatTargetDifference(nutrition.protein.targetContext.averageDifference, 'g')}`)
+  }
+
+  return (
+    <section>
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="text-lg font-semibold tracking-tight">Nutrition</h2>
+        <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+          {RANGE_HEADINGS[overview.period.range]}
+        </p>
+      </div>
+      {nutrition.loggedDays === 0 ? (
+        <p className="mt-2 text-sm text-zinc-600">No nutrition days logged in this period.</p>
+      ) : (
+        <>
+          <button
+            type="button"
+            className="mt-3 w-full rounded-lg border border-zinc-200 bg-white p-3 text-left hover:border-zinc-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900 md:p-4"
+            onClick={() =>
+              onEvidence({
+                title: 'Nutrition',
+                subtitle: RANGE_HEADINGS[overview.period.range],
+                facts: nutritionFacts(nutrition),
+                evidence: nutrition.evidence.dates.map((date) => ({ domain: 'nutrition', date })),
+                actions: latestDate ? [{ label: 'Open Nutrition day', to: `/nutrition?date=${latestDate}` }] : undefined,
+              })
+            }
+          >
+            <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm md:grid-cols-4">
+              <div>
+                <dt className="text-xs uppercase tracking-wide text-zinc-500">Logged</dt>
+                <dd className="mt-0.5 font-medium">{formatCoverageDays(nutrition.loggedDays, nutrition.calendarDays)}</dd>
+                <p className="mt-0.5 text-xs text-zinc-500">{formatCoveragePct(nutrition.coveragePct)}</p>
+              </div>
+              {calorieLine ? (
+                <div>
+                  <dt className="text-xs uppercase tracking-wide text-zinc-500">Calories</dt>
+                  <dd className="mt-0.5 font-medium">{calorieLine}</dd>
+                </div>
+              ) : null}
+              {proteinLine ? (
+                <div>
+                  <dt className="text-xs uppercase tracking-wide text-zinc-500">Protein</dt>
+                  <dd className="mt-0.5 font-medium">{proteinLine}</dd>
+                </div>
+              ) : null}
+              {targetLines.length > 0 ? (
+                <div>
+                  <dt className="text-xs uppercase tracking-wide text-zinc-500">Targets</dt>
+                  <dd className="mt-0.5 font-medium">{targetLines.join(' · ')}</dd>
+                </div>
+              ) : null}
+            </dl>
+          </button>
+          <LoggedCaloriesChart points={caloriePoints} />
+        </>
+      )}
+    </section>
   )
 }
 

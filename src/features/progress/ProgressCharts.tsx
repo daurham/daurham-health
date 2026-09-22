@@ -3,6 +3,7 @@ import {
   CartesianGrid,
   Line,
   LineChart,
+  ReferenceLine,
   ResponsiveContainer,
   Scatter,
   ScatterChart,
@@ -170,6 +171,68 @@ export function PerformanceFrontierChart({
         </ScatterChart>
       </ResponsiveContainer>
     </ChartFrame>
+  )
+}
+
+export function LoggedCaloriesChart({
+  points,
+}: {
+  points: Array<{ date: string; calories: number; targetCalories: number | null }>
+}) {
+  if (points.length < 2) {
+    return null
+  }
+  const domain = paddedDomain(points.map((item) => item.calories))
+  const targetValues = [...new Set(points.map((item) => item.targetCalories).filter((value): value is number => value != null))]
+  const constantTarget = targetValues.length === 1 ? targetValues[0]! : null
+  const varyingTargets =
+    targetValues.length > 1
+      ? points.flatMap((item) =>
+          item.targetCalories != null ? [{ date: item.date, calories: item.targetCalories }] : [],
+        )
+      : []
+  return (
+    <div className="mt-3 rounded-lg border border-zinc-200 bg-white p-4">
+      <h3 className="text-sm font-semibold tracking-tight">Calories</h3>
+      <p className="mt-1 text-sm text-zinc-600">Logged days only. Unlogged dates are omitted, not zero.</p>
+      <div className="mt-4 h-40 w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <ScatterChart margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+            <CartesianGrid stroke="#e4e4e7" strokeDasharray="3 3" />
+            <XAxis
+              dataKey="date"
+              type="category"
+              allowDuplicatedCategory={false}
+              tickFormatter={formatCalendarDate}
+              tick={{ fill: '#71717a', fontSize: 11 }}
+            />
+            <YAxis
+              dataKey="calories"
+              unit=" kcal"
+              domain={domain}
+              tick={{ fill: '#71717a', fontSize: 11 }}
+              width={64}
+            />
+            <Tooltip
+              content={({ payload }) => {
+                const item = payload?.[0]?.payload as { date: string; calories: number; targetCalories?: number | null } | undefined
+                if (!item) {
+                  return null
+                }
+                const target =
+                  item.targetCalories != null ? ` · target ${item.targetCalories.toLocaleString('en-US')} kcal` : ''
+                return tooltipBox(`${formatCalendarDate(item.date)} · ${item.calories.toLocaleString('en-US')} kcal${target}`)
+              }}
+            />
+            {constantTarget != null ? (
+              <ReferenceLine y={constantTarget} stroke="#a1a1aa" strokeDasharray="4 4" />
+            ) : null}
+            <Scatter data={points} fill="#18181b" name="Calories" />
+            {varyingTargets.length > 0 ? <Scatter data={varyingTargets} fill="#a1a1aa" name="Target" /> : null}
+          </ScatterChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
   )
 }
 

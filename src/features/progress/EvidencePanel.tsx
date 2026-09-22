@@ -75,7 +75,7 @@ export function EvidencePanel({
             <ul className="mt-2 space-y-2">
               {topic.evidence.map((item, index) => (
                 <li
-                  key={item.setId ?? item.measurementId ?? `${item.sessionId ?? 'ev'}-${index}`}
+                  key={item.setId ?? item.measurementId ?? item.entryId ?? `${item.sessionId ?? 'ev'}-${index}`}
                   className="rounded-md border border-zinc-200 px-3 py-2 text-sm"
                 >
                   <p className="font-medium">

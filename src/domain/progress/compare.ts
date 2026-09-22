@@ -29,6 +29,7 @@ import {
 import { periodExternalVolume } from './volume.js'
 import type { ProgressCheckpoint } from './checkpoints.js'
 import type { ProgressCanonicalInput } from './overview.js'
+import { nutritionCoverageDiffers, nutritionPeriodSummary, type NutritionPeriodSummary } from './nutrition.js'
 
 export type ComparePeriod = {
   start: string
@@ -127,6 +128,11 @@ export type ProgressCompare = {
     }
     metrics: CompareBodyMetric[]
   }
+  nutrition: {
+    a: NutritionPeriodSummary
+    b: NutritionPeriodSummary
+    coverageDiffers: boolean
+  }
   exercises: CompareExercise[]
   findings: CompareFinding[]
 }
@@ -139,6 +145,29 @@ export function comparePeriod(start: string, end: string): ComparePeriod {
     throw new Error('Compare start must be on or before end')
   }
   return { start, end, dayCount: inclusiveDayCount(start, end) }
+}
+
+function nutritionForPeriod(
+  canonical: ProgressCanonicalInput,
+  period: ComparePeriod,
+): NutritionPeriodSummary {
+  return nutritionPeriodSummary({
+    entries: canonical.nutritionEntries ?? [],
+    targets: canonical.nutritionTargets ?? [],
+    start: period.start,
+    end: period.end,
+  })
+}
+
+function nutritionCompareSides(
+  a: NutritionPeriodSummary,
+  b: NutritionPeriodSummary,
+): ProgressCompare['nutrition'] {
+  return {
+    a,
+    b,
+    coverageDiffers: nutritionCoverageDiffers(a, b),
+  }
 }
 
 function inRange(date: string, period: ComparePeriod): boolean {
@@ -734,6 +763,7 @@ export function buildProgressCompare(input: {
       },
       metrics: metricKeys.map((key) => bodyMetricForPeriods(canonical.bodyObservations, key, periodA, periodB)),
     },
+    nutrition: nutritionCompareSides(nutritionForPeriod(canonical, periodA), nutritionForPeriod(canonical, periodB)),
     exercises: buildExercises(
       canonical,
       periodA,
@@ -859,6 +889,7 @@ export function buildSinceCheckpointCompare(input: {
       },
       metrics: bodyMetrics,
     },
+    nutrition: nutritionCompareSides(nutritionForPeriod(canonical, periodA), nutritionForPeriod(canonical, periodB)),
     exercises,
   }
   return { ...draft, findings: compareFindings(draft) }

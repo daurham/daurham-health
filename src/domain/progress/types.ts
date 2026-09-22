@@ -76,6 +76,8 @@ export type CanonicalEvidence = {
   exerciseId?: string
   measurementId?: string
   measurementSessionId?: string
+  entryId?: string
+  mealGroupId?: string
   date?: string
   setNumber?: number
   loadKg?: number | null
@@ -244,5 +246,11 @@ export type ProgressFinding = {
   observationCount?: number
   currentWorkouts?: number
   previousWorkouts?: number
+  loggedDays?: number
+  calendarDays?: number
+  coveragePct?: number
+  average?: number
+  observedDays?: number
+  nutrient?: string
   evidence: CanonicalEvidence[]
 }

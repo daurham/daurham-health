@@ -36,12 +36,14 @@ export function TimelineLanes({
   onSelect: (eventId: string) => void
 }) {
   const checkpoints = series.checkpoints ?? []
+  const nutritionCalories = series.nutritionCalories ?? []
   const lanes = [
     series.bodyWeight.length > 0 ? 'body' : null,
     series.workouts.length > 0 ? 'workouts' : null,
     series.performanceBests.length > 0 ? 'bests' : null,
+    nutritionCalories.length > 0 ? 'nutrition' : null,
     checkpoints.length > 0 ? 'checkpoints' : null,
-  ].filter((lane): lane is 'body' | 'workouts' | 'bests' | 'checkpoints' => lane != null)
+  ].filter((lane): lane is 'body' | 'workouts' | 'bests' | 'nutrition' | 'checkpoints' => lane != null)
 
   if (lanes.length === 0) {
     return null
@@ -92,12 +94,20 @@ export function TimelineLanes({
         viewBox={`0 0 800 ${height}`}
         className="h-auto w-full min-w-[20rem]"
         role="img"
-        aria-label="Progress timeline lanes for body weight, workouts, performance bests, and checkpoints"
+        aria-label="Progress timeline lanes for body weight, workouts, performance bests, nutrition, and checkpoints"
       >
         {lanes.map((lane, index) => {
           const y = index * laneHeight + laneHeight / 2
           const label =
-            lane === 'body' ? 'Body weight' : lane === 'workouts' ? 'Workouts' : lane === 'bests' ? 'Bests' : 'Notes'
+            lane === 'body'
+              ? 'Body weight'
+              : lane === 'workouts'
+                ? 'Workouts'
+                : lane === 'bests'
+                  ? 'Bests'
+                  : lane === 'nutrition'
+                    ? 'Nutrition'
+                    : 'Notes'
           return (
             <g key={lane}>
               <text x="0" y={y + 4} className="fill-zinc-500" fontSize="11">
@@ -239,6 +249,28 @@ export function TimelineLanes({
               }),
             )
           : null}
+        {lanes.includes('nutrition')
+          ? nutritionCalories.map((item) => {
+              const laneIndex = lanes.indexOf('nutrition')
+              const x = xForDate(item.date, start, end, plotLeft, plotWidth)
+              const maxCalories = Math.max(...nutritionCalories.map((point) => point.calories), 1)
+              const barH = Math.max(4, (item.calories / maxCalories) * (laneHeight - 18))
+              const y = laneIndex * laneHeight + (laneHeight - 8) - barH
+              return (
+                <g key={item.eventId}>
+                  <rect x={x - 3} y={y} width="6" height={barH} className="fill-zinc-800" rx="1" />
+                  <foreignObject x={x - 10} y={laneIndex * laneHeight + 8} width="20" height={laneHeight - 12}>
+                    <button
+                      type="button"
+                      className="h-full w-5 cursor-pointer rounded-sm bg-transparent"
+                      aria-label={`${item.calories.toLocaleString('en-US')} kcal on ${formatCalendarDate(item.date)}`}
+                      onClick={() => onSelect(item.eventId)}
+                    />
+                  </foreignObject>
+                </g>
+              )
+            })
+          : null}
         {lanes.includes('checkpoints')
           ? checkpoints.map((item) => {
               const laneIndex = lanes.indexOf('checkpoints')
@@ -282,6 +314,7 @@ export function TimelineLaneLegend({
     series.bodyWeight.length > 0 ? { shape: '●', label: 'Body weight' } : null,
     series.workouts.length > 0 ? { shape: '◆', label: 'Workouts' } : null,
     series.performanceBests.length > 0 ? { shape: '★', label: 'Performance bests' } : null,
+    (series.nutritionCalories?.length ?? 0) > 0 ? { shape: '▮', label: 'Nutrition calories' } : null,
     (series.checkpoints?.length ?? 0) > 0 ? { shape: '|', label: 'Checkpoints' } : null,
   ].filter((item): item is { shape: string; label: string } => item != null)
   if (items.length === 0) {

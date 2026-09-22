@@ -10,6 +10,8 @@ import type {
   ProgressWorkoutSummary,
 } from '../../src/domain/progress/types.js'
 import { PERFORMANCE_TYPES, ANALYTICS_LOAD_TYPES, ANALYTICS_REP_MODES } from '../../src/domain/progress/types.js'
+import type { NutritionEntry, NutritionTarget } from '../../src/domain/nutrition/types.js'
+import { listAllEntries, listAllTargets } from '../nutrition/queries.js'
 
 const TABLES_UNAVAILABLE = 'Progress tables are not available. Apply pending migrations.'
 
@@ -85,6 +87,8 @@ export type ProgressCanonicalRows = {
   sets: CanonicalSetRecord[]
   bodyObservations: BodyObservation[]
   checkpoints: ProgressCheckpoint[]
+  nutritionEntries: NutritionEntry[]
+  nutritionTargets: NutritionTarget[]
 }
 
 export function mapCheckpointRow(row: Record<string, unknown>): ProgressCheckpoint {
@@ -100,21 +104,22 @@ export function mapCheckpointRow(row: Record<string, unknown>): ProgressCheckpoi
 
 export async function loadProgressCanonicalRows(): Promise<ProgressCanonicalRows> {
   const sql = await getSql()
-  const [exerciseRows, sessionRows, setRows, bodyRows, checkpointRows] = await queryOrUnavailable(() =>
-    Promise.all([
-      sql.query(
-        `SELECT id, external_id, name, measurement_kind, unilateral, performance_type, analytics_load_type, analytics_rep_mode
+  const [exerciseRows, sessionRows, setRows, bodyRows, checkpointRows, nutritionEntries, nutritionTargets] =
+    await queryOrUnavailable(() =>
+      Promise.all([
+        sql.query(
+          `SELECT id, external_id, name, measurement_kind, unilateral, performance_type, analytics_load_type, analytics_rep_mode
          FROM exercise_definitions
          WHERE is_active = true
          ORDER BY name, id`,
-      ),
-      sql.query(
-        `SELECT id, workout_date, created_at, template_name, routine_code, effort, duration_min
+        ),
+        sql.query(
+          `SELECT id, workout_date, created_at, template_name, routine_code, effort, duration_min
          FROM workout_sessions
          ORDER BY workout_date ASC, created_at ASC, id ASC`,
-      ),
-      sql.query(
-        `SELECT
+        ),
+        sql.query(
+          `SELECT
             sets.id AS set_id,
             sessions.id AS session_id,
             exercises.id AS session_exercise_id,
@@ -139,9 +144,9 @@ export async function loadProgressCanonicalRows(): Promise<ProgressCanonicalRows
            ON sessions.id = exercises.workout_session_id
          ORDER BY sessions.workout_date ASC, sessions.created_at ASC, sessions.id ASC,
                   exercises.position ASC, sets.set_number ASC, sets.id ASC`,
-      ),
-      sql.query(
-        `SELECT
+        ),
+        sql.query(
+          `SELECT
             metrics.id AS measurement_id,
             metrics.measurement_session_id,
             metrics.metric_key,
@@ -154,10 +159,12 @@ export async function loadProgressCanonicalRows(): Promise<ProgressCanonicalRows
          JOIN body_measurement_sessions AS sessions
            ON sessions.id = metrics.measurement_session_id
          ORDER BY sessions.measured_at ASC, metrics.id ASC`,
-      ),
-      sql.query(LIST_CHECKPOINTS_SQL),
-    ]),
-  )
+        ),
+        sql.query(LIST_CHECKPOINTS_SQL),
+        listAllEntries(),
+        listAllTargets(),
+      ]),
+    )
 
   const exercises: ProgressExerciseDefinition[] = (exerciseRows as Record<string, unknown>[]).map((row) => {
     const fallback = classificationForExternalId(typeof row.external_id === 'string' ? row.external_id : null)
@@ -234,5 +241,7 @@ export async function loadProgressCanonicalRows(): Promise<ProgressCanonicalRows
     sets,
     bodyObservations,
     checkpoints: (checkpointRows as Record<string, unknown>[]).map(mapCheckpointRow),
+    nutritionEntries,
+    nutritionTargets,
   }
 }

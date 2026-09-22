@@ -8,6 +8,7 @@ import {
   formatPerformed,
   formatSigned,
 } from './format'
+import { formatKcal } from '@/features/nutrition/format'
 
 export const RANGE_OPTIONS: Array<{ id: ProgressRange; label: string }> = [
   { id: '30d', label: '30D' },
@@ -21,6 +22,7 @@ export const TIMELINE_FOCUS_OPTIONS: Array<{ id: TimelineFocus; label: string }>
   { id: 'all', label: 'All' },
   { id: 'training', label: 'Training' },
   { id: 'body', label: 'Body' },
+  { id: 'nutrition', label: 'Nutrition' },
   { id: 'bests', label: 'Performance Bests' },
 ]
 
@@ -131,6 +133,10 @@ export function findingTitle(kind: string): string {
       return 'Weight trend'
     case 'training_frequency_change':
       return 'Workout frequency'
+    case 'nutrition_logging_summary':
+      return 'Nutrition logging'
+    case 'nutrition_period_average':
+      return 'Calories on logged days'
     default:
       return kind.replace(/_/g, ' ')
   }
@@ -161,6 +167,12 @@ export function findingHeadline(finding: ProgressFinding, overview: ProgressOver
   }
   if (finding.kind === 'training_frequency_change') {
     return `${finding.currentWorkouts ?? 0} workouts`
+  }
+  if (finding.kind === 'nutrition_logging_summary' && finding.loggedDays != null && finding.calendarDays != null) {
+    return `${finding.loggedDays} of ${finding.calendarDays} days logged`
+  }
+  if (finding.kind === 'nutrition_period_average' && finding.average != null && finding.observedDays != null) {
+    return `${formatKcal(finding.average)} avg on ${finding.observedDays} logged day${finding.observedDays === 1 ? '' : 's'}`
   }
   return findingTitle(finding.kind)
 }
@@ -198,6 +210,12 @@ export function findingResult(finding: ProgressFinding, overview: ProgressOvervi
   }
   if (finding.kind === 'training_frequency_change' && finding.currentWorkouts != null) {
     return `${finding.currentWorkouts} workout${finding.currentWorkouts === 1 ? '' : 's'}`
+  }
+  if (finding.kind === 'nutrition_logging_summary' && finding.loggedDays != null && finding.calendarDays != null) {
+    return `${finding.loggedDays} / ${finding.calendarDays}`
+  }
+  if (finding.kind === 'nutrition_period_average' && finding.average != null) {
+    return formatKcal(finding.average)
   }
   return null
 }
@@ -246,6 +264,12 @@ export function progressBriefLines(overview: ProgressOverview): string[] {
   const weightTrend = overview.body.weight.trend
   if (weightTrend.status === 'available') {
     lines.push(`Weight trend ${formatSigned(kilogramsToPounds(weightTrend.value.slopePerWeek), 2, 'lb')}/week`)
+  }
+
+  if (overview.nutrition.loggedDays > 0) {
+    lines.push(
+      `${overview.nutrition.loggedDays} nutrition day${overview.nutrition.loggedDays === 1 ? '' : 's'} logged`,
+    )
   }
 
   return lines

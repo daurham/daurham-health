@@ -21,6 +21,8 @@ import {
 } from './findings.js'
 import { performanceFrontier, timedPerformanceFrontier } from './frontier.js'
 import { dateInInclusiveRange, trailingPeriod, type TrailingPeriod } from './periods.js'
+import { nutritionFindings, nutritionPeriodSummary, type NutritionPeriodSummary } from './nutrition.js'
+import type { NutritionEntry, NutritionTarget } from '../nutrition/types.js'
 import { performanceBestsForExercise } from './prs.js'
 import { relativeStrength } from './relative-strength.js'
 import {
@@ -48,6 +50,8 @@ export type ProgressCanonicalInput = {
   sets: CanonicalSetRecord[]
   workouts: ProgressWorkoutSummary[]
   bodyObservations: BodyObservation[]
+  nutritionEntries?: NutritionEntry[]
+  nutritionTargets?: NutritionTarget[]
 }
 
 export type ProgressOverview = {
@@ -121,6 +125,7 @@ export type ProgressOverview = {
     }>
     performedPoints: FrontierPoint[]
   }>
+  nutrition: NutritionPeriodSummary
   findings: ProgressFinding[]
 }
 
@@ -129,6 +134,7 @@ function earliestDate(input: ProgressCanonicalInput): string | null {
     ...input.workouts.map((item) => item.sessionDate),
     ...input.sets.map((item) => item.sessionDate),
     ...input.bodyObservations.map((item) => item.calendarDate),
+    ...(input.nutritionEntries ?? []).map((item) => item.logDate),
   ].filter((date) => date <= input.asOf)
   if (dates.length === 0) {
     return null
@@ -384,6 +390,14 @@ export function buildProgressOverview(input: ProgressCanonicalInput): ProgressOv
     ...findingsFromTrainingFrequency(workoutCountComparison, workoutEvidence(currentWorkouts)),
   )
 
+  const nutrition = nutritionPeriodSummary({
+    entries: input.nutritionEntries ?? [],
+    targets: input.nutritionTargets ?? [],
+    start: period.start,
+    end: period.end,
+  })
+  findings.push(...nutritionFindings(nutrition))
+
   let weightChange: ReturnType<typeof compareCounts> = notApplicableMetric(0)
   if (latestWeight && period.comparisonStart) {
     const startNearest = [...weightPoints]
@@ -428,6 +442,7 @@ export function buildProgressOverview(input: ProgressCanonicalInput): ProgressOv
       },
     },
     exercises: exerciseViews,
+    nutrition,
     findings,
   }
 }

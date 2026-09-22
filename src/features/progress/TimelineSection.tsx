@@ -1,19 +1,23 @@
+import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
   groupedTimelineDays,
   performanceBestsForSession,
   timelineEventsForFocus,
   timelineSeriesForFocus,
+  type NutritionDayEntrySnapshot,
   type ProgressRange,
   type ProgressTimeline,
   type TimelineBodyMeasurementEvent,
   type TimelineCheckpointEvent,
   type TimelineEvent,
   type TimelineFocus,
+  type TimelineNutritionDayEvent,
   type TimelinePerformanceBestEvent,
   type TimelineTrainingSessionEvent,
 } from '@/domain/progress'
 import { cn } from '@/lib'
+import { formatGrams, formatKcal, formatQuantity, mealLabel } from '@/features/nutrition/format'
 import { TIMELINE_FOCUS_OPTIONS } from './copy'
 import type { EvidenceTopic } from './EvidencePanel'
 import {
@@ -69,7 +73,7 @@ export function TimelineSection({
       <div>
         <h2 className="text-lg font-semibold tracking-tight">Timeline</h2>
         <p className="mt-1 text-sm text-zinc-600">
-          Recorded training, body measurements, and performance bests in chronological order.
+          Recorded training, body measurements, nutrition days, and performance bests in chronological order.
         </p>
       </div>
 
@@ -152,6 +156,9 @@ function TimelineEventCard({
   }
   if (event.kind === 'checkpoint') {
     return <CheckpointEventCard event={event} />
+  }
+  if (event.kind === 'nutrition_day') {
+    return <NutritionEventCard event={event} onEvidence={onEvidence} />
   }
   return <PerformanceBestCard event={event} range={range} onEvidence={onEvidence} standalone />
 }
@@ -369,6 +376,163 @@ function CheckpointEventCard({ event }: { event: TimelineCheckpointEvent }) {
           <p className="mt-0.5 text-sm text-zinc-600">{formatCalendarDate(event.date)}</p>
           {event.data.notes ? <p className="mt-1 text-sm text-zinc-600">{event.data.notes}</p> : null}
         </div>
+      </div>
+    </article>
+  )
+}
+
+function nutritionMacroLine(event: TimelineNutritionDayEvent): string {
+  const parts: string[] = []
+  if (event.data.calories.status === 'available' && event.data.calories.value != null) {
+    parts.push(formatKcal(event.data.calories.value))
+  }
+  if (event.data.protein.status === 'available' && event.data.protein.value != null) {
+    parts.push(`${formatGrams(event.data.protein.value)} protein`)
+  } else {
+    parts.push('Protein unavailable')
+  }
+  parts.push(`${event.data.entryCount} ${event.data.entryCount === 1 ? 'entry' : 'entries'}`)
+  return parts.join(' · ')
+}
+
+function clusterNutritionSnapshots(entries: readonly NutritionDayEntrySnapshot[]): Array<
+  | { kind: 'entry'; key: string; entry: NutritionDayEntrySnapshot }
+  | { kind: 'meal'; key: string; entries: NutritionDayEntrySnapshot[]; calories: number }
+> {
+  const rows: Array<
+    | { kind: 'entry'; key: string; entry: NutritionDayEntrySnapshot }
+    | { kind: 'meal'; key: string; entries: NutritionDayEntrySnapshot[]; calories: number }
+  > = []
+  const seen = new Set<string>()
+  for (const entry of entries) {
+    if (!entry.mealGroupId) {
+      rows.push({ kind: 'entry', key: entry.id, entry })
+      continue
+    }
+    if (seen.has(entry.mealGroupId)) {
+      continue
+    }
+    seen.add(entry.mealGroupId)
+    const group = entries.filter((item) => item.mealGroupId === entry.mealGroupId)
+    rows.push({
+      kind: 'meal',
+      key: entry.mealGroupId,
+      entries: group,
+      calories: group.reduce((sum, item) => sum + item.calories, 0),
+    })
+  }
+  return rows
+}
+
+function groupedNutritionSnapshots(entries: readonly NutritionDayEntrySnapshot[]): Array<{
+  label: string
+  items: ReturnType<typeof clusterNutritionSnapshots>
+}> {
+  if (entries.every((entry) => entry.meal == null)) {
+    return [{ label: 'Logged', items: clusterNutritionSnapshots(entries) }]
+  }
+  const order = ['breakfast', 'lunch', 'dinner', 'snack', 'other'] as const
+  return order
+    .map((meal) => ({
+      label: mealLabel(meal),
+      items: clusterNutritionSnapshots(entries.filter((entry) => (entry.meal ?? 'other') === meal)),
+    }))
+    .filter((group) => group.items.length > 0)
+}
+
+function NutritionEventCard({
+  event,
+  onEvidence,
+}: {
+  event: TimelineNutritionDayEvent
+  onEvidence: (topic: EvidenceTopic) => void
+}) {
+  const dense = event.data.entryCount > 6
+  const [open, setOpen] = useState(!dense)
+  const groups = groupedNutritionSnapshots(event.data.entries)
+  return (
+    <article
+      id={event.id}
+      tabIndex={-1}
+      className="rounded-lg border border-zinc-200 bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-zinc-400 md:grid md:grid-cols-[7.5rem_minmax(0,1fr)_auto] md:items-start md:gap-4 md:px-4"
+    >
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Nutrition</p>
+      <div>
+        <p className="font-medium tracking-tight">{nutritionMacroLine(event)}</p>
+        {open ? (
+          <div className="mt-3 space-y-3">
+            {groups.map((group) => (
+              <div key={group.label}>
+                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{group.label}</p>
+                <ul className="mt-1 space-y-1 text-sm">
+                  {group.items.map((item) =>
+                    item.kind === 'entry' ? (
+                      <li key={item.key} className="flex justify-between gap-3">
+                        <span>{item.entry.foodName}</span>
+                        <span className="shrink-0 text-zinc-600">{formatKcal(item.entry.calories)}</span>
+                      </li>
+                    ) : (
+                      <li key={item.key}>
+                        <div className="flex justify-between gap-3">
+                          <span>Photo meal</span>
+                          <span className="shrink-0 text-zinc-600">{formatKcal(item.calories)}</span>
+                        </div>
+                        <ul className="mt-1 space-y-0.5 pl-3 text-zinc-600">
+                          {item.entries.map((entry) => (
+                            <li key={entry.id}>
+                              {entry.foodName}
+                              <span className="text-zinc-400">
+                                {' '}
+                                · {formatQuantity(entry.servingQuantity, entry.servingUnit)}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </li>
+                    ),
+                  )}
+                </ul>
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2 md:mt-0 md:justify-end">
+        {dense ? (
+          <button
+            type="button"
+            className="inline-flex min-h-10 items-center rounded-md px-3 text-sm font-medium text-zinc-700 hover:bg-zinc-100 md:min-h-9"
+            onClick={() => setOpen((current) => !current)}
+          >
+            {open ? 'Hide entries' : 'Show entries'}
+          </button>
+        ) : null}
+        <button
+          type="button"
+          className="inline-flex min-h-10 items-center rounded-md border border-zinc-300 px-3 text-sm font-medium text-zinc-800 hover:bg-zinc-50 md:min-h-9"
+          onClick={() =>
+            onEvidence({
+              title: 'Nutrition',
+              subtitle: nutritionMacroLine(event),
+              facts: [
+                { label: 'Entries', value: String(event.data.entryCount) },
+                ...(event.data.mealGroupCount > 0
+                  ? [{ label: 'Meal groups', value: String(event.data.mealGroupCount) }]
+                  : []),
+              ],
+              evidence: event.evidence,
+              actions: [{ label: 'Open Nutrition day', to: `/nutrition?date=${event.date}` }],
+            })
+          }
+        >
+          View evidence
+        </button>
+        <Link
+          to={`/nutrition?date=${event.date}`}
+          className="inline-flex min-h-10 items-center rounded-md px-3 text-sm font-medium text-zinc-700 hover:bg-zinc-100 md:min-h-9"
+        >
+          Open day
+        </Link>
       </div>
     </article>
   )

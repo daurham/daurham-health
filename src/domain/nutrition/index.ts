@@ -12,6 +12,7 @@ export type { NutrientAmount } from './servings.js'
 export { recentsFromEntries, rankFoodsForQuery } from './catalog.js'
 export { nutritionDayTotals } from './totals.js'
 export type { NutritionDayTotals, NutrientTotal, NutritionTotable } from './totals.js'
+export { resolveNutritionTarget } from './targets.js'
 export {
   normalizeBarcode,
   barcodeDigits,

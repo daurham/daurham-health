@@ -1,4 +1,4 @@
-import { getProgressOverview, getProgressTimeline } from './service.js'
+import { getProgressCompare, getProgressOverview, getProgressTimeline } from './service.js'
 import { loadProgressCanonicalRows } from './queries.js'
 import { exclusionReasonForSet } from '../../src/domain/progress/exercise-performance.js'
 import { supportsLoadedRepStrength, supportsTimedExternal } from '../../src/domain/progress/exercise-classification.js'
@@ -17,10 +17,37 @@ async function main(): Promise<void> {
     range: 'all',
     asOf: null,
   })
+  const overview30 = await getProgressOverview({
+    range: '30d',
+    asOf: '2026-09-21',
+  })
   const timeline = await getProgressTimeline({
     range: 'all',
     asOf: null,
   })
+  const timeline30 = await getProgressTimeline({
+    range: '30d',
+    asOf: '2026-09-21',
+  })
+  const compare = await getProgressCompare({
+    startA: '2026-08-23',
+    endA: '2026-09-21',
+    startB: '2026-07-24',
+    endB: '2026-08-22',
+    checkpointId: null,
+    asOf: '2026-09-21',
+  })
+  const checkpoint = rows.checkpoints[0]
+  const sinceCheckpoint = checkpoint
+    ? await getProgressCompare({
+        startA: null,
+        endA: null,
+        startB: null,
+        endB: null,
+        checkpointId: checkpoint.id,
+        asOf: '2026-09-21',
+      })
+    : null
   const exercisesById = new Map(rows.exercises.map((exercise) => [exercise.id, exercise]))
   const enoughTrend = overview.exercises.filter((exercise) => exercise.trend.status === 'available')
   const prCount = overview.exercises.reduce((sum, exercise) => sum + exercise.recentPrs.length, 0)
@@ -125,7 +152,89 @@ async function main(): Promise<void> {
         bodyWeight: timeline.series.bodyWeight.length,
         workouts: timeline.series.workouts.length,
         performanceBests: timeline.series.performanceBests.length,
+        nutritionCalories: timeline.series.nutritionCalories.length,
       },
+      nutritionDays: timeline.events
+        .filter((event) => event.kind === 'nutrition_day')
+        .map((event) =>
+          event.kind === 'nutrition_day'
+            ? {
+                date: event.date,
+                occurredAt: event.occurredAt ?? null,
+                entryCount: event.data.entryCount,
+                calories: event.data.calories,
+                protein: event.data.protein,
+              }
+            : null,
+        ),
+    },
+    nutrition: {
+      all: {
+        calendarDays: overview.nutrition.calendarDays,
+        loggedDays: overview.nutrition.loggedDays,
+        coveragePct: overview.nutrition.coveragePct,
+        calories: overview.nutrition.calories,
+        protein: overview.nutrition.protein,
+        carbs: overview.nutrition.carbs,
+        fat: overview.nutrition.fat,
+        fiber: overview.nutrition.fiber,
+        observationDates: overview.nutrition.observations.map((item) => item.date),
+        proteinStatuses: overview.nutrition.observations.map((item) => item.protein.status),
+      },
+      last30d: {
+        calendarDays: overview30.nutrition.calendarDays,
+        loggedDays: overview30.nutrition.loggedDays,
+        coveragePct: overview30.nutrition.coveragePct,
+        calories: overview30.nutrition.calories,
+        protein: overview30.nutrition.protein,
+        carbs: overview30.nutrition.carbs,
+        fat: overview30.nutrition.fat,
+        fiber: overview30.nutrition.fiber,
+        observationDates: overview30.nutrition.observations.map((item) => item.date),
+        sep20: overview30.nutrition.observations.find((item) => item.date === '2026-09-20') ?? null,
+        sep21: overview30.nutrition.observations.find((item) => item.date === '2026-09-21') ?? null,
+      },
+      timelineEventCount: {
+        all: timeline.events.filter((event) => event.kind === 'nutrition_day').length,
+        last30d: timeline30.events.filter((event) => event.kind === 'nutrition_day').length,
+      },
+      compare: {
+        coverageDiffers: compare.nutrition.coverageDiffers,
+        a: {
+          loggedDays: compare.nutrition.a.loggedDays,
+          calendarDays: compare.nutrition.a.calendarDays,
+          coveragePct: compare.nutrition.a.coveragePct,
+          caloriesAvg: compare.nutrition.a.calories.averageOnLoggedDays,
+          proteinObservedDays: compare.nutrition.a.protein.observedDays,
+        },
+        b: {
+          loggedDays: compare.nutrition.b.loggedDays,
+          calendarDays: compare.nutrition.b.calendarDays,
+          coveragePct: compare.nutrition.b.coveragePct,
+          caloriesAvg: compare.nutrition.b.calories.averageOnLoggedDays,
+          proteinObservedDays: compare.nutrition.b.protein.observedDays,
+        },
+      },
+      sinceCheckpoint: sinceCheckpoint
+        ? {
+            label: sinceCheckpoint.checkpoint?.label ?? null,
+            start: sinceCheckpoint.periodB.start,
+            end: sinceCheckpoint.periodB.end,
+            loggedDays: sinceCheckpoint.nutrition.b.loggedDays,
+            calendarDays: sinceCheckpoint.nutrition.b.calendarDays,
+            coveragePct: sinceCheckpoint.nutrition.b.coveragePct,
+            caloriesAvg: sinceCheckpoint.nutrition.b.calories.averageOnLoggedDays,
+            protein: sinceCheckpoint.nutrition.b.protein,
+          }
+        : null,
+      loadedEntryCount: rows.nutritionEntries.length,
+      loadedTargetCount: rows.nutritionTargets.length,
+      entryDates: [...new Set(rows.nutritionEntries.map((item) => item.logDate))].sort(),
+      targets: rows.nutritionTargets.map((item) => ({
+        effectiveFrom: item.effectiveFrom,
+        caloriesTarget: item.caloriesTarget,
+        proteinTarget: item.proteinTarget,
+      })),
     },
     loadedRepEligible: rows.exercises.filter(supportsLoadedRepStrength).map((exercise) => exercise.name),
     timedEligible: rows.exercises.filter(supportsTimedExternal).map((exercise) => exercise.name),

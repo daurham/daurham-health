@@ -194,6 +194,10 @@ export const LIST_ENTRIES_FOR_DATE_SQL = `SELECT ${ENTRY_COLUMNS}
          WHERE log_date = $1
          ORDER BY consumed_at NULLS LAST, created_at ASC, id ASC`
 
+export const LIST_ALL_ENTRIES_SQL = `SELECT ${ENTRY_COLUMNS}
+         FROM nutrition_entries
+         ORDER BY log_date ASC, created_at ASC, id ASC`
+
 export const LIST_ENTRIES_BY_MEAL_GROUP_SQL = `SELECT ${ENTRY_COLUMNS} FROM nutrition_entries
          WHERE meal_group_id = $1
          ORDER BY created_at ASC, id ASC`
@@ -240,6 +244,10 @@ export const TARGET_FOR_DATE_SQL = `SELECT id, effective_from, calories_target, 
          WHERE effective_from <= $1
          ORDER BY effective_from DESC
          LIMIT 1`
+
+export const LIST_ALL_TARGETS_SQL = `SELECT id, effective_from, calories_target, protein_target, carbs_target, fat_target, fiber_target, created_at, updated_at
+         FROM nutrition_targets
+         ORDER BY effective_from ASC, created_at ASC`
 
 export const UPSERT_TARGET_SQL = `INSERT INTO nutrition_targets (
            effective_from, calories_target, protein_target, carbs_target, fat_target, fiber_target
@@ -352,6 +360,14 @@ export async function listEntriesForDate(date: string): Promise<NutritionEntry[]
   })
 }
 
+export async function listAllEntries(): Promise<NutritionEntry[]> {
+  return queryOrUnavailable(async () => {
+    const sql = await getSql()
+    const rows = (await sql.query(LIST_ALL_ENTRIES_SQL)) as EntryRow[]
+    return rows.map(mapEntryRow)
+  })
+}
+
 export async function getEntry(id: string): Promise<NutritionEntry | null> {
   return queryOrUnavailable(async () => {
     const sql = await getSql()
@@ -411,6 +427,14 @@ export async function targetForDate(date: string): Promise<NutritionTarget | nul
     const sql = await getSql()
     const rows = (await sql.query(TARGET_FOR_DATE_SQL, [date])) as TargetRow[]
     return rows[0] ? mapTargetRow(rows[0]) : null
+  })
+}
+
+export async function listAllTargets(): Promise<NutritionTarget[]> {
+  return queryOrUnavailable(async () => {
+    const sql = await getSql()
+    const rows = (await sql.query(LIST_ALL_TARGETS_SQL)) as TargetRow[]
+    return rows.map(mapTargetRow)
   })
 }
 

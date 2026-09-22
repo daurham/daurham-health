@@ -5,10 +5,12 @@ import { utcCalendarDateFromNow } from '@/domain/progress/dates'
 import type {
   CompareExercise,
   MetricResult,
+  NutritionPeriodSummary,
   ProgressCompare,
   ProgressCheckpoint,
 } from '@/domain/progress'
 import { cn } from '@/lib'
+import { formatGrams, formatKcal } from '@/features/nutrition/format'
 import {
   createProgressCheckpoint,
   deleteProgressCheckpoint,
@@ -20,8 +22,10 @@ import type { EvidenceTopic } from './EvidencePanel'
 import {
   formatBodyCanonical,
   formatCalendarDate,
+  formatCoverageDays,
   formatPercent,
   formatPerformed,
+  formatTargetDifference,
 } from './format'
 
 function metricNumber(result: MetricResult<{ value: number }>): string {
@@ -476,6 +480,8 @@ function CompareResults({
         </p>
       ) : null}
 
+      <NutritionCompareBlock compare={compare} left={left} right={right} onEvidence={onEvidence} />
+
       <section>
         <h3 className="text-sm font-semibold tracking-tight">Exercises</h3>
         {compare.exercises.length === 0 ? (
@@ -526,6 +532,146 @@ function CompareResults({
         )}
       </section>
     </div>
+  )
+}
+
+function nutritionSideCopy(summary: NutritionPeriodSummary): {
+  logged: string
+  calories: string
+  protein: string
+  proteinObserved: string
+} {
+  return {
+    logged: formatCoverageDays(summary.loggedDays, summary.calendarDays),
+    calories:
+      summary.calories.averageOnLoggedDays != null ? formatKcal(summary.calories.averageOnLoggedDays) : '—',
+    protein:
+      summary.protein.averageOnObservedDays != null
+        ? (formatGrams(summary.protein.averageOnObservedDays) ?? 'Unavailable')
+        : summary.loggedDays > 0
+          ? 'Unavailable'
+          : '—',
+    proteinObserved:
+      summary.protein.observedDays > 0 ? `${summary.protein.observedDays} days` : summary.loggedDays > 0 ? '0 observed' : '—',
+  }
+}
+
+function NutritionCompareBlock({
+  compare,
+  left,
+  right,
+  onEvidence,
+}: {
+  compare: ProgressCompare
+  left: string
+  right: string
+  onEvidence: (topic: EvidenceTopic) => void
+}) {
+  const since = compare.mode === 'since_checkpoint'
+  const a = nutritionSideCopy(compare.nutrition.a)
+  const b = nutritionSideCopy(compare.nutrition.b)
+  const shown = since ? compare.nutrition.b : null
+  if (compare.nutrition.a.loggedDays === 0 && compare.nutrition.b.loggedDays === 0) {
+    return null
+  }
+
+  const rows = [
+    { label: 'Logged days', a: a.logged, b: b.logged },
+    { label: 'Calories avg on logged days', a: a.calories, b: b.calories },
+    { label: 'Protein avg on observed days', a: a.protein, b: b.protein },
+    { label: 'Protein observed', a: a.proteinObserved, b: b.proteinObserved },
+  ]
+
+  return (
+    <section className="space-y-3">
+      <div className="flex items-baseline justify-between gap-3">
+        <h3 className="text-sm font-semibold tracking-tight">Nutrition</h3>
+        <button
+          type="button"
+          className="text-sm text-zinc-600 hover:text-zinc-900"
+          onClick={() =>
+            onEvidence({
+              title: 'Nutrition compare',
+              facts: [
+                { label: `${left} logged`, value: a.logged },
+                { label: `${right} logged`, value: b.logged },
+                { label: `${left} calories avg`, value: a.calories },
+                { label: `${right} calories avg`, value: b.calories },
+              ],
+              evidence: [
+                ...compare.nutrition.a.evidence.dates.map((date) => ({ domain: 'nutrition' as const, date })),
+                ...compare.nutrition.b.evidence.dates.map((date) => ({ domain: 'nutrition' as const, date })),
+              ],
+            })
+          }
+        >
+          View evidence
+        </button>
+      </div>
+      {compare.nutrition.coverageDiffers ? (
+        <p className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-700">
+          Nutrition coverage differs between these periods. Averages describe logged days only, not full-period intake.
+        </p>
+      ) : null}
+      {since && shown ? (
+        <div className="rounded-lg border border-zinc-200 bg-white px-3 py-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+            Since {compare.checkpoint?.label ?? 'checkpoint'}
+          </p>
+          <p className="mt-1 font-medium">{formatCoverageDays(shown.loggedDays, shown.calendarDays)} logged</p>
+          {shown.calories.averageOnLoggedDays != null ? (
+            <p className="mt-1 text-sm text-zinc-600">{formatKcal(shown.calories.averageOnLoggedDays)} avg on logged days</p>
+          ) : null}
+          {shown.protein.averageOnObservedDays != null ? (
+            <p className="text-sm text-zinc-600">
+              {formatGrams(shown.protein.averageOnObservedDays)} protein avg across {shown.protein.observedDays} observed
+              day{shown.protein.observedDays === 1 ? '' : 's'}
+            </p>
+          ) : shown.loggedDays > 0 ? (
+            <p className="text-sm text-zinc-600">Protein unavailable</p>
+          ) : null}
+          {shown.calories.targetContext ? (
+            <p className="mt-1 text-sm text-zinc-600">
+              Calories vs target {formatTargetDifference(shown.calories.targetContext.averageDifference, 'kcal')} avg
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+      <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white">
+        <table className="hidden min-w-full text-sm md:table">
+          <thead>
+            <tr className="border-b border-zinc-200 text-left text-xs uppercase tracking-wide text-zinc-500">
+              <th className="px-3 py-2 font-semibold" />
+              <th className="px-3 py-2 font-semibold">{left}</th>
+              <th className="px-3 py-2 font-semibold">{right}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.label} className="border-t border-zinc-100">
+                <td className="px-3 py-2 text-zinc-600">{row.label}</td>
+                <td className="px-3 py-2 font-medium">{row.a}</td>
+                <td className="px-3 py-2 font-medium">{row.b}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <div className="space-y-3 p-3 md:hidden">
+          {rows.map((row) => (
+            <div key={row.label}>
+              <p className="text-xs uppercase tracking-wide text-zinc-500">{row.label}</p>
+              <p className="mt-1 text-sm">
+                <span className="text-zinc-500">{left}: </span>
+                {row.a}
+                <span className="mx-2 text-zinc-300">·</span>
+                <span className="text-zinc-500">{right}: </span>
+                {row.b}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
   )
 }
 

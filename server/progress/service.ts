@@ -105,6 +105,8 @@ export async function getProgressOverview(input: {
     workouts: rows.workouts,
     sets: rows.sets,
     bodyObservations: rows.bodyObservations,
+    nutritionEntries: rows.nutritionEntries,
+    nutritionTargets: rows.nutritionTargets,
   })
 }
 
@@ -123,6 +125,8 @@ export async function getProgressTimeline(input: {
     sets: rows.sets,
     bodyObservations: rows.bodyObservations,
     checkpoints: rows.checkpoints,
+    nutritionEntries: rows.nutritionEntries,
+    nutritionTargets: rows.nutritionTargets,
   })
 }
 
@@ -144,6 +148,8 @@ export async function getProgressCompare(input: {
     workouts: rows.workouts,
     sets: rows.sets,
     bodyObservations: rows.bodyObservations,
+    nutritionEntries: rows.nutritionEntries,
+    nutritionTargets: rows.nutritionTargets,
   }
   if (query.mode === 'since_checkpoint') {
     const checkpoint = rows.checkpoints.find((item) => item.id === query.checkpointId)

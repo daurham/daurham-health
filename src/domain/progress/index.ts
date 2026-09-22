@@ -60,6 +60,22 @@ export { relativeStrength } from './relative-strength.js'
 export { trainingConsistency } from './consistency.js'
 export { buildProgressOverview, type ProgressCanonicalInput, type ProgressOverview } from './overview.js'
 export {
+  emptyNutritionPeriodSummary,
+  nutritionCalorieSeries,
+  nutritionCoverageDiffers,
+  nutritionDailyObservations,
+  nutritionDayEventData,
+  nutritionFindings,
+  nutritionPeriodSummary,
+  type NutritionCaloriesPeriodStat,
+  type NutritionDailyObservation,
+  type NutritionDayEntrySnapshot,
+  type NutritionDayEventData,
+  type NutritionMacroPeriodStat,
+  type NutritionNutrientObservation,
+  type NutritionPeriodSummary,
+} from './nutrition.js'
+export {
   TIMELINE_DOMAINS,
   TIMELINE_EVENT_KINDS,
   TIMELINE_FOCUSES,
@@ -78,6 +94,7 @@ export {
   type TimelinePerformanceBestEvent,
   type TimelineTrainingSessionEvent,
   type TimelineCheckpointEvent,
+  type TimelineNutritionDayEvent,
 } from './timeline.js'
 export { classificationForExternalId, supportsTimedExternal } from './exercise-classification.js'
 export { calendarDateFromInstant, utcCalendarDateFromNow } from './dates.js'

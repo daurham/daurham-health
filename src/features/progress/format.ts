@@ -149,6 +149,36 @@ export function performanceTypeLabel(performanceType: string): string {
   return performanceType.replace(/_/g, ' ')
 }
 
+export function formatNutritionCalories(value: number | null | undefined, status?: 'available' | 'unavailable'): string {
+  if (status === 'unavailable' || value == null) {
+    return 'Calories unavailable'
+  }
+  return `${value.toLocaleString('en-US', { maximumFractionDigits: 0 })} kcal`
+}
+
+export function formatNutritionGrams(
+  label: string,
+  value: number | null | undefined,
+  status?: 'available' | 'unavailable',
+): string {
+  if (status === 'unavailable' || value == null) {
+    return `${label} unavailable`
+  }
+  return `${value.toLocaleString('en-US', { maximumFractionDigits: 1, minimumFractionDigits: 0 })} g ${label.toLowerCase()}`
+}
+
+export function formatCoverageDays(loggedDays: number, calendarDays: number): string {
+  return `${loggedDays} / ${calendarDays} days`
+}
+
+export function formatCoveragePct(coveragePct: number): string {
+  return `${coveragePct.toLocaleString('en-US', { maximumFractionDigits: 0 })}% coverage`
+}
+
+export function formatTargetDifference(value: number, unit: 'kcal' | 'g'): string {
+  return formatSigned(value, unit === 'kcal' ? 0 : 1, unit)
+}
+
 export function bodyMetricLabel(key: string): string {
   const labels: Record<string, string> = {
     weight: 'Weight',
