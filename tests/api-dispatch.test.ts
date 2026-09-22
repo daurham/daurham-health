@@ -119,6 +119,7 @@ describe('Vercel nested API routing', () => {
     expect(matchHealthApiRoute('/api/apple-health/import/status')).toBe('apple-health-import')
     expect(matchHealthApiRoute('/api/apple-health/import/preview')).toBe('apple-health-import')
     expect(matchHealthApiRoute('/api/apple-health/import/commit')).toBe('apple-health-import')
+    expect(matchHealthApiRoute('/api/ingest/apple-health')).toBe('apple-health-sync')
     expect(matchHealthApiRoute(`/api/training/transcription/jobs/${JOB_ID}`)).toBe(
       'transcription-job-detail',
     )
@@ -303,6 +304,13 @@ describe('api/index after Vercel nested rewrite', () => {
     const commit = await hit('POST', '/api/apple-health/import/commit')
     expect(commit.status()).not.toBe(404)
     expect(isDeniedPrivate(commit.status())).toBe(true)
+
+    const sync = await hit('POST', '/api/ingest/apple-health')
+    expect(sync.status()).not.toBe(404)
+    expect(isDeniedPrivate(sync.status())).toBe(true)
+    const syncRead = await hit('GET', '/api/ingest/apple-health')
+    expect(syncRead.status()).not.toBe(200)
+    expect(JSON.stringify(syncRead.body() ?? {})).not.toContain('stepsCount')
   })
 
   it('returns 404 for unknown API routes and 405 for unsupported methods', async () => {

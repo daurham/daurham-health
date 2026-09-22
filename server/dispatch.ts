@@ -32,6 +32,7 @@ import nutritionMealJobsHandler from './handlers/nutrition-meal-jobs.js'
 import nutritionMealJobDetailHandler from './handlers/nutrition-meal-job-detail.js'
 import nutritionMealCommitHandler from './handlers/nutrition-meal-commit.js'
 import appleHealthImportHandler from './handlers/apple-health-import.js'
+import appleHealthSyncHandler from './handlers/apple-health-sync.js'
 
 export type HealthApiRoute =
   | 'health'
@@ -67,6 +68,7 @@ export type HealthApiRoute =
   | 'nutrition-meal-job-detail'
   | 'nutrition-meal-commit'
   | 'apple-health-import'
+  | 'apple-health-sync'
 
 type HealthApiHandler = (req: ApiRequest, res: ApiResponse) => unknown | Promise<unknown>
 
@@ -104,6 +106,7 @@ const HANDLERS: Record<HealthApiRoute, HealthApiHandler> = {
   'nutrition-meal-job-detail': nutritionMealJobDetailHandler,
   'nutrition-meal-commit': nutritionMealCommitHandler,
   'apple-health-import': appleHealthImportHandler,
+  'apple-health-sync': appleHealthSyncHandler,
 }
 
 function isSingleSegmentAfter(pathname: string, prefix: string): boolean {
@@ -169,6 +172,8 @@ export function matchHealthApiRoute(pathname: string): HealthApiRoute | null {
     case '/api/apple-health/import/preview':
     case '/api/apple-health/import/commit':
       return 'apple-health-import'
+    case '/api/ingest/apple-health':
+      return 'apple-health-sync'
     default:
       break
   }

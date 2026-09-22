@@ -8,6 +8,7 @@ import type { AppleHealthPreviewCounts } from '../../src/domain/apple-health/pre
 import { fingerprintForRecord } from '../../src/domain/apple-health/types.js'
 import { formatDatabaseError, getSql } from '../db.js'
 import { HttpError } from '../http.js'
+import { latestHealthAutoExportStatus } from './hae-service.js'
 import { buildAppleHealthClaimStatement } from './commit-sql.js'
 import {
   APPLE_HEALTH_SOURCE_SQL,
@@ -48,6 +49,12 @@ export type AppleHealthStatusResponse = {
     workoutCount: number
     metadata: Record<string, unknown>
   } | null
+  autoExport: {
+    importedAt: string
+    status: string
+    latestDay: string | null
+  } | null
+  activitySampleCount: number
 }
 
 export type AppleHealthPreviewLookup = {
@@ -147,8 +154,13 @@ export async function appleHealthImportStatus(): Promise<AppleHealthStatusRespon
       workout_count: number
     }>
     const row = rows[0]
+    const autoExport = await latestHealthAutoExportStatus()
+    const sampleRows = (await sql.query(`SELECT COUNT(*)::int AS count FROM activity_samples`)) as Array<{
+      count: number
+    }>
+    const activitySampleCount = sampleRows[0]?.count ?? 0
     if (!row) {
-      return { sourceKey: APPLE_HEALTH_SOURCE_KEY, job: null }
+      return { sourceKey: APPLE_HEALTH_SOURCE_KEY, job: null, autoExport, activitySampleCount }
     }
     return {
       sourceKey: APPLE_HEALTH_SOURCE_KEY,
@@ -168,6 +180,8 @@ export async function appleHealthImportStatus(): Promise<AppleHealthStatusRespon
         workoutCount: row.workout_count,
         metadata: row.metadata ?? {},
       },
+      autoExport,
+      activitySampleCount,
     }
   } catch (error) {
     const message = formatDatabaseError(error)

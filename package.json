@@ -11,6 +11,9 @@
     "migrate": "tsx server/migrate.ts",
     "nutrition:legacy-preview": "tsx server/nutrition/legacy-cli.ts",
     "apple-health:preview": "tsx server/apple-health/cli.ts",
+    "apple-health:compact-preview": "tsx server/apple-health/compact-cli.ts",
+    "apple-health:commit-archive": "tsx server/apple-health/archive-cli.ts",
+    "apple-health:hae-import": "tsx server/apple-health/hae-cli.ts",
     "test": "vitest run"
   },
   "dependencies": {

@@ -93,6 +93,19 @@ describe('splitSqlStatements', () => {
     expect(activitySleep[0]).toMatch(/^CREATE TABLE activity_samples/)
     expect(activitySleep[3]).toMatch(/^CREATE TABLE sleep_intervals/)
     expect(activitySleep[6]).toMatch(/^CREATE TABLE activity_workouts/)
+    const daily = splitSqlStatements(
+      readFileSync(path.join('migrations', '0013_activity_daily_summaries.sql'), 'utf8'),
+    )
+    expect(daily).toHaveLength(2)
+    expect(daily[0]).toMatch(/^CREATE TABLE activity_daily_summaries/)
+    expect(daily[0]).toContain('steps_count NUMERIC NULL')
+    expect(daily[1]).toMatch(/^CREATE INDEX activity_daily_summaries_import_job_idx/)
+    const autoExport = splitSqlStatements(
+      readFileSync(path.join('migrations', '0014_health_auto_export.sql'), 'utf8'),
+    )
+    expect(autoExport).toHaveLength(1)
+    expect(autoExport[0]).toMatch(/^INSERT INTO data_sources/)
+    expect(autoExport[0]).toContain('health_auto_export')
     expect(training.every((statement) => !statement.includes('$tag$'))).toBe(true)
     expect(training[0]).toMatch(/^CREATE TABLE exercise_definitions/)
     expect(training[7]).toMatch(/^INSERT INTO exercise_definitions/)

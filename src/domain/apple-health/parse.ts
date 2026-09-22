@@ -9,6 +9,7 @@ import {
 } from './config.js'
 import { appleHealthFingerprint } from './fingerprint.js'
 import { mapSleepStage } from './sleep.js'
+import { parseActivitySummaryTag, type AppleActivitySummary } from './activity-summary.js'
 import {
   convertDistanceToMeters,
   convertDurationToMinutes,
@@ -78,6 +79,8 @@ export type AppleHealthParseResult = {
   locale: string | null
   records: NormalizedAppleHealthRecord[]
   skipped: SkippedAppleHealthRecord[]
+  activitySummaries: AppleActivitySummary[]
+  activitySummarySkips: { sentinel: number; malformed: number }
   unknownSleepCategories: string[]
   sources: string[]
   devices: string[]
@@ -319,6 +322,49 @@ function parseWorkoutTag(tag: string): NormalizedAppleHealthRecord | SkippedAppl
   }
 }
 
+function applyWorkoutStatistic(workout: NormalizedWorkoutSample, tag: string): NormalizedWorkoutSample {
+  const attrs = parseAttrs(tag)
+  const sum = optionalFinite(attrs.sum)
+  if (sum == null) {
+    return workout
+  }
+  const type = attrs.type ?? ''
+  try {
+    if (type === 'HKQuantityTypeIdentifierActiveEnergyBurned' && workout.energyKcal == null) {
+      return { ...workout, energyKcal: convertEnergyToKcal(sum, attrs.unit ?? 'kcal') }
+    }
+    if (
+      (type === 'HKQuantityTypeIdentifierDistanceWalkingRunning' ||
+        type === 'HKQuantityTypeIdentifierDistanceCycling') &&
+      workout.distanceM == null &&
+      sum !== 0
+    ) {
+      return { ...workout, distanceM: convertDistanceToMeters(sum, attrs.unit ?? 'm') }
+    }
+  } catch {
+    return workout
+  }
+  return workout
+}
+
+function nextCloseWorkout(xml: string, from: number): { start: number; end: number } | null {
+  const start = xml.indexOf('</Workout>', from)
+  if (start < 0) {
+    return null
+  }
+  return { start, end: start + '</Workout>'.length }
+}
+
+export type AppleHealthScanItem = NormalizedAppleHealthRecord | SkippedAppleHealthRecord
+
+export type AppleHealthXmlScannerOptions = {
+  /** When false, finish() does not retain every record. Use onItem for large exports. */
+  retain?: boolean
+  onItem?: (item: AppleHealthScanItem) => void
+  onActivitySummary?: (summary: AppleActivitySummary) => void
+  onActivitySummarySkip?: (reason: 'sentinel' | 'malformed') => void
+}
+
 export type AppleHealthXmlScanner = {
   push(chunk: string): void
   finish(): AppleHealthParseResult
@@ -343,16 +389,31 @@ function captureExportMetadata(xml: string, state: { exportDate: string | null; 
   }
 }
 
-export function createAppleHealthXmlScanner(): AppleHealthXmlScanner {
+export function createAppleHealthXmlScanner(options: AppleHealthXmlScannerOptions = {}): AppleHealthXmlScanner {
+  const retain = options.retain !== false
   let buffer = ''
   const records: NormalizedAppleHealthRecord[] = []
   const skipped: SkippedAppleHealthRecord[] = []
+  const activitySummaries: AppleActivitySummary[] = []
+  const activitySummarySkips = { sentinel: 0, malformed: 0 }
   const unknownSleep = new Set<string>()
   const sources = new Set<string>()
   const devices = new Set<string>()
   const meta = { exportDate: null as string | null, locale: null as string | null }
+  let openWorkout: NormalizedWorkoutSample | null = null
 
-  function accept(parsed: NormalizedAppleHealthRecord | SkippedAppleHealthRecord) {
+  function accept(parsed: AppleHealthScanItem) {
+    options.onItem?.(parsed)
+    if (!retain) {
+      if (!('reason' in parsed)) {
+        remember(sources, parsed.sourceName)
+        remember(devices, parsed.deviceName)
+        if (parsed.kind === 'sleep' && parsed.stage === 'unsupported') {
+          unknownSleep.add(parsed.sourceCategory)
+        }
+      }
+      return
+    }
     if ('reason' in parsed) {
       skipped.push(parsed)
       return
@@ -365,39 +426,81 @@ export function createAppleHealthXmlScanner(): AppleHealthXmlScanner {
     }
   }
 
+  function closeWorkout() {
+    if (!openWorkout) {
+      return
+    }
+    accept(openWorkout)
+    openWorkout = null
+  }
+
   function consume() {
     captureExportMetadata(buffer, meta)
     let cursor = 0
     while (cursor < buffer.length) {
       const recordTag = nextNamedTag(buffer, 'Record', cursor)
       const workoutTag = nextNamedTag(buffer, 'Workout', cursor)
-      const next =
-        recordTag && workoutTag
-          ? recordTag.start < workoutTag.start
-            ? { kind: 'record' as const, tag: recordTag }
-            : { kind: 'workout' as const, tag: workoutTag }
-          : recordTag
-            ? { kind: 'record' as const, tag: recordTag }
-            : workoutTag
-              ? { kind: 'workout' as const, tag: workoutTag }
-              : null
+      const summaryTag = nextNamedTag(buffer, 'ActivitySummary', cursor)
+      const statisticTag = openWorkout ? nextNamedTag(buffer, 'WorkoutStatistics', cursor) : null
+      const closeTag = openWorkout ? nextCloseWorkout(buffer, cursor) : null
+      const candidates = [
+        recordTag ? { kind: 'record' as const, tag: recordTag } : null,
+        workoutTag ? { kind: 'workout' as const, tag: workoutTag } : null,
+        summaryTag ? { kind: 'summary' as const, tag: summaryTag } : null,
+        statisticTag ? { kind: 'statistic' as const, tag: statisticTag } : null,
+        closeTag ? { kind: 'close' as const, tag: closeTag } : null,
+      ].filter((item) => item != null)
+      const next = candidates.sort((left, right) => left.tag.start - right.tag.start)[0]
       if (!next) {
         break
       }
-      const open = next.kind === 'record' ? '<Record' : '<Workout'
-      if (buffer.indexOf(open, cursor) !== next.tag.start) {
+      if (next.kind === 'close') {
+        closeWorkout()
         cursor = next.tag.end
         continue
       }
+      if (next.kind === 'statistic') {
+        if (openWorkout) {
+          openWorkout = applyWorkoutStatistic(openWorkout, buffer.slice(next.tag.start, next.tag.end))
+        }
+        cursor = next.tag.end
+        continue
+      }
+      if (next.kind === 'summary') {
+        const parsed = parseActivitySummaryTag(buffer.slice(next.tag.start, next.tag.end))
+        if (parsed.kind === 'skip') {
+          activitySummarySkips[parsed.reason] += 1
+          options.onActivitySummarySkip?.(parsed.reason)
+        } else {
+          options.onActivitySummary?.(parsed.summary)
+          if (retain) {
+            activitySummaries.push(parsed.summary)
+          }
+        }
+        cursor = next.tag.end
+        continue
+      }
+      closeWorkout()
       const xmlTag = buffer.slice(next.tag.start, next.tag.end)
-      accept(next.kind === 'record' ? parseRecordTag(xmlTag) : parseWorkoutTag(xmlTag))
+      if (next.kind === 'workout') {
+        const parsed = parseWorkoutTag(xmlTag)
+        if ('reason' in parsed) {
+          accept(parsed)
+        } else if (parsed.kind === 'workout') {
+          openWorkout = parsed
+        }
+      } else {
+        accept(parseRecordTag(xmlTag))
+      }
       cursor = next.tag.end
     }
     if (cursor > 0) {
       buffer = buffer.slice(cursor)
     }
-    if (buffer.length > 256 * 1024) {
-      buffer = buffer.slice(-64 * 1024)
+    if (buffer.length > 1024 * 1024) {
+      const cut = buffer.length - 256 * 1024
+      const boundary = buffer.lastIndexOf('<', cut)
+      buffer = boundary >= cut - 4096 ? buffer.slice(boundary) : buffer.slice(cut)
     }
   }
 
@@ -408,11 +511,14 @@ export function createAppleHealthXmlScanner(): AppleHealthXmlScanner {
     },
     finish() {
       consume()
+      closeWorkout()
       return {
         exportDate: meta.exportDate,
         locale: meta.locale,
         records,
         skipped,
+        activitySummaries,
+        activitySummarySkips,
         unknownSleepCategories: [...unknownSleep].sort(),
         sources: [...sources].sort(),
         devices: [...devices].sort(),

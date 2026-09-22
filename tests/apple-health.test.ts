@@ -76,6 +76,57 @@ describe('Apple Health parser', () => {
     expect(sample?.startAt).not.toMatch(/^\d{4}-\d{2}-\d{2}$/)
   })
 
+  it('does not treat the Health DTD as records and can scan without retaining them', () => {
+    const xml = `<!DOCTYPE HealthData [<!ELEMENT Record EMPTY><!ELEMENT Workout EMPTY>]>
+<HealthData locale="en_US">
+  <ExportDate value="2026-09-21 12:00:00 -0700"/>
+  <Record type="HKQuantityTypeIdentifierStepCount" sourceName="iPhone" startDate="2026-09-20 08:00:00 -0700" endDate="2026-09-20 09:00:00 -0700" value="10" unit="count"/>
+</HealthData>`
+    const seen: string[] = []
+    const scanner = createAppleHealthXmlScanner({
+      retain: false,
+      onItem: (item) => {
+        if (!('reason' in item) && item.kind === 'quantity') {
+          seen.push(item.fingerprint)
+        }
+      },
+    })
+    scanner.push(xml)
+    const parsed = scanner.finish()
+    expect(parsed.records).toHaveLength(0)
+    expect(seen).toHaveLength(1)
+    expect(parseAppleHealthXml(xml).records).toHaveLength(1)
+  })
+
+  it('parses a later workout when WorkoutEvent sits between workout tags', () => {
+    const xml = `<HealthData locale="en_US">
+  <Workout workoutActivityType="HKWorkoutActivityTypeRunning" duration="10" durationUnit="min" sourceName="Apple Watch" startDate="2026-09-20 17:00:00 -0700" endDate="2026-09-20 17:10:00 -0700">
+    <WorkoutStatistics type="HKQuantityTypeIdentifierActiveEnergyBurned" startDate="2026-09-20 17:00:00 -0700" endDate="2026-09-20 17:10:00 -0700" sum="80" unit="Cal"/>
+    <WorkoutStatistics type="HKQuantityTypeIdentifierDistanceWalkingRunning" startDate="2026-09-20 17:00:00 -0700" endDate="2026-09-20 17:10:00 -0700" sum="1.5" unit="km"/>
+  </Workout>
+  <Workout workoutActivityType="HKWorkoutActivityTypeWalking" duration="5" durationUnit="min" sourceName="Apple Watch" startDate="2026-09-20 18:00:00 -0700" endDate="2026-09-20 18:05:00 -0700"/>
+</HealthData>`
+    const workouts = parseAppleHealthXml(xml).records.filter((item) => item.kind === 'workout')
+    expect(workouts.map((item) => (item.kind === 'workout' ? item.activityType : ''))).toEqual([
+      'HKWorkoutActivityTypeRunning',
+      'HKWorkoutActivityTypeWalking',
+    ])
+    const running = workouts[0]
+    expect(running?.kind === 'workout' && running.energyKcal).toBe(80)
+    expect(running?.kind === 'workout' && running.distanceM).toBe(1500)
+  })
+
+  it('ignores the unstable HKDevice pointer when fingerprinting', () => {
+    const left = parseAppleHealthXml(
+      `<HealthData locale="en_US"><Record type="HKQuantityTypeIdentifierStepCount" sourceName="iPhone" device="&lt;&lt;HKDevice: 0x111&gt;, name:iPhone&gt;" startDate="2026-09-20 08:00:00 -0700" endDate="2026-09-20 09:00:00 -0700" value="10" unit="count"/></HealthData>`,
+    ).records[0]
+    const right = parseAppleHealthXml(
+      `<HealthData locale="en_US"><Record type="HKQuantityTypeIdentifierStepCount" sourceName="iPhone" device="&lt;&lt;HKDevice: 0x222&gt;, name:iPhone&gt;" startDate="2026-09-20 08:00:00 -0700" endDate="2026-09-20 09:00:00 -0700" value="10" unit="count"/></HealthData>`,
+    ).records[0]
+    expect(left?.deviceName).not.toBe(right?.deviceName)
+    expect(left?.fingerprint).toBe(right?.fingerprint)
+  })
+
   it('parses incrementally without depending on WorkoutEvent tags', () => {
     const scanner = createAppleHealthXmlScanner()
     for (const chunk of FIXTURE.match(/[\s\S]{1,80}/g) ?? []) {
@@ -194,6 +245,7 @@ describe('Apple Health security and routing', () => {
     expect(matchHealthApiRoute('/api/apple-health/import/status')).toBe('apple-health-import')
     expect(matchHealthApiRoute('/api/apple-health/import/preview')).toBe('apple-health-import')
     expect(matchHealthApiRoute('/api/apple-health/import/commit')).toBe('apple-health-import')
+    expect(matchHealthApiRoute('/api/ingest/apple-health')).toBe('apple-health-sync')
     const layout = readFileSync('src/components/Layout.tsx', 'utf8')
     expect(layout).toContain('to="/settings"')
     expect(layout).not.toMatch(/id: 'settings'/)

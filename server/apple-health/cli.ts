@@ -9,6 +9,7 @@ import {
   type AppleHealthParseResult,
 } from '../../src/domain/apple-health/index.js'
 import { ingestNormalizedAppleHealthRecords } from './service.js'
+import { streamAppleHealthPreview } from './stream-preview.js'
 
 function findExportXml(files: Record<string, Uint8Array>): Uint8Array {
   const names = Object.keys(files)
@@ -74,6 +75,18 @@ async function main() {
   const resolved = path.resolve(filePath)
   const info = await stat(resolved)
   process.stderr.write(`Parsing ${resolved} (${(info.size / (1024 * 1024)).toFixed(1)} MB)…\n`)
+  if (!commit) {
+    const report = await streamAppleHealthPreview(
+      resolved.toLowerCase().endsWith('.zip')
+        ? { zipPath: resolved, zipBytes: info.size }
+        : { xmlPath: resolved, zipBytes: null },
+    )
+    process.stdout.write(`${JSON.stringify(report, null, 2)}\n`)
+    return
+  }
+  if (info.size > 40 * 1024 * 1024) {
+    throw new Error('Large Apple Health exports must be previewed before commit. Re-run without --commit.')
+  }
   const parsed = await parseExport(resolved)
   const preview = previewAppleHealth(parsed)
   const report = publicPreview(parsed)

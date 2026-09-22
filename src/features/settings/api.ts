@@ -24,6 +24,14 @@ const statusSchema = z.object({
       metadata: z.record(z.string(), z.unknown()),
     })
     .nullable(),
+  autoExport: z
+    .object({
+      importedAt: z.string(),
+      status: z.string(),
+      latestDay: z.string().nullable(),
+    })
+    .nullable(),
+  activitySampleCount: z.number(),
 })
 
 const previewLookupSchema = z.object({

@@ -1,8 +1,9 @@
-export const APPLE_HEALTH_PARSER_VERSION = '1.0.0'
+export const APPLE_HEALTH_PARSER_VERSION = '1.1.0'
 export const APPLE_HEALTH_SOURCE_KEY = 'apple_health'
 export const APPLE_HEALTH_COMMIT_BATCH = 400
 
 export const ACTIVITY_SAMPLE_ENTITY = 'activity_sample'
+export const ACTIVITY_DAILY_ENTITY = 'activity_daily_summary'
 export const SLEEP_INTERVAL_ENTITY = 'sleep_interval'
 export const ACTIVITY_WORKOUT_ENTITY = 'activity_workout'
 

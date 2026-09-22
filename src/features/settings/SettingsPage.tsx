@@ -144,8 +144,21 @@ export function SettingsPage() {
           <h2 className="text-base font-semibold">Data sources</h2>
           <h3 className="mt-1 text-sm font-medium text-zinc-800">Apple Health</h3>
           <p className="mt-1 text-sm text-zinc-600">
-            Parse an Apple export.zip or export.xml in the browser, then upload only supported Activity and Sleep
-            records. Body weight and Nutrition types are skipped. Training sessions are never overwritten.
+            Daily steps, active energy, exercise time, and resting heart rate sync from Health Auto Export. Sleep
+            intervals and workout summaries come from the Apple archive. Training sessions are never overwritten.
+          </p>
+        </div>
+
+        <div className="rounded-md bg-zinc-50 px-3 py-2 text-sm text-zinc-700">
+          <p>
+            Historical archive:{' '}
+            {job ? `${new Date(job.importedAt).toLocaleString()} · ${job.status}` : 'Not imported'}
+          </p>
+          <p>
+            Health Auto Export:{' '}
+            {status?.autoExport
+              ? `${status.autoExport.status} · last sync ${new Date(status.autoExport.importedAt).toLocaleString()} · latest day ${status.autoExport.latestDay ?? '—'}`
+              : 'No sync yet'}
           </p>
         </div>
 

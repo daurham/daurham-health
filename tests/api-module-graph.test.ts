@@ -157,6 +157,10 @@ describe('Vercel function module specifiers', () => {
     expect(files).not.toContain('server/migrate.ts')
     expect(files).not.toContain('server/progress/inspect.ts')
     expect(files).not.toContain('server/apple-health/cli.ts')
+    expect(files).not.toContain('server/apple-health/compact-cli.ts')
+    expect(files).not.toContain('server/apple-health/archive-cli.ts')
+    expect(files).not.toContain('server/apple-health/hae-cli.ts')
+    expect(files).not.toContain('server/apple-health/compact-service.ts')
     expect(files).not.toContain('src/domain/apple-health/zip.ts')
   })
 
