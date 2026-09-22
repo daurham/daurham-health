@@ -1,4 +1,4 @@
-import { looksLikeHiddenFat, sanitizeMealCandidate, type MealPhotoCandidate } from './meal.js'
+import { looksLikeHiddenFat, sanitizeMealEstimate, type MealEstimateCandidate, type MealPhotoCandidate } from './meal.js'
 import {
   missingField,
   sanitizeLabelCandidate,
@@ -69,7 +69,7 @@ export type FoodDescriptionInterpretInput = {
 }
 
 export interface NutritionInterpreter {
-  interpretMealPhoto(input: MealPhotoInterpretInput): Promise<MealPhotoCandidate>
+  interpretMealPhoto(input: MealPhotoInterpretInput): Promise<MealEstimateCandidate>
   interpretFoodDescription(input: FoodDescriptionInterpretInput): Promise<FoodDescriptionCandidate>
   interpretNutritionLabel(input: NutritionLabelInterpretInput): Promise<NutritionLabelCandidate>
 }
@@ -86,18 +86,15 @@ export type GeminiDescriptionResponse = {
   ambiguities: string[]
 }
 
-export type GeminiMealItem = {
-  name: string
-  portion: string | null
-  amount: number | null
-  unit: string | null
-  note: string | null
-}
-
 export type GeminiMealResponse = {
-  items: GeminiMealItem[]
-  possibleExtras: string[]
-  ambiguities: string[]
+  name: string
+  foodsSeen: string[]
+  assumptions: string[]
+  calories: number
+  proteinGrams: number
+  carbsGrams: number
+  fatGrams: number
+  fiberGrams: number | null
 }
 
 export type GeminiLabelResponse = {
@@ -119,24 +116,16 @@ export type GeminiLabelResponse = {
 
 export const GEMINI_MEAL_RESPONSE_SCHEMA = {
   type: 'object',
-  required: ['items'],
+  required: ['name', 'foodsSeen', 'calories', 'proteinGrams', 'carbsGrams', 'fatGrams'],
   properties: {
-    items: {
-      type: 'array',
-      items: {
-        type: 'object',
-        required: ['name'],
-        properties: {
-          name: { type: 'string' },
-          portion: { type: 'string' },
-          amount: { type: 'number' },
-          unit: { type: 'string' },
-          note: { type: 'string' },
-        },
-      },
-    },
-    possibleExtras: { type: 'array', items: { type: 'string' } },
-    ambiguities: { type: 'array', items: { type: 'string' } },
+    name: { type: 'string' },
+    foodsSeen: { type: 'array', items: { type: 'string' } },
+    assumptions: { type: 'array', items: { type: 'string' } },
+    calories: { type: 'number' },
+    proteinGrams: { type: 'number' },
+    carbsGrams: { type: 'number' },
+    fatGrams: { type: 'number' },
+    fiberGrams: { type: 'number' },
   },
 } as const
 
@@ -214,16 +203,15 @@ export function parseNutritionProvider(value: unknown): NutritionProvider {
 
 export function mealPhotoPrompt(userContext: string | null): string {
   const instructions = [
-    'You identify likely visible food components and portions.',
+    'Identify the visible meal and estimate nutrition for the entire consumed plate.',
     'Output JSON only. Do not wrap the JSON in markdown.',
-    'Do not provide calorie or macro totals.',
-    'Do not invent hidden ingredients as facts.',
-    'Flag possible sauces or oils in possibleExtras.',
-    "Use USER-PROVIDED CONTEXT as supporting evidence about the image.",
-    'If the image and the user note materially conflict, record that conflict in ambiguities.',
-    'Do not decide which source is correct.',
-    'Use this shape: {"items":[{"name":"scrambled eggs","portion":"roughly 2 eggs","amount":2,"unit":"egg","note":null}],"possibleExtras":["cooking oil"],"ambiguities":[]}',
-    'amount must be a JSON number when a count is visible. Use null when it is not a number. Do not convert cups or handfuls into grams.',
+    'Estimate visible portion sizes, then estimate total calories, protein, carbs, fat, and fiber.',
+    'Visual estimates are approximate. Do not pretend they are exact.',
+    'Include major assumptions that materially affect the estimate.',
+    'Acknowledge hidden oils or sauces when they are uncertain.',
+    'Use USER-PROVIDED CONTEXT as known information. It should influence the estimate.',
+    'Use this shape: {"name":"Chicken, rice and broccoli","foodsSeen":["chicken thigh","white rice","broccoli"],"assumptions":["chicken appears about 5-6 oz","some cooking oil may be present"],"calories":720,"proteinGrams":48,"carbsGrams":76,"fatGrams":25,"fiberGrams":7}',
+    'calories and macros must be JSON numbers for the whole meal. Use null for fiber only when it cannot be estimated.',
   ].join('\n')
   if (!userContext) {
     return instructions
@@ -443,16 +431,45 @@ export function applyMealUserContext(candidate: MealPhotoCandidate, userContext:
   }
 }
 
-export function interpretMealPhotoResponse(text: string, userContext: string | null, model: string | null): MealPhotoCandidate {
+export function normalizeGeminiMealEstimateRaw(raw: unknown): unknown {
+  const source = asRecord(raw)
+  const foods = asStringList(source.foodsSeen)
+  if (foods.length === 0 && Array.isArray(source.items)) {
+    for (const item of source.items) {
+      const name = firstString(asRecord(item), ['name', 'proposedName', 'food', 'foodName'])
+      if (name) {
+        foods.push(name)
+      }
+    }
+  }
+  const assumptions = [...asStringList(source.assumptions), ...asStringList(source.ambiguities)]
+  return {
+    name: firstString(source, ['name']) ?? foods[0] ?? 'Meal',
+    foodsSeen: foods,
+    assumptions,
+    calories: firstPresent(source, ['calories']),
+    proteinGrams: firstPresent(source, ['proteinGrams', 'protein']),
+    carbsGrams: firstPresent(source, ['carbsGrams', 'carbs']),
+    fatGrams: firstPresent(source, ['fatGrams', 'fat']),
+    fiberGrams: firstPresent(source, ['fiberGrams', 'fiber']),
+  }
+}
+
+export function interpretMealPhotoResponse(text: string, userContext: string | null, model: string | null): MealEstimateCandidate {
   const raw = parseGeminiJson(text)
-  let candidate: MealPhotoCandidate
+  let candidate: MealEstimateCandidate
   try {
-    candidate = sanitizeMealCandidate(normalizeGeminiMealRaw(raw), { model })
+    candidate = sanitizeMealEstimate(normalizeGeminiMealEstimateRaw(raw), { model })
   } catch {
     throw new NutritionInterpretError('GEMINI_SCHEMA', "We couldn't confidently interpret this meal.")
   }
-  candidate = applyMealUserContext(candidate, userContext)
-  if (candidate.components.length === 0 || candidate.status === 'invalid') {
+  if (userContext && /\bcauliflower rice\b/i.test(userContext) && candidate.foodsSeen.some((item) => /\brice\b/i.test(item) && !/cauliflower/i.test(item))) {
+    candidate = {
+      ...candidate,
+      assumptions: [...new Set([...candidate.assumptions, 'The image appears to contain white rice, but your note says cauliflower rice.'])],
+    }
+  }
+  if (candidate.status === 'invalid' || candidate.calories <= 0) {
     throw new NutritionInterpretError('GEMINI_SEMANTIC', "We couldn't confidently interpret this meal.")
   }
   return candidate

@@ -12,7 +12,7 @@ import type {
   PendingNutritionCapture,
   NutritionLabelJobResponse,
   NutritionMealJobResponse,
-  CommitNutritionMealRequest,
+  CommitNutritionMealEstimateRequest,
 } from '@/domain/nutrition'
 import { healthFetch, readApiError } from '@/lib'
 import type { ReviewFieldError } from '@/domain/paper-load'
@@ -408,8 +408,8 @@ export async function commitFoodDescription(input: {
 }
 
 export async function commitNutritionMealReview(
-  input: CommitNutritionMealRequest,
-): Promise<{ entries: NutritionEntry[]; mealGroupId: string }> {
+  input: CommitNutritionMealEstimateRequest,
+): Promise<{ entries: NutritionEntry[] }> {
   return parseBarcodeResponse(
     await healthFetch('/api/nutrition/meal/commit', {
       method: 'POST',

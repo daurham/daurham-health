@@ -4,21 +4,21 @@ import {
   NUTRITION_MEAL_CAPTURE_KIND,
   NUTRITION_MEAL_GROUP_ENTITY,
   NUTRITION_MEAL_SOURCE_KEY,
+  commitNutritionMealEstimateRequestSchema,
   commitNutritionMealRequestSchema,
   homeAiMealJobStatusSchema,
+  mealEstimateUserAdjusted,
   isHomeAiJobId,
-  looksLikeHiddenFat,
-  matchMealComponent,
   mealComponentSnapshot,
   mealFailureMessage,
   nutritionMealJobFingerprint,
   pendingNutritionCaptureSchema,
-  recipeCandidatesForComponents,
   resolveEntryLogDate,
-  sanitizeMealCandidate,
+  sanitizeMealEstimate,
   snapshotFromDefinition,
+  validateMealEstimateReview,
   validateMealReview,
-  type MealPhotoCandidate,
+  type MealEstimateCandidate,
   type NutritionEntry,
   type NutritionFood,
   type NutritionMealJobResponse,
@@ -28,16 +28,15 @@ import type { HomeAiClient } from '../integrations/home-ai/client.js'
 import { getHomeAiClient } from '../integrations/home-ai/client.js'
 import { getSql } from '../db.js'
 import {
+  getEntry,
   getFood,
   insertEntryWithId,
   listEntriesByMealGroup,
-  listFoods,
-  listRecentFoods,
-  listRecipeFoods,
 } from './queries.js'
 import { NutritionInterpretError, normalizeUserContext, parseNutritionProvider } from '../../src/domain/nutrition/interpret.js'
 import { advanceGeminiCapture, interpretErrorToHttp } from './gemini-jobs.js'
 import {
+  findCommittedLabelEntry,
   getCaptureImage,
   getLabelJobRecord,
   type NutritionCaptureJobRecord,
@@ -119,57 +118,12 @@ export async function readMealPhotoForm(req: ApiRequest): Promise<{
   throw new HttpError(400, mealFailureMessage('UNSUPPORTED_IMAGE'))
 }
 
-async function catalogContext() {
-  const [foods, recents, recipes] = await Promise.all([
-    listFoods(null, 400),
-    listRecentFoods(NUTRITION_CONFIG.recentsLimit),
-    listRecipeFoods(NUTRITION_CONFIG.recipesLimit),
-  ])
-  return { foods, recents, recipes }
-}
-
-function matchingPayload(candidate: MealPhotoCandidate, foods: NutritionFood[], recents: NutritionFood[], recipes: NutritionFood[]) {
-  const recentIds = recents.map((food) => food.id)
-  const matches: NutritionMealJobResponse['matches'] = {}
-  const used = new Map<string, NutritionFood>()
-  for (const component of candidate.components) {
-    const ranked = matchMealComponent(component.proposedName, foods, { recentIds })
-    matches[component.id] = ranked.map((item) => {
-      used.set(item.food.id, item.food)
-      return {
-        foodId: item.food.id,
-        name: item.food.name,
-        brand: item.food.brand,
-        catalogKind: item.food.catalogKind,
-        score: item.score,
-        reason: item.reason,
-      }
-    })
-  }
-  const recipeCandidates = recipeCandidatesForComponents(
-    recipes,
-    candidate.components.map((component) => component.proposedName),
-  )
-  for (const recipe of recipeCandidates) {
-    used.set(recipe.id, recipe)
-  }
-  const hiddenFatFoods = foods.filter((food) => looksLikeHiddenFat(food.name)).slice(0, 8)
-  for (const food of hiddenFatFoods) {
-    used.set(food.id, food)
-  }
-  return {
-    foods: [...used.values()],
-    matches,
-    recipeCandidates: recipeCandidates.map((food) => ({
-      id: food.id,
-      name: food.name,
-      catalogKind: food.catalogKind,
-    })),
-    hiddenFatFoods: hiddenFatFoods.map((food) => ({
-      id: food.id,
-      name: food.name,
-      servingUnit: food.servingUnit,
-    })),
+function tryMealEstimate(raw: unknown): MealEstimateCandidate | null {
+  try {
+    const candidate = sanitizeMealEstimate(raw)
+    return candidate.status === 'invalid' || candidate.calories <= 0 ? null : candidate
+  } catch {
+    return null
   }
 }
 
@@ -178,7 +132,7 @@ function asMealResponse(input: {
   status: 'queued' | 'processing' | 'completed' | 'failed'
   elapsedMs?: number | null
   imageAvailable?: boolean
-  candidate: MealPhotoCandidate | null
+  candidate: MealEstimateCandidate | null
   foods?: NutritionFood[]
   matches?: NutritionMealJobResponse['matches']
   recipeCandidates?: NutritionMealJobResponse['recipeCandidates']
@@ -359,17 +313,26 @@ export async function getNutritionMealJob(jobId: string, client?: HomeAiClient):
     }
   }
 
-  async function withCatalog(candidate: MealPhotoCandidate, job: NutritionMealJobResponse['job']) {
-    const { foods, recents, recipes } = await catalogContext()
-    const matched = matchingPayload(candidate, foods, recents, recipes)
+  function withEstimate(candidate: unknown, job: NutritionMealJobResponse['job']) {
+    const estimate = tryMealEstimate(candidate)
+    if (!estimate) {
       return asMealResponse({
+        jobId: job.id,
+        status: 'failed',
+        elapsedMs: job.elapsedMs,
+        imageAvailable: job.imageAvailable,
+        candidate: null,
+        userContext: stored?.userContext ?? null,
+        failure: { code: 'GEMINI_SEMANTIC', message: mealFailureMessage('GEMINI_SEMANTIC') },
+      })
+    }
+    return asMealResponse({
       jobId: job.id,
       status: job.status,
       elapsedMs: job.elapsedMs,
       imageAvailable: job.imageAvailable,
-      candidate,
+      candidate: estimate,
       userContext: stored?.userContext ?? null,
-      ...matched,
     })
   }
 
@@ -402,10 +365,10 @@ export async function getNutritionMealJob(jobId: string, client?: HomeAiClient):
           status: live.status,
           elapsedMs: live.elapsedMs,
           imageAvailable: live.imageAvailable,
-          candidate: live.candidate,
+          candidate: live.candidate ? tryMealEstimate(live.candidate) : null,
         })
       }
-      return withCatalog(live.candidate, {
+      return withEstimate(live.candidate, {
         id: live.id,
         status: live.status,
         elapsedMs: live.elapsedMs,
@@ -413,7 +376,7 @@ export async function getNutritionMealJob(jobId: string, client?: HomeAiClient):
       })
     } catch (error) {
       if (stored?.candidate && (stored.status === 'completed' || stored.status === 'committed')) {
-        return withCatalog(sanitizeMealCandidate(stored.candidate), {
+        return withEstimate(stored.candidate, {
           id: stored.id,
           status: 'completed',
           elapsedMs: null,
@@ -439,7 +402,7 @@ export async function getNutritionMealJob(jobId: string, client?: HomeAiClient):
     })
   }
   if (stored?.candidate) {
-    return withCatalog(sanitizeMealCandidate(stored.candidate), {
+    return withEstimate(stored.candidate, {
       id: stored.id,
       status: stored.status === 'queued' || stored.status === 'processing' ? stored.status : 'completed',
       elapsedMs: null,
@@ -475,9 +438,18 @@ async function mealResponseFromRecord(record: NutritionCaptureJobRecord): Promis
     })
   }
   if (record.candidate && (record.status === 'completed' || record.status === 'committed')) {
-    const candidate = sanitizeMealCandidate(record.candidate)
-    const { foods, recents, recipes } = await catalogContext()
-    const matched = matchingPayload(candidate, foods, recents, recipes)
+    const candidate = tryMealEstimate(record.candidate)
+    if (!candidate) {
+      return asMealResponse({
+        jobId: record.id,
+        status: 'failed',
+        elapsedMs: record.interpretation.latencyMs ?? null,
+        imageAvailable: record.imageStored,
+        candidate: null,
+        userContext: record.userContext,
+        failure: { code: 'GEMINI_SEMANTIC', message: mealFailureMessage('GEMINI_SEMANTIC') },
+      })
+    }
     return asMealResponse({
       jobId: record.id,
       status: 'completed',
@@ -485,7 +457,6 @@ async function mealResponseFromRecord(record: NutritionCaptureJobRecord): Promis
       imageAvailable: record.imageStored,
       candidate,
       userContext: record.userContext,
-      ...matched,
     })
   }
   const status = record.status === 'queued' || record.status === 'processing' ? record.status : 'completed'
@@ -797,3 +768,112 @@ export async function commitNutritionMeal(body: unknown): Promise<{ entries: Nut
 
   return { entries, mealGroupId }
 }
+
+export async function commitNutritionMealEstimate(body: unknown): Promise<{ entries: NutritionEntry[] }> {
+  const parsed = commitNutritionMealEstimateRequestSchema.safeParse(body)
+  if (!parsed.success) {
+    throw new HttpError(400, parsed.error.issues[0]?.message ?? 'Invalid meal estimate')
+  }
+  const input = parsed.data
+  const reviewErrors = validateMealEstimateReview({ name: input.name, calories: input.calories })
+  if (reviewErrors.length > 0) {
+    throw new HttpError(400, reviewErrors[0]?.message ?? 'Invalid meal estimate', reviewErrors)
+  }
+  const reviewed = {
+    calories: input.calories,
+    proteinGrams: input.proteinGrams,
+    carbsGrams: input.carbsGrams,
+    fatGrams: input.fatGrams,
+    fiberGrams: input.fiberGrams,
+  }
+  const jobId = input.jobId
+  let baseline = reviewed
+  let model: string | null = null
+  if (jobId) {
+    const stored = await getLabelJobRecord(jobId)
+    if (!stored || stored.captureKind !== NUTRITION_MEAL_CAPTURE_KIND) {
+      throw new HttpError(404, mealFailureMessage('JOB_NOT_FOUND'), undefined, 'JOB_NOT_FOUND')
+    }
+    if (stored.status === 'committed') {
+      const committed = await findCommittedLabelEntry(jobId)
+      const existing = committed ? await getEntry(committed.entryId) : null
+      if (existing) {
+        return { entries: [existing] }
+      }
+    }
+    const estimate = stored.candidate ? tryMealEstimate(stored.candidate) : null
+    if (estimate) {
+      baseline = {
+        calories: estimate.calories,
+        proteinGrams: estimate.proteinGrams,
+        carbsGrams: estimate.carbsGrams,
+        fatGrams: estimate.fatGrams,
+        fiberGrams: estimate.fiberGrams,
+      }
+      model = estimate.model ?? stored.interpretation.model ?? null
+    }
+  }
+
+  const resolved = resolveEntryLogDate({
+    logDate: input.logDate,
+    timezone: input.timezone ?? NUTRITION_CONFIG.calendarTimeZone,
+  })
+  const entryId = randomUUID()
+  if (jobId) {
+    const sql = await getSql()
+    const sourceId = await mealPhotoSourceId()
+    const claimed = (await sql.query(CLAIM_MEAL_GROUP_SQL, [
+      randomUUID(),
+      sourceId,
+      jobId,
+      nutritionMealJobFingerprint(jobId),
+      'nutrition_entry',
+      entryId,
+      JSON.stringify({
+        source: 'meal_photo_ai',
+        provider: 'gemini',
+        model,
+        estimated: true,
+        reviewed: true,
+        userAdjusted: mealEstimateUserAdjusted(baseline, reviewed),
+        aiEstimate: baseline,
+        reviewedValues: reviewed,
+        portionScale: input.portionScale ?? 1,
+      }),
+    ])) as Array<{ entity_id: string }>
+    const claimedId = claimed[0]?.entity_id
+    if (claimedId && claimedId !== entryId) {
+      const raced = await getEntry(claimedId)
+      if (raced) {
+        return { entries: [raced] }
+      }
+    }
+  }
+
+  const entry = await insertEntryWithId([
+    entryId,
+    resolved.logDate,
+    null,
+    input.timezone ?? NUTRITION_CONFIG.calendarTimeZone,
+    input.meal ?? null,
+    null,
+    input.name.trim(),
+    null,
+    1,
+    'meal',
+    null,
+    reviewed.calories,
+    reviewed.proteinGrams,
+    reviewed.carbsGrams,
+    reviewed.fatGrams,
+    reviewed.fiberGrams,
+    'photo_ai',
+    'Reviewed from meal photo estimate.',
+    null,
+  ])
+  if (jobId) {
+    await recordLabelJobCommitted(jobId, entry.id, entry.id).catch(() => undefined)
+  }
+  return { entries: [entry] }
+}
+

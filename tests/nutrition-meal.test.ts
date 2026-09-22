@@ -8,10 +8,16 @@ import {
   matchMealComponent,
   mealFailureMessage,
   mealReviewTotals,
+  nutritionDayTotals,
   nutritionMealJobFingerprint,
   recipeCandidatesForComponents,
   roundVisualGrams,
   sanitizeMealCandidate,
+  sanitizeMealEstimate,
+  scaleMealEstimate,
+  mealEstimateUserAdjusted,
+  emptyMealEstimate,
+  validateMealEstimateReview,
   validateMealReview,
   type NutritionFood,
 } from '../src/domain/nutrition/index.ts'
@@ -213,9 +219,16 @@ describe('meal photo jobs routing and provenance', () => {
     expect(readFileSync('server/nutrition/meal.ts', 'utf8')).not.toContain('/api/nutrition/label')
     expect(readFileSync('server/handlers/nutrition-meal-jobs.ts', 'utf8')).toContain('withOwnerAuth')
     expect(readFileSync('src/features/nutrition/MealCapture.tsx', 'utf8')).not.toContain('HOME_AI_API_KEY')
+    expect(readFileSync('src/features/nutrition/MealCapture.tsx', 'utf8')).not.toContain('searchNutritionFoods')
+    expect(readFileSync('src/features/nutrition/MealCapture.tsx', 'utf8')).not.toContain('USDA')
+    expect(readFileSync('server/handlers/nutrition-meal-commit.ts', 'utf8')).toContain('commitNutritionMealEstimate')
+    expect(readFileSync('server/nutrition/describe.ts', 'utf8')).toContain('commitNutritionMeal')
     expect(readFileSync('src/features/nutrition/MealCapture.tsx', 'utf8')).toContain('Build meal manually')
-    expect(readFileSync('src/features/nutrition/MealCapture.tsx', 'utf8')).toContain('Check the foods and portions before saving.')
+    expect(readFileSync('src/features/nutrition/MealCapture.tsx', 'utf8')).toContain('Review the estimate before saving.')
     expect(readFileSync('src/features/nutrition/MealCapture.tsx', 'utf8')).not.toContain('AI calorie')
+    expect(readFileSync('src/features/nutrition/MealCapture.tsx', 'utf8')).toContain('What AI saw')
+    expect(readFileSync('src/features/nutrition/MealCapture.tsx', 'utf8')).toContain('As estimated')
+    expect(readFileSync('src/features/nutrition/MealCapture.tsx', 'utf8')).toContain('inputMode="decimal"')
     expect(readFileSync('src/features/nutrition/prepare-meal-photo.ts', 'utf8')).toContain('2000')
     expect(readFileSync('src/features/nutrition/prepare-label-photo.ts', 'utf8')).toContain('2800')
     expect(readFileSync('src/features/training/prepare-workout-photo.ts', 'utf8')).toContain('2400')
@@ -223,5 +236,76 @@ describe('meal photo jobs routing and provenance', () => {
     expect(mealFailureMessage('UNREADABLE_MEAL')).toMatch(/usable meal/i)
     expect(emptyMealCandidate().components).toEqual([])
     expect(readdirSync('api').filter((name) => name.endsWith('.ts'))).toEqual(['index.ts'])
+  })
+})
+
+describe('meal photo estimate review', () => {
+  it('keeps the original AI estimate as the portion-scale baseline', () => {
+    const estimate = sanitizeMealEstimate({
+      name: 'Chicken, rice and broccoli',
+      foodsSeen: ['chicken', 'rice', 'broccoli'],
+      assumptions: ['some cooking oil may be present'],
+      calories: 722,
+      proteinGrams: 48.2,
+      carbsGrams: 76.4,
+      fatGrams: 25.1,
+      fiberGrams: 7.4,
+    })
+    expect(estimate.calories).toBe(720)
+    expect(estimate.proteinGrams).toBe(48)
+    const plus = scaleMealEstimate(estimate, 1.1)
+    expect(plus.calories).toBe(790)
+    expect(plus.proteinGrams).toBe(53)
+    const minus = scaleMealEstimate(estimate, 0.75)
+    expect(minus.calories).toBe(540)
+    expect(mealEstimateUserAdjusted(estimate, plus)).toBe(true)
+    expect(mealEstimateUserAdjusted(estimate, estimate)).toBe(false)
+    expect(validateMealEstimateReview({ name: '', calories: 720 })[0]?.path).toBe('name')
+    expect(emptyMealEstimate().calories).toBe(0)
+    const afterPlusThenMinus = scaleMealEstimate(estimate, 0.75)
+    expect(afterPlusThenMinus).toEqual(minus)
+    expect(scaleMealEstimate(plus, 0.75).calories).not.toBe(minus.calories)
+  })
+
+  it('saves one reviewed snapshot and keeps the original AI estimate in provenance', () => {
+    const meal = readFileSync('server/nutrition/meal.ts', 'utf8')
+    const commit = meal.slice(meal.indexOf('export async function commitNutritionMealEstimate'), meal.length)
+    expect(commit).toContain("source: 'meal_photo_ai'")
+    expect(commit).toContain("provider: 'gemini'")
+    expect(commit).toContain('estimated: true')
+    expect(commit).toContain('reviewed: true')
+    expect(commit).toContain('userAdjusted: mealEstimateUserAdjusted(baseline, reviewed)')
+    expect(commit).toContain('aiEstimate: baseline')
+    expect(commit).toContain('reviewedValues: reviewed')
+    expect(commit).toContain("'nutrition_entry'")
+    expect(commit).toContain("'photo_ai'")
+    expect(commit).toMatch(/reviewed\.calories/)
+    expect(commit).toMatch(/reviewed\.proteinGrams/)
+    expect(commit).toContain("'meal'")
+    expect(commit).toContain('return { entries: [entry] }')
+    expect(commit).not.toContain('listEntriesByMealGroup')
+    expect(meal).not.toContain('matchMealComponent')
+    expect(meal).not.toContain('searchUsda')
+    expect(readFileSync('server/handlers/nutrition-meal-commit.ts', 'utf8')).not.toContain('commitNutritionMeal(')
+    expect(readFileSync('server/nutrition/describe.ts', 'utf8')).toContain('commitNutritionMeal(')
+    expect(readFileSync('src/features/nutrition/BarcodeScanner.tsx', 'utf8')).toContain('Enter barcode manually')
+    expect(readFileSync('src/features/nutrition/LabelCapture.tsx', 'utf8')).toContain('Analyze label')
+    expect(readFileSync('src/features/nutrition/MealCapture.tsx', 'utf8')).toContain('reanalyzeNutritionMealJob(previousId')
+    expect(readFileSync('server/nutrition/meal.ts', 'utf8')).toContain('requeueCaptureJob({ jobId, userContext: input.userContext })')
+    const edited = { calories: 680, proteinGrams: 38, carbsGrams: 76, fatGrams: 25, fiberGrams: 7 }
+    const baseline = { calories: 720, proteinGrams: 48, carbsGrams: 76, fatGrams: 25, fiberGrams: 7 }
+    expect(mealEstimateUserAdjusted(baseline, edited)).toBe(true)
+    const totals = nutritionDayTotals([
+      {
+        calories: edited.calories,
+        protein: edited.proteinGrams,
+        carbs: edited.carbsGrams,
+        fat: edited.fatGrams,
+        fiber: edited.fiberGrams,
+      },
+    ])
+    expect(totals.calories).toMatchObject({ status: 'available', value: 680 })
+    expect(totals.protein).toMatchObject({ status: 'available', value: 38 })
+    expect(totals.calories.value).not.toBe(baseline.calories)
   })
 })

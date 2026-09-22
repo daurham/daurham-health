@@ -126,6 +126,15 @@ export {
   nutritionMealJobFingerprint,
   roundVisualGrams,
   looksLikeHiddenFat,
+  sanitizeMealEstimate,
+  emptyMealEstimate,
+  scaleMealEstimate,
+  mealEstimateNutrients,
+  mealEstimateUserAdjusted,
+  validateMealEstimateReview,
+  roundMealCalories,
+  roundMealGrams,
+  MEAL_PORTION_SCALES,
 } from './meal.js'
 export {
   foodDescriptionOffer,
@@ -179,11 +188,17 @@ export type {
   MealReviewComponent,
   MealFoodMatch,
   CommitNutritionMealRequest,
+  CommitNutritionMealEstimateRequest,
   NutritionMealJobResponse,
+  MealEstimateCandidate,
+  MealEstimateNutrients,
+  MealPortionScale,
 } from './meal.js'
 export {
   mealPhotoCandidateSchema,
+  mealEstimateCandidateSchema,
   commitNutritionMealRequestSchema,
+  commitNutritionMealEstimateRequestSchema,
   homeAiMealJobSchema,
   homeAiMealCreatedJobSchema,
   homeAiMealJobStatusSchema,

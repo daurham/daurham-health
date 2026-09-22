@@ -6,7 +6,6 @@ import {
   GEMINI_MEAL_RESPONSE_SCHEMA,
   GEMINI_NUTRITION_MODEL_DEFAULT,
   applyLabelUserContext,
-  applyMealUserContext,
   foodDescriptionPrompt,
   interpretFoodDescriptionResponse,
   interpretMealPhotoResponse,
@@ -15,7 +14,6 @@ import {
   nutritionLabelPrompt,
   nutritionMealJobFingerprint,
   okField,
-  sanitizeMealCandidate,
   schemaMentionsNutrientTotals,
   summarizeInterpretationUsage,
   emptyLabelCandidate,
@@ -24,18 +22,14 @@ import { GeminiNutritionInterpreter, classifyGeminiError, withGeminiRetry } from
 import type { GeminiGenerate } from '../server/integrations/gemini/client.ts'
 
 const mealJson = JSON.stringify({
-  components: [
-    {
-      proposedName: 'broccoli',
-      preparation: 'steamed',
-      portionEstimate: { description: '1 cup', gramsEstimate: 90, confidence: 'medium' },
-      visualConfidence: 'medium',
-      ambiguities: [],
-      possibleSauceOrOil: false,
-    },
-  ],
-  ambiguities: [],
-  possibleUnaccountedItems: [],
+  name: 'Chicken, rice and broccoli',
+  foodsSeen: ['chicken thigh', 'white rice', 'broccoli'],
+  assumptions: ['chicken appears about 5-6 oz', 'some cooking oil may be present'],
+  calories: 720,
+  proteinGrams: 48,
+  carbsGrams: 76,
+  fatGrams: 25,
+  fiberGrams: 7,
 })
 
 function fakeGenerate(text: string): GeminiGenerate {
@@ -51,79 +45,60 @@ function fakeGenerate(text: string): GeminiGenerate {
 }
 
 describe('Gemini nutrition interpretation', () => {
-  it('maps a schema-constrained meal into the shared candidate and drops calorie totals', () => {
-    const raw = JSON.parse(mealJson) as Record<string, unknown>
-    raw.calories = 500
-    raw.protein = 40
-    const candidate = interpretMealPhotoResponse(JSON.stringify(raw), null, GEMINI_NUTRITION_MODEL_DEFAULT)
-    expect(candidate.components[0]?.proposedName).toBe('broccoli')
+  it('maps a meal photo JSON estimate into reviewed-ready totals', () => {
+    const candidate = interpretMealPhotoResponse(mealJson, null, GEMINI_NUTRITION_MODEL_DEFAULT)
+    expect(candidate.name).toBe('Chicken, rice and broccoli')
+    expect(candidate.foodsSeen).toEqual(['chicken thigh', 'white rice', 'broccoli'])
+    expect(candidate.calories).toBe(720)
+    expect(candidate.proteinGrams).toBe(48)
     expect(candidate.status).toBe('review_required')
-    expect(candidate.notes.join(' ')).toMatch(/ignored model-generated nutrition/i)
-    expect(candidate).not.toHaveProperty('calories')
-    expect(schemaMentionsNutrientTotals(GEMINI_MEAL_RESPONSE_SCHEMA)).toBe(false)
+    expect(schemaMentionsNutrientTotals(GEMINI_MEAL_RESPONSE_SCHEMA)).toBe(true)
     expect(schemaMentionsNutrientTotals(GEMINI_DESCRIPTION_RESPONSE_SCHEMA)).toBe(false)
     expect(schemaMentionsNutrientTotals(GEMINI_LABEL_RESPONSE_SCHEMA)).toBe(true)
   })
 
-  it('treats an empty component list as a semantic failure and keeps calorie notes out of canonical fields', () => {
-    expect(() => interpretMealPhotoResponse(JSON.stringify({ components: [], ambiguities: [], possibleUnaccountedItems: [] }), null, null)).toThrow(
+  it('treats a meal estimate without calories as a semantic failure', () => {
+    expect(() => interpretMealPhotoResponse(JSON.stringify({ name: 'Unknown', foodsSeen: [], calories: 0 }), null, null)).toThrow(
       /couldn't confidently interpret/i,
     )
-    const withNote = applyMealUserContext(sanitizeMealCandidate(JSON.parse(mealJson)), 'This plate is 500 calories.')
-    expect(withNote.notes.join(' ')).toMatch(/not used/i)
-    expect(withNote).not.toHaveProperty('calories')
   })
 
-  it('turns a cauliflower-rice note into an ambiguity instead of silently choosing', () => {
+  it('records a cauliflower-rice context conflict as an assumption', () => {
     const candidate = interpretMealPhotoResponse(
       JSON.stringify({
-        components: [
-          {
-            proposedName: 'white rice',
-            preparation: null,
-            portionEstimate: { description: null, gramsEstimate: 150, confidence: 'low' },
-            visualConfidence: 'low',
-            ambiguities: [],
-            possibleSauceOrOil: false,
-          },
-        ],
-        ambiguities: [],
-        possibleUnaccountedItems: [],
+        name: 'Rice bowl',
+        foodsSeen: ['white rice', 'eggs'],
+        assumptions: [],
+        calories: 400,
+        proteinGrams: 20,
+        carbsGrams: 50,
+        fatGrams: 10,
+        fiberGrams: 2,
       }),
       'This is cauliflower rice.',
       null,
     )
-    expect(candidate.components[0]?.ambiguities.join(' ')).toMatch(/cauliflower rice/i)
+    expect(candidate.assumptions.join(' ')).toMatch(/cauliflower rice/i)
+    expect(candidate.calories).toBe(400)
   })
 
-  it('flags sauce or oil without accepting a macro total', () => {
+  it('keeps oil uncertainty as an assumption instead of a catalog match', () => {
     const candidate = interpretMealPhotoResponse(
       JSON.stringify({
-        components: [
-          {
-            proposedName: 'chicken',
-            preparation: 'grilled',
-            portionEstimate: { description: null, gramsEstimate: 120, confidence: 'medium' },
-            visualConfidence: 'medium',
-            ambiguities: [],
-            possibleSauceOrOil: false,
-          },
-          {
-            proposedName: 'mayo',
-            preparation: null,
-            portionEstimate: { description: 'about 1 tbsp', gramsEstimate: 15, confidence: 'low' },
-            visualConfidence: 'low',
-            ambiguities: [],
-            possibleSauceOrOil: true,
-          },
-        ],
-        ambiguities: [],
-        possibleUnaccountedItems: [],
+        name: 'Chicken plate',
+        foodsSeen: ['chicken'],
+        assumptions: ['some cooking oil may be present'],
+        calories: 520,
+        proteinGrams: 40,
+        carbsGrams: 10,
+        fatGrams: 28,
+        fiberGrams: 0,
       }),
       null,
       null,
     )
-    expect(candidate.possibleUnaccountedItems).toContain('mayo')
+    expect(candidate.assumptions.join(' ')).toMatch(/oil/i)
+    expect(candidate.calories).toBe(520)
   })
 
   it('extracts a food description without nutrition and preserves ambiguity', () => {
@@ -183,7 +158,7 @@ describe('Gemini nutrition interpretation', () => {
 
   it('includes user context in the Gemini prompt and does not enable search grounding', () => {
     expect(mealPhotoPrompt('cauliflower rice with eggs')).toContain('cauliflower rice with eggs')
-    expect(mealPhotoPrompt(null)).toContain('Do not provide calorie or macro totals.')
+    expect(mealPhotoPrompt(null)).toContain('estimate total calories')
     expect(foodDescriptionPrompt('a cup of broccoli')).toContain('Do not calculate nutrition.')
     expect(nutritionLabelPrompt('12 oz package')).toContain('Do not infer missing numeric nutrients.')
     const client = readFileSync('server/integrations/gemini/client.ts', 'utf8')
@@ -212,7 +187,8 @@ describe('Gemini nutrition interpretation', () => {
     })
     expect(seenPrompt).toContain('about one cup')
     expect(seenPrompt).toContain('USER-PROVIDED CONTEXT')
-    expect(interpreted.candidate.components).toHaveLength(1)
+    expect(interpreted.candidate.foodsSeen).toEqual(['chicken thigh', 'white rice', 'broccoli'])
+    expect(interpreted.candidate.calories).toBe(720)
     expect(interpreted.metadata).toMatchObject({ provider: 'gemini', inputTokens: 12, outputTokens: 8, model: GEMINI_NUTRITION_MODEL_DEFAULT })
     expect(interpreted.candidate).not.toHaveProperty('inputTokens')
   })
@@ -253,12 +229,18 @@ describe('Gemini nutrition interpretation', () => {
   it('maps the smaller provider schema into the same candidate and keeps an invalid meal out of a commit', () => {
     const meal = interpretMealPhotoResponse(
       JSON.stringify({
-        components: [{ proposedName: 'broccoli', portionDescription: '1 cup', gramsEstimate: 90, possibleSauceOrOil: false }],
+        name: 'Broccoli bowl',
+        foodsSeen: ['broccoli'],
+        calories: 90,
+        proteinGrams: 8,
+        carbsGrams: 12,
+        fatGrams: 1,
+        fiberGrams: 5,
       }),
       null,
       null,
     )
-    expect(meal.components[0]?.portionEstimate.gramsEstimate).toBe(90)
+    expect(meal.calories).toBe(90)
     expect(() => interpretMealPhotoResponse('not-json', null, null)).toThrow(/couldn't confidently interpret/i)
     const label = interpretNutritionLabelResponse(
       JSON.stringify({ productName: 'Yogurt', calories: 120, proteinGrams: 12, carbsGrams: 15, fatGrams: 2, basis: 'per_serving' }),
@@ -269,8 +251,8 @@ describe('Gemini nutrition interpretation', () => {
     expect(label.fields.fiberGrams.value).toBeNull()
     const encoded = JSON.stringify(GEMINI_DESCRIPTION_RESPONSE_SCHEMA)
     expect(encoded).not.toContain('null')
-    expect(JSON.stringify(GEMINI_MEAL_RESPONSE_SCHEMA)).not.toContain('portionEstimate')
-    expect(JSON.stringify(GEMINI_MEAL_RESPONSE_SCHEMA)).toContain('items')
+    expect(JSON.stringify(GEMINI_MEAL_RESPONSE_SCHEMA)).toContain('foodsSeen')
+    expect(JSON.stringify(GEMINI_MEAL_RESPONSE_SCHEMA)).toContain('calories')
     const jobs = readFileSync('server/nutrition/gemini-jobs.ts', 'utf8')
     expect(jobs).toContain("status: 'failed'")
     expect(jobs).not.toContain('commitNutrition')
@@ -287,21 +269,21 @@ describe('Gemini nutrition interpretation', () => {
     expect(described.components[1]?.ambiguity).toMatch(/quarter onion|size unspecified/)
     const meal = interpretMealPhotoResponse(
       JSON.stringify({
-        items: [
-          { name: 'scrambled eggs', portion: 'roughly 2 eggs', amount: 2, unit: 'egg', note: null, calories: 180 },
-          { foodName: 'white rice', amount: '1', unit: 'cup' },
-        ],
-        possibleExtras: ['cooking oil'],
-        ambiguities: [],
+        name: 'Eggs and rice',
+        items: [{ name: 'scrambled eggs' }, { foodName: 'white rice' }],
+        calories: '720',
+        protein: 48,
+        carbsGrams: 76,
+        fatGrams: 25,
+        fiberGrams: 7,
+        assumptions: ['some cooking oil may be present'],
       }),
       null,
       null,
     )
-    expect(meal.components.map((item) => item.proposedName)).toEqual(['scrambled eggs', 'white rice'])
-    expect(meal.components[0]?.portionEstimate.description).toBe('roughly 2 eggs')
-    expect(meal.components[0]?.portionEstimate.gramsEstimate).toBeNull()
-    expect(meal.possibleUnaccountedItems).toContain('cooking oil')
-    expect(meal.notes.join(' ')).toMatch(/ignored model-generated nutrition/i)
+    expect(meal.foodsSeen).toEqual(['scrambled eggs', 'white rice'])
+    expect(meal.calories).toBe(720)
+    expect(meal.assumptions.join(' ')).toMatch(/oil/i)
     expect(() => interpretFoodDescriptionResponse('{items:[}', 'broccoli')).toThrow(/couldn't confidently interpret/i)
     const client = readFileSync('server/integrations/gemini/client.ts', 'utf8')
     expect(client).not.toMatch(/fix this JSON|second.*generateContent|reformat/i)
@@ -386,6 +368,9 @@ describe('Gemini routing, context, and boundaries', () => {
     expect(meal).toContain('requeueCaptureJob')
     expect(nutritionMealJobFingerprint('job-1')).toBe(nutritionMealJobFingerprint('job-1'))
     expect(mealUi).toContain('Analyze meal')
+    expect(mealUi).toContain('Tell AI anything useful')
+    expect(mealUi).toContain('Retry Gemini')
+    expect(mealUi).toContain('Edit context')
     expect(mealUi).toContain('Add context (optional)')
     expect(mealUi).toContain('Retry Gemini')
     expect(mealUi).toContain('Try local AI')

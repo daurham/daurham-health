@@ -17,7 +17,7 @@ import {
   type InterpretationMetadata,
 } from '../../../src/domain/nutrition/interpret.js'
 import type { FoodDescriptionCandidate } from '../../../src/domain/nutrition/describe.js'
-import type { MealPhotoCandidate } from '../../../src/domain/nutrition/meal.js'
+import type { MealEstimateCandidate } from '../../../src/domain/nutrition/meal.js'
 import type { NutritionLabelCandidate } from '../../../src/domain/nutrition/label.js'
 import { getGeminiConfig, type GeminiConfig } from './config.js'
 
@@ -42,7 +42,7 @@ export type GeminiGenerateResult = {
 
 export type GeminiGenerate = (request: GeminiGenerateRequest) => Promise<GeminiGenerateResult>
 
-export type InterpretedMeal = { candidate: MealPhotoCandidate; metadata: InterpretationMetadata }
+export type InterpretedMeal = { candidate: MealEstimateCandidate; metadata: InterpretationMetadata }
 export type InterpretedLabel = { candidate: NutritionLabelCandidate; metadata: InterpretationMetadata }
 export type InterpretedDescription = { candidate: FoodDescriptionCandidate; metadata: InterpretationMetadata }
 

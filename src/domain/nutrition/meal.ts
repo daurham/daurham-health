@@ -550,6 +550,48 @@ export const commitNutritionMealRequestSchema = z.object({
 })
 export type CommitNutritionMealRequest = z.input<typeof commitNutritionMealRequestSchema>
 
+export const MEAL_PORTION_SCALES = [0.75, 0.9, 1, 1.1, 1.25] as const
+export type MealPortionScale = (typeof MEAL_PORTION_SCALES)[number]
+
+export type MealEstimateNutrients = {
+  calories: number
+  proteinGrams: number
+  carbsGrams: number
+  fatGrams: number
+  fiberGrams: number | null
+}
+
+export const mealEstimateCandidateSchema = z.object({
+  schemaVersion: z.literal(NUTRITION_MEAL_SCHEMA_VERSION),
+  status: z.enum(MEAL_CANDIDATE_STATUSES),
+  pipeline: z.string().optional(),
+  model: z.string().nullable().optional(),
+  name: z.string().min(1),
+  foodsSeen: z.array(z.string()),
+  assumptions: z.array(z.string()),
+  calories: z.number(),
+  proteinGrams: z.number(),
+  carbsGrams: z.number(),
+  fatGrams: z.number(),
+  fiberGrams: z.number().nullable(),
+})
+export type MealEstimateCandidate = z.infer<typeof mealEstimateCandidateSchema>
+
+export const commitNutritionMealEstimateRequestSchema = z.object({
+  jobId: z.string().regex(HOME_AI_JOB_ID_RE).optional(),
+  logDate: z.string(),
+  timezone: z.string().optional(),
+  meal: z.enum(['breakfast', 'lunch', 'dinner', 'snack', 'other']).nullable().optional(),
+  name: z.string().trim().min(1).max(120),
+  calories: z.number().min(0),
+  proteinGrams: z.number().min(0),
+  carbsGrams: z.number().min(0),
+  fatGrams: z.number().min(0),
+  fiberGrams: z.number().min(0).nullable(),
+  portionScale: z.number().optional(),
+})
+export type CommitNutritionMealEstimateRequest = z.input<typeof commitNutritionMealEstimateRequestSchema>
+
 export type NutritionMealJobResponse = {
   job: {
     id: string
@@ -558,12 +600,114 @@ export type NutritionMealJobResponse = {
     imageAvailable?: boolean
   }
   userContext?: string | null
-  candidate: MealPhotoCandidate | null
+  candidate: MealEstimateCandidate | null
   foods: NutritionFood[]
   matches: Record<string, Array<{ foodId: string; name: string; brand: string | null; catalogKind: string; score: number; reason: string }>>
   recipeCandidates: Array<{ id: string; name: string; catalogKind: string }>
   hiddenFatFoods: Array<{ id: string; name: string; servingUnit: string }>
   failure: { code: string; message: string } | null
+}
+
+export function roundMealCalories(value: number): number {
+  if (!Number.isFinite(value) || value < 0) {
+    return 0
+  }
+  return Math.round(value / 5) * 5
+}
+
+export function roundMealGrams(value: number | null | undefined): number | null {
+  if (value == null || !Number.isFinite(value) || value < 0) {
+    return null
+  }
+  return Math.round(value)
+}
+
+export function mealEstimateNutrients(input: MealEstimateNutrients): MealEstimateNutrients {
+  return {
+    calories: roundMealCalories(input.calories),
+    proteinGrams: roundMealGrams(input.proteinGrams) ?? 0,
+    carbsGrams: roundMealGrams(input.carbsGrams) ?? 0,
+    fatGrams: roundMealGrams(input.fatGrams) ?? 0,
+    fiberGrams: roundMealGrams(input.fiberGrams),
+  }
+}
+
+export function scaleMealEstimate(baseline: MealEstimateNutrients, scale: number): MealEstimateNutrients {
+  const factor = Number.isFinite(scale) && scale > 0 ? scale : 1
+  return mealEstimateNutrients({
+    calories: baseline.calories * factor,
+    proteinGrams: baseline.proteinGrams * factor,
+    carbsGrams: baseline.carbsGrams * factor,
+    fatGrams: baseline.fatGrams * factor,
+    fiberGrams: baseline.fiberGrams == null ? null : baseline.fiberGrams * factor,
+  })
+}
+
+export function mealEstimateUserAdjusted(baseline: MealEstimateNutrients, reviewed: MealEstimateNutrients): boolean {
+  return (
+    baseline.calories !== reviewed.calories ||
+    baseline.proteinGrams !== reviewed.proteinGrams ||
+    baseline.carbsGrams !== reviewed.carbsGrams ||
+    baseline.fatGrams !== reviewed.fatGrams ||
+    baseline.fiberGrams !== reviewed.fiberGrams
+  )
+}
+
+export function emptyMealEstimate(partial?: Partial<MealEstimateCandidate>): MealEstimateCandidate {
+  return mealEstimateCandidateSchema.parse({
+    schemaVersion: NUTRITION_MEAL_SCHEMA_VERSION,
+    status: 'review_required',
+    pipeline: NUTRITION_MEAL_PIPELINE,
+    model: null,
+    name: 'Meal',
+    foodsSeen: [],
+    assumptions: [],
+    calories: 0,
+    proteinGrams: 0,
+    carbsGrams: 0,
+    fatGrams: 0,
+    fiberGrams: null,
+    ...partial,
+  })
+}
+
+export function sanitizeMealEstimate(raw: unknown, options?: { model?: string | null }): MealEstimateCandidate {
+  const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {}
+  const foodsSeen = Array.isArray(source.foodsSeen)
+    ? source.foodsSeen.map(asText).filter((item): item is string => Boolean(item))
+    : []
+  const assumptions = Array.isArray(source.assumptions)
+    ? source.assumptions.map(asText).filter((item): item is string => Boolean(item))
+    : []
+  const nutrients = mealEstimateNutrients({
+    calories: asNumber(source.calories) ?? 0,
+    proteinGrams: asNumber(source.proteinGrams ?? source.protein) ?? 0,
+    carbsGrams: asNumber(source.carbsGrams ?? source.carbs) ?? 0,
+    fatGrams: asNumber(source.fatGrams ?? source.fat) ?? 0,
+    fiberGrams: asNumber(source.fiberGrams ?? source.fiber),
+  })
+  const name = asText(typeof source.name === 'string' ? source.name : null) ?? foodsSeen[0] ?? 'Meal'
+  return mealEstimateCandidateSchema.parse({
+    schemaVersion: NUTRITION_MEAL_SCHEMA_VERSION,
+    status: nutrients.calories <= 0 && foodsSeen.length === 0 ? 'invalid' : 'review_required',
+    pipeline: NUTRITION_MEAL_PIPELINE,
+    model: options?.model ?? (typeof source.model === 'string' ? source.model : null),
+    name,
+    foodsSeen: [...new Set(foodsSeen)],
+    assumptions: [...new Set(assumptions)],
+    ...nutrients,
+  })
+}
+
+export function validateMealEstimateReview(input: { name: string; calories: number }): ReviewFieldError[] {
+  const errors: ReviewFieldError[] = []
+  if (!input.name.trim()) {
+    errors.push({ path: 'name', message: 'Add a meal name.' })
+  }
+  if (!Number.isFinite(input.calories) || input.calories < 0) {
+    errors.push({ path: 'calories', message: 'Calories must be a number.' })
+  }
+  return errors
 }
 
 export { isHomeAiJobId, HOME_AI_JOB_ID_RE }

@@ -75,6 +75,23 @@ describe('nutrition entry grouping', () => {
     expect(clustered[0]?.kind === 'meal' && clustered[0].entries).toHaveLength(2)
     expect(clustered[1]).toMatchObject({ kind: 'entry', entry: { id: '3' } })
   })
+
+  it('shows a meal-photo snapshot as one log row', () => {
+    const entries = [
+      {
+        id: '1',
+        foodName: 'Chicken, rice and broccoli',
+        calories: 680,
+        protein: 38,
+        mealGroupId: null,
+        meal: 'dinner',
+        sourceKind: 'photo_ai',
+      },
+    ] as NutritionEntry[]
+    const clustered = clusterMealLogItems(entries)
+    expect(clustered).toHaveLength(1)
+    expect(clustered[0]).toMatchObject({ kind: 'entry', entry: { id: '1', calories: 680, protein: 38 } })
+  })
 })
 
 describe('nutrition daily UX source', () => {
