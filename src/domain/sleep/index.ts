@@ -59,6 +59,7 @@ export {
   sleepNightlySummariesFromDecisions,
   sleepNightlySummaryFromDecision,
   sleepNightSemanticPayload,
+  stableSleepNightPayload,
   type SleepNightAlternativeEvidence,
   type SleepNightEvidence,
   type SleepNightlySummary,

@@ -1,6 +1,8 @@
-import { HealthAutoExportError } from '../../src/domain/apple-health/hae.js'
+import { HealthAutoExportError, healthAutoExportHasActivityMetrics } from '../../src/domain/apple-health/hae.js'
+import { parseHealthAutoExportSleep } from '../../src/domain/apple-health/hae-sleep.js'
 import { handleApiError, HttpError, readJsonBody, sendJson, type ApiRequest, type ApiResponse } from '../http.js'
 import { ingestHealthAutoExport } from '../apple-health/hae-service.js'
+import { ingestHealthAutoExportSleep } from '../apple-health/hae-sleep-service.js'
 import { appleHealthSyncAuthorized, appleHealthSyncToken } from '../apple-health/sync-auth.js'
 
 function authorizationHeader(req: ApiRequest): string | string[] | undefined {
@@ -31,14 +33,23 @@ export default async function appleHealthSyncHandler(req: ApiRequest, res: ApiRe
       }
       throw error
     }
-    const result = await ingestHealthAutoExport({ payload, sourceFilename: 'health-auto-export-sync' })
+    const sleepParsed = parseHealthAutoExportSleep(payload)
+    const activity = healthAutoExportHasActivityMetrics(payload)
+      ? await ingestHealthAutoExport({ payload, sourceFilename: 'health-auto-export-sync' })
+      : null
+    const sleep = sleepParsed.metricPresent ? await ingestHealthAutoExportSleep({ payload }) : null
     sendJson(res, 200, {
-      accepted: result.accepted,
-      daysSeen: result.daysSeen,
-      daysInserted: result.daysInserted,
-      daysUpdated: result.daysUpdated,
-      metricsApplied: result.metricsApplied,
-      ignoredMetrics: result.ignoredMetrics,
+      accepted: 1 as const,
+      ...(activity
+        ? {
+            daysSeen: activity.daysSeen,
+            daysInserted: activity.daysInserted,
+            daysUpdated: activity.daysUpdated,
+            metricsApplied: activity.metricsApplied,
+            ignoredMetrics: activity.ignoredMetrics,
+          }
+        : {}),
+      ...(sleep ? { sleep } : {}),
     })
   } catch (error) {
     if (error instanceof HealthAutoExportError) {

@@ -73,7 +73,28 @@ export const UPSERT_SLEEP_NIGHTLY_SUMMARY_SQL = `INSERT INTO sleep_nightly_summa
            evidence = EXCLUDED.evidence,
            source_id = EXCLUDED.source_id,
            import_job_id = EXCLUDED.import_job_id,
-           updated_at = now()`
+           updated_at = now()
+         WHERE sleep_nightly_summaries.logical_source_key IS DISTINCT FROM EXCLUDED.logical_source_key
+            OR sleep_nightly_summaries.source_name IS DISTINCT FROM EXCLUDED.source_name
+            OR sleep_nightly_summaries.start_at IS DISTINCT FROM EXCLUDED.start_at
+            OR sleep_nightly_summaries.end_at IS DISTINCT FROM EXCLUDED.end_at
+            OR sleep_nightly_summaries.total_sleep_minutes IS DISTINCT FROM EXCLUDED.total_sleep_minutes
+            OR sleep_nightly_summaries.time_in_bed_minutes IS DISTINCT FROM EXCLUDED.time_in_bed_minutes
+            OR sleep_nightly_summaries.awake_minutes IS DISTINCT FROM EXCLUDED.awake_minutes
+            OR sleep_nightly_summaries.core_minutes IS DISTINCT FROM EXCLUDED.core_minutes
+            OR sleep_nightly_summaries.deep_minutes IS DISTINCT FROM EXCLUDED.deep_minutes
+            OR sleep_nightly_summaries.rem_minutes IS DISTINCT FROM EXCLUDED.rem_minutes
+            OR sleep_nightly_summaries.unspecified_sleep_minutes IS DISTINCT FROM EXCLUDED.unspecified_sleep_minutes
+            OR sleep_nightly_summaries.stage_coverage_pct IS DISTINCT FROM EXCLUDED.stage_coverage_pct
+            OR sleep_nightly_summaries.stage_conflict_minutes IS DISTINCT FROM EXCLUDED.stage_conflict_minutes
+            OR sleep_nightly_summaries.observation_status IS DISTINCT FROM EXCLUDED.observation_status
+            OR sleep_nightly_summaries.analysis_eligible IS DISTINCT FROM EXCLUDED.analysis_eligible
+            OR sleep_nightly_summaries.stage_analysis_eligible IS DISTINCT FROM EXCLUDED.stage_analysis_eligible
+            OR sleep_nightly_summaries.selection_reason IS DISTINCT FROM EXCLUDED.selection_reason
+            OR sleep_nightly_summaries.calculation_version IS DISTINCT FROM EXCLUDED.calculation_version
+            OR sleep_nightly_summaries.evidence IS DISTINCT FROM EXCLUDED.evidence
+            OR sleep_nightly_summaries.source_id IS DISTINCT FROM EXCLUDED.source_id
+            OR sleep_nightly_summaries.import_job_id IS DISTINCT FROM EXCLUDED.import_job_id`
 
 export const LIST_SLEEP_NIGHTLY_SUMMARIES_SQL = `SELECT sleep_date::text AS sleep_date,
            timezone,
@@ -100,6 +121,10 @@ export const LIST_SLEEP_NIGHTLY_SUMMARIES_SQL = `SELECT sleep_date::text AS slee
          ORDER BY sleep_date ASC`
 
 export const SLEEP_NIGHTLY_BACKFILL_BATCH = 40
+
+export const DELETE_SLEEP_NIGHTS_SQL = `DELETE FROM sleep_nightly_summaries
+         WHERE timezone = $1
+           AND sleep_date = ANY($2::date[])`
 
 function asNumber(value: unknown): number | null {
   if (value == null) {

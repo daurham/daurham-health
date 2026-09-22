@@ -9,7 +9,9 @@ import { HEALTH_CALENDAR_TIME_ZONE } from '../../src/domain/time.js'
 import { formatDatabaseError, getSql } from '../db.js'
 import { HttpError } from '../http.js'
 import { INSERT_APPLE_HEALTH_JOB_SQL, UPDATE_APPLE_HEALTH_JOB_SQL } from './queries.js'
-import { HAE_COMMIT_BATCH, HAE_SOURCE_SQL, LATEST_ACTIVITY_DAY_SQL, LATEST_HAE_JOB_SQL, buildHaeDailyStatement } from './hae-sql.js'
+import { latestHaeSleepStatus } from './hae-sleep-service.js'
+import { LATEST_HAE_STRATEGY_SQL } from './hae-sleep-sql.js'
+import { HAE_COMMIT_BATCH, HAE_SOURCE_SQL, LATEST_ACTIVITY_DAY_SQL, buildHaeDailyStatement } from './hae-sql.js'
 
 export type HaeIngestResult = {
   accepted: true
@@ -22,10 +24,24 @@ export type HaeIngestResult = {
   jobId: string
 }
 
+export type HaeSyncChannel = {
+  importedAt: string
+  status: string
+  latestDay: string | null
+}
+
+export type HaeSleepSyncChannel = {
+  importedAt: string
+  status: string
+  latestNight: string | null
+}
+
 export type HaeSyncStatus = {
   importedAt: string
   status: string
   latestDay: string | null
+  activity: HaeSyncChannel | null
+  sleep: HaeSleepSyncChannel | null
 } | null
 
 async function haeSourceId(): Promise<string> {
@@ -45,21 +61,32 @@ export async function latestHealthAutoExportStatus(): Promise<HaeSyncStatus> {
   if (!sourceId) {
     return null
   }
-  const jobs = (await sql.query(LATEST_HAE_JOB_SQL, [sourceId])) as Array<{
+  const jobs = (await sql.query(LATEST_HAE_STRATEGY_SQL, [sourceId, 'health_auto_export_daily'])) as Array<{
     imported_at: string | Date
     status: string
   }>
   const job = jobs[0]
-  if (!job) {
-    return null
-  }
   const days = (await sql.query(LATEST_ACTIVITY_DAY_SQL, [HEALTH_CALENDAR_TIME_ZONE])) as Array<{
     latest_day: string | null
   }>
+  const activity = job
+    ? {
+        importedAt: new Date(job.imported_at).toISOString(),
+        status: job.status,
+        latestDay: days[0]?.latest_day ?? null,
+      }
+    : null
+  const sleep = await latestHaeSleepStatus()
+  const headline = activity ?? (sleep ? { importedAt: sleep.importedAt, status: sleep.status, latestDay: null } : null)
+  if (!headline) {
+    return null
+  }
   return {
-    importedAt: new Date(job.imported_at).toISOString(),
-    status: job.status,
-    latestDay: days[0]?.latest_day ?? null,
+    importedAt: headline.importedAt,
+    status: headline.status,
+    latestDay: activity?.latestDay ?? null,
+    activity,
+    sleep,
   }
 }
 

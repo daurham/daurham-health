@@ -145,7 +145,8 @@ export function SettingsPage() {
           <h3 className="mt-1 text-sm font-medium text-zinc-800">Apple Health</h3>
           <p className="mt-1 text-sm text-zinc-600">
             Daily steps, active energy, exercise time, and resting heart rate sync from Health Auto Export. Sleep
-            intervals and workout summaries come from the Apple archive. Training sessions are never overwritten.
+            analysis syncs from Health Auto Export when it sends individual intervals. Workout summaries come from
+            the Apple archive. Training sessions are never overwritten.
           </p>
         </div>
 
@@ -155,9 +156,15 @@ export function SettingsPage() {
             {job ? `${new Date(job.importedAt).toLocaleString()} · ${job.status}` : 'Not imported'}
           </p>
           <p>
-            Health Auto Export:{' '}
-            {status?.autoExport
-              ? `${status.autoExport.status} · last sync ${new Date(status.autoExport.importedAt).toLocaleString()} · latest day ${status.autoExport.latestDay ?? '—'}`
+            Health Auto Export activity:{' '}
+            {status?.autoExport?.activity
+              ? `${status.autoExport.activity.status} · last sync ${new Date(status.autoExport.activity.importedAt).toLocaleString()} · latest day ${status.autoExport.activity.latestDay ?? '—'}`
+              : 'No sync yet'}
+          </p>
+          <p>
+            Health Auto Export sleep:{' '}
+            {status?.autoExport?.sleep
+              ? `${status.autoExport.sleep.status} · last sync ${new Date(status.autoExport.sleep.importedAt).toLocaleString()} · latest night ${status.autoExport.sleep.latestNight ?? '—'}`
               : 'No sync yet'}
           </p>
         </div>

@@ -210,6 +210,16 @@ function readPoint(metric: HaeCanonicalMetric, point: unknown, declaredUnit: str
   }
 }
 
+export function healthAutoExportHasActivityMetrics(payload: unknown): boolean {
+  if (!isRecord(payload) || !isRecord(payload.data) || !Array.isArray(payload.data.metrics)) {
+    return false
+  }
+  if (payload.data.metrics.length === 0) {
+    return true
+  }
+  return payload.data.metrics.some((metric) => isRecord(metric) && metric.name !== 'sleep_analysis')
+}
+
 export function parseHealthAutoExport(payload: unknown): HaeParseResult {
   if (!isRecord(payload) || !isRecord(payload.data) || !Array.isArray(payload.data.metrics)) {
     throw new HealthAutoExportError('Health Auto Export payload must contain data.metrics')
@@ -231,6 +241,9 @@ export function parseHealthAutoExport(payload: unknown): HaeParseResult {
     const data = Array.isArray(metric.data) ? metric.data : null
     if (!data) {
       throw new HealthAutoExportError(`Health Auto Export ${name} data is invalid`)
+    }
+    if (name === 'sleep_analysis') {
+      continue
     }
     if (!canonical) {
       ignored.set(name, (ignored.get(name) ?? 0) + data.length)

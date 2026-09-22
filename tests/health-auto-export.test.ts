@@ -81,6 +81,25 @@ describe('Health Auto Export parser', () => {
       exerciseMinutes: null,
     })
     expect(parsed.ignoredMetrics).toEqual([{ name: 'heart_rate', count: 1 }])
+    const withSleep = parseHealthAutoExport(
+      payload([
+        { name: 'step_count', units: 'count', data: [point('2026-09-20 00:00:00 -0700', 5354)] },
+        {
+          name: 'sleep_analysis',
+          units: 'hr',
+          data: [{ date: '2026-09-20 00:00:00 -0700', qty: 7.5 }],
+        },
+        {
+          name: 'walking_running_distance',
+          units: 'mi',
+          data: [point('2026-09-20 00:00:00 -0700', 3)],
+        },
+      ]),
+    )
+    expect(withSleep.days[0]?.stepsCount).toBe(5354)
+    expect(withSleep.ignoredMetrics.map((metric) => metric.name)).toEqual(['walking_running_distance'])
+    expect(withSleep.ignoredDistanceCount).toBe(1)
+    expect(JSON.stringify(withSleep.days)).not.toContain('sleep')
     expect(parsed.metricsApplied.step_count).toBe(1)
     expect(parsed.metricsApplied.active_energy).toBe(0)
   })

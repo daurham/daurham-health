@@ -29,6 +29,22 @@ const statusSchema = z.object({
       importedAt: z.string(),
       status: z.string(),
       latestDay: z.string().nullable(),
+      activity: z
+        .object({
+          importedAt: z.string(),
+          status: z.string(),
+          latestDay: z.string().nullable(),
+        })
+        .nullable()
+        .optional(),
+      sleep: z
+        .object({
+          importedAt: z.string(),
+          status: z.string(),
+          latestNight: z.string().nullable(),
+        })
+        .nullable()
+        .optional(),
     })
     .nullable(),
   activitySampleCount: z.number(),

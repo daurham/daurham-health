@@ -117,6 +117,12 @@ export function sleepNightlySummariesFromDecisions(
     .filter((item): item is SleepNightlySummary => item != null)
 }
 
+export function stableSleepNightPayload(night: SleepNightlySummary): string {
+  return JSON.stringify(sleepNightSemanticPayload(night), (_key, value: unknown) =>
+    typeof value === 'number' ? Math.round(value * 1_000_000) / 1_000_000 : value,
+  )
+}
+
 export function sleepNightSemanticPayload(night: SleepNightlySummary): Record<string, unknown> {
   return {
     sleepDate: night.sleepDate,
