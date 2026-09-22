@@ -94,7 +94,7 @@ export function Layout() {
       </header>
       <main
         className={cn(
-          'mx-auto px-4 py-6 pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:py-8 md:pb-8',
+          'mx-auto px-4 py-6 pb-[var(--shell-main-pad)] md:py-8',
           SHELL_MAX_WIDTH_CLASS,
         )}
       >

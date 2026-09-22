@@ -66,8 +66,8 @@ describe('nutrition entry grouping', () => {
 
   it('clusters photo-meal entries under a group without collapsing snapshots', () => {
     const entries = [
-      { id: '1', foodName: 'Chicken', calories: 250, protein: 40, mealGroupId: 'g1', meal: 'dinner' },
-      { id: '2', foodName: 'Rice', calories: 200, protein: 4, mealGroupId: 'g1', meal: 'dinner' },
+      { id: '1', foodName: 'Chicken', calories: 250, protein: 40, mealGroupId: 'g1', meal: 'dinner', sourceKind: 'photo_ai' },
+      { id: '2', foodName: 'Rice', calories: 200, protein: 4, mealGroupId: 'g1', meal: 'dinner', sourceKind: 'photo_ai' },
       { id: '3', foodName: 'Yogurt', calories: 100, protein: 10, mealGroupId: null, meal: 'dinner' },
     ] as NutritionEntry[]
     const clustered = clusterMealLogItems(entries)
@@ -84,13 +84,15 @@ describe('nutrition daily UX source', () => {
     const layout = readFileSync('src/components/Layout.tsx', 'utf8')
     expect(page).toContain('Add food')
     expect(page).toContain('md:grid-cols-[minmax(0,1fr)_22rem]')
-    expect(page).toContain("bottom: 'calc(4.5rem + env(safe-area-inset-bottom))'")
+    expect(page).toContain("bottom: 'calc(var(--shell-nav-offset) + 1rem)'")
     expect(page).toContain('useSearchParams')
     expect(page).toContain('setParams({ date: resource.committedKey }')
     expect(page).toContain('useAtomicKeyedResource')
     expect(page).toContain('prefetchKeys: adjacentNutritionDates')
     expect(page).toContain('PendingLoadRegion')
-    expect(panels).toContain('Search foods')
+    expect(panels).toContain('Search foods or describe what you ate')
+    expect(panels).toContain('Use this description')
+    expect(panels).toContain('No matching saved foods.')
     expect(panels).toContain('stickyHeader')
     expect(panels).toContain('Scan barcode')
     expect(panels).toContain('Scan nutrition label')

@@ -191,11 +191,20 @@ export async function savePackagedFoodAndLog(input: {
   )
 }
 
-export async function createNutritionLabelJob(file: File): Promise<{ id: string; status: 'queued' }> {
+export async function createNutritionLabelJob(
+  file: File,
+  input?: { userContext?: string; provider?: 'gemini' | 'home_ai' },
+): Promise<{ id: string; status: 'queued' }> {
   const form = new FormData()
   form.set('image', file)
+  if (input?.userContext) {
+    form.set('userContext', input.userContext)
+  }
+  if (input?.provider) {
+    form.set('provider', input.provider)
+  }
   const response = await healthFetch('/api/nutrition/label/jobs', { method: 'POST', body: form })
-  const body = await parseBarcodeResponse<{ job: { id: string; status: 'queued' } }>(response)
+  const body = await parseMealAction<{ job: { id: string; status: 'queued' } }>(response)
   return body.job
 }
 
@@ -243,11 +252,39 @@ export async function commitNutritionLabelReview(input: {
   )
 }
 
-export async function createNutritionMealJob(file: File): Promise<{ id: string; status: 'queued' }> {
+export class MealClientError extends Error {
+  readonly code: string
+
+  constructor(message: string, code: string) {
+    super(message)
+    this.name = 'MealClientError'
+    this.code = code
+  }
+}
+
+async function parseMealAction<T>(response: Response): Promise<T> {
+  const body = (await response.json().catch(() => ({}))) as { error?: string; code?: string } & T
+  if (!response.ok) {
+    const code = typeof body.code === 'string' && body.code.length > 0 ? body.code : 'HOME_AI_UNAVAILABLE'
+    throw new MealClientError(typeof body.error === 'string' ? body.error : 'Meal analysis is temporarily unavailable.', code)
+  }
+  return body
+}
+
+export async function createNutritionMealJob(
+  file: File,
+  input?: { userContext?: string; provider?: 'gemini' | 'home_ai' },
+): Promise<{ id: string; status: 'queued' }> {
   const form = new FormData()
   form.set('image', file)
+  if (input?.userContext) {
+    form.set('userContext', input.userContext)
+  }
+  if (input?.provider) {
+    form.set('provider', input.provider)
+  }
   const response = await healthFetch('/api/nutrition/meal/jobs', { method: 'POST', body: form })
-  const body = await parseBarcodeResponse<{ job: { id: string; status: 'queued' } }>(response)
+  const body = await parseMealAction<{ job: { id: string; status: 'queued' } }>(response)
   return body.job
 }
 
@@ -270,6 +307,104 @@ export async function fetchNutritionMealJob(jobId: string): Promise<NutritionMea
 
 export function nutritionMealImageUrl(jobId: string): string {
   return `/api/nutrition/meal/jobs/${jobId}/image`
+}
+
+export type FoodDescriptionReview = {
+  original: string
+  components: Array<{
+    id: string
+    proposedName: string
+    quantity: number | null
+    unit: string
+    preparation: string | null
+    ambiguity: string | null
+    matches: Array<{
+      foodId: string
+      name: string
+      score: number
+      servingQuantity: number
+      servingUnit: string
+      servingGrams: number | null
+      calories: number
+      protein: number | null
+      carbs: number | null
+      fat: number | null
+      fiber: number | null
+    }>
+    usda: Array<{
+      fdcId: number
+      name: string
+      servingQuantity: number
+      servingUnit: string
+      servingGrams: number
+      calories: number
+      protein: number | null
+      carbs: number | null
+      fat: number | null
+      fiber: number | null
+    }>
+    selectedFoodId: string | null
+  }>
+}
+
+export async function reanalyzeNutritionMealJob(
+  jobId: string,
+  input: { userContext?: string | null; provider?: 'gemini' | 'home_ai' },
+): Promise<{ id: string; status: 'queued' }> {
+  const response = await healthFetch(`/api/nutrition/meal/jobs/${jobId}/reanalyze`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+  const body = await parseMealAction<{ job: { id: string; status: 'queued' } }>(response)
+  return body.job
+}
+
+export async function reanalyzeNutritionLabelJob(
+  jobId: string,
+  input: { userContext?: string | null; provider?: 'gemini' | 'home_ai' },
+): Promise<{ id: string; status: 'queued' }> {
+  const response = await healthFetch(`/api/nutrition/label/jobs/${jobId}/reanalyze`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+  const body = await parseMealAction<{ job: { id: string; status: 'queued' } }>(response)
+  return body.job
+}
+
+export async function describeFoodText(text: string, provider?: 'gemini' | 'home_ai'): Promise<FoodDescriptionReview> {
+  const response = await healthFetch('/api/nutrition/describe', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text, provider }),
+  })
+  return parseMealAction<FoodDescriptionReview>(response)
+}
+
+export async function commitFoodDescription(input: {
+  text: string
+  logDate: string
+  timezone: string
+  meal?: string | null
+  components: Array<{
+    id: string
+    included: boolean
+    proposedName: string
+    foodId: string | null
+    fdcId?: number | null
+    quantity: number | null
+    unit: string
+    grams: number | null
+  }>
+}): Promise<{ entries: NutritionEntry[]; mealGroupId: string }> {
+  return parseOk(
+    await healthFetch('/api/nutrition/describe/commit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    }),
+  )
 }
 
 export async function commitNutritionMealReview(

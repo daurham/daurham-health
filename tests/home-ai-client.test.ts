@@ -130,6 +130,25 @@ describe('home-ai client', () => {
     })
   })
 
+  it('distinguishes meal auth, missing route, model, and timeout without logging the key', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const photo = { bytes: JPEG, filename: 'meal.jpg', mimeType: 'image/jpeg' }
+    const authFetch = vi.fn(async () => new Response(JSON.stringify({ error: { code: 'UNAUTHORIZED' } }), { status: 401 })) as unknown as typeof fetch
+    await expect(client(authFetch).createNutritionMealJob(photo)).rejects.toMatchObject({ code: 'HOME_AI_AUTH' })
+    const missingFetch = vi.fn(async () => new Response('<pre>Cannot POST /api/nutrition/meal/jobs</pre>', { status: 404 })) as unknown as typeof fetch
+    await expect(client(missingFetch).createNutritionMealJob(photo)).rejects.toMatchObject({ code: 'HOME_AI_ROUTE_MISSING' })
+    const modelFetch = vi.fn(async () => new Response(JSON.stringify({ error: { code: 'MODEL_UNAVAILABLE' } }), { status: 503 })) as unknown as typeof fetch
+    await expect(client(modelFetch).createNutritionMealJob(photo)).rejects.toMatchObject({ code: 'HOME_AI_MODEL_UNAVAILABLE' })
+    const timeoutFetch = vi.fn(async () => {
+      const error = new Error('timed out')
+      error.name = 'TimeoutError'
+      throw error
+    }) as unknown as typeof fetch
+    await expect(client(timeoutFetch).createNutritionMealJob(photo)).rejects.toMatchObject({ code: 'TIMED_OUT' })
+    expect(logged.mock.calls.flat().join(' ')).not.toContain('secret-home-ai-key')
+    logged.mockRestore()
+  })
+
   it('does not put the API key on invalid job ids', async () => {
     const fetchImpl = vi.fn() as unknown as typeof fetch
     await expect(client(fetchImpl).getWorkoutTranscriptionJob('../job.json')).rejects.toMatchObject({

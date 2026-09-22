@@ -31,6 +31,7 @@ import nutritionLabelCommitHandler from './handlers/nutrition-label-commit.js'
 import nutritionMealJobsHandler from './handlers/nutrition-meal-jobs.js'
 import nutritionMealJobDetailHandler from './handlers/nutrition-meal-job-detail.js'
 import nutritionMealCommitHandler from './handlers/nutrition-meal-commit.js'
+import nutritionDescribeHandler from './handlers/nutrition-describe.js'
 import appleHealthImportHandler from './handlers/apple-health-import.js'
 import appleHealthSyncHandler from './handlers/apple-health-sync.js'
 
@@ -67,6 +68,7 @@ export type HealthApiRoute =
   | 'nutrition-meal-jobs'
   | 'nutrition-meal-job-detail'
   | 'nutrition-meal-commit'
+  | 'nutrition-describe'
   | 'apple-health-import'
   | 'apple-health-sync'
 
@@ -105,6 +107,7 @@ const HANDLERS: Record<HealthApiRoute, HealthApiHandler> = {
   'nutrition-meal-jobs': nutritionMealJobsHandler,
   'nutrition-meal-job-detail': nutritionMealJobDetailHandler,
   'nutrition-meal-commit': nutritionMealCommitHandler,
+  'nutrition-describe': nutritionDescribeHandler,
   'apple-health-import': appleHealthImportHandler,
   'apple-health-sync': appleHealthSyncHandler,
 }
@@ -165,6 +168,9 @@ export function matchHealthApiRoute(pathname: string): HealthApiRoute | null {
       return 'nutrition-meal-jobs'
     case '/api/nutrition/meal/commit':
       return 'nutrition-meal-commit'
+    case '/api/nutrition/describe':
+    case '/api/nutrition/describe/commit':
+      return 'nutrition-describe'
     case '/api/nutrition/import/legacy/preview':
     case '/api/nutrition/import/legacy/commit':
       return 'nutrition-legacy-import'
@@ -200,13 +206,13 @@ export function matchHealthApiRoute(pathname: string): HealthApiRoute | null {
   }
   if (pathname.startsWith('/api/nutrition/label/jobs/')) {
     const rest = pathname.slice('/api/nutrition/label/jobs/'.length)
-    if (rest.length > 0 && (rest.split('/').length === 1 || rest.endsWith('/image'))) {
+    if (rest.length > 0 && (rest.split('/').length === 1 || rest.endsWith('/image') || rest.endsWith('/reanalyze'))) {
       return 'nutrition-label-job-detail'
     }
   }
   if (pathname.startsWith('/api/nutrition/meal/jobs/')) {
     const rest = pathname.slice('/api/nutrition/meal/jobs/'.length)
-    if (rest.length > 0 && (rest.split('/').length === 1 || rest.endsWith('/image'))) {
+    if (rest.length > 0 && (rest.split('/').length === 1 || rest.endsWith('/image') || rest.endsWith('/reanalyze'))) {
       return 'nutrition-meal-job-detail'
     }
   }

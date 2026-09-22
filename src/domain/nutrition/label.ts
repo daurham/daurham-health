@@ -401,10 +401,25 @@ export function validateLabelReview(draft: LabelReviewDraft): ReviewFieldError[]
   return errors
 }
 
+export function isLabelRetryCode(code: string): boolean {
+  return code === 'HOME_AI_UNAVAILABLE' || code === 'TIMED_OUT' || code.startsWith('GEMINI_') || code.startsWith('HOME_AI_')
+}
+
 export function labelFailureMessage(code: string): string {
   switch (code) {
     case 'HOME_AI_UNAVAILABLE':
       return 'Home AI is temporarily unavailable.'
+    case 'GEMINI_NOT_CONFIGURED':
+    case 'GEMINI_AUTH':
+    case 'GEMINI_QUOTA':
+    case 'GEMINI_UNAVAILABLE':
+    case 'GEMINI_TIMEOUT':
+      return 'Label analysis is temporarily unavailable.'
+    case 'GEMINI_SCHEMA':
+    case 'GEMINI_SEMANTIC':
+      return "We couldn't confidently read this label."
+    case 'CONTEXT_TOO_LONG':
+      return 'Keep the note under 2000 characters.'
     case 'UNSUPPORTED_IMAGE':
       return 'Use a JPEG or PNG nutrition label photo.'
     case 'UPLOAD_TOO_LARGE':
@@ -468,6 +483,7 @@ export const nutritionLabelJobResponseSchema = z.object({
   }),
   candidate: nutritionLabelCandidateSchema.nullable(),
   comparison: nutritionLabelComparisonSchema.nullable(),
+  userContext: z.string().nullable().optional(),
   failure: z
     .object({
       code: z.string().min(1),

@@ -3,6 +3,8 @@ import {
   NUTRITION_CONFIG,
   draftFromCandidate,
   emptyLabelCandidate,
+  isLabelRetryCode,
+  labelFailureMessage,
   snapshotFromDefinition,
   validateLabelReview,
   type LabelBasis,
@@ -16,9 +18,11 @@ import { cn } from '@/lib'
 import {
   BarcodeLookupClientError,
   commitNutritionLabelReview,
+  MealClientError,
   createNutritionLabelJob,
   fetchNutritionLabelJob,
   nutritionLabelImageUrl,
+  reanalyzeNutritionLabelJob,
 } from './api'
 import { LabelPhotoPrepareError, prepareLabelPhoto } from './prepare-label-photo'
 import { formatKcal, formatGrams } from './format'
@@ -42,10 +46,12 @@ type LabelCaptureProps = {
 }
 
 export function LabelCaptureSheet({ date, jobId, onClose, onBack, onLogged }: LabelCaptureProps) {
-  const [phase, setPhase] = useState<'pick' | 'working' | 'review' | 'failed'>(jobId ? 'working' : 'pick')
+  const [phase, setPhase] = useState<'pick' | 'preview' | 'working' | 'review' | 'failed'>(jobId ? 'working' : 'pick')
   const [activeJobId, setActiveJobId] = useState<string | null>(jobId ?? null)
   const [payload, setPayload] = useState<NutritionLabelJobResponse | null>(null)
   const [localPreview, setLocalPreview] = useState<string | null>(null)
+  const [preparedFile, setPreparedFile] = useState<File | null>(null)
+  const [context, setContext] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [errorCode, setErrorCode] = useState<string | null>(null)
   const [manual, setManual] = useState(false)
@@ -89,8 +95,13 @@ export function LabelCaptureSheet({ date, jobId, onClose, onBack, onLogged }: La
         if (cancelled) {
           return
         }
-        setError(caught instanceof Error ? caught.message : 'Home AI is temporarily unavailable.')
-        setErrorCode('HOME_AI_UNAVAILABLE')
+        if (caught instanceof MealClientError) {
+          setError(labelFailureMessage(caught.code))
+          setErrorCode(caught.code)
+        } else {
+          setError('Label analysis is temporarily unavailable.')
+          setErrorCode('HOME_AI_UNAVAILABLE')
+        }
         setPhase('failed')
       }
     }
@@ -113,15 +124,15 @@ export function LabelCaptureSheet({ date, jobId, onClose, onBack, onLogged }: La
     try {
       const prepared = await prepareLabelPhoto(file)
       const preview = URL.createObjectURL(prepared.file)
+      setPreparedFile(prepared.file)
+      setActiveJobId(null)
       setLocalPreview((current) => {
         if (current) {
           URL.revokeObjectURL(current)
         }
         return preview
       })
-      setPhase('working')
-      const job = await createNutritionLabelJob(prepared.file)
-      setActiveJobId(job.id)
+      setPhase('preview')
     } catch (caught) {
       if (caught instanceof LabelPhotoPrepareError) {
         setError(caught.message)
@@ -129,10 +140,52 @@ export function LabelCaptureSheet({ date, jobId, onClose, onBack, onLogged }: La
         setPhase('failed')
         return
       }
-      setError(caught instanceof Error ? caught.message : 'Home AI is temporarily unavailable.')
-      setErrorCode('HOME_AI_UNAVAILABLE')
+      if (caught instanceof MealClientError) {
+        setError(labelFailureMessage(caught.code))
+        setErrorCode(caught.code)
+      } else {
+        setError('Label analysis is temporarily unavailable.')
+        setErrorCode('HOME_AI_UNAVAILABLE')
+      }
       setPhase('failed')
     }
+  }
+
+  async function analyze(provider: 'gemini' | 'home_ai') {
+    if (!activeJobId && !preparedFile) {
+      setPhase('pick')
+      return
+    }
+    setError(null)
+    setErrorCode(null)
+    const previousId = activeJobId
+    const file = preparedFile
+    setPhase('working')
+    setActiveJobId(null)
+    try {
+      const note = context.trim()
+      const job = previousId
+        ? await reanalyzeNutritionLabelJob(previousId, { userContext: note, provider })
+        : await createNutritionLabelJob(file as File, { userContext: note, provider })
+      setActiveJobId(job.id)
+    } catch (caught) {
+      if (previousId) {
+        setActiveJobId(previousId)
+      }
+      if (caught instanceof MealClientError) {
+        setError(labelFailureMessage(caught.code))
+        setErrorCode(caught.code)
+      } else {
+        setError('Label analysis is temporarily unavailable.')
+        setErrorCode('HOME_AI_UNAVAILABLE')
+      }
+      setPhase('failed')
+    }
+  }
+
+  function editContext() {
+    setContext(payload?.userContext ?? context)
+    setPhase('preview')
   }
 
   if (phase === 'review' || manual) {
@@ -144,6 +197,8 @@ export function LabelCaptureSheet({ date, jobId, onClose, onBack, onLogged }: La
         candidate={candidate}
         comparison={payload?.comparison ?? null}
         imageUrl={activeJobId && payload?.job.imageAvailable ? nutritionLabelImageUrl(activeJobId) : localPreview}
+        userContext={payload?.userContext ?? (context.trim() || null)}
+        onEditContext={activeJobId || preparedFile ? editContext : undefined}
         onClose={onClose}
         onBack={() => {
           setManual(false)
@@ -160,9 +215,21 @@ export function LabelCaptureSheet({ date, jobId, onClose, onBack, onLogged }: La
         <p className="text-sm text-zinc-800">{error}</p>
         {localPreview ? <img src={localPreview} alt="Nutrition label" className="mt-3 max-h-48 w-full rounded-lg object-contain bg-zinc-100" /> : null}
         <div className="mt-4 space-y-2">
-          {errorCode !== 'UNSUPPORTED' ? (
+          {errorCode && isLabelRetryCode(errorCode) ? (
+            <>
+              <button type="button" className={primaryClass} onClick={() => void analyze('gemini')}>
+                Retry Gemini
+              </button>
+              <button type="button" className={secondaryClass + ' w-full'} onClick={editContext}>
+                Edit context
+              </button>
+              <button type="button" className={secondaryClass + ' w-full'} onClick={() => void analyze('home_ai')}>
+                Try local AI
+              </button>
+            </>
+          ) : errorCode !== 'UNSUPPORTED' ? (
             <button type="button" className={primaryClass} onClick={() => setPhase('pick')}>
-              {errorCode === 'HOME_AI_UNAVAILABLE' || errorCode === 'TIMED_OUT' ? 'Retry' : 'Use another photo'}
+              Use another photo
             </button>
           ) : null}
           <button
@@ -190,6 +257,33 @@ export function LabelCaptureSheet({ date, jobId, onClose, onBack, onLogged }: La
         <button type="button" className={secondaryClass + ' mt-4 w-full'} onClick={onBack}>
           Back
         </button>
+      </NutritionSheet>
+    )
+  }
+
+  if (phase === 'preview') {
+    const previewSrc = localPreview ?? (activeJobId ? nutritionLabelImageUrl(activeJobId) : null)
+    return (
+      <NutritionSheet title="Scan nutrition label" onClose={onClose}>
+        {previewSrc ? <img src={previewSrc} alt="Nutrition label" className="max-h-64 w-full rounded-lg object-contain bg-zinc-100" /> : null}
+        <details className="mt-4">
+          <summary className="cursor-pointer text-sm font-medium text-zinc-700">Add context (optional)</summary>
+          <textarea
+            className={inputClass + ' mt-2 min-h-24 py-2'}
+            maxLength={2000}
+            value={context}
+            placeholder="This is the 12 oz package. The serving is 4 pieces."
+            onChange={(event) => setContext(event.target.value)}
+          />
+        </details>
+        <div className="mt-4 space-y-2">
+          <button type="button" className={primaryClass} disabled={!preparedFile && !activeJobId} onClick={() => void analyze('gemini')}>
+            Analyze label
+          </button>
+          <button type="button" className="text-sm text-zinc-600 underline" onClick={() => setPhase('pick')}>
+            Back
+          </button>
+        </div>
       </NutritionSheet>
     )
   }
@@ -231,6 +325,8 @@ function LabelReviewSheet({
   candidate,
   comparison,
   imageUrl,
+  userContext,
+  onEditContext,
   onClose,
   onBack,
   onLogged,
@@ -240,6 +336,8 @@ function LabelReviewSheet({
   candidate: NutritionLabelCandidate
   comparison: NutritionLabelJobResponse['comparison']
   imageUrl: string | null
+  userContext?: string | null
+  onEditContext?: () => void
   onClose: () => void
   onBack: () => void
   onLogged: (entry: NutritionEntry, food: NutritionFood) => void
@@ -354,6 +452,17 @@ function LabelReviewSheet({
         {imageUrl ? (
           <img src={imageUrl} alt="Source nutrition label" className="max-h-40 w-full rounded-lg object-contain bg-zinc-100" />
         ) : null}
+        {userContext ? <p className="text-sm text-zinc-600">Context: {userContext}</p> : null}
+        {onEditContext ? (
+          <button type="button" className="text-sm text-zinc-600 underline" onClick={onEditContext}>
+            Edit context
+          </button>
+        ) : null}
+        {candidate.ambiguities.map((ambiguity) => (
+          <p key={ambiguity} className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+            {ambiguity}
+          </p>
+        ))}
         {candidate.warnings.map((warning) => (
           <p key={warning} className="text-sm text-zinc-600">
             {warning}

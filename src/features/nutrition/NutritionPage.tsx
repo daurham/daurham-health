@@ -341,7 +341,7 @@ export function NutritionPage() {
         type="button"
         onClick={() => setPanel({ kind: 'add' })}
         className="fixed right-4 z-30 inline-flex min-h-12 min-w-12 items-center justify-center rounded-full bg-zinc-900 px-5 text-sm font-medium text-white shadow-lg md:hidden"
-        style={{ bottom: 'calc(4.5rem + env(safe-area-inset-bottom))' }}
+        style={{ bottom: 'calc(var(--shell-nav-offset) + 1rem)' }}
       >
         Add food
       </button>

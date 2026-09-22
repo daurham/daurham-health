@@ -1,5 +1,33 @@
 @import "tailwindcss";
 
+/* Mobile shell. Bottom nav height and the home-indicator inset live here so
+   pages do not guess them independently. */
+:root {
+  --shell-nav-row: 3rem;
+  --shell-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --shell-nav-offset: calc(var(--shell-nav-row) + var(--shell-safe-bottom));
+  --shell-action-bar: 4.25rem;
+  --shell-main-pad: calc(var(--shell-nav-offset) + 1rem);
+}
+
+@media (min-width: 768px) {
+  :root {
+    --shell-nav-offset: 0px;
+    --shell-main-pad: 2rem;
+  }
+}
+
+.shell-action-bar {
+  position: fixed;
+  z-index: 30;
+  inset-inline: 0;
+  bottom: var(--shell-nav-offset);
+}
+
+.shell-action-reserve {
+  padding-bottom: var(--shell-action-bar);
+}
+
 /* iOS Safari zooms focused controls under 16px. Keep pinch-zoom available. */
 @media (max-width: 767px) {
   input:not([type='checkbox']):not([type='radio']):not([type='file']):not([type='hidden']):not([type='button']):not([type='submit']):not([type='reset']),

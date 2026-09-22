@@ -6,6 +6,8 @@ import {
   draftFromMealCandidate,
   emptyMealCandidate,
   looksLikeHiddenFat,
+  isMealRetryCode,
+  mealFailureMessage,
   mealReviewTotals,
   validateMealReview,
   type MealReviewComponent,
@@ -17,10 +19,12 @@ import {
 import type { ReviewFieldError } from '@/domain/paper-load'
 import {
   BarcodeLookupClientError,
+  MealClientError,
   commitNutritionMealReview,
   createNutritionFood,
   createNutritionMealJob,
   fetchNutritionMealJob,
+  reanalyzeNutritionMealJob,
   nutritionMealImageUrl,
   searchNutritionFoods,
 } from './api'
@@ -48,10 +52,12 @@ type MealCaptureProps = {
 }
 
 export function MealCaptureSheet({ date, jobId, recents = [], recipes = [], onClose, onBack, onLogged }: MealCaptureProps) {
-  const [phase, setPhase] = useState<'pick' | 'working' | 'review' | 'failed'>(jobId ? 'working' : 'pick')
+  const [phase, setPhase] = useState<'pick' | 'preview' | 'working' | 'review' | 'failed'>(jobId ? 'working' : 'pick')
   const [activeJobId, setActiveJobId] = useState<string | null>(jobId ?? null)
   const [payload, setPayload] = useState<NutritionMealJobResponse | null>(null)
   const [localPreview, setLocalPreview] = useState<string | null>(null)
+  const [preparedFile, setPreparedFile] = useState<File | null>(null)
+  const [context, setContext] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [errorCode, setErrorCode] = useState<string | null>(null)
   const [manual, setManual] = useState(false)
@@ -95,8 +101,13 @@ export function MealCaptureSheet({ date, jobId, recents = [], recipes = [], onCl
         if (cancelled) {
           return
         }
-        setError(caught instanceof Error ? caught.message : 'Home AI is temporarily unavailable.')
-        setErrorCode('HOME_AI_UNAVAILABLE')
+        if (caught instanceof MealClientError) {
+          setError(mealFailureMessage(caught.code))
+          setErrorCode(caught.code)
+        } else {
+          setError('Meal analysis is temporarily unavailable.')
+          setErrorCode('HOME_AI_UNAVAILABLE')
+        }
         setPhase('failed')
       }
     }
@@ -119,15 +130,15 @@ export function MealCaptureSheet({ date, jobId, recents = [], recipes = [], onCl
     try {
       const prepared = await prepareMealPhoto(file)
       const preview = URL.createObjectURL(prepared.file)
+      setPreparedFile(prepared.file)
+      setActiveJobId(null)
       setLocalPreview((current) => {
         if (current) {
           URL.revokeObjectURL(current)
         }
         return preview
       })
-      setPhase('working')
-      const job = await createNutritionMealJob(prepared.file)
-      setActiveJobId(job.id)
+      setPhase('preview')
     } catch (caught) {
       if (caught instanceof MealPhotoPrepareError) {
         setError(caught.message)
@@ -135,10 +146,52 @@ export function MealCaptureSheet({ date, jobId, recents = [], recipes = [], onCl
         setPhase('failed')
         return
       }
-      setError(caught instanceof Error ? caught.message : 'Home AI is temporarily unavailable.')
-      setErrorCode('HOME_AI_UNAVAILABLE')
+      if (caught instanceof MealClientError) {
+        setError(mealFailureMessage(caught.code))
+        setErrorCode(caught.code)
+      } else {
+        setError('Meal analysis is temporarily unavailable.')
+        setErrorCode('HOME_AI_UNAVAILABLE')
+      }
       setPhase('failed')
     }
+  }
+
+  async function analyze(provider: 'gemini' | 'home_ai') {
+    if (!activeJobId && !preparedFile) {
+      setPhase('pick')
+      return
+    }
+    setError(null)
+    setErrorCode(null)
+    const previousId = activeJobId
+    const file = preparedFile
+    setPhase('working')
+    setActiveJobId(null)
+    try {
+      const note = context.trim()
+      const job = previousId
+        ? await reanalyzeNutritionMealJob(previousId, { userContext: note, provider })
+        : await createNutritionMealJob(file as File, { userContext: note, provider })
+      setActiveJobId(job.id)
+    } catch (caught) {
+      if (previousId) {
+        setActiveJobId(previousId)
+      }
+      if (caught instanceof MealClientError) {
+        setError(mealFailureMessage(caught.code))
+        setErrorCode(caught.code)
+      } else {
+        setError('Meal analysis is temporarily unavailable.')
+        setErrorCode('GEMINI_UNAVAILABLE')
+      }
+      setPhase('failed')
+    }
+  }
+
+  function editContext() {
+    setContext(payload?.userContext ?? context)
+    setPhase('preview')
   }
 
   if (phase === 'review' || manual) {
@@ -156,6 +209,8 @@ export function MealCaptureSheet({ date, jobId, recents = [], recipes = [], onCl
         hiddenFatFoods={payload?.hiddenFatFoods ?? []}
         catalogFoods={[...recents, ...recipes, ...(payload?.foods ?? [])]}
         imageUrl={activeJobId && payload?.job.imageAvailable ? nutritionMealImageUrl(activeJobId) : localPreview}
+        userContext={payload?.userContext ?? (context.trim() || null)}
+        onEditContext={activeJobId || preparedFile ? editContext : undefined}
         onClose={onClose}
         onBack={() => {
           setManual(false)
@@ -172,9 +227,21 @@ export function MealCaptureSheet({ date, jobId, recents = [], recipes = [], onCl
         <p className="text-sm text-zinc-800">{error}</p>
         {localPreview ? <img src={localPreview} alt="Meal" className="mt-3 max-h-48 w-full rounded-lg object-contain bg-zinc-100" /> : null}
         <div className="mt-4 space-y-2">
-          {errorCode !== 'UNSUPPORTED' ? (
+          {errorCode && isMealRetryCode(errorCode) ? (
+            <>
+              <button type="button" className={primaryClass} onClick={() => void analyze('gemini')}>
+                Retry Gemini
+              </button>
+              <button type="button" className={secondaryClass + ' w-full'} onClick={editContext}>
+                Edit context
+              </button>
+              <button type="button" className={secondaryClass + ' w-full'} onClick={() => void analyze('home_ai')}>
+                Try local AI
+              </button>
+            </>
+          ) : errorCode !== 'UNSUPPORTED' ? (
             <button type="button" className={primaryClass} onClick={() => setPhase('pick')}>
-              {errorCode === 'HOME_AI_UNAVAILABLE' || errorCode === 'TIMED_OUT' ? 'Retry' : 'Use another photo'}
+              Use another photo
             </button>
           ) : null}
           <button type="button" className={secondaryClass + ' w-full'} onClick={() => setManual(true)}>
@@ -196,6 +263,33 @@ export function MealCaptureSheet({ date, jobId, recents = [], recipes = [], onCl
         <button type="button" className={secondaryClass + ' mt-4 w-full'} onClick={onBack}>
           Back
         </button>
+      </NutritionSheet>
+    )
+  }
+
+  if (phase === 'preview') {
+    const previewSrc = localPreview ?? (activeJobId ? nutritionMealImageUrl(activeJobId) : null)
+    return (
+      <NutritionSheet title="Meal photo" onClose={onClose}>
+        {previewSrc ? <img src={previewSrc} alt="Meal" className="max-h-64 w-full rounded-lg object-contain bg-zinc-100" /> : null}
+        <label className="mt-4 block">
+          <span className={labelClass}>Add context (optional)</span>
+          <textarea
+            className={inputClass + ' min-h-28 py-2'}
+            maxLength={2000}
+            value={context}
+            placeholder="Tell AI anything useful about this meal — ingredients, portions, preparation, sauces, substitutions, etc."
+            onChange={(event) => setContext(event.target.value)}
+          />
+        </label>
+        <div className="mt-4 space-y-2">
+          <button type="button" className={primaryClass} disabled={!preparedFile && !activeJobId} onClick={() => void analyze('gemini')}>
+            Analyze meal
+          </button>
+          <button type="button" className="text-sm text-zinc-600 underline" onClick={() => setPhase('pick')}>
+            Back
+          </button>
+        </div>
       </NutritionSheet>
     )
   }
@@ -229,6 +323,8 @@ function MealReviewSheet({
   hiddenFatFoods,
   catalogFoods,
   imageUrl,
+  userContext,
+  onEditContext,
   onClose,
   onBack,
   onLogged,
@@ -241,6 +337,8 @@ function MealReviewSheet({
   hiddenFatFoods: Array<{ id: string; name: string; servingUnit: string }>
   catalogFoods: NutritionFood[]
   imageUrl: string | null
+  userContext?: string | null
+  onEditContext?: () => void
   onClose: () => void
   onBack: () => void
   onLogged: (entries: NutritionEntry[]) => void
@@ -366,6 +464,29 @@ function MealReviewSheet({
       <div className="space-y-4">
         <p className="text-sm text-zinc-600">Check the foods and portions before saving.</p>
         {imageUrl ? <img src={imageUrl} alt="Meal" className="max-h-40 w-full rounded-lg object-contain bg-zinc-100" /> : null}
+        {userContext ? (
+          <div>
+            <p className="text-sm font-medium text-zinc-800">Your context</p>
+            <p className="mt-1 whitespace-pre-wrap text-sm text-zinc-700">{userContext}</p>
+          </div>
+        ) : null}
+        {onEditContext ? (
+          <button type="button" className="text-sm text-zinc-600 underline" onClick={onEditContext}>
+            Edit context
+          </button>
+        ) : null}
+        {candidate.components.flatMap((component) =>
+          component.ambiguities.map((ambiguity) => (
+            <p key={`${component.id}-${ambiguity}`} className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+              {ambiguity}
+            </p>
+          )),
+        )}
+        {candidate.notes.map((note) => (
+          <p key={note} className="text-sm text-zinc-600">
+            {note}
+          </p>
+        ))}
         {errors.length > 0 ? <p className="text-sm text-red-700">{errors[0]?.message}</p> : null}
 
         <div>

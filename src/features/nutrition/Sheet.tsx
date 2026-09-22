@@ -68,7 +68,9 @@ export function NutritionSheet({ title, onClose, children, footer, stickyHeader 
         </div>
         {stickyHeader ? <div className="shrink-0 border-b border-zinc-200 px-4 py-3">{stickyHeader}</div> : null}
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">{children}</div>
-        {footer ? <div className="border-t border-zinc-200 px-4 py-3">{footer}</div> : null}
+        {footer ? (
+          <div className="border-t border-zinc-200 px-4 pt-3 pb-[calc(0.75rem+var(--shell-safe-bottom))]">{footer}</div>
+        ) : null}
       </div>
     </div>
   )

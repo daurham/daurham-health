@@ -19,6 +19,7 @@ import {
   type NutritionLabelCandidate,
   type NutritionLabelJobResponse,
 } from '../../src/domain/nutrition/index.js'
+import { NutritionInterpretError, normalizeUserContext, parseNutritionProvider } from '../../src/domain/nutrition/interpret.js'
 import { HttpError, parseMultipart, type ApiRequest } from '../http.js'
 import type { HomeAiClient } from '../integrations/home-ai/client.js'
 import { getHomeAiClient } from '../integrations/home-ai/client.js'
@@ -34,17 +35,21 @@ import {
   LEGACY_SOURCE_SQL,
   updateFood,
 } from './queries.js'
+import { advanceGeminiCapture, interpretErrorToHttp } from './gemini-jobs.js'
 import {
+  findCommittedLabelEntry,
+  getCaptureImage,
   getLabelJobRecord,
   listOutstandingLabelJobs,
   recordLabelJobCommitted,
   recordLabelJobCreated,
   recordLabelJobStatus,
   refreshOutstandingLabelJobs,
-  findCommittedLabelEntry,
+  requeueCaptureJob,
+  saveCaptureImage,
 } from './label-jobs.js'
 
-const LABEL_PHOTO_SERVER_MAX_BYTES = 8 * 1024 * 1024
+const LABEL_PHOTO_SERVER_MAX_BYTES = 4_500_000
 
 const JPEG_MAGIC = [0xff, 0xd8]
 const PNG_MAGIC = [0x89, 0x50, 0x4e, 0x47]
@@ -67,8 +72,10 @@ export async function readLabelPhotoForm(req: ApiRequest): Promise<{
   bytes: Uint8Array
   filename: string
   mimeType: string
+  userContext: string | null
+  provider: 'gemini' | 'home_ai'
 }> {
-  const { files } = await parseMultipart(req, LABEL_PHOTO_SERVER_MAX_BYTES)
+  const { files, fields } = await parseMultipart(req, LABEL_PHOTO_SERVER_MAX_BYTES)
   const file = files.image
   if (!file || file.data.length === 0) {
     throw new HttpError(400, labelFailureMessage('MISSING_IMAGE'))
@@ -76,11 +83,23 @@ export async function readLabelPhotoForm(req: ApiRequest): Promise<{
   if (file.data.length > LABEL_PHOTO_SERVER_MAX_BYTES) {
     throw new HttpError(413, labelFailureMessage('UPLOAD_TOO_LARGE'))
   }
+  let userContext: string | null
+  try {
+    userContext = normalizeUserContext(fields.userContext)
+  } catch (error) {
+    if (error instanceof NutritionInterpretError) {
+      throw interpretErrorToHttp(error, 'label')
+    }
+    throw error
+  }
+  const provider = parseNutritionProvider(fields.provider)
   if (isJpeg(file.data)) {
     return {
       bytes: file.data,
       filename: /\.jpe?g$/i.test(file.filename) ? file.filename : 'nutrition-label.jpg',
       mimeType: 'image/jpeg',
+      userContext,
+      provider,
     }
   }
   if (isPng(file.data)) {
@@ -88,6 +107,8 @@ export async function readLabelPhotoForm(req: ApiRequest): Promise<{
       bytes: file.data,
       filename: /\.png$/i.test(file.filename) ? file.filename : 'nutrition-label.png',
       mimeType: 'image/png',
+      userContext,
+      provider,
     }
   }
   throw new HttpError(400, labelFailureMessage('UNSUPPORTED_IMAGE'))
@@ -95,18 +116,75 @@ export async function readLabelPhotoForm(req: ApiRequest): Promise<{
 
 export async function createNutritionLabelJob(req: ApiRequest, client?: HomeAiClient) {
   const photo = await readLabelPhotoForm(req)
+  if (photo.provider === 'home_ai') {
+    return createHomeAiLabelJob(photo, client)
+  }
+  const jobId = randomUUID()
+  await recordLabelJobCreated({
+    jobId,
+    filename: photo.filename,
+    provider: 'gemini',
+    userContext: photo.userContext,
+  })
+  await saveCaptureImage({ jobId, bytes: photo.bytes, mimeType: photo.mimeType })
+  return { job: { id: jobId, status: 'queued' as const } }
+}
+
+async function createHomeAiLabelJob(
+  photo: { bytes: Uint8Array; filename: string; mimeType: string; userContext: string | null },
+  client?: HomeAiClient,
+) {
   let homeAi: HomeAiClient
   try {
     homeAi = client ?? (await getHomeAiClient())
   } catch (error) {
     if (error instanceof HttpError && error.statusCode === 503) {
-      throw new HttpError(502, labelFailureMessage('HOME_AI_UNAVAILABLE'))
+      throw new HttpError(502, labelFailureMessage('HOME_AI_UNAVAILABLE'), undefined, 'HOME_AI_UNAVAILABLE')
     }
     throw error
   }
   const job = await homeAi.createNutritionLabelJob(photo)
-  await recordLabelJobCreated({ jobId: job.id, filename: photo.filename })
+  await recordLabelJobCreated({
+    jobId: job.id,
+    filename: photo.filename,
+    provider: 'home_ai',
+    userContext: photo.userContext,
+  })
   return { job: { id: job.id, status: 'queued' as const } }
+}
+
+export async function reanalyzeNutritionLabel(
+  jobId: string,
+  input: { userContext: string | null; provider: 'gemini' | 'home_ai' },
+  client?: HomeAiClient,
+) {
+  const stored = await getLabelJobRecord(jobId)
+  if (!stored || stored.captureKind !== 'nutrition_label') {
+    throw new HttpError(404, labelFailureMessage('JOB_NOT_FOUND'), undefined, 'JOB_NOT_FOUND')
+  }
+  if (stored.status === 'committed') {
+    throw new HttpError(409, 'That label is already saved.')
+  }
+  if (input.provider === 'home_ai') {
+    const image = await getCaptureImage(jobId)
+    if (!image) {
+      throw new HttpError(400, labelFailureMessage('MISSING_IMAGE'), undefined, 'MISSING_IMAGE')
+    }
+    return createHomeAiLabelJob(
+      {
+        bytes: image.bytes,
+        filename: stored.filename ?? 'nutrition-label.jpg',
+        mimeType: image.mimeType,
+        userContext: input.userContext,
+      },
+      client,
+    )
+  }
+  const queued = await requeueCaptureJob({ jobId, userContext: input.userContext })
+  if (!queued) {
+    throw new HttpError(404, labelFailureMessage('JOB_NOT_FOUND'), undefined, 'JOB_NOT_FOUND')
+  }
+  return { job: { id: jobId, status: 'queued' as const } }
 }
 
 export async function listNutritionLabelJobs(client?: HomeAiClient) {
@@ -177,6 +255,10 @@ export async function getNutritionLabelJob(
     throw new HttpError(400, labelFailureMessage('INVALID_JOB_ID'))
   }
   const stored = await getLabelJobRecord(jobId)
+  if (stored?.provider === 'gemini') {
+    const ready = await advanceGeminiCapture(stored)
+    return await labelResponseFromRecord(ready)
+  }
   let homeAi: HomeAiClient | null = client ?? null
   if (!homeAi) {
     try {
@@ -200,6 +282,7 @@ export async function getNutritionLabelJob(
           job: { id: live.id, status: live.status, elapsedMs: live.elapsedMs, imageAvailable: live.imageAvailable },
           candidate: null,
           comparison: null,
+          userContext: stored?.userContext ?? null,
           failure: {
             code: live.error?.code ?? 'PIPELINE_FAILED',
             message: live.error?.message ?? labelFailureMessage('PIPELINE_FAILED'),
@@ -211,6 +294,7 @@ export async function getNutritionLabelJob(
           job: { id: live.id, status: live.status, elapsedMs: live.elapsedMs, imageAvailable: live.imageAvailable },
           candidate: live.candidate,
           comparison: null,
+          userContext: stored?.userContext ?? null,
           failure: null,
         })
       }
@@ -219,15 +303,17 @@ export async function getNutritionLabelJob(
         job: { id: live.id, status: live.status, elapsedMs: live.elapsedMs, imageAvailable: live.imageAvailable },
         candidate: live.candidate,
         comparison,
+        userContext: stored?.userContext ?? null,
         failure: null,
       })
     } catch (error) {
       if (stored?.candidate && stored.status === 'completed') {
         const comparison = await comparisonForCandidate(stored.candidate as NutritionLabelCandidate)
         return nutritionLabelJobResponseSchema.parse({
-          job: { id: stored.id, status: 'completed', elapsedMs: null, imageAvailable: false },
+          job: { id: stored.id, status: 'completed', elapsedMs: null, imageAvailable: stored.imageStored },
           candidate: stored.candidate,
           comparison,
+          userContext: stored.userContext,
           failure: null,
         })
       }
@@ -239,21 +325,23 @@ export async function getNutritionLabelJob(
 
   if (stored?.status === 'failed') {
     return nutritionLabelJobResponseSchema.parse({
-      job: { id: stored.id, status: 'failed', elapsedMs: null, imageAvailable: false },
+      job: { id: stored.id, status: 'failed', elapsedMs: null, imageAvailable: stored.imageStored },
       candidate: null,
       comparison: null,
+      userContext: stored.userContext,
       failure: {
-        code: 'PIPELINE_FAILED',
-        message: stored.failureMessage ?? labelFailureMessage('PIPELINE_FAILED'),
+        code: stored.interpretation.failureCode ?? 'PIPELINE_FAILED',
+        message: stored.failureMessage ?? labelFailureMessage(stored.interpretation.failureCode ?? 'PIPELINE_FAILED'),
       },
     })
   }
   if (stored?.candidate) {
     const comparison = await comparisonForCandidate(stored.candidate as NutritionLabelCandidate)
     return nutritionLabelJobResponseSchema.parse({
-      job: { id: stored.id, status: stored.status === 'committed' ? 'completed' : stored.status, elapsedMs: null, imageAvailable: false },
+      job: { id: stored.id, status: stored.status === 'committed' ? 'completed' : stored.status, elapsedMs: null, imageAvailable: stored.imageStored },
       candidate: stored.candidate,
       comparison,
+      userContext: stored.userContext,
       failure: null,
     })
   }
@@ -263,19 +351,69 @@ export async function getNutritionLabelJob(
         id: stored.id,
         status: stored.status === 'committed' ? 'completed' : stored.status,
         elapsedMs: null,
-        imageAvailable: false,
+        imageAvailable: stored.imageStored,
       },
       candidate: null,
       comparison: null,
+      userContext: stored.userContext,
       failure: null,
     })
   }
   throw new HttpError(404, labelFailureMessage('JOB_NOT_FOUND'))
 }
 
+async function labelResponseFromRecord(
+  record: NonNullable<Awaited<ReturnType<typeof getLabelJobRecord>>>,
+): Promise<NutritionLabelJobResponse> {
+  const failureCode = record.interpretation.failureCode ?? 'PIPELINE_FAILED'
+  if (record.status === 'failed') {
+    return nutritionLabelJobResponseSchema.parse({
+      job: {
+        id: record.id,
+        status: 'failed',
+        elapsedMs: record.interpretation.latencyMs ?? null,
+        imageAvailable: record.imageStored,
+      },
+      candidate: null,
+      comparison: null,
+      userContext: record.userContext,
+      failure: {
+        code: failureCode,
+        message: record.failureMessage ?? labelFailureMessage(failureCode),
+      },
+    })
+  }
+  const candidate =
+    record.candidate && (record.status === 'completed' || record.status === 'committed')
+      ? (record.candidate as NutritionLabelCandidate)
+      : null
+  const comparison = candidate ? await comparisonForCandidate(candidate) : null
+  const status = record.status === 'queued' || record.status === 'processing' ? record.status : 'completed'
+  return nutritionLabelJobResponseSchema.parse({
+    job: {
+      id: record.id,
+      status,
+      elapsedMs: record.interpretation.latencyMs ?? null,
+      imageAvailable: record.imageStored,
+    },
+    candidate,
+    comparison,
+    userContext: record.userContext,
+    failure: null,
+  })
+}
+
 export async function getNutritionLabelImage(jobId: string, client?: HomeAiClient) {
   if (!isHomeAiJobId(jobId)) {
     throw new HttpError(400, labelFailureMessage('INVALID_JOB_ID'))
+  }
+  const stored = await getCaptureImage(jobId)
+  if (stored) {
+    return stored
+  }
+  const record = await getLabelJobRecord(jobId)
+  if (record?.provider === 'gemini') {
+    return null
   }
   const homeAi = client ?? (await getHomeAiClient())
   return homeAi.getNutritionLabelImage(jobId)

@@ -18,7 +18,7 @@ export const MEAL_PHOTO_BYPASS_MAX_BYTES = Math.floor(1.5 * 1024 * 1024)
 export const MEAL_PHOTO_CLIENT_MAX_BYTES = 4 * 1024 * 1024
 export const MEAL_PHOTO_PREPARED_FILENAME = 'meal-photo.jpg'
 export const MEAL_PHOTO_PREPARED_TYPE = 'image/jpeg'
-export const MEAL_PHOTO_SERVER_MAX_BYTES = 8 * 1024 * 1024
+export const MEAL_PHOTO_SERVER_MAX_BYTES = 4_500_000
 
 export const MEAL_PHOTO_USER_MESSAGES = {
   unreadable: "Couldn't read that photo. Use a JPEG or PNG of the meal.",

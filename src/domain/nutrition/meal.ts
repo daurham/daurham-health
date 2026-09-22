@@ -423,10 +423,89 @@ export function validateMealReview(draft: MealReviewDraft): ReviewFieldError[] {
   return errors
 }
 
+export const MEAL_CONNECTIVITY_CODES = [
+  'HOME_AI_UNAVAILABLE',
+  'HOME_AI_AUTH',
+  'HOME_AI_ROUTE_MISSING',
+  'HOME_AI_MODEL_UNAVAILABLE',
+  'TIMED_OUT',
+] as const
+
+export function isMealConnectivityCode(code: string): boolean {
+  return (MEAL_CONNECTIVITY_CODES as readonly string[]).includes(code)
+}
+
+export function isMealRetryCode(code: string): boolean {
+  return isMealConnectivityCode(code) || code.startsWith('GEMINI_')
+}
+
+function mealErrorCode(body: unknown): string {
+  if (!body || typeof body !== 'object') {
+    return ''
+  }
+  if ('error' in body && body.error && typeof body.error === 'object' && 'code' in body.error) {
+    return String((body.error as { code?: unknown }).code ?? '')
+  }
+  if ('code' in body) {
+    return String((body as { code?: unknown }).code ?? '')
+  }
+  return ''
+}
+
+function bodyRaw(body: unknown): string {
+  if (!body || typeof body !== 'object' || !('raw' in body)) {
+    return ''
+  }
+  return String((body as { raw?: unknown }).raw ?? '')
+}
+
+export function classifyMealTransportFailure(input: {
+  status?: number
+  body?: unknown
+  timedOut?: boolean
+}): string {
+  if (input.timedOut) {
+    return 'TIMED_OUT'
+  }
+  const status = input.status ?? 0
+  const code = mealErrorCode(input.body)
+  const raw = bodyRaw(input.body)
+  if (status === 401 || code === 'UNAUTHORIZED' || code === 'FORBIDDEN' || code === 'AUTH') {
+    return 'HOME_AI_AUTH'
+  }
+  if (status === 404 && (code === 'JOB_NOT_FOUND' || code === 'INVALID_JOB_ID')) {
+    return code
+  }
+  if (status === 404 || /cannot (get|post|put|delete)/i.test(raw)) {
+    return 'HOME_AI_ROUTE_MISSING'
+  }
+  if (/model/i.test(code)) {
+    return 'HOME_AI_MODEL_UNAVAILABLE'
+  }
+  if (status === 403 || status === 0 || status >= 500) {
+    return 'HOME_AI_UNAVAILABLE'
+  }
+  return code || 'PIPELINE_FAILED'
+}
+
 export function mealFailureMessage(code: string): string {
   switch (code) {
     case 'HOME_AI_UNAVAILABLE':
-      return 'Home AI is temporarily unavailable.'
+    case 'HOME_AI_AUTH':
+    case 'HOME_AI_ROUTE_MISSING':
+    case 'HOME_AI_MODEL_UNAVAILABLE':
+    case 'TIMED_OUT':
+    case 'GEMINI_NOT_CONFIGURED':
+    case 'GEMINI_AUTH':
+    case 'GEMINI_QUOTA':
+    case 'GEMINI_UNAVAILABLE':
+    case 'GEMINI_TIMEOUT':
+      return 'Meal analysis is temporarily unavailable.'
+    case 'GEMINI_SCHEMA':
+    case 'GEMINI_SEMANTIC':
+      return "We couldn't confidently interpret this meal."
+    case 'CONTEXT_TOO_LONG':
+      return 'Keep the note under 2000 characters.'
     case 'UNSUPPORTED_IMAGE':
       return 'Use a JPEG or PNG meal photo.'
     case 'UPLOAD_TOO_LARGE':
@@ -437,8 +516,6 @@ export function mealFailureMessage(code: string): string {
       return "Couldn't read that photo. Try another JPEG or PNG."
     case 'UNREADABLE_MEAL':
       return 'That photo did not look like a usable meal.'
-    case 'TIMED_OUT':
-      return 'Meal photo analysis timed out. Try again or build the meal manually.'
     case 'JOB_NOT_FOUND':
       return 'That meal capture was not found.'
     case 'INVALID_JOB_ID':
@@ -452,6 +529,7 @@ export function mealFailureMessage(code: string): string {
 
 export const commitNutritionMealRequestSchema = z.object({
   jobId: z.string().regex(HOME_AI_JOB_ID_RE).optional(),
+  descriptionText: z.string().trim().min(1).max(500).optional(),
   logDate: z.string(),
   timezone: z.string().optional(),
   meal: z.enum(['breakfast', 'lunch', 'dinner', 'snack', 'other']).nullable().optional(),
@@ -479,6 +557,7 @@ export type NutritionMealJobResponse = {
     elapsedMs?: number | null
     imageAvailable?: boolean
   }
+  userContext?: string | null
   candidate: MealPhotoCandidate | null
   foods: NutritionFood[]
   matches: Record<string, Array<{ foodId: string; name: string; brand: string | null; catalogKind: string; score: number; reason: string }>>

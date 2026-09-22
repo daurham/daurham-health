@@ -163,7 +163,7 @@ export function clusterMealLogItems(entries: readonly NutritionEntry[]): Nutriti
       kind: 'meal',
       key: entry.mealGroupId,
       groupId: entry.mealGroupId,
-      label: 'Photo meal',
+      label: group.some((item) => item.sourceKind === 'photo_ai') ? 'Photo meal' : 'Meal',
       entries: group,
       calories,
       protein,

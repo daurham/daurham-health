@@ -72,7 +72,7 @@ export function WorkoutEditor({
   }, [errorFocusKey, firstErrorPath])
 
   return (
-    <section className="space-y-6 pb-28">
+    <section className="shell-action-reserve space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
@@ -140,7 +140,7 @@ export function WorkoutEditor({
         ))}
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 border-t border-zinc-200 bg-white/95 px-4 py-3 backdrop-blur">
+      <div className="shell-action-bar border-t border-zinc-200 bg-white/95 px-4 py-3 backdrop-blur">
         <div className={cn('mx-auto flex gap-3', SHELL_MAX_WIDTH_CLASS)}>
           <button
             type="button"

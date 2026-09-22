@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   NUTRITION_CONFIG,
   NUTRITION_MEALS,
   applyGramServing,
   applyHundredGramServing,
   rankFoodsForQuery,
+  shouldOfferFoodDescription,
   snapshotFromDefinition,
   validatePackagedReview,
   type NutritionEntry,
@@ -18,6 +19,7 @@ import {
   BarcodeLookupClientError,
   createNutritionEntry,
   createNutritionFood,
+  describeFoodText,
   lookupNutritionBarcode,
   patchNutritionEntry,
   patchNutritionFood,
@@ -26,6 +28,8 @@ import {
   searchNutritionFoods,
 } from './api'
 import { BarcodeScanner } from './BarcodeScanner'
+import { DescribeFoodSheet } from './DescribeFood'
+import type { FoodDescriptionReview } from './api'
 import { LabelCaptureSheet } from './LabelCapture'
 import { MealCaptureSheet } from './MealCapture'
 import { catalogKindLabel, formatGrams, formatKcal, formatQuantity, mealLabel, provenanceLabel } from './format'
@@ -63,6 +67,10 @@ export function AddFoodSheet({ date, quickAdd, onClose, onLogged, onMealLogged, 
   const [scan, setScan] = useState(false)
   const [label, setLabel] = useState(false)
   const [mealPhoto, setMealPhoto] = useState(false)
+  const [describe, setDescribe] = useState<FoodDescriptionReview | null>(null)
+  const [describeUnavailable, setDescribeUnavailable] = useState(false)
+  const [describeError, setDescribeError] = useState<string | null>(null)
+  const [describeBusy, setDescribeBusy] = useState(false)
   const [confirmFood, setConfirmFood] = useState<NutritionFood | null>(null)
   const [candidate, setCandidate] = useState<PackagedFoodCandidate | null>(null)
   const [lookupError, setLookupError] = useState<{
@@ -267,6 +275,65 @@ export function AddFoodSheet({ date, quickAdd, onClose, onLogged, onMealLogged, 
     )
   }
 
+  if (describe || describeUnavailable) {
+    return (
+      <DescribeFoodSheet
+        key={describe ? 'review' : 'unavailable'}
+        date={date}
+        text={query.trim()}
+        review={describe}
+        unavailable={!describe}
+        message={describeError}
+        onClose={onClose}
+        onBack={() => {
+          setDescribe(null)
+          setDescribeUnavailable(false)
+        }}
+        onRetry={() => {
+          setDescribeBusy(true)
+          void describeFoodText(query.trim())
+            .then((review) => {
+              setDescribe(review)
+              setDescribeUnavailable(false)
+            })
+            .catch((caught: unknown) => {
+              setDescribeUnavailable(true)
+              setDescribeError(caught instanceof Error ? caught.message : null)
+            })
+            .finally(() => setDescribeBusy(false))
+        }}
+        onTryLocal={() => {
+          setDescribeBusy(true)
+          void describeFoodText(query.trim(), 'home_ai')
+            .then((review) => {
+              setDescribe(review)
+              setDescribeUnavailable(false)
+            })
+            .catch((caught: unknown) => {
+              setDescribeUnavailable(true)
+              setDescribeError(caught instanceof Error ? caught.message : null)
+            })
+            .finally(() => setDescribeBusy(false))
+        }}
+        onManual={() => {
+          setDescribe(null)
+          setDescribeUnavailable(false)
+          setManual(true)
+        }}
+        onLogged={(entries) => {
+          if (onMealLogged) {
+            onMealLogged(entries)
+          } else {
+            for (const entry of entries) {
+              onLogged(entry)
+            }
+          }
+          onClose()
+        }}
+      />
+    )
+  }
+
   if (manual) {
     return (
       <ManualEntrySheet
@@ -289,13 +356,13 @@ export function AddFoodSheet({ date, quickAdd, onClose, onLogged, onMealLogged, 
         <div className="space-y-3">
           <div>
             <label className={labelClass} htmlFor="nutrition-food-search">
-              Search foods
+              Search foods or describe what you ate
             </label>
             <input
               id="nutrition-food-search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search foods…"
+              placeholder="Search foods or describe what you ate"
               className={inputClass}
               autoComplete="off"
             />
@@ -321,7 +388,32 @@ export function AddFoodSheet({ date, quickAdd, onClose, onLogged, onMealLogged, 
         <FoodSection
           title="Search"
           foods={results ?? []}
-          empty={searching ? 'Searching…' : 'No matching foods.'}
+          empty={searching ? 'Searching…' : 'No matching saved foods.'}
+          action={
+            shouldOfferFoodDescription(query, results, searching) ? (
+              <button
+                type="button"
+                className={secondaryClass + ' mt-3 w-full'}
+                disabled={describeBusy}
+                onClick={() => {
+                  setDescribeBusy(true)
+                  void describeFoodText(query.trim())
+                    .then((review) => {
+                      setDescribe(review)
+                      setDescribeUnavailable(false)
+                    })
+                    .catch((caught: unknown) => {
+                      setDescribe(null)
+                      setDescribeUnavailable(true)
+                      setDescribeError(caught instanceof Error ? caught.message : null)
+                    })
+                    .finally(() => setDescribeBusy(false))
+                }}
+              >
+                {describeBusy ? 'Reading description…' : 'Use this description'}
+              </button>
+            ) : null
+          }
           onSelect={setConfirmFood}
           onQuickLog={onQuickLog}
           onOpenFood={onOpenFood}
@@ -345,6 +437,7 @@ function FoodSection({
   title,
   foods,
   empty,
+  action,
   onSelect,
   onQuickLog,
   onOpenFood,
@@ -353,6 +446,7 @@ function FoodSection({
   title: string
   foods: NutritionFood[]
   empty: string
+  action?: ReactNode
   onSelect: (food: NutritionFood) => void
   onQuickLog: (food: NutritionFood) => void
   onOpenFood: (food: NutritionFood) => void
@@ -362,7 +456,10 @@ function FoodSection({
     <section>
       <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{title}</h3>
       {foods.length === 0 ? (
-        <p className="mt-2 text-sm text-zinc-600">{empty}</p>
+        <div>
+          <p className="mt-2 text-sm text-zinc-600">{empty}</p>
+          {action}
+        </div>
       ) : (
         <ul className="mt-2 divide-y divide-zinc-100 overflow-hidden rounded-lg border border-zinc-200">
           {foods.map((food) => (
@@ -404,6 +501,7 @@ function FoodSection({
           ))}
         </ul>
       )}
+      {foods.length > 0 ? action : null}
     </section>
   )
 }

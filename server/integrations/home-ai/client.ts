@@ -18,6 +18,7 @@ import {
 import {
   homeAiMealCreatedJobSchema,
   homeAiMealJobSchema,
+  classifyMealTransportFailure,
   mealFailureMessage,
   sanitizeMealCandidate,
   type MealPhotoCandidate,
@@ -115,24 +116,54 @@ function throwMappedFailure(status: number, body: unknown): never {
   throw new HttpError(502, homeAiFailureMessage(code || 'PIPELINE_FAILED'))
 }
 
+function logMealHomeAiFailure(code: string, status: number | null): void {
+  console.error(`home-ai meal failure code=${code} status=${status ?? 'none'}`)
+}
+
+function throwMealHomeAi(httpStatus: number, code: string, upstreamStatus: number | null = httpStatus): never {
+  logMealHomeAiFailure(code, upstreamStatus)
+  throw new HttpError(httpStatus, mealFailureMessage(code), undefined, code)
+}
+
+async function readMaybeJson(response: Response): Promise<unknown> {
+  const text = await response.text()
+  if (!text) {
+    return null
+  }
+  try {
+    return JSON.parse(text) as unknown
+  } catch {
+    return { raw: text.slice(0, 180) }
+  }
+}
+
+function mealTransportError(error: unknown): { timedOut: boolean } {
+  const timedOut = error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')
+  return { timedOut }
+}
+
 function throwMappedMealFailure(status: number, body: unknown): never {
   const code =
     body && typeof body === 'object' && 'error' in body && body.error && typeof body.error === 'object' && 'code' in body.error
       ? String((body.error as { code?: unknown }).code ?? '')
       : ''
-  if (status === 404) {
-    throw new HttpError(404, mealFailureMessage('JOB_NOT_FOUND'))
+  if (status === 404 && (code === 'JOB_NOT_FOUND' || code === 'INVALID_JOB_ID' || code === '')) {
+    const classified = classifyMealTransportFailure({ status, body })
+    throwMealHomeAi(classified === 'JOB_NOT_FOUND' || classified === 'INVALID_JOB_ID' ? status : 502, classified, status)
   }
   if (status === 400 && code === 'INVALID_JOB_ID') {
-    throw new HttpError(400, mealFailureMessage('INVALID_JOB_ID'))
+    throwMealHomeAi(400, 'INVALID_JOB_ID', status)
   }
   if (status === 413) {
-    throw new HttpError(413, mealFailureMessage('UPLOAD_TOO_LARGE'))
+    throwMealHomeAi(413, 'UPLOAD_TOO_LARGE', status)
   }
   if (status === 400 && (code === 'MISSING_IMAGE' || code === 'UNSUPPORTED_IMAGE' || code === 'INVALID_IMAGE')) {
-    throw new HttpError(400, mealFailureMessage(code))
+    throwMealHomeAi(400, code, status)
   }
-  throw new HttpError(502, mealFailureMessage(code || 'PIPELINE_FAILED'))
+  const classified = classifyMealTransportFailure({ status, body })
+  const failureCode = classified === 'PIPELINE_FAILED' ? code || 'PIPELINE_FAILED' : classified
+  const httpStatus = failureCode === 'PIPELINE_FAILED' && status >= 400 && status < 500 ? status : 502
+  throwMealHomeAi(httpStatus, failureCode, status)
 }
 
 function throwMappedLabelFailure(status: number, body: unknown): never {
@@ -344,10 +375,11 @@ export function createHomeAiClient(options: {
           body: form,
           signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
         })
-      } catch {
-        throw new HttpError(502, mealFailureMessage('HOME_AI_UNAVAILABLE'))
+      } catch (error) {
+        const code = classifyMealTransportFailure(mealTransportError(error))
+        throwMealHomeAi(0, code)
       }
-      const body = await readJson(response)
+      const body = await readMaybeJson(response)
       if (!response.ok) {
         throwMappedMealFailure(response.status, body)
       }
@@ -369,10 +401,11 @@ export function createHomeAiClient(options: {
           headers: headersWithKey(apiKey),
           signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
         })
-      } catch {
-        throw new HttpError(502, mealFailureMessage('HOME_AI_UNAVAILABLE'))
+      } catch (error) {
+        const code = classifyMealTransportFailure(mealTransportError(error))
+        throwMealHomeAi(0, code)
       }
-      const body = await readJson(response)
+      const body = await readMaybeJson(response)
       if (!response.ok) {
         throwMappedMealFailure(response.status, body)
       }

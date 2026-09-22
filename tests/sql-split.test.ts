@@ -62,6 +62,13 @@ describe('splitSqlStatements', () => {
     expect(labelJobs[0]).toMatch(/^INSERT INTO data_sources/)
     expect(labelJobs[1]).toMatch(/^CREATE TABLE nutrition_capture_jobs/)
     expect(labelJobs[2]).toMatch(/^CREATE INDEX nutrition_capture_jobs_pending_idx/)
+    const geminiJobs = splitSqlStatements(readFileSync(path.join('migrations', '0015_nutrition_gemini.sql'), 'utf8'))
+    expect(geminiJobs).toHaveLength(3)
+    expect(geminiJobs[0]).toMatch(/^ALTER TABLE nutrition_capture_jobs/)
+    expect(geminiJobs[0]).toContain('user_context')
+    expect(geminiJobs[0]).toContain('image_bytes')
+    expect(geminiJobs[1]).toContain('nutrition_capture_jobs_user_context_length')
+    expect(geminiJobs[2]).toContain('gemini')
     const analytics = splitSqlStatements(
       readFileSync(path.join('migrations', '0005_exercise_analytics.sql'), 'utf8'),
     )

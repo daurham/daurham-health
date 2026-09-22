@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import {
   NUTRITION_CONFIG,
   NUTRITION_MEAL_CAPTURE_KIND,
@@ -35,15 +35,21 @@ import {
   listRecentFoods,
   listRecipeFoods,
 } from './queries.js'
+import { NutritionInterpretError, normalizeUserContext, parseNutritionProvider } from '../../src/domain/nutrition/interpret.js'
+import { advanceGeminiCapture, interpretErrorToHttp } from './gemini-jobs.js'
 import {
+  getCaptureImage,
   getLabelJobRecord,
+  type NutritionCaptureJobRecord,
   listOutstandingLabelJobs,
   recordLabelJobCommitted,
   recordLabelJobCreated,
   recordLabelJobStatus,
+  requeueCaptureJob,
+  saveCaptureImage,
 } from './label-jobs.js'
 
-const MEAL_PHOTO_SERVER_MAX_BYTES = 8 * 1024 * 1024
+const MEAL_PHOTO_SERVER_MAX_BYTES = 4_500_000
 const JPEG_MAGIC = [0xff, 0xd8]
 const PNG_MAGIC = [0x89, 0x50, 0x4e, 0x47]
 
@@ -71,8 +77,10 @@ export async function readMealPhotoForm(req: ApiRequest): Promise<{
   bytes: Uint8Array
   filename: string
   mimeType: string
+  userContext: string | null
+  provider: 'gemini' | 'home_ai'
 }> {
-  const { files } = await parseMultipart(req, MEAL_PHOTO_SERVER_MAX_BYTES)
+  const { files, fields } = await parseMultipart(req, MEAL_PHOTO_SERVER_MAX_BYTES)
   const file = files.image
   if (!file || file.data.length === 0) {
     throw new HttpError(400, mealFailureMessage('MISSING_IMAGE'))
@@ -80,11 +88,23 @@ export async function readMealPhotoForm(req: ApiRequest): Promise<{
   if (file.data.length > MEAL_PHOTO_SERVER_MAX_BYTES) {
     throw new HttpError(413, mealFailureMessage('UPLOAD_TOO_LARGE'))
   }
+  let userContext: string | null
+  try {
+    userContext = normalizeUserContext(fields.userContext)
+  } catch (error) {
+    if (error instanceof NutritionInterpretError) {
+      throw interpretErrorToHttp(error, 'meal')
+    }
+    throw error
+  }
+  const provider = parseNutritionProvider(fields.provider)
   if (isJpeg(file.data)) {
     return {
       bytes: file.data,
       filename: /\.jpe?g$/i.test(file.filename) ? file.filename : 'meal-photo.jpg',
       mimeType: 'image/jpeg',
+      userContext,
+      provider,
     }
   }
   if (isPng(file.data)) {
@@ -92,6 +112,8 @@ export async function readMealPhotoForm(req: ApiRequest): Promise<{
       bytes: file.data,
       filename: /\.png$/i.test(file.filename) ? file.filename : 'meal-photo.png',
       mimeType: 'image/png',
+      userContext,
+      provider,
     }
   }
   throw new HttpError(400, mealFailureMessage('UNSUPPORTED_IMAGE'))
@@ -162,6 +184,7 @@ function asMealResponse(input: {
   recipeCandidates?: NutritionMealJobResponse['recipeCandidates']
   hiddenFatFoods?: NutritionMealJobResponse['hiddenFatFoods']
   failure?: { code: string; message: string } | null
+  userContext?: string | null
 }): NutritionMealJobResponse {
   return {
     job: {
@@ -170,6 +193,7 @@ function asMealResponse(input: {
       elapsedMs: input.elapsedMs ?? null,
       imageAvailable: input.imageAvailable ?? false,
     },
+    userContext: input.userContext ?? null,
     candidate: input.candidate,
     foods: input.foods ?? [],
     matches: input.matches ?? {},
@@ -181,8 +205,14 @@ function asMealResponse(input: {
 
 export async function refreshOutstandingMealJobs(client?: HomeAiClient) {
   const jobs = await listOutstandingLabelJobs(NUTRITION_MEAL_CAPTURE_KIND)
+  const pending = jobs.filter(
+    (job) => job.provider !== 'gemini' && job.status !== 'failed' && job.status !== 'completed' && job.status !== 'committed',
+  )
+  if (pending.length === 0) {
+    return jobs
+  }
   const homeAi = client ?? (await getHomeAiClient())
-  for (const job of jobs) {
+  for (const job of pending) {
     if (job.status === 'failed' || job.status === 'completed' || job.status === 'committed') {
       continue
     }
@@ -207,12 +237,40 @@ export async function refreshOutstandingMealJobs(client?: HomeAiClient) {
 
 export async function createNutritionMealJob(req: ApiRequest, client?: HomeAiClient) {
   const photo = await readMealPhotoForm(req)
+  if (photo.provider === 'home_ai') {
+    return createHomeAiMealJob(photo, client)
+  }
+  return createGeminiMealJob(photo)
+}
+
+async function createGeminiMealJob(photo: {
+  bytes: Uint8Array
+  filename: string
+  mimeType: string
+  userContext: string | null
+}) {
+  const jobId = randomUUID()
+  await recordLabelJobCreated({
+    jobId,
+    filename: photo.filename,
+    captureKind: NUTRITION_MEAL_CAPTURE_KIND,
+    provider: 'gemini',
+    userContext: photo.userContext,
+  })
+  await saveCaptureImage({ jobId, bytes: photo.bytes, mimeType: photo.mimeType })
+  return { job: { id: jobId, status: 'queued' as const } }
+}
+
+async function createHomeAiMealJob(
+  photo: { bytes: Uint8Array; filename: string; mimeType: string; userContext: string | null },
+  client?: HomeAiClient,
+) {
   let homeAi: HomeAiClient
   try {
     homeAi = client ?? (await getHomeAiClient())
   } catch (error) {
     if (error instanceof HttpError && error.statusCode === 503) {
-      throw new HttpError(502, mealFailureMessage('HOME_AI_UNAVAILABLE'))
+      throw new HttpError(502, mealFailureMessage('HOME_AI_UNAVAILABLE'), undefined, 'HOME_AI_UNAVAILABLE')
     }
     throw error
   }
@@ -221,8 +279,44 @@ export async function createNutritionMealJob(req: ApiRequest, client?: HomeAiCli
     jobId: job.id,
     filename: photo.filename,
     captureKind: NUTRITION_MEAL_CAPTURE_KIND,
+    provider: 'home_ai',
+    userContext: photo.userContext,
   })
   return { job: { id: job.id, status: 'queued' as const } }
+}
+
+export async function reanalyzeNutritionMeal(
+  jobId: string,
+  input: { userContext: string | null; provider: 'gemini' | 'home_ai' },
+  client?: HomeAiClient,
+) {
+  const stored = await getLabelJobRecord(jobId)
+  if (!stored || stored.captureKind !== NUTRITION_MEAL_CAPTURE_KIND) {
+    throw new HttpError(404, mealFailureMessage('JOB_NOT_FOUND'), undefined, 'JOB_NOT_FOUND')
+  }
+  if (stored.status === 'committed') {
+    throw new HttpError(409, 'That meal is already saved.')
+  }
+  if (input.provider === 'home_ai') {
+    const image = await getCaptureImage(jobId)
+    if (!image) {
+      throw new HttpError(400, mealFailureMessage('MISSING_IMAGE'), undefined, 'MISSING_IMAGE')
+    }
+    return createHomeAiMealJob(
+      {
+        bytes: image.bytes,
+        filename: stored.filename ?? 'meal-photo.jpg',
+        mimeType: image.mimeType,
+        userContext: input.userContext,
+      },
+      client,
+    )
+  }
+  const queued = await requeueCaptureJob({ jobId, userContext: input.userContext })
+  if (!queued) {
+    throw new HttpError(404, mealFailureMessage('JOB_NOT_FOUND'), undefined, 'JOB_NOT_FOUND')
+  }
+  return { job: { id: jobId, status: 'queued' as const } }
 }
 
 export async function listNutritionMealJobs(client?: HomeAiClient) {
@@ -252,6 +346,10 @@ export async function getNutritionMealJob(jobId: string, client?: HomeAiClient):
     throw new HttpError(400, mealFailureMessage('INVALID_JOB_ID'))
   }
   const stored = await getLabelJobRecord(jobId)
+  if (stored?.provider === 'gemini') {
+    const ready = await advanceGeminiCapture(stored)
+    return mealResponseFromRecord(ready)
+  }
   let homeAi: HomeAiClient | null = client ?? null
   if (!homeAi) {
     try {
@@ -264,12 +362,13 @@ export async function getNutritionMealJob(jobId: string, client?: HomeAiClient):
   async function withCatalog(candidate: MealPhotoCandidate, job: NutritionMealJobResponse['job']) {
     const { foods, recents, recipes } = await catalogContext()
     const matched = matchingPayload(candidate, foods, recents, recipes)
-    return asMealResponse({
+      return asMealResponse({
       jobId: job.id,
       status: job.status,
       elapsedMs: job.elapsedMs,
       imageAvailable: job.imageAvailable,
       candidate,
+      userContext: stored?.userContext ?? null,
       ...matched,
     })
   }
@@ -290,6 +389,7 @@ export async function getNutritionMealJob(jobId: string, client?: HomeAiClient):
           elapsedMs: live.elapsedMs,
           imageAvailable: live.imageAvailable,
           candidate: null,
+          userContext: stored?.userContext ?? null,
           failure: {
             code: live.error?.code ?? 'PIPELINE_FAILED',
             message: live.error?.message ?? mealFailureMessage('PIPELINE_FAILED'),
@@ -331,9 +431,10 @@ export async function getNutritionMealJob(jobId: string, client?: HomeAiClient):
       jobId: stored.id,
       status: 'failed',
       candidate: null,
+      userContext: stored.userContext,
       failure: {
-        code: 'PIPELINE_FAILED',
-        message: stored.failureMessage ?? mealFailureMessage('PIPELINE_FAILED'),
+        code: stored.interpretation.failureCode ?? 'PIPELINE_FAILED',
+        message: stored.failureMessage ?? mealFailureMessage(stored.interpretation.failureCode ?? 'PIPELINE_FAILED'),
       },
     })
   }
@@ -350,17 +451,110 @@ export async function getNutritionMealJob(jobId: string, client?: HomeAiClient):
       jobId: stored.id,
       status: stored.status === 'queued' || stored.status === 'processing' ? stored.status : 'completed',
       candidate: null,
+      userContext: stored.userContext,
+      imageAvailable: stored.imageStored,
     })
   }
   throw new HttpError(404, mealFailureMessage('JOB_NOT_FOUND'))
+}
+
+async function mealResponseFromRecord(record: NutritionCaptureJobRecord): Promise<NutritionMealJobResponse> {
+  const failureCode = record.interpretation.failureCode ?? 'PIPELINE_FAILED'
+  if (record.status === 'failed') {
+    return asMealResponse({
+      jobId: record.id,
+      status: 'failed',
+      elapsedMs: record.interpretation.latencyMs ?? null,
+      imageAvailable: record.imageStored,
+      candidate: null,
+      userContext: record.userContext,
+      failure: {
+        code: failureCode,
+        message: record.failureMessage ?? mealFailureMessage(failureCode),
+      },
+    })
+  }
+  if (record.candidate && (record.status === 'completed' || record.status === 'committed')) {
+    const candidate = sanitizeMealCandidate(record.candidate)
+    const { foods, recents, recipes } = await catalogContext()
+    const matched = matchingPayload(candidate, foods, recents, recipes)
+    return asMealResponse({
+      jobId: record.id,
+      status: 'completed',
+      elapsedMs: record.interpretation.latencyMs ?? null,
+      imageAvailable: record.imageStored,
+      candidate,
+      userContext: record.userContext,
+      ...matched,
+    })
+  }
+  const status = record.status === 'queued' || record.status === 'processing' ? record.status : 'completed'
+  return asMealResponse({
+    jobId: record.id,
+    status,
+    elapsedMs: record.interpretation.latencyMs ?? null,
+    imageAvailable: record.imageStored,
+    candidate: null,
+    userContext: record.userContext,
+  })
 }
 
 export async function getNutritionMealImage(jobId: string, client?: HomeAiClient) {
   if (!isHomeAiJobId(jobId)) {
     throw new HttpError(400, mealFailureMessage('INVALID_JOB_ID'))
   }
+  const stored = await getCaptureImage(jobId)
+  if (stored) {
+    return stored
+  }
+  const record = await getLabelJobRecord(jobId)
+  if (record?.provider === 'gemini') {
+    return null
+  }
   const homeAi = client ?? (await getHomeAiClient())
   return homeAi.getNutritionMealImage(jobId)
+}
+
+export function descriptionMealFingerprint(input: {
+  text: string
+  logDate: string
+  components: Array<{ foodId: string | null; quantity: number | null; unit: string; grams: number | null; included: boolean }>
+}): string {
+  const body = JSON.stringify({
+    text: input.text.trim().toLowerCase().replace(/\s+/g, ' '),
+    logDate: input.logDate,
+    components: input.components
+      .filter((component) => component.included && component.foodId)
+      .map((component) => ({
+        foodId: component.foodId,
+        quantity: component.quantity,
+        unit: component.unit,
+        grams: component.grams,
+      }))
+      .sort((left, right) => (left.foodId ?? '').localeCompare(right.foodId ?? '')),
+  })
+  return `nutrition-describe|${createHash('sha256').update(body).digest('hex')}`
+}
+
+async function sourceIdByKey(key: string): Promise<string> {
+  const sql = await getSql()
+  const rows = (await sql.query(`SELECT id FROM data_sources WHERE key = $1 LIMIT 1`, [key])) as Array<{ id: string }>
+  const id = rows[0]?.id
+  if (!id) {
+    throw new HttpError(500, `${key} data source is not configured`)
+  }
+  return id
+}
+
+async function findGroupByFingerprint(sourceId: string, fingerprint: string): Promise<string | null> {
+  const sql = await getSql()
+  const rows = (await sql.query(
+    `SELECT entity_id FROM source_record_links
+     WHERE source_id = $1 AND entity_type = $2 AND external_fingerprint = $3
+     LIMIT 1`,
+    [sourceId, NUTRITION_MEAL_GROUP_ENTITY, fingerprint],
+  )) as Array<{ entity_id: string }>
+  return rows[0]?.entity_id ?? null
 }
 
 async function mealPhotoSourceId(): Promise<string> {
@@ -397,6 +591,8 @@ async function insertLoggedEntry(input: {
   unit: string
   grams: number | null
   mealGroupId: string
+  sourceKind?: NutritionEntry['sourceKind']
+  notes?: string
 }): Promise<NutritionEntry> {
   const snapshot = input.grams != null
     ? mealComponentSnapshot(input.food, { quantity: input.quantity, grams: input.grams })
@@ -428,8 +624,8 @@ async function insertLoggedEntry(input: {
     snapshot.carbs,
     snapshot.fat,
     snapshot.fiber,
-    'photo_ai',
-    'Reviewed from meal photo.',
+    input.sourceKind ?? 'photo_ai',
+    input.notes ?? 'Reviewed from meal photo.',
     input.mealGroupId,
   ])
 }
@@ -480,7 +676,45 @@ export async function commitNutritionMeal(body: unknown): Promise<{ entries: Nut
   })
   const meal = input.meal ?? null
   const timezone = input.timezone ?? NUTRITION_CONFIG.calendarTimeZone
+  const described = Boolean(input.descriptionText)
+  const descriptionFingerprint = described
+    ? descriptionMealFingerprint({
+        text: input.descriptionText ?? '',
+        logDate: resolved.logDate,
+        components: input.components,
+      })
+    : null
+  if (descriptionFingerprint) {
+    const existingGroup = await findGroupByFingerprint(await sourceIdByKey('health_app'), descriptionFingerprint)
+    if (existingGroup) {
+      const entries = await listEntriesByMealGroup(existingGroup)
+      if (entries.length > 0) {
+        return { entries, mealGroupId: existingGroup }
+      }
+    }
+  }
   const mealGroupId = randomUUID()
+
+  if (descriptionFingerprint) {
+    const sql = await getSql()
+    const sourceId = await sourceIdByKey('health_app')
+    const claimed = (await sql.query(CLAIM_MEAL_GROUP_SQL, [
+      randomUUID(),
+      sourceId,
+      descriptionFingerprint,
+      descriptionFingerprint,
+      NUTRITION_MEAL_GROUP_ENTITY,
+      mealGroupId,
+      JSON.stringify({ captureKind: 'food_description', reviewed: true }),
+    ])) as Array<{ entity_id: string }>
+    const claimedId = claimed[0]?.entity_id
+    if (claimedId && claimedId !== mealGroupId) {
+      const entries = await listEntriesByMealGroup(claimedId)
+      if (entries.length > 0) {
+        return { entries, mealGroupId: claimedId }
+      }
+    }
+  }
 
   if (jobId) {
     const sql = await getSql()
@@ -547,6 +781,8 @@ export async function commitNutritionMeal(body: unknown): Promise<{ entries: Nut
         unit: component.unit || food.servingUnit,
         grams: component.grams,
         mealGroupId,
+        sourceKind: described ? 'manual' : 'photo_ai',
+        notes: described ? 'Reviewed from a food description.' : 'Reviewed from meal photo.',
       }),
     )
   }

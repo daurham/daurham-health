@@ -18,12 +18,14 @@ export type ApiResponse = ServerResponse & {
 export class HttpError extends Error {
   readonly statusCode: number
   readonly fields?: ReviewFieldError[]
+  readonly code?: string
 
-  constructor(statusCode: number, message: string, fields?: ReviewFieldError[]) {
+  constructor(statusCode: number, message: string, fields?: ReviewFieldError[], code?: string) {
     super(message)
     this.name = 'HttpError'
     this.statusCode = statusCode
     this.fields = fields
+    this.code = code
   }
 }
 
@@ -36,17 +38,21 @@ export function sendError(
   statusCode: number,
   message: string,
   fields?: ReviewFieldError[],
+  code?: string,
 ): void {
+  const body: { error: string; fields?: ReviewFieldError[]; code?: string } = { error: message }
   if (fields && fields.length > 0) {
-    sendJson(res, statusCode, { error: message, fields })
-    return
+    body.fields = fields
   }
-  sendJson(res, statusCode, { error: message })
+  if (code) {
+    body.code = code
+  }
+  sendJson(res, statusCode, body)
 }
 
 export function handleApiError(res: ApiResponse, error: unknown): void {
   if (error instanceof HttpError) {
-    sendError(res, error.statusCode, error.message, error.fields)
+    sendError(res, error.statusCode, error.message, error.fields, error.code)
     return
   }
   if (error && typeof error === 'object' && 'statusCode' in error && 'message' in error) {
