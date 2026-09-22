@@ -4,6 +4,7 @@ import type { ActivityProgressView } from '@/domain/activity'
 import type { ProgressRange } from '@/domain/progress'
 import type { SleepProgressView } from '@/domain/sleep'
 import { LoadErrorNotice, PendingLoadRegion, useAtomicKeyedResource } from '@/lib'
+import { prefixedPath, useAppPathPrefix } from '@/lib/app-prefix'
 import { activityCardCopy, sleepCardCopy } from './activity-sleep-copy'
 import { fetchProgressActivity, fetchProgressSleep } from './api'
 import { progressSearch } from './range'
@@ -17,6 +18,7 @@ export function ActivitySleepCards({
   activity: ActivityProgressView | null
   sleep: SleepProgressView | null
 }) {
+  const prefix = useAppPathPrefix()
   const activityCopy = activity && activity.range === range ? activityCardCopy(activity) : null
   const sleepCopy = sleep && sleep.range === range ? sleepCardCopy(sleep) : null
   return (
@@ -33,7 +35,7 @@ export function ActivitySleepCards({
         ) : (
           <p className="mt-1.5 text-sm text-zinc-600">Loading activity</p>
         )}
-        <Link to={`/progress/activity${progressSearch(range)}`} className="mt-3 inline-block text-sm font-medium underline">
+        <Link to={prefixedPath(prefix, `/progress/activity${progressSearch(range)}`)} className="mt-3 inline-block text-sm font-medium underline">
           View activity
         </Link>
       </article>
@@ -48,7 +50,7 @@ export function ActivitySleepCards({
         ) : (
           <p className="mt-1.5 text-sm text-zinc-600">Loading sleep</p>
         )}
-        <Link to={`/progress/sleep${progressSearch(range)}`} className="mt-3 inline-block text-sm font-medium underline">
+        <Link to={prefixedPath(prefix, `/progress/sleep${progressSearch(range)}`)} className="mt-3 inline-block text-sm font-medium underline">
           View sleep
         </Link>
       </article>

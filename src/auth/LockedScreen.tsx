@@ -4,10 +4,12 @@ export function LockedScreen({
   title,
   body,
   action,
+  secondary,
 }: {
   title: string
   body: string
   action?: { to: string; label: string; state?: unknown } | { onClick: () => void; label: string }
+  secondary?: { to: string; label: string }
 }) {
   return (
     <section className="mx-auto max-w-lg space-y-4">
@@ -30,6 +32,13 @@ export function LockedScreen({
         >
           {action.label}
         </button>
+      ) : null}
+      {secondary ? (
+        <p>
+          <Link to={secondary.to} className="text-sm font-medium text-zinc-700 underline">
+            {secondary.label}
+          </Link>
+        </p>
       ) : null}
     </section>
   )

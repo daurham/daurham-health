@@ -6,6 +6,7 @@ import { LoadErrorNotice, PendingLoadRegion, useAtomicKeyedResource } from '@/li
 import { formatSleepDuration } from '@/features/progress/activity-sleep-copy'
 import { formatCalendarDate } from '@/features/progress/format'
 import { macroHeadline, remainingHeadline } from '@/features/nutrition/format'
+import { prefixedPath, useAppPathPrefix, useDemoReadOnly } from '@/lib/app-prefix'
 import { fetchToday } from './api'
 
 function formatMeasure(value: number): string {
@@ -62,6 +63,7 @@ export function TodayPage() {
 }
 
 export function TodayBoard({ view }: { view: TodayViewModel }) {
+  const prefix = useAppPathPrefix()
   return (
     <div className="grid gap-3 md:grid-cols-2">
       {view.pendingItems.length > 0 ? (
@@ -71,7 +73,7 @@ export function TodayBoard({ view }: { view: TodayViewModel }) {
             {view.pendingItems.map((item) => (
               <li key={item.id} className="flex items-center justify-between gap-3">
                 <p className="min-w-0 text-sm text-zinc-800">{item.title}</p>
-                <Link to={item.href} className="inline-flex min-h-11 shrink-0 items-center text-sm font-medium underline">
+                <Link to={prefixedPath(prefix, item.href)} className="inline-flex min-h-11 shrink-0 items-center text-sm font-medium underline">
                   {item.action}
                 </Link>
               </li>
@@ -127,7 +129,8 @@ function ActionLink({ to, children }: { to: string; children: string }) {
 
 function NutritionCard({ view }: { view: TodayViewModel }) {
   const nutrition = view.nutrition
-  const dateHref = `/nutrition?date=${view.date}`
+  const readOnly = useDemoReadOnly()
+  const dateHref = prefixedPath(useAppPathPrefix(), `/nutrition?date=${view.date}`)
   return (
     <Card title="Nutrition">
       {nutrition.logged && nutrition.totals ? (
@@ -136,7 +139,7 @@ function NutritionCard({ view }: { view: TodayViewModel }) {
         <p>No food logged yet today.</p>
       )}
       <div className="mt-2 flex flex-wrap gap-x-4">
-        <ActionLink to={dateHref}>Add food</ActionLink>
+        {readOnly ? null : <ActionLink to={dateHref}>Add food</ActionLink>}
         <ActionLink to={dateHref}>View Nutrition</ActionLink>
       </div>
     </Card>
@@ -174,6 +177,8 @@ function NutritionTotals({
 }
 
 function TrainingCard({ view }: { view: TodayViewModel }) {
+  const prefix = useAppPathPrefix()
+  const readOnly = useDemoReadOnly()
   return (
     <Card title="Training">
       {view.training.logged ? (
@@ -184,14 +189,14 @@ function TrainingCard({ view }: { view: TodayViewModel }) {
               <p className="text-zinc-600">
                 {countLabel(session.exerciseCount, 'exercise', 'exercises')} · {countLabel(session.workingSetCount, 'working set', 'working sets')}
               </p>
-              <ActionLink to={`/training/${session.id}`}>View workout</ActionLink>
+              <ActionLink to={prefixedPath(prefix, `/training/${session.id}`)}>View workout</ActionLink>
             </li>
           ))}
         </ul>
       ) : (
         <>
           <p>No workout logged today</p>
-          <ActionLink to="/training/new">Log workout</ActionLink>
+          {readOnly ? null : <ActionLink to={prefixedPath(prefix, '/training/new')}>Log workout</ActionLink>}
         </>
       )}
     </Card>
@@ -218,7 +223,7 @@ function ActivityCard({ view }: { view: TodayViewModel }) {
       ) : (
         <p>No activity data received yet today.</p>
       )}
-      <ActionLink to="/progress/activity">View Activity</ActionLink>
+      <ActionLink to={prefixedPath(useAppPathPrefix(), '/progress/activity')}>View Activity</ActionLink>
     </Card>
   )
 }
@@ -245,13 +250,15 @@ function SleepCard({ view }: { view: TodayViewModel }) {
           Latest complete: {formatCalendarDate(sleep.latestComplete.date)} · {formatSleepDuration(sleep.latestComplete.minutes)}
         </p>
       ) : null}
-      <ActionLink to="/progress/sleep">View Sleep</ActionLink>
+      <ActionLink to={prefixedPath(useAppPathPrefix(), '/progress/sleep')}>View Sleep</ActionLink>
     </Card>
   )
 }
 
 function BodyCard({ view }: { view: TodayViewModel }) {
   const body = view.body
+  const readOnly = useDemoReadOnly()
+  const href = prefixedPath(useAppPathPrefix(), '/body')
   return (
     <Card title="Body">
       {body.latest ? (
@@ -266,8 +273,8 @@ function BodyCard({ view }: { view: TodayViewModel }) {
         <p>No body measurement recorded yet.</p>
       )}
       <div className="mt-2 flex flex-wrap gap-x-4">
-        <ActionLink to="/body">Add measurement</ActionLink>
-        <ActionLink to="/body">View Body</ActionLink>
+        {readOnly ? null : <ActionLink to={href}>Add measurement</ActionLink>}
+        <ActionLink to={href}>View Body</ActionLink>
       </div>
     </Card>
   )

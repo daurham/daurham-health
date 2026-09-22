@@ -20,6 +20,7 @@ import {
   type TimelineTrainingSessionEvent,
 } from '@/domain/progress'
 import { cn } from '@/lib'
+import { prefixedPath, useAppPathPrefix } from '@/lib/app-prefix'
 import { formatGrams, formatKcal, formatQuantity, mealLabel } from '@/features/nutrition/format'
 import { formatSleepDuration } from './activity-sleep-copy'
 import { TIMELINE_FOCUS_OPTIONS } from './copy'
@@ -189,6 +190,7 @@ function TrainingEventCard({
   nested: boolean
   onEvidence: (topic: EvidenceTopic) => void
 }) {
+  const prefix = useAppPathPrefix()
   const bests = nested ? performanceBestsForSession(timeline, event.data.sessionId) : []
   const summaryParts = [
     event.data.exerciseCount > 0
@@ -217,7 +219,7 @@ function TrainingEventCard({
         </div>
         <div className="mt-3 flex flex-wrap gap-2 md:mt-0 md:justify-end">
           <Link
-            to={`/training/${event.data.sessionId}`}
+            to={prefixedPath(prefix, `/training/${event.data.sessionId}`)}
             className="inline-flex min-h-10 items-center rounded-md bg-zinc-900 px-3 text-sm font-medium text-white md:min-h-9"
           >
             Open workout
@@ -250,6 +252,7 @@ function PerformanceBestCard({
   nested?: boolean
   standalone?: boolean
 }) {
+  const prefix = useAppPathPrefix()
   const achievements = event.data.achievements.map((item) => ACHIEVEMENT_LABELS[item] ?? item)
   return (
     <article
@@ -297,14 +300,14 @@ function PerformanceBestCard({
           </button>
           {event.data.sessionId && standalone ? (
             <Link
-              to={`/training/${event.data.sessionId}`}
+              to={prefixedPath(prefix, `/training/${event.data.sessionId}`)}
               className="inline-flex min-h-10 items-center rounded-md px-3 text-sm font-medium text-zinc-700 hover:bg-zinc-100 md:min-h-9"
             >
               Open workout
             </Link>
           ) : null}
           <Link
-            to={`/progress/strength/${event.data.exerciseId}${progressSearch(range)}`}
+            to={prefixedPath(prefix, `/progress/strength/${event.data.exerciseId}${progressSearch(range)}`)}
             className="inline-flex min-h-10 items-center rounded-md px-3 text-sm font-medium text-zinc-700 hover:bg-zinc-100 md:min-h-9"
           >
             Strength Lab
@@ -540,6 +543,7 @@ function NutritionEventCard({
   event: TimelineNutritionDayEvent
   onEvidence: (topic: EvidenceTopic) => void
 }) {
+  const prefix = useAppPathPrefix()
   const dense = event.data.entryCount > 6
   const [open, setOpen] = useState(!dense)
   const groups = groupedNutritionSnapshots(event.data.entries)
@@ -614,14 +618,14 @@ function NutritionEventCard({
                   : []),
               ],
               evidence: event.evidence,
-              actions: [{ label: 'Open Nutrition day', to: `/nutrition?date=${event.date}` }],
+              actions: [{ label: 'Open Nutrition day', to: prefixedPath(prefix, `/nutrition?date=${event.date}`) }],
             })
           }
         >
           View evidence
         </button>
         <Link
-          to={`/nutrition?date=${event.date}`}
+          to={prefixedPath(prefix, `/nutrition?date=${event.date}`)}
           className="inline-flex min-h-10 items-center rounded-md px-3 text-sm font-medium text-zinc-700 hover:bg-zinc-100 md:min-h-9"
         >
           Open day

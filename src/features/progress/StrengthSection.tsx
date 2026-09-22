@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import type { ProgressOverview, ProgressRange } from '@/domain/progress'
+import { prefixedPath, useAppPathPrefix } from '@/lib/app-prefix'
 import { compactTrendCopy } from './copy'
 import type { EvidenceTopic } from './EvidencePanel'
 import {
@@ -25,6 +26,7 @@ export function StrengthSection({
   range: ProgressRange
   onEvidence: (topic: EvidenceTopic) => void
 }) {
+  const prefix = useAppPathPrefix()
   const exercises = overview.exercises.filter(
     (exercise) =>
       exercise.latestPerformance != null || exercise.performedPoints.length > 0 || exercise.recentPrs.length > 0,
@@ -67,7 +69,7 @@ export function StrengthSection({
                   <tr key={exercise.exerciseId} className="group relative border-b border-zinc-100 hover:bg-zinc-50">
                     <td className="py-2.5 pr-3">
                       <Link
-                        to={`/progress/strength/${exercise.exerciseId}${progressSearch(range)}`}
+                        to={prefixedPath(prefix, `/progress/strength/${exercise.exerciseId}${progressSearch(range)}`)}
                         className="font-medium text-zinc-900 after:absolute after:inset-0 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
                       >
                         {exercise.name}
@@ -148,9 +150,10 @@ function ExerciseCard({
   exercise: ProgressOverview['exercises'][number]
   range: ProgressRange
 }) {
+  const prefix = useAppPathPrefix()
   return (
     <Link
-      to={`/progress/strength/${exercise.exerciseId}${progressSearch(range)}`}
+      to={prefixedPath(prefix, `/progress/strength/${exercise.exerciseId}${progressSearch(range)}`)}
       className="flex min-h-14 items-center justify-between gap-3 rounded-lg border border-zinc-200 bg-white px-3 py-2.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
     >
       <div className="min-w-0">
@@ -176,12 +179,13 @@ export function StrengthLab({
   exerciseId: string
   onEvidence: (topic: EvidenceTopic) => void
 }) {
+  const prefix = useAppPathPrefix()
   const exercise = overview.exercises.find((item) => item.exerciseId === exerciseId)
   if (!exercise) {
     return (
       <div>
         <p className="text-sm text-zinc-600">That exercise is not in the current Progress snapshot.</p>
-        <Link to={`/progress/strength${progressSearch(range)}`} className="mt-3 inline-block text-sm font-medium underline">
+        <Link to={prefixedPath(prefix, `/progress/strength${progressSearch(range)}`)} className="mt-3 inline-block text-sm font-medium underline">
           Back to Strength
         </Link>
       </div>
@@ -198,7 +202,7 @@ export function StrengthLab({
   return (
     <div className="space-y-5 md:space-y-6">
       <div>
-        <Link to={`/progress/strength${progressSearch(range)}`} className="text-sm text-zinc-600 hover:text-zinc-900">
+        <Link to={prefixedPath(prefix, `/progress/strength${progressSearch(range)}`)} className="text-sm text-zinc-600 hover:text-zinc-900">
           ← Strength
         </Link>
         <h2 className="mt-2 text-xl font-semibold tracking-tight">{exercise.name}</h2>

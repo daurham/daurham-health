@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import type { CanonicalEvidence } from '@/domain/progress'
 import { cn } from '@/lib'
+import { prefixedPath, useAppPathPrefix } from '@/lib/app-prefix'
 import { formatCalendarDate, formatEvidenceSet } from './format'
 
 export type EvidenceTopic = {
@@ -20,6 +21,7 @@ export function EvidencePanel({
   topic: EvidenceTopic
   onClose: () => void
 }) {
+  const prefix = useAppPathPrefix()
   const panelRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -110,7 +112,7 @@ export function EvidencePanel({
         ) : null}
         {topic.workoutSessionId ? (
           <Link
-            to={`/training/${topic.workoutSessionId}`}
+            to={prefixedPath(prefix, `/training/${topic.workoutSessionId}`)}
             className={cn(
               'mt-5 inline-flex min-h-11 items-center rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white',
             )}
@@ -123,7 +125,7 @@ export function EvidencePanel({
             {topic.actions.map((action) => (
               <Link
                 key={`${action.label}-${action.to}`}
-                to={action.to}
+                to={prefixedPath(prefix, action.to)}
                 className="inline-flex min-h-11 items-center rounded-md border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-800 hover:bg-zinc-50"
               >
                 {action.label}
