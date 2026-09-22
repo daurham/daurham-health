@@ -86,6 +86,13 @@ describe('splitSqlStatements', () => {
     expect(mealPhoto[0]).toContain('meal_photo')
     expect(mealPhoto[2]).toContain('meal_photo')
     expect(mealPhoto[3]).toContain('meal_group_id')
+    const activitySleep = splitSqlStatements(
+      readFileSync(path.join('migrations', '0012_activity_sleep.sql'), 'utf8'),
+    )
+    expect(activitySleep).toHaveLength(9)
+    expect(activitySleep[0]).toMatch(/^CREATE TABLE activity_samples/)
+    expect(activitySleep[3]).toMatch(/^CREATE TABLE sleep_intervals/)
+    expect(activitySleep[6]).toMatch(/^CREATE TABLE activity_workouts/)
     expect(training.every((statement) => !statement.includes('$tag$'))).toBe(true)
     expect(training[0]).toMatch(/^CREATE TABLE exercise_definitions/)
     expect(training[7]).toMatch(/^INSERT INTO exercise_definitions/)

@@ -24,20 +24,36 @@ export function Layout() {
           <p className="text-sm font-semibold tracking-tight">Daurham Health</p>
           {showOwnerChrome ? (
             <>
-              <button
-                type="button"
-                onClick={() => {
-                  void signOut()
-                }}
-                className="hidden text-sm text-zinc-500 hover:text-zinc-900 md:inline"
-              >
-                Sign out
-              </button>
+              <div className="hidden items-center gap-3 md:flex">
+                <NavLink
+                  to="/settings"
+                  className={({ isActive }) =>
+                    cn('text-sm hover:text-zinc-900', isActive ? 'text-zinc-900' : 'text-zinc-500')
+                  }
+                >
+                  Settings
+                </NavLink>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void signOut()
+                  }}
+                  className="text-sm text-zinc-500 hover:text-zinc-900"
+                >
+                  Sign out
+                </button>
+              </div>
               <details className="relative md:hidden">
                 <summary className="cursor-pointer list-none rounded-md px-2 py-1 text-sm text-zinc-600 marker:content-none hover:bg-zinc-100 hover:text-zinc-900 [&::-webkit-details-marker]:hidden">
                   Menu
                 </summary>
                 <div className="absolute right-0 z-30 mt-1 min-w-36 rounded-md border border-zinc-200 bg-white py-1 shadow-sm">
+                  <NavLink
+                    to="/settings"
+                    className="block px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50"
+                  >
+                    Settings
+                  </NavLink>
                   <button
                     type="button"
                     onClick={() => {

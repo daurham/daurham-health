@@ -1,9 +1,9 @@
-import { addCalendarDays, calendarDateFromInstant } from '@/domain/progress/dates'
-import { NUTRITION_CONFIG } from '@/domain/nutrition'
+import { addCalendarDays } from '@/domain/progress/dates'
+import { healthCalendarDateFromNow } from '@/domain/time'
 import { isCalendarDate } from '@/domain/training'
 
 export function todayNutritionDate(now = new Date()): string {
-  return calendarDateFromInstant(now, NUTRITION_CONFIG.calendarTimeZone)
+  return healthCalendarDateFromNow(now)
 }
 
 export function parseNutritionDateParam(value: string | null, today = todayNutritionDate()): string {

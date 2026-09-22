@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { trailingPeriod } from '@/domain/progress'
-import { utcCalendarDateFromNow } from '@/domain/progress/dates'
+import { healthCalendarDateFromNow } from '@/domain/time'
 import type {
   CompareExercise,
   MetricResult,
@@ -47,7 +47,7 @@ function defaultCompareParams(asOf: string): { startA: string; endA: string; sta
 
 export function CompareSection({ onEvidence }: { onEvidence: (topic: EvidenceTopic) => void }) {
   const [params, setParams] = useSearchParams()
-  const asOf = utcCalendarDateFromNow(new Date())
+  const asOf = healthCalendarDateFromNow()
   const defaults = useMemo(() => defaultCompareParams(asOf), [asOf])
   const checkpointId = params.get('checkpoint')
   const startA = params.get('startA') ?? defaults.startA
@@ -227,7 +227,7 @@ function CheckpointManager({
   onDeleted: (id: string) => void
 }) {
   const [label, setLabel] = useState('')
-  const [date, setDate] = useState(utcCalendarDateFromNow(new Date()))
+  const [date, setDate] = useState(healthCalendarDateFromNow())
   const [notes, setNotes] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [editing, setEditing] = useState<string | null>(null)

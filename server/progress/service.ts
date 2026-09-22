@@ -4,7 +4,6 @@ import {
   buildProgressOverview,
   buildProgressTimeline,
   isProgressRange,
-  utcCalendarDateFromNow,
   type ProgressOverview,
   type ProgressRange,
   type ProgressTimeline,
@@ -20,6 +19,7 @@ import {
   checkpointPatchSchema,
   type ProgressCheckpoint,
 } from '../../src/domain/progress/checkpoints.js'
+import { healthCalendarDateFromNow } from '../../src/domain/time.js'
 import { HttpError } from '../http.js'
 import { getSql } from '../db.js'
 import {
@@ -43,7 +43,7 @@ export function parseProgressQuery(input: {
   if (!isProgressRange(range)) {
     throw new HttpError(400, 'range must be 30d, 90d, 6m, 1y, or all')
   }
-  const asOf = input.asOf?.trim() || utcCalendarDateFromNow(input.now ?? new Date())
+  const asOf = input.asOf?.trim() || healthCalendarDateFromNow(input.now ?? new Date())
   if (!isCalendarDate(asOf)) {
     throw new HttpError(400, 'asOf must be YYYY-MM-DD')
   }
@@ -74,7 +74,7 @@ export function parseCompareQuery(input: {
     if (!parsed.success) {
       throw new HttpError(400, 'checkpointId is invalid')
     }
-    const asOf = input.asOf?.trim() || utcCalendarDateFromNow(input.now ?? new Date())
+    const asOf = input.asOf?.trim() || healthCalendarDateFromNow(input.now ?? new Date())
     if (!isCalendarDate(asOf)) {
       throw new HttpError(400, 'asOf must be YYYY-MM-DD')
     }

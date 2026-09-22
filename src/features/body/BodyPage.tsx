@@ -11,15 +11,8 @@ import {
   fetchBodyMeasurements,
   previewFitProfile,
 } from './api'
+import { HEALTH_CALENDAR_TIME_ZONE } from '@/domain/time'
 import { selectedFingerprints, selectionFromPreview } from './import-state'
-
-function browserTimeZone(): string {
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
-  } catch {
-    return 'UTC'
-  }
-}
 
 function formatNumber(value: number, maxFractionDigits: number): string {
   return value.toLocaleString('en-US', {
@@ -58,7 +51,7 @@ export function BodyPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [file, setFile] = useState<File | null>(null)
-  const [timezone] = useState(browserTimeZone)
+  const [timezone] = useState(HEALTH_CALENDAR_TIME_ZONE)
   const [preview, setPreview] = useState<FitProfilePreviewResponse | null>(null)
   const [selected, setSelected] = useState<Record<string, boolean>>({})
   const [busy, setBusy] = useState<'preview' | 'commit' | null>(null)

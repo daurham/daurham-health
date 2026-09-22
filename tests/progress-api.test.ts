@@ -11,7 +11,9 @@ describe('progress query and classification', () => {
       range: '90d',
       asOf: '2026-09-21',
     })
-    expect(parseProgressQuery({ range: null, asOf: null, now: new Date(Date.UTC(2026, 8, 21)) }).asOf).toBe('2026-09-21')
+    expect(parseProgressQuery({ range: null, asOf: null, now: new Date('2026-09-21T16:00:00.000Z') }).asOf).toBe(
+      '2026-09-21',
+    )
     expect(() => parseProgressQuery({ range: 'week', asOf: null })).toThrow(/range must be/)
   })
 

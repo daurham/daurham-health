@@ -1,5 +1,7 @@
+import { HEALTH_CALENDAR_TIME_ZONE } from '../time.js'
+
 export const NUTRITION_CONFIG = {
-  calendarTimeZone: 'America/Los_Angeles',
+  calendarTimeZone: HEALTH_CALENDAR_TIME_ZONE,
   foodNameMax: 200,
   brandMax: 120,
   barcodeMax: 64,

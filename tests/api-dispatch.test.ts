@@ -116,6 +116,9 @@ describe('Vercel nested API routing', () => {
     expect(matchHealthApiRoute(`/api/nutrition/meal/jobs/${JOB_ID}`)).toBe('nutrition-meal-job-detail')
     expect(matchHealthApiRoute(`/api/nutrition/meal/jobs/${JOB_ID}/image`)).toBe('nutrition-meal-job-detail')
     expect(matchHealthApiRoute('/api/nutrition/meal/commit')).toBe('nutrition-meal-commit')
+    expect(matchHealthApiRoute('/api/apple-health/import/status')).toBe('apple-health-import')
+    expect(matchHealthApiRoute('/api/apple-health/import/preview')).toBe('apple-health-import')
+    expect(matchHealthApiRoute('/api/apple-health/import/commit')).toBe('apple-health-import')
     expect(matchHealthApiRoute(`/api/training/transcription/jobs/${JOB_ID}`)).toBe(
       'transcription-job-detail',
     )
@@ -286,6 +289,20 @@ describe('api/index after Vercel nested rewrite', () => {
     const preview = await hit('POST', '/api/nutrition/import/legacy/preview')
     expect(preview.status()).not.toBe(404)
     expect(isDeniedPrivate(preview.status())).toBe(true)
+  })
+
+  it('protects Apple Health import status, preview, and commit', async () => {
+    const status = await hit('GET', '/api/apple-health/import/status')
+    expect(status.status()).not.toBe(404)
+    expect(isDeniedPrivate(status.status())).toBe(true)
+
+    const preview = await hit('POST', '/api/apple-health/import/preview')
+    expect(preview.status()).not.toBe(404)
+    expect(isDeniedPrivate(preview.status())).toBe(true)
+
+    const commit = await hit('POST', '/api/apple-health/import/commit')
+    expect(commit.status()).not.toBe(404)
+    expect(isDeniedPrivate(commit.status())).toBe(true)
   })
 
   it('returns 404 for unknown API routes and 405 for unsupported methods', async () => {

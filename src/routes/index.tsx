@@ -6,6 +6,7 @@ import { NutritionPage } from '@/features/nutrition'
 import { ProgressPage, ProgressOverviewRoute, ProgressStrengthRoute, ProgressStrengthLabRoute, ProgressBodyRoute, ProgressTimelineRoute, ProgressCompareRoute } from '@/features/progress'
 import { TodayPage } from '@/features/today'
 import { ImportWorkoutPage, StartWorkoutPage, TrainingPage, WorkoutDetailPage } from '@/features/training'
+import { SettingsPage } from '@/features/settings'
 
 const router = createBrowserRouter([
   {
@@ -19,6 +20,7 @@ const router = createBrowserRouter([
       { path: 'training/import', element: <ImportWorkoutPage /> },
       { path: 'training/:sessionId', element: <WorkoutDetailPage /> },
       { path: 'body', element: <BodyPage /> },
+      { path: 'settings', element: <SettingsPage /> },
       {
         path: 'progress',
         element: <ProgressPage />,

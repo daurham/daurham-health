@@ -143,11 +143,21 @@ describe('Vercel function module specifiers', () => {
         'server/nutrition/migrate.ts',
         'server/nutrition/providers/open-food-facts.ts',
         'src/domain/nutrition/index.ts',
+        'server/handlers/apple-health-import.ts',
+        'server/apple-health/service.ts',
+        'server/apple-health/queries.ts',
+        'server/apple-health/commit-sql.ts',
+        'src/domain/apple-health/config.ts',
+        'src/domain/apple-health/types.ts',
+        'src/domain/apple-health/parse.ts',
+        'src/domain/apple-health/ingest.ts',
       ]),
     )
     expect(files).not.toContain('server/dev-api-plugin.ts')
     expect(files).not.toContain('server/migrate.ts')
     expect(files).not.toContain('server/progress/inspect.ts')
+    expect(files).not.toContain('server/apple-health/cli.ts')
+    expect(files).not.toContain('src/domain/apple-health/zip.ts')
   })
 
   it('uses Node ESM .js specifiers so compiled functions do not import .ts paths', () => {

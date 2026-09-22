@@ -1,5 +1,21 @@
+import { calendarDateFromInstant } from './progress/dates.js'
+
 const WALL_CLOCK =
   /^(\d{1,2})\/(\d{1,2})\/(\d{4})[ T](\d{1,2}):(\d{2}):(\d{2})$/
+
+/**
+ * Canonical Health calendar timezone.
+ * Phoenix has no DST; Los Angeles must not be substituted for day bucketing.
+ */
+export const HEALTH_CALENDAR_TIME_ZONE = 'America/Phoenix'
+
+export function healthCalendarDateFromInstant(instant: Date): string {
+  return calendarDateFromInstant(instant, HEALTH_CALENDAR_TIME_ZONE)
+}
+
+export function healthCalendarDateFromNow(now = new Date()): string {
+  return healthCalendarDateFromInstant(now)
+}
 
 export function assertIanaTimeZone(timeZone: string): string {
   const value = timeZone.trim()
