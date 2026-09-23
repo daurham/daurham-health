@@ -87,9 +87,9 @@ export function EstimatedStrengthChart({
     <ChartFrame title="Estimated Strength" caption={caption}>
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
-          <CartesianGrid stroke="#e4e4e7" strokeDasharray="3 3" />
-          <XAxis dataKey="date" tickFormatter={formatCalendarDate} tick={{ fill: '#71717a', fontSize: 11 }} />
-          <YAxis dataKey="estimatedLb" unit=" lb" domain={domain} tick={{ fill: '#71717a', fontSize: 11 }} width={56} />
+          <CartesianGrid stroke="var(--chart-grid)" strokeDasharray="3 3" />
+          <XAxis dataKey="date" tickFormatter={formatCalendarDate} tick={{ fill: 'var(--chart-muted)', fontSize: 11 }} />
+          <YAxis dataKey="estimatedLb" unit=" lb" domain={domain} tick={{ fill: 'var(--chart-muted)', fontSize: 11 }} width={56} />
           <Tooltip
             content={({ payload }) => {
               const item = payload?.[0]?.payload as StrengthPoint | undefined
@@ -101,7 +101,7 @@ export function EstimatedStrengthChart({
               )
             }}
           />
-          <Line type="linear" dataKey="estimatedLb" stroke="#18181b" strokeWidth={2} dot={{ r: 3 }} />
+          <Line type="linear" dataKey="estimatedLb" stroke="var(--chart-ink)" strokeWidth={2} dot={{ r: 3 }} />
         </LineChart>
       </ResponsiveContainer>
     </ChartFrame>
@@ -147,16 +147,16 @@ export function PerformanceFrontierChart({
     >
       <ResponsiveContainer width="100%" height="100%">
         <ScatterChart margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
-          <CartesianGrid stroke="#e4e4e7" strokeDasharray="3 3" />
+          <CartesianGrid stroke="var(--chart-grid)" strokeDasharray="3 3" />
           <XAxis
             type="number"
             dataKey="loadLb"
             name="Load"
             unit=" lb"
             domain={xDomain}
-            tick={{ fill: '#71717a', fontSize: 11 }}
+            tick={{ fill: 'var(--chart-muted)', fontSize: 11 }}
           />
-          <YAxis type="number" dataKey="y" name={yLabel} domain={yDomain} tick={{ fill: '#71717a', fontSize: 11 }} width={40} />
+          <YAxis type="number" dataKey="y" name={yLabel} domain={yDomain} tick={{ fill: 'var(--chart-muted)', fontSize: 11 }} width={40} />
           <Tooltip
             content={({ payload }) => {
               const item = payload?.[0]?.payload as FrontierDatum | undefined
@@ -170,8 +170,8 @@ export function PerformanceFrontierChart({
               return tooltipBox(`${formatCalendarDate(item.date)} · ${performed}`)
             }}
           />
-          <Scatter data={historyData} fill="#a1a1aa" name="Performed" />
-          <Scatter data={frontierData} fill="#18181b" name="Frontier" />
+          <Scatter data={historyData} fill="var(--chart-soft)" name="Performed" />
+          <Scatter data={frontierData} fill="var(--chart-ink)" name="Frontier" />
         </ScatterChart>
       </ResponsiveContainer>
     </ChartFrame>
@@ -205,19 +205,19 @@ export function LoggedCaloriesChart({
       <div className="mt-4 h-40 w-full">
         <ResponsiveContainer width="100%" height="100%">
           <ScatterChart margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
-            <CartesianGrid stroke="#e4e4e7" strokeDasharray="3 3" />
+            <CartesianGrid stroke="var(--chart-grid)" strokeDasharray="3 3" />
             <XAxis
               dataKey="date"
               type="category"
               allowDuplicatedCategory={false}
               tickFormatter={formatCalendarDate}
-              tick={{ fill: '#71717a', fontSize: 11 }}
+              tick={{ fill: 'var(--chart-muted)', fontSize: 11 }}
             />
             <YAxis
               dataKey="calories"
               unit=" kcal"
               domain={domain}
-              tick={{ fill: '#71717a', fontSize: 11 }}
+              tick={{ fill: 'var(--chart-muted)', fontSize: 11 }}
               width={64}
             />
             <Tooltip
@@ -232,10 +232,10 @@ export function LoggedCaloriesChart({
               }}
             />
             {constantTarget != null ? (
-              <ReferenceLine y={constantTarget} stroke="#a1a1aa" strokeDasharray="4 4" />
+              <ReferenceLine y={constantTarget} stroke="var(--chart-soft)" strokeDasharray="4 4" />
             ) : null}
-            <Scatter data={points} fill="#18181b" name="Calories" />
-            {varyingTargets.length > 0 ? <Scatter data={varyingTargets} fill="#a1a1aa" name="Target" /> : null}
+            <Scatter data={points} fill="var(--chart-ink)" name="Calories" />
+            {varyingTargets.length > 0 ? <Scatter data={varyingTargets} fill="var(--chart-soft)" name="Target" /> : null}
           </ScatterChart>
         </ResponsiveContainer>
       </div>
@@ -268,13 +268,13 @@ export function WeightHistoryChart({
     >
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={points} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
-          <CartesianGrid stroke="#e4e4e7" strokeDasharray="3 3" />
-          <XAxis dataKey="date" tickFormatter={formatCalendarDate} tick={{ fill: '#71717a', fontSize: 11 }} />
+          <CartesianGrid stroke="var(--chart-grid)" strokeDasharray="3 3" />
+          <XAxis dataKey="date" tickFormatter={formatCalendarDate} tick={{ fill: 'var(--chart-muted)', fontSize: 11 }} />
           <YAxis
             dataKey="valueLb"
             unit=" lb"
             domain={domain}
-            tick={{ fill: '#71717a', fontSize: 11 }}
+            tick={{ fill: 'var(--chart-muted)', fontSize: 11 }}
             width={56}
           />
           <Tooltip
@@ -286,7 +286,7 @@ export function WeightHistoryChart({
               return tooltipBox(`${formatCalendarDate(item.date)} · ${item.valueLb} lb`)
             }}
           />
-          <Line type="linear" dataKey="valueLb" stroke="#18181b" strokeWidth={2} dot={{ r: 3 }} connectNulls={false} />
+          <Line type="linear" dataKey="valueLb" stroke="var(--chart-ink)" strokeWidth={2} dot={{ r: 3 }} connectNulls={false} />
         </LineChart>
       </ResponsiveContainer>
     </ChartFrame>

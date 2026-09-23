@@ -36,14 +36,14 @@ export function ActivityMetricChart({
     >
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-          <CartesianGrid stroke="#e4e4e7" strokeDasharray="3 3" />
+          <CartesianGrid stroke="var(--chart-grid)" strokeDasharray="3 3" />
           <XAxis
             dataKey="date"
             tickFormatter={formatCalendarDate}
             minTickGap={28}
-            tick={{ fill: '#71717a', fontSize: 11 }}
+            tick={{ fill: 'var(--chart-muted)', fontSize: 11 }}
           />
-          <YAxis width={48} tick={{ fill: '#71717a', fontSize: 11 }} />
+          <YAxis width={48} tick={{ fill: 'var(--chart-muted)', fontSize: 11 }} />
           <Tooltip
             content={({ payload }) => {
               const item = payload?.[0]?.payload as ActivityChartPoint | undefined
@@ -54,8 +54,8 @@ export function ActivityMetricChart({
               return tooltipBox(item.provisional ? `Today · ${label} so far` : `${formatCalendarDate(item.date)} · ${label}`)
             }}
           />
-          <Line type="linear" dataKey="completed" stroke="#18181b" strokeWidth={2} dot={{ r: 2 }} connectNulls={false} />
-          <Scatter dataKey="todayValue" fill="#a1a1aa" />
+          <Line type="linear" dataKey="completed" stroke="var(--chart-ink)" strokeWidth={2} dot={{ r: 2 }} connectNulls={false} />
+          <Scatter dataKey="todayValue" fill="var(--chart-soft)" />
         </ComposedChart>
       </ResponsiveContainer>
     </div>
@@ -82,14 +82,14 @@ export function SleepDurationChart({ points }: { points: SleepChartPoint[] }) {
     >
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-          <CartesianGrid stroke="#e4e4e7" strokeDasharray="3 3" />
+          <CartesianGrid stroke="var(--chart-grid)" strokeDasharray="3 3" />
           <XAxis
             dataKey="date"
             tickFormatter={formatCalendarDate}
             minTickGap={28}
-            tick={{ fill: '#71717a', fontSize: 11 }}
+            tick={{ fill: 'var(--chart-muted)', fontSize: 11 }}
           />
-          <YAxis width={40} tick={{ fill: '#71717a', fontSize: 11 }} />
+          <YAxis width={40} tick={{ fill: 'var(--chart-muted)', fontSize: 11 }} />
           <Tooltip
             content={({ payload }) => {
               const item = payload?.[0]?.payload as SleepChartPoint | undefined
@@ -110,12 +110,12 @@ export function SleepDurationChart({ points }: { points: SleepChartPoint[] }) {
           <Line
             type="linear"
             dataKey="eligibleMinutes"
-            stroke="#18181b"
+            stroke="var(--chart-ink)"
             strokeWidth={2}
             dot={{ r: 2 }}
             connectNulls={false}
           />
-          <Scatter dataKey="partialMinutes" fill="#a1a1aa" />
+          <Scatter dataKey="partialMinutes" fill="var(--chart-soft)" />
         </ComposedChart>
       </ResponsiveContainer>
     </div>

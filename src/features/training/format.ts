@@ -1,3 +1,4 @@
+import { formatCompactCalendarDate } from '@/domain/calendar-format'
 import { kilogramsToPounds } from '@/domain/units'
 import type { LoadState, TemplatePrescription } from '@/domain/training'
 import { formatPrescription } from '@/domain/training'
@@ -9,12 +10,7 @@ export function localIsoDate(now = new Date()): string {
 }
 
 export function formatWorkoutDate(isoDate: string): string {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate)
-  if (!match) {
-    return isoDate
-  }
-  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
-  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(date)
+  return formatCompactCalendarDate(isoDate)
 }
 
 export function formatPounds(kg: number | null | undefined): string {

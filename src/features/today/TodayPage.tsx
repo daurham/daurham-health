@@ -1,18 +1,16 @@
 import { useCallback, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
+import { formatBodyMass } from '@/domain/body-metrics'
 import type { NutritionDayTotals } from '@/domain/nutrition'
+import { formatWeekdayCalendarDate } from '@/domain/calendar-format'
 import type { TodayViewModel } from '@/domain/today'
+import { HEALTH_CALENDAR_TIME_ZONE } from '@/domain/time'
 import { LoadErrorNotice, PendingLoadRegion, useAtomicKeyedResource } from '@/lib'
 import { formatSleepDuration } from '@/features/progress/activity-sleep-copy'
-import { formatCalendarDate } from '@/features/progress/format'
-import { macroHeadline, remainingHeadline } from '@/features/nutrition/format'
+import { formatCalendarDate, formatClockTime } from '@/features/progress/format'
+import { caloriesHeadline, macroHeadline, remainingHeadline } from '@/features/nutrition/format'
 import { prefixedPath, useAppPathPrefix, useDemoReadOnly } from '@/lib/app-prefix'
 import { fetchToday } from './api'
-
-function formatMeasure(value: number): string {
-  const rounded = Math.round(value * 10) / 10
-  return Number.isInteger(rounded) ? rounded.toLocaleString('en-US') : rounded.toFixed(1)
-}
 
 function formatCount(value: number): string {
   return Math.round(value).toLocaleString('en-US')
@@ -31,17 +29,19 @@ export function TodayPage() {
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Today</h1>
-          <p className="mt-1 text-sm text-zinc-600">{view ? formatCalendarDate(view.date) : 'America/Phoenix'}</p>
+          <p className="mt-1 text-sm text-zinc-600">
+            {view ? formatWeekdayCalendarDate(view.date) : 'America/Phoenix'}
+          </p>
         </div>
         <button
           type="button"
           onClick={() => resource.retry()}
-          className="min-h-11 shrink-0 rounded-md px-3 text-sm font-medium text-zinc-700 ring-1 ring-zinc-200 hover:bg-white"
+          className="inline-flex min-h-11 shrink-0 items-center text-sm font-medium text-zinc-600 hover:text-zinc-900"
         >
-          Refresh
+          {resource.isPending && view ? 'Refreshing' : '↻ Refresh'}
         </button>
       </div>
-      <div className="mt-4">
+      <div className="mt-5">
         <PendingLoadRegion pending={resource.isPending} pendingVisible={resource.pendingVisible}>
           {view ? (
             <TodayBoard view={view} />
@@ -65,15 +65,18 @@ export function TodayPage() {
 export function TodayBoard({ view }: { view: TodayViewModel }) {
   const prefix = useAppPathPrefix()
   return (
-    <div className="grid gap-3 md:grid-cols-2">
+    <div className="space-y-3">
       {view.pendingItems.length > 0 ? (
-        <section className="rounded-lg border border-zinc-200 bg-white p-4 md:col-span-2">
-          <h2 className="text-sm font-semibold tracking-tight">Needs attention</h2>
+        <section className="rounded-lg border border-zinc-200 bg-white p-4">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Needs attention</h2>
           <ul className="mt-3 space-y-2">
             {view.pendingItems.map((item) => (
               <li key={item.id} className="flex items-center justify-between gap-3">
                 <p className="min-w-0 text-sm text-zinc-800">{item.title}</p>
-                <Link to={prefixedPath(prefix, item.href)} className="inline-flex min-h-11 shrink-0 items-center text-sm font-medium underline">
+                <Link
+                  to={prefixedPath(prefix, item.href)}
+                  className="inline-flex min-h-11 shrink-0 items-center rounded-md bg-zinc-900 px-3 text-sm font-medium text-white"
+                >
                   {item.action}
                 </Link>
               </li>
@@ -81,24 +84,34 @@ export function TodayBoard({ view }: { view: TodayViewModel }) {
           </ul>
         </section>
       ) : null}
-      <NutritionCard view={view} />
-      <TrainingCard view={view} />
-      <ActivityCard view={view} />
+      <div className="grid items-start gap-3 md:grid-cols-2">
+        <NutritionCard view={view} />
+        <TrainingCard view={view} />
+      </div>
+      <div className="grid items-start gap-3 md:grid-cols-3">
+        <ActivityCard view={view} />
+        <SleepCard view={view} />
+        <BodyCard view={view} />
+      </div>
       {view.changedItems.length > 0 ? (
-        <section className="rounded-lg border border-zinc-200 bg-white p-4 md:col-span-2">
-          <h2 className="text-sm font-semibold tracking-tight">What changed</h2>
-          <ul className="mt-2 space-y-1 text-sm text-zinc-700">
+        <section className="rounded-lg border border-zinc-200 bg-white p-4">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">What changed</h2>
+          <ul className="mt-3 space-y-4">
             {view.changedItems.map((item) => (
-              <li key={item.id}>{item.text}</li>
+              <li key={item.id}>
+                <p className="text-sm font-medium text-zinc-900">
+                  {item.direction === 'higher' ? '↑ ' : item.direction === 'lower' ? '↓ ' : ''}
+                  {item.headline}
+                </p>
+                <p className="mt-1 whitespace-pre-line text-sm text-zinc-600">{item.detail}</p>
+              </li>
             ))}
           </ul>
         </section>
       ) : null}
-      <SleepCard view={view} />
-      <BodyCard view={view} />
       {view.patterns.length > 0 ? (
-        <section className="rounded-lg border border-zinc-200 bg-white p-4 md:col-span-2">
-          <h2 className="text-sm font-semibold tracking-tight">Patterns</h2>
+        <section className="rounded-lg border border-zinc-200 bg-white p-4">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Patterns</h2>
           <ul className="mt-2 space-y-1 text-sm text-zinc-700">
             {view.patterns.map((item) => (
               <li key={item.id}>{item.text}</li>
@@ -112,18 +125,57 @@ export function TodayBoard({ view }: { view: TodayViewModel }) {
 
 function Card({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="flex h-full min-w-0 flex-col rounded-lg border border-zinc-200 bg-white p-4">
-      <h2 className="text-sm font-semibold tracking-tight">{title}</h2>
-      <div className="mt-2 flex-1 text-sm text-zinc-800">{children}</div>
+    <section className="min-w-0 rounded-lg border border-zinc-200 bg-white p-4">
+      <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{title}</h2>
+      <div className="mt-2 text-sm text-zinc-800">{children}</div>
     </section>
   )
 }
 
-function ActionLink({ to, children }: { to: string; children: string }) {
+function PrimaryAction({ to, children }: { to: string; children: string }) {
   return (
-    <Link to={to} className="inline-flex min-h-11 items-center text-sm font-medium underline">
+    <Link
+      to={to}
+      className="inline-flex min-h-11 items-center justify-center rounded-md bg-zinc-900 px-4 text-sm font-medium text-white"
+    >
       {children}
     </Link>
+  )
+}
+
+function QuietAction({ to, children }: { to: string; children: string }) {
+  return (
+    <Link to={to} className="inline-flex min-h-11 items-center text-sm text-zinc-500">
+      {children}
+    </Link>
+  )
+}
+
+function NutrientMeter({
+  label,
+  consumed,
+  target,
+}: {
+  label: string
+  consumed: number | null
+  target: number | null
+}) {
+  if (consumed == null || target == null || target <= 0) {
+    return null
+  }
+  const ratio = consumed / target
+  const width = Math.min(ratio, 1) * 100
+  return (
+    <div
+      className="mt-1 h-1.5 overflow-hidden rounded-full bg-zinc-200"
+      role="meter"
+      aria-label={label}
+      aria-valuemin={0}
+      aria-valuemax={target}
+      aria-valuenow={consumed}
+    >
+      <div className="h-full rounded-full bg-zinc-800" style={{ width: `${width}%` }} />
+    </div>
   )
 }
 
@@ -138,9 +190,9 @@ function NutritionCard({ view }: { view: TodayViewModel }) {
       ) : (
         <p>No food logged yet today.</p>
       )}
-      <div className="mt-2 flex flex-wrap gap-x-4">
-        {readOnly ? null : <ActionLink to={dateHref}>Add food</ActionLink>}
-        <ActionLink to={dateHref}>View Nutrition</ActionLink>
+      <div className="mt-3 flex flex-wrap items-center gap-x-4">
+        {readOnly ? null : <PrimaryAction to={dateHref}>Add food</PrimaryAction>}
+        <QuietAction to={dateHref}>View nutrition</QuietAction>
       </div>
     </Card>
   )
@@ -153,26 +205,38 @@ function NutritionTotals({
   totals: NutritionDayTotals
   target: TodayViewModel['nutrition']['target']
 }) {
-  const rows = [
-    { label: 'Calories', total: totals.calories, target: target?.calories ?? null, unit: 'kcal' as const },
-    { label: 'Protein', total: totals.protein, target: target?.protein ?? null, unit: 'g' as const },
-    { label: 'Carbs', total: totals.carbs, target: target?.carbs ?? null, unit: 'g' as const },
-    { label: 'Fat', total: totals.fat, target: target?.fat ?? null, unit: 'g' as const },
+  const calories = totals.calories.status === 'available' ? totals.calories.value : null
+  const calorieRemainder = remainingHeadline(totals.calories, target?.calories ?? null, 'kcal')
+  const macros = [
+    { label: 'Protein', total: totals.protein, target: target?.protein ?? null },
+    { label: 'Carbs', total: totals.carbs, target: target?.carbs ?? null },
+    { label: 'Fat', total: totals.fat, target: target?.fat ?? null },
   ]
   return (
-    <ul className="space-y-1">
-      {rows.map((row) => {
-        const remainder = remainingHeadline(row.total, row.target, row.unit)
-        return (
-          <li key={row.label} className="flex items-baseline justify-between gap-3">
-            <span>
-              {row.label} {macroHeadline(row.total, row.target, row.unit)}
-            </span>
-            {remainder ? <span className="shrink-0 text-zinc-500">{remainder}</span> : null}
-          </li>
-        )
-      })}
-    </ul>
+    <div>
+      <p className="text-2xl font-semibold tracking-tight text-zinc-900">
+        {caloriesHeadline(totals.calories, target?.calories ?? null)}
+        {calorieRemainder ? <span className="ml-2 text-base font-medium text-zinc-500">{calorieRemainder}</span> : null}
+      </p>
+      <NutrientMeter label="Calories" consumed={calories} target={target?.calories ?? null} />
+      <ul className="mt-3 space-y-2">
+        {macros.map((row) => {
+          const consumed = row.total.status === 'available' ? row.total.value : null
+          const remainder = remainingHeadline(row.total, row.target, 'g')
+          return (
+            <li key={row.label}>
+              <div className="flex items-baseline justify-between gap-3">
+                <span>
+                  {row.label} {macroHeadline(row.total, row.target, 'g')}
+                </span>
+                {remainder ? <span className="shrink-0 text-zinc-500">{remainder}</span> : null}
+              </div>
+              <NutrientMeter label={row.label} consumed={consumed} target={row.target} />
+            </li>
+          )
+        })}
+      </ul>
+    </div>
   )
 }
 
@@ -185,18 +249,24 @@ function TrainingCard({ view }: { view: TodayViewModel }) {
         <ul className="space-y-3">
           {view.training.sessions.map((session) => (
             <li key={session.id}>
-              <p className="font-medium">{session.name}</p>
+              <p className="text-lg font-semibold tracking-tight text-zinc-900">{session.name}</p>
               <p className="text-zinc-600">
                 {countLabel(session.exerciseCount, 'exercise', 'exercises')} · {countLabel(session.workingSetCount, 'working set', 'working sets')}
               </p>
-              <ActionLink to={prefixedPath(prefix, `/training/${session.id}`)}>View workout</ActionLink>
+              <div className="mt-2">
+                <QuietAction to={prefixedPath(prefix, `/training/${session.id}`)}>View workout</QuietAction>
+              </div>
             </li>
           ))}
         </ul>
       ) : (
         <>
           <p>No workout logged today</p>
-          {readOnly ? null : <ActionLink to={prefixedPath(prefix, '/training/new')}>Log workout</ActionLink>}
+          {readOnly ? null : (
+            <div className="mt-3">
+              <PrimaryAction to={prefixedPath(prefix, '/training/new')}>Log workout</PrimaryAction>
+            </div>
+          )}
         </>
       )}
     </Card>
@@ -205,25 +275,37 @@ function TrainingCard({ view }: { view: TodayViewModel }) {
 
 function ActivityCard({ view }: { view: TodayViewModel }) {
   const activity = view.activity
-  const lines = [
-    activity.steps != null ? `${formatCount(activity.steps)} steps so far` : null,
+  const synced = activity.updatedAt ? formatClockTime(activity.updatedAt, HEALTH_CALENDAR_TIME_ZONE) : null
+  const secondary = [
     activity.activeEnergyKcal != null ? `${formatCount(activity.activeEnergyKcal)} active kcal` : null,
-    activity.exerciseMinutes != null ? `${formatCount(activity.exerciseMinutes)} exercise min so far` : null,
-    activity.restingHeartRateBpm != null ? `Resting HR ${formatCount(activity.restingHeartRateBpm)} bpm so far` : null,
+    activity.exerciseMinutes != null ? `${formatCount(activity.exerciseMinutes)} exercise min` : null,
+    activity.restingHeartRateBpm != null ? `Resting HR ${formatCount(activity.restingHeartRateBpm)} bpm` : null,
   ].filter((line): line is string => line != null)
   return (
     <Card title="Activity">
-      {lines.length > 0 ? (
+      {activity.steps != null || secondary.length > 0 ? (
         <>
-          {lines.map((line) => (
-            <p key={line}>{line}</p>
+          {activity.steps != null ? (
+            <>
+              <p className="text-2xl font-semibold tracking-tight text-zinc-900">{formatCount(activity.steps)}</p>
+              <p className="text-zinc-600">steps so far</p>
+            </>
+          ) : null}
+          {secondary.map((line) => (
+            <p key={line} className="mt-1">
+              {line}
+            </p>
           ))}
-          <p className="mt-1 text-zinc-600">Today is still in progress</p>
+          <p className="mt-2 text-zinc-600">
+            {synced ? `In progress · synced ${synced}` : 'Today is still in progress'}
+          </p>
         </>
       ) : (
         <p>No activity data received yet today.</p>
       )}
-      <ActionLink to={prefixedPath(useAppPathPrefix(), '/progress/activity')}>View Activity</ActionLink>
+      <div className="mt-2">
+        <QuietAction to={prefixedPath(useAppPathPrefix(), '/progress/activity')}>View activity</QuietAction>
+      </div>
     </Card>
   )
 }
@@ -234,23 +316,29 @@ function SleepCard({ view }: { view: TodayViewModel }) {
     <Card title="Sleep">
       {sleep.kind === 'complete' && sleep.minutes != null ? (
         <>
-          <p className="font-medium">{formatSleepDuration(sleep.minutes)}</p>
+          <p className="text-2xl font-semibold tracking-tight text-zinc-900">{formatSleepDuration(sleep.minutes)}</p>
           {sleep.sourceName ? <p className="text-zinc-600">{sleep.sourceName}</p> : null}
         </>
       ) : null}
       {sleep.kind === 'partial' && sleep.minutes != null ? (
         <>
-          <p className="font-medium">{formatSleepDuration(sleep.minutes)} observed</p>
+          <p className="text-lg font-semibold tracking-tight text-zinc-900">{formatSleepDuration(sleep.minutes)} observed</p>
           <p className="text-zinc-600">Partial observation{sleep.sourceName ? ` · ${sleep.sourceName}` : ''}</p>
         </>
       ) : null}
-      {sleep.kind === 'none' ? <p>No complete sleep observation for today.</p> : null}
+      {sleep.kind === 'none' ? <p>No complete sleep record today</p> : null}
       {sleep.latestComplete ? (
-        <p className="mt-1 text-zinc-600">
-          Latest complete: {formatCalendarDate(sleep.latestComplete.date)} · {formatSleepDuration(sleep.latestComplete.minutes)}
-        </p>
+        <div className="mt-2 text-zinc-600">
+          <p>Latest complete</p>
+          <p>
+            {formatCalendarDate(sleep.latestComplete.date)} · {formatSleepDuration(sleep.latestComplete.minutes)}
+          </p>
+          {sleep.latestComplete.sourceName ? <p>{sleep.latestComplete.sourceName}</p> : null}
+        </div>
       ) : null}
-      <ActionLink to={prefixedPath(useAppPathPrefix(), '/progress/sleep')}>View Sleep</ActionLink>
+      <div className="mt-2">
+        <QuietAction to={prefixedPath(useAppPathPrefix(), '/progress/sleep')}>View sleep</QuietAction>
+      </div>
     </Card>
   )
 }
@@ -263,8 +351,8 @@ function BodyCard({ view }: { view: TodayViewModel }) {
     <Card title="Body">
       {body.latest ? (
         <>
-          <p className="font-medium">
-            {formatMeasure(body.latest.value)} {body.latest.unit}
+          <p className="text-2xl font-semibold tracking-tight text-zinc-900">
+            {formatBodyMass(body.latest.value, body.latest.unit)}
           </p>
           <p className="text-zinc-600">{body.latest.measuredLabel}</p>
           {body.trendText ? <p className="mt-1 text-zinc-600">{body.trendText}</p> : null}
@@ -272,9 +360,9 @@ function BodyCard({ view }: { view: TodayViewModel }) {
       ) : (
         <p>No body measurement recorded yet.</p>
       )}
-      <div className="mt-2 flex flex-wrap gap-x-4">
-        {readOnly ? null : <ActionLink to={href}>Add measurement</ActionLink>}
-        <ActionLink to={href}>View Body</ActionLink>
+      <div className="mt-3 flex flex-wrap items-center gap-x-4">
+        {readOnly ? null : <PrimaryAction to={href}>Add measurement</PrimaryAction>}
+        <QuietAction to={href}>View body</QuietAction>
       </div>
     </Card>
   )

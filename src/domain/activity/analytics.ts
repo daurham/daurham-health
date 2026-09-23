@@ -17,6 +17,8 @@ export type ActivityDailyRow = {
   exerciseMinutes: number | null
   walkingRunningDistanceM: number | null
   restingHeartRateBpm: number | null
+  /** Canonical summary update time. Absent when the row was not loaded with one. */
+  updatedAt?: string | null
 }
 
 export type ActivityCoverage = {

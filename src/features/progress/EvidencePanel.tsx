@@ -45,7 +45,7 @@ export function EvidencePanel({
     <div className="fixed inset-0 z-40 flex items-end justify-center sm:items-center sm:p-6">
       <button
         type="button"
-        className="absolute inset-0 bg-zinc-900/40"
+        className="theme-scrim absolute inset-0"
         aria-label="Close evidence"
         onClick={onClose}
       />

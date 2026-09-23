@@ -15,7 +15,7 @@ import {
 } from './activity-sleep-copy'
 import { ActivityMetricChart } from './ActivitySleepCharts'
 import { fetchProgressActivity } from './api'
-import { formatCalendarDate } from './format'
+import { formatCalendarRange } from './format'
 import { ProgressRangeControl } from './ProgressRangeControl'
 import { parseProgressRangeParam } from './range'
 
@@ -67,7 +67,7 @@ export function ActivitySection({ view }: { view: ActivityProgressView }) {
       <section className="min-w-0 rounded-lg border border-zinc-200 bg-white p-3 md:p-4">
         <h3 className="text-sm font-semibold tracking-tight">{option.label}</h3>
         <p className="mt-1 text-sm text-zinc-600">
-          Daily observations from {formatCalendarDate(view.start)} to {formatCalendarDate(view.end)}. Missing days stay empty.
+          Daily observations from {formatCalendarRange(view.start, view.end)}. Missing days stay empty.
         </p>
         {headline ? (
           <ActivityMetricChart points={metric.series} valueLabel={(value) => valueLabel(option.id, value)} />

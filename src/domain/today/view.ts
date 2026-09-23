@@ -10,6 +10,8 @@ import { resolveNutritionTarget } from '../nutrition/targets.js'
 import type { NutritionTarget } from '../nutrition/types.js'
 import type { ProgressSleepObservation } from '../progress/health-timeline.js'
 import { analyzeCrossDomain, findingCopy, type IntelligenceTrainingSession } from '../intelligence/index.js'
+import { formatBodyMass } from '../body-metrics.js'
+import { formatCalendarRange } from '../calendar-format.js'
 import { healthCalendarDateFromNow, HEALTH_CALENDAR_TIME_ZONE } from '../time.js'
 
 export const TODAY_PATTERN_RANGE = '90d' as const
@@ -60,6 +62,7 @@ export type TodayViewModel = {
     activeEnergyKcal: number | null
     exerciseMinutes: number | null
     restingHeartRateBpm: number | null
+    updatedAt: string | null
   }
   nutrition: {
     logged: boolean
@@ -81,7 +84,13 @@ export type TodayViewModel = {
     trendText: string | null
   }
   pendingItems: Array<{ id: string; title: string; href: string; action: string }>
-  changedItems: Array<{ id: string; text: string }>
+  changedItems: Array<{
+    id: string
+    direction: 'higher' | 'lower' | null
+    headline: string
+    detail: string
+    text: string
+  }>
   patterns: Array<{ id: string; text: string }>
 }
 
@@ -99,9 +108,19 @@ function measuredLabel(ageDays: number): string {
   return `Measured ${ageDays} days ago`
 }
 
-function quantity(value: number): string {
-  const rounded = Math.round(value * 10) / 10
-  return Number.isInteger(rounded) ? rounded.toLocaleString('en-US') : rounded.toFixed(1)
+function whole(value: number): string {
+  return Math.round(value).toLocaleString('en-US')
+}
+
+function signedMass(value: number, unit: string): string {
+  const text = formatBodyMass(Math.abs(value), unit)
+  if (value > 0) {
+    return `+${text}`
+  }
+  if (value < 0) {
+    return `-${text}`
+  }
+  return text
 }
 
 function attentionTitle(job: TodayPendingJob): string | null {
@@ -167,16 +186,31 @@ export function buildTodayView(sources: TodaySources): TodayViewModel {
   const change = activityShortTermChange(sources.activityDays, date, date)
   const changedItems: TodayViewModel['changedItems'] = []
   if (change.steps.status === 'available' && change.steps.value.absoluteDelta !== 0) {
+    const higher = change.steps.value.absoluteDelta > 0
+    const percent = change.steps.value.percentDelta
+    const percentText = percent == null ? '' : `${Math.abs(Math.round(percent))}% `
+    const headline = `Steps averaged ${percentText}${higher ? 'higher' : 'lower'} than the previous week`
+    const currentRange = formatCalendarRange(change.currentStart, change.currentEnd)
+    const previousRange = formatCalendarRange(change.previousStart, change.previousEnd)
+    const detail = `${whole(change.steps.value.current)}/day · ${currentRange}\nvs ${whole(change.steps.value.previous)}/day · ${previousRange}`
     changedItems.push({
       id: 'activity:steps:recent',
-      text: `Completed-day steps averaged ${quantity(change.steps.value.current)} over ${change.currentStart}–${change.currentEnd}, compared with ${quantity(change.steps.value.previous)} over the previous 7 days.`,
+      direction: higher ? 'higher' : 'lower',
+      headline,
+      detail,
+      text: `${headline}. ${detail.replace('\n', ' ')}`,
     })
   }
   if (trendFinding?.kind === 'body_weight_trend' && latestWeight && typeof trendFinding.slopePerWeek === 'number') {
-    const signed = `${trendFinding.slopePerWeek > 0 ? '+' : ''}${quantity(trendFinding.slopePerWeek)}`
+    const signed = signedMass(trendFinding.slopePerWeek, latestWeight.unit)
+    const headline = `Weight trend ${signed} per week`
+    const detail = `Across ${trendFinding.observationCount} measurements`
     changedItems.push({
       id: 'body:weight_trend',
-      text: `Bodyweight trend is ${signed} ${latestWeight.unit} per week across ${trendFinding.observationCount} measurements.`,
+      direction: null,
+      headline,
+      detail,
+      text: `${headline} across ${trendFinding.observationCount} measurements.`,
     })
   }
   const patterns: TodayViewModel['patterns'] = []
@@ -208,6 +242,7 @@ export function buildTodayView(sources: TodaySources): TodayViewModel {
       activeEnergyKcal,
       exerciseMinutes,
       restingHeartRateBpm,
+      updatedAt: activityRow?.updatedAt ?? null,
     },
     nutrition: {
       logged: todayEntries.length > 0,
@@ -245,7 +280,7 @@ export function buildTodayView(sources: TodaySources): TodayViewModel {
         : null,
       trendText:
         trend.status === 'available' && latestWeight
-          ? `Weight trend ${trend.value.slopePerWeek > 0 ? '+' : ''}${quantity(trend.value.slopePerWeek)} ${latestWeight.unit} per week`
+          ? `Weight trend ${signedMass(trend.value.slopePerWeek, latestWeight.unit)} per week`
           : null,
     },
     pendingItems: sources.pendingJobs.flatMap((job) => {

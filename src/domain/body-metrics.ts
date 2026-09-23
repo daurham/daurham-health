@@ -199,6 +199,23 @@ export function displayValueForMetric(
   return { value: canonicalValue, unit }
 }
 
+/** Owner-facing body mass. Storage stays canonical; kilograms display as pounds. */
+export function formatBodyMass(value: number, unit: string): string {
+  if (unit === 'kg' || unit === 'lb') {
+    const pounds = unit === 'kg' ? kilogramsToPounds(value) : value
+    const formatted = pounds.toLocaleString('en-US', {
+      maximumFractionDigits: 1,
+      minimumFractionDigits: 0,
+    })
+    return `${formatted} lb`
+  }
+  const formatted = value.toLocaleString('en-US', {
+    maximumFractionDigits: 1,
+    minimumFractionDigits: 0,
+  })
+  return unit ? `${formatted} ${unit}` : formatted
+}
+
 export const FIT_PROFILE_XLSX_ACCEPT =
   '.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 

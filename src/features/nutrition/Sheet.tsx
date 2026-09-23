@@ -37,7 +37,7 @@ export function NutritionSheet({ title, onClose, children, footer, stickyHeader 
       <button
         type="button"
         aria-label="Close"
-        className="absolute inset-0 bg-zinc-900/40"
+        className="theme-scrim absolute inset-0"
         onClick={onClose}
       />
       <div

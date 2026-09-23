@@ -48,6 +48,8 @@ npm run backup:verify -- ./backups/health-2026-09-22.health-backup.zip
 
 Then confirm row counts in the destination match the dry-run list. Derived sleep nights and activity days are restored with the raw evidence, not recomputed alone.
 
+`npm run backup:restore` uses `DATABASE_URL` through the Neon HTTP client. Do not point that command at the production database. A local socket-only Postgres cluster is not a target for this CLI. The release-candidate check restored the 2026-09-22 archive with the same restore planner into a disposable local database, compared it with the archive, and deleted that database.
+
 ## What is not in the file
 
 - Passwords, sessions, API keys, and the Apple Health ingest token

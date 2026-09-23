@@ -253,14 +253,15 @@ describe('today page', () => {
         <TodayBoard view={view} />
       </MemoryRouter>,
     )
-    expect(html).toContain('129 steps so far')
+    expect(html).toContain('>129<')
+    expect(html).toContain('steps so far')
     expect(html).toContain('12 active kcal')
     expect(html).toContain('Today is still in progress')
     expect(html).not.toContain('final')
     expect(html).toContain('No food logged yet today')
     expect(html).not.toContain('0 calories')
     expect(html).toContain('No workout logged today')
-    expect(html).toContain('No complete sleep observation for today')
+    expect(html).toContain('No complete sleep record today')
     expect(html).toContain('Latest complete')
     expect(html).toContain('Jun 14')
     expect(html).not.toMatch(/last night/i)
@@ -296,14 +297,72 @@ describe('today page', () => {
         <TodayBoard view={view} />
       </MemoryRouter>,
     )
-    expect(html).toContain('0 steps so far')
-    expect(html).toContain('0 exercise min so far')
+    expect(html).toContain('>0<')
+    expect(html).toContain('steps so far')
+    expect(html).toContain('0 exercise min')
+    expect(html).not.toContain('exercise min so far')
     expect(html).toContain('+100')
     expect(html).toContain('68 left')
     expect(html).toContain('— / 200 g')
     expect(html).toContain('+10 g')
     expect(html).toContain('Partial observation')
     expect(html).not.toContain('0h')
+    expect(html).toContain('role="meter"')
+  })
+
+  it('keeps resting heart rate off the cumulative label and shows a real sync time', () => {
+    const view = buildTodayView(
+      sources({
+        activityDays: [
+          activity('2026-09-22', {
+            stepsCount: 3688,
+            activeEnergyKcal: 373.4,
+            exerciseMinutes: 22,
+            restingHeartRateBpm: 56,
+            updatedAt: '2026-09-22T23:49:00.000Z',
+          }),
+        ],
+      }),
+    )
+    const html = renderToStaticMarkup(
+      <MemoryRouter>
+        <TodayBoard view={view} />
+      </MemoryRouter>,
+    )
+    expect(html).toContain('3,688')
+    expect(html).toContain('steps so far')
+    expect(html).toContain('Resting HR 56 bpm')
+    expect(html).not.toContain('56 bpm so far')
+    expect(html).toContain('In progress · synced')
+    expect(html).not.toContain('2026-09-22T23:49')
+    expect(view.activity.updatedAt).toBe('2026-09-22T23:49:00.000Z')
+  })
+
+  it('formats what changed without a raw calendar date and converts stored kilograms', () => {
+    const current = Array.from({ length: 7 }, (_, index) => addCalendarDays('2026-09-15', index))
+    const previous = Array.from({ length: 7 }, (_, index) => addCalendarDays('2026-09-08', index))
+    const view = buildTodayView(
+      sources({
+        activityDays: [
+          ...previous.map((date) => activity(date, { stepsCount: 5298 })),
+          ...current.map((date) => activity(date, { stepsCount: 6284.6 })),
+        ],
+        bodyWeights: [{ ...weight('2026-09-21', 86.6), unit: 'kg' }],
+      }),
+    )
+    const html = renderToStaticMarkup(
+      <MemoryRouter>
+        <TodayBoard view={view} />
+      </MemoryRouter>,
+    )
+    expect(html).toContain('190.9 lb')
+    expect(html).not.toContain('86.6 kg')
+    const change = view.changedItems.find((item) => item.id === 'activity:steps:recent')
+    expect(change?.headline).toMatch(/19% higher/)
+    expect(change?.detail).toContain('Sep 15–21')
+    expect(change?.detail).toContain('Sep 8–14')
+    expect(change?.text).not.toMatch(/\d{4}-\d{2}-\d{2}/)
+    expect(html).not.toMatch(/2026-09-1[58]/)
   })
 })
 

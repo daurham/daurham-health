@@ -139,7 +139,7 @@ export function BarcodeScanner({ onDetect, onClose, disabled = false }: BarcodeS
 
   return (
     <div className="space-y-4">
-      <div className="relative overflow-hidden rounded-xl bg-zinc-900">
+      <div className="media-chrome relative overflow-hidden rounded-xl">
         <video
           ref={videoRef}
           className="h-64 w-full object-cover"
@@ -148,10 +148,10 @@ export function BarcodeScanner({ onDetect, onClose, disabled = false }: BarcodeS
           playsInline
         />
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <div className="h-24 w-56 rounded-md border-2 border-white/80" />
+          <div className="media-frame h-24 w-56 rounded-md border-2" />
         </div>
         {status ? (
-          <p className="absolute bottom-2 left-0 right-0 text-center text-sm font-medium text-white">{status}</p>
+          <p className="absolute bottom-2 left-0 right-0 text-center text-sm font-medium">{status}</p>
         ) : null}
       </div>
       <p className="text-sm text-zinc-600">Hold barcode inside frame</p>

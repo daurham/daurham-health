@@ -1,8 +1,9 @@
-import { displayValueForMetric } from '@/domain/body-metrics'
+import { displayValueForMetric, formatBodyMass } from '@/domain/body-metrics'
 import type { CanonicalUnit } from '@/domain/body-metrics'
 import type { CanonicalEvidence, LatestPerformance, PrAchievement } from '@/domain/progress'
 import { kilogramsToPounds } from '@/domain/units'
-import { formatPounds, formatWorkoutDate } from '@/features/training/format'
+import { formatCalendarRange, formatCompactCalendarDate } from '@/domain/calendar-format'
+import { formatPounds } from '@/features/training/format'
 
 export function formatKgAsLb(kg: number | null | undefined): string {
   if (kg == null) {
@@ -26,8 +27,10 @@ export function formatReps(reps: number | null | undefined): string {
 }
 
 export function formatCalendarDate(isoDate: string): string {
-  return formatWorkoutDate(isoDate)
+  return formatCompactCalendarDate(isoDate)
 }
+
+export { formatCalendarRange }
 
 export function formatTimelineDayHeading(isoDate: string): string {
   return formatCalendarDate(isoDate).toUpperCase()
@@ -66,6 +69,9 @@ export function formatPercent(value: number): string {
 }
 
 export function formatBodyCanonical(unit: string, value: number, digits = 1): string {
+  if (unit === 'kg' || unit === 'lb') {
+    return formatBodyMass(value, unit)
+  }
   const display = displayValueForMetric(unit as CanonicalUnit, value)
   const formatted = display.value.toLocaleString('en-US', {
     maximumFractionDigits: digits,

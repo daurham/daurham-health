@@ -4,6 +4,59 @@
    missing weight, which reads as doubled letters on every word. */
 html {
   font-synthesis: none;
+  --chart-ink: #18181b;
+  --chart-muted: #71717a;
+  --chart-grid: #e4e4e7;
+  --chart-soft: #a1a1aa;
+}
+
+/* Dark mode reuses the existing zinc utilities. Buttons and cards follow
+   those variables, so pages do not need their own dark overrides. */
+html.dark {
+  color-scheme: dark;
+  --color-white: #2a2a2e;
+  --color-zinc-50: #1c1c1f;
+  --color-zinc-100: #2f2f33;
+  --color-zinc-200: #3a3a40;
+  --color-zinc-300: #52525b;
+  --color-zinc-400: #a1a1aa;
+  --color-zinc-500: #b4b4bc;
+  --color-zinc-600: #d4d4d8;
+  --color-zinc-700: #e4e4e7;
+  --color-zinc-800: #f4f4f5;
+  --color-zinc-900: #fafafa;
+  --color-red-50: #3a2426;
+  --color-red-200: #7f1d1d;
+  --color-red-700: #fecaca;
+  --color-red-800: #fecaca;
+  --color-amber-50: #3a3224;
+  --color-amber-200: #78350f;
+  --color-amber-300: #92400e;
+  --color-amber-400: #b45309;
+  --color-amber-700: #fde68a;
+  --color-amber-800: #fde68a;
+  --color-amber-900: #fef3c7;
+  --color-amber-950: #fffbeb;
+  --color-emerald-50: #1c332c;
+  --color-emerald-200: #065f46;
+  --color-emerald-800: #a7f3d0;
+  --chart-ink: #f4f4f5;
+  --chart-muted: #a1a1aa;
+  --chart-grid: #3f3f46;
+  --chart-soft: #d4d4d8;
+}
+
+.theme-scrim {
+  background: rgb(24 24 27 / 0.45);
+}
+
+.media-chrome {
+  background: #18181b;
+  color: #fff;
+}
+
+.media-frame {
+  border-color: rgb(255 255 255 / 0.8);
 }
 
 /* Mobile shell. Bottom nav height and the home-indicator inset live here so

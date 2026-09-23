@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { parseAppleHealthFile, previewAppleHealth } from '@/domain/apple-health'
+import { formatCalendarRange } from '@/domain/calendar-format'
 import { healthCalendarDateFromNow } from '@/domain/time'
+import { applyDocumentTheme, readThemePreference, resolveTheme, writeThemePreference, type ThemeChoice } from '@/theme'
 import { healthFetch, readApiError } from '@/lib'
 import type { AppleHealthPreview } from '@/domain/apple-health/preview'
 import {
@@ -14,6 +16,57 @@ function formatCount(value: number): string {
   return value.toLocaleString('en-US')
 }
 
+function currentTheme(): ThemeChoice {
+  if (typeof document === 'undefined') {
+    return 'light'
+  }
+  if (document.documentElement.classList.contains('dark')) {
+    return 'dark'
+  }
+  const stored = typeof localStorage === 'undefined' ? null : readThemePreference(localStorage)
+  const prefersDark =
+    typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      ? window.matchMedia('(prefers-color-scheme: dark)').matches
+      : false
+  return resolveTheme(stored, prefersDark)
+}
+
+function AppearanceSection() {
+  const [theme, setTheme] = useState<ThemeChoice>(() => currentTheme())
+
+  function choose(next: ThemeChoice) {
+    writeThemePreference(localStorage, next)
+    applyDocumentTheme(next, document.documentElement)
+    setTheme(next)
+  }
+
+  return (
+    <section className="space-y-3 rounded-lg border border-zinc-200 bg-white p-4">
+      <h2 className="text-base font-semibold">Appearance</h2>
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          aria-pressed={theme === 'light'}
+          aria-label="Switch to light mode"
+          onClick={() => choose('light')}
+          className="inline-flex min-h-11 items-center justify-center rounded-md px-4 text-sm font-medium ring-1 ring-zinc-200 aria-pressed:bg-zinc-900 aria-pressed:text-white"
+        >
+          Light
+        </button>
+        <button
+          type="button"
+          aria-pressed={theme === 'dark'}
+          aria-label="Switch to dark mode"
+          onClick={() => choose('dark')}
+          className="inline-flex min-h-11 items-center justify-center rounded-md px-4 text-sm font-medium ring-1 ring-zinc-200 aria-pressed:bg-zinc-900 aria-pressed:text-white"
+        >
+          Dark
+        </button>
+      </div>
+    </section>
+  )
+}
+
 function PreviewReport({ preview }: { preview: AppleHealthPreview }) {
   const counts = preview.counts
   return (
@@ -21,7 +74,7 @@ function PreviewReport({ preview }: { preview: AppleHealthPreview }) {
       <dt className="text-zinc-500">Records encountered</dt>
       <dd>{formatCount(counts.encountered)}</dd>
       <dt className="text-zinc-500">Date range</dt>
-      <dd className="break-all">{preview.dateRange ? `${preview.dateRange.start} → ${preview.dateRange.end}` : '—'}</dd>
+      <dd>{preview.dateRange ? formatCalendarRange(preview.dateRange.start, preview.dateRange.end) : '—'}</dd>
       <dt className="text-zinc-500">Steps</dt>
       <dd>{formatCount(counts.steps)}</dd>
       <dt className="text-zinc-500">Active energy</dt>
@@ -164,6 +217,8 @@ export function SettingsPage() {
         <h1 className="text-xl font-semibold tracking-tight">Settings</h1>
         <p className="mt-1 text-sm text-zinc-600">Owner data sources. Apple Health is not a primary Health destination.</p>
       </div>
+
+      <AppearanceSection />
 
       <section className="space-y-3 rounded-lg border border-zinc-200 bg-white p-4">
         <h2 className="text-base font-semibold">Data & Backup</h2>

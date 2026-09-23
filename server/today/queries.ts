@@ -61,6 +61,7 @@ function activityRow(row: Record<string, unknown>): ActivityDailyRow {
     exerciseMinutes: asNumber(row.exercise_minutes),
     walkingRunningDistanceM: asNumber(row.walking_running_distance_m),
     restingHeartRateBpm: asNumber(row.resting_heart_rate_bpm),
+    updatedAt: row.updated_at == null ? null : asIso(row.updated_at),
   }
 }
 
@@ -73,7 +74,8 @@ export async function listActivityDaysBetween(start: string, end: string): Promi
             active_energy_kcal,
             exercise_minutes,
             walking_running_distance_m,
-            resting_heart_rate_bpm
+            resting_heart_rate_bpm,
+            updated_at
      FROM activity_daily_summaries
      WHERE timezone = $1 AND summary_date >= $2::date AND summary_date <= $3::date
      ORDER BY summary_date ASC`,

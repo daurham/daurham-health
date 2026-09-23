@@ -23,6 +23,7 @@ import type { EvidenceTopic } from './EvidencePanel'
 import {
   formatBodyCanonical,
   formatCalendarDate,
+  formatCalendarRange,
   formatCoverageDays,
   formatPercent,
   formatPerformed,
@@ -436,7 +437,7 @@ function CompareResults({
         </p>
       ) : (
         <p className="text-sm text-zinc-600">
-          {formatCalendarDate(compare.periodA.start)}–{formatCalendarDate(compare.periodA.end)} vs {formatCalendarDate(compare.periodB.start)}–{formatCalendarDate(compare.periodB.end)}
+          {formatCalendarRange(compare.periodA.start, compare.periodA.end)} vs {formatCalendarRange(compare.periodB.start, compare.periodB.end)}
         </p>
       )}
 
