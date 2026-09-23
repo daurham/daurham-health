@@ -40,6 +40,18 @@ export function startAtomicRequest<K, T>(
   }
 }
 
+export function refreshAtomicRequest<K, T>(
+  state: AtomicTransitionState<K, T>,
+  key: K,
+): AtomicTransitionState<K, T> {
+  return {
+    ...state,
+    pendingKey: key,
+    generation: state.generation + 1,
+    error: state.error?.key === key ? null : state.error,
+  }
+}
+
 export function commitAtomicRequest<K, T>(
   state: AtomicTransitionState<K, T>,
   key: K,
@@ -100,6 +112,10 @@ export class KeyedResourceCache<K, T> {
     return this.items.has(key)
   }
 
+  delete(key: K): void {
+    this.items.delete(key)
+  }
+
   set(key: K, value: T): void {
     if (this.items.has(key)) {
       this.items.delete(key)
@@ -154,18 +170,30 @@ export function useAtomicKeyedResource<K, T>(options: {
 
   useEffect(() => {
     const current = stateRef.current
-    if (current.committedKey === requestedKey && current.data != null && current.pendingKey == null) {
+    const refreshing =
+      retryNonce > 0 && current.committedKey === requestedKey && current.data != null
+    if (
+      !refreshing &&
+      current.committedKey === requestedKey &&
+      current.data != null &&
+      current.pendingKey == null
+    ) {
       return
     }
-    const cached = cacheRef.current.get(requestedKey)
-    if (cached !== undefined) {
-      const started = startAtomicRequest(current, requestedKey)
-      const committed = commitAtomicRequest(started, requestedKey, cached, started.generation)
-      stateRef.current = committed
-      setState(committed)
-      return
+    if (!refreshing) {
+      const cached = cacheRef.current.get(requestedKey)
+      if (cached !== undefined) {
+        const started = startAtomicRequest(current, requestedKey)
+        const committed = commitAtomicRequest(started, requestedKey, cached, started.generation)
+        stateRef.current = committed
+        setState(committed)
+        return
+      }
     }
-    const started = startAtomicRequest(current, requestedKey)
+    cacheRef.current.delete(requestedKey)
+    const started = refreshing
+      ? refreshAtomicRequest(current, requestedKey)
+      : startAtomicRequest(current, requestedKey)
     const generation = started.generation
     stateRef.current = started
     setState(started)

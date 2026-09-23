@@ -4,6 +4,7 @@ import {
   emptyAtomicTransition,
   failAtomicRequest,
   KeyedResourceCache,
+  refreshAtomicRequest,
   replaceAtomicData,
   startAtomicRequest,
 } from '../src/lib/atomic-resource.ts'
@@ -75,6 +76,28 @@ describe('atomic keyed-resource transition', () => {
     expect(failed.data).toEqual(day(SEP_21, 1420))
     expect(failed.pendingKey).toBeNull()
     expect(failed.error).toEqual({ key: SEP_20, message: 'network' })
+  })
+
+  it('refreshes the same key while keeping the committed payload visible', () => {
+    const loaded = commitAtomicRequest(
+      startAtomicRequest(emptyAtomicTransition<string, Day>(), SEP_21),
+      SEP_21,
+      day(SEP_21, 1420),
+      1,
+    )
+    const refreshing = refreshAtomicRequest(loaded, SEP_21)
+    expect(refreshing.committedKey).toBe(SEP_21)
+    expect(refreshing.data).toEqual(day(SEP_21, 1420))
+    expect(refreshing.pendingKey).toBe(SEP_21)
+    expect(refreshing.generation).toBeGreaterThan(loaded.generation)
+    const next = commitAtomicRequest(refreshing, SEP_21, day(SEP_21, 1680), refreshing.generation)
+    expect(next.committedKey).toBe(SEP_21)
+    expect(next.data).toEqual(day(SEP_21, 1680))
+    expect(next.pendingKey).toBeNull()
+    const failed = failAtomicRequest(refreshing, SEP_21, 'network', refreshing.generation)
+    expect(failed.committedKey).toBe(SEP_21)
+    expect(failed.data).toEqual(day(SEP_21, 1420))
+    expect(failed.pendingKey).toBeNull()
   })
 
   it('replaces committed data without changing the key', () => {

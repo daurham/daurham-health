@@ -84,6 +84,31 @@ Potential:
 - Oura / Circular evaluation
 - other justified sources
 
+#### Ongoing Apple workout ingestion
+
+Current state: historical Apple workout objects exist in `activity_workouts`
+from Apple Health history, while ongoing HAE Activity synchronization currently
+focuses on daily Activity summaries.
+
+V2 should evaluate ongoing HAE / HealthKit workout-object ingestion for:
+
+- walking
+- running
+- hiking
+- cycling
+- yoga
+- other Apple Watch workout categories
+
+Potential Today presentation under Activity, not Training:
+
+- 7,400 steps so far
+- Walk · 42 min
+- Hike · 1h 13m
+
+Training remains a separate structured domain. Timeline should continue
+treating these as Activity events. Apple Watch / HealthKit workouts must not
+become canonical Training sets, volume, performance, PRs, or consistency.
+
 ### 9. Shortcut / share-sheet ingestion
 
 Frictionless mobile capture/import where technically possible.

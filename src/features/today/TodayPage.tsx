@@ -19,6 +19,7 @@ import { formatCalendarDate, formatClockTime } from '@/features/progress/format'
 import { caloriesHeadline, macroHeadline, remainingHeadline } from '@/features/nutrition/format'
 import { prefixedPath, useAppPathPrefix, useDemoReadOnly } from '@/lib/app-prefix'
 import { fetchToday } from './api'
+import { todayShouldReloadAfterNutrition, type TodayNutritionOutcome } from './nutrition-refresh'
 
 function formatCount(value: number): string {
   return Math.round(value).toLocaleString('en-US')
@@ -239,6 +240,13 @@ function TodayAddFoodAction({ date, onChanged }: { date: string; onChanged?: () 
     setOpen(false)
   }
 
+  function finish(outcome: TodayNutritionOutcome) {
+    closeSheet()
+    if (todayShouldReloadAfterNutrition(outcome)) {
+      onChanged?.()
+    }
+  }
+
   return (
     <>
       <button type="button" className={primaryButtonClass} onClick={() => void openSheet()}>
@@ -249,28 +257,18 @@ function TodayAddFoodAction({ date, onChanged }: { date: string; onChanged?: () 
           date={date}
           quickAdd={quickAdd}
           onClose={closeSheet}
-          onLogged={() => {
-            onChanged?.()
-            closeSheet()
-          }}
-          onSavedFood={() => {
-            onChanged?.()
-            closeSheet()
-          }}
-          onMealLogged={() => {
-            onChanged?.()
-            closeSheet()
-          }}
+          onLogged={() => finish('consumed')}
+          onSavedFood={() => finish('saved_for_later')}
+          onMealLogged={() => finish('consumed')}
           onQuickLog={(food) => {
             void createNutritionEntry({
               logDate: date,
               timezone: NUTRITION_CONFIG.calendarTimeZone,
               foodId: food.id,
               servingQuantity: 1,
-            }).finally(() => {
-              onChanged?.()
-              closeSheet()
             })
+              .then(() => finish('consumed'))
+              .catch(() => undefined)
           }}
           onOpenFood={() => undefined}
         />
@@ -342,7 +340,7 @@ function TrainingCard({ view }: { view: TodayViewModel }) {
         </ul>
       ) : (
         <>
-          <p>No workout logged today</p>
+          <p>No training session logged today</p>
           {readOnly ? null : (
             <div className="mt-3">
               <PrimaryAction to={prefixedPath(prefix, '/training/import')}>Log workout</PrimaryAction>

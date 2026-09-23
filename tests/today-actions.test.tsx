@@ -46,5 +46,6 @@ describe('today actions', () => {
     expect(html).toContain('/training/import')
     expect(html).not.toContain('/training/new')
     expect(html).toContain('Log workout')
+    expect(html).toContain('No training session logged today')
   })
 })

@@ -9,6 +9,8 @@ import {
   secondaryButtonClass,
   selectedCardClass,
   selectedTabClass,
+  themeChoiceClass,
+  themeChoiceSelectedClass,
 } from '../src/lib/interactive.ts'
 
 describe('interactive primitives', () => {
@@ -22,6 +24,8 @@ describe('interactive primitives', () => {
       selectedCardClass,
       interactiveRowClass,
       selectedTabClass,
+      themeChoiceClass,
+      themeChoiceSelectedClass,
     ]) {
       expect(className).toContain('cursor-pointer')
       expect(className).toMatch(/focus-visible:outline/)
@@ -31,6 +35,10 @@ describe('interactive primitives', () => {
     expect(interactiveCardClass).toContain('hover:bg-zinc-50')
     expect(selectedCardClass).toContain('border-accent')
     expect(dangerButtonClass).toContain('bg-danger')
+    expect(themeChoiceClass).toContain('w-full')
+    expect(themeChoiceSelectedClass).toContain('w-full')
+    expect(themeChoiceClass).toContain('min-h-11')
+    expect(themeChoiceSelectedClass).toContain('min-h-11')
     const css = readFileSync('src/index.css', 'utf8')
     expect(css).toContain('cursor: pointer')
     expect(css).toContain('cursor: not-allowed')

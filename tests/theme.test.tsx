@@ -99,6 +99,8 @@ describe('theme shells', () => {
     expect(html).toContain('Appearance')
     expect(html).toContain('Switch to dark mode')
     expect(html).toContain('Switch to light mode')
+    expect(html).toContain('grid-cols-2')
+    expect(html.match(/w-full/g)?.length).toBeGreaterThanOrEqual(2)
     expect(html).toContain('Data &amp; Backup')
   })
 })

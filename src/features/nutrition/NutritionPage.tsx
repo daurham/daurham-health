@@ -11,6 +11,7 @@ import {
 import {
   cn,
   interactiveRowClass,
+  NutritionPlaceholder,
   PendingLoadRegion,
   primaryButtonClass,
   useAtomicKeyedResource,
@@ -349,10 +350,10 @@ export function NutritionPage() {
       ) : null}
 
       {!day ? (
-        resource.error ? null : <p className="text-sm text-zinc-600">Loading…</p>
+        resource.error ? null : <NutritionPlaceholder />
       ) : (
         <PendingLoadRegion pending={pending} pendingVisible={resource.pendingVisible}>
-          <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-[minmax(0,1fr)_22rem] md:items-start">
+          <div className="page-enter grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-[minmax(0,1fr)_22rem] md:items-start">
             <aside className="min-w-0 space-y-4 md:order-2 md:sticky md:top-4">
               <SummaryCard day={day} onSetTargets={() => setPanel({ kind: 'targets' })} />
               <QuickAddCard recents={day.quickAdd.recents} onAdd={() => setPanel({ kind: 'add' })} onQuickLog={(food) => void quickLog(food)} />

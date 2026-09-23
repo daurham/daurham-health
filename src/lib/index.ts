@@ -7,6 +7,7 @@ export { SHELL_MAX_WIDTH_CLASS } from './shell'
 export {
   useAtomicKeyedResource,
   startAtomicRequest,
+  refreshAtomicRequest,
   commitAtomicRequest,
   failAtomicRequest,
   replaceAtomicData,
@@ -16,7 +17,7 @@ export {
 export type { AtomicTransitionState } from './atomic-resource'
 export { PendingLoadRegion } from './PendingLoad'
 export { LoadErrorNotice } from './LoadErrorNotice'
-export { ListPlaceholder } from './PagePlaceholder'
+export { ListPlaceholder, NutritionPlaceholder } from './PagePlaceholder'
 export {
   dangerButtonClass,
   interactiveCardClass,
@@ -27,4 +28,6 @@ export {
   selectedCardClass,
   selectedTabClass,
   tabClass,
+  themeChoiceClass,
+  themeChoiceSelectedClass,
 } from './interactive'

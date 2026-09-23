@@ -7,8 +7,8 @@ import {
   healthFetch,
   primaryButtonClass,
   readApiError,
-  secondaryButtonClass,
-  selectedCardClass,
+  themeChoiceClass,
+  themeChoiceSelectedClass,
 } from '@/lib'
 import type { AppleHealthPreview } from '@/domain/apple-health/preview'
 import {
@@ -49,13 +49,13 @@ function AppearanceSection() {
   return (
     <section className="space-y-3 rounded-lg border border-zinc-200 bg-white p-4">
       <h2 className="text-base font-semibold">Appearance</h2>
-      <div className="flex flex-wrap gap-2">
+      <div className="grid grid-cols-2 gap-2">
         <button
           type="button"
           aria-pressed={theme === 'light'}
           aria-label="Switch to light mode"
           onClick={() => choose('light')}
-          className={theme === 'light' ? selectedCardClass : secondaryButtonClass}
+          className={theme === 'light' ? themeChoiceSelectedClass : themeChoiceClass}
         >
           Light
         </button>
@@ -64,7 +64,7 @@ function AppearanceSection() {
           aria-pressed={theme === 'dark'}
           aria-label="Switch to dark mode"
           onClick={() => choose('dark')}
-          className={theme === 'dark' ? selectedCardClass : secondaryButtonClass}
+          className={theme === 'dark' ? themeChoiceSelectedClass : themeChoiceClass}
         >
           Dark
         </button>
