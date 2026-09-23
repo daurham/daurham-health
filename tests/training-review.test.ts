@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { HttpError } from '../server/http.ts'
 import { parseManualWorkoutRequest } from '../server/training/service.ts'
 import { CLAIM_AND_INSERT_WORKOUT_SQL } from '../server/training/commit-sql.ts'
+import { DISMISS_TRANSCRIPTION_JOB_SQL } from '../server/training/job-store.ts'
 import {
   DraftValidationError,
   buildManualWorkoutPayload,
@@ -243,6 +244,25 @@ describe('cross-device pending reviews', () => {
     const listSchema = source('src/domain/training-transcription.ts')
     expect(listSchema).toContain("status: z.enum(['queued', 'processing', 'completed', 'failed'])")
     expect(listSchema).not.toMatch(/pendingTranscriptionJobSchema[\s\S]*committed/)
+  })
+
+  it('cancels an uncommitted review by deleting the Health job so Today cannot resurrect it', () => {
+    const importPage = source('src/features/training/ImportWorkoutPage.tsx')
+    const api = source('src/features/training/api.ts')
+    const handler = source('server/handlers/transcription-job-detail.ts')
+    const store = source('server/training/job-store.ts')
+    expect(importPage).toContain('cancelLabel="Cancel import"')
+    expect(importPage).toContain('dismissTranscriptionJob')
+    expect(importPage).toContain('async function cancelImport')
+    expect(importPage).not.toMatch(/onCancel=\{resetFlow\}/)
+    expect(api).toContain("method: 'DELETE'")
+    expect(api).toContain('/api/training/transcription/jobs/')
+    expect(handler).toContain("req.method === 'DELETE'")
+    expect(handler).toContain('dismissTranscriptionJob')
+    expect(store).toContain('DISMISS_TRANSCRIPTION_JOB_SQL')
+    expect(DISMISS_TRANSCRIPTION_JOB_SQL).toContain('DELETE FROM workout_transcription_jobs')
+    expect(DISMISS_TRANSCRIPTION_JOB_SQL).toContain("status <> 'committed'")
+    expect(store).toContain("That analysis is already saved.")
   })
 
   it('keeps commit idempotent on job identity', () => {

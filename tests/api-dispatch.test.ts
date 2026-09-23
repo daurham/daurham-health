@@ -204,6 +204,11 @@ describe('api/index after Vercel nested rewrite', () => {
     expect(poll.status()).not.toBe(404)
     expect(isDeniedPrivate(poll.status())).toBe(true)
 
+    const dismiss = await hit('DELETE', `/api/training/transcription/jobs/${JOB_ID}`)
+    expect(dismiss.status()).not.toBe(404)
+    expect(dismiss.status()).not.toBe(405)
+    expect(isDeniedPrivate(dismiss.status())).toBe(true)
+
     const commit = await hit('POST', '/api/training/transcription/commit')
     expect(isDeniedPrivate(commit.status())).toBe(true)
   })

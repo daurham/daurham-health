@@ -112,6 +112,13 @@ export async function fetchTranscriptionJob(jobId: string): Promise<Transcriptio
   return transcriptionJobResponseSchema.parse(await response.json())
 }
 
+export async function dismissTranscriptionJob(jobId: string): Promise<void> {
+  const response = await healthFetch(`/api/training/transcription/jobs/${jobId}`, { method: 'DELETE' })
+  if (!response.ok) {
+    throw new Error(await readApiError(response))
+  }
+}
+
 export async function commitImportedSession(
   jobId: string,
   request: ManualWorkoutRequest,

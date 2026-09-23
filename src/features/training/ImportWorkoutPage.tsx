@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-do
 import type { ReviewFieldError } from '@/domain/paper-load'
 import type { TranscriptionGuidance, TranscriptionJobResponse } from '@/domain/training-transcription'
 import { isHomeAiJobId } from '@/domain/training-transcription'
-import { commitImportedSession, createTranscriptionJob, fetchTranscriptionJob } from './api'
+import { commitImportedSession, createTranscriptionJob, dismissTranscriptionJob, fetchTranscriptionJob } from './api'
 import { WorkoutEditor } from './WorkoutEditor'
 import {
   DraftValidationError,
@@ -35,6 +35,7 @@ export function ImportWorkoutPage() {
   const [errorFocusKey, setErrorFocusKey] = useState(0)
   const [pollError, setPollError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
   const [preparing, setPreparing] = useState(false)
   const [uploading, setUploading] = useState(false)
   const incomingFile = (location.state as { file?: File } | null)?.file
@@ -177,6 +178,28 @@ export function ImportWorkoutPage() {
     navigate('/training/import', { replace: true })
   }
 
+  async function cancelImport() {
+    if (!jobId) {
+      resetFlow()
+      return
+    }
+    setCancelling(true)
+    setError(null)
+    try {
+      await dismissTranscriptionJob(jobId)
+      resetFlow()
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : 'Could not cancel this import.'
+      if (/not found/i.test(message)) {
+        resetFlow()
+        return
+      }
+      setError(message)
+    } finally {
+      setCancelling(false)
+    }
+  }
+
   const analyzing = jobId != null && draft == null && failure == null
   const heading = analyzing
     ? 'Analyzing workout'
@@ -225,10 +248,12 @@ export function ImportWorkoutPage() {
           onCommit={() => {
             void onCommit()
           }}
-          onCancel={resetFlow}
+          onCancel={() => {
+            void cancelImport()
+          }}
           cancelLabel="Cancel import"
           commitLabel="Save Workout"
-          saving={saving}
+          saving={saving || cancelling}
           error={error}
           fieldErrors={fieldErrors}
           errorFocusKey={errorFocusKey}
@@ -291,7 +316,9 @@ export function ImportWorkoutPage() {
                 <button
                   type="button"
                   className="ml-3 text-sm font-medium text-zinc-700 hover:text-zinc-900"
-                  onClick={resetFlow}
+                  onClick={() => {
+                    void cancelImport()
+                  }}
                 >
                   Try another photo
                 </button>

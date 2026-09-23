@@ -128,6 +128,46 @@ export async function recordTranscriptionJobCommitted(jobId: string, sessionId: 
   )
 }
 
+export async function getTranscriptionJobRecord(jobId: string): Promise<TranscriptionJobRecord | null> {
+  if (!isHomeAiJobId(jobId)) {
+    return null
+  }
+  const sql = await getSql()
+  const rows = await queryOrUnavailable(() =>
+    sql.query(
+      `SELECT home_ai_job_id, status, source_filename, failure_message, created_at, updated_at
+       FROM workout_transcription_jobs
+       WHERE home_ai_job_id = $1`,
+      [jobId],
+    ),
+  )
+  const row = (rows as Record<string, unknown>[])[0]
+  return row ? mapRow(row) : null
+}
+
+export const DISMISS_TRANSCRIPTION_JOB_SQL = `DELETE FROM workout_transcription_jobs
+       WHERE home_ai_job_id = $1 AND status <> 'committed'
+       RETURNING home_ai_job_id`
+
+export async function dismissTranscriptionJob(jobId: string): Promise<{ ok: true }> {
+  if (!isHomeAiJobId(jobId)) {
+    throw new HttpError(400, 'That analysis job id is invalid.')
+  }
+  const stored = await getTranscriptionJobRecord(jobId)
+  if (!stored) {
+    throw new HttpError(404, 'That analysis was not found.')
+  }
+  if (stored.status === 'committed') {
+    throw new HttpError(409, 'That analysis is already saved.')
+  }
+  const sql = await getSql()
+  const rows = await queryOrUnavailable(() => sql.query(DISMISS_TRANSCRIPTION_JOB_SQL, [jobId]))
+  if ((rows as unknown[]).length === 0) {
+    throw new HttpError(409, 'That analysis is already saved.')
+  }
+  return { ok: true }
+}
+
 export async function listOutstandingTranscriptionJobs(): Promise<TranscriptionJobRecord[]> {
   const sql = await getSql()
   const rows = await queryOrUnavailable(() =>

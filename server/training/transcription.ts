@@ -13,6 +13,7 @@ import { HttpError, parseMultipart, type ApiRequest } from '../http.js'
 import type { HomeAiClient } from '../integrations/home-ai/client.js'
 import { getHomeAiClient } from '../integrations/home-ai/client.js'
 import {
+  dismissTranscriptionJob,
   recordTranscriptionJobCreated,
   recordTranscriptionJobStatus,
   refreshOutstandingTranscriptionJobs,
@@ -196,4 +197,4 @@ export async function getTranscriptionJob(
   })
 }
 
-export { HOME_AI_JOB_ID_RE, WORKOUT_PHOTO_MAX_BYTES }
+export { HOME_AI_JOB_ID_RE, WORKOUT_PHOTO_MAX_BYTES, dismissTranscriptionJob }

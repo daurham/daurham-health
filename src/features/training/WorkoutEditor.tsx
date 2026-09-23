@@ -84,6 +84,7 @@ export function WorkoutEditor({
           <button
             type="button"
             className={quietButtonClass}
+            disabled={saving}
             onClick={onCancel}
           >
             {cancelLabel ?? 'Cancel'}
