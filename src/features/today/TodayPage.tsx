@@ -1,11 +1,19 @@
-import { useCallback, type ReactNode } from 'react'
+import { useCallback, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { formatBodyMass } from '@/domain/body-metrics'
-import type { NutritionDayTotals } from '@/domain/nutrition'
+import { NUTRITION_CONFIG, type NutritionDayTotals, type NutritionFood } from '@/domain/nutrition'
 import { formatWeekdayCalendarDate } from '@/domain/calendar-format'
 import type { TodayViewModel } from '@/domain/today'
 import { HEALTH_CALENDAR_TIME_ZONE } from '@/domain/time'
-import { LoadErrorNotice, PendingLoadRegion, useAtomicKeyedResource } from '@/lib'
+import {
+  LoadErrorNotice,
+  PendingLoadRegion,
+  primaryButtonClass,
+  quietButtonClass,
+  useAtomicKeyedResource,
+} from '@/lib'
+import { AddFoodSheet } from '@/features/nutrition/panels'
+import { createNutritionEntry, fetchNutritionDay } from '@/features/nutrition/api'
 import { formatSleepDuration } from '@/features/progress/activity-sleep-copy'
 import { formatCalendarDate, formatClockTime } from '@/features/progress/format'
 import { caloriesHeadline, macroHeadline, remainingHeadline } from '@/features/nutrition/format'
@@ -44,7 +52,7 @@ export function TodayPage() {
       <div className="mt-5">
         <PendingLoadRegion pending={resource.isPending} pendingVisible={resource.pendingVisible}>
           {view ? (
-            <TodayBoard view={view} />
+            <TodayBoard view={view} onNutritionChanged={() => resource.retry()} />
           ) : (
             <div className="h-64 animate-pulse rounded-lg bg-zinc-200" aria-busy="true" aria-label="Loading today" />
           )}
@@ -62,7 +70,13 @@ export function TodayPage() {
   )
 }
 
-export function TodayBoard({ view }: { view: TodayViewModel }) {
+export function TodayBoard({
+  view,
+  onNutritionChanged,
+}: {
+  view: TodayViewModel
+  onNutritionChanged?: () => void
+}) {
   const prefix = useAppPathPrefix()
   return (
     <div className="space-y-3">
@@ -85,7 +99,7 @@ export function TodayBoard({ view }: { view: TodayViewModel }) {
         </section>
       ) : null}
       <div className="grid items-start gap-3 md:grid-cols-2">
-        <NutritionCard view={view} />
+        <NutritionCard view={view} onNutritionChanged={onNutritionChanged} />
         <TrainingCard view={view} />
       </div>
       <div className="grid items-start gap-3 md:grid-cols-3">
@@ -134,10 +148,7 @@ function Card({ title, children }: { title: string; children: ReactNode }) {
 
 function PrimaryAction({ to, children }: { to: string; children: string }) {
   return (
-    <Link
-      to={to}
-      className="inline-flex min-h-11 items-center justify-center rounded-md bg-zinc-900 px-4 text-sm font-medium text-white"
-    >
+    <Link to={to} className={primaryButtonClass}>
       {children}
     </Link>
   )
@@ -145,7 +156,7 @@ function PrimaryAction({ to, children }: { to: string; children: string }) {
 
 function QuietAction({ to, children }: { to: string; children: string }) {
   return (
-    <Link to={to} className="inline-flex min-h-11 items-center text-sm text-zinc-500">
+    <Link to={to} className={quietButtonClass}>
       {children}
     </Link>
   )
@@ -174,12 +185,18 @@ function NutrientMeter({
       aria-valuemax={target}
       aria-valuenow={consumed}
     >
-      <div className="h-full rounded-full bg-zinc-800" style={{ width: `${width}%` }} />
+      <div className="h-full rounded-full bg-accent" style={{ width: `${width}%` }} />
     </div>
   )
 }
 
-function NutritionCard({ view }: { view: TodayViewModel }) {
+function NutritionCard({
+  view,
+  onNutritionChanged,
+}: {
+  view: TodayViewModel
+  onNutritionChanged?: () => void
+}) {
   const nutrition = view.nutrition
   const readOnly = useDemoReadOnly()
   const dateHref = prefixedPath(useAppPathPrefix(), `/nutrition?date=${view.date}`)
@@ -191,10 +208,74 @@ function NutritionCard({ view }: { view: TodayViewModel }) {
         <p>No food logged yet today.</p>
       )}
       <div className="mt-3 flex flex-wrap items-center gap-x-4">
-        {readOnly ? null : <PrimaryAction to={dateHref}>Add food</PrimaryAction>}
+        {readOnly ? null : (
+          <TodayAddFoodAction date={view.date} onChanged={onNutritionChanged} />
+        )}
         <QuietAction to={dateHref}>View nutrition</QuietAction>
       </div>
     </Card>
+  )
+}
+
+function TodayAddFoodAction({ date, onChanged }: { date: string; onChanged?: () => void }) {
+  const [open, setOpen] = useState(false)
+  const [quickAdd, setQuickAdd] = useState<{
+    recents: NutritionFood[]
+    staples: NutritionFood[]
+    recipes: NutritionFood[]
+  }>({ recents: [], staples: [], recipes: [] })
+
+  async function openSheet() {
+    setOpen(true)
+    try {
+      const day = await fetchNutritionDay(date)
+      setQuickAdd(day.quickAdd)
+    } catch {
+      setQuickAdd({ recents: [], staples: [], recipes: [] })
+    }
+  }
+
+  function closeSheet() {
+    setOpen(false)
+  }
+
+  return (
+    <>
+      <button type="button" className={primaryButtonClass} onClick={() => void openSheet()}>
+        Add food
+      </button>
+      {open ? (
+        <AddFoodSheet
+          date={date}
+          quickAdd={quickAdd}
+          onClose={closeSheet}
+          onLogged={() => {
+            onChanged?.()
+            closeSheet()
+          }}
+          onSavedFood={() => {
+            onChanged?.()
+            closeSheet()
+          }}
+          onMealLogged={() => {
+            onChanged?.()
+            closeSheet()
+          }}
+          onQuickLog={(food) => {
+            void createNutritionEntry({
+              logDate: date,
+              timezone: NUTRITION_CONFIG.calendarTimeZone,
+              foodId: food.id,
+              servingQuantity: 1,
+            }).finally(() => {
+              onChanged?.()
+              closeSheet()
+            })
+          }}
+          onOpenFood={() => undefined}
+        />
+      ) : null}
+    </>
   )
 }
 
@@ -264,7 +345,7 @@ function TrainingCard({ view }: { view: TodayViewModel }) {
           <p>No workout logged today</p>
           {readOnly ? null : (
             <div className="mt-3">
-              <PrimaryAction to={prefixedPath(prefix, '/training/new')}>Log workout</PrimaryAction>
+              <PrimaryAction to={prefixedPath(prefix, '/training/import')}>Log workout</PrimaryAction>
             </div>
           )}
         </>

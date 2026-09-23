@@ -38,7 +38,7 @@ import {
 } from './queries.js'
 import { advanceGeminiCapture, interpretErrorToHttp } from './gemini-jobs.js'
 import {
-  findCommittedLabelEntry,
+  findCommittedLabelFood,
   getCaptureImage,
   getLabelJobRecord,
   listOutstandingLabelJobs,
@@ -466,12 +466,16 @@ function uniqueConflict(error: unknown): boolean {
   )
 }
 
-export async function commitNutritionLabel(body: unknown): Promise<{ food: NutritionFood; entry: NutritionEntry }> {
+export async function commitNutritionLabel(body: unknown): Promise<{
+  food: NutritionFood
+  entry: NutritionEntry | null
+}> {
   const parsed = commitNutritionLabelRequestSchema.safeParse(body)
   if (!parsed.success) {
     throw new HttpError(400, parsed.error.issues[0]?.message ?? 'Invalid label review')
   }
   const input = parsed.data
+  const shouldLog = input.log !== false
   const reviewErrors = validateLabelReview({
     productName: input.productName,
     brand: input.brand ?? '',
@@ -494,12 +498,18 @@ export async function commitNutritionLabel(body: unknown): Promise<{ food: Nutri
 
   const jobId = input.jobId
   if (jobId) {
-    const committed = await findCommittedLabelEntry(jobId)
+    const committed = await findCommittedLabelFood(jobId)
     if (committed) {
-      const entry = await getEntry(committed.entryId)
       const food = await getFood(committed.foodId)
-      if (entry && food) {
-        return { food, entry }
+      if (committed.entryId) {
+        const entry = await getEntry(committed.entryId)
+        if (entry && food) {
+          return { food, entry }
+        }
+      } else if (!shouldLog && food) {
+        return { food, entry: null }
+      } else if (shouldLog && food) {
+        return createLabelEntry({ input, food, jobId })
       }
     }
     const existing = await findEntryByFingerprint(jobId)
@@ -594,30 +604,59 @@ export async function commitNutritionLabel(body: unknown): Promise<{ food: Nutri
     throw new HttpError(500, 'Could not save food')
   }
 
-  const resolved = resolveEntryLogDate({
-    logDate: input.logDate,
-    consumedAt: null,
-    timezone: input.timezone ?? NUTRITION_CONFIG.calendarTimeZone,
+  if (!shouldLog) {
+    if (jobId) {
+      await recordLabelJobCommitted(jobId, food.id, null).catch(() => undefined)
+    }
+    return { food, entry: null }
+  }
+
+  return createLabelEntry({
+    input,
+    food,
+    jobId,
+    snapshotSource:
+      plan.type === 'log_existing'
+        ? {
+            calories: food.calories,
+            protein: food.protein,
+            carbs: food.carbs,
+            fat: food.fat,
+            fiber: food.fiber,
+            servingGrams: food.servingGrams,
+          }
+        : undefined,
   })
-  const logQuantity = input.logQuantity ?? 1
-  const snapshotSource =
-    plan.type === 'log_existing'
-      ? {
-          calories: food.calories,
-          protein: food.protein,
-          carbs: food.carbs,
-          fat: food.fat,
-          fiber: food.fiber,
-          servingGrams: food.servingGrams,
-        }
-      : {
-          calories: input.calories,
-          protein: input.proteinGrams ?? null,
-          carbs: input.carbsGrams ?? null,
-          fat: input.fatGrams ?? null,
-          fiber: input.fiberGrams ?? null,
-          servingGrams: input.servingGrams ?? null,
-        }
+}
+
+async function createLabelEntry(input: {
+  input: ReturnType<typeof commitNutritionLabelRequestSchema.parse>
+  food: NutritionFood
+  jobId?: string
+  snapshotSource?: {
+    calories: number
+    protein: number | null
+    carbs: number | null
+    fat: number | null
+    fiber: number | null
+    servingGrams: number | null
+  }
+}): Promise<{ food: NutritionFood; entry: NutritionEntry }> {
+  const { input: request, food, jobId } = input
+  const resolved = resolveEntryLogDate({
+    logDate: request.logDate,
+    consumedAt: null,
+    timezone: request.timezone ?? NUTRITION_CONFIG.calendarTimeZone,
+  })
+  const logQuantity = request.logQuantity ?? 1
+  const snapshotSource = input.snapshotSource ?? {
+    calories: request.calories,
+    protein: request.proteinGrams ?? null,
+    carbs: request.carbsGrams ?? null,
+    fat: request.fatGrams ?? null,
+    fiber: request.fiberGrams ?? null,
+    servingGrams: request.servingGrams ?? null,
+  }
   const snapshot = snapshotFromDefinition(snapshotSource, { quantity: logQuantity })
 
   const entryId = randomUUID()
@@ -640,7 +679,7 @@ export async function commitNutritionLabel(body: unknown): Promise<{ food: Nutri
         JSON.stringify({
           pipeline: 'nutrition-label-v1',
           reviewed: true,
-          basis: input.basis,
+          basis: request.basis,
         }),
       ],
     )) as Array<{ entity_id: string }>
@@ -657,7 +696,7 @@ export async function commitNutritionLabel(body: unknown): Promise<{ food: Nutri
     entryId,
     resolved.logDate,
     null,
-    input.timezone ?? NUTRITION_CONFIG.calendarTimeZone,
+    request.timezone ?? NUTRITION_CONFIG.calendarTimeZone,
     null,
     food.id,
     food.name,

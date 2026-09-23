@@ -241,10 +241,11 @@ export async function commitNutritionLabelReview(input: {
   basis: 'per_serving' | 'per_100g' | 'per_container' | 'unknown'
   barcode?: string | null
   logQuantity?: number
+  log?: boolean
   logDate: string
   timezone: string
   catalogKind?: 'packaged' | 'custom'
-}): Promise<{ food: NutritionFood; entry: NutritionEntry }> {
+}): Promise<{ food: NutritionFood; entry: NutritionEntry | null }> {
   return parseBarcodeResponse(
     await healthFetch('/api/nutrition/label/commit', {
       method: 'POST',

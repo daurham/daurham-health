@@ -2,7 +2,7 @@ import { Suspense } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { LockedScreen, useAuth } from '@/auth'
 import { AppSurfaceProvider } from '@/lib/app-prefix'
-import { cn, SHELL_MAX_WIDTH_CLASS } from '@/lib'
+import { cn, quietButtonClass, selectedTabClass, SHELL_MAX_WIDTH_CLASS, tabClass } from '@/lib'
 import type { NavItem } from '@/types'
 
 const navItems: NavItem[] = [
@@ -62,7 +62,7 @@ export function Layout() {
                 <NavLink
                   to="/settings"
                   className={({ isActive }) =>
-                    cn('text-sm hover:text-zinc-900', isActive ? 'text-zinc-900' : 'text-zinc-500')
+                    cn(quietButtonClass, isActive ? 'text-zinc-900' : 'text-zinc-500')
                   }
                 >
                   Settings
@@ -72,7 +72,7 @@ export function Layout() {
                   onClick={() => {
                     void signOut()
                   }}
-                  className="text-sm text-zinc-500 hover:text-zinc-900"
+                  className={quietButtonClass}
                 >
                   Sign out
                 </button>
@@ -84,7 +84,7 @@ export function Layout() {
                 <div className="absolute right-0 z-30 mt-1 min-w-36 rounded-md border border-zinc-200 bg-white py-1 shadow-sm">
                   <NavLink
                     to="/settings"
-                    className="block px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50"
+                    className="block cursor-pointer px-3 py-2 text-sm text-zinc-700 hover:bg-accent-muted"
                   >
                     Settings
                   </NavLink>
@@ -93,7 +93,7 @@ export function Layout() {
                     onClick={() => {
                       void signOut()
                     }}
-                    className="block w-full px-3 py-2 text-left text-sm text-zinc-700 hover:bg-zinc-50"
+                    className="block w-full cursor-pointer px-3 py-2 text-left text-sm text-zinc-700 hover:bg-accent-muted"
                   >
                     Sign out
                   </button>
@@ -112,10 +112,7 @@ export function Layout() {
                   end={item.to === '/' || item.to === '/demo'}
                   className={({ isActive }) =>
                     cn(
-                      'rounded-md px-3 py-2 text-sm font-medium',
-                      isActive
-                        ? 'bg-zinc-900 text-white'
-                        : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900',
+                      isActive ? selectedTabClass : tabClass,
                     )
                   }
                 >
@@ -186,8 +183,8 @@ export function Layout() {
                 end={item.to === '/' || item.to === '/demo'}
                 className={({ isActive }) =>
                   cn(
-                    'flex min-h-12 items-center justify-center whitespace-nowrap px-1 text-center text-xs font-medium',
-                    isActive ? 'text-zinc-900' : 'text-zinc-500',
+                    'flex min-h-12 cursor-pointer items-center justify-center whitespace-nowrap px-1 text-center text-xs font-medium',
+                    isActive ? 'text-accent' : 'text-zinc-500 hover:text-zinc-900',
                   )
                 }
               >

@@ -9,7 +9,7 @@ import {
   type InterpretedPaperSet,
   type ReviewFieldError,
 } from '@/domain/paper-load'
-import { cn, SHELL_MAX_WIDTH_CLASS } from '@/lib'
+import { cn, dangerButtonClass, primaryButtonClass, quietButtonClass, SHELL_MAX_WIDTH_CLASS } from '@/lib'
 import { addDraftSet, type DraftExercise, type DraftSet, type WorkoutDraft } from './draft'
 
 const inputClass =
@@ -24,6 +24,7 @@ export function WorkoutEditor({
   onChange,
   onCommit,
   onCancel,
+  onDelete,
   cancelLabel,
   commitLabel,
   saving,
@@ -39,6 +40,7 @@ export function WorkoutEditor({
   onChange: (draft: WorkoutDraft) => void
   onCommit: () => void
   onCancel?: () => void
+  onDelete?: () => void
   cancelLabel?: string
   commitLabel: string
   saving: boolean
@@ -81,7 +83,7 @@ export function WorkoutEditor({
         {onCancel ? (
           <button
             type="button"
-            className="text-sm font-medium text-zinc-600 hover:text-zinc-900"
+            className={quietButtonClass}
             onClick={onCancel}
           >
             {cancelLabel ?? 'Cancel'}
@@ -142,9 +144,14 @@ export function WorkoutEditor({
 
       <div className="shell-action-bar border-t border-zinc-200 bg-white px-4 py-3">
         <div className={cn('mx-auto flex gap-3', SHELL_MAX_WIDTH_CLASS)}>
+          {onDelete ? (
+            <button type="button" className={dangerButtonClass} disabled={saving} onClick={onDelete}>
+              Delete workout
+            </button>
+          ) : null}
           <button
             type="button"
-            className="min-h-11 flex-1 rounded-md bg-zinc-900 px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-zinc-300"
+            className={cn(primaryButtonClass, 'flex-1')}
             disabled={saving}
             onClick={onCommit}
           >

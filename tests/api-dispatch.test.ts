@@ -178,6 +178,16 @@ describe('api/index after Vercel nested rewrite', () => {
     const detail = await hit('GET', `/api/training/sessions/${SESSION_ID}`)
     expect(detail.status()).not.toBe(404)
     expect(isDeniedPrivate(detail.status())).toBe(true)
+
+    const patch = await hit('PATCH', `/api/training/sessions/${SESSION_ID}`)
+    expect(patch.status()).not.toBe(404)
+    expect(patch.status()).not.toBe(405)
+    expect(isDeniedPrivate(patch.status())).toBe(true)
+
+    const remove = await hit('DELETE', `/api/training/sessions/${SESSION_ID}`)
+    expect(remove.status()).not.toBe(404)
+    expect(remove.status()).not.toBe(405)
+    expect(isDeniedPrivate(remove.status())).toBe(true)
   })
 
   it('protects transcription job POST, list GET, dynamic GET, and commit', async () => {

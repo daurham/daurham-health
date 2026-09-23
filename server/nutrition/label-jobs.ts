@@ -154,7 +154,11 @@ export async function recordLabelJobStatus(input: {
   )
 }
 
-export async function recordLabelJobCommitted(jobId: string, foodId: string, entryId: string): Promise<void> {
+export async function recordLabelJobCommitted(
+  jobId: string,
+  foodId: string,
+  entryId: string | null,
+): Promise<void> {
   if (!isHomeAiJobId(jobId)) {
     return
   }
@@ -236,6 +240,24 @@ export async function refreshOutstandingLabelJobs(client?: HomeAiClient): Promis
     }
   }
   return listOutstandingLabelJobs()
+}
+
+export async function findCommittedLabelFood(
+  jobId: string,
+): Promise<{ foodId: string; entryId: string | null } | null> {
+  const sql = await getSql()
+  const rows = await queryOrUnavailable(() =>
+    sql.query(
+      `SELECT food_id, entry_id FROM nutrition_capture_jobs
+       WHERE home_ai_job_id = $1 AND status = 'committed' AND food_id IS NOT NULL`,
+      [jobId],
+    ),
+  )
+  const row = (rows as Array<{ food_id?: string; entry_id?: string | null }>)[0]
+  if (!row?.food_id) {
+    return null
+  }
+  return { foodId: row.food_id, entryId: row.entry_id ?? null }
 }
 
 export async function findCommittedLabelEntry(jobId: string): Promise<{ foodId: string; entryId: string } | null> {

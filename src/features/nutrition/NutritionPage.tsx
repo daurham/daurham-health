@@ -8,7 +8,13 @@ import {
   type NutritionFood,
   type PendingNutritionCapture,
 } from '@/domain/nutrition'
-import { cn, PendingLoadRegion, useAtomicKeyedResource } from '@/lib'
+import {
+  cn,
+  interactiveRowClass,
+  PendingLoadRegion,
+  primaryButtonClass,
+  useAtomicKeyedResource,
+} from '@/lib'
 import type { NutrientTotal } from '@/domain/nutrition'
 import {
   createNutritionEntry,
@@ -81,7 +87,9 @@ export function NutritionPage() {
       return
     }
     urlDateRef.current = resource.committedKey
-    setParams({ date: resource.committedKey }, { replace: true })
+    const next = new URLSearchParams(params)
+    next.set('date', resource.committedKey)
+    setParams(next, { replace: true })
   }, [params, resource.committedKey, setParams])
 
   useEffect(() => {
@@ -89,6 +97,16 @@ export function NutritionPage() {
       setIntentDate(resource.committedKey)
     }
   }, [intentDate, resource.committedKey, resource.error])
+
+  useEffect(() => {
+    if (params.get('action') !== 'add' || !day || panel?.kind === 'add') {
+      return
+    }
+    setPanel({ kind: 'add' })
+    const next = new URLSearchParams(params)
+    next.delete('action')
+    setParams(next, { replace: true })
+  }, [day, panel, params, setParams])
 
   useEffect(() => {
     let cancelled = false
@@ -290,7 +308,7 @@ export function NutritionPage() {
         <button
           type="button"
           onClick={() => setPanel({ kind: 'add' })}
-          className="hidden min-h-11 items-center justify-center rounded-md bg-zinc-900 px-4 text-sm font-medium text-white md:inline-flex"
+          className={`${primaryButtonClass} hidden md:inline-flex`}
         >
           Add food
         </button>
@@ -354,7 +372,7 @@ export function NutritionPage() {
       <button
         type="button"
         onClick={() => setPanel({ kind: 'add' })}
-        className="fixed right-4 z-30 inline-flex min-h-12 min-w-12 items-center justify-center rounded-full bg-zinc-900 px-5 text-sm font-medium text-white shadow-lg md:hidden"
+        className={`${primaryButtonClass} fixed right-4 z-30 min-h-12 min-w-12 rounded-full px-5 shadow-lg md:hidden`}
         style={{ bottom: 'calc(var(--shell-nav-offset) + 1rem)' }}
       >
         Add food
@@ -388,6 +406,11 @@ export function NutritionPage() {
             void quickLog(food)
           }}
           onOpenFood={(food) => setPanel({ kind: 'food', food })}
+          onSavedFood={(food) => {
+            prependRecent(food)
+            setNotice('Saved to My Foods without logging.')
+            setPanel(null)
+          }}
         />
       ) : null}
       {panel?.kind === 'entry' ? (
@@ -456,6 +479,12 @@ export function NutritionPage() {
               return { ...current, entries, totals: nutritionDayTotals(entries) }
             })
             prependRecent(food)
+            setCaptures((current) => current.filter((job) => job.id !== panel.jobId))
+            setPanel(null)
+          }}
+          onSavedFood={(food) => {
+            prependRecent(food)
+            setNotice('Saved to My Foods without logging.')
             setCaptures((current) => current.filter((job) => job.id !== panel.jobId))
             setPanel(null)
           }}
@@ -643,7 +672,10 @@ function MacroProgressRow({
           aria-valuemax={100}
           aria-valuenow={Math.round(ratio * 100)}
         >
-          <div className="h-full rounded-full bg-zinc-800" style={{ width: `${Math.round(ratio * 100)}%` }} />
+          <div
+            className={cn('h-full rounded-full', ratio > 1.15 ? 'bg-warning' : 'bg-accent')}
+            style={{ width: `${Math.round(Math.min(ratio, 1) * 100)}%` }}
+          />
         </div>
       ) : null}
     </div>
@@ -668,7 +700,7 @@ function EntryList({
         <button
           type="button"
           onClick={onAdd}
-          className="mt-3 inline-flex min-h-11 items-center justify-center rounded-md bg-zinc-900 px-4 text-sm font-medium text-white"
+          className={primaryButtonClass}
         >
           Add food
         </button>
@@ -702,7 +734,10 @@ function EntryRowButton({ entry, onOpen }: { entry: NutritionEntry; onOpen: (ent
     <button
       type="button"
       onClick={() => onOpen(entry)}
-      className="flex min-h-14 w-full min-w-0 items-center justify-between gap-3 px-4 py-3 text-left"
+      className={cn(
+        'flex min-h-14 w-full min-w-0 items-center justify-between gap-3 px-4 py-3 text-left',
+        interactiveRowClass,
+      )}
     >
       <span className="min-w-0 flex-1">
         <span className="block truncate font-medium">{entry.foodName}</span>
@@ -731,7 +766,10 @@ function MealGroupRow({
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}
-        className="flex min-h-14 w-full min-w-0 items-center justify-between gap-3 px-4 py-3 text-left"
+        className={cn(
+          'flex min-h-14 w-full min-w-0 items-center justify-between gap-3 px-4 py-3 text-left',
+          interactiveRowClass,
+        )}
       >
         <span className="min-w-0 flex-1">
           <span className="block truncate font-medium">{row.label}</span>

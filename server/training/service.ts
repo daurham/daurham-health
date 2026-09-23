@@ -474,6 +474,41 @@ export async function findSessionIdByHomeAiJob(jobId: string): Promise<string | 
   return entityId ?? null
 }
 
+export function importedSessionReuse(
+  existingId: string | null,
+  sessionFound: boolean,
+): 'reuse' | 'deleted' | 'create' {
+  if (!existingId) {
+    return 'create'
+  }
+  return sessionFound ? 'reuse' : 'deleted'
+}
+
+export const UPDATE_WORKOUT_SESSION_SQL = `UPDATE workout_sessions
+         SET workout_date = $2::date,
+             workout_template_id = $3::uuid,
+             routine_code = $4,
+             template_version = $5,
+             template_name = $6,
+             duration_min = $7::numeric,
+             effort = $8::int,
+             pain_level = $9::int,
+             bodyweight_kg = $10::numeric,
+             notes = $11,
+             metadata = $12::jsonb,
+             updated_at = now()
+         WHERE id = $1::uuid`
+
+export const DELETE_WORKOUT_SESSION_EXERCISES_SQL = `DELETE FROM workout_session_exercises
+         WHERE workout_session_id = $1::uuid`
+
+export const DETACH_TRANSCRIPTION_SESSION_SQL = `UPDATE workout_transcription_jobs
+         SET workout_session_id = NULL,
+             updated_at = now()
+         WHERE workout_session_id = $1::uuid`
+
+export const DELETE_WORKOUT_SESSION_SQL = `DELETE FROM workout_sessions WHERE id = $1::uuid`
+
 export async function createImportedSession(
   body: unknown,
   jobId: string,
@@ -481,8 +516,16 @@ export async function createImportedSession(
 ): Promise<SessionDetailResponse> {
   const existingId = await findSessionIdByHomeAiJob(jobId)
   if (existingId) {
-    await recordTranscriptionJobCommitted(jobId, existingId).catch(() => undefined)
-    return getSession(existingId)
+    try {
+      const existing = await getSession(existingId)
+      await recordTranscriptionJobCommitted(jobId, existingId).catch(() => undefined)
+      return existing
+    } catch (error) {
+      if (error instanceof HttpError && error.statusCode === 404) {
+        throw new HttpError(409, 'This transcription was already committed. The workout was deleted.')
+      }
+      throw error
+    }
   }
 
   const homeAi = client ?? (await getHomeAiClient())
@@ -579,8 +622,16 @@ export async function createImportedSession(
     }
     const raced = await findSessionIdByHomeAiJob(jobId)
     if (raced) {
-      await recordTranscriptionJobCommitted(jobId, raced).catch(() => undefined)
-      return getSession(raced)
+      try {
+        const existing = await getSession(raced)
+        await recordTranscriptionJobCommitted(jobId, raced).catch(() => undefined)
+        return existing
+      } catch (inner) {
+        if (inner instanceof HttpError && inner.statusCode === 404) {
+          throw new HttpError(409, 'This transcription was already committed. The workout was deleted.')
+        }
+        throw inner
+      }
     }
     throw new HttpError(500, 'Workout could not be saved')
   }
@@ -671,4 +722,119 @@ export async function getSession(sessionId: string): Promise<SessionDetailRespon
   }
 
   return sessionDetailResponseSchema.parse({ session })
+}
+
+async function loadTemplateForEdit(templateId: string): Promise<WorkoutTemplate> {
+  try {
+    return await loadTemplateById(templateId)
+  } catch (error) {
+    if (!(error instanceof HttpError) || error.statusCode !== 400) {
+      throw error
+    }
+  }
+  const listed = await listTemplates()
+  const active = listed.templates.find((item) => item.id === templateId)
+  if (active) {
+    return active
+  }
+  const sql = await getSql()
+  const templateRows = await queryOrUnavailable(() =>
+    sql.query(
+      `SELECT id, routine_code, version, name, metadata, is_active, created_at
+       FROM workout_templates
+       WHERE id = $1
+       LIMIT 1`,
+      [templateId],
+    ),
+  )
+  const template = z.array(workoutTemplateRowSchema).parse(templateRows)[0]
+  if (!template) {
+    throw new HttpError(400, 'Workout template was not found')
+  }
+  const slotRows = await sql.query(
+    `SELECT id, workout_template_id, exercise_definition_id, slot_id, position, planned_sets, prescription, metadata, created_at
+     FROM workout_template_exercises
+     WHERE workout_template_id = $1
+     ORDER BY position`,
+    [templateId],
+  )
+  const parsedSlots = z.array(workoutTemplateExerciseRowSchema).parse(slotRows)
+  const exerciseIds = [...new Set(parsedSlots.map((slot) => slot.exercise_definition_id))]
+  const exercisesById = await loadExercisesById(exerciseIds)
+  return workoutTemplateSchema.parse({
+    id: template.id,
+    routineCode: template.routine_code,
+    version: template.version,
+    name: template.name,
+    metadata: template.metadata,
+    isActive: template.is_active,
+    exercises: parsedSlots.map((slot) => {
+      const exercise = exercisesById.get(slot.exercise_definition_id)
+      if (!exercise) {
+        throw new HttpError(500, 'Template exercise is missing its definition')
+      }
+      return mapTemplateExercise(slot, exercise)
+    }),
+  })
+}
+
+export async function updateManualSession(sessionId: string, body: unknown): Promise<SessionDetailResponse> {
+  const existing = await getSession(sessionId)
+  const request = parseManualWorkoutRequest(body)
+  const exercisesById = await loadExercisesById(
+    request.exercises.map((exercise) => exercise.exerciseDefinitionId),
+  )
+  const templateId = request.workoutTemplateId ?? existing.session.workoutTemplateId
+  const template = templateId == null ? null : await loadTemplateForEdit(templateId)
+  const prepared = prepareManualSession({
+    request: { ...request, workoutTemplateId: template?.id ?? null },
+    exercisesById,
+    template,
+    sessionId,
+    sourceKind: existing.session.sourceKind,
+    metadata: existing.session.metadata,
+  })
+  const sql = await getSql()
+  try {
+    await sql.transaction([
+      sql.query(UPDATE_WORKOUT_SESSION_SQL, [
+        prepared.sessionId,
+        prepared.workoutDate,
+        prepared.workoutTemplateId,
+        prepared.routineCode,
+        prepared.templateVersion,
+        prepared.templateName,
+        prepared.durationMin == null ? null : decimalString(prepared.durationMin),
+        prepared.effort,
+        prepared.painLevel,
+        prepared.bodyweightKg == null ? null : decimalString(prepared.bodyweightKg),
+        prepared.notes,
+        JSON.stringify(prepared.metadata),
+      ]),
+      sql.query(DELETE_WORKOUT_SESSION_EXERCISES_SQL, [prepared.sessionId]),
+      ...buildSessionInsertQueries(sql, prepared).slice(1),
+    ])
+  } catch (error) {
+    if (asMissingRelation(error)) {
+      throw new HttpError(503, TABLES_UNAVAILABLE)
+    }
+    throw new HttpError(500, 'Workout could not be saved')
+  }
+  return getSession(prepared.sessionId)
+}
+
+export async function deleteManualSession(sessionId: string): Promise<void> {
+  await getSession(sessionId)
+  const sql = await getSql()
+  try {
+    await sql.transaction([
+      sql.query(DETACH_TRANSCRIPTION_SESSION_SQL, [sessionId]),
+      sql.query(DELETE_WORKOUT_SESSION_SQL, [sessionId]),
+    ])
+  } catch (error) {
+    if (asMissingRelation(error)) {
+      throw new HttpError(503, TABLES_UNAVAILABLE)
+    }
+    throw new HttpError(500, 'Workout could not be deleted')
+  }
 }

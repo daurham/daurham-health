@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import type { ProgressOverview, ProgressRange } from '@/domain/progress'
+import { interactiveCardClass } from '@/lib'
 import { prefixedPath, useAppPathPrefix } from '@/lib/app-prefix'
 import { compactTrendCopy } from './copy'
 import type { EvidenceTopic } from './EvidencePanel'
@@ -154,7 +155,7 @@ function ExerciseCard({
   return (
     <Link
       to={prefixedPath(prefix, `/progress/strength/${exercise.exerciseId}${progressSearch(range)}`)}
-      className="flex min-h-14 items-center justify-between gap-3 rounded-lg border border-zinc-200 bg-white px-3 py-2.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
+      className={`flex min-h-14 items-center justify-between gap-3 px-3 py-2.5 ${interactiveCardClass}`}
     >
       <div className="min-w-0">
         <p className="truncate font-medium">{exercise.name}</p>

@@ -14,7 +14,8 @@ import {
   type NutritionLabelJobResponse,
 } from '@/domain/nutrition'
 import type { ReviewFieldError } from '@/domain/paper-load'
-import { cn } from '@/lib'
+import { cn, primaryButtonClass, secondaryButtonClass } from '@/lib'
+import { CatalogCommitFooter } from './CatalogCommitFooter'
 import {
   BarcodeLookupClientError,
   commitNutritionLabelReview,
@@ -33,10 +34,8 @@ const POLL_MS = 4000
 const inputClass =
   'min-h-11 w-full rounded-md border border-zinc-300 bg-white px-3 text-base text-zinc-900 outline-none focus:border-zinc-500 md:text-sm'
 const labelClass = 'mb-1 block text-sm font-medium text-zinc-700'
-const primaryClass =
-  'inline-flex min-h-11 w-full items-center justify-center rounded-md bg-zinc-900 px-4 text-sm font-medium text-white disabled:opacity-50'
-const secondaryClass =
-  'inline-flex min-h-11 items-center justify-center rounded-md border border-zinc-300 bg-white px-4 text-sm font-medium text-zinc-900'
+const primaryClass = `${primaryButtonClass} w-full`
+const secondaryClass = `${secondaryButtonClass} w-full`
 
 type LabelCaptureProps = {
   date: string
@@ -44,10 +43,11 @@ type LabelCaptureProps = {
   onClose: () => void
   onBack: () => void
   onLogged: (entry: NutritionEntry, food: NutritionFood) => void
+  onSavedFood?: (food: NutritionFood) => void
   onDiscarded?: () => void
 }
 
-export function LabelCaptureSheet({ date, jobId, onClose, onBack, onLogged, onDiscarded }: LabelCaptureProps) {
+export function LabelCaptureSheet({ date, jobId, onClose, onBack, onLogged, onSavedFood, onDiscarded }: LabelCaptureProps) {
   const [phase, setPhase] = useState<'pick' | 'preview' | 'working' | 'review' | 'failed'>(jobId ? 'working' : 'pick')
   const [activeJobId, setActiveJobId] = useState<string | null>(jobId ?? null)
   const [payload, setPayload] = useState<NutritionLabelJobResponse | null>(null)
@@ -224,6 +224,7 @@ export function LabelCaptureSheet({ date, jobId, onClose, onBack, onLogged, onDi
         }}
         onDiscard={activeJobId ? () => void discardCapture() : undefined}
         onLogged={onLogged}
+        onSavedFood={onSavedFood}
       />
     )
   }
@@ -362,6 +363,7 @@ function LabelReviewSheet({
   onBack,
   onDiscard,
   onLogged,
+  onSavedFood,
 }: {
   date: string
   jobId: string | null
@@ -374,6 +376,7 @@ function LabelReviewSheet({
   onBack: () => void
   onDiscard?: () => void
   onLogged: (entry: NutritionEntry, food: NutritionFood) => void
+  onSavedFood?: (food: NutritionFood) => void
 }) {
   const [draft, setDraft] = useState(() => draftFromCandidate(candidate))
   const [errors, setErrors] = useState<ReviewFieldError[]>([])
@@ -417,10 +420,13 @@ function LabelReviewSheet({
     setErrors((current) => current.filter((item) => item.path !== path))
   }
 
-  async function saveAndLog() {
+  async function save(log: boolean) {
     const nextErrors = validateLabelReview(draft)
     if (nextErrors.length > 0) {
       setErrors(nextErrors)
+      return
+    }
+    if (busy) {
       return
     }
     setBusy(true)
@@ -444,10 +450,15 @@ function LabelReviewSheet({
         basis: draft.basis === '' ? 'unknown' : draft.basis,
         barcode: draft.barcode.trim() || null,
         logQuantity: draft.logQuantity,
+        log,
         logDate: date,
         timezone: NUTRITION_CONFIG.calendarTimeZone,
         catalogKind: draft.barcode.trim() ? 'packaged' : 'custom',
       })
+      if (!log || !saved.entry) {
+        onSavedFood?.(saved.food)
+        return
+      }
       onLogged(saved.entry, saved.food)
     } catch (caught) {
       if (caught instanceof BarcodeLookupClientError && caught.fields.length > 0) {
@@ -468,19 +479,20 @@ function LabelReviewSheet({
       title="Review nutrition label"
       onClose={onClose}
       footer={
-        <div className="flex flex-wrap gap-2">
-          <button type="button" className={secondaryClass} onClick={onBack}>
-            Back
-          </button>
-          {onDiscard ? (
-            <button type="button" className={secondaryClass} onClick={onDiscard}>
-              Discard
-            </button>
-          ) : null}
-          <button type="button" className={primaryClass} onClick={() => void saveAndLog()} disabled={busy}>
-            {busy ? 'Saving…' : 'Save & Log'}
-          </button>
-        </div>
+        <CatalogCommitFooter
+          date={date}
+          busy={busy}
+          onBack={onBack}
+          extra={
+            onDiscard ? (
+              <button type="button" className={secondaryClass} onClick={onDiscard} disabled={busy}>
+                Discard
+              </button>
+            ) : null
+          }
+          onSaveForLater={() => void save(false)}
+          onAddToDate={() => void save(true)}
+        />
       }
     >
       <div className="space-y-3">

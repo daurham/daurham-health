@@ -213,6 +213,7 @@ describe('camera scanner UX', () => {
   it('stops the camera on close/decode and offers permission plus manual fallback', () => {
     const scanner = readFileSync('src/features/nutrition/BarcodeScanner.tsx', 'utf8')
     const panels = readFileSync('src/features/nutrition/panels.tsx', 'utf8')
+    const catalog = readFileSync('src/features/nutrition/CatalogCommitFooter.tsx', 'utf8')
     expect(scanner).toContain("facingMode: { ideal: 'environment' }")
     expect(scanner).toContain('controls.stop')
     expect(scanner).toContain('getTracks()')
@@ -223,7 +224,7 @@ describe('camera scanner UX', () => {
     expect(scanner).toContain('UPC_A')
     expect(scanner).toContain('EAN_13')
     expect(panels).toContain('Scan barcode')
-    expect(panels).toContain('Save & Log')
+    expect(catalog).toContain('Save for later')
     expect(panels).toContain('Create food for this barcode')
     expect(panels).toContain('Product lookup is temporarily unavailable')
   })

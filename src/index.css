@@ -1,10 +1,27 @@
 @import "tailwindcss";
 
+@theme {
+  --color-accent: var(--health-accent);
+  --color-accent-muted: var(--health-accent-muted);
+  --color-accent-fg: var(--health-accent-fg);
+  --color-success: var(--health-success);
+  --color-warning: var(--health-warning);
+  --color-danger: var(--health-danger);
+  --color-info: var(--health-info);
+}
+
 /* iOS Safari will paint a second glyph over the first when it synthesizes a
    missing weight, which reads as doubled letters on every word. */
 html {
   font-synthesis: none;
-  --chart-ink: #18181b;
+  --health-accent: oklch(0.44 0.08 250);
+  --health-accent-muted: oklch(0.94 0.02 250);
+  --health-accent-fg: #fff;
+  --health-success: oklch(0.47 0.1 155);
+  --health-warning: oklch(0.68 0.12 80);
+  --health-danger: oklch(0.52 0.16 27);
+  --health-info: oklch(0.5 0.07 230);
+  --chart-ink: var(--health-accent);
   --chart-muted: #71717a;
   --chart-grid: #e4e4e7;
   --chart-soft: #a1a1aa;
@@ -40,7 +57,14 @@ html.dark {
   --color-emerald-50: #1c332c;
   --color-emerald-200: #065f46;
   --color-emerald-800: #a7f3d0;
-  --chart-ink: #f4f4f5;
+  --health-accent: oklch(0.72 0.08 250);
+  --health-accent-muted: oklch(0.32 0.03 250);
+  --health-accent-fg: #18181b;
+  --health-success: oklch(0.74 0.1 155);
+  --health-warning: oklch(0.82 0.12 80);
+  --health-danger: oklch(0.72 0.14 27);
+  --health-info: oklch(0.74 0.07 230);
+  --chart-ink: var(--health-accent);
   --chart-muted: #a1a1aa;
   --chart-grid: #3f3f46;
   --chart-soft: #d4d4d8;
@@ -93,5 +117,44 @@ html.dark {
   select,
   textarea {
     font-size: 1rem;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  button:not(:disabled),
+  a[href],
+  [role='button']:not([aria-disabled='true']),
+  summary,
+  label[for],
+  select,
+  input[type='checkbox'],
+  input[type='radio'],
+  input[type='file'] {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  [aria-disabled='true'] {
+    cursor: not-allowed;
+  }
+}
+
+.page-enter {
+  animation: page-enter 180ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-enter,
+  .animate-pulse {
+    animation: none;
+  }
+}
+
+@keyframes page-enter {
+  from {
+    opacity: 0.55;
+  }
+  to {
+    opacity: 1;
   }
 }

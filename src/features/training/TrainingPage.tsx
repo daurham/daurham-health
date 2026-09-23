@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { WorkoutSessionSummary } from '@/domain/training'
 import type { PendingTranscriptionJob } from '@/domain/training-transcription'
+import { interactiveCardClass, ListPlaceholder, primaryButtonClass, secondaryButtonClass } from '@/lib'
 import { fetchSessions, fetchTranscriptionJobs } from './api'
 import { formatWorkoutDate } from './format'
 
@@ -76,16 +77,10 @@ export function TrainingPage() {
           <p className="mt-2 text-zinc-600">Log sessions against your current templates.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link
-            to="/training/new"
-            className="inline-flex min-h-11 items-center justify-center rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white"
-          >
+          <Link to="/training/new" className={primaryButtonClass}>
             Start Workout
           </Link>
-          <Link
-            to="/training/import"
-            className="inline-flex min-h-11 items-center justify-center rounded-md border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-900"
-          >
+          <Link to="/training/import" className={secondaryButtonClass}>
             Import Workout Photo
           </Link>
         </div>
@@ -101,8 +96,8 @@ export function TrainingPage() {
 
       <div>
         <h2 className="text-lg font-semibold tracking-tight">Recent Workouts</h2>
-        {loading ? (
-          <p className="mt-3 text-sm text-zinc-600">Loading workouts…</p>
+        {loading && sessions.length === 0 ? (
+          <ListPlaceholder rows={4} label="Loading workouts" />
         ) : sessions.length === 0 ? (
           <p className="mt-3 text-sm text-zinc-600">
             {error
@@ -110,12 +105,12 @@ export function TrainingPage() {
               : 'No workouts yet. Start a workout to record sets in Health.'}
           </p>
         ) : (
-          <ul className="mt-4 space-y-2">
+          <ul className="page-enter mt-4 space-y-2">
             {sessions.map((session) => (
               <li key={session.id}>
                 <Link
                   to={`/training/${session.id}`}
-                  className="flex min-h-14 items-center justify-between gap-3 rounded-lg border border-zinc-200 bg-white px-4 py-3"
+                  className={`flex min-h-14 items-center justify-between gap-3 px-4 py-3 ${interactiveCardClass}`}
                 >
                   <span className="font-medium">
                     {formatWorkoutDate(session.workoutDate)}
@@ -147,7 +142,7 @@ function PendingReviewsCard({ jobs }: { jobs: PendingTranscriptionJob[] }) {
           <li key={job.id}>
             <Link
               to={`/training/import?job=${job.id}`}
-              className="flex min-h-14 items-center justify-between gap-3 rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3"
+              className={`flex min-h-14 items-center justify-between gap-3 bg-zinc-50 px-4 py-3 ${interactiveCardClass}`}
             >
               <span className="min-w-0">
                 <span className="block font-medium">{pendingReviewLabel(job.status)}</span>

@@ -5,7 +5,7 @@ import type {
   FitProfilePreviewCandidate,
   FitProfilePreviewResponse,
 } from '@/domain/body'
-import { cn } from '@/lib'
+import { cn, ListPlaceholder, primaryButtonClass } from '@/lib'
 import {
   commitFitProfile,
   fetchBodyMeasurements,
@@ -173,8 +173,8 @@ export function BodyPage() {
 
       <div>
         <h2 className="text-lg font-semibold tracking-tight">Saved measurements</h2>
-        {loading ? (
-          <p className="mt-3 text-sm text-zinc-600">Loading measurements…</p>
+        {loading && sessions.length === 0 ? (
+          <ListPlaceholder rows={3} label="Loading measurements" />
         ) : sessions.length === 0 ? (
           <p className="mt-3 text-sm text-zinc-600">
             {error
@@ -182,7 +182,7 @@ export function BodyPage() {
               : 'No saved measurements yet. Import a Fit Profile XLSX to preview, then confirm to save.'}
           </p>
         ) : (
-          <ul className="mt-4 space-y-3">
+          <ul className="page-enter mt-4 space-y-3">
             {sessions.map((session) => (
               <HistoryCard key={session.id} session={session} />
             ))}
@@ -226,7 +226,7 @@ export function ImportPanel({
         Choosing a file only previews rows. Nothing is saved until you confirm.
       </p>
       <label className="mt-4 flex cursor-pointer flex-wrap items-center gap-3">
-        <span className="rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white">
+        <span className={primaryButtonClass}>
           Import Fit Profile XLSX
         </span>
         <span className="text-sm text-zinc-600">
@@ -275,7 +275,7 @@ export function ImportPanel({
           </p>
           <button
             type="button"
-            className="w-full rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-zinc-300 sm:w-auto"
+            className={`${primaryButtonClass} w-full sm:w-auto`}
             disabled={!canCommit}
             onClick={onCommit}
           >

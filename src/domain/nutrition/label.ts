@@ -511,6 +511,7 @@ export const commitNutritionLabelRequestSchema = z.object({
   basis: z.enum(LABEL_BASES),
   barcode: z.string().nullable().optional(),
   logQuantity: z.number().optional().default(1),
+  log: z.boolean().optional().default(true),
   logDate: z.string(),
   timezone: z.string().optional(),
   catalogKind: z.enum(['packaged', 'custom']).optional(),

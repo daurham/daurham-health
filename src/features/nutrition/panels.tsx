@@ -13,7 +13,8 @@ import {
   type NutritionMeal,
   type PackagedFoodCandidate,
 } from '@/domain/nutrition'
-import { cn } from '@/lib'
+import { cn, interactiveRowClass, primaryButtonClass, secondaryButtonClass } from '@/lib'
+import { CatalogCommitFooter } from './CatalogCommitFooter'
 import type { ReviewFieldError } from '@/domain/paper-load'
 import {
   BarcodeLookupClientError,
@@ -39,10 +40,8 @@ const BarcodeScanner = lazy(() => import('./BarcodeScanner').then((module) => ({
 const inputClass =
   'min-h-11 w-full rounded-md border border-zinc-300 bg-white px-3 text-base text-zinc-900 outline-none focus:border-zinc-500 md:text-sm'
 const labelClass = 'mb-1 block text-sm font-medium text-zinc-700'
-const primaryClass =
-  'inline-flex min-h-11 w-full items-center justify-center rounded-md bg-zinc-900 px-4 text-sm font-medium text-white disabled:opacity-50'
-const secondaryClass =
-  'inline-flex min-h-11 items-center justify-center rounded-md border border-zinc-300 bg-white px-4 text-sm font-medium text-zinc-900'
+const primaryClass = `${primaryButtonClass} w-full`
+const secondaryClass = secondaryButtonClass
 
 type QuickAdd = {
   recents: NutritionFood[]
@@ -55,12 +54,22 @@ type AddFoodSheetProps = {
   quickAdd: QuickAdd
   onClose: () => void
   onLogged: (entry: NutritionEntry, food?: NutritionFood) => void
+  onSavedFood?: (food: NutritionFood) => void
   onMealLogged?: (entries: NutritionEntry[]) => void
   onQuickLog: (food: NutritionFood) => void
   onOpenFood: (food: NutritionFood) => void
 }
 
-export function AddFoodSheet({ date, quickAdd, onClose, onLogged, onMealLogged, onQuickLog, onOpenFood }: AddFoodSheetProps) {
+export function AddFoodSheet({
+  date,
+  quickAdd,
+  onClose,
+  onLogged,
+  onSavedFood,
+  onMealLogged,
+  onQuickLog,
+  onOpenFood,
+}: AddFoodSheetProps) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<NutritionFood[] | null>(null)
   const [searching, setSearching] = useState(false)
@@ -179,6 +188,10 @@ export function AddFoodSheet({ date, quickAdd, onClose, onLogged, onMealLogged, 
           onLogged(entry, food)
           onClose()
         }}
+        onSavedFood={(food) => {
+          onSavedFood?.(food)
+          onClose()
+        }}
       />
     )
   }
@@ -250,6 +263,10 @@ export function AddFoodSheet({ date, quickAdd, onClose, onLogged, onMealLogged, 
         onBack={() => setLabel(false)}
         onLogged={(entry, food) => {
           onLogged(entry, food)
+          onClose()
+        }}
+        onSavedFood={(food) => {
+          onSavedFood?.(food)
           onClose()
         }}
       />
@@ -345,6 +362,10 @@ export function AddFoodSheet({ date, quickAdd, onClose, onLogged, onMealLogged, 
         onBack={() => setManual(false)}
         onLogged={(entry, food) => {
           onLogged(entry, food)
+          onClose()
+        }}
+        onSavedFood={(food) => {
+          onSavedFood?.(food)
           onClose()
         }}
       />
@@ -470,7 +491,10 @@ function FoodSection({
               <button
                 type="button"
                 onClick={() => onSelect(food)}
-                className="flex min-h-14 min-w-0 flex-1 flex-col justify-center px-3 py-2 text-left"
+                className={cn(
+                  'flex min-h-14 min-w-0 flex-1 flex-col justify-center px-3 py-2 text-left',
+                  interactiveRowClass,
+                )}
               >
                 <span className="truncate font-medium">{food.name}</span>
                 <span className="truncate text-sm text-zinc-500">
@@ -662,11 +686,13 @@ function ManualEntrySheet({
   onClose,
   onBack,
   onLogged,
+  onSavedFood,
 }: {
   date: string
   onClose: () => void
   onBack: () => void
   onLogged: (entry: NutritionEntry, food?: NutritionFood) => void
+  onSavedFood?: (food: NutritionFood) => void
 }) {
   const [name, setName] = useState('')
   const [calories, setCalories] = useState('')
@@ -675,11 +701,13 @@ function ManualEntrySheet({
   const [fat, setFat] = useState('')
   const [fiber, setFiber] = useState('')
   const [notes, setNotes] = useState('')
-  const [saveAsFood, setSaveAsFood] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  async function submit() {
+  async function submit(log: boolean) {
+    if (busy) {
+      return
+    }
     setBusy(true)
     setError(null)
     try {
@@ -693,39 +721,29 @@ function ManualEntrySheet({
         fat: optionalNumber(fat),
         fiber: optionalNumber(fiber),
       }
-      if (saveAsFood) {
-        const food = await createNutritionFood({
-          name: name.trim(),
-          servingQuantity: 1,
-          servingUnit: 'serving',
-          calories: kcal,
-          ...macros,
-          catalogKind: 'custom',
-          sourceKind: 'manual',
-        })
-        const entry = await createNutritionEntry({
-          logDate: date,
-          timezone: NUTRITION_CONFIG.calendarTimeZone,
-          foodId: food.id,
-          servingQuantity: 1,
-        })
-        onLogged(entry, food)
-        return
-      }
-      const entry = await createNutritionEntry({
-        logDate: date,
-        timezone: NUTRITION_CONFIG.calendarTimeZone,
-        foodName: name.trim(),
+      const food = await createNutritionFood({
+        name: name.trim(),
         servingQuantity: 1,
         servingUnit: 'serving',
         calories: kcal,
         ...macros,
         notes: notes.trim() || null,
+        catalogKind: 'custom',
         sourceKind: 'manual',
       })
-      onLogged(entry)
+      if (!log) {
+        onSavedFood?.(food)
+        return
+      }
+      const entry = await createNutritionEntry({
+        logDate: date,
+        timezone: NUTRITION_CONFIG.calendarTimeZone,
+        foodId: food.id,
+        servingQuantity: 1,
+      })
+      onLogged(entry, food)
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Could not save entry')
+      setError(caught instanceof Error ? caught.message : 'Could not save food')
     } finally {
       setBusy(false)
     }
@@ -736,14 +754,13 @@ function ManualEntrySheet({
       title="Manual entry"
       onClose={onClose}
       footer={
-        <div className="flex gap-2">
-          <button type="button" className={secondaryClass} onClick={onBack}>
-            Back
-          </button>
-          <button type="button" className={primaryClass} onClick={() => void submit()} disabled={busy}>
-            {busy ? 'Saving…' : 'Log'}
-          </button>
-        </div>
+        <CatalogCommitFooter
+          date={date}
+          busy={busy}
+          onBack={onBack}
+          onSaveForLater={() => void submit(false)}
+          onAddToDate={() => void submit(true)}
+        />
       }
     >
       <div className="space-y-3">
@@ -768,10 +785,6 @@ function ManualEntrySheet({
         <Field label="Notes" htmlFor="manual-notes">
           <input id="manual-notes" className={inputClass} value={notes} onChange={(event) => setNotes(event.target.value)} />
         </Field>
-        <label className="flex min-h-11 items-center gap-2 text-sm">
-          <input type="checkbox" checked={saveAsFood} onChange={(event) => setSaveAsFood(event.target.checked)} />
-          Save this as a reusable food
-        </label>
         {error ? <p className="text-sm text-red-700">{error}</p> : null}
       </div>
     </NutritionSheet>
@@ -1110,12 +1123,14 @@ function PackagedReviewSheet({
   onClose,
   onBack,
   onLogged,
+  onSavedFood,
 }: {
   date: string
   candidate: PackagedFoodCandidate
   onClose: () => void
   onBack: () => void
   onLogged: (entry: NutritionEntry, food: NutritionFood) => void
+  onSavedFood?: (food: NutritionFood) => void
 }) {
   const [draft, setDraft] = useState(candidate)
   const [name, setName] = useState(candidate.name ?? '')
@@ -1157,7 +1172,7 @@ function PackagedReviewSheet({
     setErrors([])
   }
 
-  async function saveAndLog() {
+  async function save(log: boolean) {
     const servingGrams = optionalNumber(grams)
     const kcal = calories.trim() === '' ? null : Number(calories)
     const nextErrors = validatePackagedReview({
@@ -1170,6 +1185,9 @@ function PackagedReviewSheet({
     })
     if (nextErrors.length > 0) {
       setErrors(nextErrors)
+      return
+    }
+    if (busy) {
       return
     }
     setErrors([])
@@ -1191,8 +1209,12 @@ function PackagedReviewSheet({
         logDate: date,
         timezone: NUTRITION_CONFIG.calendarTimeZone,
         logQuantity: 1,
-        log: true,
+        log,
       })
+      if (!log) {
+        onSavedFood?.(saved.food)
+        return
+      }
       if (!saved.entry) {
         throw new Error('Food saved but logging failed. Scan again to log.')
       }
@@ -1215,14 +1237,13 @@ function PackagedReviewSheet({
       title="Review food"
       onClose={onClose}
       footer={
-        <div className="flex gap-2">
-          <button type="button" className={secondaryClass} onClick={onBack}>
-            Back
-          </button>
-          <button type="button" className={primaryClass} onClick={() => void saveAndLog()} disabled={busy}>
-            {busy ? 'Saving…' : 'Save & Log'}
-          </button>
-        </div>
+        <CatalogCommitFooter
+          date={date}
+          busy={busy}
+          onBack={onBack}
+          onSaveForLater={() => void save(false)}
+          onAddToDate={() => void save(true)}
+        />
       }
     >
       <div className="space-y-3">

@@ -3,7 +3,13 @@ import { parseAppleHealthFile, previewAppleHealth } from '@/domain/apple-health'
 import { formatCalendarRange } from '@/domain/calendar-format'
 import { healthCalendarDateFromNow } from '@/domain/time'
 import { applyDocumentTheme, readThemePreference, resolveTheme, writeThemePreference, type ThemeChoice } from '@/theme'
-import { healthFetch, readApiError } from '@/lib'
+import {
+  healthFetch,
+  primaryButtonClass,
+  readApiError,
+  secondaryButtonClass,
+  selectedCardClass,
+} from '@/lib'
 import type { AppleHealthPreview } from '@/domain/apple-health/preview'
 import {
   commitAppleHealthRecords,
@@ -49,7 +55,7 @@ function AppearanceSection() {
           aria-pressed={theme === 'light'}
           aria-label="Switch to light mode"
           onClick={() => choose('light')}
-          className="inline-flex min-h-11 items-center justify-center rounded-md px-4 text-sm font-medium ring-1 ring-zinc-200 aria-pressed:bg-zinc-900 aria-pressed:text-white"
+          className={theme === 'light' ? selectedCardClass : secondaryButtonClass}
         >
           Light
         </button>
@@ -58,7 +64,7 @@ function AppearanceSection() {
           aria-pressed={theme === 'dark'}
           aria-label="Switch to dark mode"
           onClick={() => choose('dark')}
-          className="inline-flex min-h-11 items-center justify-center rounded-md px-4 text-sm font-medium ring-1 ring-zinc-200 aria-pressed:bg-zinc-900 aria-pressed:text-white"
+          className={theme === 'dark' ? selectedCardClass : secondaryButtonClass}
         >
           Dark
         </button>
@@ -233,7 +239,7 @@ export function SettingsPage() {
             void onExport()
           }}
           disabled={exporting}
-          className="inline-flex min-h-11 items-center justify-center rounded-md bg-zinc-900 px-4 text-sm font-medium text-white disabled:opacity-50"
+          className={primaryButtonClass}
         >
           {exporting ? 'Preparing export…' : 'Export my Health data'}
         </button>
@@ -290,7 +296,7 @@ export function SettingsPage() {
             type="file"
             accept=".zip,.xml,application/zip,text/xml"
             disabled={busy !== null}
-            className="mt-1 block w-full text-base"
+            className="mt-1 block w-full cursor-pointer text-base"
             onChange={(event) => {
               const file = event.target.files?.[0]
               if (file) {
@@ -313,7 +319,7 @@ export function SettingsPage() {
               onClick={() => {
                 void onCommit()
               }}
-              className="rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+              className={primaryButtonClass}
             >
               Commit import
             </button>

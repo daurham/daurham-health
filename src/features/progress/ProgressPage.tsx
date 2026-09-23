@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation, useOutletContext, useParams, useSearchParams } from 'react-router-dom'
 import type { ProgressOverview, ProgressRange, ProgressTimeline } from '@/domain/progress'
-import { cn, LoadErrorNotice } from '@/lib'
+import { cn, LoadErrorNotice, selectedTabClass, tabClass } from '@/lib'
 import { fetchProgressOverview, fetchProgressTimeline } from './api'
 import { ActivityProgressPage } from './ActivitySection'
 import { ActivitySleepOverview } from './ActivitySleepOverview'
@@ -121,8 +121,7 @@ export function ProgressPage() {
               end={tab.end}
               className={({ isActive }) =>
                 cn(
-                  'rounded-md px-3 py-1.5 text-sm font-medium',
-                  isActive ? 'bg-zinc-100 text-zinc-900' : 'text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900',
+                  isActive ? selectedTabClass : tabClass,
                 )
               }
             >

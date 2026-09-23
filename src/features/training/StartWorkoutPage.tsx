@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import type { ReviewFieldError } from '@/domain/paper-load'
 import type { WorkoutTemplate } from '@/domain/training'
+import { interactiveCardClass } from '@/lib'
 import { createSession, fetchTemplates } from './api'
 import { WorkoutEditor } from './WorkoutEditor'
 import {
@@ -102,7 +103,7 @@ export function StartWorkoutPage() {
               <li key={template.id}>
                 <button
                   type="button"
-                  className="w-full rounded-lg border border-zinc-200 bg-white px-4 py-4 text-left"
+                  className={`w-full px-4 py-4 text-left ${interactiveCardClass}`}
                   onClick={() => setDraft(draftFromTemplate(template))}
                 >
                   <p className="font-semibold">{template.name}</p>

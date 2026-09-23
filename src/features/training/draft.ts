@@ -9,8 +9,10 @@ import {
   type MeasurementKind,
   type SetType,
   type TemplatePrescription,
+  type WorkoutSession,
   type WorkoutTemplate,
 } from '@/domain/training'
+import { kilogramsToPounds } from '@/domain/units'
 import {
   fieldErrorCountSummary,
   interpretPaperSets,
@@ -49,6 +51,7 @@ export type DraftExercise = {
 
 export type WorkoutDraft = {
   template: WorkoutTemplate | null
+  workoutTemplateId?: string | null
   workoutDate: string
   durationMin: string
   effort: number | null
@@ -183,7 +186,7 @@ export function buildManualWorkoutPayload(draft: WorkoutDraft): ManualWorkoutReq
 
   return manualWorkoutRequestSchema.parse({
     workoutDate: draft.workoutDate,
-    workoutTemplateId: draft.template?.id ?? null,
+    workoutTemplateId: draft.template?.id ?? draft.workoutTemplateId ?? null,
     durationMin: parseOptionalPositive(draft.durationMin),
     effort: draft.effort,
     painLevel: draft.painLevel,
@@ -191,6 +194,54 @@ export function buildManualWorkoutPayload(draft: WorkoutDraft): ManualWorkoutReq
     notes: draft.notes.trim() === '' ? null : draft.notes.trim(),
     exercises,
   })
+}
+
+function numberField(value: number | null | undefined): string {
+  return value == null ? '' : String(value)
+}
+
+export function draftFromSession(session: WorkoutSession, template: WorkoutTemplate | null): WorkoutDraft {
+  return {
+    template,
+    workoutTemplateId: session.workoutTemplateId,
+    workoutDate: session.workoutDate,
+    durationMin: numberField(session.durationMin),
+    effort: session.effort,
+    painLevel: session.painLevel,
+    bodyweightLb: session.bodyweightKg == null ? '' : String(Math.round(kilogramsToPounds(session.bodyweightKg) * 10) / 10),
+    notes: session.notes ?? '',
+    exercises: session.exercises.map((exercise) => ({
+      exerciseDefinitionId: exercise.exerciseDefinitionId,
+      slotId: exercise.slotId,
+      name: exercise.exerciseName,
+      measurementKind: template?.exercises.find((slot) => slot.slotId === exercise.slotId)?.exercise.measurementKind
+        ?? (exercise.sets.some((set) => set.leftDurationSec != null || set.rightDurationSec != null)
+          ? 'duration_per_side'
+          : exercise.sets.some((set) => set.leftReps != null || set.rightReps != null)
+            ? 'reps_per_side'
+            : exercise.sets.some((set) => set.durationSec != null)
+              ? 'duration'
+              : 'reps'),
+      plannedSets: template?.exercises.find((slot) => slot.slotId === exercise.slotId)?.plannedSets ?? exercise.sets.length,
+      prescription: template?.exercises.find((slot) => slot.slotId === exercise.slotId)?.prescription ?? { measurement: 'reps' },
+      notes: exercise.notes ?? '',
+      sets: exercise.sets.map((set) => ({
+        setNumber: set.setNumber,
+        setType: set.setType,
+        loadState: set.loadState,
+        weightLb: set.weightKg == null ? '' : String(Math.round(kilogramsToPounds(set.weightKg) * 10) / 10),
+        reps: numberField(set.reps),
+        durationSec: numberField(set.durationSec),
+        leftReps: numberField(set.leftReps),
+        rightReps: numberField(set.rightReps),
+        leftDurationSec: numberField(set.leftDurationSec),
+        rightDurationSec: numberField(set.rightDurationSec),
+        notes: set.notes ?? '',
+        transcribedLoadState: set.loadState,
+        transcribedWeightLb: set.weightKg == null ? '' : String(Math.round(kilogramsToPounds(set.weightKg) * 10) / 10),
+      })),
+    })),
+  }
 }
 
 export function draftHasLoggedSets(draft: WorkoutDraft): boolean {

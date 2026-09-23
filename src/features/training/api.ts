@@ -52,6 +52,25 @@ export async function fetchSession(id: string): Promise<WorkoutSession> {
   return sessionDetailResponseSchema.parse(await response.json()).session
 }
 
+export async function updateSession(id: string, request: ManualWorkoutRequest): Promise<WorkoutSession> {
+  const response = await healthFetch(`/api/training/sessions/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+  })
+  if (!response.ok) {
+    throw new Error(await readApiError(response))
+  }
+  return createSessionResponseSchema.parse(await response.json()).session
+}
+
+export async function deleteSession(id: string): Promise<void> {
+  const response = await healthFetch(`/api/training/sessions/${id}`, { method: 'DELETE' })
+  if (!response.ok) {
+    throw new Error(await readApiError(response))
+  }
+}
+
 export async function createSession(request: ManualWorkoutRequest): Promise<WorkoutSession> {
   const response = await healthFetch('/api/training/sessions', {
     method: 'POST',
