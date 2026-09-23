@@ -1,6 +1,6 @@
 # daurham-health
 
-Personal health record for one owner. The signed-in app reads and writes the owner's database. The public demo at `/demo` is anonymous, synthetic, and read-only.
+Personal health record for one owner. Frozen release **v1.0.0** (2026-09-22, America/Phoenix). The signed-in app reads and writes the owner's database. The public demo at `/demo` is anonymous, synthetic, and read-only.
 
 ## Surfaces
 

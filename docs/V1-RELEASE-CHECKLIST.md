@@ -1,40 +1,31 @@
 # V1 release checklist
 
-Release-candidate checks. This does not tag or freeze v1.
+Release version: **1.0.0**  
+Release date: **2026-09-22 America/Phoenix**
+
+Owner acceptance is complete. This file records the frozen v1.0.0 result.
+
+## Owner manual acceptance
+
+- Owner manual acceptance: **PASSED**
+- Desktop acceptance: **PASSED**
+- iPhone acceptance: **PASSED**
+- Today / Nutrition / Training / Body / Progress acceptance: **PASSED**
+- Auth / demo acceptance: **PASSED**
+- HAE current-day Activity: **PASSED**
+- HAE Previous-7-Days reconciliation: **PASSED**
+- Backup verification: **PASSED**
+- Tests / lint / build: **PASSED**
 
 ## Automated
 
 - `npm test`
 - `npm run lint`
 - `npm run build`
-- Replay `migrations/0001_health_foundation.sql` through `0016_sleep_nightly_summaries.sql` on an empty disposable Postgres database.
+- Latest schema migration: `0016_sleep_nightly_summaries.sql`
 - `npm run backup:verify -- ./backups/<archive>.health-backup.zip`
-- Restore that archive into a disposable database that is not production. Require `HEALTH_BACKUP_RESTORE=yes` and `--apply` for the Neon CLI. Delete the disposable copy after verification.
 
-The 2026-09-22 full archive verified as 22 tables and 34,258 rows. A disposable local restore matched those counts and was deleted. The Neon restore CLI cannot open a local socket database.
-
-## Owner manual
-
-Perform this on a real signed-in iPhone and desktop session. Do not mark it passed from an automated session.
-
-iPhone, signed in:
-
-- Today loads owner data, refresh works, and provisional Activity reads "so far".
-- Nutrition: change day, manual Add Food, Description, Meal Photo, Nutrition Label, barcode camera, edit, delete/undo, and keyboard/save stays above the bottom nav.
-- Training: history, session detail, workout-sheet review, and reachable Save controls.
-- Body: latest values, XLSX preview without committing, and the supported add flow.
-- Progress: overview, Strength, Body, Activity, Sleep, Timeline, Compare, a checkpoint, and ranges.
-- Settings: portable Health export downloads.
-- Auth: sign out, private routes lock, and sign-in returns to the in-app path.
-- Signed out: Explore demo stays under `/demo`.
-
-Desktop, signed in:
-
-- Today, Nutrition, Training, Body, Progress, Timeline, and Compare.
-- Browser back, forward, and a deep refresh.
-- The responsive breakpoint.
-
-Budget about 20–30 minutes.
+Phase 15A already physically restored a verified archive into disposable PostgreSQL and deleted that copy. Do not rerun that restore merely to tag.
 
 ## Production
 
