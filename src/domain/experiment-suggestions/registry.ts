@@ -1,4 +1,3 @@
-import { bodyGoalUnit } from '../goals.js'
 import { EXPERIMENT_SUGGESTION_CALCULATION_VERSION } from './config.js'
 import { sha256Hex, stableJson } from './sha256.js'
 import type {
@@ -27,24 +26,6 @@ function durationLabel(minimum: number | null, suggested: number | null): string
     return `Earliest suggested repeat after ${minimum} days`
   }
   return 'No retest interval is configured. The owner schedules the experiment window later.'
-}
-
-function goalDuration(goal: SuggestionGoalFact): string {
-  if (goal.target.evaluationWindowDays != null) {
-    return `Observation window ${goal.target.evaluationWindowDays} days, from the current goal version`
-  }
-  return 'Point observation of the current goal version. The owner schedules the experiment window later.'
-}
-
-function targetText(goal: SuggestionGoalFact): string {
-  const unit = goal.target.targetUnit
-  if (goal.target.targetMode === 'at_least') {
-    return `at least ${goal.target.targetMin} ${unit}`
-  }
-  if (goal.target.targetMode === 'at_most') {
-    return `at most ${goal.target.targetMax} ${unit}`
-  }
-  return `${goal.target.targetMin}–${goal.target.targetMax} ${unit}`
 }
 
 function fingerprint(kind: SuggestionKind, payload: Record<string, unknown>): string {
@@ -133,149 +114,24 @@ function benchmarkCandidate(protocol: SuggestionProtocolFact, kind: SuggestionKi
   }
 }
 
-function goalRequirement(goal: SuggestionGoalFact): SuggestionProtocolSpec['requirements'][number] | null {
-  const criteria = { minimumObservations: 1, minimumCoveragePercent: null, minimumAdherencePercent: null }
-  if (goal.goalKind === 'body_metric' && goal.selector.bodyMetricKey && bodyGoalUnit(goal.selector.bodyMetricKey) === goal.target.targetUnit) {
-    return {
-      position: 1,
-      role: 'primary_outcome',
-      domain: 'body',
-      requirementKind: 'body_metric',
-      selector: { metricKey: goal.selector.bodyMetricKey },
-      label: goal.displayName,
-      required: true,
-      criteria,
-    }
-  }
-  if (goal.goalKind === 'activity_steps' && goal.target.targetUnit === 'steps/day') {
-    return {
-      position: 1,
-      role: 'primary_outcome',
-      domain: 'activity',
-      requirementKind: 'activity_metric',
-      selector: { metricKey: 'steps_count' },
-      label: goal.displayName,
-      required: true,
-      criteria,
-    }
-  }
-  if (goal.goalKind === 'nutrition_protein' && goal.target.targetUnit === 'g/day') {
-    return {
-      position: 1,
-      role: 'primary_outcome',
-      domain: 'nutrition',
-      requirementKind: 'nutrition_metric',
-      selector: { metricKey: 'protein' },
-      label: goal.displayName,
-      required: true,
-      criteria,
-    }
-  }
-  if (goal.goalKind === 'sleep_duration' && goal.target.targetUnit === 'min/night') {
-    return {
-      position: 1,
-      role: 'primary_outcome',
-      domain: 'sleep',
-      requirementKind: 'sleep_metric',
-      selector: { metricKey: 'total_sleep_minutes' },
-      label: goal.displayName,
-      required: true,
-      criteria,
-    }
-  }
-  if (
-    goal.goalKind === 'supplement_adherence' &&
-    goal.selector.supplementId &&
-    goal.target.targetMode === 'at_least' &&
-    goal.target.targetUnit === '%' &&
-    goal.target.targetMin != null &&
-    goal.target.targetMin >= 0 &&
-    goal.target.targetMin <= 100
-  ) {
-    return {
-      position: 1,
-      role: 'primary_outcome',
-      domain: 'supplements',
-      requirementKind: 'supplement_adherence',
-      selector: { supplementId: goal.selector.supplementId },
-      label: goal.displayName,
-      required: true,
-      criteria: {
-        minimumObservations: null,
-        minimumCoveragePercent: null,
-        minimumAdherencePercent: goal.target.targetMin,
-      },
-    }
-  }
-  return null
-}
+const GOAL_EVIDENCE_MISSING =
+  'Missing current goal evidence is not an unmet target. A goal suggestion requires a current observation.'
+
+const GOAL_TARGET_UNSUPPORTED =
+  'Personal Lab cannot yet represent the complete goal target and evaluation semantics. Body, activity, nutrition, sleep, and supplement requirements do not evaluate the goal threshold and window.'
 
 export function compileGoalToExperimentCandidate(
   goal: SuggestionGoalFact,
   covers: readonly SuggestionCover[] = [],
 ): GoalCompileResult {
-  if (goal.status !== 'active') {
-    return { supported: false, reason: 'Only an active goal can be observed.' }
+  if (goal.targetState === 'unknown') {
+    return { supported: false, reason: GOAL_EVIDENCE_MISSING }
   }
-  if (!goal.goalVersionId) {
-    return { supported: false, reason: 'The current goal version is missing.' }
+  const covered = openCover(covers, (cover) => cover.goalId === goal.goalId)
+  return {
+    supported: false,
+    reason: covered ? `${GOAL_TARGET_UNSUPPORTED} An open experiment also covers this goal.` : GOAL_TARGET_UNSUPPORTED,
   }
-  if (goal.targetState === 'satisfied') {
-    return { supported: false, reason: 'The current target is already satisfied.' }
-  }
-  if (openCover(covers, (cover) => cover.goalId === goal.goalId)) {
-    return { supported: false, reason: 'An open experiment already covers this goal.' }
-  }
-  const requirement = goalRequirement(goal)
-  if (!requirement) {
-    return { supported: false, reason: 'Personal Lab cannot represent this goal target exactly.' }
-  }
-  const evidence = [
-    { ref: `goal:${goal.goalId}`, label: goal.displayName },
-    { ref: `goal-version:${goal.goalVersionId}`, label: `${goal.displayName} · v${goal.version}` },
-  ]
-  const described = targetText(goal)
-  const spec: SuggestionProtocolSpec = {
-    instructions: `Observe ${goal.displayName}. Keep the existing target: ${described}. Do not change the target, the unit, or the owner's intent.`,
-    durationLabel: goalDuration(goal),
-    requirements: [requirement],
-    contextControls: [],
-    benchmarkDefinitionId: null,
-    benchmarkProtocolVersionId: null,
-    protocolVersionNumber: null,
-    goalId: goal.goalId,
-    goalVersionId: goal.goalVersionId,
-  }
-  const candidate: ExperimentCandidate = {
-    candidateId: `goal-observation:${goal.goalId}:${goal.goalVersionId}`,
-    candidateFingerprint: fingerprint('goal_observation', {
-      goalId: goal.goalId,
-      goalVersionId: goal.goalVersionId,
-      goalKind: goal.goalKind,
-      targetMode: goal.target.targetMode,
-      targetMin: goal.target.targetMin,
-      targetMax: goal.target.targetMax,
-      targetUnit: goal.target.targetUnit,
-      evaluationWindowDays: goal.target.evaluationWindowDays,
-      selector: goal.selector,
-      requirement,
-      evidenceRefs: evidence.map((item) => item.ref),
-    }),
-    calculationVersion: EXPERIMENT_SUGGESTION_CALCULATION_VERSION,
-    kind: 'goal_observation',
-    presentation: 'observation',
-    title: `Observe ${goal.displayName}`,
-    question: `Does the current ${goal.displayName} observation still sit against the existing target of ${described}?`,
-    hypothesis: 'The experiment records the measurement the goal already uses. It does not prescribe how to reach the target.',
-    rationale: `${goal.displayName} is active and the current target is not satisfied.`,
-    limitations: LIMITATION,
-    why: `${goal.displayName} is an active unmet goal that Personal Lab can measure.`,
-    protocol: spec,
-    evidence,
-    linkedGoalLabel: `${goal.displayName} · v${goal.version} · ${described}`,
-    linkedBenchmarkLabel: null,
-  }
-  return { supported: true, candidate }
 }
 
 function rank(kind: SuggestionKind): number {

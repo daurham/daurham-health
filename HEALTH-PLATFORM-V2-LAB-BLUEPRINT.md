@@ -1,6 +1,6 @@
 # Daurham Health — V2 Lab Blueprint
 
-**Status:** V2-A Data Capture Foundations complete. V2-B Personal Lab Core complete (V2-B1 through V2-B4). V2-C Recipes / Batch Meals complete (V2-C1 through V2-C4). V2-D Goals + Projections complete (V2-D1 through V2-D3). V2-E Rich Sleep + Overnight Vitals complete (V2-E1 through V2-E5). Overnight vital metrics remain disabled until a payload is verified. V2-F1 Ask Health conversational analysis is implemented. V2-F2 Proactive Insights are implemented. V2-F3 Weekly Coach Brief is implemented. V2-F4 Experiment Suggestions are implemented. V2-F5 is not implemented.  
+**Status:** V2-A Data Capture Foundations complete. V2-B Personal Lab Core complete (V2-B1 through V2-B4). V2-C Recipes / Batch Meals complete (V2-C1 through V2-C4). V2-D Goals + Projections complete (V2-D1 through V2-D3). V2-E Rich Sleep + Overnight Vitals complete (V2-E1 through V2-E5). Overnight vital metrics remain disabled until a payload is verified. V2-F1 Ask Health conversational analysis is implemented. V2-F2 Proactive Insights are implemented. V2-F3 Weekly Coach Brief is implemented. V2-F4 Experiment Suggestions are implemented for due Benchmark retests and missing Benchmark baselines. Goal-observation suggestions are deferred. V2-F5 is not implemented.  
 **Calendar:** America/Phoenix  
 **Package version:** remains `1.0.0`  
 **Schema head:** `0031_experiment_origins.sql`
@@ -501,6 +501,12 @@ The brief covers the seven completed Phoenix dates before `asOf` and compares th
 V2-F4 is implemented. Migration `0031_experiment_origins.sql` adds experiment origin provenance and `experiment_goals`. Schema head is `0031_experiment_origins.sql`. Package version remains `1.0.0`. The calculation version is `experiment-suggestions-v1`. The packet version is `experiment-suggestion-evidence-v1`. The prompt version is `experiment-suggestion-v1`. V2-F5 is not implemented.
 
 Candidates come from a fixed registry: a benchmark with no valid result, a B3 `due` retest pinned to that protocol version, or an active unmet goal the existing Lab evaluators can measure. The model does not search history for experiments. Draft wording is optional and explicit. Acceptance rederives the candidate, rejects a stale fingerprint with `409`, and inserts one `accepted` Experiment. `origin_kind` records `deterministic_candidate` or `ai_assisted`. `origin_trigger` keeps the eligibility reason either way. Unaccepted suggestions are not stored, backed up, or exported. The portable export labels an accepted origin in words. The demo at `/demo/lab` is compiled fiction and does not call a provider.
+
+## Amendment — 2026-09-27T15:43:21-07:00 — V2-F4 Goal suggestions fail closed
+
+V2-F4 stays implemented for Benchmark suggestions only. There is no new migration. Schema head remains `0031_experiment_origins.sql`. Package version remains `1.0.0`. V2-F5 is not implemented.
+
+The first F4 amendment included an active unmet Goal when Lab could name the same metric. Current B4 Body, Activity, Nutrition, and Sleep requirements do not evaluate Goal thresholds. Supplement adherence does not lock the Goal evaluation window into Experiment scheduling. `compileGoalToExperimentCandidate` now returns unsupported for every current Goal kind, and `targetState = unknown` is unsupported because missing evidence is not an unmet target. `goal_observation` and `experiment_goals` remain for a later compiler. The surfaced registry is `benchmark_retest_due` and `benchmark_missing_baseline`.
 
 
 

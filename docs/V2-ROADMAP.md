@@ -2,7 +2,7 @@
 
 Current completion status and implementation order live in `HEALTH-PLATFORM-V2-LAB-BLUEPRINT.md`. The schema head is `0031_experiment_origins.sql`.
 
-Implemented: V2-A Data Capture Foundations, V2-B Personal Lab Core, V2-C Recipes / Batch Meals, V2-D Goals + Projections, V2-E Rich Sleep + Overnight Vitals, V2-F1 Ask Health, V2-F2 Proactive Insights, V2-F3 Weekly Coach Brief, and V2-F4 Experiment Suggestions. Overnight vital metrics stay disabled until a payload is verified. V2-F5 is not implemented. The schema head is `0031_experiment_origins.sql`.
+Implemented: V2-A Data Capture Foundations, V2-B Personal Lab Core, V2-C Recipes / Batch Meals, V2-D Goals + Projections, V2-E Rich Sleep + Overnight Vitals, V2-F1 Ask Health, V2-F2 Proactive Insights, V2-F3 Weekly Coach Brief, and V2-F4 Experiment Suggestions for due Benchmark retests and missing Benchmark baselines. Goal-observation suggestions are deferred. Overnight vital metrics stay disabled until a payload is verified. V2-F5 is not implemented. The schema head is `0031_experiment_origins.sql`.
 
 This file began as a post-v1 idea list. It was not part of frozen v1. The numbered sections below keep that older backlog. Sections the blueprint now marks implemented say so. The remaining sections are still ideas, not promises. External retest notifications remain deferred. Nested recipes, batch inventory, and recipe fiber remain deferred.
 

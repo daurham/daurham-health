@@ -2,6 +2,7 @@ import type { BenchmarkRetestState } from '../lab-retests.js'
 import type { LabRequirement } from '../lab.js'
 import type { GoalKind, GoalSelector, GoalTarget } from '../goals.js'
 
+/** `goal_observation` is reserved vocabulary. The registry does not emit it until Lab can evaluate a Goal target exactly. */
 export const SUGGESTION_KINDS = ['benchmark_missing_baseline', 'benchmark_retest_due', 'goal_observation'] as const
 export type SuggestionKind = (typeof SUGGESTION_KINDS)[number]
 

@@ -187,33 +187,51 @@ describe('experiment suggestions', () => {
     expect(finished[0]?.kind).toBe('benchmark_retest_due')
   })
 
-  it('compiles a supported unmet goal and fails closed otherwise', () => {
-    const supported = compileGoalToExperimentCandidate(goal())
-    expect(supported.supported).toBe(true)
-    if (supported.supported) {
-      expect(supported.candidate.protocol.requirements[0]?.selector).toEqual({ metricKey: 'weight' })
-      expect(supported.candidate.question).toContain('180 lb')
+  it('fails closed for every current goal kind, including missing evidence', () => {
+    const unknown = compileGoalToExperimentCandidate(goal({ targetState: 'unknown' }))
+    expect(unknown.supported).toBe(false)
+    if (!unknown.supported) {
+      expect(unknown.reason).toMatch(/Missing current goal evidence/)
+      expect(unknown.reason).not.toMatch(/not satisfied/)
     }
-    expect(compileGoalToExperimentCandidate(goal({ targetState: 'satisfied' })).supported).toBe(false)
-    expect(compileGoalToExperimentCandidate(goal({ goalKind: 'training_frequency', selector: { ...goal().selector, goalKind: 'training_frequency' } })).supported).toBe(false)
-    expect(compileGoalToExperimentCandidate(goal({ goalKind: 'strength_e1rm', selector: { ...goal().selector, goalKind: 'strength_e1rm', exerciseDefinitionId: RESULT } })).supported).toBe(false)
-    expect(compileGoalToExperimentCandidate(goal({ goalKind: 'benchmark_result', selector: { ...goal().selector, goalKind: 'benchmark_result', benchmarkDefinitionId: BENCHMARK } })).supported).toBe(false)
-    const revised = compileGoalToExperimentCandidate(goal({ goalVersionId: '88888888-8888-4888-8888-888888888888', version: 2, target: { ...goal().target, targetMax: 175 } }))
-    const original = compileGoalToExperimentCandidate(goal())
-    if (revised.supported && original.supported) {
-      expect(revised.candidate.candidateFingerprint).not.toBe(original.candidate.candidateFingerprint)
-    }
-    const adherence = compileGoalToExperimentCandidate(
+    const kinds = [
+      goal(),
+      goal({
+        goalKind: 'activity_steps',
+        displayName: 'Daily steps',
+        selector: { ...goal().selector, goalKind: 'activity_steps', bodyMetricKey: null },
+        target: { ...goal().target, targetMode: 'at_least', targetMin: 8000, targetMax: null, targetUnit: 'steps/day' },
+      }),
+      goal({
+        goalKind: 'nutrition_protein',
+        displayName: 'Protein',
+        selector: { ...goal().selector, goalKind: 'nutrition_protein', bodyMetricKey: null },
+        target: { ...goal().target, targetMode: 'at_least', targetMin: 160, targetMax: null, targetUnit: 'g/day' },
+      }),
+      goal({
+        goalKind: 'sleep_duration',
+        displayName: 'Sleep',
+        selector: { ...goal().selector, goalKind: 'sleep_duration', bodyMetricKey: null },
+        target: { ...goal().target, targetMode: 'at_least', targetMin: 420, targetMax: null, targetUnit: 'min/night' },
+      }),
       goal({
         goalKind: 'supplement_adherence',
         displayName: 'Creatine adherence',
         selector: { ...goal().selector, goalKind: 'supplement_adherence', bodyMetricKey: null, supplementId: SUPPLEMENT },
-        target: { ...goal().target, targetMode: 'at_least', targetMin: 90, targetMax: null, targetUnit: '%' },
+        target: { ...goal().target, targetMode: 'at_least', targetMin: 90, targetMax: null, targetUnit: '%', evaluationWindowDays: 30 },
       }),
-    )
-    expect(adherence.supported).toBe(true)
+    ] as const
+    for (const fact of kinds) {
+      const compiled = compileGoalToExperimentCandidate(fact)
+      expect(compiled.supported).toBe(false)
+      if (!compiled.supported) {
+        expect(compiled.reason).toMatch(/cannot yet represent the complete goal target/)
+      }
+    }
+    expect(buildExperimentSuggestions(input({ protocols: [], goals: [...kinds] }))).toEqual([])
     expect(SUGGESTION_KINDS).toEqual(['benchmark_missing_baseline', 'benchmark_retest_due', 'goal_observation'])
-    expect(SUGGESTION_KINDS).not.toContain('repeated_pattern')
+    expect(SUGGESTION_KINDS).toContain('goal_observation')
+    expect(buildExperimentSuggestions(input({ protocols: [], goals: [goal()] })).some((item) => item.kind === 'goal_observation')).toBe(false)
   })
 
   it('rejects invalid model output and keeps protocol fields out of the draft', () => {
@@ -348,7 +366,7 @@ describe('experiment suggestions', () => {
     ).rejects.toBeInstanceOf(HttpError)
   })
 
-  it('ranks due retests ahead of baselines and goals and caps the list at three', async () => {
+  it('ranks due retests ahead of baselines and caps the list at three', async () => {
     const facts = input({
       protocols: [
         protocol(),
@@ -357,13 +375,22 @@ describe('experiment suggestions', () => {
           protocolVersionId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2',
           retestStatus: 'no_baseline',
           anchorResultId: null,
+          anchorResultDate: null,
+          anchorValueLabel: null,
           isCurrent: true,
+        }),
+        protocol({
+          benchmarkDefinitionId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1',
+          protocolVersionId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2',
+          anchorResultId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb3',
+          retestStatus: 'due',
         }),
       ],
       goals: [goal()],
     })
     const ranked = buildExperimentSuggestions(facts)
-    expect(ranked.map((item) => item.kind)).toEqual(['benchmark_retest_due', 'benchmark_missing_baseline', 'goal_observation'])
+    expect(ranked.map((item) => item.kind)).toEqual(['benchmark_retest_due', 'benchmark_retest_due', 'benchmark_missing_baseline'])
+    expect(ranked.some((item) => item.kind === 'goal_observation')).toBe(false)
     const listed = await listExperimentSuggestions(async () => facts)
     expect(listed.suggestions).toHaveLength(3)
     expect(listed.empty).toBeNull()
@@ -397,6 +424,7 @@ describe('experiment suggestions', () => {
   it('keeps the demo fictional and provider-free', () => {
     const suggestion = demoDueSuggestion()
     expect(suggestion.kind).toBe('benchmark_retest_due')
+    expect(suggestion.kind).not.toBe('goal_observation')
     expect(suggestion.linkedBenchmarkLabel).toContain('v2')
     expect(demoEmptySuggestionCopy()).toBe(SUGGESTION_EMPTY_COPY)
     const page = readFileSync('src/features/demo/DemoLabPage.tsx', 'utf8')

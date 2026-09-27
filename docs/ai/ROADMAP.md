@@ -1,6 +1,6 @@
 # Roadmap
 
-This file records only what the repository already states. The current application is the health-app tree that includes Ask Health, Proactive Insights, Weekly Coach, Experiment Suggestions, and migration `0031_experiment_origins.sql`. The v2 authority is `HEALTH-PLATFORM-V2-LAB-BLUEPRINT.md`. The design manual is `HEALTH-PLATFORM-DESIGN-MANUAL.md` at version 1.0.34. `docs/V2-ROADMAP.md` keeps the older backlog and now marks the slices the blueprint has implemented.
+This file records only what the repository already states. The current application is the health-app tree that includes Ask Health, Proactive Insights, Weekly Coach, Experiment Suggestions, and migration `0031_experiment_origins.sql`. The v2 authority is `HEALTH-PLATFORM-V2-LAB-BLUEPRINT.md`. The design manual is `HEALTH-PLATFORM-DESIGN-MANUAL.md` at version 1.0.35. `docs/V2-ROADMAP.md` keeps the older backlog and now marks the slices the blueprint has implemented.
 
 ## Completed / existing functionality
 
@@ -14,7 +14,7 @@ Frozen v1.0.0, then the v2 slices the blueprint marks implemented:
 - V2-F1 Ask Health
 - V2-F2 Proactive Insights
 - V2-F3 Weekly Coach Brief
-- V2-F4 Experiment Suggestions
+- V2-F4 Experiment Suggestions: due Benchmark retests and missing Benchmark baselines. Goal-observation suggestions are deferred.
 
 Also present from v1 and the import work: Nutrition, Training, Body, Progress, Activity, Sleep, Timeline, Compare, checkpoints, Apple Health archive import, Health Auto Export ingest, Gemini nutrition capture, Home-AI transcription, backup and portable export, and the public demo.
 

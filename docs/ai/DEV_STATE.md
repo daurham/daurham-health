@@ -1,22 +1,23 @@
 # Dev state
 
-Snapshot recorded 2026-09-27 after V2-F4 Experiment Suggestions. This commit is the current health application.
+Snapshot recorded 2026-09-27 after the V2-F4 acceptance correction. Goal suggestions fail closed. This commit is the current health application.
 
 ## Git
 
 - Branch: `main`
-- Parent: `bedc9eaf0941775405f214349a6ce4a0e242739f` (“chore: establish health app AI development baseline”)
-- This commit adds V2-F4 Experiment Suggestions and migration `0031_experiment_origins.sql`
-- Finished tasks are committed and pushed. This commit is pushed to `origin/main` with its parent, which had not been pushed before
-- Local annotated tag `v1.0.0` points at `7124ca513efa6c833457303ee6ff79d78344fce6`. Whether that tag exists on the remote is unknown. No remote was contacted
+- Baseline the correction was measured against: `749c4a3f937f37c710f5cd82898b4848d8257328` (“Add experiment suggestions the owner must explicitly accept.”)
+- Parent of this snapshot: `49233fa` (“docs: add F4 acceptance correction task”)
+- This commit corrects Goal-derived experiment suggestions so they are not emitted. It does not add a migration
+- Finished tasks are committed and pushed
+- Local annotated tag `v1.0.0` points at `7124ca513efa6c833457303ee6ff79d78344fce6`. Whether that tag exists on the remote is unknown
 
 ## Schema
 
 - Migration head in the working tree: `0031_experiment_origins.sql`
-- `npm run migrate` applied `0030_ai_usage.sql` and `0031_experiment_origins.sql` to the configured database. `0030` had not been applied there yet
-- Design manual version in the working tree: 1.0.34
+- No migration was applied for this correction. `0030_ai_usage.sql` and `0031_experiment_origins.sql` were already applied during the original F4 task
+- Design manual version in the working tree: 1.0.35
 - Package version: 1.0.0
-- The live blueprint header names `0031_experiment_origins.sql` as the schema head. Historical amendments and manual ledger rows that name an older head stay as history
+- The live blueprint header names `0031_experiment_origins.sql` as the schema head. Historical amendments and manual ledger rows that name an older head, or that describe Goal suggestions as supported, stay as history
 
 ## Experiment origin
 
@@ -34,27 +35,29 @@ Existing rows become `owner_created` unless `origin` was already `ai_assisted` o
 
 An open unique index on `origin_fingerprint` covers `proposed`, `accepted`, `scheduled`, and `active`. Acceptance also takes `pg_advisory_xact_lock(hashtext(fingerprint))`.
 
+`experiment_goals` stays. Surfaced candidates do not write it today. `goal_observation` remains a legal `origin_trigger` value and is not produced by the registry.
+
 ## Candidate registry
 
 Calculation version `experiment-suggestions-v1`. The registry is explicit. It does not discover types and it does not ask Gemini to search history.
 
-Implemented families, in product rank order, then stable candidate id. The list shows at most 3.
+Surfaced families, in product rank order, then stable candidate id. The list shows at most 3.
 
 1. `benchmark_retest_due` only when B3 status is `due`. The candidate pins that protocol version and anchor result. `available`, `waiting_minimum`, `unconfigured`, and `no_baseline` do not create a due candidate. A newer protocol version is not substituted for the due version.
 2. `benchmark_missing_baseline` for the current protocol version of an active benchmark with no valid comparable result.
-3. `goal_observation` from `compileGoalToExperimentCandidate`.
 
-Supported goal kinds: `body_metric`, `activity_steps`, `nutrition_protein`, `sleep_duration`, and `supplement_adherence` when the selector and unit match an existing Lab requirement. Supplement adherence copies an `at_least` percent into the existing `minimumAdherencePercent` criterion.
+`goal_observation` stays in `SUGGESTION_KINDS` as dormant vocabulary. `compileGoalToExperimentCandidate` always returns `supported: false`. `buildExperimentSuggestions` therefore never emits a Goal candidate. B4 was not expanded, and F4 did not add a second Goal evaluator.
 
-Unsupported, fail closed: `strength_e1rm`, `training_frequency`, `benchmark_result`, and anything else. F2 `repeated_pattern` is not a candidate family. Satisfied goals are omitted. An open experiment (`proposed`, `accepted`, `scheduled`, `active`) linked to the same benchmark or goal suppresses the candidate.
+`targetState = unknown` fails closed with a reason that missing current evidence is not an unmet target. Every other current Goal kind, including unmet `body_metric`, `activity_steps`, `nutrition_protein`, `sleep_duration`, and `supplement_adherence`, fails closed because Body, Activity, Nutrition, and Sleep requirements do not evaluate the Goal threshold, and supplement adherence does not lock `evaluationWindowDays` into Experiment scheduling.
 
-Windowed goal thresholds stay on the pinned goal version. Lab requirement criteria do not store those numeric targets, so F4 does not add a second evaluator. Accepted experiments start with null windows, matching manual creation. The review screen shows the duration as text.
+An open experiment (`proposed`, `accepted`, `scheduled`, `active`) linked to the same benchmark suppresses that benchmark candidate.
 
-Candidate ids:
+Candidate ids that can be emitted:
 
 - `benchmark-retest:<benchmarkId>:<protocolVersionId>:<anchorResultId>`
 - `benchmark-missing-baseline:<benchmarkId>:<protocolVersionId>`
-- `goal-observation:<goalId>:<goalVersionId>`
+
+The `goal-observation:<goalId>:<goalVersionId>` id format remains in the type vocabulary and is not emitted.
 
 The fingerprint covers kind, canonical ids, versions, eligibility, protocol definition, and evidence refs. It excludes time and AI wording.
 
@@ -70,21 +73,21 @@ Packet `experiment-suggestion-evidence-v1`. Prompt `experiment-suggestion-v1`. R
 
 Personal Lab shows Suggested experiments. It is not a primary tab. A benchmark suggestion may be labeled Challenge. Challenge is not a table.
 
-`POST /api/lab/experiment-suggestions/:candidateId/accept` accepts a fingerprint, an optional title, optional notes, and `usedAiDraft`. It ignores protocol JSON from the browser. The server rederives the candidate. A missing candidate or fingerprint mismatch returns `409` with code `stale_candidate`. The insert creates an experiment protocol version, requirements, the benchmark or goal link, and an experiment in status `accepted`.
+`POST /api/lab/experiment-suggestions/:candidateId/accept` accepts a fingerprint, an optional title, optional notes, and `usedAiDraft`. It ignores protocol JSON from the browser. The server rederives the candidate. A missing candidate or fingerprint mismatch returns `409` with code `stale_candidate`. The insert creates an experiment protocol version, requirements, the benchmark link, and an experiment in status `accepted`.
 
-Without a used draft, `origin_kind` is `deterministic_candidate`. With one, it is `ai_assisted`. `origin_trigger` stays the registry kind either way. The legacy `origin` value is `evidence_gap`, `stale_benchmark`, `goal_plateau`, or `ai_assisted`.
+Without a used draft, `origin_kind` is `deterministic_candidate`. With one, it is `ai_assisted`. `origin_trigger` stays the registry kind either way. The legacy `origin` value is `evidence_gap`, `stale_benchmark`, or `ai_assisted` for the families that can still be accepted.
 
 ## Backup and demo
 
-Unaccepted suggestions are not stored. Accepted origin columns and `experiment_goals` are in the full archive and the portable export. Portable experiment rows add `origin_label` and `origin_trigger_label`.
+Unaccepted suggestions are not stored. Accepted origin columns and `experiment_goals` are in the full archive and the portable export. Portable experiment rows add `origin_label` and `origin_trigger_label`. Backup and export tests for those fields still pass. Schema-head assertions still expect `0031_experiment_origins.sql`.
 
-`/demo/lab` shows one compiled due Push-up Capacity retest, the empty-state sentence, and the label “Example proposal — not generated live”. It does not call Gemini or create an experiment.
+`/demo/lab` shows one compiled due Push-up Capacity retest, the empty-state sentence, and the label “Example proposal — not generated live”. It does not call Gemini, create an experiment, or invent a Goal suggestion.
 
 Anonymous suggestion routes return 401. A non-owner returns 403. A wrong method returns 405 before auth. The Apple ingest token is not consulted.
 
 ## Implemented
 
-V2-A through V2-E, plus V2-F1 Ask Health, V2-F2 Proactive Insights, V2-F3 Weekly Coach Brief, and V2-F4 Experiment Suggestions. V2-F5 literature retrieval is not implemented.
+V2-A through V2-E, plus V2-F1 Ask Health, V2-F2 Proactive Insights, V2-F3 Weekly Coach Brief, and V2-F4 Experiment Suggestions for due Benchmark retests and missing Benchmark baselines. Goal-observation suggestions are deferred. V2-F5 literature retrieval is not implemented.
 
 Weekly facts, coach prose, insight cards, and unaccepted suggestions are derived. Ask Health transcripts are session-only.
 
@@ -97,16 +100,17 @@ Weekly facts, coach prose, insight cards, and unaccepted suggestions are derived
 
 ## Validation
 
-Recorded 2026-09-27 against this tree. There is no separate typecheck script. `npm run build` runs `tsc -b` and then `vite build`.
+Recorded 2026-09-27 against this tree. There is no separate typecheck script. `npm run build` runs `tsc -b` and then `vite build`. `npx tsc -b` was also run on its own before the test suite.
 
 - `npx eslint .`: exit 0. No findings.
-- `npm test`: exit 0. 103 files passed, 872 tests passed. Duration 25.51s.
-- `npm run build`: exit 0. `tsc -b` completed, then Vite reported `built in 9.94s`. Vite warned that some chunks are larger than 500 kB. The warning did not fail the build.
-- `npm run migrate`: exit 0. Applied `0030_ai_usage.sql` and `0031_experiment_origins.sql`.
+- `npx tsc -b`: exit 0.
+- `npm test`: exit 0. 103 files passed, 872 tests passed. Duration 27.52s. Benchmark due-retest, missing-baseline, ranking, stale-candidate, and duplicate-accept tests stayed green. F1, F2, and F3 suites stayed green.
+- `npm run build`: exit 0. Vite reported `built in 9.86s`. Vite warned that some chunks are larger than 500 kB. The warning did not fail the build.
+- No migration command was run.
 
 ## Manual QA
 
-`/demo/lab` on the running dev server showed the fictional Challenge “Push-up Capacity retest”, the due reason, “67 reps · 2026-06-18”, “Push-up Capacity · v2”, the compiled example label, and “No evidence-grounded experiment suggestions right now.” Demo navigation stayed on the public tabs. No create control is on that page.
+`/demo/lab` on the running dev server at `http://127.0.0.1:5173/demo/lab` showed the fictional Challenge “Push-up Capacity retest”, “Push-up Capacity retest is due.”, “67 reps · 2026-06-18”, “Push-up Capacity · v2”, “Example proposal — not generated live”, and “No evidence-grounded experiment suggestions right now.” The page copy says nothing there creates an experiment. No Goal suggestion was shown. Demo navigation stayed on the public tabs. Owner Lab remains behind sign-in, so that path was not exercised.
 
 ## Debt relevant to the next task
 
@@ -118,9 +122,7 @@ Recorded 2026-09-27 against this tree. There is no separate typecheck script. `n
 
 ## Deviations
 
-- Goal observation does not invent an evaluator for e1RM, training frequency, or benchmark-result goals.
-- Accepted suggestion experiments do not write `window_start` / `window_end`. The owner schedules later through the existing Lab action.
-- F1, F2, and F3 request behavior was left in place. The shared AI config gained `experimentSuggestionMaxRequestCostUsd` with the same $0.05 default.
+- None. The correction fails closed instead of extending B4. `experiment_goals` and the `goal_observation` enum stay unused by the surfaced registry. Accepted suggestion experiments still do not write `window_start` / `window_end`.
 
 ## Handoff
 
