@@ -13,6 +13,7 @@ import { analyzeCrossDomain, findingCopy, type IntelligenceTrainingSession } fro
 import { formatBodyMass } from '../body-metrics.js'
 import { formatCalendarRange } from '../calendar-format.js'
 import { buildTodaySupplementSection, type TodaySupplementInput, type TodaySupplementSection } from '../supplements/index.js'
+import type { GoalAttentionItem } from '../goal-status.js'
 import {
   selectTodayBodyReminder,
   type CadenceConfig,
@@ -69,6 +70,7 @@ export type TodaySources = {
   pendingJobs: readonly TodayPendingJob[]
   supplements?: readonly TodaySupplementInput[]
   context?: DailyContext | null
+  goalAttention?: readonly GoalAttentionItem[]
   lab?: {
     experiments: readonly TodayLabExperiment[]
     retests?: readonly BenchmarkRetestView[]
@@ -113,8 +115,10 @@ export type TodayViewModel = {
     latest: { value: number; unit: string; calendarDate: string; ageDays: number; measuredLabel: string } | null
     trendText: string | null
     measurementDue: TodayBodyReminder | null
+    goalSupport: string | null
   }
   pendingItems: Array<{ id: string; title: string; href: string; action: string }>
+  goalAttention: GoalAttentionItem[]
   changedItems: Array<{
     id: string
     direction: 'higher' | 'lower' | null
@@ -129,6 +133,7 @@ export type TodayViewModel = {
     experiments: TodayLabExperiment[]
     retest: BenchmarkRetestView | null
     otherDueRetestCount: number
+    goalSupport: string | null
   }
 }
 
@@ -205,6 +210,7 @@ function todayLab(sources: TodaySources): TodayViewModel['lab'] {
     experiments: [...(sources.lab?.experiments ?? [])],
     retest: selected.retest,
     otherDueRetestCount: selected.otherDueCount,
+    goalSupport: null,
   }
 }
 
@@ -227,6 +233,26 @@ export function buildTodayView(sources: TodaySources): TodayViewModel {
   const trend = bodyWeightTrend(weights)
   const trendFinding = findingsFromBodyWeightTrend(trend, [])[0] ?? null
   const night = todaySleep(sources.sleepNights, date)
+  const measurementDue = selectTodayBodyReminder(
+    sources.bodyCadence?.configs ?? [],
+    sources.bodyCadence?.observations ?? [],
+    date,
+  )
+  const lab = todayLab(sources)
+  const absorbed = new Set<string>()
+  let bodyGoalSupport: string | null = null
+  let labGoalSupport: string | null = null
+  for (const item of sources.goalAttention ?? []) {
+    if (measurementDue && item.key === `body_metric_due:${measurementDue.metricKey}`) {
+      bodyGoalSupport = item.detail
+      absorbed.add(item.key)
+    }
+    if (lab.retest && item.key === `benchmark_retest_due:${lab.retest.benchmarkDefinitionId}/${lab.retest.protocolVersionId}`) {
+      labGoalSupport = item.detail
+      absorbed.add(item.key)
+    }
+  }
+  const goalAttention = (sources.goalAttention ?? []).filter((item) => !absorbed.has(item.key))
   const kind = sleepKind(night)
   const latest = sources.latestCompleteSleep
   const showLatest = kind === 'none' && latest && latest.sleepDate !== date && latest.analysisEligible && finite(latest.totalSleepMinutes)
@@ -329,15 +355,12 @@ export function buildTodayView(sources: TodaySources): TodayViewModel {
         trend.status === 'available' && latestWeight
           ? `Weight trend ${signedMass(trend.value.slopePerWeek, latestWeight.unit)} per week`
           : null,
-      measurementDue: selectTodayBodyReminder(
-        sources.bodyCadence?.configs ?? [],
-        sources.bodyCadence?.observations ?? [],
-        date,
-      ),
+      measurementDue,
+      goalSupport: bodyGoalSupport,
     },
     supplements: buildTodaySupplementSection(date, sources.supplements ?? []),
     context: todayContextFromRecord(sources.context ?? null),
-    lab: todayLab(sources),
+    lab: { ...lab, goalSupport: labGoalSupport },
     pendingItems: [
       ...sources.pendingJobs.flatMap((job) => {
         const title = attentionTitle(job)
@@ -355,6 +378,7 @@ export function buildTodayView(sources: TodaySources): TodayViewModel {
           action: 'Review result',
         })),
     ],
+    goalAttention,
     changedItems,
     patterns,
   }

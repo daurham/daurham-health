@@ -100,13 +100,27 @@ export function TodayBoard({
   const prefix = useAppPathPrefix()
   return (
     <div className="space-y-3">
-      {view.pendingItems.length > 0 ? (
+      {view.pendingItems.length > 0 || view.goalAttention.length > 0 ? (
         <section className="rounded-lg border border-zinc-200 bg-white p-4">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Needs attention</h2>
           <ul className="mt-3 space-y-2">
             {view.pendingItems.map((item) => (
               <li key={item.id} className="flex items-center justify-between gap-3">
                 <p className="min-w-0 text-sm text-zinc-800">{item.title}</p>
+                <Link
+                  to={prefixedPath(prefix, item.href)}
+                  className="inline-flex min-h-11 shrink-0 items-center rounded-md bg-zinc-900 px-3 text-sm font-medium text-white"
+                >
+                  {item.action}
+                </Link>
+              </li>
+            ))}
+            {view.goalAttention.map((item) => (
+              <li key={item.key} className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm text-zinc-800">{item.title}</p>
+                  <p className="text-sm text-zinc-600">{item.detail}</p>
+                </div>
                 <Link
                   to={prefixedPath(prefix, item.href)}
                   className="inline-flex min-h-11 shrink-0 items-center rounded-md bg-zinc-900 px-3 text-sm font-medium text-white"
@@ -180,6 +194,7 @@ function LabRetestCard({ view }: { view: TodayViewModel }) {
         Last result
         {primary ? ` ${primary}` : ''} · {retestAgePhrase(retest.daysSinceResult)}
       </p>
+      {view.lab.goalSupport ? <p className="mt-1 text-sm text-zinc-600">{view.lab.goalSupport}</p> : null}
       {others ? <p className="mt-1 text-sm text-zinc-600">{others}</p> : null}
       <Link to={prefixedPath(prefix, `/lab/benchmarks/${retest.benchmarkDefinitionId}`)} className={`${quietButtonClass} mt-3`}>
         Open benchmark
@@ -705,6 +720,7 @@ function BodyCard({ view }: { view: TodayViewModel }) {
           <p className="font-medium text-zinc-900">{copy.title}</p>
           <p className="text-zinc-600">{copy.detail}</p>
           {copy.more ? <p className="text-zinc-600">{copy.more}</p> : null}
+          {body.goalSupport ? <p className="text-zinc-600">{body.goalSupport}</p> : null}
         </div>
       ) : null}
       <div className="mt-3 flex flex-wrap items-center gap-x-4">

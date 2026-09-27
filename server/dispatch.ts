@@ -43,6 +43,7 @@ import todayHandler from './handlers/today.js'
 import supplementsHandler from './handlers/supplements.js'
 import contextHandler from './handlers/context.js'
 import labHandler from './handlers/lab.js'
+import goalsHandler from './handlers/goals.js'
 import backupExportHandler from './handlers/backup-export.js'
 
 export type HealthApiRoute =
@@ -90,6 +91,7 @@ export type HealthApiRoute =
   | 'supplements'
   | 'context'
   | 'lab'
+  | 'goals'
   | 'backup-export'
 
 type HealthApiHandler = (req: ApiRequest, res: ApiResponse) => unknown | Promise<unknown>
@@ -139,6 +141,7 @@ const HANDLERS: Record<HealthApiRoute, HealthApiHandler> = {
   supplements: supplementsHandler,
   context: contextHandler,
   lab: labHandler,
+  goals: goalsHandler,
   'backup-export': backupExportHandler,
 }
 
@@ -236,6 +239,9 @@ export function matchHealthApiRoute(pathname: string): HealthApiRoute | null {
   }
   if (pathname === '/api/lab' || pathname.startsWith('/api/lab/')) {
     return 'lab'
+  }
+  if (pathname === '/api/goals' || pathname.startsWith('/api/goals/')) {
+    return 'goals'
   }
   if (pathname === '/api/body/measurements' || pathname.startsWith('/api/body/measurements/')) {
     return 'body-measurements'

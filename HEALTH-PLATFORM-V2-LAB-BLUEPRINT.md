@@ -1,9 +1,9 @@
 # Daurham Health — V2 Lab Blueprint
 
-**Status:** V2-A Data Capture Foundations complete. V2-B Personal Lab Core complete (V2-B1 through V2-B4). V2-C Recipes / Batch Meals complete (V2-C1 through V2-C4).  
+**Status:** V2-A Data Capture Foundations complete. V2-B Personal Lab Core complete (V2-B1 through V2-B4). V2-C Recipes / Batch Meals complete (V2-C1 through V2-C4). V2-D Goals + Projections complete (V2-D1 through V2-D3).  
 **Calendar:** America/Phoenix  
 **Package version:** remains `1.0.0`  
-**Schema head after V2-C4:** `0027_nutrition_food_ai_source.sql`
+**Schema head after V2-D3:** `0028_goals.sql`
 
 This file is the v2 product authority for work after the frozen v1 manual. The frozen manual remains the authority for retained v1 semantics. Where this blueprint intentionally extends the product, it takes precedence over the older post-v1 roadmap in the v1 manual and in `docs/V2-ROADMAP.md`.
 
@@ -30,7 +30,12 @@ The file was not present in the repository when V2-A1 implementation started. Th
    - V2-C3 Recipe consumption logging — implemented
    - V2-C4 In-builder ingredient creation — implemented
    - V2-C Recipes / Batch Meals — complete
-4. Later product work, including Goals and Ask Health, stays behind this foundation.
+4. **V2-D Goals**
+   - V2-D1 First-Class Goals — implemented
+   - V2-D2 Deterministic projections — implemented
+   - V2-D3 goal-aware status and reminders — implemented
+   - V2-D Goals + Projections — complete
+5. Later product work, including Ask Health, stays behind this foundation.
 
 Invariant:
 
@@ -378,6 +383,43 @@ Preview and commit still reload `nutrition_foods` and apply the existing fingerp
 ## Amendment — 2026-09-27T09:18:47-07:00 — V2-C4 provenance correction
 
 USDA reusable foods keep `source_kind = 'usda'` on `nutrition_foods`. The FDC id is `source_record_links.external_id` for data source `usda_fooddata_central` and entity type `nutrition_food`. The fingerprint also includes the reviewed serving amount, unit, and grams, so one FDC food may have more than one reusable serving. Reuse does not read notes, brand, or name. A text description saved as a reusable food uses `source_kind = 'description_ai'`. Meal Photo remains `meal_photo_ai`. Ordinary Food Description remains a consumption entry. Migration `0027_nutrition_food_ai_source.sql` is the schema head. Package version remains `1.0.0`. V2-C Recipes / Batch Meals stays complete. Recipe versions are not rewritten.
+
+## Amendment — 2026-09-27T09:27:03-07:00 — Portable USDA provenance
+
+The full archive still stores `data_sources`, `source_record_links`, and `nutrition_foods` with their canonical ids. The portable owner export does not include those source-link foreign keys. A USDA food in that export carries `external_provenance` with provider `usda_fooddata_central`, the FDC `external_id`, and the serving-basis `external_fingerprint`. The reviewed serving stays on the food row. The seeded source UUID is not exported. Portable JSON is not a second restore path. Schema head remains `0027_nutrition_food_ai_source.sql`. Package version remains `1.0.0`.
+
+## Amendment — 2026-09-27T09:57:21-07:00 — V2-D1 First-Class Goals
+
+V2-D1 is implemented. Migration `0028_goals.sql` adds `goals` and `goal_versions`. Schema head is `0028_goals.sql`. Package version remains `1.0.0`. V2-D2 and V2-D3 are not implemented.
+
+A Goal is the metric the owner chose, the original target, later target revisions, the current revision, and the current lifecycle. It does not say when the target will be reached, and it does not say the owner is on or off track.
+
+Supported kinds are body metric, strength e1RM, benchmark result, training frequency, activity steps, nutrition protein, sleep duration, and supplement adherence. Nutrition consistency, sleep consistency, and general activity stay unsupported. The selector is structured columns. An arbitrary metric string is rejected. The selector does not change after creation.
+
+Version 1 is written with the goal. A target revision locks the current version, requires `sourceVersionId`, inserts the next version, and leaves the previous version unchanged. Lifecycle changes do not create a version. Status is active, paused, or completed. Only the owner completes a goal. A current observation that meets the target does not.
+
+Body goals use the existing body metric keys and display units `lb`, `in`, and `%`. Strength goals reference an exercise definition. Benchmark goals pin the protocol version and one primary or secondary outcome. The benchmark unit comes from that outcome. Training frequency is at least N canonical training sessions per fixed 7 days and does not count Apple Activity workouts. Activity steps average observed completed days. Protein averages logged days with a known total. Sleep averages analysis-eligible nights and leaves partial nights out of the average. Supplement adherence is taken divided by taken plus skipped. Unknown is not skipped. Missing evidence stays null.
+
+Target modes are `at_least`, `at_most`, and `range` where that mode fits the kind. The target date is optional. Evaluation windows belong to the version. Point metrics have no window. There is no projection table, no reminder, and no AI endpoint that commits a goal. `/goals` is a private route linked from Settings and Progress. It is not a primary navigation tab. `/demo/goals` is omitted. Backup and portable export include both tables. Portable rows add a readable selector label and the manual source key. Those labels are not a restore path.
+
+## Amendment — 2026-09-27T10:16:35-07:00 — V2-D2 Deterministic Goal Projections
+
+V2-D2 is implemented. There is no migration. Schema head remains `0028_goals.sql`. Package version remains `1.0.0`. V2-D3 is not implemented.
+
+Projections are derived on read. The calculation version is `goal-projection-v1`. It is not a Goal Version. Only active body-metric and strength e1RM goals are projected. Benchmark results, training frequency, steps, protein, sleep duration, and supplement adherence are `not_applicable`. Paused and completed goals are `not_applicable_lifecycle`.
+
+The slope is Theil–Sen. Slope dispersion is the 25th and 75th percentile of the same pairwise slopes. It is not a confidence interval. All three slopes must move toward the owner-chosen boundary. A current value that already meets the target produces no ETA. Body evidence is the trailing 90 days and keeps the five-measurement, 14-day gate, with one observation per calendar date. Strength evidence is the trailing 180 days, one canonical e1RM per exercise appearance, at least six appearances spanning 28 days. The horizon is `min(365, max(90, spanDays * 4))`. Crossing dates use `ceil` of the unrounded day count after `asOf`.
+
+The target date does not change the observed slope. Nothing is stored, exported as an ETA, or sent to a model. Goal detail can show an estimated window. It does not say the owner will arrive on that date, and it does not say the owner is on or off track.
+
+## Amendment — 2026-09-27T10:36:03-07:00 — V2-D3 Goal-Aware Status + Reminders
+
+V2-D3 is implemented. There is no migration and no status table. Schema head remains `0028_goals.sql`. Package version remains `1.0.0`. V2-D Goals + Projections is complete.
+
+Status is derived on read as `goal-status-v1`. `targetState` and `deadlineState` stay separate. Missing evidence is unknown. Meeting a target does not complete the goal. On track means the entire available D2 window falls on or before the owner-chosen date. Off track means the entire window falls after that date. Overlap stays uncertain. An unavailable projection is not off track. A passed date does not invent a historical failure.
+
+Reminders are current in-app attention. Body uses the existing A2 cadence. Benchmarks use the pinned protocol version and only a B3 `due` state. There is no invented strength cadence and no coaching for training, steps, protein, sleep, or supplements. Today returns at most two goal-derived items, after existing review work, and dedupes them against the domain item. Paused and completed goals suppress that attention. Nothing is stored, exported, or sent to a model. There is no push, email, or SMS.
+
 
 
 

@@ -1,6 +1,6 @@
 export const BACKUP_FORMAT = 'daurham-health-backup'
 export const BACKUP_FORMAT_VERSION = 1
-export const LATEST_SCHEMA_MIGRATION = '0027_nutrition_food_ai_source.sql'
+export const LATEST_SCHEMA_MIGRATION = '0028_goals.sql'
 export const PORTABLE_EXPORT_BYTE_LIMIT = 3_500_000
 
 export type ColumnKind = 'uuid' | 'text' | 'date' | 'timestamptz' | 'numeric' | 'int' | 'bool' | 'json' | 'bytea'
@@ -839,6 +839,64 @@ export const BACKUP_TABLES: readonly BackupTable[] = [
       col('source_id', 'uuid'),
       col('created_at', 'timestamptz'),
       col('updated_at', 'timestamptz'),
+    ],
+  }),
+  table({
+    name: 'goals',
+    backupClass: 'canonical',
+    primaryKey: ['id'],
+    seeded: false,
+    portable: true,
+    references: [
+      { column: 'source_id', table: 'data_sources' },
+      { column: 'exercise_definition_id', table: 'exercise_definitions' },
+      { column: 'benchmark_definition_id', table: 'benchmark_definitions' },
+      { column: 'benchmark_protocol_version_id', table: 'lab_protocol_versions' },
+      { column: 'benchmark_requirement_id', table: 'lab_protocol_requirements' },
+      { column: 'supplement_id', table: 'supplements' },
+    ],
+    columns: [
+      col('id', 'uuid'),
+      col('goal_kind', 'text'),
+      col('status', 'text'),
+      col('started_on', 'date'),
+      col('body_metric_key', 'text'),
+      col('exercise_definition_id', 'uuid'),
+      col('benchmark_definition_id', 'uuid'),
+      col('benchmark_protocol_version_id', 'uuid'),
+      col('benchmark_requirement_id', 'uuid'),
+      col('supplement_id', 'uuid'),
+      col('source_id', 'uuid'),
+      col('paused_at', 'timestamptz'),
+      col('completed_at', 'timestamptz'),
+      col('created_at', 'timestamptz'),
+      col('updated_at', 'timestamptz'),
+    ],
+  }),
+  table({
+    name: 'goal_versions',
+    backupClass: 'canonical',
+    primaryKey: ['id'],
+    seeded: false,
+    portable: true,
+    references: [
+      { column: 'goal_id', table: 'goals' },
+      { column: 'source_id', table: 'data_sources' },
+    ],
+    columns: [
+      col('id', 'uuid'),
+      col('goal_id', 'uuid'),
+      col('version', 'int'),
+      col('is_current', 'bool'),
+      col('target_mode', 'text'),
+      col('target_min', 'numeric'),
+      col('target_max', 'numeric'),
+      col('target_unit', 'text'),
+      col('target_date', 'date'),
+      col('evaluation_window_days', 'int'),
+      col('notes', 'text'),
+      col('source_id', 'uuid'),
+      col('created_at', 'timestamptz'),
     ],
   }),
   table({

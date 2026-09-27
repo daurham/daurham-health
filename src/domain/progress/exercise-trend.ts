@@ -1,5 +1,5 @@
 import { PROGRESS_ANALYTICS_CONFIG } from './config.js'
-import { sessionStrengthPoint } from './exercise-performance.js'
+import { compareSetChronology, sessionStrengthPoint } from './exercise-performance.js'
 import { median, percentChange } from './statistics.js'
 import { sessionExternalVolumeKg } from './volume.js'
 import {
@@ -22,6 +22,28 @@ export type ExerciseTrendValue = {
   previousMedian: number
   observationCount: number
   basis: 'recent_3_vs_previous_3'
+}
+
+export function appearanceStrengthSeries(
+  sets: readonly CanonicalSetRecord[],
+  exercise: ProgressExerciseDefinition,
+): SessionStrengthPoint[] {
+  const groups = new Map<string, CanonicalSetRecord[]>()
+  const order: string[] = []
+  for (const set of [...sets].sort(compareSetChronology)) {
+    const key = `${set.sessionId}:${set.sessionExerciseId}`
+    const existing = groups.get(key)
+    if (existing) {
+      existing.push(set)
+    } else {
+      groups.set(key, [set])
+      order.push(key)
+    }
+  }
+  return sessionStrengthHistory(
+    order.map((key) => groups.get(key)!),
+    exercise,
+  )
 }
 
 export function sessionStrengthHistory(

@@ -16,7 +16,7 @@ Personal health record for one owner. Frozen release **v1.0.0** (2026-09-22, Ame
 
 ## Data
 
-- Schema migrations live in `migrations/`. The current migration is `0027_nutrition_food_ai_source.sql`. Apply them with `npm run migrate`.
+- Schema migrations live in `migrations/`. The current migration is `0028_goals.sql`. Apply them with `npm run migrate`.
 - Full backup, verify, and restore commands are in `docs/BACKUP.md`.
 - Release checks are in `docs/V1-RELEASE-CHECKLIST.md`.
 

@@ -11,6 +11,8 @@ import { benchmarkIdsWithActionableExperiment } from '../../src/domain/lab-retes
 import { listTodayLabExperiments } from '../lab/service.js'
 import { listBenchmarkRetests, listRetestExperimentLinks } from '../lab/retests.js'
 import { loadCadenceEvidence } from '../body/cadence-service.js'
+import { goalAttentionForToday } from '../goals/service.js'
+import { listProtocolRetestViews } from '../lab/retests.js'
 import {
   latestCompleteSleepNight,
   listActivityDaysBetween,
@@ -43,6 +45,8 @@ export async function getTodayView(now = new Date()): Promise<TodayViewModel> {
       listBenchmarkRetests(date),
       listRetestExperimentLinks(),
     ])
+  const protocolRetests = await listProtocolRetestViews(date)
+  const goalAttention = await goalAttentionForToday(date, bodyCadence, protocolRetests)
   const pendingJobs: TodayPendingJob[] = [
     ...workoutJobs.map((job) => ({ id: job.id, kind: 'workout_transcription' as const, status: job.status })),
     ...labelJobs.map((job) => ({ id: job.id, kind: 'nutrition_label' as const, status: job.status })),
@@ -63,6 +67,7 @@ export async function getTodayView(now = new Date()): Promise<TodayViewModel> {
     pendingJobs,
     supplements,
     context,
+    goalAttention,
     lab: {
       experiments: labExperiments,
       retests: retests.retests,

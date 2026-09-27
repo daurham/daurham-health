@@ -1,5 +1,7 @@
 import { createHash } from 'node:crypto'
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate'
+import { bodyGoalDisplayName, goalKindDefinition } from '../../src/domain/goals.js'
+import { NUTRITION_FOOD_ENTITY, USDA_FOODDATA_SOURCE_KEY } from '../../src/domain/nutrition/config.js'
 import { HEALTH_CALENDAR_TIME_ZONE } from '../../src/domain/time.js'
 import {
   AUTH_TABLES_EXCLUDED,
@@ -178,7 +180,7 @@ function readme(manifest: Pick<BackupManifest, 'createdAt' | 'profile' | 'schema
     'Photos that live only on Home-AI disk are not included.',
     manifest.profile === 'full'
       ? 'Gemini capture images stored in nutrition_capture_jobs are included as base64.'
-      : 'This portable export omits raw activity samples, raw sleep intervals, capture jobs, and import provenance. Use the backup CLI for full recovery.',
+      : 'This portable export omits raw activity samples, raw sleep intervals, capture jobs, and database source-link ids. A USDA food includes its provider key, FoodData Central id, and serving fingerprint. Use the backup CLI for full recovery.',
     '',
     'tables/*.ndjson is the machine-readable copy used for restore.',
     'csv/*.csv is for reading. Empty CSV fields mean unknown, not zero. CSV is not used to restore.',
@@ -201,11 +203,12 @@ export function buildBackupArchive(input: {
   for (const definition of selected) {
     const rows = input.rowsByTable[definition.name] ?? []
     const normalized = rows.map((row) => normalizeRow(definition, row))
-    rowsForCsv[definition.name] = normalized
-    const bytes = encodeNdjson(normalized)
+    const projected = projectPortableRows(input.profile, definition.name, normalized, input.rowsByTable)
+    rowsForCsv[definition.name] = projected
+    const bytes = encodeNdjson(projected)
     const file = tableFileName(definition.name)
     files[file] = bytes
-    tableMeta[definition.name] = { rows: normalized.length, file, sha256: sha256(bytes) }
+    tableMeta[definition.name] = { rows: projected.length, file, sha256: sha256(bytes) }
   }
   const csvFiles = csvBundle(rowsForCsv)
   const csvMeta: BackupManifest['csv'] = {}
@@ -228,6 +231,147 @@ export function buildBackupArchive(input: {
   files[MANIFEST_NAME] = strToU8(`${JSON.stringify(manifest, null, 2)}\n`)
   files[README_NAME] = strToU8(readme(manifest))
   return zipSync(files)
+}
+
+function projectPortableRows(
+  profile: BackupProfile,
+  table: string,
+  rows: BackupRow[],
+  rowsByTable: Record<string, readonly BackupRow[]>,
+): BackupRow[] {
+  if (profile !== 'portable') {
+    return rows
+  }
+  if (table === 'nutrition_foods') {
+    return withPortableUsdaProvenance(rows, rowsByTable)
+  }
+  if (table === 'goals') {
+    return withPortableGoalContext(rows, rowsByTable)
+  }
+  if (table === 'goal_versions') {
+    return withPortableSourceKey(rows, rowsByTable)
+  }
+  return rows
+}
+
+function sourceKeyById(rowsByTable: Record<string, readonly BackupRow[]>): Map<string, string> {
+  const keys = new Map<string, string>()
+  for (const source of rowsByTable.data_sources ?? []) {
+    if (typeof source.id === 'string' && typeof source.key === 'string') {
+      keys.set(source.id, source.key)
+    }
+  }
+  return keys
+}
+
+function textById(rows: readonly BackupRow[] | undefined, idColumn: string, labelColumn: string): Map<string, string> {
+  const labels = new Map<string, string>()
+  for (const row of rows ?? []) {
+    if (typeof row[idColumn] === 'string' && typeof row[labelColumn] === 'string') {
+      labels.set(row[idColumn], row[labelColumn])
+    }
+  }
+  return labels
+}
+
+/** Portable-only semantic labels. Not database columns and not part of the full archive. */
+export function withPortableGoalContext(
+  goals: readonly BackupRow[],
+  rowsByTable: Record<string, readonly BackupRow[]>,
+): BackupRow[] {
+  const sources = sourceKeyById(rowsByTable)
+  const exercises = textById(rowsByTable.exercise_definitions, 'id', 'name')
+  const supplements = textById(rowsByTable.supplements, 'id', 'name')
+  const protocols = textById(rowsByTable.lab_protocols, 'id', 'title')
+  const benchmarks = new Map<string, string>()
+  for (const benchmark of rowsByTable.benchmark_definitions ?? []) {
+    if (typeof benchmark.id === 'string' && typeof benchmark.protocol_id === 'string') {
+      const title = protocols.get(benchmark.protocol_id)
+      if (title) {
+        benchmarks.set(benchmark.id, title)
+      }
+    }
+  }
+  const requirements = textById(rowsByTable.lab_protocol_requirements, 'id', 'label')
+  return goals.map((goal) => {
+    const kind = typeof goal.goal_kind === 'string' ? goal.goal_kind : ''
+    let selectorLabel = goalKindDefinition(kind)?.displayName ?? kind
+    if (kind === 'body_metric' && typeof goal.body_metric_key === 'string') {
+      selectorLabel = bodyGoalDisplayName(goal.body_metric_key)
+    } else if (kind === 'strength_e1rm' && typeof goal.exercise_definition_id === 'string') {
+      selectorLabel = `${exercises.get(goal.exercise_definition_id) ?? 'Exercise'} e1RM`
+    } else if (kind === 'benchmark_result' && typeof goal.benchmark_requirement_id === 'string') {
+      selectorLabel = requirements.get(goal.benchmark_requirement_id) ?? benchmarks.get(String(goal.benchmark_definition_id)) ?? selectorLabel
+    } else if (kind === 'supplement_adherence' && typeof goal.supplement_id === 'string') {
+      selectorLabel = `${supplements.get(goal.supplement_id) ?? 'Supplement'} adherence`
+    }
+    const sourceKey = typeof goal.source_id === 'string' ? sources.get(goal.source_id) ?? null : null
+    return {
+      ...goal,
+      selector_label: selectorLabel,
+      source_key: sourceKey,
+    }
+  })
+}
+
+export function withPortableSourceKey(
+  rows: readonly BackupRow[],
+  rowsByTable: Record<string, readonly BackupRow[]>,
+): BackupRow[] {
+  const sources = sourceKeyById(rowsByTable)
+  return rows.map((row) => ({
+    ...row,
+    source_key: typeof row.source_id === 'string' ? sources.get(row.source_id) ?? null : null,
+  }))
+}
+
+/** Portable-only semantic USDA identity. Not a database column and not part of the full archive. */
+export function withPortableUsdaProvenance(
+  foods: readonly BackupRow[],
+  rowsByTable: Record<string, readonly BackupRow[]>,
+): BackupRow[] {
+  const sourceKeyById = new Map<string, string>()
+  for (const source of rowsByTable.data_sources ?? []) {
+    if (typeof source.id === 'string' && typeof source.key === 'string') {
+      sourceKeyById.set(source.id, source.key)
+    }
+  }
+  const linkByFood = new Map<string, { externalId: string; fingerprint: string }>()
+  for (const link of rowsByTable.source_record_links ?? []) {
+    if (link.entity_type !== NUTRITION_FOOD_ENTITY || typeof link.entity_id !== 'string') {
+      continue
+    }
+    if (typeof link.source_id !== 'string' || sourceKeyById.get(link.source_id) !== USDA_FOODDATA_SOURCE_KEY) {
+      continue
+    }
+    if (typeof link.external_id !== 'string' || typeof link.external_fingerprint !== 'string') {
+      continue
+    }
+    linkByFood.set(link.entity_id, {
+      externalId: link.external_id,
+      fingerprint: link.external_fingerprint,
+    })
+  }
+  return foods.map((food) => {
+    if (food.source_kind !== 'usda' || typeof food.id !== 'string') {
+      return food
+    }
+    const link = linkByFood.get(food.id)
+    if (!link) {
+      return food
+    }
+    return {
+      ...food,
+      external_provenance: JSON.stringify({
+        source: {
+          kind: 'usda',
+          provider: USDA_FOODDATA_SOURCE_KEY,
+          external_id: link.externalId,
+          external_fingerprint: link.fingerprint,
+        },
+      }),
+    }
+  })
 }
 
 function normalizeRow(definition: BackupTable, row: BackupRow): BackupRow {

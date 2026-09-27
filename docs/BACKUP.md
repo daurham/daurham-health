@@ -54,7 +54,7 @@ Then confirm row counts in the destination match the dry-run list. Derived sleep
 
 - Passwords, sessions, API keys, and the Apple Health ingest token
 - Photos that exist only on Home-AI disk
-- A Settings download may be a portable export when the full archive is large. Portable exports omit raw samples, raw sleep intervals, and capture jobs. Use the CLI archive for disaster recovery.
+- A Settings download may be a portable export when the full archive is large. Portable exports omit raw samples, raw sleep intervals, capture jobs, and database source-link ids. A USDA food in that export still includes its provider key, FoodData Central id, and serving fingerprint. Use the CLI archive for disaster recovery.
 
 Settings → Data & Backup downloads a private copy for the signed-in owner. The machine ingest token cannot read it.
 
@@ -65,6 +65,8 @@ Owner Health data includes Body sessions, metrics, and measurement cadence (`bod
 ## Supplements
 
 Owner Health data includes supplement definitions, schedules, lifecycle events, and explicit taken/skipped adherence (`supplements`, `supplement_schedules`, `supplement_status_events`, `supplement_adherence`). They are in the full archive and in the portable export. An absent adherence row means the dose is unknown, not skipped. Restore keeps the original ids, dates, timestamps, and nulls.
+
+Owner Health data includes goals and their target versions (`goals`, `goal_versions`). Both are in the full archive and in the portable export. Restore inserts exercise definitions, supplements, lab protocol requirements, and benchmark definitions before goals, then goal versions. A goal keeps its selector, status, start date, and every version, including a null target date and a range. The portable export adds `selector_label` and `source_key` so the metric can be read without only a UUID. The full archive does not add those fields, and they are not restored.
 
 ## Daily context
 

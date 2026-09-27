@@ -171,6 +171,13 @@ export function ProgressOverviewRoute() {
           Open Lab
         </Link>
       </section>
+      <section className="rounded-lg border border-zinc-200 bg-white p-4">
+        <h2 className="text-sm font-semibold text-zinc-900">Goals</h2>
+        <p className="mt-1 text-sm text-zinc-600">Current targets across Body, Training, Activity, Nutrition, Sleep, and Supplements</p>
+        <Link to="/goals" className={`${quietButtonClass} mt-3 inline-flex`}>
+          Open Goals
+        </Link>
+      </section>
     </div>
   )
 }

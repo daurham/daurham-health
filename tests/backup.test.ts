@@ -13,7 +13,14 @@ import {
 import { AUTH_TABLES_EXCLUDED, BACKUP_TABLES, LATEST_SCHEMA_MIGRATION, tablesForProfile } from '../server/backup/inventory.ts'
 
 const SOURCE = '11111111-1111-4111-8111-111111111111'
+const USDA_SOURCE = '10101010-1010-4010-8010-101010101010'
 const FOOD = '22222222-2222-4222-8222-222222222222'
+const USDA_FOOD_OZ = '20202020-2020-4020-8020-202020202020'
+const USDA_FOOD_GRAMS = '30303030-3030-4030-8030-303030303030'
+const USDA_LINK_OZ = '40404040-4040-4040-8040-404040404040'
+const USDA_LINK_GRAMS = '50505050-5050-4050-8050-505050505050'
+const USDA_FINGERPRINT_OZ = 'usda-fdc-serving-v1|{"amount":4,"fdcId":171477,"grams":112,"unit":"oz"}'
+const USDA_FINGERPRINT_GRAMS = 'usda-fdc-serving-v1|{"amount":100,"fdcId":171477,"grams":100,"unit":"g"}'
 const RECIPE = 'c1c1c1c1-c1c1-41c1-81c1-c1c1c1c1c1c1'
 const RECIPE_VERSION = 'c2c2c2c2-c2c2-42c2-82c2-c2c2c2c2c2c2'
 const RECIPE_LINE = 'c3c3c3c3-c3c3-43c3-83c3-c3c3c3c3c3c3'
@@ -40,6 +47,13 @@ const CHECKPOINT = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
 const DAY = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
 const NIGHT = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'
 const SUPPLEMENT = 'ffffffff-ffff-4fff-8fff-ffffffffffff'
+const GOAL_BODY = 'd1d1d1d1-d1d1-41d1-81d1-d1d1d1d1d1d1'
+const GOAL_BODY_V1 = 'd2d2d2d2-d2d2-42d2-82d2-d2d2d2d2d2d2'
+const GOAL_BODY_V2 = 'd3d3d3d3-d3d3-43d3-83d3-d3d3d3d3d3d3'
+const GOAL_BENCH = 'd4d4d4d4-d4d4-44d4-84d4-d4d4d4d4d4d4'
+const GOAL_BENCH_V1 = 'd5d5d5d5-d5d5-45d5-85d5-d5d5d5d5d5d5'
+const GOAL_SUP = 'd6d6d6d6-d6d6-46d6-86d6-d6d6d6d6d6d6'
+const GOAL_SUP_V1 = 'd7d7d7d7-d7d7-47d7-87d7-d7d7d7d7d7d7'
 const SUPPLEMENT_SCHEDULE = '12121212-1212-4121-8121-121212121212'
 const SUPPLEMENT_STATUS = '34343434-3434-4343-8343-343434343434'
 const SUPPLEMENT_ADHERENCE = '56565656-5656-4565-8565-565656565656'
@@ -86,6 +100,13 @@ function fixture(): Record<string, BackupRow[]> {
         key: 'manual',
         display_name: 'Manual',
         source_kind: 'manual',
+        created_at: INSTANT,
+      }),
+      row({
+        id: USDA_SOURCE,
+        key: 'usda_fooddata_central',
+        display_name: 'USDA FoodData Central',
+        source_kind: 'reference',
         created_at: INSTANT,
       }),
     ],
@@ -166,6 +187,72 @@ function fixture(): Record<string, BackupRow[]> {
         notes: null,
         created_at: INSTANT,
         updated_at: INSTANT,
+      }),
+      row({
+        id: USDA_FOOD_OZ,
+        name: '93% lean ground turkey',
+        brand: 'Jennie-O',
+        barcode: null,
+        catalog_kind: 'ingredient',
+        serving_quantity: '4',
+        serving_unit: 'oz',
+        serving_grams: '112',
+        calories: '170',
+        protein: '21',
+        carbs: '0',
+        fat: '9',
+        fiber: null,
+        source_kind: 'usda',
+        is_staple: false,
+        archived: false,
+        notes: 'Owner likes this cut',
+        created_at: INSTANT,
+        updated_at: INSTANT,
+      }),
+      row({
+        id: USDA_FOOD_GRAMS,
+        name: '93% lean ground turkey',
+        brand: null,
+        barcode: null,
+        catalog_kind: 'ingredient',
+        serving_quantity: '100',
+        serving_unit: 'g',
+        serving_grams: '100',
+        calories: '150',
+        protein: '19',
+        carbs: '0',
+        fat: '8',
+        fiber: null,
+        source_kind: 'usda',
+        is_staple: false,
+        archived: false,
+        notes: 'Per 100 g review',
+        created_at: INSTANT,
+        updated_at: INSTANT,
+      }),
+    ],
+    source_record_links: [
+      row({
+        id: USDA_LINK_OZ,
+        source_id: USDA_SOURCE,
+        import_job_id: null,
+        external_id: '171477',
+        external_fingerprint: USDA_FINGERPRINT_OZ,
+        entity_type: 'nutrition_food',
+        entity_id: USDA_FOOD_OZ,
+        source_payload: null,
+        created_at: INSTANT,
+      }),
+      row({
+        id: USDA_LINK_GRAMS,
+        source_id: USDA_SOURCE,
+        import_job_id: null,
+        external_id: '171477',
+        external_fingerprint: USDA_FINGERPRINT_GRAMS,
+        entity_type: 'nutrition_food',
+        entity_id: USDA_FOOD_GRAMS,
+        source_payload: null,
+        created_at: INSTANT,
       }),
     ],
     nutrition_entries: [
@@ -897,6 +984,121 @@ function fixture(): Record<string, BackupRow[]> {
       row({ context_id: CONTEXT_MULTI, tag_key: 'late_meal', created_at: INSTANT }),
       row({ context_id: CONTEXT_TAG, tag_key: 'sick', created_at: INSTANT }),
     ],
+    goals: [
+      row({
+        id: GOAL_BODY,
+        goal_kind: 'body_metric',
+        status: 'active',
+        started_on: '2026-09-01',
+        body_metric_key: 'weight',
+        exercise_definition_id: null,
+        benchmark_definition_id: null,
+        benchmark_protocol_version_id: null,
+        benchmark_requirement_id: null,
+        supplement_id: null,
+        source_id: SOURCE,
+        paused_at: null,
+        completed_at: null,
+        created_at: INSTANT,
+        updated_at: INSTANT,
+      }),
+      row({
+        id: GOAL_BENCH,
+        goal_kind: 'benchmark_result',
+        status: 'paused',
+        started_on: '2026-08-01',
+        body_metric_key: null,
+        exercise_definition_id: null,
+        benchmark_definition_id: LAB_BENCHMARK,
+        benchmark_protocol_version_id: LAB_VERSION,
+        benchmark_requirement_id: LAB_REQUIREMENT,
+        supplement_id: null,
+        source_id: SOURCE,
+        paused_at: INSTANT,
+        completed_at: null,
+        created_at: INSTANT,
+        updated_at: INSTANT,
+      }),
+      row({
+        id: GOAL_SUP,
+        goal_kind: 'supplement_adherence',
+        status: 'completed',
+        started_on: '2026-07-01',
+        body_metric_key: null,
+        exercise_definition_id: null,
+        benchmark_definition_id: null,
+        benchmark_protocol_version_id: null,
+        benchmark_requirement_id: null,
+        supplement_id: SUPPLEMENT,
+        source_id: SOURCE,
+        paused_at: null,
+        completed_at: INSTANT,
+        created_at: INSTANT,
+        updated_at: INSTANT,
+      }),
+    ],
+    goal_versions: [
+      row({
+        id: GOAL_BODY_V1,
+        goal_id: GOAL_BODY,
+        version: '1',
+        is_current: false,
+        target_mode: 'at_most',
+        target_min: null,
+        target_max: '175',
+        target_unit: 'lb',
+        target_date: '2026-12-31',
+        evaluation_window_days: null,
+        notes: 'initial cut target',
+        source_id: SOURCE,
+        created_at: INSTANT,
+      }),
+      row({
+        id: GOAL_BODY_V2,
+        goal_id: GOAL_BODY,
+        version: '2',
+        is_current: true,
+        target_mode: 'range',
+        target_min: '175',
+        target_max: '180',
+        target_unit: 'lb',
+        target_date: null,
+        evaluation_window_days: null,
+        notes: 'revised after strength block',
+        source_id: SOURCE,
+        created_at: INSTANT,
+      }),
+      row({
+        id: GOAL_BENCH_V1,
+        goal_id: GOAL_BENCH,
+        version: '1',
+        is_current: true,
+        target_mode: 'at_least',
+        target_min: '80',
+        target_max: null,
+        target_unit: 'reps',
+        target_date: null,
+        evaluation_window_days: null,
+        notes: null,
+        source_id: SOURCE,
+        created_at: INSTANT,
+      }),
+      row({
+        id: GOAL_SUP_V1,
+        goal_id: GOAL_SUP,
+        version: '1',
+        is_current: true,
+        target_mode: 'at_least',
+        target_min: '90',
+        target_max: null,
+        target_unit: '%',
+        target_date: null,
+        evaluation_window_days: '30',
+        notes: null,
+        source_id: SOURCE,
+        created_at: INSTANT,
+      }),
+    ],
   }
 }
 
@@ -1061,6 +1263,38 @@ describe('health backup archive', () => {
     expect(insertAt('benchmark_results')).toBeLessThan(insertAt('benchmark_result_values'))
     expect(insertAt('benchmark_result_values')).toBeLessThan(insertAt('benchmark_result_evidence'))
     expect(insertAt('nutrition_foods')).toBeLessThan(insertAt('recipes'))
+    expect(insertAt('supplements')).toBeLessThan(insertAt('goals'))
+    expect(insertAt('exercise_definitions')).toBeLessThan(insertAt('goals'))
+    expect(insertAt('lab_protocol_requirements')).toBeLessThan(insertAt('goals'))
+    expect(insertAt('benchmark_definitions')).toBeLessThan(insertAt('goals'))
+    expect(insertAt('goals')).toBeLessThan(insertAt('goal_versions'))
+    expect(verified.tables.goal_versions?.find((version) => version.id === GOAL_BODY_V1)).toMatchObject({
+      is_current: false,
+      target_mode: 'at_most',
+      target_min: null,
+      target_max: '175',
+      target_unit: 'lb',
+      notes: 'initial cut target',
+    })
+    expect(verified.tables.goal_versions?.find((version) => version.id === GOAL_BODY_V2)).toMatchObject({
+      is_current: true,
+      target_mode: 'range',
+      target_min: '175',
+      target_max: '180',
+      target_date: null,
+    })
+    expect(verified.tables.goals?.find((goal) => goal.id === GOAL_BENCH)).toMatchObject({
+      status: 'paused',
+      benchmark_requirement_id: LAB_REQUIREMENT,
+      paused_at: INSTANT,
+      completed_at: null,
+    })
+    expect(verified.tables.goals?.find((goal) => goal.id === GOAL_SUP)).toMatchObject({
+      status: 'completed',
+      supplement_id: SUPPLEMENT,
+      completed_at: INSTANT,
+    })
+    expect(verified.tables.goals?.[0]).not.toHaveProperty('selector_label')
     expect(insertAt('recipes')).toBeLessThan(insertAt('recipe_versions'))
     expect(insertAt('recipe_versions')).toBeLessThan(insertAt('recipe_version_ingredients'))
     expect(insertAt('recipe_version_ingredients')).toBeLessThan(insertAt('nutrition_entries'))
@@ -1115,6 +1349,8 @@ describe('health backup archive', () => {
       'benchmark_results',
       'benchmark_result_values',
       'benchmark_result_evidence',
+      'goals',
+      'goal_versions',
     ]))
   })
 
@@ -1198,6 +1434,97 @@ describe('health backup archive', () => {
     expect(statements[0]?.text).toBe('DELETE FROM workout_template_exercises')
     expect(statements.some((statement) => statement.params.includes(ENTRY))).toBe(true)
     expect(statements.some((statement) => statement.params.includes(FOOD))).toBe(true)
+  })
+
+  it('projects USDA identity into the portable food record without a source UUID', () => {
+    const full = verifyBackupArchive(archive())
+    expect(full.errors).toEqual([])
+    const fullOz = full.tables.nutrition_foods?.find((food) => food.id === USDA_FOOD_OZ)
+    expect(fullOz).toMatchObject({
+      name: '93% lean ground turkey',
+      brand: 'Jennie-O',
+      notes: 'Owner likes this cut',
+      serving_quantity: '4',
+      serving_unit: 'oz',
+      serving_grams: '112',
+      source_kind: 'usda',
+    })
+    expect(fullOz).not.toHaveProperty('external_provenance')
+    expect(full.tables.source_record_links?.find((link) => link.id === USDA_LINK_OZ)).toMatchObject({
+      source_id: USDA_SOURCE,
+      external_id: '171477',
+      external_fingerprint: USDA_FINGERPRINT_OZ,
+      entity_type: 'nutrition_food',
+      entity_id: USDA_FOOD_OZ,
+    })
+    const restored = restoreStatements(full.tables)
+    const foodInsert = restored.find((statement) => statement.text.startsWith('INSERT INTO nutrition_foods ('))
+    const linkInsert = restored.find((statement) => statement.text.startsWith('INSERT INTO source_record_links ('))
+    expect(foodInsert?.text).not.toContain('external_provenance')
+    expect(linkInsert?.text).toContain('source_id')
+    expect(linkInsert?.params).toContain(USDA_SOURCE)
+    expect(linkInsert?.params).toContain('171477')
+
+    const portable = buildBackupArchive({
+      profile: 'portable',
+      createdAt: '2026-09-22T22:30:00.000Z',
+      schemaMigration: LATEST_SCHEMA_MIGRATION,
+      appVersionOrCommit: '0.0.0',
+      rowsByTable: fixture(),
+    })
+    const verified = verifyBackupArchive(portable)
+    expect(verified.errors).toEqual([])
+    expect(verified.tables.source_record_links).toBeUndefined()
+    expect(verified.tables.data_sources).toBeUndefined()
+    expect(verified.tables.nutrition_foods?.find((food) => food.id === FOOD)).not.toHaveProperty('external_provenance')
+
+    const ounce = verified.tables.nutrition_foods?.find((food) => food.id === USDA_FOOD_OZ)
+    const grams = verified.tables.nutrition_foods?.find((food) => food.id === USDA_FOOD_GRAMS)
+    const ounceSource = JSON.parse(String(ounce?.external_provenance)) as {
+      source: { kind: string; provider: string; external_id: string; external_fingerprint: string }
+    }
+    const gramSource = JSON.parse(String(grams?.external_provenance)) as {
+      source: { kind: string; provider: string; external_id: string; external_fingerprint: string }
+    }
+    expect(ounceSource.source).toEqual({
+      kind: 'usda',
+      provider: 'usda_fooddata_central',
+      external_id: '171477',
+      external_fingerprint: USDA_FINGERPRINT_OZ,
+    })
+    expect(gramSource.source.external_id).toBe('171477')
+    expect(gramSource.source.external_fingerprint).toBe(USDA_FINGERPRINT_GRAMS)
+    expect(gramSource.source.external_fingerprint).not.toBe(ounceSource.source.external_fingerprint)
+    expect(ounce?.serving_quantity).toBe('4')
+    expect(ounce?.serving_unit).toBe('oz')
+    expect(ounce?.serving_grams).toBe('112')
+    expect(grams?.serving_quantity).toBe('100')
+    expect(grams?.serving_grams).toBe('100')
+    expect(ounce?.notes).toBe('Owner likes this cut')
+    expect(ounce?.brand).toBe('Jennie-O')
+    expect(grams?.notes).toBe('Per 100 g review')
+    expect(grams?.brand).toBeNull()
+    expect(JSON.stringify(ounceSource)).not.toContain(USDA_SOURCE)
+    expect(JSON.stringify(ounceSource)).not.toContain('Jennie-O')
+    expect(JSON.stringify(ounceSource)).not.toContain('Owner likes this cut')
+    expect(JSON.stringify(gramSource)).not.toContain(USDA_SOURCE)
+    expect(strFromU8(unzipSync(portable)['README.txt'] ?? new Uint8Array())).toContain('FoodData Central id')
+    const portableGoals = verified.tables.goals ?? []
+    expect(portableGoals.find((goal) => goal.id === GOAL_BODY)).toMatchObject({
+      selector_label: 'Bodyweight',
+      source_key: 'manual',
+      body_metric_key: 'weight',
+    })
+    expect(portableGoals.find((goal) => goal.id === GOAL_BENCH)?.selector_label).toBe('Push-up total reps')
+    expect(portableGoals.find((goal) => goal.id === GOAL_SUP)?.selector_label).toBe('Creatine monohydrate adherence')
+    expect(JSON.stringify(portableGoals.find((goal) => goal.id === GOAL_BODY)?.selector_label)).not.toContain(SOURCE)
+    expect(verified.tables.goal_versions?.find((version) => version.id === GOAL_BODY_V2)).toMatchObject({
+      source_key: 'manual',
+      target_min: '175',
+      target_max: '180',
+      target_date: null,
+    })
+    expect(verified.tables.goal_versions?.find((version) => version.id === GOAL_BENCH_V1)?.target_unit).toBe('reps')
   })
 
   it('refuses a portable export as a recovery backup', () => {

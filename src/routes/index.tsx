@@ -38,6 +38,8 @@ const ProgressStrengthLabRoute = lazy(() => import('@/features/progress').then((
 const ProgressBodyRoute = lazy(() => import('@/features/progress').then((module) => ({ default: module.ProgressBodyRoute })))
 const ProgressTimelineRoute = lazy(() => import('@/features/progress').then((module) => ({ default: module.ProgressTimelineRoute })))
 const ProgressCompareRoute = lazy(() => import('@/features/progress').then((module) => ({ default: module.ProgressCompareRoute })))
+const GoalsPage = lazy(() => import('@/features/goals/GoalsPages').then((module) => ({ default: module.GoalsPage })))
+const GoalDetailPage = lazy(() => import('@/features/goals/GoalsPages').then((module) => ({ default: module.GoalDetailPage })))
 const DemoTodayPage = lazy(() => import('@/features/demo/DemoTodayPage').then((module) => ({ default: module.DemoTodayPage })))
 const DemoNutritionPage = lazy(() => import('@/features/demo/DemoNutritionPage').then((module) => ({ default: module.DemoNutritionPage })))
 const DemoTrainingPage = lazy(() => import('@/features/demo/DemoTrainingPage').then((module) => ({ default: module.DemoTrainingPage })))
@@ -74,6 +76,8 @@ const router = createBrowserRouter([
       { path: 'supplements', element: <SupplementsPage /> },
       { path: 'context', element: <ContextPage /> },
       { path: 'lab', element: <LabPage /> },
+      { path: 'goals', element: <GoalsPage /> },
+      { path: 'goals/:goalId', element: <GoalDetailPage /> },
       { path: 'lab/experiments/new', element: <NewExperimentPage /> },
       { path: 'lab/experiments/:experimentId/result', element: <ReviewExperimentResultPage /> },
       { path: 'lab/experiments/:experimentId', element: <ExperimentDetailPage /> },

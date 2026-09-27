@@ -68,6 +68,11 @@ export async function listBenchmarkRetests(asOf = healthCalendarDateFromNow()): 
   }
 }
 
+export async function listProtocolRetestViews(asOf = healthCalendarDateFromNow()): Promise<BenchmarkRetestView[]> {
+  const built = await loadRetests(null, asOf)
+  return built.map((item) => item.view)
+}
+
 export async function getBenchmarkRetest(
   benchmarkDefinitionId: string,
   asOf = healthCalendarDateFromNow(),

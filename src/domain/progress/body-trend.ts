@@ -17,6 +17,10 @@ export type BodyWeightTrendValue = {
   latest: BodyObservation
 }
 
+export function prepareBodyMetricSeries(observations: readonly BodyObservation[], key: string): BodyObservation[] {
+  return onePointPerDate(observations.filter((item) => item.key === key))
+}
+
 function onePointPerDate(observations: readonly BodyObservation[]): BodyObservation[] {
   const byDate = new Map<string, BodyObservation>()
   const ordered = [...observations].sort((left, right) => {
@@ -39,7 +43,7 @@ function onePointPerDate(observations: readonly BodyObservation[]): BodyObservat
 export function bodyWeightTrend(
   observations: readonly BodyObservation[],
 ): MetricResult<BodyWeightTrendValue> {
-  const points = onePointPerDate(observations.filter((item) => item.key === 'weight'))
+  const points = prepareBodyMetricSeries(observations, 'weight')
   const required = PROGRESS_ANALYTICS_CONFIG.bodyWeightTrend.minimumMeasurements
   const minSpan = PROGRESS_ANALYTICS_CONFIG.bodyWeightTrend.minimumSpanDays
   if (points.length < required) {
@@ -75,7 +79,7 @@ export function bodyWeightTrend(
 }
 
 export function bodyWeightTrendEvidence(observations: readonly BodyObservation[]): CanonicalEvidence[] {
-  return onePointPerDate(observations.filter((item) => item.key === 'weight')).map((item) => ({
+  return prepareBodyMetricSeries(observations, 'weight').map((item) => ({
     domain: 'body' as const,
     measurementId: item.measurementId,
     measurementSessionId: item.measurementSessionId,

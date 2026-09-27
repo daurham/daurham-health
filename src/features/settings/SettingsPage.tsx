@@ -238,6 +238,14 @@ export function SettingsPage() {
       </section>
 
       <section className="space-y-3 rounded-lg border border-zinc-200 bg-white p-4">
+        <h2 className="text-base font-semibold">Goals</h2>
+        <p className="text-sm text-zinc-600">Targets you chose to pursue. Progress estimates and reminders are not part of this page.</p>
+        <Link to="/goals" className={primaryButtonClass}>
+          Open goals
+        </Link>
+      </section>
+
+      <section className="space-y-3 rounded-lg border border-zinc-200 bg-white p-4">
         <h2 className="text-base font-semibold">Data & Backup</h2>
         <p className="text-sm text-zinc-600">This export contains private health information.</p>
         <p className="text-sm text-zinc-600">
