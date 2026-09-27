@@ -51,6 +51,10 @@ export const bodyMeasurementSessionSchema = z.object({
   measuredAt: timestamptzSchema,
   timezone: z.string().nullable(),
   deviceName: z.string().nullable(),
+  notes: z.string().nullable(),
+  importJobId: uuidSchema.nullable(),
+  sourceKey: z.string().min(1),
+  manual: z.boolean(),
   metrics: z.array(bodyMetricSchema),
 })
 

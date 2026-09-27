@@ -8,6 +8,18 @@ import { TodayPage } from '@/features/today'
 const NutritionPage = lazy(() => import('@/features/nutrition').then((module) => ({ default: module.NutritionPage })))
 const BodyPage = lazy(() => import('@/features/body').then((module) => ({ default: module.BodyPage })))
 const SettingsPage = lazy(() => import('@/features/settings').then((module) => ({ default: module.SettingsPage })))
+const SupplementsPage = lazy(() => import('@/features/supplements').then((module) => ({ default: module.SupplementsPage })))
+const ContextPage = lazy(() => import('@/features/context').then((module) => ({ default: module.ContextPage })))
+const LabPage = lazy(() => import('@/features/lab').then((module) => ({ default: module.LabPage })))
+const NewExperimentPage = lazy(() => import('@/features/lab').then((module) => ({ default: module.NewExperimentPage })))
+const ExperimentDetailPage = lazy(() => import('@/features/lab').then((module) => ({ default: module.ExperimentDetailPage })))
+const ReviewExperimentResultPage = lazy(() => import('@/features/lab').then((module) => ({ default: module.ReviewExperimentResultPage })))
+const ExperimentResultDetailPage = lazy(() => import('@/features/lab').then((module) => ({ default: module.ExperimentResultDetailPage })))
+const NewBenchmarkPage = lazy(() => import('@/features/lab').then((module) => ({ default: module.NewBenchmarkPage })))
+const BenchmarkDetailPage = lazy(() => import('@/features/lab').then((module) => ({ default: module.BenchmarkDetailPage })))
+const RecordBenchmarkResultPage = lazy(() => import('@/features/lab').then((module) => ({ default: module.RecordBenchmarkResultPage })))
+const ReviewBenchmarkResultPage = lazy(() => import('@/features/lab').then((module) => ({ default: module.ReviewBenchmarkResultPage })))
+const BenchmarkResultDetailPage = lazy(() => import('@/features/lab').then((module) => ({ default: module.BenchmarkResultDetailPage })))
 const TrainingPage = lazy(() => import('@/features/training').then((module) => ({ default: module.TrainingPage })))
 const StartWorkoutPage = lazy(() => import('@/features/training').then((module) => ({ default: module.StartWorkoutPage })))
 const ImportWorkoutPage = lazy(() => import('@/features/training').then((module) => ({ default: module.ImportWorkoutPage })))
@@ -49,6 +61,18 @@ const router = createBrowserRouter([
       { path: 'training/:sessionId', element: <WorkoutDetailPage /> },
       { path: 'body', element: <BodyPage /> },
       { path: 'settings', element: <SettingsPage /> },
+      { path: 'supplements', element: <SupplementsPage /> },
+      { path: 'context', element: <ContextPage /> },
+      { path: 'lab', element: <LabPage /> },
+      { path: 'lab/experiments/new', element: <NewExperimentPage /> },
+      { path: 'lab/experiments/:experimentId/result', element: <ReviewExperimentResultPage /> },
+      { path: 'lab/experiments/:experimentId', element: <ExperimentDetailPage /> },
+      { path: 'lab/experiment-results/:resultId', element: <ExperimentResultDetailPage /> },
+      { path: 'lab/benchmarks/new', element: <NewBenchmarkPage /> },
+      { path: 'lab/benchmarks/:benchmarkId/record', element: <RecordBenchmarkResultPage /> },
+      { path: 'lab/benchmarks/:benchmarkId', element: <BenchmarkDetailPage /> },
+      { path: 'lab/results/review', element: <ReviewBenchmarkResultPage /> },
+      { path: 'lab/benchmark-results/:resultId', element: <BenchmarkResultDetailPage /> },
       {
         path: 'progress',
         element: <ProgressPage />,

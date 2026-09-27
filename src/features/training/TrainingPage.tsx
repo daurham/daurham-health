@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import type { WorkoutSessionSummary } from '@/domain/training'
+import { sessionIntentLabel, trainingSessionDisplayName, type WorkoutSessionSummary } from '@/domain/training'
 import type { PendingTranscriptionJob } from '@/domain/training-transcription'
 import { interactiveCardClass, ListPlaceholder, primaryButtonClass, secondaryButtonClass } from '@/lib'
 import { fetchSessions, fetchTranscriptionJobs } from './api'
@@ -74,11 +74,14 @@ export function TrainingPage() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Training</h1>
-          <p className="mt-2 text-zinc-600">Log sessions against your current templates.</p>
+          <p className="mt-2 text-zinc-600">Log a programmed routine, an ad-hoc session, or a workout photo.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Link to="/training/new" className={primaryButtonClass}>
-            Start Workout
+            Start Programmed Workout
+          </Link>
+          <Link to="/training/new?type=ad_hoc" className={secondaryButtonClass}>
+            Ad-hoc Workout
           </Link>
           <Link to="/training/import" className={secondaryButtonClass}>
             Import Workout Photo
@@ -112,10 +115,13 @@ export function TrainingPage() {
                   to={`/training/${session.id}`}
                   className={`flex min-h-14 items-center justify-between gap-3 px-4 py-3 ${interactiveCardClass}`}
                 >
-                  <span className="font-medium">
-                    {formatWorkoutDate(session.workoutDate)}
-                    {' · '}
-                    {session.templateName ?? 'Workout'}
+                  <span className="min-w-0">
+                    <span className="block font-medium">
+                      {formatWorkoutDate(session.workoutDate)}
+                      {' · '}
+                      {trainingSessionDisplayName(session)}
+                    </span>
+                    <span className="mt-0.5 block text-sm text-zinc-500">{sessionIntentLabel(session.sessionType)}</span>
                   </span>
                   {session.effort != null ? (
                     <span className="text-sm text-zinc-500">Effort {session.effort}</span>

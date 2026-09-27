@@ -1,6 +1,7 @@
 import { handleApiError, requestApiPathname, sendJson, type ApiRequest, type ApiResponse } from './http.js'
 import authHandler from './handlers/auth.js'
 import bodyMeasurementsHandler from './handlers/body-measurements.js'
+import bodyCadencesHandler from './handlers/body-cadences.js'
 import fitProfileCommitHandler from './handlers/fit-profile-commit.js'
 import fitProfilePreviewHandler from './handlers/fit-profile-preview.js'
 import healthHandler from './handlers/health.js'
@@ -37,6 +38,9 @@ import nutritionDescribeHandler from './handlers/nutrition-describe.js'
 import appleHealthImportHandler from './handlers/apple-health-import.js'
 import appleHealthSyncHandler from './handlers/apple-health-sync.js'
 import todayHandler from './handlers/today.js'
+import supplementsHandler from './handlers/supplements.js'
+import contextHandler from './handlers/context.js'
+import labHandler from './handlers/lab.js'
 import backupExportHandler from './handlers/backup-export.js'
 
 export type HealthApiRoute =
@@ -44,6 +48,7 @@ export type HealthApiRoute =
   | 'session'
   | 'auth'
   | 'body-measurements'
+  | 'body-cadences'
   | 'fit-profile-preview'
   | 'fit-profile-commit'
   | 'training-exercises'
@@ -78,6 +83,9 @@ export type HealthApiRoute =
   | 'apple-health-import'
   | 'apple-health-sync'
   | 'today'
+  | 'supplements'
+  | 'context'
+  | 'lab'
   | 'backup-export'
 
 type HealthApiHandler = (req: ApiRequest, res: ApiResponse) => unknown | Promise<unknown>
@@ -87,6 +95,7 @@ const HANDLERS: Record<HealthApiRoute, HealthApiHandler> = {
   session: sessionHandler,
   auth: authHandler,
   'body-measurements': bodyMeasurementsHandler,
+  'body-cadences': bodyCadencesHandler,
   'fit-profile-preview': fitProfilePreviewHandler,
   'fit-profile-commit': fitProfileCommitHandler,
   'training-exercises': trainingExercisesHandler,
@@ -121,6 +130,9 @@ const HANDLERS: Record<HealthApiRoute, HealthApiHandler> = {
   'apple-health-import': appleHealthImportHandler,
   'apple-health-sync': appleHealthSyncHandler,
   today: todayHandler,
+  supplements: supplementsHandler,
+  context: contextHandler,
+  lab: labHandler,
   'backup-export': backupExportHandler,
 }
 
@@ -203,8 +215,26 @@ export function matchHealthApiRoute(pathname: string): HealthApiRoute | null {
     default:
       break
   }
+  if (pathname === '/api/supplements' || pathname.startsWith('/api/supplements/')) {
+    return 'supplements'
+  }
+  if (pathname === '/api/context/days' || pathname.startsWith('/api/context/days/')) {
+    return 'context'
+  }
+  if (pathname === '/api/lab' || pathname.startsWith('/api/lab/')) {
+    return 'lab'
+  }
+  if (pathname === '/api/body/measurements' || pathname.startsWith('/api/body/measurements/')) {
+    return 'body-measurements'
+  }
+  if (pathname === '/api/body/cadences' || pathname.startsWith('/api/body/cadences/')) {
+    return 'body-cadences'
+  }
   if (pathname === '/api/auth' || pathname.startsWith('/api/auth/')) {
     return 'auth'
+  }
+  if (isSingleSegmentAfter(pathname, '/api/training/exercises/')) {
+    return 'training-exercises'
   }
   if (isSingleSegmentAfter(pathname, '/api/training/sessions/')) {
     return 'training-session-detail'

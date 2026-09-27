@@ -1,11 +1,11 @@
 # Daurham Health Platform — Complete Architecture & Data Systems Design Manual
 
 **Canonical document:** `HEALTH-PLATFORM-DESIGN-MANUAL.md`  
-**Manual version:** 1.0.6  
+**Manual version:** 1.0.15  
 **System:** `health.daurham.com`  
-**Status:** **v1.0.0 frozen.** Owner acceptance passed; final automated release verification passed; a fresh production backup was created and verified; package metadata is 1.0.0; release commit `7124ca513efa6c833457303ee6ff79d78344fce6` is tagged locally with annotated tag `v1.0.0`. The tag/commit have not been pushed. Backup/export/recovery was previously physically exercised against a disposable PostgreSQL restore target during Phase 15A.  
+**Status:** **v1.0.0 frozen.** Owner acceptance passed; final automated release verification passed; a fresh production backup was created and verified; package metadata remains 1.0.0; release commit `7124ca513efa6c833457303ee6ff79d78344fce6` is tagged locally with annotated tag `v1.0.0`. The tag/commit have not been pushed. Backup/export/recovery was previously physically exercised against a disposable PostgreSQL restore target during Phase 15A. **Post-v1 extensions:** V2-A1 Supplements (`0017_supplements.sql`, section 31), V2-A2 Body measurement capture (`0018_body_measurement_cadence.sql`, section 32), V2-A3 ad-hoc Training (`0019_training_session_types.sql`, section 33), V2-A4 Daily Context (`0020_daily_context.sql`, section 34), V2-B1 Personal Lab (`0021_personal_lab_protocols.sql`, section 35), V2-B2 Benchmark Results (`0022_benchmark_results.sql`, section 36), V2-B3 Retest Scheduling (derived, no new migration, section 37), and V2-B4 Experiment Result Summaries (`0023_experiment_results.sql`, section 38). V2-A Data Capture Foundations is complete. V2-B Personal Lab Core is complete. V2-B1 records experiment and benchmark protocol identity. V2-B2 stores deterministic benchmark results linked to canonical evidence. V2-B3 derives retest guidance from the current protocol version and the latest valid result. V2-B4 records a deterministic experiment result under the frozen protocol. These extensions do not rewrite frozen v1 semantics.  
 **Canonical calendar timezone:** `America/Phoenix`  
-**Created / last updated:** `2026-09-22T21:02:16-07:00`  
+**Created / last updated:** `2026-09-27T00:36:13-07:00`  
 **Timestamp policy:** every semantic, schema, provider, routing, security, or workflow update to this manual must add a new ISO-8601 America/Phoenix timestamp to the Revision Ledger.  
 **Audience:** the owner, future maintainers, Cursor/coding agents, and any future AI asked to understand, rebuild, audit, or extend the platform.
 
@@ -499,7 +499,16 @@ Confirmed migration purposes through the implemented project include:
 - `0012`: Apple-derived raw foundation (`activity_samples`, `sleep_intervals`, `activity_workouts`)
 - `0013`: `activity_daily_summaries`
 - `0015`: Nutrition Gemini/capture evolution (`0015_nutrition_gemini.sql`)
-- later migration(s): `sleep_nightly_summaries` and subsequent hardening/backup work; **read the repository for exact numeric filenames before modifying them**.
+- `0016`: canonical nightly sleep summaries (`0016_sleep_nightly_summaries.sql`)
+- `0017`: post-v1 V2-A1 Supplements (`0017_supplements.sql`)
+- `0018`: post-v1 V2-A2 Body cadence and measurement correction timestamps (`0018_body_measurement_cadence.sql`)
+- `0019`: post-v1 V2-A3 Training session type and optional session name (`0019_training_session_types.sql`)
+- `0020`: post-v1 V2-A4 Daily Context (`0020_daily_context.sql`)
+- `0021`: post-v1 V2-B1 Personal Lab protocols (`0021_personal_lab_protocols.sql`)
+- `0022`: post-v1 V2-B2 Benchmark Results (`0022_benchmark_results.sql`)
+- `0023`: post-v1 V2-B4 Experiment Result Summaries (`0023_experiment_results.sql`)
+
+Current schema head: `0023_experiment_results.sql`. Exact filenames must still be read from `migrations/` before adding another migration.
 
 The manual treats the semantics below as authoritative even when a table's exact migration number is not recorded here.
 
@@ -572,6 +581,8 @@ Missing measurements are never forward-filled into fake daily body values.
 
 Body UI is intentionally sparse/progressive: show what is actually observed rather than implying continuous measurements.
 
+Post-v1 V2-A2 adds manual quick entry for a controlled metric set, canonical circumference storage in centimeters, and opt-in per-metric cadence. It does not change the Theil–Sen trend rules above. See section 32. Fit Profile import remains the deterministic XLSX path in section 8.2.
+
 ---
 
 # 9. Training domain
@@ -594,6 +605,8 @@ printed workout sheet
 ```
 
 The transcription system's job is to **transcribe, not coach**.
+
+Ad-hoc Training, added in section 33, is a second way to record canonical sets. It does not replace this paper-first programmed workflow.
 
 ## 9.2 Stable identity
 
@@ -976,6 +989,8 @@ Every range has an explicit `asOf`.
 - `/progress/timeline`
 - `/progress/compare`
 
+The private Progress overview links to `/lab`. That is not a sixth primary destination. `/demo/progress` does not link to the private lab.
+
 ## 11.4 Timeline
 
 Timeline contains real chronological observations/events, not arbitrary summary findings.
@@ -989,9 +1004,12 @@ Event families include:
 - Progress checkpoints;
 - Activity daily observations;
 - Apple activity workouts as Activity context;
-- complete and partial Sleep observations.
+- complete and partial Sleep observations;
+- owner-recorded Daily context annotations;
+- valid Benchmark Result annotations;
+- valid Experiment Result annotations.
 
-Date-only source facts remain date-only. The application does not invent timestamps.
+Date-only source facts remain date-only. The application does not invent timestamps. Daily context is date precision only. `created_at` and `updated_at` are record-management times and are not used as an occurrence time. On a shared calendar day, a context annotation is ordered before the day's other events so it can be read with them. Context is not a plotted series. See section 34.
 
 Apple activity workouts never become Training sessions or PR sources.
 
@@ -1379,7 +1397,10 @@ It is not a miniature version of every Progress chart.
 Current presentation hierarchy:
 
 - desktop primary row: Nutrition + Training;
+- Supplements, when at least one supplement definition exists, between that row and the Activity, Sleep, and Body row;
 - desktop secondary row: Activity + Sleep + Body;
+- optional Daily context after that secondary row and before What Changed;
+- optional Personal Lab experiments, only when one is scheduled or active, after Daily context;
 - What Changed below those cards;
 - Needs Attention and Patterns appear only when real state requires them;
 - mobile collapses to a single vertical stack while preserving the same semantic order.
@@ -1400,6 +1421,12 @@ Shows today's logged totals/targets/remaining or over. No logged food means `No 
 
 Only a canonical Training workout counts. Apple activity workouts do not satisfy Training status.
 
+### Supplements
+
+Post-v1 V2-A1. See section 31. Today includes supplement occurrences inside the same `GET /api/today` payload. The card lists only doses scheduled today under an active lifecycle. `unknown` means not yet recorded. Checkbox sets taken or clears back to unknown. Skip is a separate action. Paused, discontinued, and unscheduled definitions are omitted from the checklist. If no supplement definitions exist, the card is omitted. `/supplements` is reached from the card and from Settings, not from a sixth primary tab.
+
+Post-v1 V2-A2. See section 32. The same Today payload may include one Body measurement reminder when the owner has enabled a cadence. Current measurements produce no reminder. The reminder does not create a measurement.
+
 ### Sleep
 
 If a complete night ending today exists, show it. A partial is explicitly labeled partial. If no current sleep observation exists, the page may show the latest complete night only as clearly historical context; it must never be called last night's sleep.
@@ -1410,7 +1437,15 @@ Shows latest measurement and age/staleness. It does not imply an old measurement
 
 ### Needs attention
 
-Shows recoverable/pending review work only, such as a ready Nutrition capture or workout transcription review.
+Shows recoverable/pending review work only, such as a ready Nutrition capture or workout transcription review. A day with no Daily context is not Needs Attention. An existing Experiment is not Needs Attention and does not create a due reminder.
+
+### Daily context
+
+Post-v1 V2-A4. See section 34. The same `GET /api/today` payload includes today's context, or a recorded-false snapshot when none exists. The card is optional. An empty day offers Add context and does not show the tag catalog. A recorded day shows catalog labels, the note, and Edit. There is no streak, score, or reminder. `/context` is an editor route, not a primary tab.
+
+### Personal Lab
+
+Post-v1 V2-B1. See section 35. The same `GET /api/today` payload includes scheduled and active experiments. Accepted, abandoned, and superseded experiments are omitted. The card names the experiment and its date window and links to Personal Lab. It does not say the experiment is due or incomplete. On `window_end` the card can say the experiment ends today. Ready to review, including the Needs Attention item “Experiment ready to review,” begins on the next Health calendar day, when the inclusive window is closed. V2-B3 adds at most one Benchmark retest to the same payload when the current protocol is in `due` state. The copy says retest suggested. It does not say overdue, and the retest is not a Needs Attention item. See sections 37 and 38.
 
 ### Patterns
 
@@ -1464,6 +1499,7 @@ Even though one physical Vercel function dispatches requests, APIs remain concep
 - Body
 - Progress
 - Today
+- Supplements
 - Apple Health ingestion
 - capture/review jobs
 - Settings/status
@@ -1762,6 +1798,27 @@ NULL, date-only values, timestamp instants, UUIDs, booleans, JSON evidence, and 
 - `activity_samples`
 - `activity_workouts`
 - `sleep_intervals`
+- `supplements`
+- `supplement_schedules`
+- `supplement_status_events`
+- `supplement_adherence`
+- `body_measurement_cadences`
+- `daily_context`
+- `daily_context_tags`
+- `lab_protocols`
+- `lab_protocol_versions`
+- `lab_protocol_requirements`
+- `lab_protocol_context_controls`
+- `benchmark_definitions`
+- `experiments`
+- `experiment_benchmarks`
+- `experiment_supplements`
+- `benchmark_results`
+- `benchmark_result_values`
+- `benchmark_result_evidence`
+- `experiment_results`
+- `experiment_result_requirements`
+- `experiment_result_evidence`
 
 `activity_samples` is intentionally included even though it currently contains zero rows. Canonical compact Activity history is currently represented by daily summaries rather than raw sample retention.
 
@@ -1783,7 +1840,7 @@ Gemini capture image bytes that live in `nutrition_capture_jobs` are included in
 
 ### Schema metadata
 
-`schema_migrations` is represented in the manifest rather than exported as a normal user-data table. The accepted production schema at this revision is `0016_sleep_nightly_summaries.sql`.
+`schema_migrations` is represented in the manifest rather than exported as a normal user-data table. The schema head at manual 1.0.14 is `0023_experiment_results.sql`. V2-B3 retest state is derived from protocol versions and benchmark results, so it has no backup table. Experiment results are stored and restored as written. Restore does not recalculate them. `lab_protocol_requirements.criteria` travels with the requirement row. The v1.0.0 acceptance schema remains the historical anchor `0016_sleep_nightly_summaries.sql` recorded in section 23. `workout_sessions.session_type`, `session_name`, `experiment_id`, and `benchmark_protocol_version_id` travel with that table. Restore inserts `experiments` and `lab_protocol_versions` before `workout_sessions`, supplements before `experiment_supplements`, and `benchmark_results` before `benchmark_result_values` and `benchmark_result_evidence`. A result that names `supersedes_result_id` is inserted after the result it replaces. Owner-created exercise definitions are rows in `exercise_definitions`, which is already portable. Restore replaces that seeded table from the archive, so custom rows survive beside seeded rows when the archive contains both. `daily_context.source_id` references `data_sources`. `daily_context_tags.context_id` references `daily_context`, and restore inserts the parent before the tags.
 
 ### Never exported
 
@@ -1931,6 +1988,8 @@ It intentionally omits large/internal recovery-only data such as:
 - raw `sleep_intervals`;
 - provenance/link tables;
 - capture-job history.
+
+V2-A1 adds the four canonical supplement tables to both the full archive and the portable export: `supplements`, `supplement_schedules`, `supplement_status_events`, and `supplement_adherence`. V2-A2 adds `body_measurement_cadences` to both, and adds `updated_at` on `body_measurement_sessions` and `body_metrics`. V2-A4 adds `daily_context` and `daily_context_tags` to both. The 15-table portable count above is the 2026-09-22 v1 acceptance anchor, not the post-v1 inventory.
 
 The CLI archive remains the authoritative full recovery artifact.
 
@@ -2099,6 +2158,10 @@ Remaining final work:
 - tag/freeze v1.0.0;
 - make no further v1 feature changes unless a concrete regression is found.
 
+## Post-v1 — V2-A1 Supplements
+
+After the v1.0.0 freeze, V2-A1 added canonical supplement identity, effective-dated schedules, lifecycle history, and explicit adherence. Missing adherence stays unknown. See section 31. V2-A2 adds manual Body capture and opt-in cadence without changing the frozen weight-trend algorithm. See section 32. V2-A3 adds ad-hoc Training. See section 33. V2-A4 adds optional daily context. See section 34. V2-B1 adds Personal Lab protocol identity. See section 35. V2-B2 adds Benchmark Results. See section 36. V2-B3 derives Benchmark retest scheduling without a new migration. See section 37. V2-B4 records experiment result summaries on `0023_experiment_results.sql`. See section 38. Frozen v1 Nutrition, Training, Activity, and Sleep semantics are unchanged.
+
 ---
 
 # 22. Current domain status matrix
@@ -2106,18 +2169,21 @@ Remaining final work:
 | Domain / subsystem | Status | Canonical owner | Notes |
 |---|---|---|---|
 | Auth/owner security | Implemented | Health | 401/403 owner boundary, cookie session |
-| Body | Implemented/frozen | Health | Fit Profile + manual metrics, robust trends |
-| Training | Implemented / release candidate | Health | Paper-first, Home-AI transcription v1.3.x; canonical workout edit/delete supported |
+| Body | Implemented/frozen, extended by V2-A2 | Health | Fit Profile and weight trends stay frozen. V2-A2 adds manual quick entry, circumference keys, and opt-in cadence. See section 32. |
+| Training | Implemented, extended by V2-A3 and V2-B1 | Health | Paper-first, Home-AI transcription v1.3.x; canonical workout edit/delete supported. V2-A3 adds ad-hoc sessions and owner exercises. V2-B1 lets an experiment session reference an active Experiment or a Benchmark protocol version. See sections 33 and 35. |
 | Nutrition | Implemented / release candidate | Health | Gemini primary, reviewed estimates, barcode/label/manual; reusable foods can be saved without logging |
-| Progress Strength/Body | Implemented | Health | Deterministic analytics |
+| Progress Strength/Body | Implemented | Health | Deterministic analytics. Daily context does not change these calculations. |
 | Activity | Implemented/frozen | Health | HAE daily summary canonical |
 | Sleep | Implemented/frozen | Health | XML/HAE intervals → nightly summaries |
 | Apple activity workouts | Implemented | Health Activity context | Never Training canonical |
-| Timeline | Implemented | Health Progress | Real chronological events |
+| Timeline | Implemented, extended by V2-A4, V2-B2, and V2-B4 | Health Progress | Real chronological observations, plus date-only Daily context, valid Benchmark Result annotations, and valid Experiment Result annotations. No numeric Benchmark or Experiment lane. See sections 34, 36, and 38. |
 | Compare | Implemented | Health Progress | Coverage-aware normalized comparisons |
 | Checkpoints | Implemented | Health Progress | Domain-specific interval/baseline semantics |
 | Cross-domain intelligence | Implemented engine | Health | Zero surfaced findings currently |
-| Today | Implemented | Health | One coherent `/api/today` payload |
+| Today | Implemented | Health | One coherent `/api/today` payload. V2-A1 adds scheduled supplement occurrences. V2-A2 adds at most one Body cadence reminder. V2-A4 adds optional daily context and does not treat absence as Needs Attention. V2-B1 adds scheduled and active experiments without a due reminder. V2-B4 adds Ready to review on the Health day after `window_end`. |
+| Supplements | Post-v1 V2-A1 implemented | Health | Canonical schedules, lifecycle history, and explicit taken/skipped adherence. Missing stays unknown. See section 31. |
+| Daily context | Post-v1 V2-A4 implemented | Health | One optional owner annotation per America/Phoenix date. Missing means no context was recorded. See section 34. |
+| Personal Lab | Post-v1 V2-B complete | Health | Experiments, Benchmark definitions, immutable protocol versions, evidence-linked Benchmark Results, derived retest scheduling, and deterministic Experiment Results. A result reports observations. It does not claim the intervention caused the change. See sections 35 through 38. |
 | Hardening 13A | Implemented | Health | Mobile/resilience/performance |
 | Backup/recovery 13B | Implemented and physically restore-tested | Health | Full archive + verify + safe restore + portable export; real archive restored to disposable PostgreSQL and verified during Phase 15A |
 | Public demo | Implemented | Compiled deterministic demo fixtures | `/demo`, fixed synthetic dataset, read-only, no owner-data/API fallback |
@@ -2452,11 +2518,15 @@ A new implementation can reproduce the current system in the following dependenc
 50. release commit + local annotated `v1.0.0` tag.
 51. v1 freeze.
 
+## Post-v1 extension
+
+After the v1 sequence above, V2-A1 adds supplement capture on `0017_supplements.sql`. See section 31. V2-A2 adds Body measurement capture and cadence on `0018_body_measurement_cadence.sql`. See section 32. V2-A3 adds ad-hoc Training on `0019_training_session_types.sql`. See section 33. V2-A4 adds Daily Context on `0020_daily_context.sql`. See section 34. V2-B1 adds Personal Lab protocols on `0021_personal_lab_protocols.sql`. See section 35. V2-B2 adds Benchmark Results on `0022_benchmark_results.sql`. See section 36. V2-B3 derives retest scheduling from that schema. See section 37. V2-B4 adds experiment result summaries on `0023_experiment_results.sql`. See section 38. Do not renumber the frozen v1 steps to include these extensions.
+
 ---
 
 # 28. Current known deferred work
 
-Deferred work is not forgotten work. It is intentionally outside the current v1 core unless a later revision promotes it. The prioritized post-v1 roadmap is also maintained in `docs/V2-ROADMAP.md`.
+Deferred work is not forgotten work. It is intentionally outside the current v1 core unless a later revision promotes it. The numbered list below is that frozen v1 backlog, not the v2 implementation order. V2-A Data Capture Foundations is recorded in `HEALTH-PLATFORM-V2-LAB-BLUEPRINT.md` and is complete: V2-A1 Supplements (section 31), V2-A2 Body measurement capture (section 32), V2-A3 ad-hoc Training (section 33), and V2-A4 Daily Context (section 34). V2-B1 Personal Lab protocol identity is implemented (section 35). V2-B2 Benchmark Results are implemented (section 36). V2-B3 Retest Scheduling is implemented as derived state (section 37). V2-B4 Experiment Result Summaries are implemented (section 38). V2-B Personal Lab Core is complete. Notifications and AI proposals remain deferred. Recipes remain later Nutrition work and were not started by these extensions. `docs/V2-ROADMAP.md` still records the older v1 ordering.
 
 Highest-priority v2 work:
 
@@ -2492,8 +2562,16 @@ Other known deferred possibilities:
 
 | 2026-09-22T20:11:37-07:00 | 1.0.4 | 9.7, 10.11, 21–23, 27–29 | Recorded the final Phase 15B-2 owner-acceptance fixes: direct Today Add Food / photo-workout entry, canonical Training edit/delete with transcription recommit protection, reusable-food Save for later vs Add to date semantics, standardized interaction affordances, restrained semantic color, low-risk loading polish, and the prioritized v2 roadmap. | No schema migration or canonical analytics change. Training mutations preserve existing session identity/validation; deleting transcription-created workouts preserves recommit protection. Nutrition historical snapshots remain immutable. Final signed-in owner QA and v1 tag/freeze remain. |
 | 2026-09-22T20:50:00-07:00 | 1.0.5 | 21–24, 28–29 | Recorded Phase 15B-3 final owner acceptance: reactive Today Nutrition after consumed-food commit, clarified Training-vs-Activity wording, Nutrition loading parity, fixed Light/Dark selector layout, generic Health favicon, and explicit v2 Apple Watch workout-object ingestion under Activity. | No schema, ingestion, or analytics change. Apple/HealthKit workouts remain outside canonical Training. Owner manual QA passed; only final automated freeze/tag remains. |
-
 | 2026-09-22T21:02:16-07:00 | 1.0.6 | 21–24, 27, 29 | Recorded final Phase 15C release verification and v1.0.0 freeze: owner acceptance passed; 512 tests/lint/build passed; final 22-table/34,245-row production backup and 15-table/3,789-row portable export verified; final client secret scan passed; version set to 1.0.0; release commit `7124ca513efa6c833457303ee6ff79d78344fce6` tagged locally as annotated `v1.0.0`. | Documentation/release-state change only; no schema, ingestion, or analytics change. v1 is frozen. Commit/tag remain local and unpushed. |
+| 2026-09-26T21:24:40-07:00 | 1.0.7 | 7, 16, 17, 20, 22, 28, 31 | Recorded post-v1 V2-A1 Supplements: migration `0017_supplements.sql`; effective-dated schedules with an ISO weekday mask; lifecycle events; explicit taken/skipped adherence; unknown when no row exists; Today checklist inside `GET /api/today`; `/supplements` outside the five-item primary nav; backup and portable export of all four canonical tables. Package version stays 1.0.0. Automated suite: 540 tests. | New canonical tables. No change to frozen v1 Nutrition, Training, Body, Activity, or Sleep semantics. Historical v1 backup counts remain historical. Restore still requires an empty destination on the current schema head. No AI dependency. |
+| 2026-09-26T21:49:02-07:00 | 1.0.8 | 7, 8, 16, 17, 20, 21, 22, 27, 28, 32 | Recorded post-v1 V2-A2 Body measurement expansion: migration `0018_body_measurement_cadence.sql`; controlled manual metrics with circumference canonical centimeters; manual session create/correct/delete; imported Fit Profile sessions stay read-only; opt-in per-metric cadence; Today shows at most one reminder. Package version stays 1.0.0. Automated suite: 552 tests. | New cadence table and `updated_at` on existing Body session/metric rows, backfilled from `created_at`. No recomputation of historical measurements. Weight trend thresholds are unchanged. No AI dependency. |
+| 2026-09-26T22:13:01-07:00 | 1.0.9 | 7, 9, 16, 17, 20, 21, 22, 27, 28, 33 | Recorded post-v1 V2-A3 ad-hoc Training: migration `0019_training_session_types.sql`; `session_type` (`programmed`, `ad_hoc`, `experiment`) orthogonal to `source_kind`; optional `session_name`; historical backfill from template identity; owner-created exercises on `exercise_definitions` with conservative analytics. Package version stays 1.0.0. Automated suite: 563 tests. | Existing workout rows gain `session_type` from template identity, otherwise `ad_hoc`. No session, exercise, set, template snapshot, or `source_kind` rewrite. `experiment` is reserved and cannot be created until a linked Experiment or Benchmark exists. No AI dependency. |
+| 2026-09-26T22:34:28-07:00 | 1.0.10 | 7, 11, 16, 20, 21, 22, 28, 34 | Recorded post-v1 V2-A4 Daily Context: migration `0020_daily_context.sql`; one optional context row per America/Phoenix date; twelve frozen tags in `daily_context_tags`; optional note of at most 500 characters; absence means no context was recorded. Today and Timeline read it without a second browser request. Package version stays 1.0.0. Automated suite: 579 tests. | New canonical tables. No diagnosis, no causal claim, and no change to Supplement, Training, Sleep, Nutrition, Body, or Activity calculations. Future dates are rejected. Empty editor state is not stored. No AI dependency. |
+| 2026-09-26T23:03:14-07:00 | 1.0.11 | 7, 11, 16, 20, 21, 22, 28, 35 | Recorded post-v1 V2-B1 Personal Lab: migration `0021_personal_lab_protocols.sql`; shared immutable protocol versions for separate Experiment and Benchmark objects; structured evidence requirements and observe-only context controls; supplement and benchmark links; experiment Training sessions. Package version stays 1.0.0. Automated suite: 591 tests. | New canonical tables. No result rows, no copied observations, no due reminders, and no causal claim. Existing ad-hoc workouts stay ad-hoc. Protocol version content is not rewritten in place. No AI dependency. |
+| 2026-09-26T23:38:19-07:00 | 1.0.12 | 7, 11, 16, 20, 21, 22, 28, 35, 36 | Recorded post-v1 V2-B2 Benchmark Results: migration `0022_benchmark_results.sql`; immutable evidence-linked results; deterministic evaluators; owner attestation when the source does not already name the protocol; invalidation instead of rewrite. Package version stays 1.0.0. Automated suite: 608 tests. | New canonical tables. Result values are derived from canonical observations and are not typed by the client. Same-protocol results can show a numeric delta. Different protocol versions are not directly compared. No experiment completion, no retest reminder, and no causal claim. No AI dependency. |
+| 2026-09-26T23:55:51-07:00 | 1.0.13 | 7, 16, 20, 21, 22, 28, 36, 37 | Recorded post-v1 V2-B3 Retest Scheduling. Retest state is derived from the current protocol version and the latest valid same-version result. No new migration. Package version stays 1.0.0. Automated suite: 621 tests. | No schedule table. Minimum interval does not block a result. Only the suggested interval creates `due`. Today shows at most one due retest and does not say overdue. No notifications, snooze, or AI timing. |
+| 2026-09-27T00:29:14-07:00 | 1.0.14 | 7, 11, 16, 20, 21, 22, 28, 37, 38 | Recorded post-v1 V2-B4 Experiment Result Summaries: migration `0023_experiment_results.sql`; deterministic classifications; owner protocol and safety attestations; immutable results. Package version stays 1.0.0. Automated suite: 637 tests. V2-B Personal Lab Core is complete. | A result reports observations under one frozen protocol version. It does not say the intervention caused the change. Unknown adherence is not skipped. Context absence is not negative evidence. No AI classification. |
+| 2026-09-27T00:36:13-07:00 | 1.0.15 | 16, 22, 38 | Ordinary Experiment Result finalization waits until the Health calendar day after `window_end`. The inclusive final day stays open. Early safety and protocol-invalid stops are unchanged. Schema head stays `0023_experiment_results.sql`. Package version stays 1.0.0. Automated suite: 638 tests. | A committed ordinary result includes only closed historical days. The current Activity day is not frozen because the planned window ends today. |
 ---
 
 # 30. Final system invariant
@@ -2515,3 +2593,464 @@ USER-FACING ANALYTICS / TODAY
 AI can assist at the interpretation boundary, but it does not erase the distinction between evidence, canonical records, and derived conclusions.
 
 That separation is what allows the platform to remain rebuildable, auditable, and trustworthy as providers, algorithms, devices, and UI evolve.
+
+---
+
+# 31. Post-v1 extension — Supplements (V2-A1)
+
+This section records a post-v1 extension. It does not mean v1 always contained Supplements. Frozen v1 rules in the earlier sections still apply: Health owns canonical facts, sources provide observations, deterministic code derives state, missing evidence is not manufactured, and AI does not commit these rows. V2-A1 uses no AI.
+
+Implemented schema head: `0017_supplements.sql`.
+
+Package version remains `1.0.0`. This extension does not create a v2 release tag.
+
+## 31.1 Canonical tables
+
+| Table | Role |
+|---|---|
+| `supplements` | Persistent identity and descriptive metadata |
+| `supplement_schedules` | Effective-dated dose, unit, slot, and weekday mask |
+| `supplement_status_events` | Effective-dated `active`, `paused`, or `discontinued` |
+| `supplement_adherence` | Explicit `taken` or `skipped` observations only |
+
+Provenance uses the existing `data_sources.key = 'manual'` row from `0001_health_foundation.sql`. Ordinary checkbox actions do not create `import_jobs`.
+
+## 31.2 Schedule recurrence
+
+Weekday mask, Monday = bit 0 through Sunday = bit 6. `127` is every day. A normal plan change closes the prior row with `effective_through` and inserts a new row. It does not rewrite a historically operative dose. A future schedule that has not taken effect and has no adherence may be edited in place.
+
+V2-A1 does not implement RRULEs, monthly schedules, PRN medication, reminders, or unit conversion. `1 serving` is not treated as a mass.
+
+## 31.3 Lifecycle and missingness
+
+The state on a date is the latest status event with `effective_date <= that date`. Creating a supplement also creates its first `active` event.
+
+Resolved occurrence order:
+
+1. paused lifecycle → `paused`
+2. not active → `not_scheduled`
+3. schedule interval and weekday mask
+4. explicit `taken` or `skipped`
+5. otherwise `unknown`
+
+No adherence row means unknown, not skipped. The app does not insert skipped rows after midnight. Paused and discontinued periods do not manufacture misses. Clearing an observation deletes that row and returns the occurrence to unknown.
+
+`taken_at` is set only when the owner supplies an instant. `created_at` is when Health recorded the fact.
+
+Future adherence dates are rejected. Actual dose amount and unit must both be present or both be absent. A positive actual amount does not change the planned schedule.
+
+## 31.4 Today and management
+
+`GET /api/today` remains the only Today payload. It includes scheduled active occurrences for the Phoenix date. Counts keep `unknown` separate from `skipped`. Primary adherence is `taken / scheduled`. Capture coverage is `(taken + skipped) / scheduled`.
+
+`/supplements` manages definitions, schedules, pause/resume/discontinue, and backfill. The five primary destinations stay Today, Nutrition, Training, Body, and Progress. Settings links to `/supplements`.
+
+`/demo` does not receive a supplement fixture and does not call supplement APIs.
+
+## 31.5 Backup
+
+All four tables are canonical, parent-before-child, included in the full archive and the owner portable export, and covered by the restore round-trip tests. Auth secrets remain excluded.
+
+## 31.6 Intentionally deferred
+
+Experiments, benchmarks, Ask Health, supplement advice, interaction warnings, notifications, prescriptions, Recipes, Body Inbox, ad-hoc Training, context tags, and goals are not part of V2-A1. Manual Body capture and cadence are recorded later in section 32.
+
+---
+
+# 32. Post-v1 extension — Body measurement capture (V2-A2)
+
+This section records a post-v1 extension. It does not mean v1 always had circumference quick entry or measurement cadence. Frozen Body sessions, EAV metrics, Fit Profile import, missing-sentinel rules, kilogram weight storage, pound display, and the Theil–Sen trend thresholds remain as written in section 8.
+
+Implemented schema head: `0018_body_measurement_cadence.sql`.
+
+Package version remains `1.0.0`. This extension does not create a v2 release tag.
+
+## 32.1 Controlled manual metrics
+
+Manual capture uses the existing `body_measurement_sessions` and `body_metrics` tables. There is no parallel measurement store.
+
+Canonical keys:
+
+```text
+weight
+body_fat_percentage
+waist_circumference
+hip_circumference
+chest_circumference
+neck_circumference
+left_upper_arm_circumference
+right_upper_arm_circumference
+left_forearm_circumference
+right_forearm_circumference
+left_thigh_circumference
+right_thigh_circumference
+left_calf_circumference
+right_calf_circumference
+```
+
+`waist_circumference` is not `waist_hip_ratio`. Left and right limb keys stay separate.
+
+| Metric | Canonical unit | Manual input | Owner display |
+|---|---|---|---|
+| weight | kg | lb or kg | lb, 0.1 |
+| body fat | percent, not a fraction | percent | %, 0.1 |
+| circumferences | cm | in or cm | in, 0.1 |
+
+`1 in = 2.54 cm`. Conversion is not rounded until display. A blank field is omitted. It is not stored as zero. A manual session needs at least one metric. Weight and circumferences must be greater than zero. Body fat must be from 0 through 100.
+
+## 32.2 Manual sessions
+
+A manual session uses `data_sources.key = manual`, `import_job_id = NULL`, `value_kind = manual`, and timezone `America/Phoenix`. Quick entry uses the actual current instant. A date-only value is rejected. Future instants are rejected. Ordinary form saves do not create import jobs.
+
+`POST /api/body/measurements` creates a session. `PATCH` replaces that session's manual metrics and can correct notes or an explicit instant. `DELETE` removes the session; metrics cascade. Sessions with an import job, or any source other than `manual`, stay read-only.
+
+`updated_at` on sessions and metrics was backfilled to `created_at` for rows that already existed. There is no separate audit log.
+
+## 32.3 Cadence
+
+`body_measurement_cadences` stores one mutable owner preference per metric: interval days from 1 to 3650, and `enabled_from`. No cadence is created automatically. Deleting the row turns the reminder off. Changing a cadence does not rewrite measurements.
+
+Group buttons such as Arms or Full measurements only write the individual metric rows. They are not a second stored model.
+
+The resolver is calendar-based in America/Phoenix, using each session's own timezone to date an observation:
+
+```text
+no row                         no reminder
+age < interval                 current
+interval <= age < 2 * interval due
+age >= 2 * interval            stale
+no observation yet             initial_due
+```
+
+`initial_due` is not called overdue. A future observation does not satisfy the current date. Any valid observation of that exact key can satisfy the cadence, including Fit Profile weight. Waist does not satisfy hips. Left does not satisfy right.
+
+## 32.4 Today
+
+`GET /api/today` still returns one payload. It surfaces at most one reminder, ranked stale, then `initial_due`, then due, then days past due, then catalog order. `dueCount` lets the card say how many others are due without listing them. The Measure link opens `/body?action=measure&metric=...`. A cadence before its `enabled_from` date is not shown.
+
+## 32.5 Backup and demo
+
+`body_measurement_cadences` is canonical and included in the full archive and the portable export. Restore keeps ids, dates, timestamps, nulls, and centimeter values.
+
+`/demo` stays synthetic and read-only. It does not show owner cadence or open the manual capture form.
+
+## 32.6 Intentionally deferred
+
+Body Inbox, Shortcut ingestion, Apple Health body ingestion, photo tape-measure capture, circumference projections, goals, medical ranges, body scores, notifications, Experiments, and Benchmarks are not part of V2-A2. Cadence asks for a measurement. It never invents one.
+
+---
+
+# 33. Post-v1 extension — Ad-hoc Training (V2-A3)
+
+This section records a post-v1 extension. It does not mean v1 workouts were always labeled programmed or ad-hoc. Frozen exercise identity, slot identity, template snapshots, set families, load rules, blank-is-missing, paper load inheritance, transcription, and derived analytics remain as written in section 9.
+
+Implemented schema head: `0019_training_session_types.sql`.
+
+Package version remains `1.0.0`. This extension does not create a v2 release tag.
+
+## 33.1 Session intent
+
+`workout_sessions` gains `session_type` and nullable `session_name`.
+
+`session_type` is what kind of Training session this is: `programmed`, `ad_hoc`, or `experiment`. `source_kind` remains how Health received it (`manual` or `imported_candidate`). Those dimensions stay orthogonal. There is no `source_kind = ad_hoc`.
+
+Historical rows are classified `programmed` when `workout_template_id`, `routine_code`, `template_version`, or `template_name` is present. Otherwise they are `ad_hoc`. The column is added nullable, backfilled, then set `NOT NULL` with a check. It has no permanent default. Existing session ids, exercises, sets, template snapshots, and `source_kind` are unchanged.
+
+`session_name` is an optional human label for a non-template session. Blank is stored as NULL. It is not `template_name`. A missing name displays as “Ad-hoc workout”. That fallback is not written back.
+
+A new programmed session requires a real template. The server still resolves routine, version, template name, and exercise name. An ad-hoc session stores `workout_template_id`, `routine_code`, `template_version`, `template_name`, and exercise `slot_id` as NULL. Ordinary create of `experiment` returns 409: “Experiment sessions require a linked Experiment or Benchmark.” No experiment id or benchmark name is invented. Session type does not change during a normal edit.
+
+Photo transcription still commits `session_type = programmed` and `source_kind = imported_candidate`. Recommit protection after deletion is unchanged.
+
+## 33.2 Owner exercises
+
+Ad-hoc work uses the same `exercise_definitions`, `workout_session_exercises`, and `workout_sets` tables. The owner can create a reusable exercise with name, measurement family (`reps`, `duration`, `reps_per_side`, `duration_per_side`), and a load type already used by the catalog (`bodyweight`, `barbell`, `dumbbell`, `kettlebell`, `dumbbell_or_kettlebell`, `cable`, `machine`, `band`, `other`, `none`). Unilateral must match the family: per-side measurements are unilateral, and the other two are not. Distance is not a set field.
+
+New owner exercises use `performance_type = other`, `analytics_load_type = none`, and `analytics_rep_mode = per_side` only for a per-side family. Otherwise the rep mode is `standard`. Sets are stored. Unsupported analytics stay unsupported. Provenance for these definitions is metadata `{ "origin": "owner", "created_via": "ad_hoc_training" }`. That metadata is not a health observation. Seeded catalog rows are not archived or semantically rewritten through this API.
+
+An unused owner exercise can still correct name, measurement family, load type, and unilateral. After a workout references it, measurement family, unilateral, and load type stay fixed. A name correction does not rewrite historical `exercise_name` snapshots. Delete archives the definition with `is_active = false`. Inactive definitions leave the picker. Historical workouts still load.
+
+## 33.3 Today, analytics, backup, demo
+
+`GET /api/today` remains one payload. Training items include `sessionType` and a resolved name: programmed uses the template snapshot, then the routine, then “Workout”; ad-hoc uses `session_name`, then “Ad-hoc workout”; experiment uses a future title, then “Experiment workout”. The current template name is not looked up over the snapshot. When nothing is logged, “Log workout” still opens `/training/import`, and “Ad-hoc workout” opens `/training/new?type=ad_hoc`.
+
+An ad-hoc session counts as Training. Sets for an already classified exercise participate in that exercise’s analytics. Apple Activity workouts stay outside Training.
+
+`session_type` and `session_name` are in the `workout_sessions` backup inventory. Owner-created definitions are included with `exercise_definitions` in the full archive and the portable export. `/demo` stays synthetic and read-only. It does not offer ad-hoc creation or the owner exercise API.
+
+## 33.4 Intentionally deferred
+
+Experiment and Benchmark tables, experiment foreign keys, protocol versions, retest intervals, Personal Lab, context tags, goals, distance, pace, heart rate, power, rounds, per-set RPE, GPS routes, Apple workouts as Training, and automatic exercise classification are not part of V2-A3. A benchmark-like session logged now is an ad-hoc workout that a later version can reference. Daily context arrived in V2-A4. See section 34.
+
+---
+
+# 34. Post-v1 extension — V2-A4 Daily Context
+
+V2-A4 records owner-declared circumstances for one America/Phoenix calendar date. It is not a diagnosis, a journal, a symptom tracker, or a causal explanation. A missing row means no context was recorded. It does not mean the day was ordinary, and a tag left off a recorded day is not a negative clinical finding.
+
+The tag catalog lives in `src/domain/context.ts`. The frozen keys are `sick`, `travel`, `alcohol`, `late_meal`, `unusual_stress`, `poor_sleep_opportunity`, `baby_night_interruption`, `pain`, `rest_day`, `new_supplement`, `medication_change`, and `unusual_physical_labor`. Custom tags are not accepted. The optional note is trimmed, blank becomes null, and the maximum is 500 characters. Responses return tags in catalog order.
+
+## 34.1 Schema and API
+
+`daily_context` has one row per `context_date`, a nullable note, and `source_id` pointing at the existing manual data source. `daily_context_tags` stores tag membership with `ON DELETE CASCADE` and a check constraint for the frozen keys. `created_at` and `updated_at` describe the database row, not when the circumstance happened. There is no import job and no AI inference.
+
+A write must contain at least one tag or a nonblank note. Clearing both deletes the row. A later correction updates the same `id` and `created_at`, replaces tag membership, and changes `updated_at`. Future dates are rejected. Past dates and today are allowed.
+
+Owner routes:
+
+- `GET /api/context/days?start=YYYY-MM-DD&end=YYYY-MM-DD`
+- `GET /api/context/days/:date` returns `{ context: null }` when nothing was recorded
+- `PUT /api/context/days/:date`
+- `DELETE /api/context/days/:date` is idempotent when the date has no row
+
+The range is required, ordered by date, and capped at 3660 days. Anonymous callers receive 401. A signed-in non-owner receives 403. The Apple Health ingest token has no context authority.
+
+`/context?date=YYYY-MM-DD` is a private editor. It is not a primary tab, a Settings destination, or a demo route. Omitted date means today in America/Phoenix.
+
+## 34.2 Today, Timeline, and other domains
+
+`GET /api/today` includes `context` for today's Health date. The card sits after Activity, Sleep, and Body and before What Changed. Absence never enters Needs Attention. The demo surface omits context and does not show Add or Edit.
+
+Progress loads context with the timeline request. The event kind is `daily_context`, domain `annotation`, time precision `date`, with no invented `occurredAt`. The card links Edit to `/context?date=...` on the private app. Timeline focus `context` shows only those annotations and has no numeric lane. All includes them. Training, Body, Nutrition, Activity, Sleep, and Performance Bests do not. On a shared day, context sorts before the other events.
+
+Context does not change body trends, strength analytics, activity averages, Nutrition totals, or sleep calculations, and it does not exclude a day from those calculations. `new_supplement` does not create a Supplement. `rest_day` does not forbid Training. `pain` does not replace a workout pain score. Sleep and Nutrition measurements are not converted into tags.
+
+A date-and-tag query reads `daily_context_tags`. It does not parse notes. V2-A4 did not add Personal Lab. V2-B1 does, in section 35. Causal interpretation is still not implemented.
+
+## 34.3 Backup and deviations
+
+Both tables are canonical and portable. Restore preserves ids, dates, notes, tag membership, source ids, and timestamps, and it does not create a second row for the same date.
+
+Deviations from the implementation handoff:
+
+- Duplicate submitted tags are deduped into catalog order.
+- A missing detail is HTTP 200 with `{ context: null }`. A missing delete is HTTP 200 with `{ deleted: false }`.
+- The public range is limited to 3660 days.
+- All-time Timeline can show a context day on or before the as-of date even when that day is earlier than the first other observation. That does not move analytics windows.
+- The database check constrains note shape and tag keys. The no-empty-row rule is enforced by the write path, because a parent row is inserted before its tags.
+- `/demo` shows no context annotations.
+
+Signed-in owner smoke of the private editor was not run in this pass. Local private routes still require an owner session.
+
+---
+
+# 35. Post-v1 — V2-B1 Personal Lab
+
+V2-B1 adds the objects later result collection will use. It does not store results and does not say what an experiment proved.
+
+An Experiment is one bounded question. A Benchmark definition is a reusable measurement. A Protocol is the exact instructions and evidence requirements for one of those objects. Observations stay in their existing canonical tables. A Result, which would interpret those observations, is deferred.
+
+## 35.1 Shared protocol versions
+
+`lab_protocols` identifies an experiment protocol or a benchmark protocol. `lab_protocol_versions` stores version number, instructions, optional retest day counts, and exactly one current version. `lab_protocol_requirements` stores ordered evidence expectations. `lab_protocol_context_controls` stores tags to observe.
+
+Version content is immutable. A change inserts the next version and marks it current. Older versions stay readable. Product UI does not delete a protocol version.
+
+Requirement roles are `primary_outcome`, `secondary_outcome`, `adherence`, `context`, and `safety`. Domains are `training`, `body`, `nutrition`, `activity`, `sleep`, `supplements`, `context`, and `benchmark`. Selectors are validated in `src/domain/lab.ts` for the domain and requirement kind. Unknown body keys, context tags, metric names, training measures, and missing supplement, exercise, or benchmark ids are rejected. The owner edits structured fields. The owner does not type selector JSON.
+
+Context controls support only `observe`. They do not write Daily Context and they do not exclude a day.
+
+Text limits used by the write path, and not specified in the phase handoff, are 200 characters for titles and requirement labels, 2000 for an experiment question, 4000 for hypothesis, rationale, and description, and 8000 for instructions.
+
+## 35.2 Experiments
+
+`experiments` stores title, question, optional hypothesis and rationale, origin, status, the exact `protocol_version_id`, an optional America/Phoenix date window, and the manual source. There is no goal id and no literature table.
+
+Origins are `owner_created`, `ai_assisted`, `evidence_gap`, `goal_plateau`, `stale_benchmark`, `repeated_pattern`, and `external_research`. The owner UI creates `owner_created` with status `accepted`. `createProposedExperiment` is a separate service path for a future proposal. It starts at `proposed` and does not accept or start the experiment. Owner acceptance is `POST /api/lab/experiments/:id/accept`.
+
+B1 transitions are: `proposed` to `accepted`, `abandoned`, or `superseded`; `accepted` to `scheduled`, `abandoned`, or `superseded`; `scheduled` to `accepted`, `active`, `abandoned`, or `superseded`; `active` to `abandoned`. `abandoned` and `superseded` are terminal. `completed` and `inconclusive` are rejected because they belong to a later result workflow. There is no generic status patch.
+
+`accepted` has no dates. `scheduled` requires `window_end >= window_start`. Returning to `accepted` clears the window. Starting requires `scheduled` and a window, then freezes `protocol_version_id`, `window_start`, and `window_end`. Protocol editing before `active` creates the next version and points the experiment at it. Protocol editing after `active` is rejected. A fundamental protocol change after start means abandon or supersede the experiment and create another one.
+
+`experiment_supplements` links canonical supplement ids as `intervention` or `tracked`. More than one intervention may be stored. That storage does not claim the design isolates any one supplement. Deleting or discontinuing a supplement does not cascade-delete the experiment. `experiment_benchmarks` links benchmark definitions as `primary` or `secondary`, with at most one primary. An experiment does not require a benchmark.
+
+An untouched `accepted` experiment with no Training session may be deleted. After it is scheduled, active, or linked to a workout, the owner abandons or supersedes it.
+
+## 35.3 Benchmarks
+
+`benchmark_definitions` owns one `lab_protocols` row whose kind is `benchmark`. The visible name is the protocol title. Domains are `training`, `body`, `activity`, `sleep`, and `other`. A new protocol edit creates the next version. Archive sets `is_active` false and keeps the history. A definition with protocol history is not deleted.
+
+## 35.4 Training
+
+`workout_sessions.experiment_id` and `benchmark_protocol_version_id` are nullable. A programmed or ad-hoc session must leave both null. An experiment session needs at least one. A benchmark protocol version must belong to `protocol_kind = benchmark`. If both parents are set and the experiment has a primary benchmark, the version must belong to that benchmark's protocol. The experiment must be `active`. An archived benchmark cannot be run.
+
+Creation starts from Personal Lab: `/training/new?type=experiment&experimentId=` or `&benchmarkProtocolVersionId=`. Training home does not offer Experiment as a third generic workout type. Sets stay canonical. Existing ad-hoc workouts are not reclassified. Deleting a workout does not delete the experiment. Abandoning an experiment does not delete its workouts. Session type and the lab parents stay fixed on an ordinary edit.
+
+## 35.5 Surfaces, Today, and Timeline
+
+Private routes are `/lab`, `/lab/experiments/new`, `/lab/experiments/:id`, `/lab/benchmarks/new`, and `/lab/benchmarks/:id`. The five primary destinations stay Today, Nutrition, Training, Body, and Progress. Progress overview links to Personal Lab. `/demo` has no lab route and does not call owner lab APIs.
+
+`GET /api/today` remains one payload. It includes scheduled and active experiments, including a future scheduled window. It does not invent a due action.
+
+Timeline does not gain `experiment_started`, `experiment_abandoned`, or `experiment_superseded` events in this phase. The experiment detail shows the date window. Benchmark result events arrive in section 36.
+
+A protocol requirement does not create a body measurement, a cadence, a supplement schedule, or a context tag.
+
+## 35.6 API, backup, and deviations
+
+Owner routes, all behind owner auth:
+
+- `GET` and `POST /api/lab/experiments`
+- `GET`, `PATCH`, and `DELETE /api/lab/experiments/:id`
+- `POST /api/lab/experiments/:id/schedule|start|abandon|supersede|accept|protocol-version`
+- `GET` and `POST /api/lab/benchmarks`
+- `GET` and `PATCH /api/lab/benchmarks/:id`
+- `POST /api/lab/benchmarks/:id/protocol-version|archive`
+
+Anonymous is 401. A signed-in non-owner is 403. The Apple Health token has no lab authority. The wrong method is 405.
+
+The lab tables are canonical and portable. Restore preserves protocol ids, version numbers, the current-version flag, requirement selectors, context controls, experiment status and windows, supplement and benchmark links, and Training parent ids.
+
+Deviations:
+
+- Requirement kind names are the catalog names in section 35.1, including `training_measure`, `body_metric`, `nutrition_metric`, `activity_metric`, `sleep_metric`, `supplement_adherence`, `context_tag`, and `benchmark_definition`.
+- Text length caps are those in section 35.1.
+- Duplicate context tags are deduped into catalog order.
+- Timeline lifecycle events are deferred. The window is visible on the experiment.
+- `/demo` omits Personal Lab.
+- `POST .../accept` exists so a future proposal can be accepted only by an owner action. The owner create path does not use it.
+- Signed-in owner smoke was not run. Private routes still require an owner session.
+
+Benchmark outcome roles are tightened on new benchmark protocol writes in section 36. Stored B1 rows stay readable.
+
+# 36. Post-v1 — V2-B2 Benchmark Results
+
+A Benchmark Result is a Personal Lab record. It is not another observation table. Training sets, body measurements, nutrition entries, activity summaries, and sleep nights stay canonical. The result stores the deterministic values those observations produced under one immutable protocol version.
+
+## 36.1 Tables and lifecycle
+
+`benchmark_results` stores the benchmark definition, the protocol version, the evidence-derived result date, an optional experiment, status `valid` or `invalidated`, protocol confirmation `linked_protocol` or `owner_attested`, the evidence fingerprint, the manual source, optional `supersedes_result_id`, and invalidation metadata.
+
+`benchmark_result_values` stores one numeric value per resolved primary or secondary outcome. The unit is the canonical unit from the evaluator. `value_kind` is `observed` when the value is the canonical metric itself and `derived` when deterministic code computes it. A missing observation is not stored as zero.
+
+`benchmark_result_evidence` stores a bounded `evidence_ref` and `evidence_snapshot` for `training_session`, `body_metric`, `nutrition_day`, `activity_day`, or `sleep_night`. The snapshot is provenance for the committed result. Later edits to the source observation do not change it.
+
+A committed result is immutable. The owner invalidates it and may commit a replacement. There is no un-invalidate action and no product hard-delete. Invalidated results stay readable and in backup. Default history, the latest-valid helper, and the default Timeline omit them.
+
+`latestValidBenchmarkResult(benchmarkDefinitionId, protocolVersionId)` returns the latest valid result for that pair. Retest scheduling uses that anchor in section 37.
+
+## 36.2 Evaluation
+
+Evaluators are centralized by requirement kind. A preview is `eligible`, `missing_primary`, `ambiguous`, `unsupported`, `duplicate`, or `conflicting_dates`. Preview writes nothing. Commit re-reads canonical evidence and rejects client-supplied numbers and a client-supplied result date.
+
+Training measures use canonical set helpers. Qualifying sets are `set_type = working` with a performed value. Warmup, drop, other, and blank sets are omitted. `total_reps` and `largest_set_reps` apply to reps families and use `volumeRepsForSet`. `duration` is the sum of `timedDurationSecForSet` in seconds for duration families. `working_sets` counts qualifying sets. A family that does not fit is `unsupported`.
+
+Body, activity, and eligible sleep values are `observed`. Nutrition day totals are `derived`. Activity and sleep use the America/Phoenix daily identity. A body result date uses the measurement session timezone, or America/Phoenix when the session has none. Every resolved outcome in one result must share one Health date.
+
+If the workout's `benchmark_protocol_version_id` equals the selected version and every outcome is that training evidence, confirmation is `linked_protocol`. Otherwise the owner must attest that the observation followed the protocol. An ad-hoc workout stays `session_type = ad_hoc`. A result does not change experiment status. An experiment id is taken from the training session, and a requested experiment id must match it.
+
+The same benchmark, protocol version, and evidence fingerprint cannot be inserted twice, including after invalidation. The API returns 409 and the existing result id. A different observation on the same date is a different fingerprint.
+
+Same-protocol valid results may show an absolute delta and a percent delta. The percent is omitted when the previous value is zero. The UI does not label the change better or worse. Results from different protocol versions are retained and are not directly compared. Multiple primary values stay separate.
+
+New benchmark protocol writes require a result-capable primary outcome. Primary and secondary outcomes must be `training_measure`, `body_metric`, `nutrition_metric`, `activity_metric`, or `sleep_metric`. Experiment protocols are unchanged. Existing stored rows stay readable.
+
+## 36.3 Surfaces
+
+Benchmark detail groups results by protocol version and hides invalidated results until the owner asks to see them. Record-from-existing-data and review-after-workout both open a preview. Result detail shows the values, evidence, protocol confirmation, optional experiment link, and Daily Context for the result date. No context row reads "No context was recorded." A context control is highlighted when that tag is present. It does not invalidate the result.
+
+Timeline kind `benchmark_result` is domain `annotation`, precision `date`. Valid results appear. Invalidated results do not. There is no numeric lane. Today is unchanged.
+
+Result values are not fed back into Training, Body, Activity, Sleep, or Nutrition analytics.
+
+## 36.4 Backup and deviations
+
+The three result tables are canonical and portable. Evidence JSON is compared by parsed content. Restore keeps ids, the fingerprint, units, value kind, refs, snapshots, and invalidation fields.
+
+Deviations:
+
+- Preview adds `conflicting_dates` when outcome evidence does not share one Health date.
+- Invalidation reasons are at most 500 characters.
+- `supersedes_result_id` is stored. The replaced result must already be invalidated and must belong to the same benchmark.
+- `duration` means the sum of performed working-set duration seconds. B1 named the selector and did not define that total.
+- A preview without a date, workout, or measurement asks the owner to choose evidence. It does not scan all history.
+- The request `date` is a selector. It is stored only when it is the evidence date.
+- `/demo` still omits Personal Lab. Signed-in owner smoke for the result screens was not run.
+
+# 37. Post-v1 — V2-B3 Retest Scheduling
+
+Retest state is derived. Health does not store `next_retest_date`, `retest_due`, or a snooze. Schema head remains `0022_benchmark_results.sql`.
+
+## 37.1 State
+
+The states are `unconfigured`, `no_baseline`, `waiting_minimum`, `available`, and `due`.
+
+`minimum_retest_days` is the earliest suggested repeat. Before that date the state is `waiting_minimum`. The owner can still run the benchmark or record a result. The new valid result becomes the anchor.
+
+`suggested_retest_days` is the date when Health says a retest is suggested. `due` exists only when that interval is set and today is on or after the suggested date. A protocol with a minimum and no suggested interval becomes `available` after the minimum. It never becomes `due`. A protocol with neither interval is `unconfigured`. Health does not invent a cadence.
+
+A current protocol with guidance and no valid result for that exact version is `no_baseline`. An older version's result does not schedule the current version. Invalidated results do not anchor the schedule. A replacement result anchors on its `result_date`, not on `created_at`. Two valid results on the same date share one schedule date.
+
+Dates are calendar addition in America/Phoenix. The boundary day is included: today equal to the minimum date is no longer `waiting_minimum`, and today equal to the suggested date is `due`.
+
+Archived benchmarks stay readable and are omitted from the active retest list and from Today.
+
+## 37.2 Surfaces
+
+Personal Lab lists `due` retests, then `available` ones, each labeled with its protocol version. `waiting_minimum`, `no_baseline`, and `unconfigured` stay on the benchmark detail.
+
+Today receives retest data inside `GET /api/today`. It shows at most one `due` retest, chosen by days past the suggested date, then the oldest anchor date, then benchmark title and id. Other due retests are counted, not listed. A scheduled or active experiment linked to that benchmark through `experiment_benchmarks` suppresses the standalone Today card. An accepted experiment does not. The experiment card remains. The retest is not a Needs Attention item, and the copy does not say overdue.
+
+`GET /api/lab/retests` and `GET /api/lab/benchmarks/:id/retest` are owner-only reads. `asOf` defaults to the Phoenix date and must be a calendar date.
+
+## 37.3 Deviations
+
+- `experiment_benchmarks` identifies the benchmark definition and does not store a protocol version. A scheduled or active link suppresses the current-protocol Today retest. A future versioned link would need an explicit match.
+- Same-day display still uses the existing latest-valid ordering when `created_at` differs. The schedule date does not.
+- An archived benchmark's detail says automatic scheduling is off. It does not say retest suggested.
+- There is no notification, snooze, or persisted dismissal.
+- `/demo` still omits Personal Lab. Signed-in owner smoke was not run.
+
+# 38. Post-v1 — V2-B4 Experiment Result Summaries
+
+An Experiment Result is a historical record of what the frozen protocol observed. Schema head is `0023_experiment_results.sql`. Package version stays 1.0.0. V2-B Personal Lab Core is complete.
+
+## 38.1 Classification
+
+The classifications are `completed_interpretable`, `completed_low_adherence`, `incomplete`, `inconclusive`, `invalid_protocol`, and `stopped_safety`. None of them means the intervention worked or failed.
+
+Precedence is centralized:
+
+1. An explicit safety stop is `stopped_safety`.
+2. An owner attestation that the material protocol was not followed is `invalid_protocol`.
+3. An ordinary review on or before `window_end` cannot be committed. The inclusive window closes on the next Health calendar day.
+4. A required non-context requirement that is missing or insufficient is `incomplete`.
+5. A required essential requirement that is unsupported, or an uncertain protocol attestation, is `inconclusive`.
+6. A configured adherence threshold that fails after coverage is sufficient is `completed_low_adherence`.
+7. Otherwise the result is `completed_interpretable`.
+
+`completed_interpretable` and `completed_low_adherence` set `experiments.status` to `completed`. The other four set it to `inconclusive`. Those statuses are written only by result commit. Invalidating the current valid result, with no replacement, returns the experiment to `active` so it can be reviewed again. The planned window and protocol stay frozen. Abandoned and superseded experiments are not finalizable.
+
+## 38.2 Window, attestations, and criteria
+
+Experiment windows are inclusive calendar-date windows. Ordinary result finalization becomes available on the first Health calendar day after `window_end`, when the full planned observation window is closed. On `window_end` the preview stays in progress and says the final observation day is still open. Early finalization remains available for a safety stop or a material protocol deviation, including on `window_end`, with an `effective_end_date` inside the planned window and not after today. `experiments.window_end` is not overwritten.
+
+The owner attests `followed`, `not_followed`, or `uncertain`. Safety is an explicit attestation plus a reason of at most 500 characters. Pain tags, poor sleep, and low performance do not infer a safety stop. An optional owner note of at most 2000 characters is commentary.
+
+`lab_protocol_requirements.criteria` is part of the immutable protocol version. Existing rows keep `{}`, which means the minimum evidence rule for that kind and invents no historical threshold. Supplement adherence may set `minimumAdherencePercent` and `minimumCoveragePercent`. When an adherence percent is set and coverage is not, resolved coverage must be 100% before the threshold is applied. Coverage below the gate is insufficient, which leads to `incomplete`, not low adherence.
+
+Adherence counts scheduled days as taken, skipped, and unknown. Adherence percent is taken divided by resolved days. Unknown is not skipped. Paused and unscheduled days are not scheduled opportunities. Zero scheduled days on a required adherence requirement is insufficient, not 0%.
+
+Context requirements and observe controls record which tags were present. Absence does not mean the factor did not occur, does not make the result incomplete, and does not invalidate it.
+
+## 38.3 Evidence
+
+All evaluators use the same inclusive effective window. Benchmark outcomes use valid results linked to the experiment. New experiment protocols pin `benchmarkProtocolVersionId`. Older selectors that name only the definition stay readable. If those in-window results use more than one protocol version, the requirement is unsupported. A prior same-version result strictly before `window_start` can show a numeric delta. No prior result is stated as unavailable. It is not treated as zero, and the comparison does not say improved or worsened.
+
+Training evidence is limited to sessions with `experiment_id` set to this experiment. Body, nutrition, activity, and sleep summaries use each domain's existing missingness rules. Missing nutrition is not zero intake. Ineligible sleep is not zero-duration sleep. Ordinary finalization cannot include the current Health day, so a window that ends today does not freeze Activity's provisional row, an open Nutrition day, unresolved supplement adherence, or a Daily Context note that can still change. Activity keeps its existing completed-day rule. There is no separate Activity finalization flag.
+
+Commit re-reads canonical evidence, classifies on the server, and stores bounded evidence snapshots plus a SHA-256 fingerprint. The client cannot submit a classification or calculated outcomes. A committed result is not patched. Correction is invalidate, review again, and commit a replacement that names the invalidated result. At most one valid result exists per experiment.
+
+## 38.4 Surfaces
+
+The result screen shows the classification, question, hypothesis, observations, adherence, recorded context, limitations, and protocol version. The footer says these are recorded personal observations and do not establish causality. The hypothesis is not marked supported or refuted.
+
+Today keeps the existing experiment card before `window_end`. On `window_end` an active experiment can say it ends today and does not say Ready to review. On the next Health day, an active experiment without a valid result says Ready to review. Completing or closing the experiment removes that prompt. Invalidation brings it back. Timeline adds a date-only `experiment_result` annotation on `effective_end_date` for valid results. There is no numeric lane.
+
+`experiment_results`, `experiment_result_requirements`, `experiment_result_evidence`, and requirement criteria are portable. Restore writes the stored result and does not recalculate it. `/demo` does not call the result API and does not show an owner result on the fictional Timeline.
+
+There is no AI call, causality score, confidence score, confounder score, or invented baseline window.
+
+
+
+

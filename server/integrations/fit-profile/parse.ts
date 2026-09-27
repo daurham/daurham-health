@@ -3,6 +3,7 @@
 // exports; do not swap the library solely to silence audit.
 import * as XLSX from 'xlsx'
 import {
+  type CanonicalUnit,
   FIT_PROFILE_METRIC_MAPPINGS,
   FIT_PROFILE_REQUIRED_HEADERS,
   FIT_PROFILE_VENDOR_HEADERS,
@@ -28,7 +29,7 @@ export type FitProfileRawRow = Record<string, unknown>
 export type FitProfileCanonicalMetric = {
   key: string
   value: number
-  unit: 'kg' | 'percent' | 'ratio' | 'index' | 'kcal_per_day' | 'years'
+  unit: CanonicalUnit
   valueKind: 'measured' | 'device_estimated' | 'vendor_derived' | 'manual'
   sourceHeader: string
   sourceValue: number

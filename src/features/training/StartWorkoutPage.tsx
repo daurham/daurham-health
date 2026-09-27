@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import type { ReviewFieldError } from '@/domain/paper-load'
-import type { WorkoutTemplate } from '@/domain/training'
+import { trainingSessionDisplayName } from '@/domain/training'
+import type { ExerciseDefinition, WorkoutTemplate } from '@/domain/training'
 import { interactiveCardClass } from '@/lib'
-import { createSession, fetchTemplates } from './api'
+import { createOwnerExercise, createSession, fetchExercises, fetchTemplates } from './api'
 import { WorkoutEditor } from './WorkoutEditor'
 import {
   DraftValidationError,
   buildManualWorkoutPayload,
+  draftForAdHocWorkout,
+  draftForExperimentWorkout,
   draftFromTemplate,
   validateWorkoutDraft,
   type WorkoutDraft,
@@ -15,15 +18,46 @@ import {
 
 export function StartWorkoutPage() {
   const navigate = useNavigate()
+  const [params] = useSearchParams()
+  const adHoc = params.get('type') === 'ad_hoc'
+  const experimentWorkout = params.get('type') === 'experiment'
+  const experimentId = params.get('experimentId')
+  const benchmarkProtocolVersionId = params.get('benchmarkProtocolVersionId')
   const [templates, setTemplates] = useState<WorkoutTemplate[]>([])
-  const [loading, setLoading] = useState(true)
+  const [catalog, setCatalog] = useState<ExerciseDefinition[]>([])
+  const [loading, setLoading] = useState(!adHoc && !experimentWorkout)
   const [error, setError] = useState<string | null>(null)
-  const [draft, setDraft] = useState<WorkoutDraft | null>(null)
+  const [draft, setDraft] = useState<WorkoutDraft | null>(() => {
+    if (adHoc) {
+      return draftForAdHocWorkout()
+    }
+    if (experimentWorkout && (experimentId || benchmarkProtocolVersionId)) {
+      return draftForExperimentWorkout({ experimentId, benchmarkProtocolVersionId })
+    }
+    return null
+  })
   const [saving, setSaving] = useState(false)
   const [fieldErrors, setFieldErrors] = useState<ReviewFieldError[]>([])
   const [errorFocusKey, setErrorFocusKey] = useState(0)
 
   useEffect(() => {
+    if (adHoc || experimentWorkout) {
+      let cancelled = false
+      fetchExercises()
+        .then((next) => {
+          if (!cancelled) {
+            setCatalog(next)
+          }
+        })
+        .catch((caught: unknown) => {
+          if (!cancelled) {
+            setError(caught instanceof Error ? caught.message : 'Could not load exercises')
+          }
+        })
+      return () => {
+        cancelled = true
+      }
+    }
     let cancelled = false
     fetchTemplates()
       .then((next) => {
@@ -44,7 +78,7 @@ export function StartWorkoutPage() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [adHoc, experimentWorkout])
 
   async function onSave() {
     if (!draft) {
@@ -78,6 +112,17 @@ export function StartWorkoutPage() {
   }
 
   if (!draft) {
+    if (experimentWorkout) {
+      return (
+        <section className="space-y-4">
+          <h1 className="text-2xl font-semibold tracking-tight">Experiment workout</h1>
+          <p className="text-sm text-zinc-700">Start this workout from Personal Lab so it keeps its experiment or benchmark.</p>
+          <Link to="/lab" className="text-sm text-zinc-500 hover:text-zinc-900">
+            Open Lab
+          </Link>
+        </section>
+      )
+    }
     return (
       <section className="space-y-6">
         <div>
@@ -126,10 +171,16 @@ export function StartWorkoutPage() {
           Training
         </Link>
         {' / '}
-        {draft.template?.name}
+        {experimentWorkout ? 'Experiment workout' : adHoc ? 'Ad-hoc workout' : draft.template?.name}
       </p>
       <WorkoutEditor
-        title={draft.template?.name ?? 'Workout'}
+        title={
+          experimentWorkout
+            ? trainingSessionDisplayName({ sessionType: 'experiment', sessionName: draft.sessionName })
+            : adHoc
+              ? trainingSessionDisplayName({ sessionType: 'ad_hoc', sessionName: draft.sessionName })
+              : (draft.template?.name ?? 'Workout')
+        }
         subtitle="Draft — not saved until you tap Save Workout."
         draft={draft}
         onChange={(next) => {
@@ -139,8 +190,16 @@ export function StartWorkoutPage() {
         onCommit={() => {
           void onSave()
         }}
-        onCancel={() => setDraft(null)}
-        cancelLabel="Change template"
+        onCancel={adHoc || experimentWorkout ? () => navigate(experimentWorkout ? '/lab' : '/training') : () => setDraft(null)}
+        cancelLabel={adHoc || experimentWorkout ? 'Cancel' : 'Change template'}
+        allowExerciseManagement={adHoc || experimentWorkout}
+        allowSessionName={adHoc || experimentWorkout}
+        exerciseCatalog={catalog}
+        onCreateExercise={async (input) => {
+          const created = await createOwnerExercise(input)
+          setCatalog((current) => [...current.filter((exercise) => exercise.id !== created.id), created])
+          return created
+        }}
         commitLabel="Save Workout"
         saving={saving}
         error={error}

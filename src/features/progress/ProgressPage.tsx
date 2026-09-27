@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { NavLink, Outlet, useLocation, useOutletContext, useParams, useSearchParams } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation, useOutletContext, useParams, useSearchParams } from 'react-router-dom'
 import type { ProgressOverview, ProgressRange, ProgressTimeline } from '@/domain/progress'
-import { cn, LoadErrorNotice, selectedTabClass, tabClass } from '@/lib'
+import { cn, LoadErrorNotice, quietButtonClass, selectedTabClass, tabClass } from '@/lib'
 import { fetchProgressOverview, fetchProgressTimeline } from './api'
 import { ActivityProgressPage } from './ActivitySection'
 import { ActivitySleepOverview } from './ActivitySleepOverview'
@@ -164,6 +164,13 @@ export function ProgressOverviewRoute() {
     <div className="space-y-5 md:space-y-6">
       <OverviewSection overview={overview} onEvidence={onEvidence} />
       <ActivitySleepOverview range={range} />
+      <section className="rounded-lg border border-zinc-200 bg-white p-4">
+        <h2 className="text-sm font-semibold text-zinc-900">Personal Lab</h2>
+        <p className="mt-1 text-sm text-zinc-600">Experiments and repeatable benchmarks</p>
+        <Link to="/lab" className={`${quietButtonClass} mt-3 inline-flex`}>
+          Open Lab
+        </Link>
+      </section>
     </div>
   )
 }

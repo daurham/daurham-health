@@ -59,6 +59,8 @@ function session(): WorkoutSession {
     routineCode: 'A',
     templateVersion: '1.3.1',
     templateName: 'Full Body A',
+    sessionType: 'programmed',
+    sessionName: null,
     durationMin: 48,
     effort: 4,
     painLevel: 1,

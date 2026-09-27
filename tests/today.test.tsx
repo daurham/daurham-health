@@ -151,7 +151,7 @@ describe('today nutrition and training', () => {
   it('counts a canonical workout and ignores days that only have activity', () => {
     const logged = buildTodayView(
       sources({
-        trainingToday: [{ id: 'session-1', name: 'Routine B', exerciseCount: 6, workingSetCount: 18 }],
+        trainingToday: [{ id: 'session-1', sessionType: 'programmed', name: 'Routine B', exerciseCount: 6, workingSetCount: 18 }],
         activityDays: [activity('2026-09-22', { stepsCount: 8000, exerciseMinutes: 40 })],
       }),
     )

@@ -143,6 +143,7 @@ describe('session bounds', () => {
     const base = {
       workoutDate: '2026-09-20',
       workoutTemplateId: null,
+      sessionType: 'programmed',
       durationMin: null,
       painLevel: null,
       bodyweightLb: null,
@@ -178,6 +179,7 @@ describe('session bounds', () => {
     const result = manualWorkoutRequestSchema.safeParse({
       workoutDate: '2026-09-20',
       workoutTemplateId: null,
+      sessionType: 'programmed',
       durationMin: null,
       effort: null,
       painLevel: 4,

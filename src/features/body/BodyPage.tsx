@@ -1,16 +1,28 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { displayValueForMetric, FIT_PROFILE_XLSX_ACCEPT } from '@/domain/body-metrics'
+import { metricDefinition, ownerInputNumber } from '@/domain/body-manual'
 import type {
   BodyMeasurementSession,
   FitProfilePreviewCandidate,
   FitProfilePreviewResponse,
 } from '@/domain/body'
-import { cn, ListPlaceholder, primaryButtonClass } from '@/lib'
+import { cn, ListPlaceholder, primaryButtonClass, quietButtonClass } from '@/lib'
 import {
   commitFitProfile,
+  createManualMeasurement,
+  deleteBodyCadence,
+  deleteManualMeasurement,
+  fetchBodyCadences,
   fetchBodyMeasurements,
   previewFitProfile,
+  saveBodyCadence,
+  updateManualMeasurement,
+  type BodyCadenceItem,
 } from './api'
+import { CadencePanel } from './CadencePanel'
+import { MeasureForm } from './MeasureForm'
+import { customKeysFor, presetForMetric } from './measure-preset'
 import { HEALTH_CALENDAR_TIME_ZONE } from '@/domain/time'
 import { selectedFingerprints, selectionFromPreview } from './import-state'
 
@@ -47,27 +59,34 @@ function metricByKey(candidate: FitProfilePreviewCandidate, key: string) {
 }
 
 export function BodyPage() {
+  const [params, setParams] = useSearchParams()
   const [sessions, setSessions] = useState<BodyMeasurementSession[]>([])
+  const [cadences, setCadences] = useState<BodyCadenceItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [file, setFile] = useState<File | null>(null)
   const [timezone] = useState(HEALTH_CALENDAR_TIME_ZONE)
   const [preview, setPreview] = useState<FitProfilePreviewResponse | null>(null)
   const [selected, setSelected] = useState<Record<string, boolean>>({})
-  const [busy, setBusy] = useState<'preview' | 'commit' | null>(null)
+  const [busy, setBusy] = useState<'preview' | 'commit' | 'save' | null>(null)
   const [importNotice, setImportNotice] = useState<string | null>(null)
+  const [editing, setEditing] = useState<BodyMeasurementSession | null>(null)
+  const [formOpen, setFormOpen] = useState(params.get('action') === 'measure')
+  const focusKey = params.get('metric')
 
   async function reloadHistory() {
-    const next = await fetchBodyMeasurements()
-    setSessions(next)
+    const [nextSessions, nextCadences] = await Promise.all([fetchBodyMeasurements(), fetchBodyCadences()])
+    setSessions(nextSessions)
+    setCadences(nextCadences)
   }
 
   useEffect(() => {
     let cancelled = false
-    fetchBodyMeasurements()
-      .then((next) => {
+    Promise.all([fetchBodyMeasurements(), fetchBodyCadences()])
+      .then(([nextSessions, nextCadences]) => {
         if (!cancelled) {
-          setSessions(next)
+          setSessions(nextSessions)
+          setCadences(nextCadences)
         }
       })
       .catch((caught: unknown) => {
@@ -84,6 +103,12 @@ export function BodyPage() {
       cancelled = true
     }
   }, [])
+
+  useEffect(() => {
+    if (params.get('action') === 'measure') {
+      setFormOpen(true)
+    }
+  }, [params])
 
   const selectedFingerprintList = useMemo(
     () => selectedFingerprints(selected),
@@ -132,17 +157,115 @@ export function BodyPage() {
     }
   }
 
+  function closeForm() {
+    setFormOpen(false)
+    setEditing(null)
+    if (params.get('action') || params.get('metric')) {
+      setParams({}, { replace: true })
+    }
+  }
+
+  const due = cadences.filter((item) => item.status !== 'current')
+  const formValues = valuesFromSession(editing)
+  const formPreset = editing ? 'custom' : presetForMetric(focusKey)
+  const formCustomKeys = editing
+    ? editing.metrics.map((metric) => metric.key)
+    : customKeysFor(focusKey)
+
   return (
     <section className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Body</h1>
-        <p className="mt-2 text-zinc-600">Weight, measurements, and composition.</p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Body</h1>
+          <p className="mt-2 text-zinc-600">Weight, measurements, and composition.</p>
+        </div>
+        <button
+          type="button"
+          className={primaryButtonClass}
+          onClick={() => {
+            setEditing(null)
+            setFormOpen(true)
+          }}
+        >
+          Add measurement
+        </button>
       </div>
 
+      {due.length > 0 ? (
+        <ul className="space-y-1 text-sm text-zinc-700">
+          {due.map((item) => (
+            <li key={item.metricKey}>
+              <button
+                type="button"
+                className={quietButtonClass}
+                onClick={() => {
+                  setEditing(null)
+                  setFormOpen(true)
+                  setParams({ action: 'measure', metric: item.metricKey })
+                }}
+              >
+                {item.label} · {item.status === 'initial_due' ? 'baseline due' : item.status === 'stale' ? 'stale' : 'due'}
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      {formOpen ? (
+        <MeasureForm
+          key={`${editing?.id ?? 'new'}:${focusKey ?? ''}:${formPreset}`}
+          preset={formPreset}
+          focusKey={focusKey}
+          initialValues={formValues}
+          initialCustomKeys={formCustomKeys}
+          editing={editing != null}
+          busy={busy === 'save'}
+          onCancel={closeForm}
+          onSubmit={async (body) => {
+            setBusy('save')
+            setError(null)
+            try {
+              if (editing) {
+                await updateManualMeasurement(editing.id, body)
+              } else {
+                await createManualMeasurement(body)
+              }
+              await reloadHistory()
+              closeForm()
+            } finally {
+              setBusy(null)
+            }
+          }}
+        />
+      ) : null}
+
+      <CadencePanel
+        items={cadences}
+        busy={busy != null}
+        onSave={async (metricKey, intervalDays, enabledFrom) => {
+          await saveBodyCadence(metricKey, intervalDays, enabledFrom)
+          setCadences(await fetchBodyCadences())
+        }}
+        onDisable={async (metricKey) => {
+          await deleteBodyCadence(metricKey)
+          setCadences(await fetchBodyCadences())
+        }}
+        onApply={async (keys, intervalDays) => {
+          const existing = new Map(cadences.map((item) => [item.metricKey, item.enabledFrom]))
+          for (const key of keys) {
+            await saveBodyCadence(key, intervalDays, existing.get(key))
+          }
+          setCadences(await fetchBodyCadences())
+        }}
+      />
+
+      <details className="rounded-lg border border-zinc-200 bg-white p-4">
+        <summary className="cursor-pointer text-sm font-medium">Fit Profile import</summary>
+        <div className="mt-4">
       <ImportPanel
         timezone={timezone}
         file={file}
-        busy={busy}
+        busy={busy === 'preview' || busy === 'commit' ? busy : null}
         preview={preview}
         selected={selected}
         onSelectFile={(next) => {
@@ -158,6 +281,8 @@ export function BodyPage() {
         }}
         canCommit={selectedFingerprintList.length > 0 && busy == null}
       />
+        </div>
+      </details>
 
       {error ? (
         <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
@@ -179,12 +304,29 @@ export function BodyPage() {
           <p className="mt-3 text-sm text-zinc-600">
             {error
               ? 'History is unavailable until Body tables are migrated.'
-              : 'No saved measurements yet. Import a Fit Profile XLSX to preview, then confirm to save.'}
+              : 'No saved measurements yet. Add a measurement, or import a Fit Profile workbook.'}
           </p>
         ) : (
           <ul className="page-enter mt-4 space-y-3">
             {sessions.map((session) => (
-              <HistoryCard key={session.id} session={session} />
+              <HistoryCard
+                key={session.id}
+                session={session}
+                onEdit={() => {
+                  setEditing(session)
+                  setFormOpen(true)
+                }}
+                onDelete={() => {
+                  if (!window.confirm('Delete this manual measurement? This cannot be undone.')) {
+                    return
+                  }
+                  void deleteManualMeasurement(session.id)
+                    .then(() => reloadHistory())
+                    .catch((caught: unknown) => {
+                      setError(caught instanceof Error ? caught.message : 'Could not delete the measurement')
+                    })
+                }}
+              />
             ))}
           </ul>
         )}
@@ -328,7 +470,67 @@ export function PreviewRow({
   )
 }
 
-function HistoryCard({ session }: { session: BodyMeasurementSession }) {
+function valuesFromSession(session: BodyMeasurementSession | null): Record<string, string> {
+  if (!session) {
+    return {}
+  }
+  const values: Record<string, string> = {}
+  for (const metric of session.metrics) {
+    const definition = metricDefinition(metric.key)
+    if (!definition) {
+      continue
+    }
+    const display = ownerInputNumber(metric.unit, metric.value)
+    values[metric.key] = String(Math.round(display * 10) / 10)
+  }
+  if (session.notes) {
+    values.notes = session.notes
+  }
+  return values
+}
+
+function HistoryCard({
+  session,
+  onEdit,
+  onDelete,
+}: {
+  session: BodyMeasurementSession
+  onEdit: () => void
+  onDelete: () => void
+}) {
+  if (session.manual) {
+    return (
+      <li className="rounded-lg border border-zinc-200 bg-white p-4">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <p className="font-medium">{formatWhen(session.measuredAt, session.timezone)}</p>
+          <p className="text-xs text-zinc-500">Manual</p>
+        </div>
+        {session.notes ? <p className="mt-1 text-sm text-zinc-600">{session.notes}</p> : null}
+        <dl className="mt-3 space-y-1 text-sm">
+          {session.metrics.map((metric) => {
+            const definition = metricDefinition(metric.key)
+            const display = displayValueForMetric(metric.unit, metric.value)
+            return (
+              <div key={metric.key} className="flex justify-between gap-3">
+                <dt>{definition?.label ?? metric.key}</dt>
+                <dd>
+                  {formatNumber(display.value, 1)} {display.unit}
+                </dd>
+              </div>
+            )
+          })}
+        </dl>
+        <div className="mt-3 flex gap-3">
+          <button type="button" className={quietButtonClass} onClick={onEdit}>
+            Edit
+          </button>
+          <button type="button" className={quietButtonClass} onClick={onDelete}>
+            Delete
+          </button>
+        </div>
+      </li>
+    )
+  }
   const extra = session.metrics.filter(
     (metric) =>
       metric.key !== 'weight' &&
@@ -339,9 +541,7 @@ function HistoryCard({ session }: { session: BodyMeasurementSession }) {
   return (
     <li className="rounded-lg border border-zinc-200 bg-white p-4">
       <p className="font-medium">{formatWhen(session.measuredAt, session.timezone)}</p>
-      {session.deviceName ? (
-        <p className="mt-1 text-xs text-zinc-500">{session.deviceName}</p>
-      ) : null}
+      <p className="mt-1 text-xs text-zinc-500">{session.deviceName ?? 'Fit Profile / device'}</p>
       <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-sm sm:grid-cols-4">
         <Metric label="Weight" value={formatMetric(session, 'weight', 1)} note="measured" />
         <Metric label="Body Fat" value={formatMetric(session, 'body_fat_percentage', 1)} note="BIA" />

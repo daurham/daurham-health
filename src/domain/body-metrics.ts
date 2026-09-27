@@ -1,4 +1,4 @@
-import { kilogramsToPounds, poundsToKilograms } from './units.js'
+import { centimetersToInches, kilogramsToPounds, poundsToKilograms } from './units.js'
 
 export const FIT_PROFILE_SOURCE_KEY = 'fit_profile_xlsx' as const
 export const BODY_MEASUREMENT_SESSION_ENTITY = 'body_measurement_session' as const
@@ -19,6 +19,7 @@ export const CANONICAL_UNITS = [
   'index',
   'kcal_per_day',
   'years',
+  'cm',
 ] as const
 
 export type CanonicalUnit = (typeof CANONICAL_UNITS)[number]
@@ -186,6 +187,9 @@ export function displayValueForMetric(
 ): { value: number; unit: string } {
   if (unit === 'kg') {
     return { value: kilogramsToPounds(canonicalValue), unit: 'lb' }
+  }
+  if (unit === 'cm') {
+    return { value: centimetersToInches(canonicalValue), unit: 'in' }
   }
   if (unit === 'kcal_per_day') {
     return { value: canonicalValue, unit: 'kcal/day' }

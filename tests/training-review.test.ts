@@ -102,6 +102,7 @@ describe('review draft validation after paper inference', () => {
     const parsed = parseManualWorkoutRequest({
       workoutDate: '2026-09-20',
       workoutTemplateId: TEMPLATE_ID,
+      sessionType: 'programmed',
       durationMin: null,
       effort: null,
       painLevel: null,
@@ -171,6 +172,7 @@ describe('review draft validation after paper inference', () => {
       parseManualWorkoutRequest({
         workoutDate: '2026-09-20',
         workoutTemplateId: null,
+        sessionType: 'programmed',
         durationMin: null,
         effort: null,
         painLevel: null,

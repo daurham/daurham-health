@@ -15,11 +15,16 @@ import {
   activityWorkoutsInRange,
   sleepObservationsInRange,
 } from './health-timeline.js'
+import { orderContextTags, type DailyContext, type DailyContextTagKey } from '../context.js'
+import { classificationCopy, type ExperimentResultClassification } from '../experiment-results.js'
 
 export const TIMELINE_DOMAINS = [...HEALTH_DOMAINS, 'annotation'] as const
 export type TimelineDomain = (typeof TIMELINE_DOMAINS)[number]
 
 export const TIMELINE_EVENT_KINDS = [
+  'daily_context',
+  'benchmark_result',
+  'experiment_result',
   'training_session',
   'body_measurement',
   'performance_best',
@@ -31,7 +36,7 @@ export const TIMELINE_EVENT_KINDS = [
 ] as const
 export type TimelineEventKind = (typeof TIMELINE_EVENT_KINDS)[number]
 
-export const TIMELINE_FOCUSES = ['all', 'training', 'body', 'nutrition', 'activity', 'sleep', 'bests'] as const
+export const TIMELINE_FOCUSES = ['all', 'training', 'body', 'nutrition', 'activity', 'sleep', 'bests', 'context'] as const
 export type TimelineFocus = (typeof TIMELINE_FOCUSES)[number]
 
 export type TimelineTimePrecision = 'date' | 'timestamp'
@@ -182,6 +187,41 @@ export type TimelineSleepNightEvent = TimelineEventBase & {
   data: TimelineSleepNightData
 }
 
+export type TimelineDailyContextEvent = TimelineEventBase & {
+  domain: 'annotation'
+  kind: 'daily_context'
+  timePrecision: 'date'
+  data: {
+    contextId: string
+    tags: DailyContextTagKey[]
+    note: string | null
+  }
+}
+
+export type TimelineBenchmarkResultEvent = TimelineEventBase & {
+  domain: 'annotation'
+  kind: 'benchmark_result'
+  timePrecision: 'date'
+  data: {
+    resultId: string
+    title: string
+    protocolVersion: number
+    primary: Array<{ label: string; value: number; unit: string }>
+  }
+}
+
+export type TimelineExperimentResultEvent = TimelineEventBase & {
+  domain: 'annotation'
+  kind: 'experiment_result'
+  timePrecision: 'date'
+  data: {
+    resultId: string
+    title: string
+    classification: string
+    classificationTitle: string
+  }
+}
+
 export type TimelineEvent =
   | TimelineTrainingSessionEvent
   | TimelinePerformanceBestEvent
@@ -191,6 +231,9 @@ export type TimelineEvent =
   | TimelineActivityDayEvent
   | TimelineActivityWorkoutEvent
   | TimelineSleepNightEvent
+  | TimelineDailyContextEvent
+  | TimelineBenchmarkResultEvent
+  | TimelineExperimentResultEvent
 
 export type ProgressTimeline = {
   period: TrailingPeriod
@@ -230,6 +273,22 @@ export type ProgressTimeline = {
 
 const BODY_CARD_KEYS = ['weight', 'bmi', 'body_fat_percentage'] as const
 
+const EXPERIMENT_CLASSIFICATIONS = [
+  'completed_interpretable',
+  'completed_low_adherence',
+  'incomplete',
+  'inconclusive',
+  'invalid_protocol',
+  'stopped_safety',
+] as const
+
+function experimentClassificationTitle(classification: string): string {
+  if ((EXPERIMENT_CLASSIFICATIONS as readonly string[]).includes(classification)) {
+    return classificationCopy(classification as ExperimentResultClassification).title
+  }
+  return classification
+}
+
 function sessionTitle(templateName: string | null | undefined, routineCode: string | null | undefined): string {
   if (templateName && templateName.trim().length > 0) {
     return templateName
@@ -243,6 +302,24 @@ function sessionTitle(templateName: string | null | undefined, routineCode: stri
 function compareEvents(left: TimelineEvent, right: TimelineEvent): number {
   if (left.date !== right.date) {
     return left.date < right.date ? 1 : -1
+  }
+  if (left.kind === 'daily_context' && right.kind !== 'daily_context') {
+    return -1
+  }
+  if (right.kind === 'daily_context' && left.kind !== 'daily_context') {
+    return 1
+  }
+  if (left.kind === 'benchmark_result' && right.kind !== 'benchmark_result') {
+    return -1
+  }
+  if (right.kind === 'benchmark_result' && left.kind !== 'benchmark_result') {
+    return 1
+  }
+  if (left.kind === 'experiment_result' && right.kind !== 'experiment_result' && right.kind !== 'daily_context' && right.kind !== 'benchmark_result') {
+    return -1
+  }
+  if (right.kind === 'experiment_result' && left.kind !== 'experiment_result' && left.kind !== 'daily_context' && left.kind !== 'benchmark_result') {
+    return 1
   }
   const leftStamp = left.occurredAt
   const rightStamp = right.occurredAt
@@ -261,14 +338,17 @@ function compareEvents(left: TimelineEvent, right: TimelineEvent): number {
     }
   }
   const kindRank: Record<TimelineEventKind, number> = {
-    checkpoint: 0,
-    body_measurement: 1,
-    nutrition_day: 2,
-    sleep_night: 3,
-    activity_day: 4,
-    activity_workout: 5,
-    training_session: 6,
-    performance_best: 7,
+    daily_context: 0,
+    benchmark_result: 9,
+    experiment_result: 10,
+    checkpoint: 1,
+    body_measurement: 2,
+    nutrition_day: 3,
+    sleep_night: 4,
+    activity_day: 5,
+    activity_workout: 6,
+    training_session: 7,
+    performance_best: 8,
   }
   if (kindRank[left.kind] !== kindRank[right.kind]) {
     return kindRank[left.kind] - kindRank[right.kind]
@@ -281,7 +361,25 @@ export function isTimelineFocus(value: string): value is TimelineFocus {
 }
 
 export function buildProgressTimeline(
-  input: ProgressCanonicalInput & { checkpoints?: readonly ProgressCheckpoint[] },
+  input: ProgressCanonicalInput & {
+    checkpoints?: readonly ProgressCheckpoint[]
+    dailyContexts?: readonly DailyContext[]
+    benchmarkResults?: ReadonlyArray<{
+      id: string
+      resultDate: string
+      title: string
+      protocolVersion: number
+      status?: 'valid' | 'invalidated'
+      primary: Array<{ label: string; value: number; unit: string }>
+    }>
+    experimentResults?: ReadonlyArray<{
+      id: string
+      title: string
+      classification: string
+      effectiveEndDate: string
+      status?: 'valid' | 'invalidated'
+    }>
+  },
 ): ProgressTimeline {
   const overview = buildProgressOverview(input)
   const period = overview.period
@@ -511,7 +609,73 @@ export function buildProgressTimeline(
     },
   }))
 
+  const contextEvents: TimelineDailyContextEvent[] = (input.dailyContexts ?? [])
+    .filter((item) => {
+      if (item.contextDate > period.end) {
+        return false
+      }
+      if (input.range === 'all') {
+        return true
+      }
+      return inPeriod(item.contextDate)
+    })
+    .map((item) => ({
+      id: `daily_context:${item.id}`,
+      domain: 'annotation',
+      kind: 'daily_context',
+      date: item.contextDate,
+      timePrecision: 'date',
+      title: 'Daily context',
+      evidence: [],
+      data: {
+        contextId: item.id,
+        tags: orderContextTags(item.tags),
+        note: item.note,
+      },
+    }))
+
+  const experimentEvents: TimelineExperimentResultEvent[] = (input.experimentResults ?? [])
+    .filter((item) => item.status !== 'invalidated')
+    .filter((item) => (input.range === 'all' ? true : inPeriod(item.effectiveEndDate)))
+    .map((item) => ({
+      id: `experiment_result:${item.id}`,
+      domain: 'annotation',
+      kind: 'experiment_result',
+      date: item.effectiveEndDate,
+      timePrecision: 'date',
+      title: item.title,
+      evidence: [],
+      data: {
+        resultId: item.id,
+        title: item.title,
+        classification: item.classification,
+        classificationTitle: experimentClassificationTitle(item.classification),
+      },
+    }))
+
+  const benchmarkEvents: TimelineBenchmarkResultEvent[] = (input.benchmarkResults ?? [])
+    .filter((item) => item.status !== 'invalidated')
+    .filter((item) => (input.range === 'all' ? true : inPeriod(item.resultDate)))
+    .map((item) => ({
+      id: `benchmark_result:${item.id}`,
+      domain: 'annotation',
+      kind: 'benchmark_result',
+      date: item.resultDate,
+      timePrecision: 'date',
+      title: item.title,
+      evidence: [],
+      data: {
+        resultId: item.id,
+        title: item.title,
+        protocolVersion: item.protocolVersion,
+        primary: item.primary,
+      },
+    }))
+
   const events = [
+    ...contextEvents,
+    ...benchmarkEvents,
+    ...experimentEvents,
     ...trainingEvents,
     ...performanceBestEvents,
     ...bodyEvents,
@@ -579,6 +743,9 @@ export function timelineEventsForFocus(timeline: ProgressTimeline, focus: Timeli
   }
   if (focus === 'sleep') {
     return timeline.events.filter((event) => event.kind === 'sleep_night')
+  }
+  if (focus === 'context') {
+    return timeline.events.filter((event) => event.kind === 'daily_context')
   }
   return timeline.events.filter((event) => {
     if (event.kind === 'performance_best') {

@@ -12,6 +12,15 @@ import type { ProgressSleepObservation } from '../progress/health-timeline.js'
 import { analyzeCrossDomain, findingCopy, type IntelligenceTrainingSession } from '../intelligence/index.js'
 import { formatBodyMass } from '../body-metrics.js'
 import { formatCalendarRange } from '../calendar-format.js'
+import { buildTodaySupplementSection, type TodaySupplementInput, type TodaySupplementSection } from '../supplements/index.js'
+import {
+  selectTodayBodyReminder,
+  type CadenceConfig,
+  type CadenceObservation,
+  type TodayBodyReminder,
+} from '../body-cadence.js'
+import { todayContextFromRecord, type DailyContext, type TodayContextSnapshot } from '../context.js'
+import { selectTodayRetest, type BenchmarkRetestView } from '../lab-retests.js'
 import { healthCalendarDateFromNow, HEALTH_CALENDAR_TIME_ZONE } from '../time.js'
 
 export const TODAY_PATTERN_RANGE = '90d' as const
@@ -19,6 +28,7 @@ export const TODAY_PATTERN_LIMIT = 3
 
 export type TodayTrainingSession = {
   id: string
+  sessionType: 'programmed' | 'ad_hoc' | 'experiment'
   name: string
   exerciseCount: number
   workingSetCount: number
@@ -32,6 +42,15 @@ export type TodayPendingJob = {
 
 export type TodayNutritionEntry = NutritionTotable & { logDate: string }
 
+export type TodayLabExperiment = {
+  id: string
+  title: string
+  status: 'scheduled' | 'active'
+  windowStart: string
+  windowEnd: string
+  reviewReady?: boolean
+}
+
 export type TodaySources = {
   now?: Date
   activityDays: readonly ActivityDailyRow[]
@@ -43,7 +62,18 @@ export type TodaySources = {
   sleepNights: readonly ProgressSleepObservation[]
   latestCompleteSleep: ProgressSleepObservation | null
   bodyWeights: readonly BodyObservation[]
+  bodyCadence?: {
+    configs: readonly CadenceConfig[]
+    observations: readonly CadenceObservation[]
+  }
   pendingJobs: readonly TodayPendingJob[]
+  supplements?: readonly TodaySupplementInput[]
+  context?: DailyContext | null
+  lab?: {
+    experiments: readonly TodayLabExperiment[]
+    retests?: readonly BenchmarkRetestView[]
+    coveredBenchmarkIds?: readonly string[]
+  }
 }
 
 export type TodayNutrientTarget = {
@@ -82,6 +112,7 @@ export type TodayViewModel = {
   body: {
     latest: { value: number; unit: string; calendarDate: string; ageDays: number; measuredLabel: string } | null
     trendText: string | null
+    measurementDue: TodayBodyReminder | null
   }
   pendingItems: Array<{ id: string; title: string; href: string; action: string }>
   changedItems: Array<{
@@ -92,6 +123,13 @@ export type TodayViewModel = {
     text: string
   }>
   patterns: Array<{ id: string; text: string }>
+  supplements: TodaySupplementSection | null
+  context: TodayContextSnapshot
+  lab: {
+    experiments: TodayLabExperiment[]
+    retest: BenchmarkRetestView | null
+    otherDueRetestCount: number
+  }
 }
 
 function finite(value: number | null | undefined): value is number {
@@ -159,6 +197,15 @@ function sleepKind(night: ProgressSleepObservation | null): TodayViewModel['slee
     return 'partial'
   }
   return 'none'
+}
+
+function todayLab(sources: TodaySources): TodayViewModel['lab'] {
+  const selected = selectTodayRetest(sources.lab?.retests ?? [], new Set(sources.lab?.coveredBenchmarkIds ?? []))
+  return {
+    experiments: [...(sources.lab?.experiments ?? [])],
+    retest: selected.retest,
+    otherDueRetestCount: selected.otherDueCount,
+  }
 }
 
 export function buildTodayView(sources: TodaySources): TodayViewModel {
@@ -282,14 +329,32 @@ export function buildTodayView(sources: TodaySources): TodayViewModel {
         trend.status === 'available' && latestWeight
           ? `Weight trend ${signedMass(trend.value.slopePerWeek, latestWeight.unit)} per week`
           : null,
+      measurementDue: selectTodayBodyReminder(
+        sources.bodyCadence?.configs ?? [],
+        sources.bodyCadence?.observations ?? [],
+        date,
+      ),
     },
-    pendingItems: sources.pendingJobs.flatMap((job) => {
-      const title = attentionTitle(job)
-      if (!title) {
-        return []
-      }
-      return [{ id: job.id, title, href: pendingHref(job, date), action: 'Review' }]
-    }),
+    supplements: buildTodaySupplementSection(date, sources.supplements ?? []),
+    context: todayContextFromRecord(sources.context ?? null),
+    lab: todayLab(sources),
+    pendingItems: [
+      ...sources.pendingJobs.flatMap((job) => {
+        const title = attentionTitle(job)
+        if (!title) {
+          return []
+        }
+        return [{ id: job.id, title, href: pendingHref(job, date), action: 'Review' }]
+      }),
+      ...(sources.lab?.experiments ?? [])
+        .filter((experiment) => experiment.reviewReady)
+        .map((experiment) => ({
+          id: `experiment-review:${experiment.id}`,
+          title: 'Experiment ready to review',
+          href: `/lab/experiments/${experiment.id}/result`,
+          action: 'Review result',
+        })),
+    ],
     changedItems,
     patterns,
   }

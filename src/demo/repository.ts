@@ -139,6 +139,7 @@ export function demoToday(): TodayViewModel {
       const exerciseIds = new Set(sessionSets.map((set) => set.exerciseId))
       return {
         id: session.sessionId,
+        sessionType: 'programmed' as const,
         name: session.templateName ?? 'Workout',
         exerciseCount: exerciseIds.size,
         workingSetCount: sessionSets.length,

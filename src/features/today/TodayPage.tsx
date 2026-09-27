@@ -1,8 +1,12 @@
-import { useCallback, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { formatBodyMass } from '@/domain/body-metrics'
+import { bodyReminderCopy, measureHref } from '@/domain/body-cadence'
 import { NUTRITION_CONFIG, type NutritionDayTotals, type NutritionFood } from '@/domain/nutrition'
-import { formatWeekdayCalendarDate } from '@/domain/calendar-format'
+import { formatWeekdayCalendarDate, formatCalendarRange } from '@/domain/calendar-format'
+import { otherRetestsPhrase, retestAgePhrase } from '@/domain/lab-retests'
+import { sessionIntentLabel } from '@/domain/training'
+import { dailyContextTagLabel } from '@/domain/context'
 import type { TodayViewModel } from '@/domain/today'
 import { HEALTH_CALENDAR_TIME_ZONE } from '@/domain/time'
 import {
@@ -17,6 +21,15 @@ import { createNutritionEntry, fetchNutritionDay } from '@/features/nutrition/ap
 import { formatSleepDuration } from '@/features/progress/activity-sleep-copy'
 import { formatCalendarDate, formatClockTime } from '@/features/progress/format'
 import { caloriesHeadline, macroHeadline, remainingHeadline } from '@/features/nutrition/format'
+import {
+  aggregateOccurrenceStates,
+  checkboxAdherenceAction,
+  formatPlannedDose,
+  supplementDaySummary,
+  supplementSummaryText,
+  type TodaySupplementItem,
+} from '@/domain/supplements'
+import { recordSupplementAdherence } from '@/features/supplements/api'
 import { prefixedPath, useAppPathPrefix, useDemoReadOnly } from '@/lib/app-prefix'
 import { fetchToday } from './api'
 import { todayShouldReloadAfterNutrition, type TodayNutritionOutcome } from './nutrition-refresh'
@@ -53,7 +66,11 @@ export function TodayPage() {
       <div className="mt-5">
         <PendingLoadRegion pending={resource.isPending} pendingVisible={resource.pendingVisible}>
           {view ? (
-            <TodayBoard view={view} onNutritionChanged={() => resource.retry()} />
+            <TodayBoard
+              view={view}
+              onNutritionChanged={() => resource.retry()}
+              onSupplementsChanged={() => resource.retry()}
+            />
           ) : (
             <div className="h-64 animate-pulse rounded-lg bg-zinc-200" aria-busy="true" aria-label="Loading today" />
           )}
@@ -74,9 +91,11 @@ export function TodayPage() {
 export function TodayBoard({
   view,
   onNutritionChanged,
+  onSupplementsChanged,
 }: {
   view: TodayViewModel
   onNutritionChanged?: () => void
+  onSupplementsChanged?: () => void
 }) {
   const prefix = useAppPathPrefix()
   return (
@@ -103,11 +122,15 @@ export function TodayBoard({
         <NutritionCard view={view} onNutritionChanged={onNutritionChanged} />
         <TrainingCard view={view} />
       </div>
+      <SupplementsCard view={view} onChanged={onSupplementsChanged} />
       <div className="grid items-start gap-3 md:grid-cols-3">
         <ActivityCard view={view} />
         <SleepCard view={view} />
         <BodyCard view={view} />
       </div>
+      <ContextCard view={view} />
+      <LabRetestCard view={view} />
+      <LabCard view={view} />
       {view.changedItems.length > 0 ? (
         <section className="rounded-lg border border-zinc-200 bg-white p-4">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">What changed</h2>
@@ -135,6 +158,238 @@ export function TodayBoard({
         </section>
       ) : null}
     </div>
+  )
+}
+
+function LabRetestCard({ view }: { view: TodayViewModel }) {
+  const readOnly = useDemoReadOnly()
+  const prefix = useAppPathPrefix()
+  const retest = view.lab.retest
+  if (readOnly || !retest || retest.status !== 'due' || !retest.latestResult || retest.daysSinceResult == null) {
+    return null
+  }
+  const primary = retest.latestResult.primaryValues.map((item) => `${item.value} ${item.unit}`).join(' · ')
+  const others = otherRetestsPhrase(view.lab.otherDueRetestCount)
+  return (
+    <section className="rounded-lg border border-zinc-200 bg-white p-4">
+      <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Personal Lab</h2>
+      <p className="mt-3 text-sm font-medium text-zinc-900">Retest suggested</p>
+      <p className="mt-1 text-sm text-zinc-900">{retest.benchmarkTitle}</p>
+      <p className="mt-0.5 text-sm text-zinc-600">Protocol v{retest.protocolVersion}</p>
+      <p className="mt-2 text-sm text-zinc-700">
+        Last result
+        {primary ? ` ${primary}` : ''} · {retestAgePhrase(retest.daysSinceResult)}
+      </p>
+      {others ? <p className="mt-1 text-sm text-zinc-600">{others}</p> : null}
+      <Link to={prefixedPath(prefix, `/lab/benchmarks/${retest.benchmarkDefinitionId}`)} className={`${quietButtonClass} mt-3`}>
+        Open benchmark
+      </Link>
+    </section>
+  )
+}
+
+function LabCard({ view }: { view: TodayViewModel }) {
+  const readOnly = useDemoReadOnly()
+  const prefix = useAppPathPrefix()
+  if (readOnly || view.lab.experiments.length === 0) {
+    return null
+  }
+  return (
+    <section className="rounded-lg border border-zinc-200 bg-white p-4">
+      <div className="flex items-start justify-between gap-3">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Experiment</h2>
+        <Link to={prefixedPath(prefix, '/lab')} className={quietButtonClass}>
+          Open Lab
+        </Link>
+      </div>
+      <ul className="mt-3 space-y-3">
+        {view.lab.experiments.map((experiment) => (
+          <li key={experiment.id}>
+            <Link to={prefixedPath(prefix, `/lab/experiments/${experiment.id}`)} className="text-sm font-medium text-zinc-900 hover:underline">
+              {experiment.title}
+            </Link>
+            <p className="mt-0.5 text-sm text-zinc-600">
+              {experiment.reviewReady
+                ? 'Ready to review'
+                : experiment.status === 'active' && experiment.windowEnd === view.date
+                  ? 'Ends today'
+                  : `${experiment.status === 'active' ? 'Active' : 'Scheduled'} · ${formatCalendarRange(experiment.windowStart, experiment.windowEnd)}`}
+            </p>
+            {experiment.reviewReady ? (
+              <Link to={prefixedPath(prefix, `/lab/experiments/${experiment.id}/result`)} className="mt-1 inline-flex min-h-11 items-center text-sm text-zinc-700 hover:underline">
+                Review result
+              </Link>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+function ContextCard({ view }: { view: TodayViewModel }) {
+  const readOnly = useDemoReadOnly()
+  const prefix = useAppPathPrefix()
+  if (readOnly && !view.context.recorded) {
+    return null
+  }
+  const href = prefixedPath(prefix, `/context?date=${view.date}&from=today`)
+  return (
+    <section className="rounded-lg border border-zinc-200 bg-white p-4">
+      <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Context</h2>
+      {view.context.recorded ? (
+        <div className="mt-3 space-y-2">
+          {view.context.tags.length > 0 ? (
+            <ul className="flex flex-wrap gap-2">
+              {view.context.tags.map((tag) => (
+                <li key={tag} className="rounded-full bg-zinc-100 px-3 py-1 text-sm text-zinc-800">
+                  {dailyContextTagLabel(tag)}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {view.context.note ? <p className="text-sm text-zinc-700">{view.context.note}</p> : null}
+          {readOnly ? null : (
+            <Link to={href} className={quietButtonClass}>
+              Edit
+            </Link>
+          )}
+        </div>
+      ) : (
+        <Link to={href} className={`${quietButtonClass} mt-2`}>
+          + Add context
+        </Link>
+      )}
+    </section>
+  )
+}
+
+function shownDose(item: TodaySupplementItem): string {
+  if (item.actualDoseAmount != null && item.actualDoseUnit) {
+    return formatPlannedDose(item.actualDoseAmount, item.actualDoseUnit)
+  }
+  return formatPlannedDose(item.plannedDoseAmount, item.plannedDoseUnit)
+}
+
+function SupplementsCard({ view, onChanged }: { view: TodayViewModel; onChanged?: () => void }) {
+  const supplements = view.supplements
+  const readOnly = useDemoReadOnly()
+  const [items, setItems] = useState(supplements?.items ?? [])
+  const [error, setError] = useState<string | null>(null)
+  const [pendingId, setPendingId] = useState<string | null>(null)
+
+  useEffect(() => {
+    setItems(supplements?.items ?? [])
+  }, [supplements])
+
+  if (!supplements) {
+    return null
+  }
+
+  const counts = aggregateOccurrenceStates(items.map((item) => item.state))
+  const summary = supplementDaySummary(counts)
+  const summaryText = supplementSummaryText(summary)
+
+  async function record(item: TodaySupplementItem, action: 'taken' | 'skipped' | 'clear') {
+    const previous = items
+    setError(null)
+    setPendingId(item.scheduleId)
+    setItems((current) =>
+      current.map((row) =>
+        row.scheduleId === item.scheduleId
+          ? { ...row, state: action === 'clear' ? 'unknown' : action, actualDoseAmount: action === 'clear' ? null : row.actualDoseAmount, actualDoseUnit: action === 'clear' ? null : row.actualDoseUnit }
+          : row,
+      ),
+    )
+    try {
+      await recordSupplementAdherence({
+        scheduleId: item.scheduleId,
+        supplementId: item.supplementId,
+        scheduledDate: view.date,
+        action,
+      })
+      onChanged?.()
+    } catch (caught) {
+      setItems(previous)
+      setError(caught instanceof Error ? caught.message : 'Could not record that supplement')
+    } finally {
+      setPendingId(null)
+    }
+  }
+
+  return (
+    <section className="min-w-0 rounded-lg border border-zinc-200 bg-white p-4">
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Supplements</h2>
+        <p className="text-sm text-zinc-600">{summary.kind === 'complete' ? `✓ ${summaryText}` : summaryText}</p>
+      </div>
+      {items.length === 0 ? (
+        <p className="mt-2 text-sm text-zinc-800">Nothing scheduled today</p>
+      ) : (
+        <ul className="mt-2 space-y-1">
+          {items.map((item) => (
+            <li key={item.scheduleId} className="flex items-center gap-2" data-state={item.state}>
+              {readOnly ? (
+                <span className="inline-flex min-h-11 min-w-11 items-center justify-center text-lg" aria-hidden="true">
+                  {item.state === 'taken' ? '☑' : '☐'}
+                </span>
+              ) : (
+                <label className="inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center">
+                  <input
+                    type="checkbox"
+                    className="h-6 w-6"
+                    checked={item.state === 'taken'}
+                    disabled={pendingId === item.scheduleId}
+                    aria-label={item.state === 'taken' ? `Clear ${item.name}` : `Mark ${item.name} taken`}
+                    onChange={() => {
+                      void record(item, checkboxAdherenceAction(item.state))
+                    }}
+                  />
+                </label>
+              )}
+              <div className="min-w-0 flex-1">
+                <p className={item.state === 'skipped' ? 'text-sm text-zinc-500' : 'text-sm text-zinc-900'}>
+                  {item.name}
+                  {item.slotLabel ? <span className="text-zinc-500"> · {item.slotLabel}</span> : null}
+                </p>
+                {item.state === 'skipped' ? <p className="text-sm text-zinc-500">Skipped</p> : null}
+              </div>
+              <p className="shrink-0 text-sm text-zinc-700">{shownDose(item)}</p>
+              {readOnly ? null : item.state === 'unknown' ? (
+                <button
+                  type="button"
+                  className={quietButtonClass}
+                  disabled={pendingId === item.scheduleId}
+                  onClick={() => {
+                    void record(item, 'skipped')
+                  }}
+                >
+                  Skip
+                </button>
+              ) : null}
+              {readOnly ? null : item.state === 'skipped' ? (
+                <button
+                  type="button"
+                  className={quietButtonClass}
+                  disabled={pendingId === item.scheduleId}
+                  onClick={() => {
+                    void record(item, 'clear')
+                  }}
+                >
+                  Clear
+                </button>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      )}
+      {error ? <p className="mt-2 text-sm text-red-700">{error}</p> : null}
+      {readOnly ? null : (
+        <div className="mt-2">
+          <QuietAction to="/supplements">Manage</QuietAction>
+        </div>
+      )}
+    </section>
   )
 }
 
@@ -329,6 +584,7 @@ function TrainingCard({ view }: { view: TodayViewModel }) {
           {view.training.sessions.map((session) => (
             <li key={session.id}>
               <p className="text-lg font-semibold tracking-tight text-zinc-900">{session.name}</p>
+              <p className="text-sm text-zinc-500">{sessionIntentLabel(session.sessionType)}</p>
               <p className="text-zinc-600">
                 {countLabel(session.exerciseCount, 'exercise', 'exercises')} · {countLabel(session.workingSetCount, 'working set', 'working sets')}
               </p>
@@ -342,8 +598,9 @@ function TrainingCard({ view }: { view: TodayViewModel }) {
         <>
           <p>No training session logged today</p>
           {readOnly ? null : (
-            <div className="mt-3">
+            <div className="mt-3 flex flex-wrap gap-2">
               <PrimaryAction to={prefixedPath(prefix, '/training/import')}>Log workout</PrimaryAction>
+              <QuietAction to={prefixedPath(prefix, '/training/new?type=ad_hoc')}>Ad-hoc workout</QuietAction>
             </div>
           )}
         </>
@@ -425,7 +682,11 @@ function SleepCard({ view }: { view: TodayViewModel }) {
 function BodyCard({ view }: { view: TodayViewModel }) {
   const body = view.body
   const readOnly = useDemoReadOnly()
-  const href = prefixedPath(useAppPathPrefix(), '/body')
+  const prefix = useAppPathPrefix()
+  const href = prefixedPath(prefix, '/body')
+  const due = body.measurementDue
+  const copy = due ? bodyReminderCopy(due) : null
+  const measureTo = due ? prefixedPath(prefix, measureHref(due.metricKey)) : href
   return (
     <Card title="Body">
       {body.latest ? (
@@ -439,8 +700,15 @@ function BodyCard({ view }: { view: TodayViewModel }) {
       ) : (
         <p>No body measurement recorded yet.</p>
       )}
+      {copy && due ? (
+        <div className="mt-3">
+          <p className="font-medium text-zinc-900">{copy.title}</p>
+          <p className="text-zinc-600">{copy.detail}</p>
+          {copy.more ? <p className="text-zinc-600">{copy.more}</p> : null}
+        </div>
+      ) : null}
       <div className="mt-3 flex flex-wrap items-center gap-x-4">
-        {readOnly ? null : <PrimaryAction to={href}>Add measurement</PrimaryAction>}
+        {readOnly ? null : due ? <PrimaryAction to={measureTo}>Measure</PrimaryAction> : <PrimaryAction to={href}>Add measurement</PrimaryAction>}
         <QuietAction to={href}>View body</QuietAction>
       </div>
     </Card>

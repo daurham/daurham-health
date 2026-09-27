@@ -5,6 +5,12 @@ import { healthCalendarDateFromNow } from '../../src/domain/time.js'
 import { listOutstandingLabelJobs } from '../nutrition/label-jobs.js'
 import { listAllTargets, listEntriesBetween } from '../nutrition/queries.js'
 import { listOutstandingTranscriptionJobs } from '../training/job-store.js'
+import { listTodaySupplementInputs } from '../supplements/queries.js'
+import { getDailyContext } from '../context/service.js'
+import { benchmarkIdsWithActionableExperiment } from '../../src/domain/lab-retests.js'
+import { listTodayLabExperiments } from '../lab/service.js'
+import { listBenchmarkRetests, listRetestExperimentLinks } from '../lab/retests.js'
+import { loadCadenceEvidence } from '../body/cadence-service.js'
 import {
   latestCompleteSleepNight,
   listActivityDaysBetween,
@@ -17,7 +23,7 @@ import {
 export async function getTodayView(now = new Date()): Promise<TodayViewModel> {
   const date = healthCalendarDateFromNow(now)
   const period = trailingPeriod(TODAY_PATTERN_RANGE, date)
-  const [activityDays, sleepNights, latestCompleteSleep, trainingToday, trainingSessions, nutritionEntries, nutritionTargets, bodyWeights, workoutJobs, labelJobs, mealJobs] =
+  const [activityDays, sleepNights, latestCompleteSleep, trainingToday, trainingSessions, nutritionEntries, nutritionTargets, bodyWeights, workoutJobs, labelJobs, mealJobs, supplements, bodyCadence, context, labExperiments, retests, retestLinks] =
     await Promise.all([
       listActivityDaysBetween(period.start, date),
       listSleepNightsBetween(period.start, date),
@@ -30,6 +36,12 @@ export async function getTodayView(now = new Date()): Promise<TodayViewModel> {
       listOutstandingTranscriptionJobs(),
       listOutstandingLabelJobs('nutrition_label'),
       listOutstandingLabelJobs('meal_photo'),
+      listTodaySupplementInputs(date),
+      loadCadenceEvidence(),
+      getDailyContext(date, now),
+      listTodayLabExperiments(),
+      listBenchmarkRetests(date),
+      listRetestExperimentLinks(),
     ])
   const pendingJobs: TodayPendingJob[] = [
     ...workoutJobs.map((job) => ({ id: job.id, kind: 'workout_transcription' as const, status: job.status })),
@@ -47,6 +59,14 @@ export async function getTodayView(now = new Date()): Promise<TodayViewModel> {
     sleepNights,
     latestCompleteSleep,
     bodyWeights,
+    bodyCadence,
     pendingJobs,
+    supplements,
+    context,
+    lab: {
+      experiments: labExperiments,
+      retests: retests.retests,
+      coveredBenchmarkIds: [...benchmarkIdsWithActionableExperiment(retestLinks)],
+    },
   })
 }

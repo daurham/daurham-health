@@ -321,23 +321,20 @@ export async function commitFitProfileImport(input: {
 
 export async function listBodyMeasurements(): Promise<BodyHistoryResponse> {
   const sql = await getSql()
-  let sessionRows: Array<{
-    id: string
-    measured_at: string | Date
-    timezone: string | null
-    device_name: string | null
-  }>
+  let sessionRows: SessionHistoryRow[]
   try {
     sessionRows = (await sql.query(
-      `SELECT id, measured_at, timezone, device_name
-       FROM body_measurement_sessions
-       ORDER BY measured_at DESC`,
-    )) as Array<{
-      id: string
-      measured_at: string | Date
-      timezone: string | null
-      device_name: string | null
-    }>
+      `SELECT sessions.id,
+              sessions.measured_at,
+              sessions.timezone,
+              sessions.device_name,
+              sessions.notes,
+              sessions.import_job_id,
+              sources.key AS source_key
+       FROM body_measurement_sessions AS sessions
+       JOIN data_sources AS sources ON sources.id = sessions.source_id
+       ORDER BY sessions.measured_at DESC`,
+    )) as SessionHistoryRow[]
   } catch (error) {
     const message = formatDatabaseError(error)
     if (message.includes('does not exist')) {
@@ -383,15 +380,40 @@ export async function listBodyMeasurements(): Promise<BodyHistoryResponse> {
     metricsBySession.set(row.measurement_session_id, list)
   }
 
-  const sessions = sessionRows.map((row) =>
-    bodyMeasurementSessionSchema.parse({
-      id: row.id,
-      measuredAt: row.measured_at,
-      timezone: row.timezone,
-      deviceName: row.device_name,
-      metrics: metricsBySession.get(row.id) ?? [],
-    }),
-  )
-
+  const sessions = sessionRows.map((row) => sessionFrom(row, metricsBySession.get(row.id) ?? []))
   return bodyHistoryResponseSchema.parse({ sessions })
+}
+
+type SessionHistoryRow = {
+  id: string
+  measured_at: string | Date
+  timezone: string | null
+  device_name: string | null
+  notes: string | null
+  import_job_id: string | null
+  source_key: string
+}
+
+function sessionFrom(
+  row: SessionHistoryRow,
+  metrics: ReturnType<typeof bodyMetricSchema.parse>[],
+) {
+  const importJobId = row.import_job_id
+  const sourceKey = row.source_key
+  return bodyMeasurementSessionSchema.parse({
+    id: row.id,
+    measuredAt: row.measured_at,
+    timezone: row.timezone,
+    deviceName: row.device_name,
+    notes: row.notes,
+    importJobId,
+    sourceKey,
+    manual: importJobId == null && sourceKey === 'manual',
+    metrics,
+  })
+}
+
+export async function getBodyMeasurement(id: string) {
+  const history = await listBodyMeasurements()
+  return history.sessions.find((session) => session.id === id) ?? null
 }

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { parseAppleHealthFile, previewAppleHealth } from '@/domain/apple-health'
 import { formatCalendarRange } from '@/domain/calendar-format'
 import { healthCalendarDateFromNow } from '@/domain/time'
@@ -225,6 +226,16 @@ export function SettingsPage() {
       </div>
 
       <AppearanceSection />
+
+      <section className="space-y-3 rounded-lg border border-zinc-200 bg-white p-4">
+        <h2 className="text-base font-semibold">Supplements</h2>
+        <p className="text-sm text-zinc-600">
+          Definitions, schedules, and recorded doses. An unchecked dose stays unknown until you mark it taken or skipped.
+        </p>
+        <Link to="/supplements" className={primaryButtonClass}>
+          Manage supplements
+        </Link>
+      </section>
 
       <section className="space-y-3 rounded-lg border border-zinc-200 bg-white p-4">
         <h2 className="text-base font-semibold">Data & Backup</h2>

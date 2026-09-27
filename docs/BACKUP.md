@@ -32,13 +32,13 @@ This prints schema versions, row counts, and conflicts. It does not write.
 
 ## Restore to a new database
 
-Point `DATABASE_URL` at an empty Health database that has already had `npm run migrate` applied. The destination must be on the same migration as the backup. User tables must be empty. Migration seed rows for sources, exercises, and templates are replaced so original ids survive.
+Point `DATABASE_URL` at an empty Health database that has already had `npm run migrate` applied. The destination must be on the same migration as the backup. User tables must be empty. Migration seed rows for sources, exercises, and templates are replaced so original ids survive. Owner-created exercises live in `exercise_definitions` and are restored with that table. `workout_sessions` includes `session_type` and `session_name`.
 
 ```bash
 HEALTH_BACKUP_RESTORE=yes npm run backup:restore -- ./backups/health-2026-09-22.health-backup.zip --apply
 ```
 
-If the destination already has nutrition, training, body, activity, or sleep rows, restore stops. It does not merge and it does not overwrite newer rows.
+If the destination already has nutrition, training, body, activity, sleep, supplement, or measurement-cadence rows, restore stops. It does not merge and it does not overwrite newer rows.
 
 ## Verify recovery
 
@@ -57,3 +57,19 @@ Then confirm row counts in the destination match the dry-run list. Derived sleep
 - A Settings download may be a portable export when the full archive is large. Portable exports omit raw samples, raw sleep intervals, and capture jobs. Use the CLI archive for disaster recovery.
 
 Settings → Data & Backup downloads a private copy for the signed-in owner. The machine ingest token cannot read it.
+
+## Body measurements
+
+Owner Health data includes Body sessions, metrics, and measurement cadence (`body_measurement_sessions`, `body_metrics`, `body_measurement_cadences`). Cadence is the owner's reminder plan, not a measurement. Circumference values use centimeters. Session and metric `updated_at` is included. They are in the full archive and in the portable export.
+
+## Supplements
+
+Owner Health data includes supplement definitions, schedules, lifecycle events, and explicit taken/skipped adherence (`supplements`, `supplement_schedules`, `supplement_status_events`, `supplement_adherence`). They are in the full archive and in the portable export. An absent adherence row means the dose is unknown, not skipped. Restore keeps the original ids, dates, timestamps, and nulls.
+
+## Daily context
+
+Owner Health data includes one optional context row per calendar date and its tag membership (`daily_context`, `daily_context_tags`). Both are in the full archive and in the portable export. Restore inserts `daily_context` before `daily_context_tags`, keeps the original ids, dates, notes, tags, source ids, and timestamps, and does not add a second row for the same date. A missing context row means no context was recorded. Deleting a context row cascades its tags.
+
+## Personal Lab
+
+Owner Health data includes protocol identity, immutable protocol versions, measurement requirements, observe-only context controls, benchmark definitions, experiments, their supplement and benchmark links, and Benchmark Results (`lab_protocols`, `lab_protocol_versions`, `lab_protocol_requirements`, `lab_protocol_context_controls`, `benchmark_definitions`, `experiments`, `experiment_benchmarks`, `experiment_supplements`, `experiment_results`, `experiment_result_requirements`, `experiment_result_evidence`, `benchmark_results`, `benchmark_result_values`, `benchmark_result_evidence`). `lab_protocol_requirements.criteria` is stored with the requirement. `workout_sessions` also carries `experiment_id` and `benchmark_protocol_version_id`. All of these tables are in the full archive and in the portable export. Restore inserts protocols and experiments before workout sessions, supplements before experiment supplement links, and benchmark results before their values and evidence. It keeps the original protocol version ids, result ids, fingerprints, units, evidence JSON, and invalidation fields. A workout is not remapped onto a different protocol version. A committed Benchmark Result or Experiment Result is not recalculated from later edits to its source observations. Restore writes the stored experiment result, its requirement summaries, and its evidence snapshots. Retest scheduling is derived from the protocol intervals and valid results. It has no backup table, and the same restored facts produce the same retest state for the same `asOf` date.

@@ -1,3 +1,4 @@
+import { trainingSessionDisplayName } from '../../src/domain/training.js'
 import { formatDatabaseError, getSql } from '../db.js'
 import { HttpError } from '../http.js'
 import { calendarDateFromInstant } from '../../src/domain/progress/dates.js'
@@ -114,7 +115,7 @@ export async function loadProgressCanonicalRows(): Promise<ProgressCanonicalRows
          ORDER BY name, id`,
         ),
         sql.query(
-          `SELECT id, workout_date, created_at, template_name, routine_code, effort, duration_min
+          `SELECT id, workout_date, created_at, template_name, routine_code, session_type, session_name, effort, duration_min
          FROM workout_sessions
          ORDER BY workout_date ASC, created_at ASC, id ASC`,
         ),
@@ -189,15 +190,28 @@ export async function loadProgressCanonicalRows(): Promise<ProgressCanonicalRows
     }
   })
 
-  const workouts: ProgressWorkoutSummary[] = (sessionRows as Record<string, unknown>[]).map((row) => ({
-    sessionId: String(row.id),
-    sessionDate: asCalendarDate(row.workout_date),
-    createdAt: asIso(row.created_at),
-    templateName: typeof row.template_name === 'string' ? row.template_name : null,
-    routineCode: typeof row.routine_code === 'string' ? row.routine_code : null,
-    effort: asInt(row.effort),
-    durationMin: asNumber(row.duration_min),
-  }))
+  const workouts: ProgressWorkoutSummary[] = (sessionRows as Record<string, unknown>[]).map((row) => {
+    const sessionType =
+      row.session_type === 'ad_hoc' || row.session_type === 'experiment' || row.session_type === 'programmed'
+        ? row.session_type
+        : 'programmed'
+    const templateName = typeof row.template_name === 'string' ? row.template_name : null
+    const routineCode = typeof row.routine_code === 'string' ? row.routine_code : null
+    return {
+      sessionId: String(row.id),
+      sessionDate: asCalendarDate(row.workout_date),
+      createdAt: asIso(row.created_at),
+      templateName: trainingSessionDisplayName({
+        sessionType,
+        sessionName: typeof row.session_name === 'string' ? row.session_name : null,
+        templateName,
+        routineCode,
+      }),
+      routineCode: sessionType === 'programmed' ? routineCode : null,
+      effort: asInt(row.effort),
+      durationMin: asNumber(row.duration_min),
+    }
+  })
 
   const sets: CanonicalSetRecord[] = (setRows as Record<string, unknown>[]).map((row) => ({
     setId: String(row.set_id),

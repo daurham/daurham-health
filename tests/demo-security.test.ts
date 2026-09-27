@@ -96,7 +96,13 @@ describe('public demo security boundary', () => {
     expect(today).toContain('href="/demo/progress/activity"')
     expect(today).not.toContain('Add food')
     expect(today).not.toContain('Log workout')
+    expect(today).not.toContain('Ad-hoc workout')
     expect(today).not.toContain('Add measurement')
+    expect(today).not.toContain('Add context')
+    expect(today).not.toContain('/context')
+    const lockedContext = renderAnonymous('/context')
+    expect(lockedContext).toContain('Private Health data')
+    expect(lockedContext).not.toContain('What was different about this day?')
   })
 
   it('has no public demo API and keeps private owner routes closed', async () => {
@@ -131,6 +137,8 @@ describe('public demo security boundary', () => {
     ).rejects.toMatchObject({ statusCode: 401 })
     const denied = [
       ['GET', '/api/today'],
+      ['GET', '/api/supplements'],
+      ['POST', '/api/supplements/adherence'],
       ['GET', '/api/nutrition/day'],
       ['GET', '/api/nutrition/entries'],
       ['GET', '/api/training/sessions'],
@@ -141,7 +149,25 @@ describe('public demo security boundary', () => {
       ['POST', '/api/nutrition/label/jobs'],
       ['POST', '/api/nutrition/describe'],
       ['POST', '/api/training/transcription/jobs'],
+      ['POST', '/api/training/exercises'],
       ['POST', '/api/body/import/fit-profile/commit'],
+      ['POST', '/api/body/measurements'],
+      ['PUT', '/api/body/cadences/waist_circumference'],
+      ['GET', '/api/context/days'],
+      ['PUT', '/api/context/days/2026-09-26'],
+      ['DELETE', '/api/context/days/2026-09-26'],
+      ['GET', '/api/lab/experiments'],
+      ['POST', '/api/lab/experiments'],
+      ['GET', '/api/lab/benchmarks'],
+      ['POST', '/api/lab/benchmarks'],
+      ['POST', '/api/lab/benchmarks/11111111-1111-4111-8111-111111111111/results'],
+      ['POST', '/api/lab/benchmark-results/11111111-1111-4111-8111-111111111111/invalidate'],
+      ['POST', '/api/lab/experiments/11111111-1111-4111-8111-111111111111/result/preview'],
+      ['POST', '/api/lab/experiments/11111111-1111-4111-8111-111111111111/result'],
+      ['GET', '/api/lab/experiment-results/11111111-1111-4111-8111-111111111111'],
+      ['POST', '/api/lab/experiment-results/11111111-1111-4111-8111-111111111111/invalidate'],
+      ['GET', '/api/lab/retests'],
+      ['GET', '/api/lab/benchmarks/11111111-1111-4111-8111-111111111111/retest'],
     ] as const
     for (const [method, url] of denied) {
       const status = await hit(method, url)

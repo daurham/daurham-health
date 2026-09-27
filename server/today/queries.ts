@@ -4,6 +4,7 @@ import type { ProgressSleepObservation } from '../../src/domain/progress/health-
 import type { BodyObservation } from '../../src/domain/progress/types.js'
 import type { SleepObservationStatus } from '../../src/domain/sleep/completeness.js'
 import { HEALTH_CALENDAR_TIME_ZONE } from '../../src/domain/time.js'
+import { trainingSessionDisplayName, type TrainingSessionType } from '../../src/domain/training.js'
 import type { TodayTrainingSession } from '../../src/domain/today/index.js'
 import type { IntelligenceTrainingSession } from '../../src/domain/intelligence/index.js'
 import { getSql } from '../db.js'
@@ -131,14 +132,11 @@ function asInt(value: unknown): number | null {
   return parsed == null || !Number.isInteger(parsed) ? null : parsed
 }
 
-function sessionName(templateName: string | null, routineCode: string | null): string {
-  if (templateName && templateName.trim().length > 0) {
-    return templateName
+function storedSessionType(value: unknown): TrainingSessionType {
+  if (value === 'ad_hoc' || value === 'experiment' || value === 'programmed') {
+    return value
   }
-  if (routineCode && routineCode.trim().length > 0) {
-    return `Routine ${routineCode}`
-  }
-  return 'Workout'
+  return 'programmed'
 }
 
 export async function listTrainingToday(date: string): Promise<TodayTrainingSession[]> {
@@ -147,6 +145,8 @@ export async function listTrainingToday(date: string): Promise<TodayTrainingSess
     `SELECT sessions.id::text AS id,
             sessions.template_name,
             sessions.routine_code,
+            sessions.session_type,
+            sessions.session_name,
             COUNT(DISTINCT exercises.id)::int AS exercise_count,
             COUNT(sets.id) FILTER (WHERE sets.set_type = 'working')::int AS working_set_count
      FROM workout_sessions AS sessions
@@ -155,16 +155,25 @@ export async function listTrainingToday(date: string): Promise<TodayTrainingSess
      LEFT JOIN workout_sets AS sets
        ON sets.workout_session_exercise_id = exercises.id
      WHERE sessions.workout_date = $1::date
-     GROUP BY sessions.id, sessions.template_name, sessions.routine_code, sessions.created_at
+     GROUP BY sessions.id, sessions.template_name, sessions.routine_code, sessions.session_type, sessions.session_name, sessions.created_at
      ORDER BY sessions.created_at ASC, sessions.id ASC`,
     [date],
   )) as Array<Record<string, unknown>>
-  return rows.map((row) => ({
-    id: String(row.id),
-    name: sessionName(typeof row.template_name === 'string' ? row.template_name : null, typeof row.routine_code === 'string' ? row.routine_code : null),
-    exerciseCount: asInt(row.exercise_count) ?? 0,
-    workingSetCount: asInt(row.working_set_count) ?? 0,
-  }))
+  return rows.map((row) => {
+    const sessionType = storedSessionType(row.session_type)
+    return {
+      id: String(row.id),
+      sessionType,
+      name: trainingSessionDisplayName({
+        sessionType,
+        sessionName: typeof row.session_name === 'string' ? row.session_name : null,
+        templateName: typeof row.template_name === 'string' ? row.template_name : null,
+        routineCode: typeof row.routine_code === 'string' ? row.routine_code : null,
+      }),
+      exerciseCount: asInt(row.exercise_count) ?? 0,
+      workingSetCount: asInt(row.working_set_count) ?? 0,
+    }
+  })
 }
 
 export async function listBodyWeights(): Promise<BodyObservation[]> {

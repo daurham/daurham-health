@@ -4,8 +4,8 @@ Personal health record for one owner. Frozen release **v1.0.0** (2026-09-22, Ame
 
 ## Surfaces
 
-- Owner app: Today, Nutrition, Training, Body, Progress, Activity, Sleep, Timeline, Compare, Checkpoints, and Settings.
-- Public demo: `/demo` and the same sections under that prefix. It does not use the database, owner APIs, or providers.
+- Owner app: Today, Nutrition, Training, Body, Progress, Activity, Sleep, Timeline, Compare, Checkpoints, Settings, and Supplements. Supplements is not a primary navigation tab.
+- Public demo: `/demo` and the same primary sections under that prefix. It does not use the database, owner APIs, or providers.
 - Sign-in is owner-only. Private APIs reject anonymous callers. The Apple Health ingest token can write `POST /api/ingest/apple-health` and cannot read Health data.
 
 ## Providers
@@ -16,7 +16,7 @@ Personal health record for one owner. Frozen release **v1.0.0** (2026-09-22, Ame
 
 ## Data
 
-- Schema migrations live in `migrations/`. The current migration is `0016_sleep_nightly_summaries.sql`. Apply them with `npm run migrate`.
+- Schema migrations live in `migrations/`. The current migration is `0023_experiment_results.sql`. Apply them with `npm run migrate`.
 - Full backup, verify, and restore commands are in `docs/BACKUP.md`.
 - Release checks are in `docs/V1-RELEASE-CHECKLIST.md`.
 

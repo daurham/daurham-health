@@ -5,7 +5,9 @@ import {
   sessionListResponseSchema,
   templateListResponseSchema,
   type ExerciseDefinition,
+  exerciseDefinitionSchema,
   type ManualWorkoutRequest,
+  type OwnerExerciseRequest,
   type WorkoutSession,
   type WorkoutSessionSummary,
   type WorkoutTemplate,
@@ -26,6 +28,18 @@ export async function fetchExercises(): Promise<ExerciseDefinition[]> {
     throw new Error(await readApiError(response))
   }
   return exerciseListResponseSchema.parse(await response.json()).exercises
+}
+
+export async function createOwnerExercise(input: OwnerExerciseRequest): Promise<ExerciseDefinition> {
+  const response = await healthFetch('/api/training/exercises', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+  if (!response.ok) {
+    throw new Error(await readApiError(response))
+  }
+  return exerciseDefinitionSchema.parse((await response.json()).exercise)
 }
 
 export async function fetchTemplates(): Promise<WorkoutTemplate[]> {

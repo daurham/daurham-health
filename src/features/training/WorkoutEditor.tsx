@@ -1,6 +1,7 @@
-import { useEffect } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { formatPrescription } from '@/domain/training'
-import type { LoadState, MeasurementKind } from '@/domain/training'
+import type { ExerciseDefinition, LoadState, MeasurementKind, OwnerExerciseRequest } from '@/domain/training'
+import { OWNER_EXERCISE_LOAD_TYPES, MEASUREMENT_KINDS } from '@/domain/training'
 import type { TranscriptionGuidance } from '@/domain/training-transcription'
 import {
   interpretPaperSets,
@@ -10,7 +11,7 @@ import {
   type ReviewFieldError,
 } from '@/domain/paper-load'
 import { cn, dangerButtonClass, primaryButtonClass, quietButtonClass, SHELL_MAX_WIDTH_CLASS } from '@/lib'
-import { addDraftSet, type DraftExercise, type DraftSet, type WorkoutDraft } from './draft'
+import { addDraftSet, draftExerciseFromDefinition, type DraftExercise, type DraftSet, type WorkoutDraft } from './draft'
 
 const inputClass =
   'min-h-11 w-full rounded-md border border-zinc-300 bg-white px-2.5 py-2 text-base text-zinc-900 disabled:bg-zinc-100'
@@ -33,6 +34,10 @@ export function WorkoutEditor({
   errorFocusKey = 0,
   guidance = [],
   disclaimer,
+  allowExerciseManagement = false,
+  allowSessionName = false,
+  exerciseCatalog = [],
+  onCreateExercise,
 }: {
   title: string
   subtitle?: string
@@ -49,6 +54,10 @@ export function WorkoutEditor({
   errorFocusKey?: number
   guidance?: TranscriptionGuidance[]
   disclaimer?: string
+  allowExerciseManagement?: boolean
+  allowSessionName?: boolean
+  exerciseCatalog?: ExerciseDefinition[]
+  onCreateExercise?: (input: OwnerExerciseRequest) => Promise<ExerciseDefinition>
 }) {
   const highlightDate = guidance.some((item) => item.path === 'workoutDate')
   const dateError = fieldError(fieldErrors, 'workoutDate')
@@ -116,6 +125,7 @@ export function WorkoutEditor({
         draft={draft}
         highlightDate={highlightDate}
         dateError={dateError}
+        allowSessionName={allowSessionName}
         onChange={onChange}
       />
 
@@ -128,11 +138,40 @@ export function WorkoutEditor({
       <div className="space-y-4">
         {draft.exercises.map((exercise, exerciseIndex) => (
           <ExerciseCard
-            key={exercise.slotId ?? exercise.exerciseDefinitionId}
+            key={`${exercise.exerciseDefinitionId}-${exerciseIndex}`}
             exercise={exercise}
             exerciseIndex={exerciseIndex}
             highlighted={guidance.some((item) => item.path === `exercises.${exercise.slotId}`)}
             fieldErrors={fieldErrors}
+            showPrescription={!allowExerciseManagement}
+            allowSetRemoval={allowExerciseManagement}
+            onMove={
+              allowExerciseManagement
+                ? (direction) => {
+                    const target = exerciseIndex + direction
+                    if (target < 0 || target >= draft.exercises.length) {
+                      return
+                    }
+                    const next = [...draft.exercises]
+                    const [item] = next.splice(exerciseIndex, 1)
+                    if (!item) {
+                      return
+                    }
+                    next.splice(target, 0, item)
+                    onChange({ ...draft, exercises: next })
+                  }
+                : undefined
+            }
+            onRemove={
+              allowExerciseManagement
+                ? () => {
+                    onChange({
+                      ...draft,
+                      exercises: draft.exercises.filter((_, index) => index !== exerciseIndex),
+                    })
+                  }
+                : undefined
+            }
             onChange={(next) => {
               onChange({
                 ...draft,
@@ -142,6 +181,16 @@ export function WorkoutEditor({
           />
         ))}
       </div>
+      {allowExerciseManagement ? (
+        <ExercisePicker
+          catalog={exerciseCatalog}
+          disabled={saving}
+          onSelect={(exercise) => {
+            onChange({ ...draft, exercises: [...draft.exercises, draftExerciseFromDefinition(exercise)] })
+          }}
+          onCreateExercise={onCreateExercise}
+        />
+      ) : null}
 
       <div className="shell-action-bar border-t border-zinc-200 bg-white px-4 py-3">
         <div className={cn('mx-auto flex gap-3', SHELL_MAX_WIDTH_CLASS)}>
@@ -172,11 +221,13 @@ function SessionMeta({
   draft,
   highlightDate,
   dateError,
+  allowSessionName,
   onChange,
 }: {
   draft: WorkoutDraft
   highlightDate: boolean
   dateError?: string
+  allowSessionName: boolean
   onChange: (draft: WorkoutDraft) => void
 }) {
   const dateInvalid = Boolean(dateError)
@@ -203,6 +254,18 @@ function SessionMeta({
         />
         {dateError ? <p className="mt-1 text-xs text-red-700">{dateError}</p> : null}
       </label>
+      {allowSessionName ? (
+        <label className="mt-4 block text-sm font-medium text-zinc-700">
+          Workout name
+          <input
+            type="text"
+            className={cn(inputClass, 'mt-1')}
+            value={draft.sessionName}
+            placeholder="Push-up volume"
+            onChange={(event) => onChange({ ...draft, sessionName: event.target.value })}
+          />
+        </label>
+      ) : null}
       <div className="mt-4 grid grid-cols-2 gap-3">
         <label className="block text-sm font-medium text-zinc-700">
           Duration (min)
@@ -301,12 +364,20 @@ function ExerciseCard({
   exerciseIndex,
   highlighted,
   fieldErrors,
+  showPrescription,
+  allowSetRemoval,
+  onMove,
+  onRemove,
   onChange,
 }: {
   exercise: DraftExercise
   exerciseIndex: number
   highlighted: boolean
   fieldErrors: ReviewFieldError[]
+  showPrescription: boolean
+  allowSetRemoval: boolean
+  onMove?: (direction: -1 | 1) => void
+  onRemove?: () => void
   onChange: (exercise: DraftExercise) => void
 }) {
   const interpreted = interpretPaperSets(exercise.sets)
@@ -317,28 +388,60 @@ function ExerciseCard({
         highlighted ? 'border-amber-300 bg-amber-50/40' : 'border-zinc-200',
       )}
     >
-      <h2 className="font-semibold">{exercise.name}</h2>
-      <p className="mt-1 text-sm text-zinc-500">
-        {formatPrescription(exercise.plannedSets, exercise.prescription)}
-      </p>
+      <div className="flex items-start justify-between gap-3">
+        <h2 className="font-semibold">{exercise.name}</h2>
+        {onRemove ? (
+          <div className="flex shrink-0 gap-2">
+            <button type="button" className="text-sm text-zinc-600" onClick={() => onMove?.(-1)}>
+              Up
+            </button>
+            <button type="button" className="text-sm text-zinc-600" onClick={() => onMove?.(1)}>
+              Down
+            </button>
+            <button type="button" className="text-sm text-red-700" onClick={onRemove}>
+              Remove
+            </button>
+          </div>
+        ) : null}
+      </div>
+      {showPrescription ? (
+        <p className="mt-1 text-sm text-zinc-500">
+          {formatPrescription(exercise.plannedSets, exercise.prescription)}
+        </p>
+      ) : null}
       <div className="mt-4 space-y-3">
         <SetHeader measurementKind={exercise.measurementKind} />
         {interpreted.map((item, setIndex) => (
-          <SetRow
-            key={item.set.setNumber}
-            set={item.set}
-            exerciseIndex={exerciseIndex}
-            setIndex={setIndex}
-            interpretation={item}
-            measurementKind={exercise.measurementKind}
-            fieldErrors={fieldErrors}
-            onChange={(next) => {
-              onChange({
-                ...exercise,
-                sets: exercise.sets.map((row, index) => (index === setIndex ? next : row)),
-              })
-            }}
-          />
+          <div key={item.set.setNumber}>
+            <SetRow
+              set={item.set}
+              exerciseIndex={exerciseIndex}
+              setIndex={setIndex}
+              interpretation={item}
+              measurementKind={exercise.measurementKind}
+              fieldErrors={fieldErrors}
+              onChange={(next) => {
+                onChange({
+                  ...exercise,
+                  sets: exercise.sets.map((row, index) => (index === setIndex ? next : row)),
+                })
+              }}
+            />
+            {allowSetRemoval ? (
+              <button
+                type="button"
+                className="mt-1 text-sm text-zinc-500"
+                onClick={() => {
+                  onChange({
+                    ...exercise,
+                    sets: exercise.sets.filter((_, index) => index !== setIndex),
+                  })
+                }}
+              >
+                Remove set
+              </button>
+            ) : null}
+          </div>
         ))}
       </div>
       <button
@@ -546,6 +649,158 @@ function MeasurementInputs({
         aria-label={`Set ${set.setNumber} right seconds`}
         onChange={(event) => onChange({ ...set, rightDurationSec: event.target.value })}
       />
+    </div>
+  )
+}
+
+const MEASUREMENT_LABELS: Record<MeasurementKind, string> = {
+  reps: 'Reps',
+  duration: 'Duration',
+  reps_per_side: 'Reps each side',
+  duration_per_side: 'Duration each side',
+}
+
+function ExercisePicker({
+  catalog,
+  disabled,
+  onSelect,
+  onCreateExercise,
+}: {
+  catalog: ExerciseDefinition[]
+  disabled: boolean
+  onSelect: (exercise: ExerciseDefinition) => void
+  onCreateExercise?: (input: OwnerExerciseRequest) => Promise<ExerciseDefinition>
+}) {
+  const [query, setQuery] = useState('')
+  const [creating, setCreating] = useState(false)
+  const [name, setName] = useState('')
+  const [measurementKind, setMeasurementKind] = useState<MeasurementKind>('reps')
+  const [loadType, setLoadType] = useState<(typeof OWNER_EXERCISE_LOAD_TYPES)[number]>('bodyweight')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const matches = useMemo(() => {
+    const needle = query.trim().toLowerCase()
+    const active = catalog.filter((exercise) => exercise.isActive)
+    if (!needle) {
+      return active.slice(0, 8)
+    }
+    return active.filter((exercise) => exercise.name.toLowerCase().includes(needle)).slice(0, 8)
+  }, [catalog, query])
+  const perSide = measurementKind === 'reps_per_side' || measurementKind === 'duration_per_side'
+
+  async function createExercise() {
+    if (!onCreateExercise || name.trim() === '') {
+      setError('Exercise name is required')
+      return
+    }
+    setSaving(true)
+    setError(null)
+    try {
+      const created = await onCreateExercise({
+        name: name.trim(),
+        measurementKind,
+        loadType,
+        unilateral: perSide,
+      })
+      onSelect(created)
+      setCreating(false)
+      setName('')
+      setQuery('')
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Could not create exercise')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="rounded-lg border border-zinc-200 bg-white p-4">
+      <h2 className="font-semibold">Add exercise</h2>
+      <label className="mt-3 block text-sm font-medium text-zinc-700">
+        Search
+        <input
+          type="search"
+          className={cn(inputClass, 'mt-1')}
+          value={query}
+          disabled={disabled}
+          onChange={(event) => setQuery(event.target.value)}
+        />
+      </label>
+      <ul className="mt-3 space-y-2">
+        {matches.map((exercise) => (
+          <li key={exercise.id}>
+            <button
+              type="button"
+              className="min-h-11 w-full rounded-md border border-zinc-200 px-3 text-left"
+              disabled={disabled}
+              onClick={() => onSelect(exercise)}
+            >
+              {exercise.name}
+            </button>
+          </li>
+        ))}
+      </ul>
+      {matches.length === 0 ? <p className="mt-3 text-sm text-zinc-500">No matching exercises.</p> : null}
+      {onCreateExercise ? (
+        <div className="mt-4">
+          <p className="text-sm text-zinc-600">Can&apos;t find it?</p>
+          {creating ? (
+            <div className="mt-3 space-y-3">
+              <label className="block text-sm font-medium text-zinc-700">
+                Name
+                <input
+                  type="text"
+                  className={cn(inputClass, 'mt-1')}
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                />
+              </label>
+              <label className="block text-sm font-medium text-zinc-700">
+                Measurement
+                <select
+                  className={cn(inputClass, 'mt-1')}
+                  value={measurementKind}
+                  onChange={(event) => setMeasurementKind(event.target.value as MeasurementKind)}
+                >
+                  {MEASUREMENT_KINDS.map((kind) => (
+                    <option key={kind} value={kind}>
+                      {MEASUREMENT_LABELS[kind]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block text-sm font-medium text-zinc-700">
+                Load
+                <select
+                  className={cn(inputClass, 'mt-1')}
+                  value={loadType}
+                  onChange={(event) => setLoadType(event.target.value as (typeof OWNER_EXERCISE_LOAD_TYPES)[number])}
+                >
+                  {OWNER_EXERCISE_LOAD_TYPES.map((kind) => (
+                    <option key={kind} value={kind}>
+                      {kind.split('_').join(' ')}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <p className="text-sm text-zinc-500">{perSide ? 'Each side is recorded separately.' : 'Both sides share one count.'}</p>
+              {error ? <p className="text-sm text-red-700">{error}</p> : null}
+              <div className="flex gap-2">
+                <button type="button" className={primaryButtonClass} disabled={saving} onClick={() => void createExercise()}>
+                  {saving ? 'Saving…' : 'Create exercise'}
+                </button>
+                <button type="button" className={quietButtonClass} disabled={saving} onClick={() => setCreating(false)}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button type="button" className={cn(quietButtonClass, 'mt-2')} disabled={disabled} onClick={() => setCreating(true)}>
+              Create exercise
+            </button>
+          )}
+        </div>
+      ) : null}
     </div>
   )
 }

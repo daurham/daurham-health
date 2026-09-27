@@ -4,6 +4,7 @@ import {
   buildProgressOverview,
   buildProgressTimeline,
   isProgressRange,
+  trailingPeriod,
   type ProgressOverview,
   type ProgressRange,
   type ProgressTimeline,
@@ -26,6 +27,9 @@ import { listActivityDailySummaries, listActivityWorkoutsForProgress } from '../
 import { listSleepNightlySummaries, listSleepObservationsForProgress } from '../sleep/queries.js'
 import { HttpError } from '../http.js'
 import { getSql } from '../db.js'
+import { listTimelineContexts } from '../context/service.js'
+import { listTimelineExperimentResults } from '../lab/experiment-results.js'
+import { listTimelineBenchmarkResults } from '../lab/results.js'
 import {
   DELETE_CHECKPOINT_SQL,
   INSERT_CHECKPOINT_SQL,
@@ -155,7 +159,14 @@ export async function getProgressTimeline(input: {
   now?: Date
 }): Promise<ProgressTimeline> {
   const query = parseProgressQuery(input)
-  const [rows, health] = await Promise.all([loadProgressCanonicalRows(), loadActivitySleepContext(input.now)])
+  const period = trailingPeriod(query.range, query.asOf)
+  const [rows, health, dailyContexts, benchmarkResults, experimentResults] = await Promise.all([
+    loadProgressCanonicalRows(),
+    loadActivitySleepContext(input.now),
+    listTimelineContexts(period.start, period.end, query.range === 'all'),
+    listTimelineBenchmarkResults(period.start, period.end, query.range === 'all'),
+    listTimelineExperimentResults(period.start, period.end, query.range === 'all'),
+  ])
   return buildProgressTimeline({
     asOf: query.asOf,
     range: query.range,
@@ -166,6 +177,15 @@ export async function getProgressTimeline(input: {
     checkpoints: rows.checkpoints,
     nutritionEntries: rows.nutritionEntries,
     nutritionTargets: rows.nutritionTargets,
+    dailyContexts,
+    benchmarkResults,
+    experimentResults: experimentResults.map((item) => ({
+      id: item.id,
+      title: item.title,
+      classification: item.classification,
+      effectiveEndDate: item.effective_end_date,
+      status: item.status,
+    })),
     ...health,
   })
 }

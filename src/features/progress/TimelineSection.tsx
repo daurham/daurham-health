@@ -18,9 +18,13 @@ import {
   type TimelinePerformanceBestEvent,
   type TimelineSleepNightEvent,
   type TimelineTrainingSessionEvent,
+  type TimelineDailyContextEvent,
+  type TimelineBenchmarkResultEvent,
+  type TimelineExperimentResultEvent,
 } from '@/domain/progress'
 import { cn } from '@/lib'
-import { prefixedPath, useAppPathPrefix } from '@/lib/app-prefix'
+import { prefixedPath, useAppPathPrefix, useDemoReadOnly } from '@/lib/app-prefix'
+import { dailyContextTagLabel } from '@/domain/context'
 import { formatGrams, formatKcal, formatQuantity, mealLabel } from '@/features/nutrition/format'
 import { formatSleepDuration } from './activity-sleep-copy'
 import { TIMELINE_FOCUS_OPTIONS } from './copy'
@@ -173,6 +177,15 @@ function TimelineEventCard({
   }
   if (event.kind === 'sleep_night') {
     return <SleepNightCard event={event} />
+  }
+  if (event.kind === 'daily_context') {
+    return <ContextEventCard event={event} />
+  }
+  if (event.kind === 'benchmark_result') {
+    return <BenchmarkResultEventCard event={event} />
+  }
+  if (event.kind === 'experiment_result') {
+    return <ExperimentResultEventCard event={event} />
   }
   return <PerformanceBestCard event={event} range={range} onEvidence={onEvidence} standalone />
 }
@@ -456,6 +469,108 @@ function SleepNightCard({ event }: { event: TimelineSleepNightEvent }) {
       </div>
     </article>
   )
+}
+
+function ContextEventCard({ event }: { event: TimelineDailyContextEvent }) {
+  const readOnly = useDemoReadOnly()
+  const prefix = useAppPathPrefix()
+  const tags = event.data.tags.map((tag) => dailyContextTagLabel(tag))
+  return (
+    <article
+      id={event.id}
+      tabIndex={-1}
+      className="rounded-lg border border-dashed border-zinc-300 bg-zinc-50 px-3 py-3 outline-none focus:ring-2 focus:ring-zinc-400 md:px-4"
+    >
+      <div className="md:grid md:grid-cols-[7.5rem_minmax(0,1fr)] md:items-start md:gap-4">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Context</p>
+        <div>
+          <p className="font-medium tracking-tight">{event.title}</p>
+          <p className="mt-0.5 text-sm text-zinc-600">{formatCalendarDate(event.date)}</p>
+          {tags.length > 0 ? <p className="mt-1 text-sm text-zinc-800">{tags.join(' · ')}</p> : null}
+          {event.data.note ? <p className="mt-1 text-sm text-zinc-600">{event.data.note}</p> : null}
+          {readOnly ? null : (
+            <Link
+              to={prefixedPath(prefix, `/context?date=${event.date}&from=timeline`)}
+              className="mt-2 inline-flex min-h-11 items-center text-sm text-zinc-500 hover:text-zinc-900"
+            >
+              Edit
+            </Link>
+          )}
+        </div>
+      </div>
+    </article>
+  )
+}
+
+function ExperimentResultEventCard({ event }: { event: TimelineExperimentResultEvent }) {
+  const readOnly = useDemoReadOnly()
+  const prefix = useAppPathPrefix()
+  return (
+    <article
+      id={event.id}
+      tabIndex={-1}
+      className="rounded-lg border border-zinc-200 bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-zinc-400 md:px-4"
+    >
+      <div className="md:grid md:grid-cols-[7.5rem_minmax(0,1fr)] md:items-start md:gap-4">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Experiment</p>
+        <div>
+          <p className="font-medium tracking-tight">{event.data.title}</p>
+          <p className="mt-0.5 text-sm text-zinc-600">{event.data.classificationTitle}</p>
+          {readOnly ? null : (
+            <Link
+              to={prefixedPath(prefix, `/lab/experiment-results/${event.data.resultId}`)}
+              className="mt-2 inline-flex min-h-11 items-center text-sm text-zinc-500 hover:text-zinc-900"
+            >
+              Open result
+            </Link>
+          )}
+        </div>
+      </div>
+    </article>
+  )
+}
+
+function BenchmarkResultEventCard({ event }: { event: TimelineBenchmarkResultEvent }) {
+  const readOnly = useDemoReadOnly()
+  const prefix = useAppPathPrefix()
+  return (
+    <article
+      id={event.id}
+      tabIndex={-1}
+      className="rounded-lg border border-zinc-200 bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-zinc-400 md:px-4"
+    >
+      <div className="md:grid md:grid-cols-[7.5rem_minmax(0,1fr)] md:items-start md:gap-4">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Benchmark</p>
+        <div>
+          <p className="font-medium tracking-tight">{event.data.title}</p>
+          <p className="mt-0.5 text-sm text-zinc-600">{formatCalendarDate(event.date)}</p>
+          <ul className="mt-1 text-sm text-zinc-800">
+            {event.data.primary.map((item) => (
+              <li key={item.label}>
+                {item.label} {formatLabResult(item.value, item.unit)}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-1 text-sm text-zinc-600">Protocol v{event.data.protocolVersion}</p>
+          {readOnly ? null : (
+            <Link
+              to={prefixedPath(prefix, `/lab/benchmark-results/${event.data.resultId}`)}
+              className="mt-2 inline-flex min-h-11 items-center text-sm text-zinc-500 hover:text-zinc-900"
+            >
+              Open result
+            </Link>
+          )}
+        </div>
+      </div>
+    </article>
+  )
+}
+
+function formatLabResult(value: number, unit: string): string {
+  if (unit === 'kg' || unit === 'cm' || unit === 'percent') {
+    return formatBodyCanonical(unit, value)
+  }
+  return `${value} ${unit}`
 }
 
 function CheckpointEventCard({ event }: { event: TimelineCheckpointEvent }) {

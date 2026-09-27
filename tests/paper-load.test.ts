@@ -103,6 +103,7 @@ describe('paper load inheritance', () => {
     const applied = applyPaperInheritanceToManualRequest({
       workoutDate: '2026-09-20',
       workoutTemplateId: null,
+      sessionType: 'programmed',
       durationMin: null,
       effort: null,
       painLevel: null,
@@ -159,6 +160,7 @@ describe('paper load inheritance', () => {
     const applied = applyPaperInheritanceToManualRequest({
       workoutDate: '2026-09-20',
       workoutTemplateId: null,
+      sessionType: 'programmed',
       durationMin: null,
       effort: null,
       painLevel: null,

@@ -9,6 +9,7 @@ import {
   type MeasurementKind,
   type SetType,
   type TemplatePrescription,
+  type TrainingSessionType,
   type WorkoutSession,
   type WorkoutTemplate,
 } from '@/domain/training'
@@ -52,6 +53,8 @@ export type DraftExercise = {
 export type WorkoutDraft = {
   template: WorkoutTemplate | null
   workoutTemplateId?: string | null
+  sessionType: TrainingSessionType
+  sessionName: string
   workoutDate: string
   durationMin: string
   effort: number | null
@@ -59,6 +62,8 @@ export type WorkoutDraft = {
   bodyweightLb: string
   notes: string
   exercises: DraftExercise[]
+  experimentId?: string | null
+  benchmarkProtocolVersionId?: string | null
 }
 
 export function emptyDraftSet(setNumber: number): DraftSet {
@@ -93,6 +98,8 @@ export function draftFromTranscription(
 ): WorkoutDraft {
   return {
     template,
+    sessionType: 'programmed',
+    sessionName: '',
     workoutDate: draft.workoutDate,
     durationMin: draft.durationMin,
     effort: draft.effort,
@@ -106,6 +113,8 @@ export function draftFromTranscription(
 export function draftFromTemplate(template: WorkoutTemplate, now = new Date()): WorkoutDraft {
   return {
     template,
+    sessionType: 'programmed',
+    sessionName: '',
     workoutDate: localIsoDate(now),
     durationMin: '',
     effort: null,
@@ -170,7 +179,7 @@ export function buildManualWorkoutPayload(draft: WorkoutDraft): ManualWorkoutReq
     return [
       {
         exerciseDefinitionId: exercise.exerciseDefinitionId,
-        slotId: exercise.slotId,
+        slotId: draft.sessionType === 'programmed' ? exercise.slotId : null,
         notes: exercise.notes.trim() === '' ? null : exercise.notes.trim(),
         sets: kept.map((item) =>
           draftSetToManualInput(item.set.setNumber, {
@@ -184,14 +193,19 @@ export function buildManualWorkoutPayload(draft: WorkoutDraft): ManualWorkoutReq
     ]
   })
 
+  const freeform = draft.sessionType !== 'programmed'
   return manualWorkoutRequestSchema.parse({
     workoutDate: draft.workoutDate,
-    workoutTemplateId: draft.template?.id ?? draft.workoutTemplateId ?? null,
+    workoutTemplateId: freeform ? null : (draft.template?.id ?? draft.workoutTemplateId ?? null),
+    sessionType: draft.sessionType,
+    sessionName: freeform ? draft.sessionName : null,
     durationMin: parseOptionalPositive(draft.durationMin),
     effort: draft.effort,
     painLevel: draft.painLevel,
     bodyweightLb: parseOptionalPositive(draft.bodyweightLb),
     notes: draft.notes.trim() === '' ? null : draft.notes.trim(),
+    experimentId: draft.sessionType === 'experiment' ? (draft.experimentId ?? null) : null,
+    benchmarkProtocolVersionId: draft.sessionType === 'experiment' ? (draft.benchmarkProtocolVersionId ?? null) : null,
     exercises,
   })
 }
@@ -200,10 +214,60 @@ function numberField(value: number | null | undefined): string {
   return value == null ? '' : String(value)
 }
 
+export function draftForAdHocWorkout(now = new Date()): WorkoutDraft {
+  return {
+    template: null,
+    workoutTemplateId: null,
+    sessionType: 'ad_hoc',
+    sessionName: '',
+    workoutDate: localIsoDate(now),
+    durationMin: '',
+    effort: null,
+    painLevel: null,
+    bodyweightLb: '',
+    notes: '',
+    exercises: [],
+  }
+}
+
+export function draftForExperimentWorkout(input: {
+  experimentId?: string | null
+  benchmarkProtocolVersionId?: string | null
+  sessionName?: string
+  now?: Date
+}): WorkoutDraft {
+  return {
+    ...draftForAdHocWorkout(input.now),
+    sessionType: 'experiment',
+    sessionName: input.sessionName ?? '',
+    experimentId: input.experimentId ?? null,
+    benchmarkProtocolVersionId: input.benchmarkProtocolVersionId ?? null,
+  }
+}
+
+export function draftExerciseFromDefinition(exercise: {
+  id: string
+  name: string
+  measurementKind: MeasurementKind
+}): DraftExercise {
+  return {
+    exerciseDefinitionId: exercise.id,
+    slotId: null,
+    name: exercise.name,
+    measurementKind: exercise.measurementKind,
+    plannedSets: null,
+    prescription: { measurement: exercise.measurementKind },
+    notes: '',
+    sets: [emptyDraftSet(1)],
+  }
+}
+
 export function draftFromSession(session: WorkoutSession, template: WorkoutTemplate | null): WorkoutDraft {
   return {
-    template,
-    workoutTemplateId: session.workoutTemplateId,
+    template: session.sessionType === 'programmed' ? template : null,
+    workoutTemplateId: session.sessionType === 'programmed' ? session.workoutTemplateId : null,
+    sessionType: session.sessionType,
+    sessionName: session.sessionName ?? '',
     workoutDate: session.workoutDate,
     durationMin: numberField(session.durationMin),
     effort: session.effort,

@@ -462,7 +462,7 @@ export function restoreStatements(tables: Record<string, readonly BackupRow[]>):
     statements.push({ text: `DELETE FROM ${definition.name}`, params: [] })
   }
   for (const definition of BACKUP_TABLES) {
-    const rows = tables[definition.name] ?? []
+    const rows = orderSelfReferences(definition, tables[definition.name] ?? [])
     const width = definition.columns.length
     const batchSize = Math.max(1, Math.min(100, Math.floor(60000 / width)))
     for (let offset = 0; offset < rows.length; offset += batchSize) {
@@ -483,6 +483,36 @@ export function restoreStatements(tables: Record<string, readonly BackupRow[]>):
     }
   }
   return statements
+}
+
+function orderSelfReferences(definition: BackupTable, rows: readonly BackupRow[]): BackupRow[] {
+  const self = definition.references.find((reference) => reference.table === definition.name)
+  const key = definition.primaryKey[0]
+  if (!self || !key || rows.length < 2) {
+    return [...rows]
+  }
+  const pending = [...rows]
+  const ordered: BackupRow[] = []
+  const seen = new Set<string>()
+  while (pending.length > 0) {
+    const next = pending.findIndex((row) => {
+      const parent = row[self.column]
+      return typeof parent !== 'string' || parent.length === 0 || seen.has(parent)
+    })
+    if (next < 0) {
+      return [...ordered, ...pending]
+    }
+    const row = pending.splice(next, 1)[0]
+    if (!row) {
+      break
+    }
+    const id = row[key]
+    if (typeof id === 'string') {
+      seen.add(id)
+    }
+    ordered.push(row)
+  }
+  return ordered
 }
 
 export function assertNoSecretTables(): readonly string[] {

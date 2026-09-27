@@ -235,6 +235,9 @@ describe('imported commit reuse', () => {
       ),
     })
     expect(prepared.sourceKind).toBe('imported_candidate')
+    expect(prepared.sessionType).toBe('programmed')
+    expect(prepared.templateName).toBe(templates()[1]?.name)
+    expect(prepared.workoutTemplateId).toBe(templates()[1]?.id)
     expect(prepared.exercises[0]?.sets[0]?.weightKg).toBeCloseTo(poundsToKilograms(55), 10)
     expect(prepared.metadata.entry_mass_unit).toBe('lb')
   })
@@ -245,6 +248,7 @@ describe('imported commit reuse', () => {
       /INSERT INTO source_record_links[\s\S]*ON CONFLICT \(source_id, external_fingerprint\) DO NOTHING/,
     )
     expect(CLAIM_AND_INSERT_WORKOUT_SQL).toContain('INSERT INTO workout_sessions')
+    expect(CLAIM_AND_INSERT_WORKOUT_SQL).toContain('session_type')
     expect(CLAIM_AND_INSERT_WORKOUT_SQL).toContain('FROM claimed')
     const payload = provenancePayload({
       jobId: JOB_ID,

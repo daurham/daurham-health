@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import type { WorkoutSession, WorkoutTemplate } from '@/domain/training'
+import { sessionIntentLabel, trainingSessionDisplayName, type ExerciseDefinition, type WorkoutSession, type WorkoutTemplate } from '@/domain/training'
 import type { ReviewFieldError } from '@/domain/paper-load'
 import {
   dangerButtonClass,
@@ -8,7 +8,7 @@ import {
   quietButtonClass,
   secondaryButtonClass,
 } from '@/lib'
-import { deleteSession, fetchSession, fetchTemplates, updateSession } from './api'
+import { createOwnerExercise, deleteSession, fetchExercises, fetchSession, fetchTemplates, updateSession } from './api'
 import {
   DraftValidationError,
   buildManualWorkoutPayload,
@@ -23,6 +23,7 @@ export function WorkoutDetailPage() {
   const { sessionId } = useParams()
   const navigate = useNavigate()
   const [session, setSession] = useState<WorkoutSession | null>(null)
+  const [catalog, setCatalog] = useState<ExerciseDefinition[]>([])
   const [template, setTemplate] = useState<WorkoutTemplate | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -74,6 +75,23 @@ export function WorkoutDetailPage() {
       cancelled = true
     }
   }, [sessionId, reloadToken])
+
+  useEffect(() => {
+    if (session?.sessionType !== 'ad_hoc' && session?.sessionType !== 'experiment') {
+      return
+    }
+    let cancelled = false
+    fetchExercises()
+      .then((next) => {
+        if (!cancelled) {
+          setCatalog(next)
+        }
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [session?.sessionType])
 
   async function onSave() {
     if (!sessionId || !draft) {
@@ -145,9 +163,21 @@ export function WorkoutDetailPage() {
       {loading && !session ? <p className="text-sm text-zinc-600">Loading workout…</p> : null}
       {editing && draft ? (
         <WorkoutEditor
-          title={session?.templateName ?? 'Edit workout'}
+          title={session ? trainingSessionDisplayName(session) : 'Edit workout'}
           subtitle="Changes update this workout. They are not saved until you tap Save workout."
           draft={draft}
+          allowExerciseManagement={session?.sessionType === 'ad_hoc' || session?.sessionType === 'experiment'}
+          allowSessionName={session?.sessionType === 'ad_hoc' || session?.sessionType === 'experiment'}
+          exerciseCatalog={catalog}
+          onCreateExercise={
+            session?.sessionType === 'ad_hoc' || session?.sessionType === 'experiment'
+              ? async (input) => {
+                  const created = await createOwnerExercise(input)
+                  setCatalog((current) => [...current.filter((exercise) => exercise.id !== created.id), created])
+                  return created
+                }
+              : undefined
+          }
           onChange={(next) => {
             setDraft(next)
             setFieldErrors((current) => (current.length > 0 ? validateWorkoutDraft(next) : current))
@@ -217,19 +247,23 @@ function SessionDetail({
           <h1 className="text-2xl font-semibold tracking-tight">
             {formatWorkoutDate(session.workoutDate)}
             {' · '}
-            {session.templateName ?? 'Workout'}
+            {trainingSessionDisplayName(session)}
           </h1>
-          {session.routineCode ? (
-            <p className="mt-1 text-sm text-zinc-500">
-              Routine {session.routineCode}
-              {session.templateVersion ? ` · v${session.templateVersion}` : ''}
-            </p>
-          ) : null}
+          <p className="mt-1 text-sm text-zinc-500">
+            {session.sessionType === 'programmed' && session.routineCode
+              ? `Routine ${session.routineCode}${session.templateVersion ? ` · v${session.templateVersion}` : ''} · Programmed`
+              : sessionIntentLabel(session.sessionType)}
+          </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button type="button" className={primaryButtonClass} onClick={onEdit}>
             Edit workout
           </button>
+          {session.benchmarkProtocolVersionId ? (
+            <Link to={`/lab/results/review?protocolVersionId=${session.benchmarkProtocolVersionId}&workoutSessionId=${session.id}`} className={secondaryButtonClass}>
+              Review benchmark result
+            </Link>
+          ) : null}
           <button type="button" className={dangerButtonClass} onClick={onDelete}>
             Delete workout
           </button>

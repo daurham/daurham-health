@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { z, ZodError } from 'zod'
 import {
+  EXPERIMENT_SESSION_MESSAGE,
   exerciseDefinitionFromRow,
   exerciseDefinitionRowSchema,
   exerciseListResponseSchema,
@@ -13,6 +14,9 @@ import {
   templateListResponseSchema,
   templatePrescriptionSchema,
   toCanonicalSetInsert,
+  programmedTemplateEditError,
+  sessionTypeEditError,
+  trainingSessionCoherenceError,
   workoutSessionExerciseRowSchema,
   workoutSessionRowSchema,
   workoutSetFromRow,
@@ -26,11 +30,13 @@ import {
   type SessionDetailResponse,
   type SessionListResponse,
   type SessionSourceKind,
+  type TrainingSessionType,
   type TemplateListResponse,
   type WorkoutSession,
   type WorkoutTemplate,
   type WorkoutTemplateExercise,
 } from '../../src/domain/training.js'
+import { assertTrainingLabParents } from '../lab/service.js'
 import {
   HOME_AI_PIPELINE,
   HOME_AI_SOURCE_KEY,
@@ -244,6 +250,10 @@ export type PreparedManualSession = {
   bodyweightKg: number | null
   notes: string | null
   sourceKind: SessionSourceKind
+  sessionType: TrainingSessionType
+  sessionName: string | null
+  experimentId: string | null
+  benchmarkProtocolVersionId: string | null
   metadata: Record<string, unknown>
   exercises: Array<{
     id: string
@@ -265,7 +275,18 @@ export function prepareManualSession(input: {
   sourceKind?: SessionSourceKind
   metadata?: Record<string, unknown>
 }): PreparedManualSession {
-  const { request, exercisesById, template } = input
+  const { request, exercisesById } = input
+  const coherence = trainingSessionCoherenceError({
+    sessionType: request.sessionType,
+    workoutTemplateId: request.workoutTemplateId,
+    slotIds: request.exercises.map((exercise) => exercise.slotId),
+    experimentId: request.experimentId,
+    benchmarkProtocolVersionId: request.benchmarkProtocolVersionId,
+  })
+  if (coherence) {
+    throw new HttpError(coherence.status, coherence.message)
+  }
+  const template = request.sessionType === 'programmed' ? input.template : null
   if (request.workoutTemplateId != null) {
     if (!template || template.id !== request.workoutTemplateId) {
       throw new HttpError(400, 'Workout template was not found')
@@ -332,6 +353,11 @@ export function prepareManualSession(input: {
       request.bodyweightLb == null ? null : poundsToKilograms(request.bodyweightLb),
     notes: request.notes ?? null,
     sourceKind: input.sourceKind ?? 'manual',
+    sessionType: request.sessionType,
+    sessionName: request.sessionType === 'programmed' ? null : request.sessionName,
+    experimentId: request.sessionType === 'experiment' ? (request.experimentId ?? null) : null,
+    benchmarkProtocolVersionId:
+      request.sessionType === 'experiment' ? (request.benchmarkProtocolVersionId ?? null) : null,
     metadata: { entry_mass_unit: 'lb', ...(input.metadata ?? {}) },
     exercises,
   }
@@ -345,10 +371,12 @@ function buildSessionInsertQueries(
     sql.query(
       `INSERT INTO workout_sessions (
          id, workout_date, workout_template_id, routine_code, template_version, template_name,
-         duration_min, effort, pain_level, bodyweight_kg, notes, source_kind, metadata
+         duration_min, effort, pain_level, bodyweight_kg, notes, source_kind, metadata,
+         session_type, session_name, experiment_id, benchmark_protocol_version_id
        ) VALUES (
          $1::uuid, $2::date, $3::uuid, $4, $5, $6,
-         $7::numeric, $8::int, $9::int, $10::numeric, $11, $12, $13::jsonb
+         $7::numeric, $8::int, $9::int, $10::numeric, $11, $12, $13::jsonb,
+         $14, $15, $16::uuid, $17::uuid
        )`,
       [
         prepared.sessionId,
@@ -364,6 +392,10 @@ function buildSessionInsertQueries(
         prepared.notes,
         prepared.sourceKind,
         JSON.stringify(prepared.metadata),
+        prepared.sessionType,
+        prepared.sessionName,
+        prepared.experimentId,
+        prepared.benchmarkProtocolVersionId,
       ],
     ),
   ]
@@ -430,6 +462,11 @@ export async function createManualSession(body: unknown): Promise<SessionDetailR
   const template =
     request.workoutTemplateId == null ? null : await loadTemplateById(request.workoutTemplateId)
   const prepared = prepareManualSession({ request, exercisesById, template })
+  await assertTrainingLabParents({
+    sessionType: prepared.sessionType,
+    experimentId: prepared.experimentId,
+    benchmarkProtocolVersionId: prepared.benchmarkProtocolVersionId,
+  })
   const sql = await getSql()
 
   try {
@@ -496,6 +533,7 @@ export const UPDATE_WORKOUT_SESSION_SQL = `UPDATE workout_sessions
              bodyweight_kg = $10::numeric,
              notes = $11,
              metadata = $12::jsonb,
+             session_name = $13,
              updated_at = now()
          WHERE id = $1::uuid`
 
@@ -535,6 +573,12 @@ export async function createImportedSession(
   }
 
   const request = parseManualWorkoutRequest(body)
+  if (request.sessionType === 'experiment') {
+    throw new HttpError(409, EXPERIMENT_SESSION_MESSAGE)
+  }
+  if (request.sessionType !== 'programmed') {
+    throw new HttpError(400, 'Imported workouts are programmed Training.')
+  }
   const exercisesById = await loadExercisesById(
     request.exercises.map((exercise) => exercise.exerciseDefinitionId),
   )
@@ -613,6 +657,8 @@ export async function createImportedSession(
         prepared.notes,
         prepared.sourceKind,
         JSON.stringify(prepared.metadata),
+        prepared.sessionType,
+        prepared.sessionName,
       ]),
       ...buildSessionInsertQueries(sql, prepared).slice(1),
     ])
@@ -646,6 +692,7 @@ export async function listSessions(): Promise<SessionListResponse> {
   const rows = await queryOrUnavailable(() =>
     sql.query(
       `SELECT id, workout_date, workout_template_id, routine_code, template_version, template_name,
+              session_type, session_name, experiment_id, benchmark_protocol_version_id,
               duration_min, effort, pain_level, bodyweight_kg, notes, source_kind, metadata, created_at, updated_at
        FROM workout_sessions
        ORDER BY workout_date DESC, created_at DESC`,
@@ -661,6 +708,7 @@ export async function getSession(sessionId: string): Promise<SessionDetailRespon
   const sessionRows = await queryOrUnavailable(() =>
     sql.query(
       `SELECT id, workout_date, workout_template_id, routine_code, template_version, template_name,
+              session_type, session_name, experiment_id, benchmark_protocol_version_id,
               duration_min, effort, pain_level, bodyweight_kg, notes, source_kind, metadata, created_at, updated_at
        FROM workout_sessions
        WHERE id = $1
@@ -781,13 +829,39 @@ async function loadTemplateForEdit(templateId: string): Promise<WorkoutTemplate>
 export async function updateManualSession(sessionId: string, body: unknown): Promise<SessionDetailResponse> {
   const existing = await getSession(sessionId)
   const request = parseManualWorkoutRequest(body)
+  const typeError = sessionTypeEditError(existing.session.sessionType, request.sessionType)
+  if (typeError) {
+    throw new HttpError(typeError.status, typeError.message)
+  }
   const exercisesById = await loadExercisesById(
     request.exercises.map((exercise) => exercise.exerciseDefinitionId),
   )
-  const templateId = request.workoutTemplateId ?? existing.session.workoutTemplateId
-  const template = templateId == null ? null : await loadTemplateForEdit(templateId)
+  let template: WorkoutTemplate | null = null
+  let nextRequest = request
+  if (existing.session.sessionType === 'ad_hoc') {
+    nextRequest = { ...request, workoutTemplateId: null, sessionType: 'ad_hoc', experimentId: null, benchmarkProtocolVersionId: null }
+  } else if (existing.session.sessionType === 'experiment') {
+    nextRequest = {
+      ...request,
+      workoutTemplateId: null,
+      sessionType: 'experiment',
+      experimentId: existing.session.experimentId ?? null,
+      benchmarkProtocolVersionId: existing.session.benchmarkProtocolVersionId ?? null,
+    }
+  } else {
+    const templateError = programmedTemplateEditError(existing.session.workoutTemplateId, request.workoutTemplateId)
+    if (templateError) {
+      throw new HttpError(409, templateError)
+    }
+    const templateId = existing.session.workoutTemplateId
+    if (templateId == null) {
+      throw new HttpError(400, 'A programmed workout needs a template.')
+    }
+    template = await loadTemplateForEdit(templateId)
+    nextRequest = { ...request, workoutTemplateId: templateId, sessionType: 'programmed', sessionName: null }
+  }
   const prepared = prepareManualSession({
-    request: { ...request, workoutTemplateId: template?.id ?? null },
+    request: nextRequest,
     exercisesById,
     template,
     sessionId,
@@ -810,6 +884,7 @@ export async function updateManualSession(sessionId: string, body: unknown): Pro
         prepared.bodyweightKg == null ? null : decimalString(prepared.bodyweightKg),
         prepared.notes,
         JSON.stringify(prepared.metadata),
+        prepared.sessionName,
       ]),
       sql.query(DELETE_WORKOUT_SESSION_EXERCISES_SQL, [prepared.sessionId]),
       ...buildSessionInsertQueries(sql, prepared).slice(1),

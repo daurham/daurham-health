@@ -1,0 +1,5 @@
+export { LabPage } from './LabPage'
+export { NewExperimentPage, ExperimentDetailPage } from './ExperimentPages'
+export { ReviewExperimentResultPage, ExperimentResultDetailPage } from './ExperimentResultPages'
+export { NewBenchmarkPage, BenchmarkDetailPage } from './BenchmarkPages'
+export { RecordBenchmarkResultPage, ReviewBenchmarkResultPage, BenchmarkResultDetailPage } from './BenchmarkResultPages'
