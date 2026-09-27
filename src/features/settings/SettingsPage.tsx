@@ -270,8 +270,9 @@ export function SettingsPage() {
           <h3 className="mt-1 text-sm font-medium text-zinc-800">Apple Health</h3>
           <p className="mt-1 text-sm text-zinc-600">
             Daily steps, active energy, exercise time, and resting heart rate sync from Health Auto Export. Sleep
-            analysis syncs from Health Auto Export when it sends individual intervals. Workout summaries come from
-            the Apple archive. Training sessions are never overwritten.
+            analysis syncs from Health Auto Export when it sends individual intervals. Historical workout summaries
+            come from the Apple archive. Ongoing workout summaries sync from a separate Health Auto Export Workouts
+            automation. Both stay in Activity and never become Training sessions.
           </p>
         </div>
 
@@ -290,6 +291,12 @@ export function SettingsPage() {
             Health Auto Export sleep:{' '}
             {status?.autoExport?.sleep
               ? `${status.autoExport.sleep.status} · last sync ${new Date(status.autoExport.sleep.importedAt).toLocaleString()} · latest night ${status.autoExport.sleep.latestNight ?? '—'}`
+              : 'No sync yet'}
+          </p>
+          <p>
+            Health Auto Export workouts:{' '}
+            {status?.autoExport?.workouts
+              ? `${status.autoExport.workouts.status} · last sync ${new Date(status.autoExport.workouts.importedAt).toLocaleString()} · latest workout ${status.autoExport.workouts.latestWorkoutAt ? new Date(status.autoExport.workouts.latestWorkoutAt).toLocaleString() : '—'}`
               : 'No sync yet'}
           </p>
         </div>

@@ -1,6 +1,6 @@
 # Health Auto Export
 
-Health Auto Export daily summaries are the canonical source for steps, active energy, Apple exercise time, and resting heart rate. The Apple XML archive remains the source for sleep intervals and workout summaries.
+Health Auto Export daily summaries are the canonical source for steps, active energy, Apple exercise time, and resting heart rate. A separate Workouts automation sends JSON v2 workout objects into the existing Activity workout rows. The Apple XML archive remains the historical source for sleep intervals and earlier workout summaries.
 
 Daily walking and running distance is not ingested. The default Health Auto Export aggregate failed Apple Health UI validation on multi-source days (2025-08-30: Apple showed 2.2 mi, the export aggregate was 6.624 mi and included Circular). Health Auto Export can prefer a source later. Until that is validated, `walking_running_distance_m` stays empty. Workout rows may still carry their own workout distance.
 
@@ -40,6 +40,21 @@ This sync does not use Home AI or the Beelink.
 
 Enable the automations only after production has `APPLE_HEALTH_SYNC_TOKEN` set. The same write-only endpoint also accepts a separate Sleep Analysis automation. Sleep reconciliation may replace Health Auto Export intervals inside its window. It does not delete Apple XML sleep evidence.
 
+## Workout automation
+
+Purpose: keep Activity workout objects current. They never become Training sessions.
+
+Use a separate Health Auto Export automation. It posts to the same endpoint with the same bearer token.
+
+- Data type: Workouts
+- Format: JSON
+- Export version: v2
+- Header: `Authorization: Bearer <APPLE_HEALTH_SYNC_TOKEN>`
+- A rolling window is safe. The provider workout id is idempotent, so a repeated workout does not create a second Activity row.
+- Route data is not required. Include Workout Metrics is not required. Route geometry, heart-rate streams, cadence, power, and other nested workout metrics are ignored and are not stored.
+
+Stored summary fields are the workout id, name, start, end, duration, and, when the payload includes them, active energy burned and distance. Location and the indoor flag may be kept in metadata. `totalEnergy` is not used as active energy. A workout missing from a later export is left in place. It is not deleted.
+
 ## Step counts
 
 Health Auto Export may send fractional step totals. Canonical steps truncate toward zero:
@@ -52,7 +67,7 @@ The original quantity is kept in the import evidence. Values are not rounded to 
 
 ## What this does not sync
 
-Walking and running distance, workout automation, Progress, and Timeline are not part of this activity setup. Sleep uses a separate automation on the same endpoint.
+Walking and running distance on the daily Activity summary, route geometry, nested workout telemetry, Progress calculations, and Timeline event kinds are not part of this setup. Sleep uses a separate automation on the same endpoint. Workouts use the automation above and stay in Activity.
 
 ## Sleep vitals
 

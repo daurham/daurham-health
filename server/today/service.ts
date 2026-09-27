@@ -20,14 +20,16 @@ import {
   listSleepNightsBetween,
   listTrainingSessionsBetween,
   listTrainingToday,
+  listTodayActivityWorkouts,
 } from './queries.js'
 
 export async function getTodayView(now = new Date()): Promise<TodayViewModel> {
   const date = healthCalendarDateFromNow(now)
   const period = trailingPeriod(TODAY_PATTERN_RANGE, date)
-  const [activityDays, sleepNights, latestCompleteSleep, trainingToday, trainingSessions, nutritionEntries, nutritionTargets, bodyWeights, workoutJobs, labelJobs, mealJobs, supplements, bodyCadence, context, labExperiments, retests, retestLinks] =
+  const [activityDays, activityWorkouts, sleepNights, latestCompleteSleep, trainingToday, trainingSessions, nutritionEntries, nutritionTargets, bodyWeights, workoutJobs, labelJobs, mealJobs, supplements, bodyCadence, context, labExperiments, retests, retestLinks] =
     await Promise.all([
       listActivityDaysBetween(period.start, date),
+      listTodayActivityWorkouts(date),
       listSleepNightsBetween(period.start, date),
       latestCompleteSleepNight(date),
       listTrainingToday(date),
@@ -55,6 +57,7 @@ export async function getTodayView(now = new Date()): Promise<TodayViewModel> {
   return buildTodayView({
     now,
     activityDays,
+    activityWorkouts,
     nutritionEntries: nutritionEntries.filter((entry) => entry.logDate === date),
     nutritionTargets,
     nutritionDays: nutritionDailyObservations({ entries: nutritionEntries, targets: nutritionTargets, start: period.start, end: date }),

@@ -638,7 +638,7 @@ function ActivityCard({ view }: { view: TodayViewModel }) {
   ].filter((line): line is string => line != null)
   return (
     <Card title="Activity">
-      {activity.steps != null || secondary.length > 0 ? (
+      {activity.steps != null || secondary.length > 0 || activity.workouts.length > 0 ? (
         <>
           {activity.steps != null ? (
             <>
@@ -651,6 +651,14 @@ function ActivityCard({ view }: { view: TodayViewModel }) {
               {line}
             </p>
           ))}
+          {activity.workouts.map((workout) => (
+            <p key={workout.id} className="mt-1">
+              {workout.line}
+            </p>
+          ))}
+          {activity.additionalWorkoutCount > 0 ? (
+            <p className="mt-1 text-zinc-600">{activity.additionalWorkoutCount} more</p>
+          ) : null}
           <p className="mt-2 text-zinc-600">
             {synced ? `In progress · synced ${synced}` : 'Today is still in progress'}
           </p>

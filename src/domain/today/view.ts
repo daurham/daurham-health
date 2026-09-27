@@ -1,14 +1,14 @@
 import type { ActivityDailyRow } from '../activity/analytics.js'
 import { activityShortTermChange } from '../activity/analytics.js'
 import { bodyWeightTrend } from '../progress/body-trend.js'
-import { calendarDaysBetween } from '../progress/dates.js'
+import { calendarDateFromInstant, calendarDaysBetween } from '../progress/dates.js'
 import { findingsFromBodyWeightTrend } from '../progress/findings.js'
 import type { BodyObservation } from '../progress/types.js'
 import type { NutritionDailyObservation } from '../progress/nutrition.js'
 import { nutritionDayTotals, type NutritionDayTotals, type NutritionTotable } from '../nutrition/totals.js'
 import { resolveNutritionTarget } from '../nutrition/targets.js'
 import type { NutritionTarget } from '../nutrition/types.js'
-import type { ProgressSleepObservation } from '../progress/health-timeline.js'
+import { activityWorkoutLabel, type ProgressActivityWorkout, type ProgressSleepObservation } from '../progress/health-timeline.js'
 import { analyzeCrossDomain, findingCopy, type IntelligenceTrainingSession } from '../intelligence/index.js'
 import { formatBodyMass } from '../body-metrics.js'
 import { formatCalendarRange } from '../calendar-format.js'
@@ -55,6 +55,7 @@ export type TodayLabExperiment = {
 export type TodaySources = {
   now?: Date
   activityDays: readonly ActivityDailyRow[]
+  activityWorkouts?: readonly ProgressActivityWorkout[]
   nutritionEntries: readonly TodayNutritionEntry[]
   nutritionTargets: readonly NutritionTarget[]
   nutritionDays?: readonly NutritionDailyObservation[]
@@ -78,6 +79,58 @@ export type TodaySources = {
   }
 }
 
+export type TodayActivityWorkout = {
+  id: string
+  activityType: string
+  label: string
+  startAt: string
+  durationMinutes: number | null
+  line: string
+}
+
+const TODAY_WORKOUT_LIMIT = 3
+
+export function formatActivityWorkoutDuration(minutes: number): string {
+  const rounded = Math.round(minutes)
+  if (rounded < 60) {
+    return `${rounded} min`
+  }
+  const hours = Math.trunc(rounded / 60)
+  const rest = rounded % 60
+  return rest === 0 ? `${hours}h` : `${hours}h ${rest}m`
+}
+
+function activityWorkoutLine(label: string, durationMinutes: number | null): string {
+  if (durationMinutes == null || !Number.isFinite(durationMinutes)) {
+    return label
+  }
+  return `${label} · ${formatActivityWorkoutDuration(durationMinutes)}`
+}
+
+function todayActivityWorkouts(workouts: readonly ProgressActivityWorkout[] | undefined, date: string): {
+  workouts: TodayActivityWorkout[]
+  additionalWorkoutCount: number
+} {
+  const todays = (workouts ?? [])
+    .filter((workout) => calendarDateFromInstant(new Date(workout.startAt), HEALTH_CALENDAR_TIME_ZONE) === date)
+    .slice()
+    .sort((left, right) => left.startAt.localeCompare(right.startAt) || left.id.localeCompare(right.id))
+  return {
+    workouts: todays.slice(0, TODAY_WORKOUT_LIMIT).map((workout) => {
+      const label = activityWorkoutLabel(workout.activityType)
+      return {
+        id: workout.id,
+        activityType: workout.activityType,
+        label,
+        startAt: workout.startAt,
+        durationMinutes: workout.durationMinutes,
+        line: activityWorkoutLine(label, workout.durationMinutes),
+      }
+    }),
+    additionalWorkoutCount: Math.max(0, todays.length - TODAY_WORKOUT_LIMIT),
+  }
+}
+
 export type TodayNutrientTarget = {
   calories: number
   protein: number
@@ -95,6 +148,8 @@ export type TodayViewModel = {
     exerciseMinutes: number | null
     restingHeartRateBpm: number | null
     updatedAt: string | null
+    workouts: TodayActivityWorkout[]
+    additionalWorkoutCount: number
   }
   nutrition: {
     logged: boolean
@@ -256,6 +311,7 @@ export function buildTodayView(sources: TodaySources): TodayViewModel {
   const kind = sleepKind(night)
   const latest = sources.latestCompleteSleep
   const showLatest = kind === 'none' && latest && latest.sleepDate !== date && latest.analysisEligible && finite(latest.totalSleepMinutes)
+  const activityWorkouts = todayActivityWorkouts(sources.activityWorkouts, date)
   const change = activityShortTermChange(sources.activityDays, date, date)
   const changedItems: TodayViewModel['changedItems'] = []
   if (change.steps.status === 'available' && change.steps.value.absoluteDelta !== 0) {
@@ -310,12 +366,19 @@ export function buildTodayView(sources: TodaySources): TodayViewModel {
     date,
     timezone: HEALTH_CALENDAR_TIME_ZONE,
     activity: {
-      inProgress: steps != null || activeEnergyKcal != null || exerciseMinutes != null || restingHeartRateBpm != null,
+      inProgress:
+        steps != null ||
+        activeEnergyKcal != null ||
+        exerciseMinutes != null ||
+        restingHeartRateBpm != null ||
+        activityWorkouts.workouts.length > 0,
       steps,
       activeEnergyKcal,
       exerciseMinutes,
       restingHeartRateBpm,
       updatedAt: activityRow?.updatedAt ?? null,
+      workouts: activityWorkouts.workouts,
+      additionalWorkoutCount: activityWorkouts.additionalWorkoutCount,
     },
     nutrition: {
       logged: todayEntries.length > 0,

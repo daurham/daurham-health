@@ -146,6 +146,7 @@ export function demoToday(): TodayViewModel {
   return buildTodayView({
     now: DEMO_NOW,
     activityDays: data.activity,
+    activityWorkouts: data.activityWorkouts,
     nutritionEntries: data.entries,
     nutritionTargets: data.targets,
     nutritionDays: nutritionDailyObservations({

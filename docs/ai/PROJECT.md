@@ -50,7 +50,7 @@ Derived products are not stored as tables. That includes goal status, projection
 - Nutrition logs foods, recipes, targets, barcode lookups, label photos, meal photos, and text descriptions. Capture jobs can ask Gemini, with Home-AI as an explicit fallback.
 - Training stores exercises, templates, and workout sessions. A workout photo becomes a Home-AI transcription job. The owner reviews it before it becomes a session.
 - Body stores manual measurements, an XLSX fit-profile import, and optional measurement cadence.
-- Apple Health history can be imported from export archives. Ongoing Activity and Sleep sync arrives as `POST /api/ingest/apple-health` with the ingest bearer token. That token cannot read Health data.
+- Apple Health history can be imported from export archives. Ongoing Activity, Sleep, and workout sync arrives as `POST /api/ingest/apple-health` with the ingest bearer token. That token cannot read Health data. Apple and Health Auto Export workouts stay in Activity. They are not Training sessions.
 - Progress, insights, and the weekly coach read canonical rows and run the existing analytics. They do not create a second copy of those formulas in React.
 - Ask Health, Weekly Coach, and Experiment Suggestion drafts may call Gemini only after an explicit owner action, and only through the `ai_usage` reservation gate.
 

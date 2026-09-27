@@ -48,7 +48,13 @@ Observed from the current code and product docs. Where the original rationale is
 
 **Status:** Active  
 **Reason:** Canonical Training session types are `programmed`, `ad_hoc`, and `experiment`. Roadmap and manual text keep Apple workout objects out of Training sets, volume, and performance bests.  
-**Implications:** Activity sync must not increment Training session counts or create performance bests.
+**Implications:** Activity sync must not increment Training session counts or create performance bests. Ongoing Health Auto Export workouts use the same `activity_workouts` rows.
+
+## Decision: Health Auto Export workout identity is exact
+
+**Status:** Active  
+**Reason:** V2-G1 ingests JSON v2 `data.workouts` into `activity_workouts`. The provider workout id is the exact duplicate key. A cross-source match requires the same start instant, the same end instant, and the same activity identity after formatting normalization.  
+**Implications:** Overlap is not a match. Several matches fail closed. A conflicting repeated id does not rewrite the historical row. Omitting a workout from a later payload does not delete it. There is no general correction lifecycle. The Health Auto Export transport is not an observing source. Route geometry and nested workout telemetry are not stored. Daily Activity totals do not include workout energy or duration.
 
 ## Decision: Current-day Activity is provisional
 

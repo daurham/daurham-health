@@ -2,7 +2,7 @@
 
 Current completion status and implementation order live in `HEALTH-PLATFORM-V2-LAB-BLUEPRINT.md`. The schema head is `0031_experiment_origins.sql`.
 
-Implemented: V2-A Data Capture Foundations, V2-B Personal Lab Core, V2-C Recipes / Batch Meals, V2-D Goals + Projections, V2-E Rich Sleep + Overnight Vitals, V2-F1 Ask Health, V2-F2 Proactive Insights, V2-F3 Weekly Coach Brief, V2-F4 Experiment Suggestions for due Benchmark retests and missing Benchmark baselines, and V2-F5 Literature-Backed Evidence Drawer. Goal-observation suggestions are deferred. Overnight vital metrics stay disabled until a payload is verified. V2-F is complete. The schema head is `0031_experiment_origins.sql`.
+Implemented: V2-A Data Capture Foundations, V2-B Personal Lab Core, V2-C Recipes / Batch Meals, V2-D Goals + Projections, V2-E Rich Sleep + Overnight Vitals, V2-F1 Ask Health, V2-F2 Proactive Insights, V2-F3 Weekly Coach Brief, V2-F4 Experiment Suggestions for due Benchmark retests and missing Benchmark baselines, V2-F5 Literature-Backed Evidence Drawer, and V2-G1 ongoing Apple workout ingestion. Goal-observation suggestions are deferred. Overnight vital metrics stay disabled until a payload is verified. V2-F is complete. The schema head is `0031_experiment_origins.sql`.
 
 This file began as a post-v1 idea list. It was not part of frozen v1. The numbered sections below keep that older backlog. Sections the blueprint now marks implemented say so. The remaining sections are still ideas, not promises. External retest notifications remain deferred. Nested recipes, batch inventory, and recipe fiber remain deferred.
 
@@ -87,28 +87,9 @@ Potential:
 
 #### Ongoing Apple workout ingestion
 
-Current state: historical Apple workout objects exist in `activity_workouts`
-from Apple Health history, while ongoing HAE Activity synchronization currently
-focuses on daily Activity summaries.
+Implemented as V2-G1. Historical Apple workout objects and ongoing Health Auto Export JSON v2 `data.workouts` both live in `activity_workouts`. The same endpoint and write-only bearer token accept a separate Workouts automation. Accepted summary fields are id, name, start, end, duration, and optional active energy, distance, location, and indoor flag. Route geometry and nested workout metrics are not stored. A provider id is idempotent. An exact start, end, and formatted activity identity can attach Health Auto Export provenance to an existing archive row. Today can show a few current-day lines under Activity, such as Walking · 42 min. Timeline keeps one Activity event per canonical row.
 
-V2 should evaluate ongoing HAE / HealthKit workout-object ingestion for:
-
-- walking
-- running
-- hiking
-- cycling
-- yoga
-- other Apple Watch workout categories
-
-Potential Today presentation under Activity, not Training:
-
-- 7,400 steps so far
-- Walk · 42 min
-- Hike · 1h 13m
-
-Training remains a separate structured domain. Timeline should continue
-treating these as Activity events. Apple Watch / HealthKit workouts must not
-become canonical Training sets, volume, performance, PRs, or consistency.
+Training remains a separate structured domain. Apple Watch / HealthKit workouts must not become canonical Training sets, volume, performance, PRs, or consistency.
 
 ### 9. Shortcut / share-sheet ingestion
 

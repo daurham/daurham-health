@@ -605,6 +605,15 @@ export function buildDemoDataset(): DemoDataset {
       energyKcal: 140 + (hashDate(date) % 80),
     })
   }
+  const todayWalkStart = atPhoenix(DEMO_AS_OF, 7, 15)
+  activityWorkouts.push({
+    id: 'demo-walk-today',
+    activityType: 'HKWorkoutActivityTypeWalking',
+    startAt: todayWalkStart,
+    endAt: new Date(Date.parse(todayWalkStart) + 42 * 60_000).toISOString(),
+    durationMinutes: 42,
+    energyKcal: 160,
+  })
 
   const sleep = dates.map((date) => sleepNight(date)).filter((night): night is SleepNightlySummary => night != null)
 

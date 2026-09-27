@@ -1,6 +1,6 @@
 import type { ActivityDailyRow } from '../../src/domain/activity/analytics.js'
-import { calendarDateFromInstant } from '../../src/domain/progress/dates.js'
-import type { ProgressSleepObservation } from '../../src/domain/progress/health-timeline.js'
+import { addCalendarDays, calendarDateFromInstant } from '../../src/domain/progress/dates.js'
+import type { ProgressActivityWorkout, ProgressSleepObservation } from '../../src/domain/progress/health-timeline.js'
 import type { BodyObservation } from '../../src/domain/progress/types.js'
 import type { SleepObservationStatus } from '../../src/domain/sleep/completeness.js'
 import { HEALTH_CALENDAR_TIME_ZONE } from '../../src/domain/time.js'
@@ -213,4 +213,31 @@ export async function listBodyWeights(): Promise<BodyObservation[]> {
     })
   }
   return weights
+}
+
+export async function listTodayActivityWorkouts(date: string): Promise<ProgressActivityWorkout[]> {
+  const sql = await getSql()
+  const start = new Date(`${date}T00:00:00-07:00`).toISOString()
+  const end = new Date(`${addCalendarDays(date, 1)}T00:00:00-07:00`).toISOString()
+  const rows = (await sql.query(
+    `SELECT id::text AS id,
+            activity_type,
+            start_at,
+            end_at,
+            duration_min,
+            energy_kcal
+     FROM activity_workouts
+     WHERE start_at >= $1::timestamptz
+       AND start_at < $2::timestamptz
+     ORDER BY start_at ASC, id ASC`,
+    [start, end],
+  )) as Array<Record<string, unknown>>
+  return rows.map((row) => ({
+    id: String(row.id),
+    activityType: String(row.activity_type),
+    startAt: asIso(row.start_at),
+    endAt: asIso(row.end_at),
+    durationMinutes: asNumber(row.duration_min),
+    energyKcal: asNumber(row.energy_kcal),
+  }))
 }

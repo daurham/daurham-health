@@ -1,6 +1,6 @@
 # Roadmap
 
-This file records only what the repository already states. The current application is the health-app tree that includes Ask Health, Proactive Insights, Weekly Coach, Experiment Suggestions, Literature-Backed Evidence, and migration `0031_experiment_origins.sql`. The v2 authority is `HEALTH-PLATFORM-V2-LAB-BLUEPRINT.md`. The design manual is `HEALTH-PLATFORM-DESIGN-MANUAL.md` at version 1.0.36. `docs/V2-ROADMAP.md` keeps the older backlog and now marks the slices the blueprint has implemented.
+This file records only what the repository already states. The current application is the health-app tree that includes Ask Health, Proactive Insights, Weekly Coach, Experiment Suggestions, Literature-Backed Evidence, ongoing Health Auto Export workouts, and migration `0031_experiment_origins.sql`. The v2 authority is `HEALTH-PLATFORM-V2-LAB-BLUEPRINT.md`. The design manual is `HEALTH-PLATFORM-DESIGN-MANUAL.md` at version 1.0.37. `docs/V2-ROADMAP.md` keeps the older backlog and now marks the slices the blueprint has implemented.
 
 ## Completed / existing functionality
 
@@ -16,6 +16,7 @@ Frozen v1.0.0, then the v2 slices the blueprint marks implemented:
 - V2-F3 Weekly Coach Brief
 - V2-F4 Experiment Suggestions: due Benchmark retests and missing Benchmark baselines. Goal-observation suggestions are deferred.
 - V2-F5 Literature-Backed Evidence Drawer: explicit Europe PMC search, separate from personal Health evidence. Literature is not stored.
+- V2-G1 Ongoing Apple workout ingestion: Health Auto Export JSON v2 workout objects write `activity_workouts`. They stay Activity and never become Training.
 
 Also present from v1 and the import work: Nutrition, Training, Body, Progress, Activity, Sleep, Timeline, Compare, checkpoints, Apple Health archive import, Health Auto Export ingest, Gemini nutrition capture, Home-AI transcription, backup and portable export, and the public demo.
 
@@ -30,7 +31,6 @@ Named by the current manual or blueprint, and not marked implemented:
 - Overnight vital metrics remain disabled until a payload is verified.
 - External retest notifications remain deferred (`docs/V2-ROADMAP.md` and the blueprint).
 - Nested recipes, batch inventory, and recipe fiber remain deferred.
-- Ongoing Apple workout-object ingestion is recorded as something v2 should evaluate. It is not marked implemented. Historical workout objects already exist; ongoing sync focuses on daily Activity summaries.
 - Notifications, push, email, and background model calls for Weekly Coach are deferred.
 - Nutrition Gemini is not on the `ai_usage` ledger yet.
 

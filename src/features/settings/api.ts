@@ -4,7 +4,7 @@ import type { NormalizedAppleHealthRecord } from '@/domain/apple-health/parse'
 import type { AppleHealthPreview } from '@/domain/apple-health/preview'
 import { healthFetch, readApiError } from '@/lib'
 
-const statusSchema = z.object({
+export const appleHealthStatusSchema = z.object({
   sourceKey: z.literal('apple_health'),
   job: z
     .object({
@@ -45,6 +45,14 @@ const statusSchema = z.object({
         })
         .nullable()
         .optional(),
+      workouts: z
+        .object({
+          importedAt: z.string(),
+          status: z.string(),
+          latestWorkoutAt: z.string().nullable(),
+        })
+        .nullable()
+        .optional(),
     })
     .nullable(),
   activitySampleCount: z.number(),
@@ -62,7 +70,7 @@ const commitSchema = z.object({
   status: z.string(),
 })
 
-export type AppleHealthStatus = z.infer<typeof statusSchema>
+export type AppleHealthStatus = z.infer<typeof appleHealthStatusSchema>
 export type AppleHealthCommitBatchResult = z.infer<typeof commitSchema>
 
 export async function fetchAppleHealthStatus(): Promise<AppleHealthStatus> {
@@ -70,7 +78,7 @@ export async function fetchAppleHealthStatus(): Promise<AppleHealthStatus> {
   if (!response.ok) {
     throw new Error(await readApiError(response))
   }
-  return statusSchema.parse(await response.json())
+  return appleHealthStatusSchema.parse(await response.json())
 }
 
 export async function lookupAppleHealthDuplicates(fingerprints: string[]): Promise<string[]> {

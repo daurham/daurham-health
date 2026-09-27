@@ -10,6 +10,7 @@ import { formatDatabaseError, getSql } from '../db.js'
 import { HttpError } from '../http.js'
 import { INSERT_APPLE_HEALTH_JOB_SQL, UPDATE_APPLE_HEALTH_JOB_SQL } from './queries.js'
 import { latestHaeSleepStatus } from './hae-sleep-service.js'
+import { latestHaeWorkoutStatus, type HaeWorkoutSyncChannel } from './hae-workout-service.js'
 import { LATEST_HAE_STRATEGY_SQL } from './hae-sleep-sql.js'
 import { HAE_COMMIT_BATCH, HAE_SOURCE_SQL, LATEST_ACTIVITY_DAY_SQL, buildHaeDailyStatement } from './hae-sql.js'
 
@@ -42,6 +43,7 @@ export type HaeSyncStatus = {
   latestDay: string | null
   activity: HaeSyncChannel | null
   sleep: HaeSleepSyncChannel | null
+  workouts: HaeWorkoutSyncChannel | null
 } | null
 
 async function haeSourceId(): Promise<string> {
@@ -77,7 +79,11 @@ export async function latestHealthAutoExportStatus(): Promise<HaeSyncStatus> {
       }
     : null
   const sleep = await latestHaeSleepStatus()
-  const headline = activity ?? (sleep ? { importedAt: sleep.importedAt, status: sleep.status, latestDay: null } : null)
+  const workouts = await latestHaeWorkoutStatus(sourceId)
+  const headline =
+    activity ??
+    (sleep ? { importedAt: sleep.importedAt, status: sleep.status, latestDay: null } : null) ??
+    (workouts ? { importedAt: workouts.importedAt, status: workouts.status, latestDay: null } : null)
   if (!headline) {
     return null
   }
@@ -87,6 +93,7 @@ export async function latestHealthAutoExportStatus(): Promise<HaeSyncStatus> {
     latestDay: activity?.latestDay ?? null,
     activity,
     sleep,
+    workouts,
   }
 }
 

@@ -1,6 +1,6 @@
 # Daurham Health — V2 Lab Blueprint
 
-**Status:** V2-A Data Capture Foundations complete. V2-B Personal Lab Core complete (V2-B1 through V2-B4). V2-C Recipes / Batch Meals complete (V2-C1 through V2-C4). V2-D Goals + Projections complete (V2-D1 through V2-D3). V2-E Rich Sleep + Overnight Vitals complete (V2-E1 through V2-E5). Overnight vital metrics remain disabled until a payload is verified. V2-F1 Ask Health conversational analysis is implemented. V2-F2 Proactive Insights are implemented. V2-F3 Weekly Coach Brief is implemented. V2-F4 Experiment Suggestions are implemented for due Benchmark retests and missing Benchmark baselines. Goal-observation suggestions are deferred. V2-F5 Literature-Backed Evidence Drawer is implemented. V2-F Ask Health + Proactive Intelligence is complete.  
+**Status:** V2-A Data Capture Foundations complete. V2-B Personal Lab Core complete (V2-B1 through V2-B4). V2-C Recipes / Batch Meals complete (V2-C1 through V2-C4). V2-D Goals + Projections complete (V2-D1 through V2-D3). V2-E Rich Sleep + Overnight Vitals complete (V2-E1 through V2-E5). Overnight vital metrics remain disabled until a payload is verified. V2-F1 Ask Health conversational analysis is implemented. V2-F2 Proactive Insights are implemented. V2-F3 Weekly Coach Brief is implemented. V2-F4 Experiment Suggestions are implemented for due Benchmark retests and missing Benchmark baselines. Goal-observation suggestions are deferred. V2-F5 Literature-Backed Evidence Drawer is implemented. V2-F Ask Health + Proactive Intelligence is complete. V2-G1 ongoing Apple workout ingestion is implemented.  
 **Calendar:** America/Phoenix  
 **Package version:** remains `1.0.0`  
 **Schema head:** `0031_experiment_origins.sql`
@@ -48,6 +48,9 @@ The file was not present in the repository when V2-A1 implementation started. Th
    - V2-F3 Weekly Coach Brief — implemented
    - V2-F4 Experiment Suggestions — implemented
    - V2-F5 Literature-Backed Evidence Drawer — implemented
+   - V2-F Ask Health + Proactive Intelligence — complete
+7. **V2-G Activity workouts**
+   - V2-G1 Ongoing Apple workout ingestion — implemented
 
 Invariant:
 
@@ -513,6 +516,14 @@ The first F4 amendment included an active unmet Goal when Lab could name the sam
 V2-F5 is implemented. There is no migration and no literature table. Schema head remains `0031_experiment_origins.sql`. Package version remains `1.0.0`. The retrieval version is `literature-retrieval-v1`. The prompt version is `literature-synthesis-v1`. The request type is `literature_synthesis`. V2-F1 through V2-F5 are implemented. Goal-observation experiment suggestions remain deferred.
 
 Europe PMC is the literature provider. Search is explicit. The owner edits the visible query, and only that query plus `SRC:MED` and `HAS_ABSTRACT:Y` is sent. Personal Health evidence is not sent. The server keeps at most five PubMed-indexed records with abstracts, addressed as `pubmed:<PMID>`. Study type is descriptive metadata, not a score. Abstracts are transient. Gemini paraphrases only the retrieved set and cannot emit numeric claims or new citations. Source cards remain when synthesis fails. Zero sources means zero Gemini call. Synthesis shares `ai_usage`. Nothing from the drawer is stored, backed up, or turned into an Experiment. The demo uses verified citation metadata and does not call Europe PMC or Gemini.
+
+## Amendment — 2026-09-27T16:55:27-07:00 — V2-G1 Ongoing Apple Workout Ingestion
+
+V2-G1 is implemented. There is no migration and no second workout table. Schema head remains `0031_experiment_origins.sql`. Package version remains `1.0.0`. The calculation version is `hae-workout-v1`. V2-F stays complete. Goal-observation experiment suggestions remain deferred. Overnight vital metrics remain disabled until a payload is verified.
+
+`POST /api/ingest/apple-health` accepts Health Auto Export JSON v2 `data.workouts` on the existing write-only bearer token. Accepted fields are `id`, `name`, offset-aware `start` and `end`, `duration` in seconds, and optional `activeEnergyBurned`, `distance`, `location`, and `isIndoor`. `activeEnergy` and `totalEnergy` are not active energy. Route geometry, heart-rate streams, cadence, power, and other nested telemetry are ignored. `source_name`, `source_version`, and `device_name` stay null. The Health Auto Export transport is not an observing source.
+
+The provider workout id is stored as `health_auto_export|workout|v2|<id>` and as `external_id`. The same id does not create another row. A cross-source match requires the same start instant, the same end instant, and the same activity identity after formatting normalization. One match keeps the historical row and adds a provenance link. Several matches fail closed for that workout. A later payload that omits a workout does not delete it, and a conflicting id does not rewrite history. Import jobs use strategy `health_auto_export_workouts`. Today lists up to three current Phoenix-day Activity workouts without adding their energy or duration to the daily summary. Timeline still emits one `activity_workout` event per canonical row, and that event stays out of All and out of Training. The demo shows one fictional current-day walk and does not call Health Auto Export.
 
 
 
