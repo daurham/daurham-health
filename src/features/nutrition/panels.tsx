@@ -376,6 +376,7 @@ export function AddFoodSheet({
     <NutritionSheet
       title="Add food"
       onClose={onClose}
+      mobileLayout="stable"
       stickyHeader={
         <div className="space-y-3">
           <div>

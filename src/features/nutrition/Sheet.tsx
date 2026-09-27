@@ -7,9 +7,18 @@ type NutritionSheetProps = {
   children: React.ReactNode
   footer?: React.ReactNode
   stickyHeader?: React.ReactNode
+  /** Mobile-only: lock sheet height so inner results scroll instead of resizing the dialog. */
+  mobileLayout?: 'hug' | 'stable'
 }
 
-export function NutritionSheet({ title, onClose, children, footer, stickyHeader }: NutritionSheetProps) {
+export function NutritionSheet({
+  title,
+  onClose,
+  children,
+  footer,
+  stickyHeader,
+  mobileLayout = 'hug',
+}: NutritionSheetProps) {
   const headingId = useId()
   const panelRef = useRef<HTMLDivElement>(null)
 
@@ -47,9 +56,11 @@ export function NutritionSheet({ title, onClose, children, footer, stickyHeader 
         aria-labelledby={headingId}
         tabIndex={-1}
         className={cn(
-          'relative z-10 flex max-h-[90dvh] w-full flex-col overflow-hidden bg-white shadow-xl',
-          'rounded-t-2xl md:max-w-lg md:rounded-xl',
+          'relative z-10 flex w-full flex-col overflow-hidden bg-white shadow-xl',
+          'rounded-t-2xl md:max-h-[90dvh] md:max-w-lg md:rounded-xl',
+          mobileLayout === 'stable' ? 'max-md:h-[90%] max-md:max-h-[90%]' : 'max-h-[90dvh]',
         )}
+        data-nutrition-sheet-layout={mobileLayout}
       >
         <div className="flex items-center justify-between gap-3 border-b border-zinc-200 px-4 py-3">
           <h2 id={headingId} className="text-base font-semibold tracking-tight">
@@ -64,7 +75,9 @@ export function NutritionSheet({ title, onClose, children, footer, stickyHeader 
           </button>
         </div>
         {stickyHeader ? <div className="shrink-0 border-b border-zinc-200 px-4 py-3">{stickyHeader}</div> : null}
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4" data-nutrition-sheet-body="">
+          {children}
+        </div>
         {footer ? (
           <div className="border-t border-zinc-200 px-4 pt-3 pb-[calc(0.75rem+var(--shell-safe-bottom))]">{footer}</div>
         ) : null}
