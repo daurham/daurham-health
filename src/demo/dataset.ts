@@ -22,6 +22,7 @@ const EXPLICIT_ZERO_EXERCISE = '2026-04-02'
 const PARTIAL_SLEEP = new Set(['2026-03-11', '2026-07-08'])
 const MISSING_SLEEP = new Set(['2026-02-19', '2026-05-21', '2026-08-30'])
 const LOW_STAGE_SLEEP = '2026-04-16'
+const BEDSIDE_SLEEP = new Set(['2026-08-17', '2026-08-18', '2026-08-19'])
 
 export type DemoDataset = {
   version: string
@@ -272,11 +273,14 @@ function sleepNight(date: string): SleepNightlySummary | null {
   const startAt = atPhoenix(previous, 22, 10 + (hashDate(date) % 20))
   const endAt = new Date(Date.parse(startAt) + minutes * 60_000).toISOString()
   const status = partial || !analysisEligible ? 'partial_observation' : 'analysis_eligible'
+  const bedside = BEDSIDE_SLEEP.has(date)
+  const sourceName = bedside ? 'Bedside sensor' : SOURCE
+  const logicalSourceKey = bedside ? 'demo-bedside' : 'demo-wrist'
   return {
     sleepDate: date,
     timezone: SLEEP_TIMEZONE,
-    logicalSourceKey: 'demo-wrist',
-    sourceName: SOURCE,
+    logicalSourceKey,
+    sourceName,
     startAt,
     endAt,
     totalSleepMinutes: minutes,
@@ -294,8 +298,8 @@ function sleepNight(date: string): SleepNightlySummary | null {
     selectionReason: partial ? 'partial_only' : 'source_priority',
     calculationVersion: SLEEP_NIGHT_CALCULATION_VERSION,
     evidence: {
-      selectedLogicalSource: 'demo-wrist',
-      selectedSourceName: SOURCE,
+      selectedLogicalSource: logicalSourceKey,
+      selectedSourceName: sourceName,
       selectedDurationMinutes: minutes,
       selectedStatus: status,
       alternatives: [],

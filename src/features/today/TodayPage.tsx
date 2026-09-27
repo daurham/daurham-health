@@ -663,6 +663,9 @@ function ActivityCard({ view }: { view: TodayViewModel }) {
 
 function SleepCard({ view }: { view: TodayViewModel }) {
   const sleep = view.sleep
+  const prefix = useAppPathPrefix()
+  const nightDate = sleep.kind === 'none' ? sleep.latestComplete?.date ?? null : view.date
+  const nightHref = nightDate ? prefixedPath(prefix, `/progress/sleep/${nightDate}`) : null
   return (
     <Card title="Sleep">
       {sleep.kind === 'complete' && sleep.minutes != null ? (
@@ -687,8 +690,9 @@ function SleepCard({ view }: { view: TodayViewModel }) {
           {sleep.latestComplete.sourceName ? <p>{sleep.latestComplete.sourceName}</p> : null}
         </div>
       ) : null}
-      <div className="mt-2">
-        <QuietAction to={prefixedPath(useAppPathPrefix(), '/progress/sleep')}>View sleep</QuietAction>
+      <div className="mt-2 flex flex-wrap gap-3">
+        {nightHref ? <QuietAction to={nightHref}>View night</QuietAction> : null}
+        <QuietAction to={prefixedPath(prefix, '/progress/sleep')}>View sleep</QuietAction>
       </div>
     </Card>
   )

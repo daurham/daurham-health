@@ -15,7 +15,7 @@ import {
   type ProgressTimeline,
 } from '../domain/progress/index.js'
 import type { ProgressSleepObservation } from '../domain/progress/health-timeline.js'
-import { buildSleepProgressView, type SleepProgressView } from '../domain/sleep/index.js'
+import { buildSleepNightDetail, buildSleepProgressView, type SleepNightDetail, type SleepProgressView } from '../domain/sleep/index.js'
 import type { SleepNightlySummary } from '../domain/sleep/summarize.js'
 import { buildTodayView, type TodayViewModel } from '../domain/today/view.js'
 import { DEMO_AS_OF, DEMO_NOW, DEMO_RANGE_START } from './constants.js'
@@ -59,6 +59,26 @@ function sleepObservation(night: SleepNightlySummary): ProgressSleepObservation 
     startAt: night.startAt,
     endAt: night.endAt,
   }
+}
+
+export function demoSleepNightDetail(sleepDate: string): SleepNightDetail | null {
+  const nights = [...dataset().sleep].sort((left, right) => left.sleepDate.localeCompare(right.sleepDate))
+  const index = nights.findIndex((night) => night.sleepDate === sleepDate)
+  const night = index >= 0 ? nights[index] : null
+  if (!night) {
+    return null
+  }
+  return buildSleepNightDetail(
+    night,
+    {
+      previousSleepDate: nights[index - 1]?.sleepDate ?? null,
+      nextSleepDate: nights[index + 1]?.sleepDate ?? null,
+    },
+    null,
+    [],
+    undefined,
+    nights.filter((item) => item.sleepDate <= night.sleepDate),
+  )
 }
 
 export function demoCanonical(range: ProgressRange): ProgressCanonicalInput {

@@ -1,4 +1,4 @@
-import type { SleepIntervalRow, SleepNightlySummary, SleepObservationStatus, SleepSelectionReason } from '../../src/domain/sleep/index.js'
+import type { SleepIntervalRow, SleepNightlySummary, SleepObservationStatus, SleepSelectionReason, SleepVitalMetricKey, SleepVitalObservation } from '../../src/domain/sleep/index.js'
 import type { ProgressSleepObservation } from '../../src/domain/progress/health-timeline.js'
 import { getSql } from '../db.js'
 
@@ -219,33 +219,184 @@ export async function listSleepObservationsForProgress(timezone = 'America/Phoen
   }))
 }
 
+export function mapSleepNightlySummaryRow(row: Record<string, unknown>): SleepNightlySummary {
+  const evidence = typeof row.evidence === 'object' && row.evidence != null ? row.evidence : {}
+  return {
+    sleepDate: String(row.sleep_date),
+    timezone: String(row.timezone),
+    logicalSourceKey: String(row.logical_source_key),
+    sourceName: String(row.source_name),
+    startAt: asIso(row.start_at),
+    endAt: asIso(row.end_at),
+    totalSleepMinutes: asNumber(row.total_sleep_minutes),
+    timeInBedMinutes: asNumber(row.time_in_bed_minutes),
+    awakeMinutes: asNumber(row.awake_minutes),
+    coreMinutes: asNumber(row.core_minutes),
+    deepMinutes: asNumber(row.deep_minutes),
+    remMinutes: asNumber(row.rem_minutes),
+    unspecifiedSleepMinutes: asNumber(row.unspecified_sleep_minutes),
+    stageCoveragePct: asNumber(row.stage_coverage_pct),
+    stageConflictMinutes: asNumber(row.stage_conflict_minutes) ?? 0,
+    observationStatus: String(row.observation_status) as SleepObservationStatus,
+    analysisEligible: Boolean(row.analysis_eligible),
+    stageAnalysisEligible: Boolean(row.stage_analysis_eligible),
+    selectionReason: String(row.selection_reason) as SleepSelectionReason,
+    calculationVersion: String(row.calculation_version),
+    evidence: evidence as SleepNightlySummary['evidence'],
+  }
+}
+
+export async function readSleepNightRecord(
+  sleepDate: string,
+  timezone = 'America/Phoenix',
+): Promise<{ night: SleepNightlySummary; transportName: string | null; previousSleepDate: string | null; nextSleepDate: string | null } | null> {
+  const sql = await getSql()
+  const rows = (await sql.query(
+    `SELECT nights.sleep_date::text AS sleep_date,
+            nights.timezone,
+            nights.logical_source_key,
+            nights.source_name,
+            nights.start_at,
+            nights.end_at,
+            nights.total_sleep_minutes,
+            nights.time_in_bed_minutes,
+            nights.awake_minutes,
+            nights.core_minutes,
+            nights.deep_minutes,
+            nights.rem_minutes,
+            nights.unspecified_sleep_minutes,
+            nights.stage_coverage_pct,
+            nights.stage_conflict_minutes,
+            nights.observation_status,
+            nights.analysis_eligible,
+            nights.stage_analysis_eligible,
+            nights.selection_reason,
+            nights.calculation_version,
+            nights.evidence,
+            sources.display_name AS transport_name,
+            (
+              SELECT previous.sleep_date::text
+              FROM sleep_nightly_summaries previous
+              WHERE previous.timezone = nights.timezone AND previous.sleep_date < nights.sleep_date
+              ORDER BY previous.sleep_date DESC
+              LIMIT 1
+            ) AS previous_sleep_date,
+            (
+              SELECT next_night.sleep_date::text
+              FROM sleep_nightly_summaries next_night
+              WHERE next_night.timezone = nights.timezone AND next_night.sleep_date > nights.sleep_date
+              ORDER BY next_night.sleep_date ASC
+              LIMIT 1
+            ) AS next_sleep_date
+     FROM sleep_nightly_summaries nights
+     LEFT JOIN data_sources sources ON sources.id = nights.source_id
+     WHERE nights.sleep_date = $1::date AND nights.timezone = $2`,
+    [sleepDate, timezone],
+  )) as Array<Record<string, unknown>>
+  const row = rows[0]
+  if (!row) {
+    return null
+  }
+  return {
+    night: mapSleepNightlySummaryRow(row),
+    transportName: typeof row.transport_name === 'string' ? row.transport_name : null,
+    previousSleepDate: row.previous_sleep_date == null ? null : String(row.previous_sleep_date),
+    nextSleepDate: row.next_sleep_date == null ? null : String(row.next_sleep_date),
+  }
+}
+
+const SLEEP_VITAL_KEYS = new Set<string>([
+  'heart_rate',
+  'hrv_sdnn',
+  'respiratory_rate',
+  'oxygen_saturation',
+  'sleeping_wrist_temperature',
+])
+
+export async function listSleepVitalSamples(episodeStart: string, episodeEnd: string): Promise<SleepVitalObservation[]> {
+  const sql = await getSql()
+  const rows = (await sql.query(
+    `SELECT id::text AS id,
+            metric_key,
+            value_numeric,
+            unit,
+            observed_at,
+            start_at,
+            end_at,
+            source_family,
+            fingerprint
+     FROM sleep_vital_samples
+     WHERE observed_at >= $1::timestamptz
+       AND observed_at < $2::timestamptz
+     ORDER BY observed_at ASC, metric_key ASC, source_family ASC, id ASC`,
+    [episodeStart, episodeEnd],
+  )) as Array<Record<string, unknown>>
+  const samples: SleepVitalObservation[] = []
+  for (const row of rows) {
+    const metricKey = String(row.metric_key)
+    const value = asNumber(row.value_numeric)
+    if (!SLEEP_VITAL_KEYS.has(metricKey) || value == null) {
+      continue
+    }
+    const sourceFamily = String(row.source_family)
+    const familyKeys: Record<string, string> = {
+      'Apple Watch': 'apple_watch',
+      Circular: 'circular',
+      'Sleep Cycle': 'sleep_cycle',
+      iPhone: 'iphone',
+      'Unknown source': 'unknown',
+    }
+    samples.push({
+      id: String(row.id),
+      metricKey: metricKey as SleepVitalMetricKey,
+      value,
+      unit: String(row.unit),
+      observedAt: asIso(row.observed_at),
+      startAt: row.start_at == null ? null : asIso(row.start_at),
+      endAt: row.end_at == null ? null : asIso(row.end_at),
+      sourceFamily,
+      sourceFamilyKey: familyKeys[sourceFamily] ?? 'unknown',
+      fingerprint: String(row.fingerprint),
+    })
+  }
+  return samples
+}
+
 export async function listSleepNightlySummaries(): Promise<SleepNightlySummary[]> {
   const sql = await getSql()
   const rows = (await sql.query(LIST_SLEEP_NIGHTLY_SUMMARIES_SQL)) as Array<Record<string, unknown>>
-  return rows.map((row) => {
-    const evidence = typeof row.evidence === 'object' && row.evidence != null ? row.evidence : {}
-    return {
-      sleepDate: String(row.sleep_date),
-      timezone: String(row.timezone),
-      logicalSourceKey: String(row.logical_source_key),
-      sourceName: String(row.source_name),
-      startAt: asIso(row.start_at),
-      endAt: asIso(row.end_at),
-      totalSleepMinutes: asNumber(row.total_sleep_minutes),
-      timeInBedMinutes: asNumber(row.time_in_bed_minutes),
-      awakeMinutes: asNumber(row.awake_minutes),
-      coreMinutes: asNumber(row.core_minutes),
-      deepMinutes: asNumber(row.deep_minutes),
-      remMinutes: asNumber(row.rem_minutes),
-      unspecifiedSleepMinutes: asNumber(row.unspecified_sleep_minutes),
-      stageCoveragePct: asNumber(row.stage_coverage_pct),
-      stageConflictMinutes: asNumber(row.stage_conflict_minutes) ?? 0,
-      observationStatus: String(row.observation_status) as SleepObservationStatus,
-      analysisEligible: Boolean(row.analysis_eligible),
-      stageAnalysisEligible: Boolean(row.stage_analysis_eligible),
-      selectionReason: String(row.selection_reason) as SleepSelectionReason,
-      calculationVersion: String(row.calculation_version),
-      evidence: evidence as SleepNightlySummary['evidence'],
-    }
-  })
+  return rows.map((row) => mapSleepNightlySummaryRow(row))
+}
+
+const LIST_SLEEP_NIGHTS_BETWEEN_SQL = `SELECT sleep_date::text AS sleep_date,
+           timezone,
+           logical_source_key,
+           source_name,
+           start_at,
+           end_at,
+           total_sleep_minutes,
+           time_in_bed_minutes,
+           awake_minutes,
+           core_minutes,
+           deep_minutes,
+           rem_minutes,
+           unspecified_sleep_minutes,
+           stage_coverage_pct,
+           stage_conflict_minutes,
+           observation_status,
+           analysis_eligible,
+           stage_analysis_eligible,
+           selection_reason,
+           calculation_version,
+           evidence
+         FROM sleep_nightly_summaries
+         WHERE timezone = $1
+           AND sleep_date >= $2::date
+           AND sleep_date <= $3::date
+         ORDER BY sleep_date ASC`
+
+export async function listSleepNightsBetween(start: string, end: string, timezone: string): Promise<SleepNightlySummary[]> {
+  const sql = await getSql()
+  const rows = (await sql.query(LIST_SLEEP_NIGHTS_BETWEEN_SQL, [timezone, start, end])) as Array<Record<string, unknown>>
+  return rows.map((row) => mapSleepNightlySummaryRow(row))
 }

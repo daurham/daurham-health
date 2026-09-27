@@ -1,6 +1,12 @@
 export const SLEEP_SESSION_GAP_MINUTES = 90
 export const SLEEP_CALCULATION_VERSION = 'sleep-night-candidate-v1'
 export const SLEEP_NIGHT_CALCULATION_VERSION = 'sleep-night-v1'
+export const SLEEP_STAGE_ANALYTICS_VERSION = 'sleep-stage-analytics-v1'
+export const SLEEP_PERSONAL_BASELINE_VERSION = 'sleep-personal-baseline-v1'
+export const SLEEP_SOURCE_ATTRIBUTION_VERSION = 'sleep-source-attribution-v1'
+export const SLEEP_BASELINE_PRIOR_DAYS = 30
+export const SLEEP_BASELINE_MIN_OBSERVATIONS = 7
+export const SLEEP_STAGE_SUMMARY_MIN_NIGHTS = 3
 export const SLEEP_TIMEZONE = 'America/Phoenix'
 
 export const MIN_ANALYSIS_SLEEP_MINUTES = 240

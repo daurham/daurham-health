@@ -1,7 +1,6 @@
 import type { ActivityProgressMetricView, ActivityProgressView } from '@/domain/activity'
 import type { ProgressRange } from '@/domain/progress'
-import type { MetricResult } from '@/domain/progress'
-import type { SleepProgressNight, SleepProgressView } from '@/domain/sleep'
+import type { SleepPersonalBaseline, SleepProgressNight, SleepProgressView } from '@/domain/sleep'
 import { RANGE_HEADINGS } from './copy'
 import { formatCalendarDate, formatPercent, formatSigned } from './format'
 
@@ -29,6 +28,75 @@ export function formatSleepDuration(minutes: number): string {
     return `${hours}h`
   }
   return `${hours}h ${rest}m`
+}
+
+export function durationDeviationCopy(deviationMinutes: number): string {
+  const rounded = Math.round(deviationMinutes)
+  if (rounded === 0) {
+    return 'Matches recent median'
+  }
+  const amount = formatSleepDuration(Math.abs(rounded))
+  return rounded > 0 ? `${amount} above recent median` : `${amount} below recent median`
+}
+
+function vitalQuantity(value: number, unit: string): string {
+  const rounded = Math.round(value * 10) / 10
+  const text = Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1)
+  if (unit === '°C') {
+    return `${text} °C`
+  }
+  if (unit === '%') {
+    return `${text}%`
+  }
+  return `${text} ${unit}`
+}
+
+export function vitalDeviationCopy(deviation: number, unit: string): string {
+  const rounded = Math.round(deviation * 10) / 10
+  if (rounded === 0) {
+    return 'Matches recent median'
+  }
+  const amount = vitalQuantity(Math.abs(rounded), unit)
+  return rounded > 0 ? `${amount} above recent median` : `${amount} below recent median`
+}
+
+export function recentMedianCopy(value: number, unit: string): string {
+  if (unit === 'min') {
+    return formatSleepDuration(value)
+  }
+  return vitalQuantity(value, unit)
+}
+
+export function priorNightsCopy(count: number, source: string | null, prefix: 'based' | 'count'): string {
+  const nights = count === 1 ? 'night' : 'nights'
+  const sourceLabel = source && source !== 'Unknown source' ? `${source} ` : ''
+  if (prefix === 'based') {
+    return `Based on ${count} prior ${sourceLabel}${nights}`
+  }
+  return `${count} prior ${sourceLabel}${nights}`
+}
+
+export function durationBaselineDetail(baseline: SleepPersonalBaseline): string[] {
+  if (baseline.state === 'current_night_ineligible') {
+    return ['Personal baseline comparison unavailable for a partial Sleep observation.']
+  }
+  if (baseline.state === 'source_not_comparable') {
+    return ['Personal baseline comparison unavailable. The observing source is unknown.']
+  }
+  if (baseline.state === 'current_observation_missing') {
+    return ['Personal baseline comparison unavailable. This night has no actual-sleep value.']
+  }
+  if (baseline.state !== 'available' || baseline.baselineMedian == null || baseline.deviation == null) {
+    return [
+      'Recent median unavailable',
+      priorNightsCopy(baseline.baselineObservationCount, baseline.sourceFamily, 'count'),
+    ]
+  }
+  return [
+    `Recent baseline ${formatSleepDuration(baseline.baselineMedian)} median`,
+    durationDeviationCopy(baseline.deviation),
+    priorNightsCopy(baseline.baselineObservationCount, baseline.sourceFamily, 'count'),
+  ]
 }
 
 function formatWhole(value: number): string {
@@ -204,11 +272,4 @@ export function sleepCardCopy(view: SleepProgressView): { primary: string; secon
 
 export function rangeHeading(range: ProgressRange): string {
   return RANGE_HEADINGS[range]
-}
-
-export function stageAverageLine(label: string, metric: MetricResult<number>): string | null {
-  if (metric.status !== 'available') {
-    return null
-  }
-  return `${label} ${formatSleepDuration(metric.value)}`
 }

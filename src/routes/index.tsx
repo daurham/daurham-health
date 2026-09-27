@@ -33,6 +33,7 @@ const ProgressPage = lazy(() => import('@/features/progress').then((module) => (
 const ProgressOverviewRoute = lazy(() => import('@/features/progress').then((module) => ({ default: module.ProgressOverviewRoute })))
 const ProgressActivityRoute = lazy(() => import('@/features/progress').then((module) => ({ default: module.ProgressActivityRoute })))
 const ProgressSleepRoute = lazy(() => import('@/features/progress').then((module) => ({ default: module.ProgressSleepRoute })))
+const ProgressSleepNightRoute = lazy(() => import('@/features/progress').then((module) => ({ default: module.ProgressSleepNightRoute })))
 const ProgressStrengthRoute = lazy(() => import('@/features/progress').then((module) => ({ default: module.ProgressStrengthRoute })))
 const ProgressStrengthLabRoute = lazy(() => import('@/features/progress').then((module) => ({ default: module.ProgressStrengthLabRoute })))
 const ProgressBodyRoute = lazy(() => import('@/features/progress').then((module) => ({ default: module.ProgressBodyRoute })))
@@ -49,6 +50,7 @@ const DemoProgressPage = lazy(() => import('@/features/demo/DemoProgressPage').t
 const DemoProgressOverviewRoute = lazy(() => import('@/features/demo/DemoProgressPage').then((module) => ({ default: module.DemoProgressOverviewRoute })))
 const DemoProgressActivityRoute = lazy(() => import('@/features/demo/DemoProgressPage').then((module) => ({ default: module.DemoProgressActivityRoute })))
 const DemoProgressSleepRoute = lazy(() => import('@/features/demo/DemoProgressPage').then((module) => ({ default: module.DemoProgressSleepRoute })))
+const DemoSleepNightRoute = lazy(() => import('@/features/demo/DemoProgressPage').then((module) => ({ default: module.DemoSleepNightRoute })))
 const DemoProgressStrengthRoute = lazy(() => import('@/features/demo/DemoProgressPage').then((module) => ({ default: module.DemoProgressStrengthRoute })))
 const DemoProgressStrengthLabRoute = lazy(() => import('@/features/demo/DemoProgressPage').then((module) => ({ default: module.DemoProgressStrengthLabRoute })))
 const DemoProgressBodyRoute = lazy(() => import('@/features/demo/DemoProgressPage').then((module) => ({ default: module.DemoProgressBodyRoute })))
@@ -93,6 +95,7 @@ const router = createBrowserRouter([
         children: [
           { index: true, element: <ProgressOverviewRoute /> },
           { path: 'activity', element: <ProgressActivityRoute /> },
+          { path: 'sleep/:sleepDate', element: <ProgressSleepNightRoute /> },
           { path: 'sleep', element: <ProgressSleepRoute /> },
           { path: 'strength', element: <ProgressStrengthRoute /> },
           { path: 'strength/:exerciseId', element: <ProgressStrengthLabRoute /> },
@@ -115,6 +118,7 @@ const router = createBrowserRouter([
             children: [
               { index: true, element: <DemoProgressOverviewRoute /> },
               { path: 'activity', element: <DemoProgressActivityRoute /> },
+              { path: 'sleep/:sleepDate', element: <DemoSleepNightRoute /> },
               { path: 'sleep', element: <DemoProgressSleepRoute /> },
               { path: 'strength', element: <DemoProgressStrengthRoute /> },
               { path: 'strength/:exerciseId', element: <DemoProgressStrengthLabRoute /> },

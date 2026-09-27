@@ -1,6 +1,6 @@
 import type { ActivityProgressView } from '@/domain/activity'
 import type { ProgressCompare, ProgressCheckpoint, ProgressOverview, ProgressRange, ProgressTimeline } from '@/domain/progress'
-import type { SleepProgressView } from '@/domain/sleep'
+import type { SleepNightDetail, SleepProgressView } from '@/domain/sleep'
 import { healthFetch, readApiError } from '@/lib'
 
 export async function fetchProgressOverview(range: ProgressRange, signal?: AbortSignal): Promise<ProgressOverview> {
@@ -17,6 +17,14 @@ export async function fetchProgressActivity(range: ProgressRange, signal?: Abort
     throw new Error(await readApiError(response))
   }
   return (await response.json()) as ActivityProgressView
+}
+
+export async function fetchSleepNight(sleepDate: string, signal?: AbortSignal): Promise<SleepNightDetail> {
+  const response = await healthFetch(`/api/progress/sleep/${encodeURIComponent(sleepDate)}`, { signal })
+  if (!response.ok) {
+    throw new Error(await readApiError(response))
+  }
+  return (await response.json()) as SleepNightDetail
 }
 
 export async function fetchProgressSleep(range: ProgressRange, signal?: AbortSignal): Promise<SleepProgressView> {

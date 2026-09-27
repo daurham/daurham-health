@@ -565,6 +565,7 @@ describe('goal attention', () => {
     expect(service.slice(service.indexOf('async function deriveGoalStatus'))).not.toContain('INSERT')
     expect(today).toContain('goalAttentionForToday')
     expect(inventory).not.toContain('goal_status')
-    expect(inventory).toContain('0028_goals.sql')
+    expect(inventory).toContain("name: 'goals'")
+    expect(inventory).toContain('0029_sleep_vital_samples.sql')
   })
 })

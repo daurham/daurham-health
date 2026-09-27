@@ -1,9 +1,9 @@
 # Daurham Health — V2 Lab Blueprint
 
-**Status:** V2-A Data Capture Foundations complete. V2-B Personal Lab Core complete (V2-B1 through V2-B4). V2-C Recipes / Batch Meals complete (V2-C1 through V2-C4). V2-D Goals + Projections complete (V2-D1 through V2-D3).  
+**Status:** V2-A Data Capture Foundations complete. V2-B Personal Lab Core complete (V2-B1 through V2-B4). V2-C Recipes / Batch Meals complete (V2-C1 through V2-C4). V2-D Goals + Projections complete (V2-D1 through V2-D3). V2-E Rich Sleep + Overnight Vitals complete (V2-E1 through V2-E5). Overnight vital metrics remain disabled until a payload is verified. V2-F is not implemented.  
 **Calendar:** America/Phoenix  
 **Package version:** remains `1.0.0`  
-**Schema head after V2-D3:** `0028_goals.sql`
+**Schema head after V2-E3:** `0029_sleep_vital_samples.sql`
 
 This file is the v2 product authority for work after the frozen v1 manual. The frozen manual remains the authority for retained v1 semantics. Where this blueprint intentionally extends the product, it takes precedence over the older post-v1 roadmap in the v1 manual and in `docs/V2-ROADMAP.md`.
 
@@ -35,7 +35,14 @@ The file was not present in the repository when V2-A1 implementation started. Th
    - V2-D2 Deterministic projections — implemented
    - V2-D3 goal-aware status and reminders — implemented
    - V2-D Goals + Projections — complete
-5. Later product work, including Ask Health, stays behind this foundation.
+5. **V2-E Sleep**
+   - V2-E1 Rich Sleep Night Detail — implemented
+   - V2-E2 Sleep Stage Analytics — implemented
+   - V2-E3 Overnight vital samples — implemented, no metric enabled
+   - V2-E4 Personal Baselines + Deviations — implemented
+   - V2-E5 Sleep Source Attribution + Continuity — implemented
+   - V2-E Rich Sleep + Overnight Vitals — complete
+6. Later product work, including Ask Health, stays behind this foundation.
 
 Invariant:
 
@@ -419,6 +426,46 @@ V2-D3 is implemented. There is no migration and no status table. Schema head rem
 Status is derived on read as `goal-status-v1`. `targetState` and `deadlineState` stay separate. Missing evidence is unknown. Meeting a target does not complete the goal. On track means the entire available D2 window falls on or before the owner-chosen date. Off track means the entire window falls after that date. Overlap stays uncertain. An unavailable projection is not off track. A passed date does not invent a historical failure.
 
 Reminders are current in-app attention. Body uses the existing A2 cadence. Benchmarks use the pinned protocol version and only a B3 `due` state. There is no invented strength cadence and no coaching for training, steps, protein, sleep, or supplements. Today returns at most two goal-derived items, after existing review work, and dedupes them against the domain item. Paused and completed goals suppress that attention. Nothing is stored, exported, or sent to a model. There is no push, email, or SMS.
+
+## Amendment — 2026-09-27T10:53:43-07:00 — V2-E1 Rich Sleep Night Detail
+
+V2-E1 is implemented. There is no migration and no Night Detail table. Schema head remains `0028_goals.sql`. Package version remains `1.0.0`. V2-E2 and later sleep work are not implemented.
+
+Night Detail reads one `sleep_nightly_summaries` row for an America/Phoenix `sleep_date`. `GET /api/progress/sleep/:sleepDate` returns that stored night. The page is `/progress/sleep/:sleepDate`. The read does not recompute actual sleep, stage totals, eligibility, or the selected source from raw intervals, and it does not rerun arbitration. The night is the Phoenix date on which the selected episode ends.
+
+The observing source is the stored logical source. Transport, such as Health Auto Export, stays separate. Actual sleep is the primary duration. Null in-bed and awake minutes stay missing. Complete, partial, and in-bed-only observations stay distinct. The 240-minute gate remains a completeness rule. Stage percentages for REM, Core, and Deep use actual sleep as the denominator and appear only when stage analysis is eligible. Low coverage and exclusive stage conflicts hide those percentages. Unspecified sleep stays visible. Selection reasons use the stored values `source_priority`, `completeness_override`, `partial_only`, and `in_bed_only`.
+
+The stage timeline is deferred. The existing interval union measures totals and conflict. It does not produce a non-overlapping display timeline, and E1 does not add a second stage engine. Today, Progress Sleep, and Timeline link to the same night. The demo route `/demo/progress/sleep/:sleepDate` uses fictional fixtures only. There are no overnight heart-rate, HRV, respiratory-rate, SpO2, or temperature values, and no sleep or readiness score.
+
+## Amendment — 2026-09-27T11:17:28-07:00 — V2-E2 Sleep Stage Analytics
+
+V2-E2 is implemented. There is no migration and no stage-analytics table. Schema head remains `0028_goals.sql`. Package version remains `1.0.0`. V2-E3 and later sleep work are not implemented.
+
+Stage analytics are derived on read as `sleep-stage-analytics-v1` from `sleep_nightly_summaries`. The stored `stage_analysis_eligible` flag decides which nights enter composition. Partial, low-coverage, and conflict nights stay out of that composition and remain visible in the coverage counts. A period summary needs at least three qualified nights. Composition is pooled stage minutes divided by pooled actual sleep, including unspecified sleep. Average stage minutes use those same nights. The ordinary Sleep duration average still uses every analysis-eligible night.
+
+The nightly chart plots qualified nights only. Gaps are not filled. Each point keeps its selected source and opens Night Detail. A range with more than one logical source says so. Recent comparison is seven Phoenix dates versus the previous seven. Each window needs four qualified nights and one shared logical source. Mixed sources and a source change suppress the delta. Available deltas are percentage points, not relative percent, and they are not labeled better or worse. There is no stage score, reference range, overnight vital, personal baseline, or change to Compare, cross-domain intelligence, Sleep Goals, or Today.
+
+## Amendment — 2026-09-27T11:43:50-07:00 — V2-E3 Overnight Vital Samples
+
+V2-E3 is implemented. Migration `0029_sleep_vital_samples.sql` adds `sleep_vital_samples`. Schema head is `0029_sleep_vital_samples.sql`. Package version remains `1.0.0`. V2-E4 and later sleep work are not implemented.
+
+No candidate metric is enabled. The audit found no unaggregated Health Auto Export payload for heart rate, HRV, respiratory rate, oxygen saturation, or sleeping wrist temperature. The synthetic `heart_rate` fixture is a midnight day summary and stays out of the vital table. `resting_heart_rate` stays an Activity day summary. Public export names that were not observed in a payload stay disabled. HRV is not labeled SDNN unless the payload says so.
+
+Enabled metrics, once verified, are timestamped samples. Night association uses the selected episode bounds, not the calendar date. The nightly display is a per-source median with a sample count. Sources are not merged. Partial nights can show the readings as a partial observation. In-bed-only nights do not present them as sleep vitals. Missing stays missing. There is no baseline, reference range, readiness score, or model call. Stage analytics, duration analytics, Goals, Compare, cross-domain intelligence, and Today are unchanged. The demo does not invent vital readings. Canonical samples are in backup and portable export. Derived medians are not a second canonical table.
+
+## Amendment — 2026-09-27T12:05:32-07:00 — V2-E4 Personal Baselines + Deviations
+
+V2-E4 is implemented. There is no migration and no baseline table. Schema head remains `0029_sleep_vital_samples.sql`. Package version remains `1.0.0`. V2-E5 and later sleep work are not implemented.
+
+A personal baseline is the median of comparable observations on the 30 Phoenix dates before the target sleep date. The target night is excluded, and later nights are not used. Seven observations are required. The live metric is Sleep duration from analysis-eligible nights with the same selected logical source. Partial and in-bed-only nights are not duration evidence. The deviation is the current total minus that median, worded only as above, below, or matching the recent median.
+
+Future vital baselines reuse the E3 nightly median, one value per metric and source per analysis-eligible night. They cover heart rate, HRV (SDNN), respiratory rate, and sleeping wrist temperature only after E3 enables that metric. Oxygen saturation is not included. Activity resting heart rate is not overnight heart rate. With the production registry disabled, Progress and Night Detail show the Sleep-duration baseline only. Goals, Today, Needs Attention, and cross-domain intelligence are unchanged. The result is derived on read. It is not backed up, exported, or labeled as a score.
+
+## Amendment — 2026-09-27T12:25:19-07:00 — V2-E5 Sleep Source Attribution + Continuity
+
+V2-E5 is implemented. There is no migration and no source-history table. Schema head remains `0029_sleep_vital_samples.sql`. Package version remains `1.0.0`. V2-E Rich Sleep + Overnight Vitals is complete. V2-F is not implemented.
+
+Attribution explains the stored logical source, transport, and selection reason. It does not rerun arbitration or present source priority as accuracy. Unknown stays unknown. Range counts separate canonical, complete, and stage-qualified nights. Transitions compare consecutive observed canonical nights and keep gaps. A transport change is not a logical source change. E2 and E4 comparison gates stay as they were. Vital sources stay independent, and no vital metric is enabled. There is no device ranking, calibration, preference editor, score, or model call. Derived transitions are not stored or exported. Portable Sleep nights include the canonical logical source key.
 
 
 

@@ -7,6 +7,7 @@ import { ActivityProgressPage } from './ActivitySection'
 import { ActivitySleepOverview } from './ActivitySleepOverview'
 import { ProgressRangeControl } from './ProgressRangeControl'
 import { SleepProgressPage } from './SleepSection'
+import { SleepNightPage } from './SleepNightPage'
 import { BodySection } from './BodySection'
 import { EvidencePanel, type EvidenceTopic } from './EvidencePanel'
 import { OverviewSection } from './OverviewSection'
@@ -36,7 +37,10 @@ export function ProgressPage() {
   const location = useLocation()
   const range = parseProgressRangeParam(params.get('range'))
   const compareView = location.pathname.endsWith('/compare')
-  const healthView = location.pathname === '/progress/activity' || location.pathname === '/progress/sleep'
+  const healthView =
+    location.pathname === '/progress/activity' ||
+    location.pathname === '/progress/sleep' ||
+    /^\/progress\/sleep\/\d{4}-\d{2}-\d{2}$/.test(location.pathname)
   const [overview, setOverview] = useState<ProgressOverview | null>(null)
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [error, setError] = useState<string | null>(null)
@@ -188,6 +192,10 @@ export function ProgressActivityRoute() {
 
 export function ProgressSleepRoute() {
   return <SleepProgressPage />
+}
+
+export function ProgressSleepNightRoute() {
+  return <SleepNightPage />
 }
 
 export function ProgressStrengthRoute() {

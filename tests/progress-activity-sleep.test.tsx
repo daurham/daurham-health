@@ -309,14 +309,19 @@ describe('activity and sleep progress UI', () => {
       ],
       { range: '1y', asOf: '2026-09-22' },
     )
-    const html = renderToStaticMarkup(<SleepSection view={view} />)
+    const html = renderToStaticMarkup(
+      <MemoryRouter>
+        <SleepSection view={view} />
+      </MemoryRouter>,
+    )
     expect(html).toContain('9h 52m average')
     expect(html).toContain('1h 22m observed')
     expect(html).toContain('Partial observation')
     expect(html).toContain('Apple Watch')
     expect(html).toContain('In-bed only')
     expect(html).toContain('7h 10m in bed')
-    expect(html).toContain('Based on 1 night with complete stage data.')
+    expect(html).toContain('1 stage-qualified night')
+    expect(html).toContain('More nights are needed for a period Stage Composition summary.')
     expect(html).not.toContain('40%')
     expect(html).not.toMatch(/sleep score|recovery score|quality grade/i)
     expect(html).not.toContain('Last night')
@@ -341,7 +346,11 @@ describe('activity and sleep progress UI', () => {
       ],
       { range: '30d', asOf: '2026-09-22' },
     )
-    const html = renderToStaticMarkup(<SleepSection view={view} />)
+    const html = renderToStaticMarkup(
+      <MemoryRouter>
+        <SleepSection view={view} />
+      </MemoryRouter>,
+    )
     expect(html).toContain('No complete sleep observations in the last 30 days.')
     expect(html).toContain('Latest complete night: Jun 14 · 9h 52m')
     expect(html).not.toContain('1h 22m')
@@ -382,7 +391,11 @@ describe('activity and sleep progress UI', () => {
       ],
       { range: 'all', asOf: '2026-09-22' },
     )
-    const html = renderToStaticMarkup(<SleepSection view={view} />)
+    const html = renderToStaticMarkup(
+      <MemoryRouter>
+        <SleepSection view={view} />
+      </MemoryRouter>,
+    )
     expect(html).toContain('Sleep Cycle')
     expect(html).toContain('Sleep Cycle was used because the Apple Watch observation was substantially incomplete.')
     expect(html).toContain('Detailed sleep stages weren&#x27;t complete enough for analysis.')

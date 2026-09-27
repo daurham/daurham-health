@@ -6,6 +6,8 @@ import { HEALTH_CALENDAR_TIME_ZONE } from '../time.js'
  *
  * Canonical v1 metrics: step_count, active_energy, apple_exercise_time,
  * resting_heart_rate. walking_running_distance is reported and ignored.
+ * heart_rate and other quantity names stay ignored here. A calendar-day
+ * heart_rate summary is not an overnight vital sample.
  * These values are Health Auto Export / HealthKit daily summaries. They are
  * not Apple ActivitySummary, Move, or Exercise ring values.
  *

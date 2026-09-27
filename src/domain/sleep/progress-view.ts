@@ -2,9 +2,11 @@ import { addCalendarDays } from '../progress/dates.js'
 import { trailingPeriod } from '../progress/periods.js'
 import { availableMetric, insufficientMetric, type MetricResult, type ProgressRange } from '../progress/types.js'
 import { sleepRangeSummary, sleepShortTermChange, type SleepShortTermChange } from './analytics.js'
+import { computeSleepDurationBaseline, latestBaselineNight, type SleepPersonalBaseline } from './baseline.js'
+import { buildSleepStageAnalytics, type SleepStageAnalytics } from './stage-analytics.js'
+import { deriveSleepSourceAttribution, sleepOverrideExplanation, type SleepSourceAttribution } from './source-attribution.js'
 import type { SleepObservationStatus, SleepSelectionReason } from './completeness.js'
 import { SLEEP_TIMEZONE } from './config.js'
-import { compareSleepSourcePriority } from './sources.js'
 import type { SleepNightlySummary } from './summarize.js'
 
 export type SleepProgressNight = {
@@ -56,21 +58,14 @@ export type SleepProgressView = {
   averageUnspecifiedMinutes: MetricResult<number>
   series: SleepChartPoint[]
   recentNights: SleepProgressNight[]
+  stageAnalytics: SleepStageAnalytics
+  personalBaseline: SleepPersonalBaseline | null
+  sourceAttribution: SleepSourceAttribution
 }
 
 const RECENT_NIGHT_LIMIT = 14
 
-export function sleepOverrideExplanation(night: SleepNightlySummary): string | null {
-  if (night.selectionReason !== 'completeness_override') {
-    return null
-  }
-  const eligible = night.evidence.alternatives.filter((item) => item.status === 'analysis_eligible' && item.sourceName.trim() !== '')
-  const preferred = [...eligible].sort((left, right) => compareSleepSourcePriority(left.logicalSourceKey, right.logicalSourceKey))[0]
-  if (!preferred) {
-    return null
-  }
-  return `${night.sourceName} was used because the ${preferred.sourceName} observation was substantially incomplete.`
-}
+export { sleepOverrideExplanation }
 
 export function toSleepProgressNight(night: SleepNightlySummary): SleepProgressNight {
   return {
@@ -136,6 +131,17 @@ export function buildSleepProgressView(
     recent.totalSleep.status === 'available' &&
     summary.observedSleepNights > 0 &&
     recent.currentDates.some((date) => date >= period.start && date <= period.end)
+  const baselineTarget = latestBaselineNight(owned, { start: period.start, end: period.end })
+  const personalBaseline = baselineTarget ? computeSleepDurationBaseline(owned, baselineTarget) : null
+  const sourceAttribution = deriveSleepSourceAttribution(inRange, {
+    range: input.range,
+    asOf: input.asOf,
+    start: period.start,
+    end: period.end,
+    baselineTarget,
+    personalBaseline,
+    baselineHistory: owned,
+  })
   return {
     range: input.range,
     asOf: input.asOf,
@@ -169,5 +175,8 @@ export function buildSleepProgressView(
       .sort((left, right) => right.sleepDate.localeCompare(left.sleepDate))
       .slice(0, RECENT_NIGHT_LIMIT)
       .map(toSleepProgressNight),
+    stageAnalytics: buildSleepStageAnalytics(nights, input),
+    personalBaseline,
+    sourceAttribution,
   }
 }

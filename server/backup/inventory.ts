@@ -1,6 +1,6 @@
 export const BACKUP_FORMAT = 'daurham-health-backup'
 export const BACKUP_FORMAT_VERSION = 1
-export const LATEST_SCHEMA_MIGRATION = '0028_goals.sql'
+export const LATEST_SCHEMA_MIGRATION = '0029_sleep_vital_samples.sql'
 export const PORTABLE_EXPORT_BYTE_LIMIT = 3_500_000
 
 export type ColumnKind = 'uuid' | 'text' | 'date' | 'timestamptz' | 'numeric' | 'int' | 'bool' | 'json' | 'bytea'
@@ -725,6 +725,32 @@ export const BACKUP_TABLES: readonly BackupTable[] = [
       col('source_id', 'uuid'),
       col('import_job_id', 'uuid'),
       col('metadata', 'json'),
+      col('created_at', 'timestamptz'),
+    ],
+  }),
+  table({
+    name: 'sleep_vital_samples',
+    backupClass: 'canonical',
+    primaryKey: ['id'],
+    seeded: false,
+    portable: true,
+    references: [
+      { column: 'transport_source_id', table: 'data_sources' },
+      { column: 'import_job_id', table: 'import_jobs' },
+    ],
+    columns: [
+      col('id', 'uuid'),
+      col('metric_key', 'text'),
+      col('value_numeric', 'numeric'),
+      col('unit', 'text'),
+      col('observed_at', 'timestamptz'),
+      col('start_at', 'timestamptz'),
+      col('end_at', 'timestamptz'),
+      col('source_family', 'text'),
+      col('transport_source_id', 'uuid'),
+      col('import_job_id', 'uuid'),
+      col('fingerprint', 'text'),
+      col('source_metadata', 'json'),
       col('created_at', 'timestamptz'),
     ],
   }),

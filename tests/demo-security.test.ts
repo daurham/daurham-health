@@ -178,6 +178,7 @@ describe('public demo security boundary', () => {
       ['POST', '/api/lab/experiments/11111111-1111-4111-8111-111111111111/result'],
       ['GET', '/api/lab/experiment-results/11111111-1111-4111-8111-111111111111'],
       ['POST', '/api/lab/experiment-results/11111111-1111-4111-8111-111111111111/invalidate'],
+      ['GET', '/api/progress/sleep/2026-09-23'],
       ['GET', '/api/goals'],
       ['POST', '/api/goals'],
       ['GET', '/api/goals/11111111-1111-4111-8111-111111111111'],

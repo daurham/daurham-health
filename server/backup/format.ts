@@ -159,8 +159,12 @@ function csvBundle(tables: Record<string, BackupRow[]>): Record<string, Uint8Arr
     tables.activity_daily_summaries ?? [],
   )
   files['csv/sleep_nights.csv'] = encodeCsv(
-    ['id', 'sleep_date', 'timezone', 'source_name', 'total_sleep_minutes', 'observation_status', 'analysis_eligible'],
+    ['id', 'sleep_date', 'timezone', 'logical_source_key', 'source_name', 'total_sleep_minutes', 'observation_status', 'analysis_eligible'],
     tables.sleep_nightly_summaries ?? [],
+  )
+  files['csv/sleep_vital_samples.csv'] = encodeCsv(
+    ['id', 'metric_key', 'value_numeric', 'unit', 'observed_at', 'start_at', 'end_at', 'source_family'],
+    tables.sleep_vital_samples ?? [],
   )
   return files
 }
@@ -251,6 +255,9 @@ function projectPortableRows(
   if (table === 'goal_versions') {
     return withPortableSourceKey(rows, rowsByTable)
   }
+  if (table === 'sleep_vital_samples') {
+    return withPortableTransportKey(rows, rowsByTable)
+  }
   return rows
 }
 
@@ -312,6 +319,17 @@ export function withPortableGoalContext(
       source_key: sourceKey,
     }
   })
+}
+
+export function withPortableTransportKey(
+  rows: readonly BackupRow[],
+  rowsByTable: Record<string, readonly BackupRow[]>,
+): BackupRow[] {
+  const sources = sourceKeyById(rowsByTable)
+  return rows.map((row) => ({
+    ...row,
+    source_key: typeof row.transport_source_id === 'string' ? sources.get(row.transport_source_id) ?? null : null,
+  }))
 }
 
 export function withPortableSourceKey(

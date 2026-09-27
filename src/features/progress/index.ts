@@ -3,6 +3,7 @@ export {
   ProgressOverviewRoute,
   ProgressActivityRoute,
   ProgressSleepRoute,
+  ProgressSleepNightRoute,
   ProgressStrengthRoute,
   ProgressStrengthLabRoute,
   ProgressBodyRoute,

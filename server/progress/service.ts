@@ -20,11 +20,13 @@ import {
   checkpointPatchSchema,
   type ProgressCheckpoint,
 } from '../../src/domain/progress/checkpoints.js'
+import { addCalendarDays } from '../../src/domain/progress/dates.js'
 import { healthCalendarDateFromNow } from '../../src/domain/time.js'
 import { buildActivityProgressView, type ActivityProgressView } from '../../src/domain/activity/index.js'
-import { buildSleepProgressView, type SleepProgressView } from '../../src/domain/sleep/index.js'
+import { baselineVitalDefinitions, buildSleepNightDetail, buildSleepProgressView, parseSleepDetailDate, type SleepNightDetail, type SleepProgressView } from '../../src/domain/sleep/index.js'
+import { SLEEP_BASELINE_PRIOR_DAYS, SLEEP_TIMEZONE } from '../../src/domain/sleep/config.js'
 import { listActivityDailySummaries, listActivityWorkoutsForProgress } from '../activity/queries.js'
-import { listSleepNightlySummaries, listSleepObservationsForProgress } from '../sleep/queries.js'
+import { listSleepNightlySummaries, listSleepNightsBetween, listSleepObservationsForProgress, listSleepVitalSamples, readSleepNightRecord } from '../sleep/queries.js'
 import { HttpError } from '../http.js'
 import { getSql } from '../db.js'
 import { listTimelineContexts } from '../context/service.js'
@@ -137,6 +139,38 @@ export async function getProgressSleep(input: {
 }): Promise<SleepProgressView> {
   const query = parseProgressQuery(input)
   return buildSleepProgressView(await listSleepNightlySummaries(), query)
+}
+
+export async function getSleepNightDetail(sleepDate: string | null, now = new Date()): Promise<SleepNightDetail> {
+  const parsed = parseSleepDetailDate(sleepDate, healthCalendarDateFromNow(now))
+  if ('error' in parsed) {
+    throw new HttpError(400, parsed.error)
+  }
+  const record = await readSleepNightRecord(parsed.sleepDate, SLEEP_TIMEZONE)
+  if (!record) {
+    throw new HttpError(404, 'No sleep observation for that date.')
+  }
+  const history = await listSleepNightsBetween(
+    addCalendarDays(record.night.sleepDate, -SLEEP_BASELINE_PRIOR_DAYS),
+    record.night.sleepDate,
+    SLEEP_TIMEZONE,
+  )
+  const currentSamples = await listSleepVitalSamples(record.night.startAt, record.night.endAt)
+  let historySamples = currentSamples
+  if (baselineVitalDefinitions().length > 0 && history.length > 0) {
+    const starts = history.map((night) => night.startAt).sort()
+    const ends = history.map((night) => night.endAt).sort()
+    historySamples = await listSleepVitalSamples(starts[0]!, ends[ends.length - 1]!)
+  }
+  return buildSleepNightDetail(
+    record.night,
+    { previousSleepDate: record.previousSleepDate, nextSleepDate: record.nextSleepDate },
+    record.transportName,
+    currentSamples,
+    undefined,
+    history,
+    historySamples,
+  )
 }
 
 async function loadActivitySleepContext(now?: Date) {

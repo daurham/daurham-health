@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import type { ProgressRange } from '@/domain/progress'
 import type { SleepProgressNight, SleepProgressView } from '@/domain/sleep'
 import { LoadErrorNotice, PendingLoadRegion, useAtomicKeyedResource } from '@/lib'
+import { prefixedPath, useAppPathPrefix } from '@/lib/app-prefix'
 import {
+  durationDeviationCopy,
   formatSleepDuration,
+  priorNightsCopy,
   rangeHeading,
   sleepAvailabilityCopy,
   sleepAverageHeadline,
@@ -12,24 +15,21 @@ import {
   sleepCoverageLine,
   sleepNightDurationLine,
   sleepNightStatusLabel,
-  stageAverageLine,
 } from './activity-sleep-copy'
 import { SleepDurationChart } from './ActivitySleepCharts'
+import { SleepStageSection } from './SleepStageSection'
+import { SleepSourceSection } from './SleepSourceSection'
 import { fetchProgressSleep } from './api'
 import { formatCalendarDate, formatClockTime } from './format'
 import { ProgressRangeControl } from './ProgressRangeControl'
 import { parseProgressRangeParam } from './range'
 
 export function SleepSection({ view }: { view: SleepProgressView }) {
+  const prefix = useAppPathPrefix()
+  const nightPath = (date: string) => prefixedPath(prefix, `/progress/sleep/${date}`)
   const headline = sleepAverageHeadline(view)
   const availability = sleepAvailabilityCopy(view)
   const change = sleepChangeLine(view)
-  const stages = [
-    stageAverageLine('Core', view.averageCoreMinutes),
-    stageAverageLine('Deep', view.averageDeepMinutes),
-    stageAverageLine('REM', view.averageRemMinutes),
-    stageAverageLine('Unspecified', view.averageUnspecifiedMinutes),
-  ].filter((line): line is string => line != null)
   return (
     <div className="min-w-0 space-y-4" data-range={view.range}>
       <div>
@@ -43,28 +43,14 @@ export function SleepSection({ view }: { view: SleepProgressView }) {
       <section className="min-w-0 rounded-lg border border-zinc-200 bg-white p-3 md:p-4">
         <h3 className="text-sm font-semibold tracking-tight">Sleep duration</h3>
         <p className="mt-1 text-sm text-zinc-600">Complete nights only. Partial observations are marked separately and are not part of the average.</p>
-        <SleepDurationChart points={view.series} />
+        <SleepDurationChart points={view.series} nightPath={nightPath} />
         {!view.series.some((point) => point.eligibleMinutes != null || point.partialMinutes != null) ? (
           <p className="mt-4 text-sm text-zinc-600">{availability?.message ?? 'No complete sleep observations in this range.'}</p>
         ) : null}
       </section>
-      {view.stageEligibleNights > 0 ? (
-        <section className="rounded-lg border border-zinc-200 bg-white p-3 md:p-4">
-          <h3 className="text-sm font-semibold tracking-tight">Sleep stages</h3>
-          <p className="mt-1 text-sm text-zinc-600">
-            Based on {view.stageEligibleNights} night{view.stageEligibleNights === 1 ? '' : 's'} with complete stage data.
-          </p>
-          {stages.length > 0 ? (
-            <ul className="mt-3 space-y-1 text-sm text-zinc-800">
-              {stages.map((line) => (
-                <li key={line}>{line}</li>
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-3 text-sm text-zinc-600">Stage durations are unavailable.</p>
-          )}
-        </section>
-      ) : null}
+      <PersonalBaselineSection view={view} nightPath={nightPath} />
+      <SleepStageSection analytics={view.stageAnalytics} nightPath={nightPath} />
+      <SleepSourceSection attribution={view.sourceAttribution} nightPath={nightPath} />
       <section className="min-w-0">
         <h3 className="text-sm font-semibold tracking-tight">Recent nights</h3>
         {view.recentNights.length === 0 ? (
@@ -73,13 +59,57 @@ export function SleepSection({ view }: { view: SleepProgressView }) {
           <ul className="mt-2 divide-y divide-zinc-200 overflow-hidden rounded-lg border border-zinc-200 bg-white">
             {view.recentNights.map((night) => (
               <li key={night.sleepDate}>
-                <SleepNightRow night={night} />
+                <SleepNightRow night={night} href={nightPath(night.sleepDate)} />
               </li>
             ))}
           </ul>
         )}
       </section>
     </div>
+  )
+}
+
+function PersonalBaselineSection({
+  view,
+  nightPath,
+}: {
+  view: SleepProgressView
+  nightPath: (date: string) => string
+}) {
+  const baseline = view.personalBaseline
+  return (
+    <section id="personal-baseline" className="min-w-0 rounded-lg border border-zinc-200 bg-white p-3 md:p-4">
+      <h3 className="text-sm font-semibold tracking-tight">Personal baseline</h3>
+      {baseline == null || baseline.currentValue == null ? (
+        <p className="mt-2 text-sm text-zinc-600">No complete Sleep observation available for baseline comparison.</p>
+      ) : (
+        <div className="mt-2 space-y-1 text-sm">
+          <p className="text-zinc-500">Latest complete night</p>
+          <p>
+            <Link to={nightPath(baseline.targetSleepDate)} className="font-medium text-zinc-900">
+              {formatSleepDuration(baseline.currentValue)}
+            </Link>
+          </p>
+          {baseline.state === 'available' && baseline.baselineMedian != null && baseline.deviation != null ? (
+            <>
+              <p className="text-zinc-500">Recent median</p>
+              <p>{formatSleepDuration(baseline.baselineMedian)}</p>
+              <p>{durationDeviationCopy(baseline.deviation)}</p>
+              <p className="text-zinc-600">{priorNightsCopy(baseline.baselineObservationCount, baseline.sourceFamily, 'based')}</p>
+            </>
+          ) : baseline.state === 'source_not_comparable' ? (
+            <p className="text-zinc-600">Personal baseline comparison unavailable. The observing source is unknown.</p>
+          ) : (
+            <>
+              <p>Recent median unavailable</p>
+              <p className="text-zinc-600">{priorNightsCopy(baseline.baselineObservationCount, baseline.sourceFamily, 'count')}</p>
+              {view.sourceAttribution.baselineSeparationNote ? <p className="text-zinc-600">{view.sourceAttribution.baselineSeparationNote}</p> : null}
+            </>
+          )}
+          <p className="text-zinc-500">Previous 30 days</p>
+        </div>
+      )}
+    </section>
   )
 }
 
@@ -141,7 +171,7 @@ export function SleepProgressPage() {
   )
 }
 
-function SleepNightRow({ night }: { night: SleepProgressNight }) {
+function SleepNightRow({ night, href }: { night: SleepProgressNight; href: string }) {
   return (
     <details className="group min-w-0 px-3 py-2">
       <summary className="cursor-pointer list-none marker:content-none [&::-webkit-details-marker]:hidden">
@@ -153,12 +183,12 @@ function SleepNightRow({ night }: { night: SleepProgressNight }) {
           {night.sourceName} · {sleepNightStatusLabel(night)}
         </p>
       </summary>
-      <SleepNightDetail night={night} />
+      <SleepNightDetail night={night} href={href} />
     </details>
   )
 }
 
-function SleepNightDetail({ night }: { night: SleepProgressNight }) {
+function SleepNightDetail({ night, href }: { night: SleepProgressNight; href: string }) {
   const stagesReady = night.stageAnalysisEligible
   return (
     <div className="mt-2 space-y-1 border-t border-zinc-100 pt-2 text-sm text-zinc-700">
@@ -182,6 +212,9 @@ function SleepNightDetail({ night }: { night: SleepProgressNight }) {
         <p>Detailed sleep stages weren&apos;t complete enough for analysis.</p>
       )}
       {night.overrideExplanation ? <p>{night.overrideExplanation}</p> : null}
+      <Link to={href} className="mt-2 inline-flex min-h-11 items-center text-sm underline">
+        View night
+      </Link>
     </div>
   )
 }

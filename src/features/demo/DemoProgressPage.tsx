@@ -9,6 +9,7 @@ import {
   demoOverview,
   demoSinceCheckpoint,
   demoSleep,
+  demoSleepNightDetail,
   demoTimeline,
 } from '@/demo/repository'
 import { ActivitySleepCards } from '@/features/progress/ActivitySleepOverview'
@@ -18,6 +19,7 @@ import { EvidencePanel, type EvidenceTopic } from '@/features/progress/EvidenceP
 import { OverviewSection } from '@/features/progress/OverviewSection'
 import { ProgressRangeControl } from '@/features/progress/ProgressRangeControl'
 import { SleepSection } from '@/features/progress/SleepSection'
+import { SleepNightDetailView } from '@/features/progress/SleepNightPage'
 import { StrengthLab, StrengthSection } from '@/features/progress/StrengthSection'
 import { TimelineSection } from '@/features/progress/TimelineSection'
 import { formatCoveragePct, formatCalendarDate, formatKgAsLb } from '@/features/progress/format'
@@ -47,7 +49,10 @@ export function DemoProgressPage() {
   const location = useLocation()
   const range = parseProgressRangeParam(params.get('range'))
   const compareView = location.pathname.endsWith('/compare')
-  const healthView = location.pathname.endsWith('/activity') || location.pathname.endsWith('/sleep')
+  const healthView =
+    location.pathname.endsWith('/activity') ||
+    location.pathname.endsWith('/sleep') ||
+    /\/sleep\/\d{4}-\d{2}-\d{2}$/.test(location.pathname)
   const overview = useMemo(() => demoOverview(range), [range])
   const [evidence, setEvidence] = useState<EvidenceTopic | null>(null)
 
@@ -116,6 +121,15 @@ export function DemoProgressActivityRoute() {
       <ActivitySection view={demoActivity(range)} />
     </div>
   )
+}
+
+export function DemoSleepNightRoute() {
+  const { sleepDate = '' } = useParams()
+  const detail = demoSleepNightDetail(sleepDate)
+  if (!detail) {
+    return <p className="text-sm text-zinc-600">No sleep observation for that date.</p>
+  }
+  return <SleepNightDetailView detail={detail} />
 }
 
 export function DemoProgressSleepRoute() {

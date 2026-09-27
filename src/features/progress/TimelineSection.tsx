@@ -443,6 +443,7 @@ function ActivityWorkoutCard({ event }: { event: TimelineActivityWorkoutEvent })
 }
 
 function SleepNightCard({ event }: { event: TimelineSleepNightEvent }) {
+  const prefix = useAppPathPrefix()
   const complete = event.data.status === 'analysis_eligible'
   const duration =
     event.data.totalSleepMinutes == null
@@ -465,6 +466,9 @@ function SleepNightCard({ event }: { event: TimelineSleepNightEvent }) {
             {formatClockTime(event.data.startAt, 'America/Phoenix')} – {formatClockTime(event.data.endAt, 'America/Phoenix')}
             {complete ? '' : ' · Partial'}
           </p>
+          <Link to={prefixedPath(prefix, `/progress/sleep/${event.date}`)} className="mt-2 inline-flex min-h-11 items-center text-sm underline">
+            View night
+          </Link>
         </div>
       </div>
     </article>

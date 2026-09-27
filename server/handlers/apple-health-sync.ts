@@ -1,8 +1,10 @@
 import { HealthAutoExportError, healthAutoExportHasActivityMetrics } from '../../src/domain/apple-health/hae.js'
 import { parseHealthAutoExportSleep } from '../../src/domain/apple-health/hae-sleep.js'
+import { parseHealthAutoExportVitals } from '../../src/domain/apple-health/hae-vitals.js'
 import { handleApiError, HttpError, readJsonBody, sendJson, type ApiRequest, type ApiResponse } from '../http.js'
 import { ingestHealthAutoExport } from '../apple-health/hae-service.js'
 import { ingestHealthAutoExportSleep } from '../apple-health/hae-sleep-service.js'
+import { ingestHealthAutoExportVitals } from '../apple-health/hae-vitals-service.js'
 import { appleHealthSyncAuthorized, appleHealthSyncToken } from '../apple-health/sync-auth.js'
 
 function authorizationHeader(req: ApiRequest): string | string[] | undefined {
@@ -34,10 +36,12 @@ export default async function appleHealthSyncHandler(req: ApiRequest, res: ApiRe
       throw error
     }
     const sleepParsed = parseHealthAutoExportSleep(payload)
+    parseHealthAutoExportVitals(payload)
     const activity = healthAutoExportHasActivityMetrics(payload)
       ? await ingestHealthAutoExport({ payload, sourceFilename: 'health-auto-export-sync' })
       : null
     const sleep = sleepParsed.metricPresent ? await ingestHealthAutoExportSleep({ payload }) : null
+    const sleepVitals = await ingestHealthAutoExportVitals({ payload })
     sendJson(res, 200, {
       accepted: 1 as const,
       ...(activity
@@ -50,6 +54,7 @@ export default async function appleHealthSyncHandler(req: ApiRequest, res: ApiRe
           }
         : {}),
       ...(sleep ? { sleep } : {}),
+      ...(sleepVitals ? { sleepVitals } : {}),
     })
   } catch (error) {
     if (error instanceof HealthAutoExportError) {

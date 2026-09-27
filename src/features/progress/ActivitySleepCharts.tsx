@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom'
 import { ComposedChart, CartesianGrid, Line, ResponsiveContainer, Scatter, Tooltip, XAxis, YAxis } from 'recharts'
 import type { ActivityChartPoint } from '@/domain/activity'
 import type { SleepChartPoint } from '@/domain/sleep'
@@ -62,7 +63,8 @@ export function ActivityMetricChart({
   )
 }
 
-export function SleepDurationChart({ points }: { points: SleepChartPoint[] }) {
+export function SleepDurationChart({ points, nightPath }: { points: SleepChartPoint[]; nightPath?: (date: string) => string }) {
+  const navigate = useNavigate()
   const data = points.map((point) => ({
     ...point,
     eligibleMinutes:
@@ -81,7 +83,19 @@ export function SleepDurationChart({ points }: { points: SleepChartPoint[] }) {
       aria-label="Sleep chart. Complete nights are connected. Partial observations are separate points."
     >
       <ResponsiveContainer width="100%" height="100%">
-        <ComposedChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+        <ComposedChart
+          data={data}
+          margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+          onClick={(state) => {
+            const labeled = typeof state.activeLabel === 'string' ? data.find((point) => point.date === state.activeLabel) : undefined
+            const index = typeof state.activeTooltipIndex === 'number' ? state.activeTooltipIndex : null
+            const point = labeled ?? (index == null ? undefined : data[index])
+            if (!nightPath || !point?.date || (point.eligibleMinutes == null && point.partialMinutes == null)) {
+              return
+            }
+            navigate(nightPath(point.date))
+          }}
+        >
           <CartesianGrid stroke="var(--chart-grid)" strokeDasharray="3 3" />
           <XAxis
             dataKey="date"

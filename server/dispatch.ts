@@ -16,6 +16,7 @@ import transcriptionJobsHandler from './handlers/transcription-jobs.js'
 import progressOverviewHandler from './handlers/progress-overview.js'
 import progressActivityHandler from './handlers/progress-activity.js'
 import progressSleepHandler from './handlers/progress-sleep.js'
+import progressSleepDetailHandler from './handlers/progress-sleep-detail.js'
 import progressTimelineHandler from './handlers/progress-timeline.js'
 import progressCompareHandler from './handlers/progress-compare.js'
 import progressCheckpointsHandler from './handlers/progress-checkpoints.js'
@@ -64,6 +65,7 @@ export type HealthApiRoute =
   | 'progress-overview'
   | 'progress-activity'
   | 'progress-sleep'
+  | 'progress-sleep-detail'
   | 'progress-timeline'
   | 'progress-compare'
   | 'progress-checkpoints'
@@ -114,6 +116,7 @@ const HANDLERS: Record<HealthApiRoute, HealthApiHandler> = {
   'progress-overview': progressOverviewHandler,
   'progress-activity': progressActivityHandler,
   'progress-sleep': progressSleepHandler,
+  'progress-sleep-detail': progressSleepDetailHandler,
   'progress-timeline': progressTimelineHandler,
   'progress-compare': progressCompareHandler,
   'progress-checkpoints': progressCheckpointsHandler,
@@ -263,6 +266,9 @@ export function matchHealthApiRoute(pathname: string): HealthApiRoute | null {
   }
   if (isSingleSegmentAfter(pathname, '/api/progress/checkpoints/')) {
     return 'progress-checkpoint-detail'
+  }
+  if (isSingleSegmentAfter(pathname, '/api/progress/sleep/')) {
+    return 'progress-sleep-detail'
   }
   if (isSingleSegmentAfter(pathname, '/api/nutrition/entries/')) {
     return 'nutrition-entry-detail'

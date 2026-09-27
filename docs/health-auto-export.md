@@ -53,3 +53,11 @@ The original quantity is kept in the import evidence. Values are not rounded to 
 ## What this does not sync
 
 Walking and running distance, workout automation, Progress, and Timeline are not part of this activity setup. Sleep uses a separate automation on the same endpoint.
+
+## Sleep vitals
+
+No Sleep Vitals automation is configured.
+
+The repository fixtures and the current Activity and Sleep automations do not contain an unaggregated heart-rate, HRV, respiratory-rate, oxygen-saturation, or wrist-temperature export. The only `heart_rate` example is a midnight daily point, and the activity parser ignores it. `resting_heart_rate` stays an Activity day summary. It is not overnight heart rate.
+
+Do not add those metrics to the Activity automations or to the Sleep Analysis automation. A separate automation that sends individual observations is the intended path once a payload verifies the metric name, unit, timestamp, and source. Until that export exists, those metrics stay disabled. Inspect a saved payload with `tsx server/apple-health/vital-audit-cli.ts <payload.json>`. The audit prints metric names, units, and source families. It does not print quantities or device identifiers.
