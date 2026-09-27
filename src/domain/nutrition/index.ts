@@ -1,4 +1,4 @@
-export { NUTRITION_CONFIG, NUTRITION_SOURCE_KINDS, NUTRITION_CATALOG_KINDS, NUTRITION_MEALS, NUTRITION_FOOD_ENTITY, NUTRITION_ENTRY_ENTITY } from './config.js'
+export { NUTRITION_CONFIG, NUTRITION_SOURCE_KINDS, NUTRITION_CATALOG_KINDS, NUTRITION_MEALS, NUTRITION_FOOD_ENTITY, NUTRITION_ENTRY_ENTITY, USDA_FOODDATA_SOURCE_KEY } from './config.js'
 export type { NutritionSourceKind, NutritionCatalogKind, NutritionMeal } from './config.js'
 export {
   parseOptionalGramsFromServingText,
@@ -20,11 +20,16 @@ export {
 export type { RecipePortionKind, RecipePortionBasis, LoggableRecipeVersion, ResolvedRecipePortion } from './recipe-consumption.js'
 export {
   COMPOSITE_FOOD_GUIDANCE,
-  aiReusableFoodNotes,
   appendIngredientFood,
+  descriptionFoodFingerprint,
+  descriptionFoodProvenance,
   looksLikeCompositeFoodDescription,
   scalePer100Grams,
-  usdaReusableFoodNotes,
+  stripUsdaMachineBrand,
+  stripUsdaMachineNotes,
+  usdaExternalId,
+  usdaFoodOrigin,
+  usdaServingFingerprint,
 } from './recipe-ingredients.js'
 export type { IngredientFoodRef, RecipeIngredientDraft, UsdaPortionChoice } from './recipe-ingredients.js'
 export { nutritionDayTotals } from './totals.js'

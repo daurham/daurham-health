@@ -28,7 +28,9 @@ export const NUTRITION_SOURCE_KINDS = [
 export type NutritionSourceKind = (typeof NUTRITION_SOURCE_KINDS)[number]
 
 /** Food catalog only. Nutrition entries keep the original source list. */
-export const NUTRITION_FOOD_SOURCE_KINDS = [...NUTRITION_SOURCE_KINDS, 'usda'] as const
+export const NUTRITION_FOOD_SOURCE_KINDS = [...NUTRITION_SOURCE_KINDS, 'usda', 'description_ai'] as const
+
+export const USDA_FOODDATA_SOURCE_KEY = 'usda_fooddata_central'
 
 export type NutritionFoodSourceKind = (typeof NUTRITION_FOOD_SOURCE_KINDS)[number]
 

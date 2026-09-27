@@ -3,7 +3,7 @@
 **Status:** V2-A Data Capture Foundations complete. V2-B Personal Lab Core complete (V2-B1 through V2-B4). V2-C Recipes / Batch Meals complete (V2-C1 through V2-C4).  
 **Calendar:** America/Phoenix  
 **Package version:** remains `1.0.0`  
-**Schema head after V2-C4:** `0026_nutrition_food_usda_source.sql`
+**Schema head after V2-C4:** `0027_nutrition_food_ai_source.sql`
 
 This file is the v2 product authority for work after the frozen v1 manual. The frozen manual remains the authority for retained v1 semantics. Where this blueprint intentionally extends the product, it takes precedence over the older post-v1 roadmap in the v1 manual and in `docs/V2-ROADMAP.md`.
 
@@ -374,6 +374,10 @@ The recipe draft stays in memory in the builder. Add ingredient can search My Fo
 USDA results stay candidates until a real FoodData Central portion is reviewed and saved. The FDC id is the external identity. The same id and serving is reused. Similar names are not merged. Barcode reuses a local food or reviews an Open Food Facts candidate, then saves without logging. Nutrition label capture uses the existing capture jobs and, inside a recipe, saves the food only. Manual food uses the shared reusable-food validation. AI output is an estimate until review. A composite description is not turned into recipe lines. Ordinary Food Description, Meal Photo, and reference USDA lookup outside the builder stay unchanged.
 
 Preview and commit still reload `nutrition_foods` and apply the existing fingerprint and stale-basis rules. New foods export as normal food rows. `/demo` does not expose the builder. Later product work is not marked implemented.
+
+## Amendment — 2026-09-27T09:18:47-07:00 — V2-C4 provenance correction
+
+USDA reusable foods keep `source_kind = 'usda'` on `nutrition_foods`. The FDC id is `source_record_links.external_id` for data source `usda_fooddata_central` and entity type `nutrition_food`. The fingerprint also includes the reviewed serving amount, unit, and grams, so one FDC food may have more than one reusable serving. Reuse does not read notes, brand, or name. A text description saved as a reusable food uses `source_kind = 'description_ai'`. Meal Photo remains `meal_photo_ai`. Ordinary Food Description remains a consumption entry. Migration `0027_nutrition_food_ai_source.sql` is the schema head. Package version remains `1.0.0`. V2-C Recipes / Batch Meals stays complete. Recipe versions are not rewritten.
 
 
 

@@ -3,22 +3,35 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { nutritionFoodCreateSchema } from '../src/domain/nutrition/types.ts'
 import {
   COMPOSITE_FOOD_GUIDANCE,
-  aiReusableFoodNotes,
   appendIngredientFood,
+  descriptionFoodProvenance,
   looksLikeCompositeFoodDescription,
   scalePer100Grams,
-  usdaReusableFoodNotes,
+  stripUsdaMachineBrand,
+  stripUsdaMachineNotes,
+  usdaFoodOrigin,
+  usdaServingFingerprint,
   type RecipeIngredientDraft,
 } from '../src/domain/nutrition/recipe-ingredients.ts'
 import { usdaCandidateFromFood } from '../server/nutrition/providers/usda-fdc.ts'
 import { HttpError } from '../server/http.ts'
 import { matchHealthApiRoute } from '../server/dispatch.ts'
+import { backupTable } from '../server/backup/inventory.ts'
+
+type StoredLink = {
+  fingerprint: string
+  externalId: string
+  entityId: string
+  entityType: string
+  payload: string
+  food: Record<string, unknown> | null
+}
 
 const state = vi.hoisted(() => ({
   texts: [] as string[],
   params: [] as unknown[][],
-  rows: [] as Array<Record<string, unknown>>,
   inserts: 0,
+  links: [] as StoredLink[],
 }))
 
 vi.mock('../server/db.ts', () => ({
@@ -26,12 +39,36 @@ vi.mock('../server/db.ts', () => ({
     query: async (text: string, params: unknown[] = []) => {
       state.texts.push(text)
       state.params.push(params)
+      if (text.includes('FROM data_sources')) {
+        return [{ id: params[0] === 'usda_fooddata_central' ? 'source-usda' : 'source-health' }]
+      }
+      if (text.includes('external_fingerprint') && text.includes('nutrition_foods')) {
+        const link = state.links.find((item) => item.fingerprint === params[2] && item.food && item.food.archived !== true)
+        return link?.food ? [link.food] : []
+      }
+      if (text.includes('INSERT INTO source_record_links')) {
+        const fingerprint = String(params[3])
+        if (state.links.some((item) => item.fingerprint === fingerprint)) {
+          return []
+        }
+        state.links.push({
+          fingerprint,
+          externalId: String(params[2]),
+          entityId: String(params[5]),
+          entityType: String(params[4]),
+          payload: String(params[6]),
+          food: null,
+        })
+        return [{ entity_id: params[5] }]
+      }
       if (text.includes('INSERT INTO nutrition_foods')) {
         state.inserts += 1
-        return [foodRow(`food-${state.inserts}`, params)]
-      }
-      if (text.includes("source_kind = 'usda'")) {
-        return state.rows
+        const row = foodRow(params)
+        const link = state.links.find((item) => item.entityId === String(params[0]))
+        if (link) {
+          link.food = row
+        }
+        return [row]
       }
       return []
     },
@@ -72,25 +109,25 @@ const provider = {
   },
 }
 
-function foodRow(id: string, params: unknown[]) {
+function foodRow(params: unknown[]) {
   return {
-    id,
-    name: params[0],
-    brand: params[1],
-    barcode: params[2],
-    catalog_kind: params[3],
-    serving_quantity: params[4],
-    serving_unit: params[5],
-    serving_grams: params[6],
-    calories: params[7],
-    protein: params[8],
-    carbs: params[9],
-    fat: params[10],
-    fiber: params[11],
-    source_kind: params[12],
+    id: params[0],
+    name: params[1],
+    brand: params[2],
+    barcode: params[3],
+    catalog_kind: params[4],
+    serving_quantity: params[5],
+    serving_unit: params[6],
+    serving_grams: params[7],
+    calories: params[8],
+    protein: params[9],
+    carbs: params[10],
+    fat: params[11],
+    fiber: params[12],
+    source_kind: params[13],
     is_staple: false,
     archived: false,
-    notes: params[14],
+    notes: params[15],
     created_at: '2026-09-27T16:00:00.000Z',
     updated_at: '2026-09-27T16:00:00.000Z',
   }
@@ -133,7 +170,7 @@ describe('recipe ingredient creation', () => {
   beforeEach(() => {
     state.texts = []
     state.params = []
-    state.rows = []
+    state.links = []
     state.inserts = 0
   })
 
@@ -180,38 +217,29 @@ describe('recipe ingredient creation', () => {
   it('saves a reviewed USDA portion as a reusable food and reuses that identity', async () => {
     const saved = await saveUsdaReusableFood({ fdcId: 171477, amount: 1, unit: 'cup', grams: 156 }, provider)
     expect(saved.reused).toBe(false)
-    expect(saved.food.id).toBe('food-1')
     expect(saved.food.sourceKind).toBe('usda')
+    expect(saved.food.brand).toBeNull()
+    expect(saved.food.notes).toBeNull()
     expect(saved.food.servingQuantity).toBe(1)
     expect(saved.food.servingUnit).toBe('cup')
     expect(saved.food.servingGrams).toBe(156)
     expect(saved.food.calories).toBeCloseTo(234)
-    expect(saved.food.notes?.startsWith('fdc:171477')).toBe(true)
     expect(saved.food.barcode).toBeNull()
+    const link = state.links[0]
+    expect(link?.externalId).toBe('171477')
+    expect(link?.entityType).toBe('nutrition_food')
+    expect(link?.entityId).toBe(saved.food.id)
+    expect(link?.fingerprint).toBe(usdaServingFingerprint({ fdcId: 171477, amount: 1, unit: 'cup', grams: 156 }))
+    expect(state.texts.some((text) => text.includes('notes LIKE'))).toBe(false)
     expect(state.texts.some((text) => text.includes('nutrition_entries'))).toBe(false)
-
-    state.rows = [
-      foodRow('food-1', [
-        'Turkey, ground, 93% lean',
-        '1 cup (156 g)',
-        null,
-        'ingredient',
-        1,
-        'cup',
-        156,
-        234,
-        31.2,
-        0,
-        12.48,
-        0,
-        'usda',
-        false,
-        usdaReusableFoodNotes(171477, '1 cup (156 g)'),
-      ]),
-    ]
+    if (link?.food) {
+      link.food.notes = 'Keep this human note'
+      link.food.name = 'Renamed turkey'
+    }
     const again = await saveUsdaReusableFood({ fdcId: 171477, amount: 1, unit: 'cup', grams: 156 }, provider)
     expect(again.reused).toBe(true)
-    expect(again.food.id).toBe('food-1')
+    expect(again.food.id).toBe(saved.food.id)
+    expect(again.food.notes).toBe('Keep this human note')
     expect(state.inserts).toBe(1)
   })
 
@@ -219,9 +247,18 @@ describe('recipe ingredient creation', () => {
     await saveUsdaReusableFood({ fdcId: 171477, amount: 100, unit: 'g', grams: 100 }, provider)
     await saveUsdaReusableFood({ fdcId: 171796, amount: 100, unit: 'g', grams: 100 }, provider)
     expect(state.inserts).toBe(2)
-    const notes = state.params.map((params) => String(params[params.length - 1] ?? ''))
-    expect(notes.some((note) => note.startsWith('fdc:171477'))).toBe(true)
-    expect(notes.some((note) => note.startsWith('fdc:171796'))).toBe(true)
+    expect(state.links.map((link) => link.externalId).sort()).toEqual(['171477', '171796'])
+    expect(new Set(state.links.map((link) => link.entityId)).size).toBe(2)
+  })
+
+  it('keeps distinct serving bases for one FDC food', async () => {
+    await saveUsdaReusableFood({ fdcId: 171477, amount: 100, unit: 'g', grams: 100 }, provider)
+    await saveUsdaReusableFood({ fdcId: 171477, amount: 1, unit: 'cup', grams: 156 }, provider)
+    expect(state.inserts).toBe(2)
+    expect(state.links.map((link) => link.externalId)).toEqual(['171477', '171477'])
+    expect(state.links[0]?.fingerprint).not.toBe(state.links[1]?.fingerprint)
+    expect(state.links[0]?.fingerprint).toBe(usdaServingFingerprint({ fdcId: 171477, amount: 100, unit: 'g', grams: 100 }))
+    expect(state.links[1]?.fingerprint).toBe(usdaServingFingerprint({ fdcId: 171477, amount: 1, unit: 'Cup', grams: 156 }))
   })
 
   it('uses only provider portions that include a gram weight', () => {
@@ -242,12 +279,14 @@ describe('recipe ingredient creation', () => {
   it('saves one reviewed AI food and ignores an estimate that was not accepted', async () => {
     expect(state.inserts).toBe(0)
     const saved = await saveAiReusableFood(aiBody({ calories: 90, adjusted: true }))
-    expect(saved.food.id).toBe('food-1')
-    expect(saved.food.sourceKind).toBe('photo_ai')
-    expect(saved.food.notes).toContain('AI-assisted estimate')
-    expect(saved.food.notes).toContain('provider: gemini')
-    expect(saved.food.notes).toContain('adjusted: yes')
-    expect(saved.food.notes).not.toContain('candidates')
+    expect(saved.food.sourceKind).toBe('description_ai')
+    expect(saved.food.notes).toBeNull()
+    const payload = JSON.parse(state.links[0]?.payload ?? '{}') as { source?: string; inputKind?: string; provider?: string; userAdjusted?: boolean }
+    expect(payload.source).toBe('description_ai')
+    expect(payload.inputKind).toBe('description')
+    expect(payload.provider).toBe('gemini')
+    expect(payload.userAdjusted).toBe(true)
+    expect(JSON.stringify(payload)).not.toContain('photo')
     expect(state.texts.some((text) => text.includes('nutrition_entries'))).toBe(false)
     expect(state.inserts).toBe(1)
   })
@@ -275,16 +314,39 @@ describe('recipe ingredient creation', () => {
     expect(COMPOSITE_FOOD_GUIDANCE).toContain('ingredients')
   })
 
-  it('keeps AI provenance bounded', () => {
-    const notes = aiReusableFoodNotes({
+  it('keeps AI provenance bounded and strips only the machine USDA marker', () => {
+    const provenance = descriptionFoodProvenance({
       text: 'x'.repeat(2000),
       provider: 'gemini',
       model: 'gemini-test',
       originalCalories: 80,
       adjusted: false,
+      name: 'Meatball',
+      calories: 80,
+      protein: 7,
+      carbs: 2,
+      fat: 4,
+      servingQuantity: 1,
+      servingUnit: 'meatball',
+      servingGrams: 45,
     })
-    expect(notes.length).toBeLessThanOrEqual(2000)
-    expect(notes.startsWith('AI-assisted estimate')).toBe(true)
+    expect(String(provenance.originalDescription).length).toBeLessThanOrEqual(500)
+    expect(provenance.inputKind).toBe('description')
+    expect(JSON.stringify(provenance)).not.toContain('photo')
+    expect(stripUsdaMachineNotes('fdc:171477\nUSDA FoodData Central\nportion: 1 cup (156 g)')).toBeNull()
+    expect(stripUsdaMachineNotes('fdc:171477\nUSDA FoodData Central\nportion: 100 g\nOwner prefers lean.')).toBe('Owner prefers lean.')
+    expect(stripUsdaMachineNotes('A family recipe.')).toBe('A family recipe.')
+    expect(stripUsdaMachineBrand('1 cup (156 g) · fdc 171477', '1 cup (156 g)')).toBeNull()
+    expect(stripUsdaMachineBrand('Jennie-O', '100 g')).toBe('Jennie-O')
+    expect(usdaServingFingerprint({ fdcId: 123, amount: 1, unit: 'cup', grams: 156 })).toBe(
+      'usda-fdc-serving-v1|{"amount":1,"fdcId":123,"grams":156,"unit":"cup"}',
+    )
+    expect(
+      usdaFoodOrigin(
+        { sourceKind: 'usda', servingQuantity: 1, servingUnit: 'cup', servingGrams: 156 },
+        { externalId: '1234567', sourceKey: 'usda_fooddata_central' },
+      ),
+    ).toEqual({ source: 'USDA FoodData Central', fdcId: '1234567', serving: '1 cup / 156 g' })
   })
 
   it('keeps recipe calculation and stale-food protection authoritative', () => {
@@ -296,12 +358,17 @@ describe('recipe ingredient creation', () => {
     const sheet = readFileSync('src/features/nutrition/RecipeIngredientSheet.tsx', 'utf8')
     const capture = readFileSync('src/features/nutrition/LabelCapture.tsx', 'utf8')
     const handler = readFileSync('server/handlers/nutrition-recipe-foods.ts', 'utf8')
-    const meal = readFileSync('src/features/nutrition/panels.tsx', 'utf8')
+    const mealUi = readFileSync('src/features/nutrition/panels.tsx', 'utf8')
+    const meal = readFileSync('server/nutrition/meal.ts', 'utf8')
     expect(recipes).toContain('loadFoodBasis')
     expect(recipes).toContain('Recipe ingredients changed since preview.')
     expect(foods).not.toContain('nutrition_entries')
+    expect(foods).not.toContain('notes LIKE')
+    expect(foods).not.toContain('photo_ai')
+    expect(foods).toContain("'description_ai'")
     expect(foods).not.toContain('createGeminiNutritionInterpreter')
     expect(describe).toContain('insertEntryWithId')
+    expect(describe).toContain("source: 'description_ai'")
     expect(label).toContain('if (!shouldLog)')
     expect(barcode).toContain('const shouldLog = record.log !== false')
     expect(sheet).toContain('describeFoodText')
@@ -320,11 +387,21 @@ describe('recipe ingredient creation', () => {
     expect(handler).toContain('withOwnerAuth')
     expect(handler).toContain('405')
     expect(handler).not.toContain('APPLE_HEALTH_SYNC_TOKEN')
-    expect(meal).not.toContain('searchUsdaFoods')
+    expect(meal).toContain("source: 'meal_photo_ai'")
+    expect(mealUi).not.toContain('searchUsdaFoods')
     expect(matchHealthApiRoute('/api/nutrition/usda/search')).toBe('nutrition-recipe-foods')
     expect(matchHealthApiRoute('/api/nutrition/recipe-foods')).toBe('nutrition-recipe-foods')
-    const migration = readFileSync('migrations/0026_nutrition_food_usda_source.sql', 'utf8')
-    expect(migration).toContain("'usda'")
-    expect(migration).not.toContain('nutrition_entries')
+    const migration = readFileSync('migrations/0027_nutrition_food_ai_source.sql', 'utf8')
+    expect(migration).toContain("'description_ai'")
+    expect(migration).toContain('usda_fooddata_central')
+    expect(migration).toContain('source_record_links')
+    expect(migration).toContain("source_kind <> 'usda'")
+    expect(migration).not.toContain('recipe_versions')
+    const links = backupTable('source_record_links')
+    expect(links?.portable).toBe(false)
+    expect(links?.columns.map((column) => column.name)).toEqual(
+      expect.arrayContaining(['external_id', 'external_fingerprint', 'entity_type', 'entity_id']),
+    )
+    expect(backupTable('nutrition_foods')?.portable).toBe(true)
   })
 })

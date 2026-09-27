@@ -325,7 +325,9 @@ export function RecipeIngredientSheet({
               {foods.map((food) => (
                 <li key={food.id}>
                   <button type="button" className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-left" onClick={() => finish(food)}>
-                    {food.name}
+                    <span className="block font-medium">{food.name}</span>
+                    {food.sourceKind === 'usda' ? <span className="block text-sm text-zinc-600">USDA</span> : null}
+                    {food.sourceKind === 'description_ai' ? <span className="block text-sm text-zinc-600">Estimated · AI-assisted</span> : null}
                   </button>
                 </li>
               ))}
@@ -354,7 +356,8 @@ export function RecipeIngredientSheet({
                       setStep('usda-review')
                     }}
                   >
-                    {food.name}
+                    <span className="block font-medium">{food.name}</span>
+                    <span className="block text-sm text-zinc-600">USDA · FDC {food.fdcId}</span>
                   </button>
                 </li>
               ))}
@@ -364,6 +367,7 @@ export function RecipeIngredientSheet({
         {step === 'usda-review' && usdaChoice && portion && usdaNutrition ? (
           <div className="space-y-2">
             <p className="font-medium">{usdaChoice.name}</p>
+            <p className="text-sm text-zinc-600">USDA · FDC {usdaChoice.fdcId}</p>
             <p className="text-sm text-zinc-600">USDA reference. This is not an estimate.</p>
             <label className="block text-sm">
               Serving basis
