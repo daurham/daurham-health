@@ -618,7 +618,7 @@ describe('ask health route', () => {
       ),
     )
     expect(html).toContain('not generated live')
-    expect(html).toContain('Evidence')
+    expect(html).toContain('Your Health evidence')
     expect(html).toContain('Wrist tracker')
     expect(html).not.toMatch(/gemini|\/api\/ask-health/i)
     const demoSource = readFileSync('src/features/demo/DemoAskHealthPage.tsx', 'utf8') + readFileSync('src/features/demo/ask-health-demo.ts', 'utf8')

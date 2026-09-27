@@ -191,6 +191,7 @@ describe('public demo security boundary', () => {
       ['GET', '/api/lab/retests'],
       ['GET', '/api/lab/benchmarks/11111111-1111-4111-8111-111111111111/retest'],
       ['POST', '/api/ask-health'],
+      ['POST', '/api/ask-health/literature'],
       ['GET', '/api/progress/insights'],
       ['GET', '/api/progress/weekly'],
       ['POST', '/api/progress/weekly'],

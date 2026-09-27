@@ -12,6 +12,7 @@ export type AiUsageConfig = {
   askHealthMaxRequestCostUsd: number
   weeklyCoachMaxRequestCostUsd: number
   experimentSuggestionMaxRequestCostUsd: number
+  literatureMaxRequestCostUsd: number
   minIntervalMs: number
   maxPerMinute: number
 }
@@ -26,6 +27,7 @@ export function readAiUsageConfig(env: NodeJS.ProcessEnv = process.env): AiUsage
       env.AI_EXPERIMENT_SUGGESTION_MAX_REQUEST_COST_USD,
       AI_USAGE_DEFAULT_MAX_REQUEST_COST_USD,
     ),
+    literatureMaxRequestCostUsd: readUsd(env.AI_LITERATURE_MAX_REQUEST_COST_USD, AI_USAGE_DEFAULT_MAX_REQUEST_COST_USD),
     minIntervalMs: readCount(env.AI_ASK_HEALTH_MIN_INTERVAL_MS, AI_USAGE_MIN_INTERVAL_MS),
     maxPerMinute: readCount(env.AI_ASK_HEALTH_MAX_PER_MINUTE, AI_USAGE_MAX_PER_MINUTE),
   }

@@ -1,21 +1,21 @@
 # Dev state
 
-Snapshot recorded 2026-09-27 after the V2-F4 acceptance correction. Goal suggestions fail closed. This commit is the current health application.
+Snapshot recorded 2026-09-27 after V2-F5 Literature-Backed Evidence Drawer. This commit is the current health application.
 
 ## Git
 
 - Branch: `main`
-- Baseline the correction was measured against: `749c4a3f937f37c710f5cd82898b4848d8257328` (“Add experiment suggestions the owner must explicitly accept.”)
-- Parent of this snapshot: `49233fa` (“docs: add F4 acceptance correction task”)
-- This commit corrects Goal-derived experiment suggestions so they are not emitted. It does not add a migration
+- Baseline the task named: `30c91b20230f5db05025b608588442f13bfd812b` (“Stop suggesting Goal experiments Lab cannot evaluate.”)
+- Parent of this snapshot: `520d602` (“docs: define V2-F5 literature evidence task”)
+- This commit adds explicit Europe PMC literature search on Ask Health. It does not add a migration
 - Finished tasks are committed and pushed
 - Local annotated tag `v1.0.0` points at `7124ca513efa6c833457303ee6ff79d78344fce6`. Whether that tag exists on the remote is unknown
 
 ## Schema
 
 - Migration head in the working tree: `0031_experiment_origins.sql`
-- No migration was applied for this correction. `0030_ai_usage.sql` and `0031_experiment_origins.sql` were already applied during the original F4 task
-- Design manual version in the working tree: 1.0.35
+- No migration was applied for F5. `0030_ai_usage.sql` and `0031_experiment_origins.sql` were already applied
+- Design manual version in the working tree: 1.0.36
 - Package version: 1.0.0
 - The live blueprint header names `0031_experiment_origins.sql` as the schema head. Historical amendments and manual ledger rows that name an older head, or that describe Goal suggestions as supported, stay as history
 
@@ -61,6 +61,22 @@ The `goal-observation:<goalId>:<goalVersionId>` id format remains in the type vo
 
 The fingerprint covers kind, canonical ids, versions, eligibility, protocol definition, and evidence refs. It excludes time and AI wording.
 
+## Literature
+
+Retrieval version `literature-retrieval-v1`. Prompt `literature-synthesis-v1`. Request type `literature_synthesis`.
+
+`POST /api/ask-health/literature` is the only literature call. Ask Health submit and opening External research do not call Europe PMC or reserve `ai_usage`. The owner edits the visible query. Europe PMC receives that query plus `SRC:MED` and `HAS_ABSTRACT:Y` at `https://www.ebi.ac.uk/europepmc/webservices/rest/search` (`format=json`, `resultType=core`, page size 8). The browser does not call Europe PMC.
+
+The adapter keeps at most five PubMed-indexed records with a PMID, nonempty title, and nonempty abstract, in provider order. Dedup is by PMID, then by DOI. Refs are `pubmed:<PMID>`. Missing DOI, journal, year, or authors stay missing. Study type comes from publication-type metadata, with this precedence: meta-analysis, systematic review, randomized trial, clinical trial, observational, review, other. There is no quality score.
+
+Abstracts are server-only, capped at 3000 characters each. The synthesis packet is capped at 18000 characters by shortening the lowest-ranked abstracts first. The browser response has source cards and no abstract text. Links are `https://pubmed.ncbi.nlm.nih.gov/<PMID>/` and `https://doi.org/<DOI>` when the DOI is a DOI.
+
+Gemini paraphrases only that packet. Output is at most four blocks, each citing a retrieved ref. Extra citation fields, unknown refs, and any digit reject the whole synthesis. Budget, rate, timeout, missing configuration, and invalid prose still return the source cards. Timeout marks the reservation uncertain. Missing configuration releases it. Invalid prose still completes the reservation at provider cost. Zero sources skip Gemini and skip the reservation. A process-local cache may skip a repeat Gemini call. It is not budget authority.
+
+`AI_LITERATURE_MODEL` falls back to `AI_ASK_HEALTH_MODEL`, then `GEMINI_NUTRITION_MODEL`. `AI_LITERATURE_MAX_REQUEST_COST_USD` defaults to $0.05. Synthesis shares `AI_MONTHLY_BUDGET_USD` and the global rate gate. The Europe PMC request is not a Gemini call.
+
+Personal evidence stays in “Your Health evidence” with numbered markers. External sources use `[R1]`, `[R2]`, and so on. The limitation sentence is product copy. Literature does not rewrite the Ask Health answer and does not create an Experiment, Goal, insight, coach brief, or Timeline row. Queries, results, abstracts, and synthesis are not stored, backed up, or put in `localStorage`.
+
 ## AI
 
 Packet `experiment-suggestion-evidence-v1`. Prompt `experiment-suggestion-v1`. Request type `experiment_suggestion`.
@@ -87,7 +103,7 @@ Anonymous suggestion routes return 401. A non-owner returns 403. A wrong method 
 
 ## Implemented
 
-V2-A through V2-E, plus V2-F1 Ask Health, V2-F2 Proactive Insights, V2-F3 Weekly Coach Brief, and V2-F4 Experiment Suggestions for due Benchmark retests and missing Benchmark baselines. Goal-observation suggestions are deferred. V2-F5 literature retrieval is not implemented.
+V2-A through V2-E, plus V2-F1 Ask Health, V2-F2 Proactive Insights, V2-F3 Weekly Coach Brief, V2-F4 Experiment Suggestions for due Benchmark retests and missing Benchmark baselines, and V2-F5 Literature-Backed Evidence Drawer. Goal-observation suggestions remain deferred. V2-F is complete.
 
 Weekly facts, coach prose, insight cards, and unaccepted suggestions are derived. Ask Health transcripts are session-only.
 
@@ -104,13 +120,13 @@ Recorded 2026-09-27 against this tree. There is no separate typecheck script. `n
 
 - `npx eslint .`: exit 0. No findings.
 - `npx tsc -b`: exit 0.
-- `npm test`: exit 0. 103 files passed, 872 tests passed. Duration 27.52s. Benchmark due-retest, missing-baseline, ranking, stale-candidate, and duplicate-accept tests stayed green. F1, F2, and F3 suites stayed green.
-- `npm run build`: exit 0. Vite reported `built in 9.86s`. Vite warned that some chunks are larger than 500 kB. The warning did not fail the build.
+- `npm test`: exit 0. 105 files passed, 884 tests passed. Duration 23.47s. F1, F2, F3, and F4 suites stayed green.
+- `npm run build`: exit 0. Vite reported `built in 9.90s`. Vite warned that some chunks are larger than 500 kB. The warning did not fail the build.
 - No migration command was run.
 
 ## Manual QA
 
-`/demo/lab` on the running dev server at `http://127.0.0.1:5173/demo/lab` showed the fictional Challenge “Push-up Capacity retest”, “Push-up Capacity retest is due.”, “67 reps · 2026-06-18”, “Push-up Capacity · v2”, “Example proposal — not generated live”, and “No evidence-grounded experiment suggestions right now.” The page copy says nothing there creates an experiment. No Goal suggestion was shown. Demo navigation stayed on the public tabs. Owner Lab remains behind sign-in, so that path was not exercised.
+`/demo/ask-health` on the running dev server showed the fictional answer with markers `[1]`, `[2]`, and `[3]` under “Your Health evidence”, then External research. Opening that drawer showed “Example research drawer — not retrieved live”, the query “sleep athletic performance”, `[R1]` Watson 2017 and `[R2]` Mah 2011, PubMed links `https://pubmed.ncbi.nlm.nih.gov/29135639/` and `https://pubmed.ncbi.nlm.nih.gov/21731144/`, the matching DOI links, and the targeted-search limitation. No Europe PMC or Gemini request was recorded. `localStorage` stayed empty. At 390px the page did not overflow horizontally. Signed-in owner Ask Health was not exercised because the owner lock screen blocks it.
 
 ## Debt relevant to the next task
 
@@ -122,8 +138,8 @@ Recorded 2026-09-27 against this tree. There is no separate typecheck script. `n
 
 ## Deviations
 
-- None. The correction fails closed instead of extending B4. `experiment_goals` and the `goal_observation` enum stay unused by the surfaced registry. Accepted suggestion experiments still do not write `window_start` / `window_end`.
+- None. F5 does not extend B4, does not add a literature table, and does not create Experiments from papers. `external_research` stays unused origin vocabulary. Goal-observation suggestions remain deferred.
 
 ## Handoff
 
-No implementation task is active. V2-F5 remains unimplemented. Read `AGENTS.md`, then `PROJECT.md`, `DECISIONS.md`, this file, and `CURRENT_TASK.md`.
+No implementation task is active. V2-F is complete. Goal-observation experiment suggestions and overnight vital metrics remain deferred. Read `AGENTS.md`, then `PROJECT.md`, `DECISIONS.md`, this file, and `CURRENT_TASK.md`.

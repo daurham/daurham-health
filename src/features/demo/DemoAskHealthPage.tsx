@@ -5,6 +5,8 @@ import type { ProgressRange } from '@/domain/progress'
 import { quietButtonClass } from '@/lib'
 import { ProgressRangeControl } from '@/features/progress/ProgressRangeControl'
 import { AskHealthAnswerView } from '@/features/ask-health/AnswerView'
+import { ResearchSources } from '@/features/ask-health/ResearchSources'
+import { DEMO_LITERATURE, DEMO_LITERATURE_LABEL } from '@/demo/literature'
 import { DEMO_ASK_EMPTY, DEMO_ASK_EXAMPLES, DEMO_ASK_NOTE, DEMO_ASK_RANGE } from './ask-health-demo'
 
 export function DemoAskHealthPage() {
@@ -98,6 +100,14 @@ export function DemoAskHealthPage() {
       ) : (
         <AskHealthAnswerView answer={shown.answer} evidence={shown.evidence} />
       )}
+      <details className="rounded-lg border border-zinc-200 bg-white p-4">
+        <summary className="cursor-pointer text-sm font-semibold text-zinc-900">External research</summary>
+        <div className="mt-3 space-y-3">
+          <p className="text-sm leading-6 text-zinc-600">This example is compiled. Nothing here is sent to Europe PMC or a model.</p>
+          <p className="text-sm text-zinc-800">Research query: {DEMO_LITERATURE.query}</p>
+          <ResearchSources result={DEMO_LITERATURE} exampleLabel={DEMO_LITERATURE_LABEL} />
+        </div>
+      </details>
     </section>
   )
 }

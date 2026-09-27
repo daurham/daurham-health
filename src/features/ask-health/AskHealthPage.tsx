@@ -7,6 +7,7 @@ import { primaryButtonClass, quietButtonClass } from '@/lib'
 import { ProgressRangeControl } from '@/features/progress/ProgressRangeControl'
 import { askHealth } from './api'
 import { AskHealthAnswerView } from './AnswerView'
+import { ExternalResearch } from './ExternalResearch'
 
 const LENSES = ['general', 'training', 'nutrition', 'recovery', 'experiments'] as const
 
@@ -30,6 +31,7 @@ export function AskHealthPage() {
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [latest, setLatest] = useState<Awaited<ReturnType<typeof askHealth>> | null>(null)
+  const [asked, setAsked] = useState<string | null>(null)
 
   async function submit(question: string) {
     const trimmed = question.trim()
@@ -51,6 +53,7 @@ export function AskHealthPage() {
         [...current, { role: 'user' as const, text: trimmed }, { role: 'assistant' as const, text: assistant }].slice(-6),
       )
       setLatest(response)
+      setAsked(trimmed)
       setDraft('')
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Ask Health couldn't generate an explanation. Your Health data is unchanged.")
@@ -72,6 +75,7 @@ export function AskHealthPage() {
           onClick={() => {
             setTurns([])
             setLatest(null)
+            setAsked(null)
             setError(null)
             setDraft('')
           }}
@@ -121,6 +125,7 @@ export function AskHealthPage() {
             </p>
           ))}
         {latest ? <AskHealthAnswerView answer={latest.answer} evidence={latest.evidence} /> : null}
+        {latest && asked ? <ExternalResearch question={asked} /> : null}
       </div>
       {latest && latest.answer.followUps.length > 0 ? (
         <div className="flex flex-col gap-2">

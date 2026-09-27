@@ -1,6 +1,6 @@
 # Daurham Health — V2 Lab Blueprint
 
-**Status:** V2-A Data Capture Foundations complete. V2-B Personal Lab Core complete (V2-B1 through V2-B4). V2-C Recipes / Batch Meals complete (V2-C1 through V2-C4). V2-D Goals + Projections complete (V2-D1 through V2-D3). V2-E Rich Sleep + Overnight Vitals complete (V2-E1 through V2-E5). Overnight vital metrics remain disabled until a payload is verified. V2-F1 Ask Health conversational analysis is implemented. V2-F2 Proactive Insights are implemented. V2-F3 Weekly Coach Brief is implemented. V2-F4 Experiment Suggestions are implemented for due Benchmark retests and missing Benchmark baselines. Goal-observation suggestions are deferred. V2-F5 is not implemented.  
+**Status:** V2-A Data Capture Foundations complete. V2-B Personal Lab Core complete (V2-B1 through V2-B4). V2-C Recipes / Batch Meals complete (V2-C1 through V2-C4). V2-D Goals + Projections complete (V2-D1 through V2-D3). V2-E Rich Sleep + Overnight Vitals complete (V2-E1 through V2-E5). Overnight vital metrics remain disabled until a payload is verified. V2-F1 Ask Health conversational analysis is implemented. V2-F2 Proactive Insights are implemented. V2-F3 Weekly Coach Brief is implemented. V2-F4 Experiment Suggestions are implemented for due Benchmark retests and missing Benchmark baselines. Goal-observation suggestions are deferred. V2-F5 Literature-Backed Evidence Drawer is implemented. V2-F Ask Health + Proactive Intelligence is complete.  
 **Calendar:** America/Phoenix  
 **Package version:** remains `1.0.0`  
 **Schema head:** `0031_experiment_origins.sql`
@@ -47,7 +47,7 @@ The file was not present in the repository when V2-A1 implementation started. Th
    - V2-F2 Proactive Insights — implemented
    - V2-F3 Weekly Coach Brief — implemented
    - V2-F4 Experiment Suggestions — implemented
-   - V2-F5 Literature retrieval — not implemented
+   - V2-F5 Literature-Backed Evidence Drawer — implemented
 
 Invariant:
 
@@ -507,6 +507,12 @@ Candidates come from a fixed registry: a benchmark with no valid result, a B3 `d
 V2-F4 stays implemented for Benchmark suggestions only. There is no new migration. Schema head remains `0031_experiment_origins.sql`. Package version remains `1.0.0`. V2-F5 is not implemented.
 
 The first F4 amendment included an active unmet Goal when Lab could name the same metric. Current B4 Body, Activity, Nutrition, and Sleep requirements do not evaluate Goal thresholds. Supplement adherence does not lock the Goal evaluation window into Experiment scheduling. `compileGoalToExperimentCandidate` now returns unsupported for every current Goal kind, and `targetState = unknown` is unsupported because missing evidence is not an unmet target. `goal_observation` and `experiment_goals` remain for a later compiler. The surfaced registry is `benchmark_retest_due` and `benchmark_missing_baseline`.
+
+## Amendment — 2026-09-27T16:22:35-07:00 — V2-F5 Literature-Backed Evidence Drawer
+
+V2-F5 is implemented. There is no migration and no literature table. Schema head remains `0031_experiment_origins.sql`. Package version remains `1.0.0`. The retrieval version is `literature-retrieval-v1`. The prompt version is `literature-synthesis-v1`. The request type is `literature_synthesis`. V2-F1 through V2-F5 are implemented. Goal-observation experiment suggestions remain deferred.
+
+Europe PMC is the literature provider. Search is explicit. The owner edits the visible query, and only that query plus `SRC:MED` and `HAS_ABSTRACT:Y` is sent. Personal Health evidence is not sent. The server keeps at most five PubMed-indexed records with abstracts, addressed as `pubmed:<PMID>`. Study type is descriptive metadata, not a score. Abstracts are transient. Gemini paraphrases only the retrieved set and cannot emit numeric claims or new citations. Source cards remain when synthesis fails. Zero sources means zero Gemini call. Synthesis shares `ai_usage`. Nothing from the drawer is stored, backed up, or turned into an Experiment. The demo uses verified citation metadata and does not call Europe PMC or Gemini.
 
 
 

@@ -1,6 +1,6 @@
 # Roadmap
 
-This file records only what the repository already states. The current application is the health-app tree that includes Ask Health, Proactive Insights, Weekly Coach, Experiment Suggestions, and migration `0031_experiment_origins.sql`. The v2 authority is `HEALTH-PLATFORM-V2-LAB-BLUEPRINT.md`. The design manual is `HEALTH-PLATFORM-DESIGN-MANUAL.md` at version 1.0.35. `docs/V2-ROADMAP.md` keeps the older backlog and now marks the slices the blueprint has implemented.
+This file records only what the repository already states. The current application is the health-app tree that includes Ask Health, Proactive Insights, Weekly Coach, Experiment Suggestions, Literature-Backed Evidence, and migration `0031_experiment_origins.sql`. The v2 authority is `HEALTH-PLATFORM-V2-LAB-BLUEPRINT.md`. The design manual is `HEALTH-PLATFORM-DESIGN-MANUAL.md` at version 1.0.36. `docs/V2-ROADMAP.md` keeps the older backlog and now marks the slices the blueprint has implemented.
 
 ## Completed / existing functionality
 
@@ -15,6 +15,7 @@ Frozen v1.0.0, then the v2 slices the blueprint marks implemented:
 - V2-F2 Proactive Insights
 - V2-F3 Weekly Coach Brief
 - V2-F4 Experiment Suggestions: due Benchmark retests and missing Benchmark baselines. Goal-observation suggestions are deferred.
+- V2-F5 Literature-Backed Evidence Drawer: explicit Europe PMC search, separate from personal Health evidence. Literature is not stored.
 
 Also present from v1 and the import work: Nutrition, Training, Body, Progress, Activity, Sleep, Timeline, Compare, checkpoints, Apple Health archive import, Health Auto Export ingest, Gemini nutrition capture, Home-AI transcription, backup and portable export, and the public demo.
 
@@ -26,7 +27,6 @@ No active implementation task. See `CURRENT_TASK.md`.
 
 Named by the current manual or blueprint, and not marked implemented:
 
-- V2-F5 literature retrieval
 - Overnight vital metrics remain disabled until a payload is verified.
 - External retest notifications remain deferred (`docs/V2-ROADMAP.md` and the blueprint).
 - Nested recipes, batch inventory, and recipe fiber remain deferred.

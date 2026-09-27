@@ -26,8 +26,8 @@ export function AskHealthAnswerView({
         ))}
       </div>
       {ordered.length > 0 ? (
-        <section className="rounded-lg border border-zinc-200 bg-white p-4" aria-label="Evidence">
-          <h2 className="text-sm font-semibold text-zinc-900">Evidence</h2>
+        <section className="rounded-lg border border-zinc-200 bg-white p-4" aria-label="Your Health evidence">
+          <h2 className="text-sm font-semibold text-zinc-900">Your Health evidence</h2>
           <ol className="mt-3 space-y-3">
             {ordered.map((item, index) => (
               <li key={item.id} className="text-sm text-zinc-700">

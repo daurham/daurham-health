@@ -62,10 +62,10 @@ Sign-in uses Neon Auth (Better Auth). The owner is `HEALTH_OWNER_USER_ID`, or, o
 
 This repository does not run a model. It calls two HTTP providers:
 
-- Gemini, through `server/integrations/gemini/`, for nutrition interpretation, Ask Health, Weekly Coach phrasing, and Experiment Suggestion phrasing.
+- Gemini, through `server/integrations/gemini/`, for nutrition interpretation, Ask Health, Weekly Coach phrasing, Experiment Suggestion phrasing, and literature synthesis.
 - Home-AI, through `server/integrations/home-ai/`, for workout transcription and as the nutrition-capture fallback. Older architecture notes describe Ollama as the runtime behind Home-AI. This repo only has the Home-AI HTTP client.
 
-Ask Health (`ask-health-evidence-v1`, prompt `ask-health-v1`), Weekly Coach (`weekly-coach-evidence-v1`, prompt `weekly-coach-v1`), and Experiment Suggestions (`experiment-suggestion-evidence-v1`, prompt `experiment-suggestion-v1`) share `ai_usage`, `AI_MONTHLY_BUDGET_USD`, and the provider rate gate. Nutrition Gemini is not on that ledger. The rate query does not filter by `request_type`. A process-local response cache is an optimization, not the budget authority. Model prose is not a canonical fact and is not stored as Health history. An experiment suggestion becomes canonical only when the owner accepts it.
+Ask Health (`ask-health-evidence-v1`, prompt `ask-health-v1`), Weekly Coach (`weekly-coach-evidence-v1`, prompt `weekly-coach-v1`), Experiment Suggestions (`experiment-suggestion-evidence-v1`, prompt `experiment-suggestion-v1`), and literature synthesis (`literature-retrieval-v1`, prompt `literature-synthesis-v1`) share `ai_usage`, `AI_MONTHLY_BUDGET_USD`, and the provider rate gate. The Europe PMC search is not a Gemini call. Nutrition Gemini is not on that ledger. The rate query does not filter by `request_type`. A process-local response cache is an optimization, not the budget authority. Model prose is not a canonical fact and is not stored as Health history. An experiment suggestion becomes canonical only when the owner accepts it.
 
 ## API conventions
 
@@ -108,6 +108,10 @@ Values belong in the host environment or `.env.local`, never in docs or client b
 - `AI_ASK_HEALTH_MAX_REQUEST_COST_USD`
 - `AI_WEEKLY_COACH_MODEL`
 - `AI_WEEKLY_COACH_MAX_REQUEST_COST_USD`
+- `AI_EXPERIMENT_SUGGESTION_MODEL`
+- `AI_EXPERIMENT_SUGGESTION_MAX_REQUEST_COST_USD`
+- `AI_LITERATURE_MODEL`
+- `AI_LITERATURE_MAX_REQUEST_COST_USD`
 - `USDA_FDC_API_KEY`
 - `OPEN_FOOD_FACTS_USER_AGENT`
 - `OPEN_FOOD_FACTS_BASE_URL`

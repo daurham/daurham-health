@@ -48,6 +48,7 @@ import contextHandler from './handlers/context.js'
 import labHandler from './handlers/lab.js'
 import goalsHandler from './handlers/goals.js'
 import askHealthHandler from './handlers/ask-health.js'
+import askHealthLiteratureHandler from './handlers/ask-health-literature.js'
 import backupExportHandler from './handlers/backup-export.js'
 
 export type HealthApiRoute =
@@ -100,6 +101,7 @@ export type HealthApiRoute =
   | 'lab'
   | 'goals'
   | 'ask-health'
+  | 'ask-health-literature'
   | 'backup-export'
 
 type HealthApiHandler = (req: ApiRequest, res: ApiResponse) => unknown | Promise<unknown>
@@ -154,6 +156,7 @@ const HANDLERS: Record<HealthApiRoute, HealthApiHandler> = {
   lab: labHandler,
   goals: goalsHandler,
   'ask-health': askHealthHandler,
+  'ask-health-literature': askHealthLiteratureHandler,
   'backup-export': backupExportHandler,
 }
 
@@ -243,6 +246,8 @@ export function matchHealthApiRoute(pathname: string): HealthApiRoute | null {
       return 'apple-health-sync'
     case '/api/ask-health':
       return 'ask-health'
+    case '/api/ask-health/literature':
+      return 'ask-health-literature'
     default:
       break
   }
