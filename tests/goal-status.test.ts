@@ -566,6 +566,6 @@ describe('goal attention', () => {
     expect(today).toContain('goalAttentionForToday')
     expect(inventory).not.toContain('goal_status')
     expect(inventory).toContain("name: 'goals'")
-    expect(inventory).toContain('0029_sleep_vital_samples.sql')
+    expect(inventory).toContain('0030_ai_usage.sql')
   })
 })

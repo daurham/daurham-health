@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useOutletContext, useParams, useSearchParams } from 'react-router-dom'
+import type { ProactiveInsight } from '@/domain/insights'
 import type { ProgressOverview, ProgressRange, ProgressTimeline } from '@/domain/progress'
 import { cn, LoadErrorNotice, quietButtonClass, selectedTabClass, tabClass } from '@/lib'
-import { fetchProgressOverview, fetchProgressTimeline } from './api'
+import { AskHealthLink } from '@/features/ask-health/AskHealthLink'
+import { fetchProgressInsights, fetchProgressOverview, fetchProgressTimeline } from './api'
 import { ActivityProgressPage } from './ActivitySection'
 import { ActivitySleepOverview } from './ActivitySleepOverview'
 import { ProgressRangeControl } from './ProgressRangeControl'
@@ -10,6 +12,8 @@ import { SleepProgressPage } from './SleepSection'
 import { SleepNightPage } from './SleepNightPage'
 import { BodySection } from './BodySection'
 import { EvidencePanel, type EvidenceTopic } from './EvidencePanel'
+import { InsightsSection } from './InsightsSection'
+import { WeeklyCoachEntry } from '@/features/weekly-coach/WeeklyCoachPage'
 import { OverviewSection } from './OverviewSection'
 import { parseProgressRangeParam, progressSearch } from './range'
 import { StrengthLab, StrengthSection } from './StrengthSection'
@@ -162,12 +166,48 @@ function ProgressSkeleton() {
   )
 }
 
+function ProgressInsights({ range }: { range: ProgressRange }) {
+  const [insights, setInsights] = useState<ProactiveInsight[] | null>(null)
+  const [failed, setFailed] = useState(false)
+  useEffect(() => {
+    const controller = new AbortController()
+    setInsights(null)
+    setFailed(false)
+    void fetchProgressInsights(range, controller.signal)
+      .then((result) => {
+        if (!controller.signal.aborted) {
+          setInsights(result.insights)
+        }
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setFailed(true)
+        }
+      })
+    return () => controller.abort()
+  }, [range])
+  if (failed) {
+    return <p className="text-sm text-zinc-600">Insights are unavailable right now.</p>
+  }
+  if (!insights) {
+    return <p className="text-sm text-zinc-500">Checking recent evidence…</p>
+  }
+  return <InsightsSection insights={insights} />
+}
+
 export function ProgressOverviewRoute() {
   const { overview, range, onEvidence } = useOutletContext<ProgressOutletContext>()
   return (
     <div className="space-y-5 md:space-y-6">
+      <ProgressInsights range={range} />
+      <WeeklyCoachEntry />
       <OverviewSection overview={overview} onEvidence={onEvidence} />
       <ActivitySleepOverview range={range} />
+      <section className="rounded-lg border border-zinc-200 bg-white p-4">
+        <h2 className="text-sm font-semibold text-zinc-900">Ask Health</h2>
+        <p className="mt-1 text-sm text-zinc-600">Questions answered from the evidence already on this page.</p>
+        <AskHealthLink className="mt-3" />
+      </section>
       <section className="rounded-lg border border-zinc-200 bg-white p-4">
         <h2 className="text-sm font-semibold text-zinc-900">Personal Lab</h2>
         <p className="mt-1 text-sm text-zinc-600">Experiments and repeatable benchmarks</p>

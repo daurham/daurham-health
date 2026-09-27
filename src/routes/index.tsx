@@ -39,8 +39,10 @@ const ProgressStrengthLabRoute = lazy(() => import('@/features/progress').then((
 const ProgressBodyRoute = lazy(() => import('@/features/progress').then((module) => ({ default: module.ProgressBodyRoute })))
 const ProgressTimelineRoute = lazy(() => import('@/features/progress').then((module) => ({ default: module.ProgressTimelineRoute })))
 const ProgressCompareRoute = lazy(() => import('@/features/progress').then((module) => ({ default: module.ProgressCompareRoute })))
+const WeeklyCoachPage = lazy(() => import('@/features/weekly-coach/WeeklyCoachPage').then((module) => ({ default: module.WeeklyCoachPage })))
 const GoalsPage = lazy(() => import('@/features/goals/GoalsPages').then((module) => ({ default: module.GoalsPage })))
 const GoalDetailPage = lazy(() => import('@/features/goals/GoalsPages').then((module) => ({ default: module.GoalDetailPage })))
+const AskHealthPage = lazy(() => import('@/features/ask-health/AskHealthPage').then((module) => ({ default: module.AskHealthPage })))
 const DemoTodayPage = lazy(() => import('@/features/demo/DemoTodayPage').then((module) => ({ default: module.DemoTodayPage })))
 const DemoNutritionPage = lazy(() => import('@/features/demo/DemoNutritionPage').then((module) => ({ default: module.DemoNutritionPage })))
 const DemoTrainingPage = lazy(() => import('@/features/demo/DemoTrainingPage').then((module) => ({ default: module.DemoTrainingPage })))
@@ -56,6 +58,8 @@ const DemoProgressStrengthLabRoute = lazy(() => import('@/features/demo/DemoProg
 const DemoProgressBodyRoute = lazy(() => import('@/features/demo/DemoProgressPage').then((module) => ({ default: module.DemoProgressBodyRoute })))
 const DemoProgressTimelineRoute = lazy(() => import('@/features/demo/DemoProgressPage').then((module) => ({ default: module.DemoProgressTimelineRoute })))
 const DemoProgressCompareRoute = lazy(() => import('@/features/demo/DemoProgressPage').then((module) => ({ default: module.DemoProgressCompareRoute })))
+const DemoWeeklyCoachPage = lazy(() => import('@/features/demo/DemoWeeklyCoachPage').then((module) => ({ default: module.DemoWeeklyCoachPage })))
+const DemoAskHealthPage = lazy(() => import('@/features/demo/DemoAskHealthPage').then((module) => ({ default: module.DemoAskHealthPage })))
 
 const router = createBrowserRouter([
   {
@@ -80,6 +84,7 @@ const router = createBrowserRouter([
       { path: 'lab', element: <LabPage /> },
       { path: 'goals', element: <GoalsPage /> },
       { path: 'goals/:goalId', element: <GoalDetailPage /> },
+      { path: 'ask-health', element: <AskHealthPage /> },
       { path: 'lab/experiments/new', element: <NewExperimentPage /> },
       { path: 'lab/experiments/:experimentId/result', element: <ReviewExperimentResultPage /> },
       { path: 'lab/experiments/:experimentId', element: <ExperimentDetailPage /> },
@@ -102,12 +107,14 @@ const router = createBrowserRouter([
           { path: 'body', element: <ProgressBodyRoute /> },
           { path: 'timeline', element: <ProgressTimelineRoute /> },
           { path: 'compare', element: <ProgressCompareRoute /> },
+          { path: 'weekly', element: <WeeklyCoachPage /> },
         ],
       },
       {
         path: 'demo',
         children: [
           { index: true, element: <DemoTodayPage /> },
+          { path: 'ask-health', element: <DemoAskHealthPage /> },
           { path: 'nutrition', element: <DemoNutritionPage /> },
           { path: 'training', element: <DemoTrainingPage /> },
           { path: 'training/:sessionId', element: <DemoWorkoutPage /> },
@@ -125,6 +132,7 @@ const router = createBrowserRouter([
               { path: 'body', element: <DemoProgressBodyRoute /> },
               { path: 'timeline', element: <DemoProgressTimelineRoute /> },
               { path: 'compare', element: <DemoProgressCompareRoute /> },
+              { path: 'weekly', element: <DemoWeeklyCoachPage /> },
             ],
           },
         ],

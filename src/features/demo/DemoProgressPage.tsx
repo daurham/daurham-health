@@ -12,11 +12,16 @@ import {
   demoSleepNightDetail,
   demoTimeline,
 } from '@/demo/repository'
+import { AskHealthLink } from '@/features/ask-health/AskHealthLink'
 import { ActivitySleepCards } from '@/features/progress/ActivitySleepOverview'
 import { ActivitySection } from '@/features/progress/ActivitySection'
 import { BodySection } from '@/features/progress/BodySection'
 import { EvidencePanel, type EvidenceTopic } from '@/features/progress/EvidencePanel'
+import { InsightsSection } from '@/features/progress/InsightsSection'
+import { WeeklyCoachEntry } from '@/features/weekly-coach/WeeklyCoachPage'
 import { OverviewSection } from '@/features/progress/OverviewSection'
+import { demoInsightEmpty, demoInsightExamples } from '@/demo/insights'
+import { INSIGHTS_EMPTY_COPY } from '@/domain/insights'
 import { ProgressRangeControl } from '@/features/progress/ProgressRangeControl'
 import { SleepSection } from '@/features/progress/SleepSection'
 import { SleepNightDetailView } from '@/features/progress/SleepNightPage'
@@ -97,10 +102,28 @@ export function DemoProgressOverviewRoute() {
   const { overview, range, onEvidence } = useOutletContext<DemoProgressContext>()
   const activity = demoActivity(range)
   const sleep = demoSleep(range)
+  const examples = demoInsightExamples()
+  const sparse = demoInsightEmpty()
   return (
     <div className="space-y-5 md:space-y-6">
+      <div className="space-y-3">
+        <p className="text-sm text-zinc-600">Compiled fictional examples. The numbers are calculated from the demo evidence.</p>
+        <InsightsSection insights={examples.insights} />
+        <WeeklyCoachEntry />
+        {sparse.insights.length === 0 ? (
+          <div className="space-y-2">
+            <p className="text-sm text-zinc-600">A separate comparison where no detector qualifies:</p>
+            <p className="rounded-lg border border-zinc-200 bg-white p-4 text-sm text-zinc-600">{INSIGHTS_EMPTY_COPY}</p>
+          </div>
+        ) : null}
+      </div>
       <OverviewSection overview={overview} onEvidence={onEvidence} />
       <ActivitySleepCards range={range} activity={activity} sleep={sleep} />
+      <section className="rounded-lg border border-zinc-200 bg-white p-4">
+        <h2 className="text-sm font-semibold text-zinc-900">Ask Health</h2>
+        <p className="mt-1 text-sm text-zinc-600">A compiled fictional example. It is not a live answer.</p>
+        <AskHealthLink className="mt-3" />
+      </section>
     </div>
   )
 }

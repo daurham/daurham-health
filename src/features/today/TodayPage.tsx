@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
+import { AskHealthLink } from '@/features/ask-health/AskHealthLink'
 import { formatBodyMass } from '@/domain/body-metrics'
 import { bodyReminderCopy, measureHref } from '@/domain/body-cadence'
 import { NUTRITION_CONFIG, type NutritionDayTotals, type NutritionFood } from '@/domain/nutrition'
@@ -100,6 +101,9 @@ export function TodayBoard({
   const prefix = useAppPathPrefix()
   return (
     <div className="space-y-3">
+      <div className="flex justify-end">
+        <AskHealthLink />
+      </div>
       {view.pendingItems.length > 0 || view.goalAttention.length > 0 ? (
         <section className="rounded-lg border border-zinc-200 bg-white p-4">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Needs attention</h2>

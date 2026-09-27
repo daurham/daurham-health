@@ -182,6 +182,60 @@ export async function getSupplementRecord(id: string, now = new Date()): Promise
   return list.supplements.find((item) => item.id === id) ?? null
 }
 
+function mapSupplementInputs(
+  supplements: Array<Record<string, unknown>>,
+  scheduleRows: SupplementSchedule[],
+  eventRows: SupplementStatusEvent[],
+  adherenceRows: SupplementAdherence[],
+): TodaySupplementInput[] {
+  return supplements.map((row) => {
+    const id = String(row.id)
+    const ownSchedules = scheduleRows.filter((schedule) => schedule.supplementId === id)
+    const ownScheduleIds = new Set(ownSchedules.map((schedule) => schedule.id))
+    return {
+      id,
+      name: String(row.name),
+      sortOrder: asNumber(row.sort_order),
+      schedules: ownSchedules,
+      events: eventRows
+        .filter((event) => event.supplementId === id)
+        .map((event) => ({ effectiveDate: event.effectiveDate, status: event.status })),
+      adherence: adherenceRows.filter((item) => ownScheduleIds.has(item.scheduleId)),
+    }
+  })
+}
+
+export async function listSupplementRangeInputs(start: string, end: string): Promise<TodaySupplementInput[]> {
+  const sql = await getSql()
+  const [supplements, schedules, events, adherence] = await Promise.all([
+    sql.query(
+      `SELECT id::text AS id, name, sort_order
+       FROM supplements
+       ORDER BY sort_order ASC, name ASC, id ASC`,
+    ) as Promise<Array<Record<string, unknown>>>,
+    sql.query(
+      `SELECT ${SCHEDULE_COLUMNS}
+       FROM supplement_schedules
+       WHERE effective_from <= $2::date
+         AND (effective_through IS NULL OR effective_through >= $1::date)`,
+      [start, end],
+    ) as Promise<Array<Record<string, unknown>>>,
+    sql.query(
+      `SELECT ${EVENT_COLUMNS}
+       FROM supplement_status_events
+       WHERE effective_date <= $1::date`,
+      [end],
+    ) as Promise<Array<Record<string, unknown>>>,
+    sql.query(
+      `SELECT ${ADHERENCE_COLUMNS}
+       FROM supplement_adherence
+       WHERE scheduled_date >= $1::date AND scheduled_date <= $2::date`,
+      [start, end],
+    ) as Promise<Array<Record<string, unknown>>>,
+  ])
+  return mapSupplementInputs(supplements, schedules.map(scheduleFrom), events.map(eventFrom), adherence.map(adherenceFrom))
+}
+
 export async function listTodaySupplementInputs(date: string): Promise<TodaySupplementInput[]> {
   const sql = await getSql()
   const [supplements, schedules, events, adherence] = await Promise.all([

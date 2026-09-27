@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import type { ActivityDailyRow } from '../../src/domain/activity/analytics.js'
 import {
+  formatGoalTarget,
   goalDisplayName,
   goalEvidence,
   latestSessionE1rm,
@@ -615,6 +616,43 @@ export async function listGoals() {
     goals.push(presentGoal(row, versions, evidence, null, { goalStatus: derived.goalStatus, projection: null }))
   }
   return { goals, asOf, catalog: await loadCatalog(sql) }
+}
+
+export async function listGoalAskSnapshots(asOf: string) {
+  const sql = await getSql()
+  const rows = await readGoalRows(sql)
+  const goals = []
+  for (const row of rows) {
+    if (row.started_on > asOf) {
+      continue
+    }
+    const versions = await readVersions(sql, row.id)
+    const current = versions.find((version) => version.is_current)
+    if (!current) {
+      continue
+    }
+    const target = targetFrom(current)
+    const evidence = await loadEvidence(sql, row, target, asOf)
+    const derived = await deriveGoalStatus(sql, row, current, evidence, asOf)
+    goals.push({
+      id: row.id,
+      kind: row.goal_kind,
+      lifecycle: row.status,
+      label: goalDisplayName({
+        goalKind: row.goal_kind,
+        bodyMetricKey: row.body_metric_key,
+        exerciseName: row.exercise_name,
+        benchmarkLabel: row.benchmark_label ?? row.benchmark_title,
+        supplementName: row.supplement_name,
+      }),
+      targetText: formatGoalTarget(target),
+      targetState: derived.goalStatus.targetState,
+      deadlineState: derived.goalStatus.deadlineState,
+      projectionState: derived.projection?.state ?? null,
+      projectionReason: derived.projection?.reason ?? null,
+    })
+  }
+  return goals
 }
 
 async function loadCatalog(sql: Sql) {

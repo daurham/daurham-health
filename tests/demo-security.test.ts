@@ -190,6 +190,10 @@ describe('public demo security boundary', () => {
       ['POST', '/api/goals/11111111-1111-4111-8111-111111111111/reopen'],
       ['GET', '/api/lab/retests'],
       ['GET', '/api/lab/benchmarks/11111111-1111-4111-8111-111111111111/retest'],
+      ['POST', '/api/ask-health'],
+      ['GET', '/api/progress/insights'],
+      ['GET', '/api/progress/weekly'],
+      ['POST', '/api/progress/weekly'],
     ] as const
     for (const [method, url] of denied) {
       const status = await hit(method, url)

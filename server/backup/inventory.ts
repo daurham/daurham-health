@@ -1,6 +1,6 @@
 export const BACKUP_FORMAT = 'daurham-health-backup'
 export const BACKUP_FORMAT_VERSION = 1
-export const LATEST_SCHEMA_MIGRATION = '0029_sleep_vital_samples.sql'
+export const LATEST_SCHEMA_MIGRATION = '0030_ai_usage.sql'
 export const PORTABLE_EXPORT_BYTE_LIMIT = 3_500_000
 
 export type ColumnKind = 'uuid' | 'text' | 'date' | 'timestamptz' | 'numeric' | 'int' | 'bool' | 'json' | 'bytea'
@@ -1179,6 +1179,28 @@ export const BACKUP_TABLES: readonly BackupTable[] = [
       col('context_id', 'uuid'),
       col('tag_key', 'text'),
       col('created_at', 'timestamptz'),
+    ],
+  }),
+  table({
+    name: 'ai_usage',
+    backupClass: 'operational',
+    primaryKey: ['id'],
+    seeded: false,
+    portable: false,
+    references: [],
+    columns: [
+      col('id', 'uuid'),
+      col('request_type', 'text'),
+      col('provider', 'text'),
+      col('model', 'text'),
+      col('request_hash', 'text'),
+      col('status', 'text'),
+      col('reserved_cost_usd', 'numeric'),
+      col('actual_cost_usd', 'numeric'),
+      col('input_tokens', 'int'),
+      col('output_tokens', 'int'),
+      col('created_at', 'timestamptz'),
+      col('finalized_at', 'timestamptz'),
     ],
   }),
 ]

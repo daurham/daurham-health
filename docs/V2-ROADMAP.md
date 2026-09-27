@@ -1,15 +1,16 @@
 # V2 roadmap
 
-These are post-v1 ideas, not promises. They are recorded so owner-accepted
-deferred workflows are not lost. None of this is implemented in v1.
+Current completion status and implementation order live in `HEALTH-PLATFORM-V2-LAB-BLUEPRINT.md`. The schema head is `0030_ai_usage.sql`.
 
-V2 implementation order is `HEALTH-PLATFORM-V2-LAB-BLUEPRINT.md`. V2-A Data Capture Foundations is complete: V2-A1 Supplements, V2-A2 Body measurement capture, V2-A3 ad-hoc Training, and V2-A4 Daily Context. V2-B Personal Lab Core is complete: V2-B1 protocol identity, V2-B2 Benchmark Results, V2-B3 derived retest scheduling, and V2-B4 Experiment Result Summaries. V2-C1 First-Class Recipes is implemented: immutable version 1 composed from reusable foods. V2-C2 Recipe version editing is implemented: later versions are new immutable rows. V2-C3 Recipe consumption logging is implemented: a portion of an exact version becomes one nutrition entry. V2-C4 in-builder ingredient creation is implemented. V2-C Recipes / Batch Meals is complete. External retest notifications remain deferred. The Recipes-first list below is the older v1 backlog, not the current build order.
+Implemented: V2-A Data Capture Foundations, V2-B Personal Lab Core, V2-C Recipes / Batch Meals, V2-D Goals + Projections, V2-E Rich Sleep + Overnight Vitals, V2-F1 Ask Health, V2-F2 Proactive Insights, and V2-F3 Weekly Coach Brief. Overnight vital metrics stay disabled until a payload is verified. V2-F4 and later are not implemented.
+
+This file began as a post-v1 idea list. It was not part of frozen v1. The numbered sections below keep that older backlog. Sections the blueprint now marks implemented say so. The remaining sections are still ideas, not promises. External retest notifications remain deferred. Nested recipes, batch inventory, and recipe fiber remain deferred.
 
 ## Priority order
 
 ### 1. Recipes / batch meals
 
-Highest-priority v2 Nutrition feature. A first-class recipe/meal model:
+Implemented as V2-C. The original scope was a first-class recipe/meal model:
 
 - named recipe
 - reusable ingredients
@@ -25,7 +26,7 @@ Highest-priority v2 Nutrition feature. A first-class recipe/meal model:
 - potentially logging by finished weight
 - historical consumed snapshots independent of future recipe edits
 
-This deserves its own architecture. Do not start recipe tables or UI during v1.
+Nested recipes, batch inventory, and fiber were not part of that completed slice.
 
 ### 2. Body ingestion / Health Inbox
 
@@ -43,7 +44,7 @@ Do not replace the verified XLSX import unless the new workflow is better.
 
 ### 3. Goals + deterministic projections
 
-First-class goals such as:
+Implemented as V2-D. The original scope was first-class goals such as:
 
 - bodyweight
 - circumference
@@ -60,8 +61,7 @@ AI must not invent the projection.
 
 ### 4. Goal-aware / cross-domain explanations
 
-Use deterministic evidence-engine outputs. Gemini may explain computed
-findings. No unsupported causality.
+Ask Health (V2-F1) explains deterministic evidence. Proactive Insights (V2-F2) surface accepted cross-domain findings. Gemini still may not invent causality. Experiment suggestions and literature retrieval are V2-F4 and V2-F5, and they are not implemented.
 
 ### 5. Theme packs / personalization
 
@@ -74,8 +74,7 @@ More polished transitions once core functionality is stable.
 
 ### 7. Cross-domain intelligence UI
 
-The Phase 11 engine already exists. Surface findings as real owner data
-becomes sufficient.
+Implemented as V2-F2 Proactive Insights. The Phase 11 engine remains the calculation. Insight cards are derived on read.
 
 ### 8. Additional health sources / metrics
 

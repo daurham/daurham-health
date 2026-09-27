@@ -1,4 +1,5 @@
 import type { ActivityProgressView } from '@/domain/activity'
+import type { ProactiveInsights } from '@/domain/insights'
 import type { ProgressCompare, ProgressCheckpoint, ProgressOverview, ProgressRange, ProgressTimeline } from '@/domain/progress'
 import type { SleepNightDetail, SleepProgressView } from '@/domain/sleep'
 import { healthFetch, readApiError } from '@/lib'
@@ -9,6 +10,14 @@ export async function fetchProgressOverview(range: ProgressRange, signal?: Abort
     throw new Error(await readApiError(response))
   }
   return (await response.json()) as ProgressOverview
+}
+
+export async function fetchProgressInsights(range: ProgressRange, signal?: AbortSignal): Promise<ProactiveInsights> {
+  const response = await healthFetch(`/api/progress/insights?range=${encodeURIComponent(range)}`, { signal })
+  if (!response.ok) {
+    throw new Error(await readApiError(response))
+  }
+  return (await response.json()) as ProactiveInsights
 }
 
 export async function fetchProgressActivity(range: ProgressRange, signal?: AbortSignal): Promise<ActivityProgressView> {

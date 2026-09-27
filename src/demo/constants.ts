@@ -17,4 +17,6 @@ export const DEMO_ROUTES = [
   '/demo/progress/sleep',
   '/demo/progress/timeline',
   '/demo/progress/compare',
+  '/demo/progress/weekly',
+  '/demo/ask-health',
 ] as const

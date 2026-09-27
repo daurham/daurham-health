@@ -14,6 +14,8 @@ import transcriptionCommitHandler from './handlers/transcription-commit.js'
 import transcriptionJobDetailHandler from './handlers/transcription-job-detail.js'
 import transcriptionJobsHandler from './handlers/transcription-jobs.js'
 import progressOverviewHandler from './handlers/progress-overview.js'
+import progressInsightsHandler from './handlers/progress-insights.js'
+import progressWeeklyHandler from './handlers/progress-weekly.js'
 import progressActivityHandler from './handlers/progress-activity.js'
 import progressSleepHandler from './handlers/progress-sleep.js'
 import progressSleepDetailHandler from './handlers/progress-sleep-detail.js'
@@ -45,6 +47,7 @@ import supplementsHandler from './handlers/supplements.js'
 import contextHandler from './handlers/context.js'
 import labHandler from './handlers/lab.js'
 import goalsHandler from './handlers/goals.js'
+import askHealthHandler from './handlers/ask-health.js'
 import backupExportHandler from './handlers/backup-export.js'
 
 export type HealthApiRoute =
@@ -63,6 +66,8 @@ export type HealthApiRoute =
   | 'transcription-job-detail'
   | 'transcription-commit'
   | 'progress-overview'
+  | 'progress-insights'
+  | 'progress-weekly'
   | 'progress-activity'
   | 'progress-sleep'
   | 'progress-sleep-detail'
@@ -94,6 +99,7 @@ export type HealthApiRoute =
   | 'context'
   | 'lab'
   | 'goals'
+  | 'ask-health'
   | 'backup-export'
 
 type HealthApiHandler = (req: ApiRequest, res: ApiResponse) => unknown | Promise<unknown>
@@ -114,6 +120,8 @@ const HANDLERS: Record<HealthApiRoute, HealthApiHandler> = {
   'transcription-job-detail': transcriptionJobDetailHandler,
   'transcription-commit': transcriptionCommitHandler,
   'progress-overview': progressOverviewHandler,
+  'progress-insights': progressInsightsHandler,
+  'progress-weekly': progressWeeklyHandler,
   'progress-activity': progressActivityHandler,
   'progress-sleep': progressSleepHandler,
   'progress-sleep-detail': progressSleepDetailHandler,
@@ -145,6 +153,7 @@ const HANDLERS: Record<HealthApiRoute, HealthApiHandler> = {
   context: contextHandler,
   lab: labHandler,
   goals: goalsHandler,
+  'ask-health': askHealthHandler,
   'backup-export': backupExportHandler,
 }
 
@@ -184,6 +193,10 @@ export function matchHealthApiRoute(pathname: string): HealthApiRoute | null {
       return 'transcription-commit'
     case '/api/progress/overview':
       return 'progress-overview'
+    case '/api/progress/insights':
+      return 'progress-insights'
+    case '/api/progress/weekly':
+      return 'progress-weekly'
     case '/api/progress/activity':
       return 'progress-activity'
     case '/api/progress/sleep':
@@ -228,6 +241,8 @@ export function matchHealthApiRoute(pathname: string): HealthApiRoute | null {
       return 'apple-health-import'
     case '/api/ingest/apple-health':
       return 'apple-health-sync'
+    case '/api/ask-health':
+      return 'ask-health'
     default:
       break
   }

@@ -1,9 +1,9 @@
 # Daurham Health — V2 Lab Blueprint
 
-**Status:** V2-A Data Capture Foundations complete. V2-B Personal Lab Core complete (V2-B1 through V2-B4). V2-C Recipes / Batch Meals complete (V2-C1 through V2-C4). V2-D Goals + Projections complete (V2-D1 through V2-D3). V2-E Rich Sleep + Overnight Vitals complete (V2-E1 through V2-E5). Overnight vital metrics remain disabled until a payload is verified. V2-F is not implemented.  
+**Status:** V2-A Data Capture Foundations complete. V2-B Personal Lab Core complete (V2-B1 through V2-B4). V2-C Recipes / Batch Meals complete (V2-C1 through V2-C4). V2-D Goals + Projections complete (V2-D1 through V2-D3). V2-E Rich Sleep + Overnight Vitals complete (V2-E1 through V2-E5). Overnight vital metrics remain disabled until a payload is verified. V2-F1 Ask Health conversational analysis is implemented. V2-F2 Proactive Insights are implemented. V2-F3 Weekly Coach Brief is implemented. V2-F4 and later are not implemented.  
 **Calendar:** America/Phoenix  
 **Package version:** remains `1.0.0`  
-**Schema head after V2-E3:** `0029_sleep_vital_samples.sql`
+**Schema head:** `0030_ai_usage.sql`
 
 This file is the v2 product authority for work after the frozen v1 manual. The frozen manual remains the authority for retained v1 semantics. Where this blueprint intentionally extends the product, it takes precedence over the older post-v1 roadmap in the v1 manual and in `docs/V2-ROADMAP.md`.
 
@@ -42,7 +42,11 @@ The file was not present in the repository when V2-A1 implementation started. Th
    - V2-E4 Personal Baselines + Deviations — implemented
    - V2-E5 Sleep Source Attribution + Continuity — implemented
    - V2-E Rich Sleep + Overnight Vitals — complete
-6. Later product work, including Ask Health, stays behind this foundation.
+6. **V2-F Ask Health**
+   - V2-F1 Conversational analysis — implemented
+   - V2-F2 Proactive Insights — implemented
+   - V2-F3 Weekly Coach Brief — implemented
+   - V2-F4 and later — not implemented
 
 Invariant:
 
@@ -466,6 +470,34 @@ Future vital baselines reuse the E3 nightly median, one value per metric and sou
 V2-E5 is implemented. There is no migration and no source-history table. Schema head remains `0029_sleep_vital_samples.sql`. Package version remains `1.0.0`. V2-E Rich Sleep + Overnight Vitals is complete. V2-F is not implemented.
 
 Attribution explains the stored logical source, transport, and selection reason. It does not rerun arbitration or present source priority as accuracy. Unknown stays unknown. Range counts separate canonical, complete, and stage-qualified nights. Transitions compare consecutive observed canonical nights and keep gaps. A transport change is not a logical source change. E2 and E4 comparison gates stay as they were. Vital sources stay independent, and no vital metric is enabled. There is no device ranking, calibration, preference editor, score, or model call. Derived transitions are not stored or exported. Portable Sleep nights include the canonical logical source key.
+
+## Amendment — 2026-09-27T12:54:47-07:00 — V2-F1 Ask Health Conversational Analysis
+
+V2-F1 is implemented. There is no migration and no conversation table. Schema head remains `0029_sleep_vital_samples.sql`. Package version remains `1.0.0`. V2-F2 and later are not implemented.
+
+Ask Health builds a deterministic packet, `ask-health-evidence-v1`, for a lens, Progress range, and `asOf`. Gemini explains that packet under prompt `ask-health-v1`. The model cannot query the database or write canonical Health data. Factual blocks must cite packet evidence ids. Missing data stays missing. Coverage, source changes, goal projection state, and experiment classifications are preserved. The model does not invent correlations, causality, diagnoses, scores, or literature. Conversation context is session-only. The cache fingerprint includes the packet, so corrected evidence is not answered from a stale reply. The in-memory budget and rate limit apply to Ask Health. The demo is compiled fiction and does not call the provider.
+
+## Amendment — 2026-09-27T13:17:21-07:00 — V2-F1 durable AI cost safety
+
+Ask Health's monthly budget and provider-call rate limit now live in `ai_usage` (`0030_ai_usage.sql`). Schema head is `0030_ai_usage.sql`. Package version remains `1.0.0`. There is still no conversation table. V2-F2 and later are not implemented.
+
+A reservation is inserted under a transaction-scoped advisory lock before Gemini is called, and the network call is outside that transaction. Completed calls count calculated token cost up to the reserved maximum. Unfinalized and uncertain calls keep the reserved maximum. Calls rejected before the provider, and a provider that was never configured, count nothing. The short-window limit remains 1.5 seconds and 8 calls per minute, shared across isolates. Billing months are UTC. The process-local response cache is only an optimization. `ai_usage` is in the full backup and not in the portable export. It stores a request hash, not the question, packet, or answer. Nutrition Gemini is not on this ledger yet.
+
+## Amendment — 2026-09-27T13:41:43-07:00 — V2-F2 Proactive Insights
+
+V2-F2 is implemented. There is no migration and no insight table. Schema head remains `0030_ai_usage.sql`. Package version remains `1.0.0`. The calculation version is `proactive-insights-v1`. V2-F3 and later are not implemented.
+
+Insights are derived on each read from the existing domain analytics and the existing allowlisted cross-domain engine. Spearman sample size, rho thresholds, coverage, and missingness are unchanged. Zero findings remains valid. Activity, Sleep, Nutrition, and Training-frequency cards use their own 14-day or 21-day windows and explicit product surfacing heuristics. Body reuses Theil–Sen. Strength reuses the six-appearance trend. Cards carry the numbers that qualified them. They do not claim a cause, a diagnosis, or a score. The list is ranked and capped at five. Explore opens canonical pages. Ask Health about this prefills a question and does not send it. F2 does not call Gemini or write `ai_usage`. Today, Timeline, Goals, backup, and portable export are unchanged. The demo calculates fictional cards from compiled evidence.
+
+## Amendment — 2026-09-27T14:13:17-07:00 — V2-F3 Weekly Coach Brief
+
+V2-F3 is implemented. There is no migration and no weekly brief table. Schema head remains `0030_ai_usage.sql`. Package version remains `1.0.0`. The packet version is `weekly-coach-evidence-v1`. The prompt version is `weekly-coach-v1`. V2-F4 and V2-F5 are not implemented.
+
+The brief covers the seven completed Phoenix dates before `asOf` and compares them with the seven dates before that. Today's incomplete evidence stays out. Facts reuse the accepted Progress, Goal, Lab, and Proactive Insight calculations. At least two substantive domains are required before Gemini runs. The model may select, order, and phrase a bounded candidate inventory. It may not invent a measurement, a focus action, an experiment, or a citation. Invalid model output falls back to the ranked facts. Weekly Coach shares the Ask Health monthly budget and provider rate gate through `ai_usage`. Generation happens only when the owner asks for it. Coach prose is not stored. The demo is compiled fiction and does not call the provider.
+
+
+
+
 
 
 
