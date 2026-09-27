@@ -252,6 +252,9 @@ function projectPortableRows(
   if (table === 'goals') {
     return withPortableGoalContext(rows, rowsByTable)
   }
+  if (table === 'experiments') {
+    return withPortableExperimentOrigin(rows)
+  }
   if (table === 'goal_versions') {
     return withPortableSourceKey(rows, rowsByTable)
   }
@@ -279,6 +282,32 @@ function textById(rows: readonly BackupRow[] | undefined, idColumn: string, labe
     }
   }
   return labels
+}
+
+const ORIGIN_KIND_LABELS: Record<string, string> = {
+  owner_created: 'Owner-created Experiment',
+  deterministic_candidate: 'Deterministic Experiment',
+  ai_assisted: 'AI-assisted Experiment',
+  external_research: 'External-research Experiment',
+}
+
+const ORIGIN_TRIGGER_LABELS: Record<string, string> = {
+  benchmark_missing_baseline: 'benchmark missing baseline',
+  benchmark_retest_due: 'benchmark retest due',
+  goal_observation: 'goal observation',
+}
+
+/** Portable-only semantic labels. Not database columns and not part of the full archive. */
+export function withPortableExperimentOrigin(rows: readonly BackupRow[]): BackupRow[] {
+  return rows.map((row) => {
+    const kind = typeof row.origin_kind === 'string' ? row.origin_kind : ''
+    const trigger = typeof row.origin_trigger === 'string' ? row.origin_trigger : ''
+    return {
+      ...row,
+      origin_label: ORIGIN_KIND_LABELS[kind] ?? kind,
+      origin_trigger_label: trigger ? (ORIGIN_TRIGGER_LABELS[trigger] ?? trigger) : null,
+    }
+  })
 }
 
 /** Portable-only semantic labels. Not database columns and not part of the full archive. */

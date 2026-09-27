@@ -14,7 +14,7 @@ Other owner surfaces, reached from pages rather than the primary tabs:
 
 - Supplements and adherence
 - Daily Context
-- Personal Lab: experiments, benchmark protocols, benchmark results, retests
+- Personal Lab: experiments, benchmark protocols, benchmark results, retests, and derived experiment suggestions
 - Goals and deterministic projections
 - Settings, including backup export
 - Ask Health
@@ -52,7 +52,7 @@ Derived products are not stored as tables. That includes goal status, projection
 - Body stores manual measurements, an XLSX fit-profile import, and optional measurement cadence.
 - Apple Health history can be imported from export archives. Ongoing Activity and Sleep sync arrives as `POST /api/ingest/apple-health` with the ingest bearer token. That token cannot read Health data.
 - Progress, insights, and the weekly coach read canonical rows and run the existing analytics. They do not create a second copy of those formulas in React.
-- Ask Health and Weekly Coach may call Gemini only after an explicit owner action, and only through the `ai_usage` reservation gate.
+- Ask Health, Weekly Coach, and Experiment Suggestion drafts may call Gemini only after an explicit owner action, and only through the `ai_usage` reservation gate.
 
 ## Authentication
 
@@ -62,10 +62,10 @@ Sign-in uses Neon Auth (Better Auth). The owner is `HEALTH_OWNER_USER_ID`, or, o
 
 This repository does not run a model. It calls two HTTP providers:
 
-- Gemini, through `server/integrations/gemini/`, for nutrition interpretation, Ask Health, and Weekly Coach phrasing.
+- Gemini, through `server/integrations/gemini/`, for nutrition interpretation, Ask Health, Weekly Coach phrasing, and Experiment Suggestion phrasing.
 - Home-AI, through `server/integrations/home-ai/`, for workout transcription and as the nutrition-capture fallback. Older architecture notes describe Ollama as the runtime behind Home-AI. This repo only has the Home-AI HTTP client.
 
-Ask Health (`ask-health-evidence-v1`, prompt `ask-health-v1`) and Weekly Coach (`weekly-coach-evidence-v1`, prompt `weekly-coach-v1`) share `ai_usage`, `AI_MONTHLY_BUDGET_USD`, and the provider rate gate. Nutrition Gemini is not on that ledger. The rate query does not filter by `request_type`. A process-local response cache is an optimization, not the budget authority. Model prose is not a canonical fact and is not stored as Health history.
+Ask Health (`ask-health-evidence-v1`, prompt `ask-health-v1`), Weekly Coach (`weekly-coach-evidence-v1`, prompt `weekly-coach-v1`), and Experiment Suggestions (`experiment-suggestion-evidence-v1`, prompt `experiment-suggestion-v1`) share `ai_usage`, `AI_MONTHLY_BUDGET_USD`, and the provider rate gate. Nutrition Gemini is not on that ledger. The rate query does not filter by `request_type`. A process-local response cache is an optimization, not the budget authority. Model prose is not a canonical fact and is not stored as Health history. An experiment suggestion becomes canonical only when the owner accepts it.
 
 ## API conventions
 

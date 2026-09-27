@@ -11,6 +11,7 @@ export type AiUsageConfig = {
   warningBudgetUsd: number | null
   askHealthMaxRequestCostUsd: number
   weeklyCoachMaxRequestCostUsd: number
+  experimentSuggestionMaxRequestCostUsd: number
   minIntervalMs: number
   maxPerMinute: number
 }
@@ -21,6 +22,10 @@ export function readAiUsageConfig(env: NodeJS.ProcessEnv = process.env): AiUsage
     warningBudgetUsd: readOptionalUsd(env.AI_WARNING_BUDGET_USD),
     askHealthMaxRequestCostUsd: readUsd(env.AI_ASK_HEALTH_MAX_REQUEST_COST_USD, AI_USAGE_DEFAULT_MAX_REQUEST_COST_USD),
     weeklyCoachMaxRequestCostUsd: readUsd(env.AI_WEEKLY_COACH_MAX_REQUEST_COST_USD, AI_USAGE_DEFAULT_MAX_REQUEST_COST_USD),
+    experimentSuggestionMaxRequestCostUsd: readUsd(
+      env.AI_EXPERIMENT_SUGGESTION_MAX_REQUEST_COST_USD,
+      AI_USAGE_DEFAULT_MAX_REQUEST_COST_USD,
+    ),
     minIntervalMs: readCount(env.AI_ASK_HEALTH_MIN_INTERVAL_MS, AI_USAGE_MIN_INTERVAL_MS),
     maxPerMinute: readCount(env.AI_ASK_HEALTH_MAX_PER_MINUTE, AI_USAGE_MAX_PER_MINUTE),
   }

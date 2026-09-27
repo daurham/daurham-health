@@ -4,7 +4,7 @@ import { Socket } from 'node:net'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { withOwnerAuth } from '../server/auth/with-owner.ts'
 import type { HealthOwnerConfig } from '../server/auth/config.ts'
-import { handleLab, matchLabRoute } from '../server/handlers/lab.ts'
+import labRoute, { handleLab, matchLabRoute } from '../server/handlers/lab.ts'
 import { matchHealthApiRoute } from '../server/dispatch.ts'
 import { wrapNodeResponse, type ApiRequest, type ApiResponse } from '../server/http.ts'
 
@@ -42,6 +42,13 @@ const retests = vi.hoisted(() => ({
   getBenchmarkRetest: vi.fn(),
 }))
 
+const suggestions = vi.hoisted(() => ({
+  listExperimentSuggestions: vi.fn(),
+  readExperimentSuggestion: vi.fn(),
+  draftExperimentSuggestion: vi.fn(),
+  acceptExperimentSuggestion: vi.fn(),
+}))
+
 const experimentResults = vi.hoisted(() => ({
   previewExperimentResult: vi.fn(),
   commitExperimentResult: vi.fn(),
@@ -54,6 +61,7 @@ vi.mock('../server/lab/service.ts', () => service)
 vi.mock('../server/lab/results.ts', () => results)
 vi.mock('../server/lab/retests.ts', () => retests)
 vi.mock('../server/lab/experiment-results.ts', () => experimentResults)
+vi.mock('../server/lab/suggestions.ts', () => suggestions)
 
 const ownerConfig: HealthOwnerConfig = {
   authBaseUrl: 'https://auth.example',
@@ -111,6 +119,9 @@ describe('personal lab API auth', () => {
       fn.mockReset()
     }
     for (const fn of Object.values(experimentResults)) {
+      fn.mockReset()
+    }
+    for (const fn of Object.values(suggestions)) {
       fn.mockReset()
     }
     retests.listBenchmarkRetests.mockResolvedValue({ asOf: '2026-09-26', retests: [] })
@@ -215,5 +226,25 @@ describe('personal lab API auth', () => {
     expect(retests.getBenchmarkRetest).toHaveBeenCalledWith(EXPERIMENT, '2026-09-01')
     const badDate = await call('GET', '/api/lab/retests?asOf=tomorrow', owner)
     expect(badDate.status()).toBe(400)
+  })
+
+  it('keeps experiment suggestions on owner auth', async () => {
+    const owner = { id: 'owner-1', email: 'owner@example.com' }
+    suggestions.listExperimentSuggestions.mockResolvedValue({ suggestions: [], empty: 'No evidence-grounded experiment suggestions right now.' })
+    expect(matchLabRoute('/api/lab/experiment-suggestions')).toEqual({
+      kind: 'suggestions',
+      candidateId: null,
+      action: null,
+    })
+    expect((await call('GET', '/api/lab/experiment-suggestions', null)).status()).toBe(401)
+    expect((await call('GET', '/api/lab/experiment-suggestions', null, { authorization: 'Bearer machine-token' })).status()).toBe(401)
+    expect(suggestions.listExperimentSuggestions).not.toHaveBeenCalled()
+    expect((await call('GET', '/api/lab/experiment-suggestions', { id: 'other', email: 'other@example.com' })).status()).toBe(403)
+    expect((await call('GET', '/api/lab/experiment-suggestions', owner)).status()).toBe(200)
+    expect(suggestions.listExperimentSuggestions).toHaveBeenCalled()
+    const wrong = captureResponse()
+    await labRoute(request('DELETE', '/api/lab/experiment-suggestions'), wrong.res)
+    expect(wrong.status()).toBe(405)
+    expect(wrong.allow()).toBe('GET')
   })
 })

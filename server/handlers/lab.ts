@@ -32,6 +32,12 @@ import {
   previewExperimentResult,
 } from '../lab/experiment-results.js'
 import { getBenchmarkRetest, listBenchmarkRetests } from '../lab/retests.js'
+import {
+  acceptExperimentSuggestion,
+  draftExperimentSuggestion,
+  listExperimentSuggestions,
+  readExperimentSuggestion,
+} from '../lab/suggestions.js'
 import { parseRetestAsOf } from '../../src/domain/lab-retests.js'
 import { healthCalendarDateFromNow } from '../../src/domain/time.js'
 import { withOwnerAuth } from '../auth/with-owner.js'
@@ -55,6 +61,7 @@ const BENCHMARK = new RegExp(`^/api/lab/benchmarks(?:/(${UUID})(?:/(protocol-ver
 const RETESTS = /^\/api\/lab\/retests$/i
 const RESULT = new RegExp(`^/api/lab/benchmark-results/(${UUID})(?:/(invalidate))?$`, 'i')
 const PROTOCOL_VERSION = new RegExp(`^/api/lab/protocol-versions/(${UUID})$`, 'i')
+const SUGGESTIONS = /^\/api\/lab\/experiment-suggestions(?:\/([^/]+)(?:\/(draft|accept))?)?$/i
 
 export function matchLabRoute(pathname: string):
   | { kind: 'experiments' }
@@ -65,6 +72,7 @@ export function matchLabRoute(pathname: string):
   | { kind: 'benchmark'; id: string; action: string | null; preview: boolean }
   | { kind: 'result'; id: string; action: string | null }
   | { kind: 'protocol-version'; id: string }
+  | { kind: 'suggestions'; candidateId: string | null; action: 'draft' | 'accept' | null }
   | null {
   const experiment = EXPERIMENT.exec(pathname)
   if (experiment) {
@@ -101,6 +109,15 @@ export function matchLabRoute(pathname: string):
   if (result?.[1]) {
     return { kind: 'result', id: result[1], action: result[2] ?? null }
   }
+  const suggestions = SUGGESTIONS.exec(pathname)
+  if (suggestions) {
+    const action = suggestions[2]
+    return {
+      kind: 'suggestions',
+      candidateId: suggestions[1] ? decodeURIComponent(suggestions[1]) : null,
+      action: action === 'draft' || action === 'accept' ? action : null,
+    }
+  }
   const protocolVersion = PROTOCOL_VERSION.exec(pathname)
   if (protocolVersion?.[1]) {
     return { kind: 'protocol-version', id: protocolVersion[1] }
@@ -117,6 +134,38 @@ export async function handleLab(req: ApiRequest, res: ApiResponse) {
   const route = matchLabRoute(requestApiPathname(req))
   if (!route) {
     sendJson(res, 404, { error: 'Not found' })
+    return
+  }
+  if (route.kind === 'suggestions') {
+    if (!route.candidateId && route.action) {
+      sendJson(res, 404, { error: 'Not found' })
+      return
+    }
+    if (!route.candidateId) {
+      if (req.method !== 'GET') {
+        methodNotAllowed(res, 'GET')
+        return
+      }
+      sendJson(res, 200, await listExperimentSuggestions())
+      return
+    }
+    if (!route.action) {
+      if (req.method !== 'GET') {
+        methodNotAllowed(res, 'GET')
+        return
+      }
+      sendJson(res, 200, await readExperimentSuggestion(route.candidateId))
+      return
+    }
+    if (req.method !== 'POST') {
+      methodNotAllowed(res, 'POST')
+      return
+    }
+    if (route.action === 'draft') {
+      sendJson(res, 200, await draftExperimentSuggestion(route.candidateId))
+      return
+    }
+    sendJson(res, 201, await acceptExperimentSuggestion(route.candidateId, await readJsonBody(req)))
     return
   }
   if (route.kind === 'experiments') {
@@ -316,4 +365,16 @@ async function labHandler(req: ApiRequest, res: ApiResponse) {
   }
 }
 
-export default withOwnerAuth(labHandler)
+const ownerLab = withOwnerAuth(labHandler)
+
+export default async function labRoute(req: ApiRequest, res: ApiResponse) {
+  const route = matchLabRoute(requestApiPathname(req))
+  if (route?.kind === 'suggestions') {
+    const allowed = route.action ? 'POST' : 'GET'
+    if (req.method !== allowed) {
+      methodNotAllowed(res, allowed)
+      return
+    }
+  }
+  return ownerLab(req, res)
+}

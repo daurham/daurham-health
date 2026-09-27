@@ -16,6 +16,8 @@ const SettingsPage = lazy(() => import('@/features/settings').then((module) => (
 const SupplementsPage = lazy(() => import('@/features/supplements').then((module) => ({ default: module.SupplementsPage })))
 const ContextPage = lazy(() => import('@/features/context').then((module) => ({ default: module.ContextPage })))
 const LabPage = lazy(() => import('@/features/lab').then((module) => ({ default: module.LabPage })))
+const SuggestionReviewPage = lazy(() => import('@/features/lab').then((module) => ({ default: module.SuggestionReviewPage })))
+const DemoLabPage = lazy(() => import('@/features/demo/DemoLabPage').then((module) => ({ default: module.DemoLabPage })))
 const NewExperimentPage = lazy(() => import('@/features/lab').then((module) => ({ default: module.NewExperimentPage })))
 const ExperimentDetailPage = lazy(() => import('@/features/lab').then((module) => ({ default: module.ExperimentDetailPage })))
 const ReviewExperimentResultPage = lazy(() => import('@/features/lab').then((module) => ({ default: module.ReviewExperimentResultPage })))
@@ -82,6 +84,7 @@ const router = createBrowserRouter([
       { path: 'supplements', element: <SupplementsPage /> },
       { path: 'context', element: <ContextPage /> },
       { path: 'lab', element: <LabPage /> },
+      { path: 'lab/suggestions/*', element: <SuggestionReviewPage /> },
       { path: 'goals', element: <GoalsPage /> },
       { path: 'goals/:goalId', element: <GoalDetailPage /> },
       { path: 'ask-health', element: <AskHealthPage /> },
@@ -119,6 +122,7 @@ const router = createBrowserRouter([
           { path: 'training', element: <DemoTrainingPage /> },
           { path: 'training/:sessionId', element: <DemoWorkoutPage /> },
           { path: 'body', element: <DemoBodyPage /> },
+          { path: 'lab', element: <DemoLabPage /> },
           {
             path: 'progress',
             element: <DemoProgressPage />,

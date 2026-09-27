@@ -2,7 +2,7 @@
 
 These rules apply to every implementation task in this repository.
 
-The current application is the tree described in `docs/ai/DEV_STATE.md`, including Ask Health, Proactive Insights, Weekly Coach, and migration `0030_ai_usage.sql`. Do not treat an older commit as the product if this handoff says the working application has moved on.
+The current application is the tree described in `docs/ai/DEV_STATE.md`, including Ask Health, Proactive Insights, Weekly Coach, Experiment Suggestions, and migration `0031_experiment_origins.sql`. Do not treat an older commit as the product if this handoff says the working application has moved on.
 
 Before changing code:
 
@@ -24,9 +24,8 @@ While implementing:
 
 When the task is complete:
 
-13. Update `docs/ai/DEV_STATE.md` so the next task starts from the application as it actually is. Set `docs/ai/CURRENT_TASK.md` back to no active task only when the user says the task is finished.
-
-Do not commit, push, or edit secrets unless the user explicitly asks. Environment examples may name variables. They must not contain real credentials.
+13. Update `docs/ai/DEV_STATE.md` so the next task starts from the application as it actually is. Set `docs/ai/CURRENT_TASK.md` back to no active task when the task is finished.
+14. Commit the finished task and push it. Do not commit or push secrets. Environment examples may name variables. They must not contain real credentials. Do not force-push.
 
 Product authority, when the task does not say otherwise:
 

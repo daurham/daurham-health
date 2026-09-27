@@ -486,8 +486,9 @@ export async function createOwnerExperiment(body: unknown) {
   const versionId = await insertVersion(sql, protocolId, 1, content)
   await sql.query(
     `INSERT INTO experiments (
-       id, title, question, hypothesis, rationale, origin, status, protocol_version_id, source_id
-     ) VALUES ($1::uuid, $2, $3, $4, $5, 'owner_created', 'accepted', $6::uuid, $7::uuid)`,
+       id, title, question, hypothesis, rationale, origin, status, protocol_version_id, source_id,
+       origin_kind
+     ) VALUES ($1::uuid, $2, $3, $4, $5, 'owner_created', 'accepted', $6::uuid, $7::uuid, 'owner_created')`,
     [experimentId, title.text, question.text, hypothesis.text, rationale.text, versionId, sourceId],
   )
   await replaceLinks(sql, experimentId, body, existence)
@@ -500,10 +501,11 @@ export async function createProposedExperiment(body: unknown, origin: Experiment
   }
   const created = await createOwnerExperiment(body)
   const sql = await getSql()
-  await sql.query(`UPDATE experiments SET origin = $2, status = 'proposed', updated_at = now() WHERE id = $1::uuid`, [
-    created.id,
-    origin,
-  ])
+  const originKind = origin === 'ai_assisted' || origin === 'external_research' ? origin : 'owner_created'
+  await sql.query(
+    `UPDATE experiments SET origin = $2, origin_kind = $3, status = 'proposed', updated_at = now() WHERE id = $1::uuid`,
+    [created.id, origin, originKind],
+  )
   return experimentDetail(sql, created.id)
 }
 

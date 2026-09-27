@@ -1,6 +1,6 @@
 # Roadmap
 
-This file records only what the repository already states. The current application is the health-app tree that includes Ask Health, Proactive Insights, Weekly Coach, and migration `0030_ai_usage.sql`. The v2 authority is `HEALTH-PLATFORM-V2-LAB-BLUEPRINT.md`. The design manual is `HEALTH-PLATFORM-DESIGN-MANUAL.md` at version 1.0.33. `docs/V2-ROADMAP.md` keeps the older backlog and now marks the slices the blueprint has implemented.
+This file records only what the repository already states. The current application is the health-app tree that includes Ask Health, Proactive Insights, Weekly Coach, Experiment Suggestions, and migration `0031_experiment_origins.sql`. The v2 authority is `HEALTH-PLATFORM-V2-LAB-BLUEPRINT.md`. The design manual is `HEALTH-PLATFORM-DESIGN-MANUAL.md` at version 1.0.34. `docs/V2-ROADMAP.md` keeps the older backlog and now marks the slices the blueprint has implemented.
 
 ## Completed / existing functionality
 
@@ -14,6 +14,7 @@ Frozen v1.0.0, then the v2 slices the blueprint marks implemented:
 - V2-F1 Ask Health
 - V2-F2 Proactive Insights
 - V2-F3 Weekly Coach Brief
+- V2-F4 Experiment Suggestions
 
 Also present from v1 and the import work: Nutrition, Training, Body, Progress, Activity, Sleep, Timeline, Compare, checkpoints, Apple Health archive import, Health Auto Export ingest, Gemini nutrition capture, Home-AI transcription, backup and portable export, and the public demo.
 
@@ -25,9 +26,7 @@ No active implementation task. See `CURRENT_TASK.md`.
 
 Named by the current manual or blueprint, and not marked implemented:
 
-- V2-F4 experiment suggestions
 - V2-F5 literature retrieval
-- The blueprint ordering line says “V2-F4 and later” without a separate specification in that list. The names above come from design-manual section 53 and the F3 blueprint amendment. A fuller F4 or F5 contract is not in the ordering section.
 - Overnight vital metrics remain disabled until a payload is verified.
 - External retest notifications remain deferred (`docs/V2-ROADMAP.md` and the blueprint).
 - Nested recipes, batch inventory, and recipe fiber remain deferred.
@@ -39,6 +38,6 @@ Named by the current manual or blueprint, and not marked implemented:
 
 ## Unknown
 
-- Whether any planned item besides F4, F5, disabled vitals, and the deferred items above has an accepted specification.
+- Whether any planned item besides F5, disabled vitals, and the deferred items above has an accepted specification.
 - Whether the external Home-AI service runs Ollama. This repository only calls Home-AI over HTTP.
 - Whether the local annotated tag `v1.0.0` has been pushed. The tag exists locally and points at `7124ca513efa6c833457303ee6ff79d78344fce6`. No remote was contacted, and local metadata has no remote-tracking tag ref, which does not prove the remote state.

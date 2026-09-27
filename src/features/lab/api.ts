@@ -1,3 +1,4 @@
+import type { ExperimentCandidate, SuggestionDraft } from '@/domain/experiment-suggestions'
 import type { BenchmarkRetestView } from '@/domain/lab-retests'
 import { healthFetch, readApiError } from '@/lib'
 
@@ -338,4 +339,27 @@ export function invalidateExperimentResult(id: string, reason: string): Promise<
 
 export function fetchLabProtocolVersion(id: string): Promise<{ id: string; version: number; title: string; benchmarkDefinitionId: string }> {
   return sendJson(`/api/lab/protocol-versions/${id}`, 'GET')
+}
+
+export function fetchSuggestions(): Promise<{ suggestions: ExperimentCandidate[]; empty: string | null }> {
+  return sendJson('/api/lab/experiment-suggestions', 'GET')
+}
+
+export function fetchSuggestion(candidateId: string): Promise<{ suggestion: ExperimentCandidate }> {
+  return sendJson(`/api/lab/experiment-suggestions/${encodeURIComponent(candidateId)}`, 'GET')
+}
+
+export function draftSuggestion(candidateId: string): Promise<{
+  suggestion: ExperimentCandidate
+  draft: SuggestionDraft | null
+  notice: string | null
+}> {
+  return sendJson(`/api/lab/experiment-suggestions/${encodeURIComponent(candidateId)}/draft`, 'POST', {})
+}
+
+export function acceptSuggestion(
+  candidateId: string,
+  body: { candidateFingerprint: string; title: string; notes: string; usedAiDraft: boolean },
+): Promise<{ id: string }> {
+  return sendJson(`/api/lab/experiment-suggestions/${encodeURIComponent(candidateId)}/accept`, 'POST', body)
 }

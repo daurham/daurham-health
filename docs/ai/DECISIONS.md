@@ -104,6 +104,12 @@ Observed from the current code and product docs. Where the original rationale is
 **Reason:** The server calls `HOME_AI_BASE_URL` for transcription and nutrition fallback. This repo has no Ollama client. Older architecture documents name Ollama as the runtime behind Home-AI. Whether that host still uses Ollama: unknown from this repo.  
 **Implications:** Workout and label jobs depend on Home-AI being configured. Do not add a local model runtime as part of an unrelated task.
 
+## Decision: Experiment suggestions are derived until the owner accepts one
+
+**Status:** Active  
+**Reason:** V2-F4 keeps eligibility in a fixed registry. Gemini may phrase an eligible candidate. The existing `experiments.origin` value cannot store both the eligibility trigger and whether the owner used AI wording.  
+**Implications:** Migration `0031_experiment_origins.sql` adds `origin_kind`, `origin_trigger`, `origin_fingerprint`, `origin_evidence`, and `experiment_goals`. Existing rows stay `owner_created` unless `origin` was already `ai_assisted` or `external_research`. Listing a suggestion does not reserve `ai_usage`. Acceptance rechecks the fingerprint and inserts one `accepted` Experiment. Goal observation is limited to body metric, steps, protein, sleep duration, and supplement adherence, because those map onto existing Lab requirements. Strength e1RM, training frequency, and benchmark-result goals stay unsupported. Windowed targets stay on the pinned goal version because Lab criteria do not store those thresholds.
+
 ## Decision: Manual ledger rows are historical
 
 **Status:** Active  

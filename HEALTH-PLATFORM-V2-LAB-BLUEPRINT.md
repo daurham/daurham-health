@@ -1,9 +1,9 @@
 # Daurham Health — V2 Lab Blueprint
 
-**Status:** V2-A Data Capture Foundations complete. V2-B Personal Lab Core complete (V2-B1 through V2-B4). V2-C Recipes / Batch Meals complete (V2-C1 through V2-C4). V2-D Goals + Projections complete (V2-D1 through V2-D3). V2-E Rich Sleep + Overnight Vitals complete (V2-E1 through V2-E5). Overnight vital metrics remain disabled until a payload is verified. V2-F1 Ask Health conversational analysis is implemented. V2-F2 Proactive Insights are implemented. V2-F3 Weekly Coach Brief is implemented. V2-F4 and later are not implemented.  
+**Status:** V2-A Data Capture Foundations complete. V2-B Personal Lab Core complete (V2-B1 through V2-B4). V2-C Recipes / Batch Meals complete (V2-C1 through V2-C4). V2-D Goals + Projections complete (V2-D1 through V2-D3). V2-E Rich Sleep + Overnight Vitals complete (V2-E1 through V2-E5). Overnight vital metrics remain disabled until a payload is verified. V2-F1 Ask Health conversational analysis is implemented. V2-F2 Proactive Insights are implemented. V2-F3 Weekly Coach Brief is implemented. V2-F4 Experiment Suggestions are implemented. V2-F5 is not implemented.  
 **Calendar:** America/Phoenix  
 **Package version:** remains `1.0.0`  
-**Schema head:** `0030_ai_usage.sql`
+**Schema head:** `0031_experiment_origins.sql`
 
 This file is the v2 product authority for work after the frozen v1 manual. The frozen manual remains the authority for retained v1 semantics. Where this blueprint intentionally extends the product, it takes precedence over the older post-v1 roadmap in the v1 manual and in `docs/V2-ROADMAP.md`.
 
@@ -46,7 +46,8 @@ The file was not present in the repository when V2-A1 implementation started. Th
    - V2-F1 Conversational analysis — implemented
    - V2-F2 Proactive Insights — implemented
    - V2-F3 Weekly Coach Brief — implemented
-   - V2-F4 and later — not implemented
+   - V2-F4 Experiment Suggestions — implemented
+   - V2-F5 Literature retrieval — not implemented
 
 Invariant:
 
@@ -494,6 +495,12 @@ Insights are derived on each read from the existing domain analytics and the exi
 V2-F3 is implemented. There is no migration and no weekly brief table. Schema head remains `0030_ai_usage.sql`. Package version remains `1.0.0`. The packet version is `weekly-coach-evidence-v1`. The prompt version is `weekly-coach-v1`. V2-F4 and V2-F5 are not implemented.
 
 The brief covers the seven completed Phoenix dates before `asOf` and compares them with the seven dates before that. Today's incomplete evidence stays out. Facts reuse the accepted Progress, Goal, Lab, and Proactive Insight calculations. At least two substantive domains are required before Gemini runs. The model may select, order, and phrase a bounded candidate inventory. It may not invent a measurement, a focus action, an experiment, or a citation. Invalid model output falls back to the ranked facts. Weekly Coach shares the Ask Health monthly budget and provider rate gate through `ai_usage`. Generation happens only when the owner asks for it. Coach prose is not stored. The demo is compiled fiction and does not call the provider.
+
+## Amendment — 2026-09-27T15:09:44-07:00 — V2-F4 Experiment Suggestions
+
+V2-F4 is implemented. Migration `0031_experiment_origins.sql` adds experiment origin provenance and `experiment_goals`. Schema head is `0031_experiment_origins.sql`. Package version remains `1.0.0`. The calculation version is `experiment-suggestions-v1`. The packet version is `experiment-suggestion-evidence-v1`. The prompt version is `experiment-suggestion-v1`. V2-F5 is not implemented.
+
+Candidates come from a fixed registry: a benchmark with no valid result, a B3 `due` retest pinned to that protocol version, or an active unmet goal the existing Lab evaluators can measure. The model does not search history for experiments. Draft wording is optional and explicit. Acceptance rederives the candidate, rejects a stale fingerprint with `409`, and inserts one `accepted` Experiment. `origin_kind` records `deterministic_candidate` or `ai_assisted`. `origin_trigger` keeps the eligibility reason either way. Unaccepted suggestions are not stored, backed up, or exported. The portable export labels an accepted origin in words. The demo at `/demo/lab` is compiled fiction and does not call a provider.
 
 
 

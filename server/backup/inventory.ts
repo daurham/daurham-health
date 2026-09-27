@@ -1,6 +1,6 @@
 export const BACKUP_FORMAT = 'daurham-health-backup'
 export const BACKUP_FORMAT_VERSION = 1
-export const LATEST_SCHEMA_MIGRATION = '0030_ai_usage.sql'
+export const LATEST_SCHEMA_MIGRATION = '0031_experiment_origins.sql'
 export const PORTABLE_EXPORT_BYTE_LIMIT = 3_500_000
 
 export type ColumnKind = 'uuid' | 'text' | 'date' | 'timestamptz' | 'numeric' | 'int' | 'bool' | 'json' | 'bytea'
@@ -486,6 +486,10 @@ export const BACKUP_TABLES: readonly BackupTable[] = [
       col('rationale', 'text'),
       col('origin', 'text'),
       col('status', 'text'),
+      col('origin_kind', 'text'),
+      col('origin_trigger', 'text'),
+      col('origin_fingerprint', 'text'),
+      col('origin_evidence', 'json'),
       col('protocol_version_id', 'uuid'),
       col('window_start', 'date'),
       col('window_end', 'date'),
@@ -922,6 +926,24 @@ export const BACKUP_TABLES: readonly BackupTable[] = [
       col('evaluation_window_days', 'int'),
       col('notes', 'text'),
       col('source_id', 'uuid'),
+      col('created_at', 'timestamptz'),
+    ],
+  }),
+  table({
+    name: 'experiment_goals',
+    backupClass: 'canonical',
+    primaryKey: ['experiment_id'],
+    seeded: false,
+    portable: true,
+    references: [
+      { column: 'experiment_id', table: 'experiments' },
+      { column: 'goal_id', table: 'goals' },
+      { column: 'goal_version_id', table: 'goal_versions' },
+    ],
+    columns: [
+      col('experiment_id', 'uuid'),
+      col('goal_id', 'uuid'),
+      col('goal_version_id', 'uuid'),
       col('created_at', 'timestamptz'),
     ],
   }),

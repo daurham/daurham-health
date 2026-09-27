@@ -5,6 +5,7 @@ import { LoadErrorNotice, primaryButtonClass, secondaryButtonClass } from '@/lib
 import { prominentRetests, type BenchmarkRetestView } from '@/domain/lab-retests'
 import { fetchBenchmarks, fetchExperiments, fetchRetests, type BenchmarkSummary, type ExperimentSummary } from './api'
 import { RetestList } from './RetestSection'
+import { LabSuggestions } from './SuggestionPages'
 
 function statusLabel(status: string): string {
   return status.slice(0, 1).toUpperCase() + status.slice(1)
@@ -65,6 +66,7 @@ export function LabPage() {
       {error ? <LoadErrorNotice message={error} /> : null}
       {loading ? <p className="text-sm text-zinc-600">Loading lab…</p> : null}
       <RetestList views={prominentRetests(retests)} />
+      {loading ? null : <LabSuggestions />}
       <section className="space-y-3">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Active / ready to review</h2>
         {current.length === 0 ? <p className="text-sm text-zinc-600">No scheduled or active experiments.</p> : <ExperimentList items={current} />}
