@@ -298,6 +298,12 @@ describe('nutrition API routing', () => {
       'nutrition-entry-detail',
     )
     expect(matchHealthApiRoute('/api/nutrition/foods')).toBe('nutrition-foods')
+    expect(matchHealthApiRoute('/api/nutrition/recipe-entries')).toBe('nutrition-recipes')
+    expect(matchHealthApiRoute('/api/nutrition/recipes')).toBe('nutrition-recipes')
+    expect(matchHealthApiRoute('/api/nutrition/recipes/11111111-1111-4111-8111-111111111111')).toBe('nutrition-recipes')
+    expect(matchHealthApiRoute('/api/nutrition/recipes/11111111-1111-4111-8111-111111111111/archive')).toBe('nutrition-recipes')
+    expect(matchHealthApiRoute('/api/nutrition/recipes/11111111-1111-4111-8111-111111111111/versions')).toBe('nutrition-recipes')
+    expect(matchHealthApiRoute('/api/nutrition/recipes/11111111-1111-4111-8111-111111111111/versions/preview')).toBe('nutrition-recipes')
     expect(matchHealthApiRoute('/api/nutrition/targets')).toBe('nutrition-targets')
     expect(matchHealthApiRoute('/api/nutrition/barcode/034000470693')).toBe('nutrition-barcode')
     expect(matchHealthApiRoute('/api/nutrition/barcode/save')).toBe('nutrition-barcode')

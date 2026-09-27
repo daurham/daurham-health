@@ -6,6 +6,11 @@ import { NotFoundPage } from '@/components/NotFoundPage'
 import { TodayPage } from '@/features/today'
 
 const NutritionPage = lazy(() => import('@/features/nutrition').then((module) => ({ default: module.NutritionPage })))
+const RecipesPage = lazy(() => import('@/features/nutrition').then((module) => ({ default: module.RecipesPage })))
+const NewRecipePage = lazy(() => import('@/features/nutrition').then((module) => ({ default: module.NewRecipePage })))
+const RecipeDetailPage = lazy(() => import('@/features/nutrition').then((module) => ({ default: module.RecipeDetailPage })))
+const RecipeEditPage = lazy(() => import('@/features/nutrition').then((module) => ({ default: module.RecipeEditPage })))
+const RecipeVersionPage = lazy(() => import('@/features/nutrition').then((module) => ({ default: module.RecipeVersionPage })))
 const BodyPage = lazy(() => import('@/features/body').then((module) => ({ default: module.BodyPage })))
 const SettingsPage = lazy(() => import('@/features/settings').then((module) => ({ default: module.SettingsPage })))
 const SupplementsPage = lazy(() => import('@/features/supplements').then((module) => ({ default: module.SupplementsPage })))
@@ -55,6 +60,11 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: <TodayPage /> },
       { path: 'nutrition', element: <NutritionPage /> },
+      { path: 'nutrition/recipes', element: <RecipesPage /> },
+      { path: 'nutrition/recipes/new', element: <NewRecipePage /> },
+      { path: 'nutrition/recipes/:recipeId/edit', element: <RecipeEditPage /> },
+      { path: 'nutrition/recipes/:recipeId/versions/:version', element: <RecipeVersionPage /> },
+      { path: 'nutrition/recipes/:recipeId', element: <RecipeDetailPage /> },
       { path: 'training', element: <TrainingPage /> },
       { path: 'training/new', element: <StartWorkoutPage /> },
       { path: 'training/import', element: <ImportWorkoutPage /> },

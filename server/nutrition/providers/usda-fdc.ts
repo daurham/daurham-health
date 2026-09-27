@@ -10,6 +10,13 @@ const NUTRIENT_IDS = {
   fiber: 1079,
 } as const
 
+export type UsdaPortion = {
+  label: string
+  amount: number
+  unit: string
+  grams: number
+}
+
 export type UsdaFoodCandidate = {
   fdcId: number
   name: string
@@ -21,6 +28,7 @@ export type UsdaFoodCandidate = {
   carbs: number | null
   fat: number | null
   fiber: number | null
+  portions: UsdaPortion[]
 }
 
 export type UsdaSearchResult =
@@ -33,6 +41,35 @@ type UsdaFetch = typeof fetch
 export function usdaApiKey(env: NodeJS.ProcessEnv = process.env): string | null {
   const key = env.USDA_FDC_API_KEY?.trim()
   return key ? key : null
+}
+
+function usdaPortions(food: Record<string, unknown>): UsdaPortion[] {
+  const portions: UsdaPortion[] = [{ label: '100 g', amount: 100, unit: 'g', grams: 100 }]
+  const raw = Array.isArray(food.foodPortions) ? food.foodPortions : []
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') {
+      continue
+    }
+    const row = item as Record<string, unknown>
+    const grams = Number(row.gramWeight)
+    if (!(grams > 0)) {
+      continue
+    }
+    const amount = Number(row.amount)
+    const quantity = Number.isFinite(amount) && amount > 0 ? amount : 1
+    const measure = row.measureUnit && typeof row.measureUnit === 'object' ? (row.measureUnit as Record<string, unknown>) : null
+    const abbreviation = typeof measure?.abbreviation === 'string' ? measure.abbreviation.trim() : ''
+    const measureName = typeof measure?.name === 'string' ? measure.name.trim() : ''
+    const modifier = typeof row.modifier === 'string' ? row.modifier.trim() : ''
+    const unit = (abbreviation || measureName || modifier || 'serving').slice(0, 80)
+    const description = typeof row.portionDescription === 'string' ? row.portionDescription.trim() : ''
+    const label = (description || `${quantity} ${unit} (${grams} g)`).slice(0, 120)
+    portions.push({ label, amount: quantity, unit, grams })
+    if (portions.length >= 8) {
+      break
+    }
+  }
+  return portions
 }
 
 function nutrientValue(food: Record<string, unknown>, id: number): number | null {
@@ -70,6 +107,7 @@ export function usdaCandidateFromFood(food: Record<string, unknown>): UsdaFoodCa
     carbs: nutrientValue(food, NUTRIENT_IDS.carbs),
     fat: nutrientValue(food, NUTRIENT_IDS.fat),
     fiber: nutrientValue(food, NUTRIENT_IDS.fiber),
+    portions: usdaPortions(food),
   }
 }
 

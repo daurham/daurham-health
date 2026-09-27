@@ -35,6 +35,8 @@ import nutritionMealJobsHandler from './handlers/nutrition-meal-jobs.js'
 import nutritionMealJobDetailHandler from './handlers/nutrition-meal-job-detail.js'
 import nutritionMealCommitHandler from './handlers/nutrition-meal-commit.js'
 import nutritionDescribeHandler from './handlers/nutrition-describe.js'
+import nutritionRecipesHandler from './handlers/nutrition-recipes.js'
+import nutritionRecipeFoodsHandler from './handlers/nutrition-recipe-foods.js'
 import appleHealthImportHandler from './handlers/apple-health-import.js'
 import appleHealthSyncHandler from './handlers/apple-health-sync.js'
 import todayHandler from './handlers/today.js'
@@ -80,6 +82,8 @@ export type HealthApiRoute =
   | 'nutrition-meal-job-detail'
   | 'nutrition-meal-commit'
   | 'nutrition-describe'
+  | 'nutrition-recipes'
+  | 'nutrition-recipe-foods'
   | 'apple-health-import'
   | 'apple-health-sync'
   | 'today'
@@ -127,6 +131,8 @@ const HANDLERS: Record<HealthApiRoute, HealthApiHandler> = {
   'nutrition-meal-job-detail': nutritionMealJobDetailHandler,
   'nutrition-meal-commit': nutritionMealCommitHandler,
   'nutrition-describe': nutritionDescribeHandler,
+  'nutrition-recipes': nutritionRecipesHandler,
+  'nutrition-recipe-foods': nutritionRecipeFoodsHandler,
   'apple-health-import': appleHealthImportHandler,
   'apple-health-sync': appleHealthSyncHandler,
   today: todayHandler,
@@ -203,6 +209,10 @@ export function matchHealthApiRoute(pathname: string): HealthApiRoute | null {
     case '/api/nutrition/describe':
     case '/api/nutrition/describe/commit':
       return 'nutrition-describe'
+    case '/api/nutrition/usda/search':
+    case '/api/nutrition/usda/foods':
+    case '/api/nutrition/recipe-foods':
+      return 'nutrition-recipe-foods'
     case '/api/nutrition/import/legacy/preview':
     case '/api/nutrition/import/legacy/commit':
       return 'nutrition-legacy-import'
@@ -214,6 +224,9 @@ export function matchHealthApiRoute(pathname: string): HealthApiRoute | null {
       return 'apple-health-sync'
     default:
       break
+  }
+  if (pathname === '/api/nutrition/recipe-entries' || pathname === '/api/nutrition/recipes' || pathname.startsWith('/api/nutrition/recipes/')) {
+    return 'nutrition-recipes'
   }
   if (pathname === '/api/supplements' || pathname.startsWith('/api/supplements/')) {
     return 'supplements'

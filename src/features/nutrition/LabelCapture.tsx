@@ -45,9 +45,10 @@ type LabelCaptureProps = {
   onLogged: (entry: NutritionEntry, food: NutritionFood) => void
   onSavedFood?: (food: NutritionFood) => void
   onDiscarded?: () => void
+  purpose?: 'log' | 'recipe'
 }
 
-export function LabelCaptureSheet({ date, jobId, onClose, onBack, onLogged, onSavedFood, onDiscarded }: LabelCaptureProps) {
+export function LabelCaptureSheet({ date, jobId, onClose, onBack, onLogged, onSavedFood, onDiscarded, purpose = 'log' }: LabelCaptureProps) {
   const [phase, setPhase] = useState<'pick' | 'preview' | 'working' | 'review' | 'failed'>(jobId ? 'working' : 'pick')
   const [activeJobId, setActiveJobId] = useState<string | null>(jobId ?? null)
   const [payload, setPayload] = useState<NutritionLabelJobResponse | null>(null)
@@ -225,6 +226,7 @@ export function LabelCaptureSheet({ date, jobId, onClose, onBack, onLogged, onSa
         onDiscard={activeJobId ? () => void discardCapture() : undefined}
         onLogged={onLogged}
         onSavedFood={onSavedFood}
+        purpose={purpose}
       />
     )
   }
@@ -364,6 +366,7 @@ function LabelReviewSheet({
   onDiscard,
   onLogged,
   onSavedFood,
+  purpose = 'log',
 }: {
   date: string
   jobId: string | null
@@ -377,6 +380,7 @@ function LabelReviewSheet({
   onDiscard?: () => void
   onLogged: (entry: NutritionEntry, food: NutritionFood) => void
   onSavedFood?: (food: NutritionFood) => void
+  purpose?: 'log' | 'recipe'
 }) {
   const [draft, setDraft] = useState(() => draftFromCandidate(candidate))
   const [errors, setErrors] = useState<ReviewFieldError[]>([])
@@ -479,20 +483,31 @@ function LabelReviewSheet({
       title="Review nutrition label"
       onClose={onClose}
       footer={
-        <CatalogCommitFooter
-          date={date}
-          busy={busy}
-          onBack={onBack}
-          extra={
-            onDiscard ? (
-              <button type="button" className={secondaryClass} onClick={onDiscard} disabled={busy}>
-                Discard
-              </button>
-            ) : null
-          }
-          onSaveForLater={() => void save(false)}
-          onAddToDate={() => void save(true)}
-        />
+        purpose === 'recipe' ? (
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className={secondaryButtonClass} onClick={onBack} disabled={busy}>
+              Back
+            </button>
+            <button type="button" className={primaryButtonClass} disabled={busy} onClick={() => void save(false)}>
+              {busy ? 'Saving…' : 'Save & add to recipe'}
+            </button>
+          </div>
+        ) : (
+          <CatalogCommitFooter
+            date={date}
+            busy={busy}
+            onBack={onBack}
+            extra={
+              onDiscard ? (
+                <button type="button" className={secondaryClass} onClick={onDiscard} disabled={busy}>
+                  Discard
+                </button>
+              ) : null
+            }
+            onSaveForLater={() => void save(false)}
+            onAddToDate={() => void save(true)}
+          />
+        )
       }
     >
       <div className="space-y-3">
@@ -629,6 +644,7 @@ function LabelReviewSheet({
         </div>
         <Field id="label-barcode" label="Barcode" value={draft.barcode} error={errorFor('barcode')} inputMode="numeric" onChange={(value) => setField('barcode', value)} />
 
+        {purpose === 'log' ? (
         <div>
           <p className={labelClass}>Quantity to log</p>
           <div className="flex items-center gap-2">
@@ -647,6 +663,7 @@ function LabelReviewSheet({
             </p>
           ) : null}
         </div>
+        ) : null}
         {error ? <p className="text-sm text-red-700">{error}</p> : null}
       </div>
     </NutritionSheet>

@@ -1,6 +1,7 @@
 import type {
   NutritionEntry,
   NutritionEntryCreate,
+  LoggableRecipeVersion,
   NutritionEntryPatch,
   NutritionFood,
   NutritionFoodCreate,
@@ -28,6 +29,7 @@ export type NutritionDayPayload = {
     recents: NutritionFood[]
     staples: NutritionFood[]
     recipes: NutritionFood[]
+    currentRecipes?: LoggableRecipeVersion[]
   }
 }
 
@@ -72,6 +74,22 @@ export async function patchNutritionFood(id: string, input: NutritionFoodPatch):
   return parseOk(
     await healthFetch(`/api/nutrition/foods/${id}`, {
       method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    }),
+  )
+}
+
+export async function logRecipeEntry(input: {
+  recipeVersionId: string
+  logDate: string
+  portionKind: 'servings' | 'fraction' | 'grams'
+  amount: number
+  timezone: string
+}): Promise<NutritionEntry> {
+  return parseOk(
+    await healthFetch('/api/nutrition/recipe-entries', {
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
     }),
@@ -354,6 +372,75 @@ export async function reanalyzeNutritionLabelJob(
   })
   const body = await parseMealAction<{ job: { id: string; status: 'queued' } }>(response)
   return body.job
+}
+
+export type UsdaPortionChoice = {
+  label: string
+  amount: number
+  unit: string
+  grams: number
+}
+
+export type UsdaFoodChoice = {
+  fdcId: number
+  name: string
+  calories: number
+  protein: number | null
+  carbs: number | null
+  fat: number | null
+  fiber: number | null
+  portions: UsdaPortionChoice[]
+}
+
+export async function searchUsdaFoods(query: string): Promise<UsdaFoodChoice[]> {
+  const body = await parseOk<{ foods: UsdaFoodChoice[] }>(
+    await healthFetch('/api/nutrition/usda/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query }),
+    }),
+  )
+  return body.foods
+}
+
+export async function saveUsdaReusableFood(input: {
+  fdcId: number
+  amount: number
+  unit: string
+  grams: number
+}): Promise<{ food: NutritionFood; reused: boolean }> {
+  return parseOk(
+    await healthFetch('/api/nutrition/usda/foods', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    }),
+  )
+}
+
+export async function saveAiReusableFood(input: {
+  name: string
+  text: string
+  servingQuantity: number
+  servingUnit: string
+  servingGrams?: number | null
+  calories: number
+  protein?: number | null
+  carbs?: number | null
+  fat?: number | null
+  fiber?: number | null
+  provider: 'gemini' | 'home_ai'
+  model?: string | null
+  originalCalories: number
+  adjusted: boolean
+}): Promise<{ food: NutritionFood; reused: boolean }> {
+  return parseOk(
+    await healthFetch('/api/nutrition/recipe-foods', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    }),
+  )
 }
 
 export async function describeFoodText(text: string, provider?: 'gemini' | 'home_ai'): Promise<FoodDescriptionReview> {

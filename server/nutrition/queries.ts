@@ -106,6 +106,15 @@ export function mapEntryRow(row: EntryRow): NutritionEntry {
     sourceKind: row.source_kind as NutritionEntry['sourceKind'],
     notes: row.notes == null || row.notes === '' ? null : String(row.notes),
     mealGroupId: row.meal_group_id == null ? null : String(row.meal_group_id),
+    recipeVersionId: row.recipe_version_id == null || row.recipe_version_id === '' ? null : String(row.recipe_version_id),
+    recipePortionKind:
+      row.recipe_portion_kind === 'servings' || row.recipe_portion_kind === 'fraction' || row.recipe_portion_kind === 'grams'
+        ? row.recipe_portion_kind
+        : null,
+    recipePortionAmount: asNumber(row.recipe_portion_amount),
+    recipeFraction: asNumber(row.recipe_fraction),
+    recipeId: row.recipe_id == null || row.recipe_id === '' ? null : String(row.recipe_id),
+    recipeVersionNumber: asNumber(row.recipe_version_number),
     createdAt: asIso(row.created_at),
     updatedAt: asIso(row.updated_at),
   }
@@ -129,7 +138,16 @@ const FOOD_COLUMNS = `id, name, brand, barcode, catalog_kind, serving_quantity, 
          calories, protein, carbs, fat, fiber, source_kind, is_staple, archived, notes, created_at, updated_at`
 
 const ENTRY_COLUMNS = `id, log_date, consumed_at, timezone, meal, food_id, food_name, brand, serving_quantity,
-         serving_unit, grams, calories, protein, carbs, fat, fiber, source_kind, notes, meal_group_id, created_at, updated_at`
+         serving_unit, grams, calories, protein, carbs, fat, fiber, source_kind, notes, meal_group_id,
+         recipe_version_id, recipe_portion_kind, recipe_portion_amount, recipe_fraction, created_at, updated_at`
+
+const ENTRY_READ_COLUMNS = ENTRY_COLUMNS.split(',')
+  .map((column) => `nutrition_entries.${column.trim()}`)
+  .join(', ')
+  .concat(', recipe_entry_versions.recipe_id::text AS recipe_id, recipe_entry_versions.version AS recipe_version_number')
+
+const ENTRY_READ_FROM = `nutrition_entries
+         LEFT JOIN recipe_versions recipe_entry_versions ON recipe_entry_versions.id = nutrition_entries.recipe_version_id`
 
 export const LIST_FOODS_SQL = `SELECT ${FOOD_COLUMNS}
          FROM nutrition_foods
@@ -189,20 +207,20 @@ export const UPDATE_FOOD_SQL = `UPDATE nutrition_foods SET
          WHERE id = $1
          RETURNING ${FOOD_COLUMNS}`
 
-export const LIST_ENTRIES_FOR_DATE_SQL = `SELECT ${ENTRY_COLUMNS}
-         FROM nutrition_entries
-         WHERE log_date = $1
-         ORDER BY consumed_at NULLS LAST, created_at ASC, id ASC`
+export const LIST_ENTRIES_FOR_DATE_SQL = `SELECT ${ENTRY_READ_COLUMNS}
+         FROM ${ENTRY_READ_FROM}
+         WHERE nutrition_entries.log_date = $1
+         ORDER BY nutrition_entries.consumed_at NULLS LAST, nutrition_entries.created_at ASC, nutrition_entries.id ASC`
 
-export const LIST_ALL_ENTRIES_SQL = `SELECT ${ENTRY_COLUMNS}
-         FROM nutrition_entries
-         ORDER BY log_date ASC, created_at ASC, id ASC`
+export const LIST_ALL_ENTRIES_SQL = `SELECT ${ENTRY_READ_COLUMNS}
+         FROM ${ENTRY_READ_FROM}
+         ORDER BY nutrition_entries.log_date ASC, nutrition_entries.created_at ASC, nutrition_entries.id ASC`
 
-export const LIST_ENTRIES_BY_MEAL_GROUP_SQL = `SELECT ${ENTRY_COLUMNS} FROM nutrition_entries
-         WHERE meal_group_id = $1
-         ORDER BY created_at ASC, id ASC`
+export const LIST_ENTRIES_BY_MEAL_GROUP_SQL = `SELECT ${ENTRY_READ_COLUMNS} FROM ${ENTRY_READ_FROM}
+         WHERE nutrition_entries.meal_group_id = $1
+         ORDER BY nutrition_entries.created_at ASC, nutrition_entries.id ASC`
 
-export const GET_ENTRY_SQL = `SELECT ${ENTRY_COLUMNS} FROM nutrition_entries WHERE id = $1`
+export const GET_ENTRY_SQL = `SELECT ${ENTRY_READ_COLUMNS} FROM ${ENTRY_READ_FROM} WHERE nutrition_entries.id = $1`
 
 export const INSERT_ENTRY_SQL = `INSERT INTO nutrition_entries (
            log_date, consumed_at, timezone, meal, food_id, food_name, brand,
@@ -352,10 +370,17 @@ export async function updateFood(values: unknown[]): Promise<NutritionFood | nul
   })
 }
 
-export const LIST_ENTRIES_BETWEEN_SQL = `SELECT ${ENTRY_COLUMNS}
-         FROM nutrition_entries
-         WHERE log_date >= $1 AND log_date <= $2
-         ORDER BY log_date ASC, consumed_at NULLS LAST, created_at ASC, id ASC`
+export const LIST_ENTRIES_BETWEEN_SQL = `SELECT ${ENTRY_READ_COLUMNS}
+         FROM ${ENTRY_READ_FROM}
+         WHERE nutrition_entries.log_date >= $1 AND nutrition_entries.log_date <= $2
+         ORDER BY nutrition_entries.log_date ASC, nutrition_entries.consumed_at NULLS LAST, nutrition_entries.created_at ASC, nutrition_entries.id ASC`
+
+export const INSERT_RECIPE_ENTRY_SQL = `INSERT INTO nutrition_entries (
+           log_date, consumed_at, timezone, meal, food_id, food_name, brand,
+           serving_quantity, serving_unit, grams, calories, protein, carbs, fat, fiber,
+           source_kind, notes, recipe_version_id, recipe_portion_kind, recipe_portion_amount, recipe_fraction
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+         RETURNING ${ENTRY_COLUMNS}`
 
 export async function listEntriesForDate(date: string): Promise<NutritionEntry[]> {
   return queryOrUnavailable(async () => {
@@ -401,6 +426,17 @@ export async function insertEntry(values: unknown[]): Promise<NutritionEntry> {
   return queryOrUnavailable(async () => {
     const sql = await getSql()
     const rows = (await sql.query(INSERT_ENTRY_SQL, values)) as EntryRow[]
+    if (!rows[0]) {
+      throw new HttpError(500, 'Entry insert failed')
+    }
+    return mapEntryRow(rows[0])
+  })
+}
+
+export async function insertRecipeEntry(values: unknown[]): Promise<NutritionEntry> {
+  return queryOrUnavailable(async () => {
+    const sql = await getSql()
+    const rows = (await sql.query(INSERT_RECIPE_ENTRY_SQL, values)) as EntryRow[]
     if (!rows[0]) {
       throw new HttpError(500, 'Entry insert failed')
     }

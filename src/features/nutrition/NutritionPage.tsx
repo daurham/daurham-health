@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import {
   NUTRITION_CONFIG,
   nutritionDayTotals,
+  recipePortionDescription,
   snapshotFromDefinition,
   type NutritionEntry,
   type NutritionFood,
@@ -14,6 +15,7 @@ import {
   NutritionPlaceholder,
   PendingLoadRegion,
   primaryButtonClass,
+  secondaryButtonClass,
   useAtomicKeyedResource,
 } from '@/lib'
 import type { NutrientTotal } from '@/domain/nutrition'
@@ -306,13 +308,18 @@ export function NutritionPage() {
           <h1 className="text-xl font-semibold tracking-tight md:text-2xl">Nutrition</h1>
           <p className="mt-1 text-sm text-zinc-600 md:text-base">{formatNutritionDayLabel(date, today)}</p>
         </div>
-        <button
-          type="button"
-          onClick={() => setPanel({ kind: 'add' })}
-          className={`${primaryButtonClass} hidden md:inline-flex`}
-        >
-          Add food
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          <Link to="/nutrition/recipes" className={secondaryButtonClass}>
+            Recipes
+          </Link>
+          <button
+            type="button"
+            onClick={() => setPanel({ kind: 'add' })}
+            className={`${primaryButtonClass} hidden md:inline-flex`}
+          >
+            Add food
+          </button>
+        </div>
       </div>
 
       {resource.error ? (
@@ -458,6 +465,7 @@ export function NutritionPage() {
                     ? [food, ...current.quickAdd.staples.filter((item) => item.id !== food.id)]
                     : current.quickAdd.staples.filter((item) => item.id !== food.id),
                   recipes: replace(current.quickAdd.recipes),
+                  currentRecipes: current.quickAdd.currentRecipes,
                 },
               }
             })
@@ -730,6 +738,17 @@ function EntryList({
   )
 }
 
+function entrySubtitle(entry: NutritionEntry): string {
+  if (entry.recipePortionKind && entry.recipePortionAmount != null && entry.recipeVersionNumber != null) {
+    return recipePortionDescription({
+      kind: entry.recipePortionKind,
+      amount: entry.recipePortionAmount,
+      version: entry.recipeVersionNumber,
+    })
+  }
+  return [entry.brand, formatQuantity(entry.servingQuantity, entry.servingUnit)].filter(Boolean).join(' · ')
+}
+
 function EntryRowButton({ entry, onOpen }: { entry: NutritionEntry; onOpen: (entry: NutritionEntry) => void }) {
   return (
     <button
@@ -742,9 +761,7 @@ function EntryRowButton({ entry, onOpen }: { entry: NutritionEntry; onOpen: (ent
     >
       <span className="min-w-0 flex-1">
         <span className="block truncate font-medium">{entry.foodName}</span>
-        <span className="block truncate text-sm text-zinc-500">
-          {[entry.brand, formatQuantity(entry.servingQuantity, entry.servingUnit)].filter(Boolean).join(' · ')}
-        </span>
+        <span className="block truncate text-sm text-zinc-500">{entrySubtitle(entry)}</span>
       </span>
       <span className="shrink-0 text-right text-sm text-zinc-700">
         <span className="block">{formatKcal(entry.calories)}</span>

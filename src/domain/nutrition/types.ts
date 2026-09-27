@@ -6,8 +6,10 @@ import {
   NUTRITION_CATALOG_KINDS,
   NUTRITION_CONFIG,
   NUTRITION_MEALS,
+  NUTRITION_FOOD_SOURCE_KINDS,
   NUTRITION_SOURCE_KINDS,
   type NutritionCatalogKind,
+  type NutritionFoodSourceKind,
   type NutritionMeal,
   type NutritionSourceKind,
 } from './config.js'
@@ -26,7 +28,7 @@ export type NutritionFood = {
   carbs: number | null
   fat: number | null
   fiber: number | null
-  sourceKind: NutritionSourceKind
+  sourceKind: NutritionFoodSourceKind
   isStaple: boolean
   archived: boolean
   notes: string | null
@@ -54,6 +56,12 @@ export type NutritionEntry = {
   sourceKind: NutritionSourceKind
   notes: string | null
   mealGroupId: string | null
+  recipeVersionId?: string | null
+  recipePortionKind?: 'servings' | 'fraction' | 'grams' | null
+  recipePortionAmount?: number | null
+  recipeFraction?: number | null
+  recipeId?: string | null
+  recipeVersionNumber?: number | null
   createdAt: string
   updatedAt: string
 }
@@ -139,6 +147,7 @@ function optionalFinite(label: string) {
 }
 
 const sourceKindSchema = z.enum(NUTRITION_SOURCE_KINDS)
+const foodSourceKindSchema = z.enum(NUTRITION_FOOD_SOURCE_KINDS)
 const catalogKindSchema = z.enum(NUTRITION_CATALOG_KINDS)
 const mealSchema = z.enum(NUTRITION_MEALS)
 const calendarDateSchema = z.string().refine(isCalendarDate, 'Date must be YYYY-MM-DD')
@@ -156,7 +165,7 @@ export const nutritionFoodCreateSchema = z.object({
   carbs: optionalFinite('carbs').optional(),
   fat: optionalFinite('fat').optional(),
   fiber: optionalFinite('fiber').optional(),
-  sourceKind: sourceKindSchema.optional().default('manual'),
+  sourceKind: foodSourceKindSchema.optional().default('manual'),
   isStaple: z.boolean().optional().default(false),
   notes: optionalTrimmed(NUTRITION_CONFIG.notesMax).optional(),
 })

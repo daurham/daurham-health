@@ -1,11 +1,11 @@
 # Daurham Health Platform — Complete Architecture & Data Systems Design Manual
 
 **Canonical document:** `HEALTH-PLATFORM-DESIGN-MANUAL.md`  
-**Manual version:** 1.0.15  
+**Manual version:** 1.0.19  
 **System:** `health.daurham.com`  
-**Status:** **v1.0.0 frozen.** Owner acceptance passed; final automated release verification passed; a fresh production backup was created and verified; package metadata remains 1.0.0; release commit `7124ca513efa6c833457303ee6ff79d78344fce6` is tagged locally with annotated tag `v1.0.0`. The tag/commit have not been pushed. Backup/export/recovery was previously physically exercised against a disposable PostgreSQL restore target during Phase 15A. **Post-v1 extensions:** V2-A1 Supplements (`0017_supplements.sql`, section 31), V2-A2 Body measurement capture (`0018_body_measurement_cadence.sql`, section 32), V2-A3 ad-hoc Training (`0019_training_session_types.sql`, section 33), V2-A4 Daily Context (`0020_daily_context.sql`, section 34), V2-B1 Personal Lab (`0021_personal_lab_protocols.sql`, section 35), V2-B2 Benchmark Results (`0022_benchmark_results.sql`, section 36), V2-B3 Retest Scheduling (derived, no new migration, section 37), and V2-B4 Experiment Result Summaries (`0023_experiment_results.sql`, section 38). V2-A Data Capture Foundations is complete. V2-B Personal Lab Core is complete. V2-B1 records experiment and benchmark protocol identity. V2-B2 stores deterministic benchmark results linked to canonical evidence. V2-B3 derives retest guidance from the current protocol version and the latest valid result. V2-B4 records a deterministic experiment result under the frozen protocol. These extensions do not rewrite frozen v1 semantics.  
+**Status:** **v1.0.0 frozen.** Owner acceptance passed; final automated release verification passed; a fresh production backup was created and verified; package metadata remains 1.0.0; release commit `7124ca513efa6c833457303ee6ff79d78344fce6` is tagged locally with annotated tag `v1.0.0`. The tag/commit have not been pushed. Backup/export/recovery was previously physically exercised against a disposable PostgreSQL restore target during Phase 15A. **Post-v1 extensions:** V2-A1 Supplements (`0017_supplements.sql`, section 31), V2-A2 Body measurement capture (`0018_body_measurement_cadence.sql`, section 32), V2-A3 ad-hoc Training (`0019_training_session_types.sql`, section 33), V2-A4 Daily Context (`0020_daily_context.sql`, section 34), V2-B1 Personal Lab (`0021_personal_lab_protocols.sql`, section 35), V2-B2 Benchmark Results (`0022_benchmark_results.sql`, section 36), V2-B3 Retest Scheduling (derived, no new migration, section 37), V2-B4 Experiment Result Summaries (`0023_experiment_results.sql`, section 38), V2-C1 First-Class Recipes (`0024_recipes.sql`, section 39), V2-C2 Recipe version editing (same schema, section 40), V2-C3 Recipe consumption logging (`0025_recipe_consumption.sql`, section 41), and V2-C4 in-builder ingredient creation (`0026_nutrition_food_usda_source.sql`, section 42). V2-A Data Capture Foundations is complete. V2-B Personal Lab Core is complete. V2-C1 adds immutable recipe versions composed from reusable foods. V2-C2 edits the current formulation by creating the next immutable version. V2-C3 logs a portion of an exact Recipe Version as one ordinary nutrition entry. V2-C4 creates a missing ingredient from My Foods, USDA, a barcode, a nutrition label, a manual food, or one AI-assisted description without leaving the recipe draft. V2-C Recipes / Batch Meals is complete. V2-B1 records experiment and benchmark protocol identity. V2-B2 stores deterministic benchmark results linked to canonical evidence. V2-B3 derives retest guidance from the current protocol version and the latest valid result. V2-B4 records a deterministic experiment result under the frozen protocol. These extensions do not rewrite frozen v1 semantics.  
 **Canonical calendar timezone:** `America/Phoenix`  
-**Created / last updated:** `2026-09-27T00:36:13-07:00`  
+**Created / last updated:** `2026-09-27T00:52:31-07:00`  
 **Timestamp policy:** every semantic, schema, provider, routing, security, or workflow update to this manual must add a new ISO-8601 America/Phoenix timestamp to the Revision Ledger.  
 **Audience:** the owner, future maintainers, Cursor/coding agents, and any future AI asked to understand, rebuild, audit, or extend the platform.
 
@@ -403,6 +403,7 @@ Historical facts remain historical.
 Examples:
 
 - a consumed Nutrition entry keeps the nutrition values that were accepted at logging time;
+- a Recipe Version keeps the food name, serving basis, and nutrition values snapshotted when that version was created;
 - a completed workout set is not rewritten because a future routine/template changes;
 - a body measurement remains the imported/measured observation;
 - Apple Health source observations remain evidence even if later derived algorithms change.
@@ -507,8 +508,11 @@ Confirmed migration purposes through the implemented project include:
 - `0021`: post-v1 V2-B1 Personal Lab protocols (`0021_personal_lab_protocols.sql`)
 - `0022`: post-v1 V2-B2 Benchmark Results (`0022_benchmark_results.sql`)
 - `0023`: post-v1 V2-B4 Experiment Result Summaries (`0023_experiment_results.sql`)
+- `0024`: post-v1 V2-C1 First-Class Recipes (`0024_recipes.sql`)
+- `0025`: post-v1 V2-C3 Recipe consumption logging (`0025_recipe_consumption.sql`)
+- `0026`: post-v1 V2-C4 USDA reusable-food source (`0026_nutrition_food_usda_source.sql`)
 
-Current schema head: `0023_experiment_results.sql`. Exact filenames must still be read from `migrations/` before adding another migration.
+Current schema head: `0026_nutrition_food_usda_source.sql`. Exact filenames must still be read from `migrations/` before adding another migration.
 
 The manual treats the semantics below as authoritative even when a table's exact migration number is not recorded here.
 
@@ -745,15 +749,20 @@ Training edit/delete remains owner-only; anonymous callers receive `401`, authen
 
 ## 10.1 Canonical principles
 
-Nutrition keeps **food definitions** separate from **consumed snapshots**.
+Nutrition keeps **food definitions**, **recipe preparations**, and **consumed snapshots** separate.
 
-Editing a reusable food later does not rewrite historical intake.
+`nutrition_foods` is a reusable food or product. `recipes` is a reusable preparation. `nutrition_entries` is what was actually consumed on a date. A recipe is not a food row, and creating a recipe does not log intake. `nutrition_foods.catalog_kind = 'recipe'` remains the older quick-add catalog kind. It is not the recipe model in section 39.
+
+Editing a reusable food later does not rewrite historical intake or an existing Recipe Version.
 
 Canonical concepts include:
 
 - `nutrition_foods`
 - `nutrition_entries`
 - `nutrition_targets`
+- `recipes`
+- `recipe_versions`
+- `recipe_version_ingredients`
 - durable capture jobs
 - optional meal grouping where a workflow genuinely needs grouped component entries
 
@@ -770,6 +779,16 @@ The migration verified existing live production data rather than assuming reposi
 Primary route:
 
 `/nutrition?date=YYYY-MM-DD`
+
+Recipe management is secondary to daily logging:
+
+- `/nutrition/recipes`
+- `/nutrition/recipes/new`
+- `/nutrition/recipes/:id`
+- `/nutrition/recipes/:id/edit`
+- `/nutrition/recipes/:id/versions/:version`
+
+Recipes are not a primary navigation item. The edit route loads the current version. A historical version page reads that version's snapshots. `/demo` has no recipe route.
 
 Calendar semantics use America/Phoenix.
 
@@ -1792,6 +1811,9 @@ NULL, date-only values, timestamp instants, UUIDs, booleans, JSON evidence, and 
 - `nutrition_foods`
 - `nutrition_entries`
 - `nutrition_targets`
+- `recipes`
+- `recipe_versions`
+- `recipe_version_ingredients`
 - `body_measurement_sessions`
 - `body_metrics`
 - `progress_checkpoints`
@@ -1840,7 +1862,7 @@ Gemini capture image bytes that live in `nutrition_capture_jobs` are included in
 
 ### Schema metadata
 
-`schema_migrations` is represented in the manifest rather than exported as a normal user-data table. The schema head at manual 1.0.14 is `0023_experiment_results.sql`. V2-B3 retest state is derived from protocol versions and benchmark results, so it has no backup table. Experiment results are stored and restored as written. Restore does not recalculate them. `lab_protocol_requirements.criteria` travels with the requirement row. The v1.0.0 acceptance schema remains the historical anchor `0016_sleep_nightly_summaries.sql` recorded in section 23. `workout_sessions.session_type`, `session_name`, `experiment_id`, and `benchmark_protocol_version_id` travel with that table. Restore inserts `experiments` and `lab_protocol_versions` before `workout_sessions`, supplements before `experiment_supplements`, and `benchmark_results` before `benchmark_result_values` and `benchmark_result_evidence`. A result that names `supersedes_result_id` is inserted after the result it replaces. Owner-created exercise definitions are rows in `exercise_definitions`, which is already portable. Restore replaces that seeded table from the archive, so custom rows survive beside seeded rows when the archive contains both. `daily_context.source_id` references `data_sources`. `daily_context_tags.context_id` references `daily_context`, and restore inserts the parent before the tags.
+`schema_migrations` is represented in the manifest rather than exported as a normal user-data table. The schema head at manual 1.0.19 is `0026_nutrition_food_usda_source.sql`. A recipe may have several versions. Exactly one is current. Restore keeps each version id, integer, snapshot, nutrition, current flag, and archive state. Restore inserts `nutrition_foods` before `recipes`, `recipe_versions`, and `recipe_version_ingredients`, and those versions before `nutrition_entries`. A recipe-derived entry keeps its version id and portion. Older entries keep the recipe columns null. Ingredient `food_id` may be null after a food is removed. The name, serving basis, and nutrition snapshots still restore. Recipe calories and macros keep their numeric precision, including null macros. V2-B3 retest state is derived from protocol versions and benchmark results, so it has no backup table. Experiment results are stored and restored as written. Restore does not recalculate them. `lab_protocol_requirements.criteria` travels with the requirement row. The v1.0.0 acceptance schema remains the historical anchor `0016_sleep_nightly_summaries.sql` recorded in section 23. `workout_sessions.session_type`, `session_name`, `experiment_id`, and `benchmark_protocol_version_id` travel with that table. Restore inserts `experiments` and `lab_protocol_versions` before `workout_sessions`, supplements before `experiment_supplements`, and `benchmark_results` before `benchmark_result_values` and `benchmark_result_evidence`. A result that names `supersedes_result_id` is inserted after the result it replaces. Owner-created exercise definitions are rows in `exercise_definitions`, which is already portable. Restore replaces that seeded table from the archive, so custom rows survive beside seeded rows when the archive contains both. `daily_context.source_id` references `data_sources`. `daily_context_tags.context_id` references `daily_context`, and restore inserts the parent before the tags.
 
 ### Never exported
 
@@ -2160,7 +2182,7 @@ Remaining final work:
 
 ## Post-v1 — V2-A1 Supplements
 
-After the v1.0.0 freeze, V2-A1 added canonical supplement identity, effective-dated schedules, lifecycle history, and explicit adherence. Missing adherence stays unknown. See section 31. V2-A2 adds manual Body capture and opt-in cadence without changing the frozen weight-trend algorithm. See section 32. V2-A3 adds ad-hoc Training. See section 33. V2-A4 adds optional daily context. See section 34. V2-B1 adds Personal Lab protocol identity. See section 35. V2-B2 adds Benchmark Results. See section 36. V2-B3 derives Benchmark retest scheduling without a new migration. See section 37. V2-B4 records experiment result summaries on `0023_experiment_results.sql`. See section 38. Frozen v1 Nutrition, Training, Activity, and Sleep semantics are unchanged.
+After the v1.0.0 freeze, V2-A1 added canonical supplement identity, effective-dated schedules, lifecycle history, and explicit adherence. Missing adherence stays unknown. See section 31. V2-A2 adds manual Body capture and opt-in cadence without changing the frozen weight-trend algorithm. See section 32. V2-A3 adds ad-hoc Training. See section 33. V2-A4 adds optional daily context. See section 34. V2-B1 adds Personal Lab protocol identity. See section 35. V2-B2 adds Benchmark Results. See section 36. V2-B3 derives Benchmark retest scheduling without a new migration. See section 37. V2-B4 records experiment result summaries on `0023_experiment_results.sql`. See section 38. V2-C1 records first-class recipes on `0024_recipes.sql`. See section 39. V2-C2 records immutable recipe editing on that same schema. See section 40. V2-C3 logs consumption from an exact recipe version on `0025_recipe_consumption.sql`. See section 41. V2-C4 adds in-builder ingredient creation on `0026_nutrition_food_usda_source.sql`. See section 42. Frozen v1 Nutrition logging, Training, Activity, and Sleep semantics are unchanged.
 
 ---
 
@@ -2171,7 +2193,7 @@ After the v1.0.0 freeze, V2-A1 added canonical supplement identity, effective-da
 | Auth/owner security | Implemented | Health | 401/403 owner boundary, cookie session |
 | Body | Implemented/frozen, extended by V2-A2 | Health | Fit Profile and weight trends stay frozen. V2-A2 adds manual quick entry, circumference keys, and opt-in cadence. See section 32. |
 | Training | Implemented, extended by V2-A3 and V2-B1 | Health | Paper-first, Home-AI transcription v1.3.x; canonical workout edit/delete supported. V2-A3 adds ad-hoc sessions and owner exercises. V2-B1 lets an experiment session reference an active Experiment or a Benchmark protocol version. See sections 33 and 35. |
-| Nutrition | Implemented / release candidate | Health | Gemini primary, reviewed estimates, barcode/label/manual; reusable foods can be saved without logging |
+| Nutrition | Implemented / release candidate, extended by V2-C1 through V2-C3 | Health | Gemini primary, reviewed estimates, barcode/label/manual; reusable foods can be saved without logging. V2-C1 adds immutable recipe versions. V2-C2 creates the next version when the current formulation changes. V2-C3 logs one nutrition entry from an exact recipe version. See sections 39 through 41. |
 | Progress Strength/Body | Implemented | Health | Deterministic analytics. Daily context does not change these calculations. |
 | Activity | Implemented/frozen | Health | HAE daily summary canonical |
 | Sleep | Implemented/frozen | Health | XML/HAE intervals → nightly summaries |
@@ -2520,17 +2542,17 @@ A new implementation can reproduce the current system in the following dependenc
 
 ## Post-v1 extension
 
-After the v1 sequence above, V2-A1 adds supplement capture on `0017_supplements.sql`. See section 31. V2-A2 adds Body measurement capture and cadence on `0018_body_measurement_cadence.sql`. See section 32. V2-A3 adds ad-hoc Training on `0019_training_session_types.sql`. See section 33. V2-A4 adds Daily Context on `0020_daily_context.sql`. See section 34. V2-B1 adds Personal Lab protocols on `0021_personal_lab_protocols.sql`. See section 35. V2-B2 adds Benchmark Results on `0022_benchmark_results.sql`. See section 36. V2-B3 derives retest scheduling from that schema. See section 37. V2-B4 adds experiment result summaries on `0023_experiment_results.sql`. See section 38. Do not renumber the frozen v1 steps to include these extensions.
+After the v1 sequence above, V2-A1 adds supplement capture on `0017_supplements.sql`. See section 31. V2-A2 adds Body measurement capture and cadence on `0018_body_measurement_cadence.sql`. See section 32. V2-A3 adds ad-hoc Training on `0019_training_session_types.sql`. See section 33. V2-A4 adds Daily Context on `0020_daily_context.sql`. See section 34. V2-B1 adds Personal Lab protocols on `0021_personal_lab_protocols.sql`. See section 35. V2-B2 adds Benchmark Results on `0022_benchmark_results.sql`. See section 36. V2-B3 derives retest scheduling from that schema. See section 37. V2-B4 adds experiment result summaries on `0023_experiment_results.sql`. See section 38. V2-C1 adds first-class recipes on `0024_recipes.sql`. See section 39. V2-C2 adds recipe version editing without a new migration. See section 40. V2-C3 adds recipe consumption logging on `0025_recipe_consumption.sql`. See section 41. V2-C4 adds in-builder ingredient creation on `0026_nutrition_food_usda_source.sql`. See section 42. Do not renumber the frozen v1 steps to include these extensions.
 
 ---
 
 # 28. Current known deferred work
 
-Deferred work is not forgotten work. It is intentionally outside the current v1 core unless a later revision promotes it. The numbered list below is that frozen v1 backlog, not the v2 implementation order. V2-A Data Capture Foundations is recorded in `HEALTH-PLATFORM-V2-LAB-BLUEPRINT.md` and is complete: V2-A1 Supplements (section 31), V2-A2 Body measurement capture (section 32), V2-A3 ad-hoc Training (section 33), and V2-A4 Daily Context (section 34). V2-B1 Personal Lab protocol identity is implemented (section 35). V2-B2 Benchmark Results are implemented (section 36). V2-B3 Retest Scheduling is implemented as derived state (section 37). V2-B4 Experiment Result Summaries are implemented (section 38). V2-B Personal Lab Core is complete. Notifications and AI proposals remain deferred. Recipes remain later Nutrition work and were not started by these extensions. `docs/V2-ROADMAP.md` still records the older v1 ordering.
+Deferred work is not forgotten work. It is intentionally outside the current v1 core unless a later revision promotes it. The numbered list below is that frozen v1 backlog, not the v2 implementation order. V2-A Data Capture Foundations is recorded in `HEALTH-PLATFORM-V2-LAB-BLUEPRINT.md` and is complete: V2-A1 Supplements (section 31), V2-A2 Body measurement capture (section 32), V2-A3 ad-hoc Training (section 33), and V2-A4 Daily Context (section 34). V2-B1 Personal Lab protocol identity is implemented (section 35). V2-B2 Benchmark Results are implemented (section 36). V2-B3 Retest Scheduling is implemented as derived state (section 37). V2-B4 Experiment Result Summaries are implemented (section 38). V2-B Personal Lab Core is complete. V2-C1 First-Class Recipes are implemented (section 39): identity, immutable v1, and snapshotted ingredients. V2-C2 Recipe version editing is implemented (section 40). V2-C3 Recipe consumption logging is implemented (section 41). V2-C4 in-builder ingredient creation is implemented (section 42). V2-C Recipes / Batch Meals is complete. Notifications and AI proposals remain deferred. `docs/V2-ROADMAP.md` still records the older v1 ordering.
 
 Highest-priority v2 work:
 
-1. **Recipes / Batch Meals** — first-class named recipes made from reusable foods/ingredients, whole-recipe nutrition, servings/fractions/finished-weight logging, and historical consumed snapshots that remain stable when the recipe later changes.
+1. **Recipes / Batch Meals** — V2-C1 stores the recipe identity, immutable v1, ordered ingredient snapshots, and whole-recipe nutrition. V2-C2 stores later immutable versions of the same recipe. V2-C3 logs servings, a fraction of the recipe, or finished-weight grams from an exact version. V2-C4 creates a missing ingredient inside the recipe draft. V2-C Recipes / Batch Meals is complete. Nested recipes, batch inventory, and fiber remain deferred.
 2. **Body ingestion / Health Inbox** — substantially easier phone-first body-data intake, including quicker manual capture and investigation of share/Shortcut/device-source workflows while retaining the verified XLSX path.
 3. **Goals + deterministic projections** — first-class measurable goals with evidence-based trend/projection and uncertainty; optional AI may explain the deterministic result but does not invent the projection.
 4. **Goal-aware / cross-domain explanations** — deterministic evidence first, optional Gemini explanation second, no unsupported causality.
@@ -2572,6 +2594,10 @@ Other known deferred possibilities:
 | 2026-09-26T23:55:51-07:00 | 1.0.13 | 7, 16, 20, 21, 22, 28, 36, 37 | Recorded post-v1 V2-B3 Retest Scheduling. Retest state is derived from the current protocol version and the latest valid same-version result. No new migration. Package version stays 1.0.0. Automated suite: 621 tests. | No schedule table. Minimum interval does not block a result. Only the suggested interval creates `due`. Today shows at most one due retest and does not say overdue. No notifications, snooze, or AI timing. |
 | 2026-09-27T00:29:14-07:00 | 1.0.14 | 7, 11, 16, 20, 21, 22, 28, 37, 38 | Recorded post-v1 V2-B4 Experiment Result Summaries: migration `0023_experiment_results.sql`; deterministic classifications; owner protocol and safety attestations; immutable results. Package version stays 1.0.0. Automated suite: 637 tests. V2-B Personal Lab Core is complete. | A result reports observations under one frozen protocol version. It does not say the intervention caused the change. Unknown adherence is not skipped. Context absence is not negative evidence. No AI classification. |
 | 2026-09-27T00:36:13-07:00 | 1.0.15 | 16, 22, 38 | Ordinary Experiment Result finalization waits until the Health calendar day after `window_end`. The inclusive final day stays open. Early safety and protocol-invalid stops are unchanged. Schema head stays `0023_experiment_results.sql`. Package version stays 1.0.0. Automated suite: 638 tests. | A committed ordinary result includes only closed historical days. The current Activity day is not frozen because the planned window ends today. |
+| 2026-09-27T00:52:31-07:00 | 1.0.16 | 5, 7, 10, 16, 20, 22, 28, 39 | Recorded post-v1 V2-C1 First-Class Recipes: migration `0024_recipes.sql`; immutable recipe version 1; ingredient nutrition snapshots; deterministic whole-recipe nutrition. Package version stays 1.0.0. Automated suite: 654 tests. | A Recipe Version stays fixed to the foods, quantities, and nutrition values used when it was created. Later food edits do not rewrite version 1. |
+| 2026-09-27T08:11:37-07:00 | 1.0.17 | 10, 16, 20, 22, 28, 39, 40 | Recorded post-v1 V2-C2 Recipe version editing. No new migration. Schema head stays `0024_recipes.sql`. Editing the current formulation creates the next immutable version after preview. Package version stays 1.0.0. Automated suite: 663 tests. | Historical recipe versions are not rewritten. A new version re-resolves live foods only after the owner reviews the difference. |
+| 2026-09-27T08:38:26-07:00 | 1.0.18 | 10, 16, 20, 22, 28, 40, 41 | Recorded post-v1 V2-C3 Recipe consumption logging: migration `0025_recipe_consumption.sql`. A portion of an exact recipe version becomes one nutrition entry. Package version stays 1.0.0. Automated suite: 669 tests. | The consumed entry keeps the recipe version, portion, and nutrition accepted at logging time. Later recipe versions do not rewrite it. |
+| 2026-09-27T09:02:35-07:00 | 1.0.19 | 10, 16, 20, 22, 28, 39, 42 | Recorded post-v1 V2-C4 in-builder ingredient creation: migration `0026_nutrition_food_usda_source.sql` adds `usda` as a reusable-food source. A recipe draft can select or create a canonical food without leaving the builder. Package version stays 1.0.0. Automated suite: 682 tests. | Every recipe ingredient is still a `nutrition_foods` row. Creating that food does not log a nutrition entry or save the recipe. |
 ---
 
 # 30. Final system invariant
@@ -3003,7 +3029,7 @@ Today receives retest data inside `GET /api/today`. It shows at most one `due` r
 
 # 38. Post-v1 — V2-B4 Experiment Result Summaries
 
-An Experiment Result is a historical record of what the frozen protocol observed. Schema head is `0023_experiment_results.sql`. Package version stays 1.0.0. V2-B Personal Lab Core is complete.
+An Experiment Result is a historical record of what the frozen protocol observed. Its migration is `0023_experiment_results.sql`. Package version stays 1.0.0. V2-B Personal Lab Core is complete. Current schema head is recorded in section 7.
 
 ## 38.1 Classification
 
@@ -3050,6 +3076,124 @@ Today keeps the existing experiment card before `window_end`. On `window_end` an
 `experiment_results`, `experiment_result_requirements`, `experiment_result_evidence`, and requirement criteria are portable. Restore writes the stored result and does not recalculate it. `/demo` does not call the result API and does not show an owner result on the fictional Timeline.
 
 There is no AI call, causality score, confidence score, confounder score, or invented baseline window.
+
+# 39. Post-v1 — V2-C1 First-Class Recipes
+
+A Recipe is a reusable preparation. It is not a `nutrition_foods` row and it is not a consumed `nutrition_entries` row. Creating or archiving a recipe does not log intake. Schema head is `0024_recipes.sql`. Package version stays 1.0.0.
+
+## 39.1 Identity and immutable v1
+
+`recipes` holds identity, the manual source, and whether the recipe is active. The name, notes, yield, ingredients, and nutrition belong to `recipe_versions`. C1 creates version 1 and marks it current. A partial unique index allows at most one current version per recipe. The same shape can hold a later version. C1 exposes no PATCH of version content.
+
+`yield_servings` and `finished_weight_g` are optional and must be greater than zero when present. They are stored so a later consumption log can use them. C1 does not calculate per-serving calories unless a serving yield exists, and the list shows the serving count rather than inventing a per-serving calorie figure.
+
+## 39.2 Ingredient snapshots and calculation
+
+Ingredients are existing reusable `nutrition_foods` only. There are no nested recipes and no loose USDA ids. Each line stores the owner's amount and unit, the scale factor against the food's canonical serving basis, and a snapshot of the food name, source kind, barcode when present, serving basis, and calories, protein, carbs, and fat.
+
+The server resolves the unit, snapshots the food, and calculates the line. The client does not send calories or a scale factor. `serving` and `servings` mean that many of the whole serving basis. An exact normalized match to the food's serving unit scales by the serving quantity. Grams, ounces, and pounds scale by the food's serving weight, using 28.349523125 grams per ounce and 453.59237 grams per pound. Cups, tablespoons, and other units do not convert by guessed density. An unsupported unit, a weight without a weight basis, or a non-positive amount rejects the whole create. Nothing is inserted.
+
+Line calories are the snapshotted base calories times the scale factor, without intermediate rounding. Protein, carbs, and fat follow the same multiplication when known. If any ingredient is missing one of those macros, the whole-recipe value for that macro is null. The other macros still sum. Calories stay required. The stored calculation version is `recipe-v1`.
+
+`food_id` uses `ON DELETE SET NULL`. The snapshot remains if the food row is later removed. The product UI does not hard-delete foods. Later edits to a food's name or calories do not change version 1.
+
+The same food may appear on more than one line. `position` preserves owner order.
+
+## 39.3 Surfaces
+
+Owner routes are `GET` and `POST /api/nutrition/recipes`, `GET /api/nutrition/recipes/:id`, and `POST` archive and restore. Anonymous callers receive 401, other authenticated users receive 403, and the Apple ingest token has no authority. Archive hides the recipe from the active list and leaves the version readable. Restore returns it to the list. Archive does not change version 1.
+
+Nutrition links to Recipes beside Add food. Quick Log stays the primary daily action. The builder searches the existing food catalog. A local estimate can show before save. The saved response is the server calculation. Unknown macros display as not fully known, not as zero. Editing the current version is section 40. C1 itself does not patch version content.
+
+`/demo` does not mount recipe pages or call the recipe API.
+
+## 39.4 Backup
+
+`recipes`, `recipe_versions`, and `recipe_version_ingredients` are canonical portable tables. Restore order is foods, then recipe identity, then versions, then ingredients. Numeric precision, null macros, snapshots, archive state, the current flag, and ingredient order round-trip.
+
+## 39.5 Deferred
+
+C2 recipe version editing is section 40. C3 consumption logging is section 41. C4 in-builder ingredient creation is section 42. Fiber, sodium, and micronutrients are not added. Legacy `meal_combos` are not revived.
+
+# 40. Post-v1 — V2-C2 Recipe version editing
+
+A semantic edit of a Recipe creates the next immutable version of the same `recipes.id`. Version 1 is not rewritten. Schema head stays `0024_recipes.sql`. Package version stays 1.0.0. The stored calculation version stays `recipe-v1`. A recipe version number and the calculation version are different things.
+
+## 40.1 Lifecycle
+
+Only the current version can be edited. Historical versions stay readable from their snapshots, including a line whose `food_id` is null. The owner cannot edit version 1 while version 3 is current.
+
+The server loads the current version, resolves every surviving food against the current `nutrition_foods` row, recalculates line and whole nutrition with the C1 unit resolver, and inserts version N+1 in one transaction. That transaction locks the recipe and its current version, demotes that version, and inserts `version + 1` only while no current version remains. The unique current-version index still applies. A committed success has exactly one current version. `recipes.updated_at` moves. Historical version rows, including `created_at`, do not.
+
+An identical formulation whose live food bases still match the current snapshots does not create a version. A formulation that is unchanged except for a live food-basis correction does create a version. Ingredient order and yield are part of the formulation, so changing either creates a version.
+
+An archived recipe is read-only. Restore sets `is_active` true and does not create a version. The same current version stays current.
+
+## 40.2 Preview and commit
+
+`POST /api/nutrition/recipes/:id/versions/preview` writes nothing. The body carries `sourceVersionId` and the owner fields: name, notes, yield, finished weight, and ordered ingredients (`foodId`, amount, unit). Calculated calories, macros, and scale factors are rejected.
+
+The response compares the current version with the candidate: metadata, yield, ingredient changes, food-basis changes, both whole-nutrition figures, a neutral delta, warnings, `canCommit`, the next version number, and a `previewFingerprint`. Change categories include added, removed, reordered, amount changed, unit changed, food replaced, food basis changed, and unchanged. A line whose food is gone is unresolved until the owner replaces or removes it. A basis change compares name, serving amount, serving unit, serving weight, calories, protein, carbs, and fat. Usage counts and timestamps are not part of that comparison. If either side of a macro is unknown, that delta is unavailable rather than zero.
+
+`POST /api/nutrition/recipes/:id/versions` commits. It reloads foods and recalculates. If the source version is no longer current, the response is 409 `stale_version` (“Recipe changed since editing began.”). If the recomputed fingerprint differs, the response is 409 `stale_preview` (“Recipe ingredients changed since preview.”). No changes, a missing food, an unsupported unit, an invalid amount or yield, and an archived recipe return structured errors. Neither path writes a nutrition entry.
+
+`GET /api/nutrition/recipes/:id/versions/:version` returns that historical version from snapshots. The list and the default detail use the current version. History is ordered by the version integer, newest first.
+
+The private edit route is `/nutrition/recipes/:id/edit`. Review states that saving creates the next version and that the previous version remains unchanged. Historical pages are `/nutrition/recipes/:id/versions/:version` and have no edit action. The builder still searches existing foods. USDA, barcode, label, manual food creation, and AI food description stay in C4. Nested recipes stay rejected.
+
+## 40.3 Backup and export
+
+The same three recipe tables already hold every version. Full backup and portable export include the version chain: identity, each integer version, which one is current, and each ingredient snapshot. Restore keeps those ids and values and still leaves exactly one current version.
+
+## 40.4 Deferred
+
+C3 consumption logging is section 41. A logged entry keeps the recipe version it was calculated from. C4 in-builder ingredient creation is section 42. `/demo` still has no recipe management.
+
+# 41. Post-v1 — V2-C3 Recipe consumption logging
+
+Logging a Recipe creates one ordinary `nutrition_entries` row. The Recipe Version stays the reusable formulation. The entry is the consumed snapshot. Later recipe edits do not change that entry. Schema head is `0025_recipe_consumption.sql`. Package version stays 1.0.0.
+
+## 41.1 Provenance
+
+A recipe-derived entry stores `recipe_version_id`, `recipe_portion_kind` (`servings`, `fraction`, or `grams`), `recipe_portion_amount`, and `recipe_fraction`. All four are present, or all four are null. Ordinary food entries keep them null. The foreign key points at `recipe_versions`, not merely the recipe identity, so leftovers from version 1 can be logged after version 2 exists. The legacy `nutrition_foods.catalog_kind = 'recipe'` quick-add kind is unchanged and is not this model.
+
+The owner action uses the manual source kind. The entry name is the recipe version name at logging time. The portion description is stored on the entry, for example `1 serving · Recipe v2`, `0.5 recipe · Recipe v1`, or `475 g · Recipe v3`. Daily totals, targets, Today, and Progress read the entry. They do not recalculate it from the recipe or its ingredients.
+
+## 41.2 Portion math
+
+One resolver handles the three modes. Servings require `yield_servings` and use amount divided by that yield. Fraction mode is available on every version and uses the amount itself, including values above 1. Grams require `finished_weight_g` and use grams divided by that weight. Amounts must be greater than zero. There is no inventory ceiling and no batch remaining balance.
+
+Consumed calories and macros are the stored whole-recipe totals times that fraction, using the same nutrient scaling as other nutrition entries. There is no per-serving rounding step. A null macro stays null. Nutrition entries remain numeric; the day list still displays calories with the existing calorie formatter.
+
+`POST /api/nutrition/recipe-entries` requires `recipeVersionId`, `logDate`, `portionKind`, and `amount`. It does not reload ingredient foods. Archived recipes stay out of active search, and a direct log of a historical version still succeeds. Two deliberate logs can create two entries. Delete removes the entry and leaves the recipe version untouched. Generic entry correction keeps the recipe provenance columns and does not rewrite the recipe version.
+
+## 41.3 Surfaces
+
+Quick Log search shows the current version of active recipes beside saved foods. Choosing one opens a portion chooser. Historical versions are not search results. They are logged from version history with `Log this version`. The button uses the selected Nutrition date, so a past date says `Add to Sep 20` rather than Today. The same date rules as other nutrition logs apply.
+
+## 41.4 Backup
+
+`nutrition_entries` remains a portable table and now references `recipe_versions`. Restore inserts foods, recipe identity, versions, and ingredient lines before entries. Older entries restore with the recipe columns null. A recipe-derived entry restores its version id, portion, fraction, name, description, nutrition, date, and source.
+
+## 41.5 Deferred
+
+C4 in-builder ingredient creation is section 42. There is no batch inventory. `/demo` does not log recipes.
+
+# 42. Post-v1 — V2-C4 In-builder ingredient creation
+
+A recipe draft stays in the builder while an ingredient is selected or created. The draft holds the name, notes, yield, finished weight, and ingredient lines. Opening, cancelling, or failing a food flow does not discard it. Saving the food does not save the recipe. The builder returns the saved or reused `nutrition_foods.id` and adds that line. Refresh warns through the browser before an unsaved draft is dropped. There is no recipe draft table.
+
+Every committed ingredient still references `nutrition_foods.id`. USDA, Open Food Facts, a nutrition label, and an AI description are candidates until the owner reviews them and they are saved as reusable foods. Search alone does not create a food.
+
+My Foods search selects an existing food. USDA search uses FoodData Central portions that include a gram weight. The saved food keeps the FDC id in its notes, `source_kind = 'usda'`, and the reviewed serving. The same FDC id and serving is reused. A different USDA food is not merged because the names look alike. Barcode lookup reuses a local food. A new product is reviewed and saved with `log: false`. Nutrition label capture uses the existing capture jobs. Inside a recipe, the action is `Save & add to recipe` and it does not create a nutrition entry. Manual entry uses the same reusable-food validation. AI description is a separate reusable-food intent: one food, then review. A description that looks like a composite meal asks the owner to add ingredients or explicitly save one food. It does not build recipe lines by itself. The saved food is `photo_ai`, marked as an estimate, and keeps bounded provider, model, description, and adjustment notes. The estimate uses the existing description endpoint and its Gemini budget. Ordinary Food Description, Meal Photo, and USDA Quick Log behavior stay consumption or reference flows and do not start saving catalog foods by themselves.
+
+Recipe preview and commit still reload canonical foods, calculate, and fingerprint. A food created during an edit is part of the next version only after the owner saves that version. Earlier versions stay unchanged. A later correction of the food follows the existing food correction rules.
+
+`nutrition_foods.source_kind` now allows `usda`. Nutrition entry sources are unchanged. No new backup table was added. A USDA, barcode, label, manual, or AI food exports as a normal `nutrition_foods` row. Recipe export still snapshots that food. Owner authentication still guards the new food endpoints. `/demo/nutrition/recipes` stays unavailable. Package version stays 1.0.0. Schema head is `0026_nutrition_food_usda_source.sql`.
+
+## 42.1 Deferred
+
+Nested recipes, batch inventory, fiber, and meal-photo ingredient capture are not part of C4. V2-C Recipes / Batch Meals is complete. Later product work is not marked implemented.
 
 
 

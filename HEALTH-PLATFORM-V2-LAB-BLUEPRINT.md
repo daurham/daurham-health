@@ -1,9 +1,9 @@
 # Daurham Health — V2 Lab Blueprint
 
-**Status:** V2-A Data Capture Foundations complete. V2-B Personal Lab Core complete (V2-B1 through V2-B4).  
+**Status:** V2-A Data Capture Foundations complete. V2-B Personal Lab Core complete (V2-B1 through V2-B4). V2-C Recipes / Batch Meals complete (V2-C1 through V2-C4).  
 **Calendar:** America/Phoenix  
 **Package version:** remains `1.0.0`  
-**Schema head after V2-B4:** `0023_experiment_results.sql`
+**Schema head after V2-C4:** `0026_nutrition_food_usda_source.sql`
 
 This file is the v2 product authority for work after the frozen v1 manual. The frozen manual remains the authority for retained v1 semantics. Where this blueprint intentionally extends the product, it takes precedence over the older post-v1 roadmap in the v1 manual and in `docs/V2-ROADMAP.md`.
 
@@ -24,7 +24,13 @@ The file was not present in the repository when V2-A1 implementation started. Th
    - V2-B3 Retest Scheduling — implemented
    - V2-B4 Experiment Result Summaries — implemented
    - V2-B Personal Lab Core — complete
-3. Later product work, including Recipes, Goals, and Ask Health, stays behind this foundation.
+3. **V2-C Nutrition**
+   - V2-C1 First-Class Recipes — implemented
+   - V2-C2 Recipe version editing — implemented
+   - V2-C3 Recipe consumption logging — implemented
+   - V2-C4 In-builder ingredient creation — implemented
+   - V2-C Recipes / Batch Meals — complete
+4. Later product work, including Goals and Ask Health, stays behind this foundation.
 
 Invariant:
 
@@ -314,6 +320,60 @@ Explicit early finalization for `stopped_safety` and `invalid_protocol` can stil
 ### Deferred from this amendment
 
 Experiment result tables, experiment completion, adherence and confounder scoring, causal language, AI retest proposals, notifications, and Goals remain later work.
+
+## Amendment — 2026-09-27T00:52:31-07:00 — V2-C1 First-Class Recipes
+
+V2-C1 is implemented. A Recipe is a reusable preparation, distinct from a reusable food and from a consumed Nutrition entry. Creating a recipe does not log intake.
+
+`recipes` is identity and archive state. `recipe_versions` holds the name, notes, optional yield, optional finished weight, whole-recipe nutrition, and calculation version `recipe-v1`. C1 writes version 1 as the only current version. Semantic version content is immutable. A later edit will create another version rather than patching v1.
+
+Ingredients are existing `nutrition_foods`. Each line snapshots the food name, serving basis, and calories, protein, carbs, and fat used at creation. `food_id` can be cleared if the food row is removed. The snapshot remains. The same food may appear more than once. Owner order is `position`.
+
+The server resolves amount and unit into a scale factor. Servings, an exact match to the food's serving unit, and grams, ounces, and pounds when the food has a weight basis are supported. Density is not guessed. An invalid ingredient creates no recipe row.
+
+If any ingredient is missing protein, carbs, or fat, that whole-recipe macro is null. The other macros still sum. Calories are required and are not rounded during calculation.
+
+Archive hides the recipe from the active list and keeps the version readable. Restore returns it. Recipe APIs are owner-only. `/demo` does not call them.
+
+Backup and portable export include `recipes`, `recipe_versions`, and `recipe_version_ingredients`. Restore order is foods, recipe identity, versions, then ingredients.
+
+C2 version editing, C3 consumption from a `recipe_version_id`, and C4 in-builder food creation are not implemented. Nested recipes, AI recipe generation, fiber, and the legacy meal-combo tables are not part of C1. Package version remains `1.0.0`.
+
+## Amendment — 2026-09-27T08:11:37-07:00 — V2-C2 Recipe version editing
+
+V2-C2 is implemented. No new migration. Schema head remains `0024_recipes.sql`. Package version remains `1.0.0`.
+
+A semantic edit creates version N+1 of the same recipe. The previous version stays unchanged, including its snapshots, nutrition, calculation version `recipe-v1`, and `created_at`. Only the current version can start an edit. The next integer is `current version + 1` inside one transaction that locks the recipe and current version. Success leaves exactly one current version.
+
+Preview (`POST /api/nutrition/recipes/:id/versions/preview`) writes nothing. It re-resolves live foods, shows food-basis changes, and returns a fingerprint. Commit (`POST /api/nutrition/recipes/:id/versions`) recalculates. A stale source version and a stale food basis are separate 409 responses. An identical draft creates no version. A food-basis refresh with no owner formulation edit can create a version. A historical line with a null `food_id` must be replaced or removed before commit. Archived recipes reject preview and commit. Restore does not create a version.
+
+The list uses the current version. History is newest version integer first. Historical detail reads snapshots. The edit route is `/nutrition/recipes/:id/edit`. Review states that the next version is created and the previous version remains unchanged. Editing does not write `nutrition_entries`. Nested recipes and C4 food creation stay out. `/demo` does not call recipe APIs.
+
+Backup and portable export already include every version row. A multi-version chain round-trips with the same ids, snapshots, current flag, and archive state.
+
+C3 consumption logging is implemented in the following amendment. C4 in-builder food creation is not implemented.
+
+## Amendment — 2026-09-27T08:38:26-07:00 — V2-C3 Recipe consumption logging
+
+V2-C3 is implemented. Migration `0025_recipe_consumption.sql` adds `recipe_version_id`, `recipe_portion_kind`, `recipe_portion_amount`, and `recipe_fraction` to `nutrition_entries`. Schema head is `0025_recipe_consumption.sql`. Package version remains `1.0.0`.
+
+Logging uses the exact recipe version, not whichever version is current. Servings divide the amount by `yield_servings`. Fraction mode uses the amount itself, including values above one. Grams divide the amount by `finished_weight_g`. The stored whole-recipe nutrition is scaled by that fraction once, through the existing nutrient scaler. A null macro stays null. One log creates one nutrition entry. Ingredient foods are not reloaded.
+
+Active current recipes appear in Quick Log search and open a portion chooser. Historical versions are logged from version history. An archived recipe stays out of active search and can still be logged from its exact version. Later recipe edits, archive, and restore do not change the consumed entry. Delete removes the entry only. The older `catalog_kind = 'recipe'` food kind stays separate.
+
+Backup and portable export include the provenance columns. Restore writes recipe versions before nutrition entries. Entries from before this migration restore with those columns null.
+
+C4 in-builder ingredient creation is implemented in the following amendment. There is no batch inventory. `/demo` does not log recipes.
+
+## Amendment — 2026-09-27T09:02:35-07:00 — V2-C4 In-builder ingredient creation
+
+V2-C4 is implemented. Migration `0026_nutrition_food_usda_source.sql` adds `usda` to the `nutrition_foods` source check. It does not add columns or change nutrition entry sources. Schema head is `0026_nutrition_food_usda_source.sql`. Package version remains `1.0.0`. V2-C Recipes / Batch Meals is complete.
+
+The recipe draft stays in memory in the builder. Add ingredient can search My Foods, search USDA, scan a barcode, photograph a nutrition label, enter a food manually, or describe one reusable food. Cancel, provider failure, and a successful food save all return to the same unsaved draft. The returned value is the canonical food id. The new line starts at one serving and can be edited. Saving the food does not save the recipe and does not write `nutrition_entries`.
+
+USDA results stay candidates until a real FoodData Central portion is reviewed and saved. The FDC id is the external identity. The same id and serving is reused. Similar names are not merged. Barcode reuses a local food or reviews an Open Food Facts candidate, then saves without logging. Nutrition label capture uses the existing capture jobs and, inside a recipe, saves the food only. Manual food uses the shared reusable-food validation. AI output is an estimate until review. A composite description is not turned into recipe lines. Ordinary Food Description, Meal Photo, and reference USDA lookup outside the builder stay unchanged.
+
+Preview and commit still reload `nutrition_foods` and apply the existing fingerprint and stale-basis rules. New foods export as normal food rows. `/demo` does not expose the builder. Later product work is not marked implemented.
 
 
 

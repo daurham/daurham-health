@@ -1,6 +1,6 @@
 export const BACKUP_FORMAT = 'daurham-health-backup'
 export const BACKUP_FORMAT_VERSION = 1
-export const LATEST_SCHEMA_MIGRATION = '0023_experiment_results.sql'
+export const LATEST_SCHEMA_MIGRATION = '0026_nutrition_food_usda_source.sql'
 export const PORTABLE_EXPORT_BYTE_LIMIT = 3_500_000
 
 export type ColumnKind = 'uuid' | 'text' | 'date' | 'timestamptz' | 'numeric' | 'int' | 'bool' | 'json' | 'bytea'
@@ -184,6 +184,84 @@ export const BACKUP_TABLES: readonly BackupTable[] = [
     ],
   }),
   table({
+    name: 'recipes',
+    backupClass: 'canonical',
+    primaryKey: ['id'],
+    seeded: false,
+    portable: true,
+    references: [{ column: 'source_id', table: 'data_sources' }],
+    columns: [
+      col('id', 'uuid'),
+      col('is_active', 'bool'),
+      col('source_id', 'uuid'),
+      col('created_at', 'timestamptz'),
+      col('updated_at', 'timestamptz'),
+    ],
+  }),
+  table({
+    name: 'recipe_versions',
+    backupClass: 'canonical',
+    primaryKey: ['id'],
+    seeded: false,
+    portable: true,
+    references: [
+      { column: 'recipe_id', table: 'recipes' },
+      { column: 'source_id', table: 'data_sources' },
+    ],
+    columns: [
+      col('id', 'uuid'),
+      col('recipe_id', 'uuid'),
+      col('version', 'int'),
+      col('is_current', 'bool'),
+      col('name', 'text'),
+      col('notes', 'text'),
+      col('yield_servings', 'numeric'),
+      col('finished_weight_g', 'numeric'),
+      col('calories_kcal', 'numeric'),
+      col('protein_g', 'numeric'),
+      col('carbs_g', 'numeric'),
+      col('fat_g', 'numeric'),
+      col('calculation_version', 'text'),
+      col('source_id', 'uuid'),
+      col('created_at', 'timestamptz'),
+    ],
+  }),
+  table({
+    name: 'recipe_version_ingredients',
+    backupClass: 'canonical',
+    primaryKey: ['id'],
+    seeded: false,
+    portable: true,
+    references: [
+      { column: 'recipe_version_id', table: 'recipe_versions' },
+      { column: 'food_id', table: 'nutrition_foods' },
+    ],
+    columns: [
+      col('id', 'uuid'),
+      col('recipe_version_id', 'uuid'),
+      col('position', 'int'),
+      col('food_id', 'uuid'),
+      col('amount', 'numeric'),
+      col('unit', 'text'),
+      col('scale_factor', 'numeric'),
+      col('food_name_snapshot', 'text'),
+      col('food_source_type_snapshot', 'text'),
+      col('food_source_external_id_snapshot', 'text'),
+      col('base_serving_amount_snapshot', 'numeric'),
+      col('base_serving_unit_snapshot', 'text'),
+      col('base_weight_grams_snapshot', 'numeric'),
+      col('base_calories_kcal_snapshot', 'numeric'),
+      col('base_protein_g_snapshot', 'numeric'),
+      col('base_carbs_g_snapshot', 'numeric'),
+      col('base_fat_g_snapshot', 'numeric'),
+      col('line_calories_kcal', 'numeric'),
+      col('line_protein_g', 'numeric'),
+      col('line_carbs_g', 'numeric'),
+      col('line_fat_g', 'numeric'),
+      col('created_at', 'timestamptz'),
+    ],
+  }),
+  table({
     name: 'nutrition_targets',
     backupClass: 'canonical',
     primaryKey: ['id'],
@@ -208,7 +286,10 @@ export const BACKUP_TABLES: readonly BackupTable[] = [
     primaryKey: ['id'],
     seeded: false,
     portable: true,
-    references: [{ column: 'food_id', table: 'nutrition_foods' }],
+    references: [
+      { column: 'food_id', table: 'nutrition_foods' },
+      { column: 'recipe_version_id', table: 'recipe_versions' },
+    ],
     columns: [
       col('id', 'uuid'),
       col('log_date', 'date'),
@@ -231,6 +312,10 @@ export const BACKUP_TABLES: readonly BackupTable[] = [
       col('created_at', 'timestamptz'),
       col('updated_at', 'timestamptz'),
       col('meal_group_id', 'uuid'),
+      col('recipe_version_id', 'uuid'),
+      col('recipe_portion_kind', 'text'),
+      col('recipe_portion_amount', 'numeric'),
+      col('recipe_fraction', 'numeric'),
     ],
   }),
   table({

@@ -1,16 +1,20 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Link } from 'react-router-dom'
 import {
   NUTRITION_CONFIG,
   NUTRITION_MEALS,
   applyGramServing,
   applyHundredGramServing,
+  matchCurrentRecipes,
   rankFoodsForQuery,
   shouldOfferFoodDescription,
   snapshotFromDefinition,
   validatePackagedReview,
+  type LoggableRecipeVersion,
   type NutritionEntry,
   type NutritionFood,
   type NutritionMeal,
+  type NutritionSourceKind,
   type PackagedFoodCandidate,
 } from '@/domain/nutrition'
 import { cn, interactiveRowClass, primaryButtonClass, secondaryButtonClass } from '@/lib'
@@ -32,8 +36,9 @@ import { DescribeFoodSheet } from './DescribeFood'
 import type { FoodDescriptionReview } from './api'
 import { LabelCaptureSheet } from './LabelCapture'
 import { MealCaptureSheet } from './MealCapture'
-import { catalogKindLabel, formatGrams, formatKcal, formatQuantity, mealLabel, provenanceLabel } from './format'
+import { catalogKindLabel, formatGrams, formatKcal, formatNumber, formatQuantity, mealLabel, provenanceLabel } from './format'
 import { NutritionSheet } from './Sheet'
+import { RecipePortionSheet } from './RecipePortionSheet'
 
 const BarcodeScanner = lazy(() => import('./BarcodeScanner').then((module) => ({ default: module.BarcodeScanner })))
 
@@ -47,6 +52,7 @@ type QuickAdd = {
   recents: NutritionFood[]
   staples: NutritionFood[]
   recipes: NutritionFood[]
+  currentRecipes?: LoggableRecipeVersion[]
 }
 
 type AddFoodSheetProps = {
@@ -82,6 +88,8 @@ export function AddFoodSheet({
   const [describeError, setDescribeError] = useState<string | null>(null)
   const [describeBusy, setDescribeBusy] = useState(false)
   const [confirmFood, setConfirmFood] = useState<NutritionFood | null>(null)
+  const [confirmRecipe, setConfirmRecipe] = useState<LoggableRecipeVersion | null>(null)
+  const recipeMatches = matchCurrentRecipes(quickAdd.currentRecipes ?? [], query)
   const [candidate, setCandidate] = useState<PackagedFoodCandidate | null>(null)
   const [lookupError, setLookupError] = useState<{
     code: 'not_found' | 'provider_unavailable' | 'invalid_barcode'
@@ -159,6 +167,22 @@ export function AddFoodSheet({
       lookupLock.current = false
       setLookupBusy(false)
     }
+  }
+
+  if (confirmRecipe) {
+    return (
+      <RecipePortionSheet
+        date={date}
+        recipe={confirmRecipe}
+        title={`Log ${confirmRecipe.name} · v${confirmRecipe.version}`}
+        onClose={onClose}
+        onBack={() => setConfirmRecipe(null)}
+        onLogged={(entry) => {
+          onLogged(entry)
+          onClose()
+        }}
+      />
+    )
   }
 
   if (confirmFood) {
@@ -410,8 +434,9 @@ export function AddFoodSheet({
       }
     >
       {query.trim().length > 0 ? (
+        <div className="space-y-4">
         <FoodSection
-          title="Search"
+          title="My Food"
           foods={results ?? []}
           empty={searching ? 'Searching…' : 'No matching saved foods.'}
           action={
@@ -444,6 +469,28 @@ export function AddFoodSheet({
           onOpenFood={onOpenFood}
           showKind
         />
+        {recipeMatches.length > 0 ? (
+          <section>
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Recipe</h3>
+            <ul className="mt-2 divide-y divide-zinc-100 overflow-hidden rounded-lg border border-zinc-200">
+              {recipeMatches.map((recipe) => (
+                <li key={recipe.recipeVersionId}>
+                  <button
+                    type="button"
+                    className="flex min-h-14 w-full flex-col justify-center px-3 py-2 text-left"
+                    onClick={() => setConfirmRecipe(recipe)}
+                  >
+                    <span className="font-medium">{recipe.name}</span>
+                    <span className="text-sm text-zinc-500">
+                      Recipe · v{recipe.version} · {formatNumber(recipe.caloriesKcal, 1)} kcal whole recipe
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+        </div>
       ) : (
         <FoodSection
           title="Recent"
@@ -537,7 +584,7 @@ function FoodSection({
 type QuantitySheetProps = {
   date: string
   food: NutritionFood
-  sourceKind?: NutritionFood['sourceKind']
+  sourceKind?: NutritionSourceKind
   onClose: () => void
   onBack: () => void
   onLogged: (entry: NutritionEntry) => void
@@ -895,6 +942,14 @@ export function EntryEditorSheet({
           </Field>
         )}
         {linked ? <p className="text-base font-medium">{entry.foodName}</p> : null}
+        {entry.recipeVersionId && entry.recipeId && entry.recipeVersionNumber != null ? (
+          <p className="text-sm text-zinc-600">
+            <Link className="underline" to={`/nutrition/recipes/${entry.recipeId}/versions/${entry.recipeVersionNumber}`}>
+              Recipe v{entry.recipeVersionNumber}
+            </Link>
+            . Changing this log does not change the Recipe Version.
+          </p>
+        ) : null}
         <QuantityControls quantity={quantity} unit={entry.servingUnit} onChange={setQuantity} />
         <Field label="Calories" htmlFor="entry-kcal">
           <input

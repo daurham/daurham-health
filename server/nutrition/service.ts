@@ -39,6 +39,7 @@ import {
   upsertTarget,
 } from './queries.js'
 import { openFoodFactsProvider } from './providers/open-food-facts.js'
+import { listCurrentRecipeVersions } from './recipe-consumption.js'
 import type { PackagedFoodProvider } from './providers/types.js'
 
 function parseOr400<T>(schema: z.ZodType<T>, body: unknown, fallback: string): T {
@@ -81,23 +82,25 @@ export type NutritionDayResponse = {
     recents: NutritionFood[]
     staples: NutritionFood[]
     recipes: NutritionFood[]
+    currentRecipes: Awaited<ReturnType<typeof listCurrentRecipeVersions>>
   }
 }
 
 export async function getNutritionDay(date: string): Promise<NutritionDayResponse> {
-  const [entries, targets, recents, staples, recipes] = await Promise.all([
+  const [entries, targets, recents, staples, recipes, currentRecipes] = await Promise.all([
     listEntriesForDate(date),
     targetForDate(date),
     listRecentFoods(NUTRITION_CONFIG.recentsLimit),
     listStapleFoods(NUTRITION_CONFIG.staplesLimit),
     listRecipeFoods(NUTRITION_CONFIG.recipesLimit),
+    listCurrentRecipeVersions(NUTRITION_CONFIG.recipesLimit),
   ])
   return {
     date,
     entries,
     totals: nutritionDayTotals(entries),
     targets,
-    quickAdd: { recents, staples, recipes },
+    quickAdd: { recents, staples, recipes, currentRecipes },
   }
 }
 
@@ -386,7 +389,7 @@ export async function patchNutritionEntry(id: string, body: unknown): Promise<Nu
   if (!updated) {
     throw new HttpError(404, 'Entry not found')
   }
-  return updated
+  return (await getEntry(id)) ?? updated
 }
 
 export async function removeNutritionEntry(id: string): Promise<void> {

@@ -14,7 +14,16 @@ import { AUTH_TABLES_EXCLUDED, BACKUP_TABLES, LATEST_SCHEMA_MIGRATION, tablesFor
 
 const SOURCE = '11111111-1111-4111-8111-111111111111'
 const FOOD = '22222222-2222-4222-8222-222222222222'
+const RECIPE = 'c1c1c1c1-c1c1-41c1-81c1-c1c1c1c1c1c1'
+const RECIPE_VERSION = 'c2c2c2c2-c2c2-42c2-82c2-c2c2c2c2c2c2'
+const RECIPE_LINE = 'c3c3c3c3-c3c3-43c3-83c3-c3c3c3c3c3c3'
+const RECIPE_LINE_REMOVED = 'c4c4c4c4-c4c4-44c4-84c4-c4c4c4c4c4c4'
+const RECIPE_VERSION_2 = 'c5c5c5c5-c5c5-45c5-85c5-c5c5c5c5c5c5'
+const RECIPE_VERSION_3 = 'c6c6c6c6-c6c6-46c6-86c6-c6c6c6c6c6c6'
+const RECIPE_LINE_2 = 'c7c7c7c7-c7c7-47c7-87c7-c7c7c7c7c7c7'
+const RECIPE_LINE_3 = 'c8c8c8c8-c8c8-48c8-88c8-c8c8c8c8c8c8'
 const ENTRY = '33333333-3333-4333-8333-333333333333'
+const RECIPE_ENTRY = 'd9d9d9d9-d9d9-49d9-89d9-d9d9d9d9d9d9'
 const BODY = '44444444-4444-4444-8444-444444444444'
 const METRIC = '55555555-5555-4555-8555-555555555555'
 const EXERCISE = '66666666-6666-4666-8666-666666666666'
@@ -182,6 +191,197 @@ function fixture(): Record<string, BackupRow[]> {
         created_at: INSTANT,
         updated_at: INSTANT,
         meal_group_id: null,
+        recipe_version_id: null,
+        recipe_portion_kind: null,
+        recipe_portion_amount: null,
+        recipe_fraction: null,
+      }),
+      row({
+        id: RECIPE_ENTRY,
+        log_date: '2026-09-20',
+        consumed_at: null,
+        timezone: 'America/Phoenix',
+        meal: null,
+        food_id: null,
+        food_name: 'Turkey tofu stew',
+        brand: null,
+        serving_quantity: '475',
+        serving_unit: 'g · Recipe v1',
+        grams: '475',
+        calories: '236.75',
+        protein: null,
+        carbs: '8',
+        fat: '4',
+        fiber: null,
+        source_kind: 'manual',
+        notes: null,
+        created_at: INSTANT,
+        updated_at: INSTANT,
+        meal_group_id: null,
+        recipe_version_id: RECIPE_VERSION,
+        recipe_portion_kind: 'grams',
+        recipe_portion_amount: '475',
+        recipe_fraction: '0.16666666666666666',
+      }),
+    ],
+    recipes: [
+      row({
+        id: RECIPE,
+        is_active: false,
+        source_id: SOURCE,
+        created_at: INSTANT,
+        updated_at: INSTANT,
+      }),
+    ],
+    recipe_versions: [
+      row({
+        id: RECIPE_VERSION,
+        recipe_id: RECIPE,
+        version: '1',
+        is_current: false,
+        name: 'Turkey tofu stew',
+        notes: null,
+        yield_servings: '6',
+        finished_weight_g: null,
+        calories_kcal: '186.5',
+        protein_g: null,
+        carbs_g: '8',
+        fat_g: null,
+        calculation_version: 'recipe-v1',
+        source_id: SOURCE,
+        created_at: INSTANT,
+      }),
+      row({
+        id: RECIPE_VERSION_2,
+        recipe_id: RECIPE,
+        version: '2',
+        is_current: false,
+        name: 'Sundubu-jjigae',
+        notes: 'Weeknight',
+        yield_servings: '6',
+        finished_weight_g: '2800',
+        calories_kcal: '240',
+        protein_g: '40',
+        carbs_g: '8',
+        fat_g: null,
+        calculation_version: 'recipe-v1',
+        source_id: SOURCE,
+        created_at: INSTANT,
+      }),
+      row({
+        id: RECIPE_VERSION_3,
+        recipe_id: RECIPE,
+        version: '3',
+        is_current: true,
+        name: 'Sundubu-jjigae spicy',
+        notes: null,
+        yield_servings: '6',
+        finished_weight_g: '2850',
+        calories_kcal: '260',
+        protein_g: null,
+        carbs_g: '9',
+        fat_g: '4',
+        calculation_version: 'recipe-v1',
+        source_id: SOURCE,
+        created_at: INSTANT,
+      }),
+    ],
+    recipe_version_ingredients: [
+      row({
+        id: RECIPE_LINE,
+        recipe_version_id: RECIPE_VERSION,
+        position: '1',
+        food_id: FOOD,
+        amount: '0.5',
+        unit: 'serving',
+        scale_factor: '0.5',
+        food_name_snapshot: 'Ground Turkey',
+        food_source_type_snapshot: 'manual',
+        food_source_external_id_snapshot: null,
+        base_serving_amount_snapshot: '1',
+        base_serving_unit_snapshot: 'serving',
+        base_weight_grams_snapshot: null,
+        base_calories_kcal_snapshot: '173',
+        base_protein_g_snapshot: '10',
+        base_carbs_g_snapshot: '3',
+        base_fat_g_snapshot: null,
+        line_calories_kcal: '86.5',
+        line_protein_g: '5',
+        line_carbs_g: '1.5',
+        line_fat_g: null,
+        created_at: INSTANT,
+      }),
+      row({
+        id: RECIPE_LINE_REMOVED,
+        recipe_version_id: RECIPE_VERSION,
+        position: '2',
+        food_id: null,
+        amount: '1',
+        unit: 'serving',
+        scale_factor: '1',
+        food_name_snapshot: 'Zucchini',
+        food_source_type_snapshot: 'manual',
+        food_source_external_id_snapshot: null,
+        base_serving_amount_snapshot: '1',
+        base_serving_unit_snapshot: 'serving',
+        base_weight_grams_snapshot: '100',
+        base_calories_kcal_snapshot: '100',
+        base_protein_g_snapshot: null,
+        base_carbs_g_snapshot: '5',
+        base_fat_g_snapshot: null,
+        line_calories_kcal: '100',
+        line_protein_g: null,
+        line_carbs_g: '5',
+        line_fat_g: null,
+        created_at: INSTANT,
+      }),
+      row({
+        id: RECIPE_LINE_2,
+        recipe_version_id: RECIPE_VERSION_2,
+        position: '1',
+        food_id: FOOD,
+        amount: '2',
+        unit: 'serving',
+        scale_factor: '2',
+        food_name_snapshot: 'Kirkland Ground Turkey 93/7',
+        food_source_type_snapshot: 'manual',
+        food_source_external_id_snapshot: null,
+        base_serving_amount_snapshot: '1',
+        base_serving_unit_snapshot: 'serving',
+        base_weight_grams_snapshot: null,
+        base_calories_kcal_snapshot: '120',
+        base_protein_g_snapshot: '20',
+        base_carbs_g_snapshot: '4',
+        base_fat_g_snapshot: null,
+        line_calories_kcal: '240',
+        line_protein_g: '40',
+        line_carbs_g: '8',
+        line_fat_g: null,
+        created_at: INSTANT,
+      }),
+      row({
+        id: RECIPE_LINE_3,
+        recipe_version_id: RECIPE_VERSION_3,
+        position: '1',
+        food_id: FOOD,
+        amount: '2',
+        unit: 'serving',
+        scale_factor: '2',
+        food_name_snapshot: 'Kirkland Ground Turkey 93/7',
+        food_source_type_snapshot: 'manual',
+        food_source_external_id_snapshot: null,
+        base_serving_amount_snapshot: '1',
+        base_serving_unit_snapshot: 'serving',
+        base_weight_grams_snapshot: '113',
+        base_calories_kcal_snapshot: '130',
+        base_protein_g_snapshot: null,
+        base_carbs_g_snapshot: '4.5',
+        base_fat_g_snapshot: '2',
+        line_calories_kcal: '260',
+        line_protein_g: null,
+        line_carbs_g: '9',
+        line_fat_g: '4',
+        created_at: INSTANT,
       }),
     ],
     body_measurement_sessions: [
@@ -733,7 +933,20 @@ describe('health backup archive', () => {
     expect(verified.tables.body_metrics?.[0]?.value).toBe('86.63614267')
     expect(verified.tables.activity_daily_summaries?.[0]?.exercise_minutes).toBeNull()
     expect(verified.tables.activity_daily_summaries?.[0]?.active_energy_kcal).toBe('12.083702334016023')
-    expect(verified.manifest.tables.nutrition_entries?.rows).toBe(1)
+    expect(verified.manifest.tables.nutrition_entries?.rows).toBe(2)
+    expect(verified.tables.nutrition_entries?.find((item) => item.id === RECIPE_ENTRY)).toMatchObject({
+      recipe_version_id: RECIPE_VERSION,
+      recipe_portion_kind: 'grams',
+      recipe_portion_amount: '475',
+      recipe_fraction: '0.16666666666666666',
+      food_name: 'Turkey tofu stew',
+      serving_unit: 'g · Recipe v1',
+      calories: '236.75',
+      protein: null,
+      log_date: '2026-09-20',
+      food_id: null,
+    })
+    expect(verified.tables.nutrition_entries?.find((item) => item.id === ENTRY)?.recipe_version_id).toBeNull()
     const restored = restoreStatements(verified.tables)
     const entryInsert = restored.find((statement) => statement.text.includes('INSERT INTO nutrition_entries'))
     expect(entryInsert?.params).toContain(ENTRY)
@@ -847,6 +1060,36 @@ describe('health backup archive', () => {
     expect(insertAt('experiments')).toBeLessThan(insertAt('benchmark_results'))
     expect(insertAt('benchmark_results')).toBeLessThan(insertAt('benchmark_result_values'))
     expect(insertAt('benchmark_result_values')).toBeLessThan(insertAt('benchmark_result_evidence'))
+    expect(insertAt('nutrition_foods')).toBeLessThan(insertAt('recipes'))
+    expect(insertAt('recipes')).toBeLessThan(insertAt('recipe_versions'))
+    expect(insertAt('recipe_versions')).toBeLessThan(insertAt('recipe_version_ingredients'))
+    expect(insertAt('recipe_version_ingredients')).toBeLessThan(insertAt('nutrition_entries'))
+    expect(verified.tables.recipes?.[0]).toMatchObject({ id: RECIPE, is_active: false, source_id: SOURCE })
+    expect(verified.tables.recipe_versions?.map((version) => [version.version, version.is_current, version.name])).toEqual([
+      ['1', false, 'Turkey tofu stew'],
+      ['2', false, 'Sundubu-jjigae'],
+      ['3', true, 'Sundubu-jjigae spicy'],
+    ])
+    expect(verified.tables.recipe_versions?.filter((version) => version.is_current)).toHaveLength(1)
+    expect(verified.tables.recipe_versions?.[0]).toMatchObject({
+      id: RECIPE_VERSION,
+      calories_kcal: '186.5',
+      protein_g: null,
+      calculation_version: 'recipe-v1',
+    })
+    expect(verified.tables.recipe_versions?.[2]).toMatchObject({
+      id: RECIPE_VERSION_3,
+      finished_weight_g: '2850',
+      calories_kcal: '260',
+      protein_g: null,
+    })
+    expect(verified.tables.recipe_version_ingredients?.map((line) => line.position)).toEqual(['1', '2', '1', '1'])
+    expect(verified.tables.recipe_version_ingredients?.[1]).toMatchObject({
+      food_id: null,
+      food_name_snapshot: 'Zucchini',
+      line_protein_g: null,
+      line_calories_kcal: '100',
+    })
     const resultInsert = restored.find((statement) => statement.text.startsWith('INSERT INTO benchmark_results ('))
     expect(resultInsert?.params.indexOf(LAB_RESULT)).toBeLessThan(resultInsert?.params.indexOf(LAB_RESULT_NEXT) ?? -1)
     const portableNames = tablesForProfile('portable').map((definition) => definition.name)
@@ -866,6 +1109,9 @@ describe('health backup archive', () => {
       'experiments',
       'experiment_benchmarks',
       'experiment_supplements',
+      'recipes',
+      'recipe_versions',
+      'recipe_version_ingredients',
       'benchmark_results',
       'benchmark_result_values',
       'benchmark_result_evidence',

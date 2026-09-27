@@ -10,6 +10,23 @@ export {
 } from './servings.js'
 export type { NutrientAmount } from './servings.js'
 export { recentsFromEntries, rankFoodsForQuery } from './catalog.js'
+export {
+  RECIPE_PORTION_KINDS,
+  matchCurrentRecipes,
+  recipePortionDescription,
+  resolveRecipePortion,
+  recipeDefinedAverageGrams,
+} from './recipe-consumption.js'
+export type { RecipePortionKind, RecipePortionBasis, LoggableRecipeVersion, ResolvedRecipePortion } from './recipe-consumption.js'
+export {
+  COMPOSITE_FOOD_GUIDANCE,
+  aiReusableFoodNotes,
+  appendIngredientFood,
+  looksLikeCompositeFoodDescription,
+  scalePer100Grams,
+  usdaReusableFoodNotes,
+} from './recipe-ingredients.js'
+export type { IngredientFoodRef, RecipeIngredientDraft, UsdaPortionChoice } from './recipe-ingredients.js'
 export { nutritionDayTotals } from './totals.js'
 export type { NutritionDayTotals, NutrientTotal, NutritionTotable } from './totals.js'
 export { resolveNutritionTarget } from './targets.js'

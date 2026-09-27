@@ -3,7 +3,7 @@
 These are post-v1 ideas, not promises. They are recorded so owner-accepted
 deferred workflows are not lost. None of this is implemented in v1.
 
-V2 implementation order is `HEALTH-PLATFORM-V2-LAB-BLUEPRINT.md`. V2-A Data Capture Foundations is complete: V2-A1 Supplements, V2-A2 Body measurement capture, V2-A3 ad-hoc Training, and V2-A4 Daily Context. V2-B Personal Lab Core is complete: V2-B1 protocol identity, V2-B2 Benchmark Results, V2-B3 derived retest scheduling, and V2-B4 Experiment Result Summaries. External retest notifications remain deferred. The Recipes-first list below is the older v1 backlog, not the current build order.
+V2 implementation order is `HEALTH-PLATFORM-V2-LAB-BLUEPRINT.md`. V2-A Data Capture Foundations is complete: V2-A1 Supplements, V2-A2 Body measurement capture, V2-A3 ad-hoc Training, and V2-A4 Daily Context. V2-B Personal Lab Core is complete: V2-B1 protocol identity, V2-B2 Benchmark Results, V2-B3 derived retest scheduling, and V2-B4 Experiment Result Summaries. V2-C1 First-Class Recipes is implemented: immutable version 1 composed from reusable foods. V2-C2 Recipe version editing is implemented: later versions are new immutable rows. V2-C3 Recipe consumption logging is implemented: a portion of an exact version becomes one nutrition entry. V2-C4 in-builder ingredient creation is implemented. V2-C Recipes / Batch Meals is complete. External retest notifications remain deferred. The Recipes-first list below is the older v1 backlog, not the current build order.
 
 ## Priority order
 
