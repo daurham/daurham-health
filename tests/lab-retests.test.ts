@@ -181,7 +181,7 @@ describe('benchmark retest state', () => {
     const after = buildBenchmarkRetestView(restored.protocol, restored.results, restored.asOf)
     expect(before.status).toBe('due')
     expect(after).toEqual(before)
-    expect(LATEST_SCHEMA_MIGRATION).toBe('0032_body_capture_inbox.sql')
+    expect(LATEST_SCHEMA_MIGRATION).toBe('0033_nutrition_capture_images.sql')
     expect(BACKUP_TABLES.map((table) => table.name)).not.toContain('benchmark_retests')
   })
 

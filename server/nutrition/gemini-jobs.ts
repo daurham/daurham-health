@@ -10,6 +10,7 @@ import {
   getLabelJobRecord,
   type NutritionCaptureJobRecord,
 } from './label-jobs.js'
+import { listMealCaptureImages, type StoredMealImage } from './meal-images.js'
 import { createGeminiNutritionInterpreter, type GeminiNutritionInterpreter } from '../integrations/gemini/client.js'
 
 const PROCESSING_STALE_MS = 45_000
@@ -17,6 +18,7 @@ const PROCESSING_STALE_MS = 45_000
 type CapturePorts = {
   claimCaptureJob: typeof claimCaptureJob
   getCaptureImage: typeof getCaptureImage
+  listMealCaptureImages: (jobId: string) => Promise<StoredMealImage[]>
   finishCaptureInterpretation: typeof finishCaptureInterpretation
   getLabelJobRecord: typeof getLabelJobRecord
   createInterpreter: () => Promise<Pick<GeminiNutritionInterpreter, 'interpretMealPhoto' | 'interpretNutritionLabel'>>
@@ -52,6 +54,14 @@ export async function advanceGeminiCapture(
 ): Promise<NutritionCaptureJobRecord> {
   const claim = ports?.claimCaptureJob ?? claimCaptureJob
   const loadImage = ports?.getCaptureImage ?? getCaptureImage
+  const loadMealImages =
+    ports?.listMealCaptureImages ??
+    (ports?.getCaptureImage
+      ? async (jobId: string) => {
+          const image = await ports.getCaptureImage!(jobId)
+          return image ? [{ position: 0, bytes: image.bytes, mimeType: image.mimeType, filename: null, sha256: '' }] : []
+        }
+      : listMealCaptureImages)
   const finish = ports?.finishCaptureInterpretation ?? finishCaptureInterpretation
   const reload = ports?.getLabelJobRecord ?? getLabelJobRecord
   const createInterpreter = ports?.createInterpreter ?? createGeminiNutritionInterpreter
@@ -68,8 +78,9 @@ export async function advanceGeminiCapture(
   if (!claimed) {
     return (await reload(job.id)) ?? job
   }
-  const image = await loadImage(job.id)
-  if (!image) {
+  const labelImage = job.captureKind === 'nutrition_label' ? await loadImage(job.id) : null
+  const mealImages = job.captureKind === 'nutrition_label' ? [] : await loadMealImages(job.id)
+  if (job.captureKind === 'nutrition_label' ? !labelImage : mealImages.length === 0) {
     await finish({
       jobId: job.id,
       status: 'failed',
@@ -80,10 +91,10 @@ export async function advanceGeminiCapture(
   }
   try {
     const interpreter = await createInterpreter()
-    if (job.captureKind === 'nutrition_label') {
+    if (job.captureKind === 'nutrition_label' && labelImage) {
       const interpreted = await interpreter.interpretNutritionLabel({
-        image: image.bytes,
-        mimeType: image.mimeType,
+        image: labelImage.bytes,
+        mimeType: labelImage.mimeType,
         userContext: job.userContext,
       })
       await finish({
@@ -94,8 +105,7 @@ export async function advanceGeminiCapture(
       })
     } else {
       const interpreted = await interpreter.interpretMealPhoto({
-        image: image.bytes,
-        mimeType: image.mimeType,
+        images: mealImages.map((item) => ({ image: item.bytes, mimeType: item.mimeType })),
         userContext: job.userContext,
       })
       await finish({

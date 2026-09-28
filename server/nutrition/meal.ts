@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
+import { MEAL_PHOTO_SET_MAX_COUNT, MEAL_PHOTO_SET_SERVER_MAX_BYTES } from '../../src/domain/nutrition/meal-photos.js'
 import {
   NUTRITION_CONFIG,
   NUTRITION_MEAL_CAPTURE_KIND,
@@ -37,7 +38,6 @@ import { NutritionInterpretError, normalizeUserContext, parseNutritionProvider }
 import { advanceGeminiCapture, interpretErrorToHttp } from './gemini-jobs.js'
 import {
   findCommittedLabelEntry,
-  getCaptureImage,
   getLabelJobRecord,
   type NutritionCaptureJobRecord,
   listOutstandingLabelJobs,
@@ -45,11 +45,16 @@ import {
   recordLabelJobCreated,
   recordLabelJobStatus,
   requeueCaptureJob,
-  saveCaptureImage,
   dismissCaptureJob,
 } from './label-jobs.js'
-
-const MEAL_PHOTO_SERVER_MAX_BYTES = 4_500_000
+import {
+  getMealCaptureImage,
+  listMealCaptureImages,
+  mealCaptureImageCount,
+  mealImageSha256,
+  persistMealCapture,
+  type MealCapturePhoto,
+} from './meal-images.js'
 const JPEG_MAGIC = [0xff, 0xd8]
 const PNG_MAGIC = [0x89, 0x50, 0x4e, 0x47]
 
@@ -73,50 +78,93 @@ function isPng(bytes: Uint8Array): boolean {
   )
 }
 
-export async function readMealPhotoForm(req: ApiRequest): Promise<{
-  bytes: Uint8Array
-  filename: string
-  mimeType: string
+export type ParsedMealPhotoUpload = {
+  photos: MealCapturePhoto[]
   userContext: string | null
   provider: 'gemini' | 'home_ai'
-}> {
-  const { files, fields } = await parseMultipart(req, MEAL_PHOTO_SERVER_MAX_BYTES)
-  const file = files.image
-  if (!file || file.data.length === 0) {
-    throw new HttpError(400, mealFailureMessage('MISSING_IMAGE'))
+}
+
+export function parseMealPhotoUpload(input: {
+  files: Record<string, { data: Uint8Array; filename: string }>
+  fields: Record<string, string | undefined>
+}): ParsedMealPhotoUpload {
+  const numbered = Object.keys(input.files)
+    .map((name) => {
+      const match = /^image(\d+)$/.exec(name)
+      return match ? Number(match[1]) : null
+    })
+    .filter((index): index is number => index != null)
+    .sort((left, right) => left - right)
+  const legacy = input.files.image
+  if (legacy && numbered.length > 0) {
+    throw new HttpError(400, mealFailureMessage('MIXED_IMAGE_FIELDS'), undefined, 'MIXED_IMAGE_FIELDS')
   }
-  if (file.data.length > MEAL_PHOTO_SERVER_MAX_BYTES) {
-    throw new HttpError(413, mealFailureMessage('UPLOAD_TOO_LARGE'))
+  const selected = legacy
+    ? [{ index: 0, file: legacy }]
+    : numbered.map((index) => ({ index, file: input.files[`image${index}`]! }))
+  if (selected.length === 0) {
+    throw new HttpError(400, mealFailureMessage('MISSING_IMAGE'), undefined, 'MISSING_IMAGE')
+  }
+  if (!legacy) {
+    if (numbered[0] !== 0 || numbered.some((index, offset) => index !== offset)) {
+      throw new HttpError(400, mealFailureMessage('IMAGE_GAP'), undefined, 'IMAGE_GAP')
+    }
+  }
+  if (selected.length > MEAL_PHOTO_SET_MAX_COUNT) {
+    throw new HttpError(400, mealFailureMessage('TOO_MANY_PHOTOS'), undefined, 'TOO_MANY_PHOTOS')
+  }
+  const photos: MealCapturePhoto[] = []
+  const seen = new Set<string>()
+  for (const item of selected) {
+    const photo = validatedMealPhoto(item.file.data, item.file.filename)
+    if (seen.has(photo.sha256)) {
+      throw new HttpError(400, mealFailureMessage('DUPLICATE_IMAGE'), undefined, 'DUPLICATE_IMAGE')
+    }
+    seen.add(photo.sha256)
+    photos.push(photo)
   }
   let userContext: string | null
   try {
-    userContext = normalizeUserContext(fields.userContext)
+    userContext = normalizeUserContext(input.fields.userContext)
   } catch (error) {
     if (error instanceof NutritionInterpretError) {
       throw interpretErrorToHttp(error, 'meal')
     }
     throw error
   }
-  const provider = parseNutritionProvider(fields.provider)
-  if (isJpeg(file.data)) {
+  const provider = parseNutritionProvider(input.fields.provider)
+  if (provider === 'home_ai' && photos.length !== 1) {
+    throw new HttpError(400, mealFailureMessage('MULTI_PHOTO_UNSUPPORTED'), undefined, 'MULTI_PHOTO_UNSUPPORTED')
+  }
+  return { photos, userContext, provider }
+}
+
+function validatedMealPhoto(bytes: Uint8Array, filename: string): MealCapturePhoto {
+  if (bytes.length === 0) {
+    throw new HttpError(400, mealFailureMessage('MISSING_IMAGE'), undefined, 'MISSING_IMAGE')
+  }
+  if (isJpeg(bytes)) {
     return {
-      bytes: file.data,
-      filename: /\.jpe?g$/i.test(file.filename) ? file.filename : 'meal-photo.jpg',
+      bytes,
+      filename: /\.jpe?g$/i.test(filename) ? filename : 'meal-photo.jpg',
       mimeType: 'image/jpeg',
-      userContext,
-      provider,
+      sha256: mealImageSha256(bytes),
     }
   }
-  if (isPng(file.data)) {
+  if (isPng(bytes)) {
     return {
-      bytes: file.data,
-      filename: /\.png$/i.test(file.filename) ? file.filename : 'meal-photo.png',
+      bytes,
+      filename: /\.png$/i.test(filename) ? filename : 'meal-photo.png',
       mimeType: 'image/png',
-      userContext,
-      provider,
+      sha256: mealImageSha256(bytes),
     }
   }
-  throw new HttpError(400, mealFailureMessage('UNSUPPORTED_IMAGE'))
+  throw new HttpError(400, mealFailureMessage('UNSUPPORTED_IMAGE'), undefined, 'UNSUPPORTED_IMAGE')
+}
+
+export async function readMealPhotoForm(req: ApiRequest): Promise<ParsedMealPhotoUpload> {
+  const { files, fields } = await parseMultipart(req, MEAL_PHOTO_SET_SERVER_MAX_BYTES)
+  return parseMealPhotoUpload({ files, fields })
 }
 
 function tryMealEstimate(raw: unknown): MealEstimateCandidate | null {
@@ -133,6 +181,7 @@ function asMealResponse(input: {
   status: 'queued' | 'processing' | 'completed' | 'failed'
   elapsedMs?: number | null
   imageAvailable?: boolean
+  imageCount?: number
   candidate: MealEstimateCandidate | null
   foods?: NutritionFood[]
   matches?: NutritionMealJobResponse['matches']
@@ -147,6 +196,7 @@ function asMealResponse(input: {
       status: input.status,
       elapsedMs: input.elapsedMs ?? null,
       imageAvailable: input.imageAvailable ?? false,
+      imageCount: input.imageCount ?? (input.imageAvailable ? 1 : 0),
     },
     userContext: input.userContext ?? null,
     candidate: input.candidate,
@@ -193,26 +243,32 @@ export async function refreshOutstandingMealJobs(client?: HomeAiClient) {
 export async function createNutritionMealJob(req: ApiRequest, client?: HomeAiClient) {
   const photo = await readMealPhotoForm(req)
   if (photo.provider === 'home_ai') {
-    return createHomeAiMealJob(photo, client)
+    const only = photo.photos[0]
+    if (!only) {
+      throw new HttpError(400, mealFailureMessage('MISSING_IMAGE'), undefined, 'MISSING_IMAGE')
+    }
+    return createHomeAiMealJob(
+      {
+        bytes: only.bytes,
+        filename: only.filename ?? 'meal-photo.jpg',
+        mimeType: only.mimeType,
+        userContext: photo.userContext,
+      },
+      client,
+    )
   }
   return createGeminiMealJob(photo)
 }
 
-async function createGeminiMealJob(photo: {
-  bytes: Uint8Array
-  filename: string
-  mimeType: string
-  userContext: string | null
-}) {
+async function createGeminiMealJob(photo: ParsedMealPhotoUpload) {
   const jobId = randomUUID()
-  await recordLabelJobCreated({
+  await persistMealCapture({
     jobId,
-    filename: photo.filename,
-    captureKind: NUTRITION_MEAL_CAPTURE_KIND,
-    provider: 'gemini',
+    filename: photo.photos[0]?.filename ?? null,
     userContext: photo.userContext,
+    provider: 'gemini',
+    photos: photo.photos,
   })
-  await saveCaptureImage({ jobId, bytes: photo.bytes, mimeType: photo.mimeType })
   return { job: { id: jobId, status: 'queued' as const } }
 }
 
@@ -253,7 +309,11 @@ export async function reanalyzeNutritionMeal(
     throw new HttpError(409, 'That meal is already saved.')
   }
   if (input.provider === 'home_ai') {
-    const image = await getCaptureImage(jobId)
+    const images = await listMealCaptureImages(jobId)
+    if (images.length > 1) {
+      throw new HttpError(400, mealFailureMessage('MULTI_PHOTO_UNSUPPORTED'), undefined, 'MULTI_PHOTO_UNSUPPORTED')
+    }
+    const image = images[0]
     if (!image) {
       throw new HttpError(400, mealFailureMessage('MISSING_IMAGE'), undefined, 'MISSING_IMAGE')
     }
@@ -431,13 +491,16 @@ export async function getNutritionMealJob(jobId: string, client?: HomeAiClient):
 }
 
 async function mealResponseFromRecord(record: NutritionCaptureJobRecord): Promise<NutritionMealJobResponse> {
+  const imageCount = await mealCaptureImageCount(record.id)
+  const imageAvailable = imageCount > 0
   const failureCode = record.interpretation.failureCode ?? 'PIPELINE_FAILED'
   if (record.status === 'failed') {
     return asMealResponse({
       jobId: record.id,
       status: 'failed',
       elapsedMs: record.interpretation.latencyMs ?? null,
-      imageAvailable: record.imageStored,
+      imageAvailable,
+      imageCount,
       candidate: null,
       userContext: record.userContext,
       failure: {
@@ -453,7 +516,8 @@ async function mealResponseFromRecord(record: NutritionCaptureJobRecord): Promis
         jobId: record.id,
         status: 'failed',
         elapsedMs: record.interpretation.latencyMs ?? null,
-        imageAvailable: record.imageStored,
+        imageAvailable,
+        imageCount,
         candidate: null,
         userContext: record.userContext,
         failure: { code: 'GEMINI_SEMANTIC', message: mealFailureMessage('GEMINI_SEMANTIC') },
@@ -463,7 +527,8 @@ async function mealResponseFromRecord(record: NutritionCaptureJobRecord): Promis
       jobId: record.id,
       status: 'completed',
       elapsedMs: record.interpretation.latencyMs ?? null,
-      imageAvailable: record.imageStored,
+      imageAvailable,
+      imageCount,
       candidate,
       userContext: record.userContext,
     })
@@ -473,19 +538,26 @@ async function mealResponseFromRecord(record: NutritionCaptureJobRecord): Promis
     jobId: record.id,
     status,
     elapsedMs: record.interpretation.latencyMs ?? null,
-    imageAvailable: record.imageStored,
+    imageAvailable,
+    imageCount,
     candidate: null,
     userContext: record.userContext,
   })
 }
 
-export async function getNutritionMealImage(jobId: string, client?: HomeAiClient) {
+export async function getNutritionMealImage(jobId: string, client?: HomeAiClient, position = 0) {
   if (!isHomeAiJobId(jobId)) {
     throw new HttpError(400, mealFailureMessage('INVALID_JOB_ID'))
   }
-  const stored = await getCaptureImage(jobId)
+  if (!Number.isInteger(position) || position < 0 || position >= MEAL_PHOTO_SET_MAX_COUNT) {
+    throw new HttpError(400, 'That meal photo view is invalid.', undefined, 'INVALID_IMAGE')
+  }
+  const stored = await getMealCaptureImage(jobId, position)
   if (stored) {
-    return stored
+    return { bytes: stored.bytes, mimeType: stored.mimeType }
+  }
+  if (position !== 0) {
+    return null
   }
   const record = await getLabelJobRecord(jobId)
   if (record?.provider === 'gemini') {

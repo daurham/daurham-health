@@ -25,7 +25,7 @@ import {
   reanalyzeNutritionMealJob,
   nutritionMealImageUrl,
 } from './api'
-import { MealPhotoPrepareError, prepareMealPhoto } from './prepare-meal-photo'
+import { MEAL_PHOTO_SET_CLIENT_MAX_BYTES, MEAL_PHOTO_SET_MAX_COUNT, MealPhotoPrepareError, prepareMealPhotoSet } from './prepare-meal-photo'
 import { mealLabel } from './format'
 import { NutritionSheet } from './Sheet'
 
@@ -46,6 +46,13 @@ const PORTION_LABELS: Record<MealPortionScale, string> = {
   1.25: '+25%',
 }
 
+type MealView = {
+  key: string
+  original: File
+  prepared: File
+  previewUrl: string
+}
+
 type MealCaptureProps = {
   date: string
   jobId?: string | null
@@ -61,8 +68,7 @@ export function MealCaptureSheet({ date, jobId, onClose, onBack, onLogged, onDis
   const [phase, setPhase] = useState<'pick' | 'preview' | 'working' | 'review' | 'failed'>(jobId ? 'working' : 'pick')
   const [activeJobId, setActiveJobId] = useState<string | null>(jobId ?? null)
   const [payload, setPayload] = useState<NutritionMealJobResponse | null>(null)
-  const [localPreview, setLocalPreview] = useState<string | null>(null)
-  const [preparedFile, setPreparedFile] = useState<File | null>(null)
+  const [views, setViews] = useState<MealView[]>([])
   const [context, setContext] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [errorCode, setErrorCode] = useState<string | null>(null)
@@ -70,11 +76,11 @@ export function MealCaptureSheet({ date, jobId, onClose, onBack, onLogged, onDis
 
   useEffect(() => {
     return () => {
-      if (localPreview) {
-        URL.revokeObjectURL(localPreview)
+      for (const view of views) {
+        URL.revokeObjectURL(view.previewUrl)
       }
     }
-  }, [localPreview])
+  }, [views])
 
   useEffect(() => {
     if (phase !== 'working' || !activeJobId) {
@@ -127,23 +133,23 @@ export function MealCaptureSheet({ date, jobId, onClose, onBack, onLogged, onDis
     }
   }, [phase, activeJobId])
 
-  async function onFile(file: File | undefined) {
-    if (!file) {
-      return
-    }
+  async function stageViews(originals: File[]) {
     setError(null)
     setErrorCode(null)
     try {
-      const prepared = await prepareMealPhoto(file)
-      const preview = URL.createObjectURL(prepared.file)
-      setPreparedFile(prepared.file)
+      const prepared = await prepareMealPhotoSet(originals)
+      const total = prepared.reduce((sum, item) => sum + item.preparedBytes, 0)
+      if (total > MEAL_PHOTO_SET_CLIENT_MAX_BYTES) {
+        throw new MealPhotoPrepareError('TOO_LARGE', 'These photos are too large to upload together. Try fewer or smaller photos.')
+      }
+      const next = prepared.map((item, index) => ({
+        key: `${index}-${item.file.size}-${item.preparedWidth}`,
+        original: originals[index] as File,
+        prepared: item.file,
+        previewUrl: URL.createObjectURL(item.file),
+      }))
+      setViews(next)
       setActiveJobId(null)
-      setLocalPreview((current) => {
-        if (current) {
-          URL.revokeObjectURL(current)
-        }
-        return preview
-      })
       setPhase('preview')
     } catch (caught) {
       if (caught instanceof MealPhotoPrepareError) {
@@ -163,22 +169,69 @@ export function MealCaptureSheet({ date, jobId, onClose, onBack, onLogged, onDis
     }
   }
 
-  async function analyze(provider: 'gemini' | 'home_ai') {
-    if (!activeJobId && !preparedFile) {
+  async function onFile(file: File | undefined, replaceIndex?: number) {
+    if (!file || activeJobId) {
+      return
+    }
+    const originals = views.map((view) => view.original)
+    if (replaceIndex == null) {
+      if (originals.length >= MEAL_PHOTO_SET_MAX_COUNT) {
+        setError('A meal capture can include up to three photos.')
+        setErrorCode('TOO_MANY')
+        return
+      }
+      originals.push(file)
+    } else {
+      originals[replaceIndex] = file
+    }
+    await stageViews(originals)
+  }
+
+  function removeView(index: number) {
+    if (activeJobId) {
+      return
+    }
+    const originals = views.filter((_, viewIndex) => viewIndex !== index).map((view) => view.original)
+    if (originals.length === 0) {
+      setViews([])
       setPhase('pick')
+      return
+    }
+    void stageViews(originals)
+  }
+
+  const photoCount = views.length || payload?.job.imageCount || 0
+  const multiPhoto = photoCount > 1
+
+  async function analyze(provider: 'gemini' | 'home_ai') {
+    if (provider === 'home_ai' && multiPhoto) {
+      setError(mealFailureMessage('MULTI_PHOTO_UNSUPPORTED'))
+      setErrorCode('MULTI_PHOTO_UNSUPPORTED')
+      setPhase('failed')
+      return
+    }
+    if (!activeJobId && views.length === 0) {
+      setPhase('pick')
+      return
+    }
+    const total = views.reduce((sum, view) => sum + view.prepared.size, 0)
+    if (!activeJobId && total > MEAL_PHOTO_SET_CLIENT_MAX_BYTES) {
+      setError('These photos are too large to upload together. Try fewer or smaller photos.')
+      setErrorCode('TOO_LARGE')
+      setPhase('failed')
       return
     }
     setError(null)
     setErrorCode(null)
     const previousId = activeJobId
-    const file = preparedFile
+    const files = views.map((view) => view.prepared)
     setPhase('working')
     setActiveJobId(null)
     try {
       const note = context.trim()
       const job = previousId
         ? await reanalyzeNutritionMealJob(previousId, { userContext: note, provider })
-        : await createNutritionMealJob(file as File, { userContext: note, provider })
+        : await createNutritionMealJob(files, { userContext: note, provider })
       setActiveJobId(job.id)
     } catch (caught) {
       if (previousId) {
@@ -222,9 +275,9 @@ export function MealCaptureSheet({ date, jobId, onClose, onBack, onLogged, onDis
         date={date}
         jobId={activeJobId}
         candidate={payload?.candidate ?? emptyMealEstimate()}
-        imageUrl={activeJobId && payload?.job.imageAvailable ? nutritionMealImageUrl(activeJobId) : localPreview}
+        imageUrls={reviewImageUrls(activeJobId, payload?.job.imageCount, payload?.job.imageAvailable, views)}
         userContext={payload?.userContext ?? (context.trim() || null)}
-        onEditContext={activeJobId || preparedFile ? editContext : undefined}
+        onEditContext={activeJobId || views.length > 0 ? editContext : undefined}
         onClose={onClose}
         onBack={() => {
           setManual(false)
@@ -240,7 +293,7 @@ export function MealCaptureSheet({ date, jobId, onClose, onBack, onLogged, onDis
     return (
       <NutritionSheet title="Meal photo" onClose={onClose}>
         <p className="text-sm text-zinc-800">{error}</p>
-        {localPreview ? <img src={localPreview} alt="Meal" className="mt-3 max-h-48 w-full rounded-lg object-contain bg-zinc-100" /> : null}
+        <MealViewStrip views={views} imageCount={photoCount} />
         <div className="mt-4 space-y-2">
           {errorCode && isMealRetryCode(errorCode) ? (
             <>
@@ -250,9 +303,11 @@ export function MealCaptureSheet({ date, jobId, onClose, onBack, onLogged, onDis
               <button type="button" className={secondaryClass + ' w-full'} onClick={editContext}>
                 Edit context
               </button>
-              <button type="button" className={secondaryClass + ' w-full'} onClick={() => void analyze('home_ai')}>
-                Try local AI
-              </button>
+              {multiPhoto ? null : (
+                <button type="button" className={secondaryClass + ' w-full'} onClick={() => void analyze('home_ai')}>
+                  Try local AI
+                </button>
+              )}
             </>
           ) : errorCode !== 'UNSUPPORTED' ? (
             <button type="button" className={primaryClass} onClick={() => setPhase('pick')}>
@@ -278,8 +333,10 @@ export function MealCaptureSheet({ date, jobId, onClose, onBack, onLogged, onDis
   if (phase === 'working') {
     return (
       <NutritionSheet title="Estimating meal" onClose={onClose}>
-        {localPreview ? <img src={localPreview} alt="Meal" className="mb-3 max-h-48 w-full rounded-lg object-contain bg-zinc-100" /> : null}
-        <p className="text-sm text-zinc-600">Estimating nutrition from the photo… You can leave and come back from Pending captures.</p>
+        <MealViewStrip views={views} imageCount={photoCount} />
+        <p className="text-sm text-zinc-600">
+          Estimating nutrition from {Math.max(photoCount, 1)} {Math.max(photoCount, 1) === 1 ? 'photo' : 'photos'}… You can leave and come back from Pending captures.
+        </p>
         <div className="mt-4 space-y-2">
           <button type="button" className={secondaryClass + ' w-full'} onClick={onBack}>
             Back
@@ -295,10 +352,9 @@ export function MealCaptureSheet({ date, jobId, onClose, onBack, onLogged, onDis
   }
 
   if (phase === 'preview') {
-    const previewSrc = localPreview ?? (activeJobId ? nutritionMealImageUrl(activeJobId) : null)
     return (
       <NutritionSheet title="Meal photo" onClose={onClose}>
-        {previewSrc ? <img src={previewSrc} alt="Meal" className="max-h-64 w-full rounded-lg object-contain bg-zinc-100" /> : null}
+        <MealViewEditor views={views} locked={Boolean(activeJobId)} onRemove={removeView} onReplace={(index, file) => void onFile(file, index)} onAdd={(file) => void onFile(file)} />
         <label className="mt-4 block">
           <span className={labelClass}>Add context (optional)</span>
           <textarea
@@ -310,7 +366,7 @@ export function MealCaptureSheet({ date, jobId, onClose, onBack, onLogged, onDis
           />
         </label>
         <div className="mt-4 space-y-2">
-          <button type="button" className={primaryClass} disabled={!preparedFile && !activeJobId} onClick={() => void analyze('gemini')}>
+          <button type="button" className={primaryClass} disabled={views.length === 0 && !activeJobId} onClick={() => void analyze('gemini')}>
             Analyze meal
           </button>
           <button type="button" className="text-sm text-zinc-600 underline" onClick={() => setPhase('pick')}>
@@ -341,11 +397,134 @@ export function MealCaptureSheet({ date, jobId, onClose, onBack, onLogged, onDis
   )
 }
 
+function reviewImageUrls(
+  jobId: string | null,
+  imageCount: number | undefined,
+  imageAvailable: boolean | undefined,
+  views: MealView[],
+): string[] {
+  const count = imageCount && imageCount > 0 ? imageCount : imageAvailable ? 1 : views.length
+  if (jobId && count > 0 && (imageAvailable || (imageCount ?? 0) > 0)) {
+    return Array.from({ length: count }, (_, index) => nutritionMealImageUrl(jobId, index))
+  }
+  return views.map((view) => view.previewUrl)
+}
+
+function MealViewStrip({ views, imageCount }: { views: MealView[]; imageCount: number }) {
+  if (views.length === 0) {
+    return imageCount > 1 ? <p className="text-sm text-zinc-600">{imageCount} photos of this meal</p> : null
+  }
+  return (
+    <div className="grid grid-cols-3 gap-2">
+      {views.map((view, index) => (
+        <img key={view.key} src={view.previewUrl} alt={`View ${index + 1}`} className="h-20 w-full rounded-lg object-cover bg-zinc-100" />
+      ))}
+    </div>
+  )
+}
+
+function MealViewEditor({
+  views,
+  locked,
+  onRemove,
+  onReplace,
+  onAdd,
+}: {
+  views: MealView[]
+  locked: boolean
+  onRemove: (index: number) => void
+  onReplace: (index: number, file: File) => void
+  onAdd: (file: File) => void
+}) {
+  return (
+    <div>
+      <div className="grid grid-cols-3 gap-2">
+        {views.map((view, index) => (
+          <div key={view.key} className="min-w-0">
+            <img src={view.previewUrl} alt={`View ${index + 1}`} className="h-24 w-full rounded-lg object-cover bg-zinc-100" />
+            <p className="mt-1 text-xs text-zinc-500">View {index + 1}</p>
+            {locked ? null : (
+              <div className="mt-1 flex gap-2">
+                <label className="inline-flex min-h-11 items-center text-sm text-zinc-700 underline">
+                  Replace
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png"
+                    className="sr-only"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0]
+                      if (file) {
+                        onReplace(index, file)
+                      }
+                    }}
+                  />
+                </label>
+                <button type="button" className="min-h-11 min-w-11 text-sm text-zinc-700 underline" onClick={() => onRemove(index)}>
+                  Remove
+                </button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+      {locked || views.length >= MEAL_PHOTO_SET_MAX_COUNT ? null : (
+        <label className={secondaryClass + ' mt-3 w-full'}>
+          Add another angle
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/*"
+            capture="environment"
+            className="sr-only"
+            onChange={(event) => {
+              const file = event.target.files?.[0]
+              if (file) {
+                onAdd(file)
+              }
+            }}
+          />
+        </label>
+      )}
+      {views.length > 0 && views.length < MEAL_PHOTO_SET_MAX_COUNT && !locked ? (
+        <p className="mt-2 text-sm text-zinc-500">Add another angle to give the estimate more visual context.</p>
+      ) : null}
+    </div>
+  )
+}
+
+function MealReviewViews({ urls }: { urls: string[] }) {
+  const [selected, setSelected] = useState(0)
+  if (urls.length === 0) {
+    return null
+  }
+  if (urls.length === 1) {
+    return <img src={urls[0]} alt="Meal" className="mb-3 max-h-48 w-full rounded-lg object-contain bg-zinc-100" />
+  }
+  const current = urls[selected] ?? urls[0]
+  return (
+    <div className="mb-3">
+      <img src={current} alt={`View ${selected + 1}`} className="max-h-40 w-full rounded-lg object-contain bg-zinc-100" />
+      <div className="mt-2 grid grid-cols-3 gap-2">
+        {urls.map((url, index) => (
+          <button
+            key={url}
+            type="button"
+            aria-pressed={selected === index}
+            className={`min-h-11 overflow-hidden rounded-md border ${selected === index ? 'border-zinc-900' : 'border-zinc-200'}`}
+            onClick={() => setSelected(index)}
+          >
+            <img src={url} alt={`View ${index + 1}`} className="h-16 w-full object-cover" />
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function MealEstimateSheet({
   date,
   jobId,
   candidate,
-  imageUrl,
+  imageUrls,
   userContext,
   onEditContext,
   onClose,
@@ -356,7 +535,7 @@ function MealEstimateSheet({
   date: string
   jobId: string | null
   candidate: MealEstimateCandidate
-  imageUrl: string | null
+  imageUrls: string[]
   userContext?: string | null
   onEditContext?: () => void
   onClose: () => void
@@ -409,7 +588,7 @@ function MealEstimateSheet({
 
   return (
     <NutritionSheet title="Review estimate" onClose={onClose}>
-      {imageUrl ? <img src={imageUrl} alt="Meal" className="mb-3 max-h-48 w-full rounded-lg object-contain bg-zinc-100" /> : null}
+      <MealReviewViews urls={imageUrls} />
       {userContext ? (
         <div className="mb-3 rounded-md bg-zinc-50 px-3 py-2">
           <p className="text-xs font-medium text-zinc-500">Your context</p>

@@ -20,6 +20,7 @@ export type NutritionGeminiRequest = {
   maxOutputTokens: number
   usageKind?: NutritionGeminiUsageKind
   image?: { mimeType: string; base64: string }
+  images?: Array<{ mimeType: string; base64: string }>
 }
 
 export type NutritionGeminiResult = {
@@ -46,11 +47,15 @@ export function nutritionGeminiRequestHash(input: {
   model: string
   prompt: string
   imageBase64?: string | null
+  imageBase64s?: Array<string | null | undefined>
 }): string {
-  const imageDigest = input.imageBase64
-    ? createHash('sha256').update(Buffer.from(input.imageBase64, 'base64')).digest('hex')
-    : ''
-  return createHash('sha256').update([input.requestType, input.model, input.prompt, imageDigest].join('\n')).digest('hex')
+  const encoded = input.imageBase64s ?? (input.imageBase64 ? [input.imageBase64] : [])
+  const digests = encoded.filter((value): value is string => Boolean(value)).map((value) =>
+    createHash('sha256').update(Buffer.from(value, 'base64')).digest('hex'),
+  )
+  return createHash('sha256')
+    .update([input.requestType, input.model, input.prompt, ...(digests.length > 0 ? digests : [''])].join('\n'))
+    .digest('hex')
 }
 
 export function nutritionGeminiReservedUsd(config: AiUsageConfig, kind: NutritionGeminiUsageKind): number {
@@ -81,7 +86,7 @@ export async function runNutritionGeminiAttempt(
     requestType,
     model: request.model,
     prompt: request.prompt,
-    imageBase64: request.image?.base64,
+    imageBase64s: request.images?.map((image) => image.base64) ?? (request.image ? [request.image.base64] : []),
   })
   let reserved: Awaited<ReturnType<AiUsageLedger['reserve']>>
   try {

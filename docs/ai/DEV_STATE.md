@@ -1,126 +1,219 @@
 # Dev state
 
-Snapshot recorded 2026-09-27 after V2-G5 Motion and micro-interactions. This commit is the current health application.
+Snapshot recorded 2026-09-27 after V2-G6 Multi-Angle Meal Photo Estimation. This commit is the current health application.
 
 ## Git
 
 - Branch: `main`
-- Baseline the task named: `2b72b6f847076349d8900c411b1d77b98cfe945b` (“Put every Nutrition Gemini attempt on the shared AI budget.”)
-- Parent of this snapshot: `9bbd905` (“docs: define V2-G5 motion micro-interactions”)
-- This commit keeps interaction motion short and turns it off when the system asks for reduced motion
+- Baseline the task named: `89747d87a7aa17404b3d88d0f302db2c19c3934a` (“Keep interaction motion short so a Health fact stays the value it is.”)
+- Parent of this snapshot: `fc3c7d8` (“docs: define V2-G6 multi-angle meal photos”)
+- This commit treats several photos as one reviewed meal
 - Finished tasks are committed and pushed
 - Local annotated tag `v1.0.0` points at `7124ca513efa6c833457303ee6ff79d78344fce6`. Whether that tag exists on the remote is unknown
 
 ## Schema
 
-- Migration head: `0032_body_capture_inbox.sql`
-- No migration was added or applied
-- Design manual version: 1.0.42
+- Migration head: `0033_nutrition_capture_images.sql`
+- `npm run migrate` applied `0033_nutrition_capture_images.sql`
+- Design manual version: 1.0.43
 - Package version: 1.0.0
 - No new runtime dependency
-- V2-F remains complete. V2-G1 through V2-G4 remain implemented. Goal-observation suggestions remain deferred. Overnight vital metrics remain disabled until a payload is verified
+- V2-F remains complete. V2-G1 through V2-G5 remain implemented. Goal-observation suggestions remain deferred. Overnight vital metrics remain disabled until a payload is verified
 
-## Shared motion vocabulary
+## nutrition_capture_images
 
-- CSS variables on `:root`: `--motion-press` 120ms, `--motion-state` 160ms, `--motion-enter` 180ms, `--motion-panel` 200ms
-- Classes live in `src/index.css`: `motion-interactive`, `motion-pressable`, `motion-card`, `page-enter` / `motion-page-enter`, `motion-panel-enter`, `motion-scrim-enter`, `motion-notice-enter`, `pending-load`, `motion-meter`
-- No second motion system and no animation library
+- Columns: `home_ai_job_id`, `position`, `source_filename`, `image_mime`, `image_bytes`, `content_sha256`, `created_at`
+- Primary key `(home_ai_job_id, position)`
+- `position` is 0, 1, or 2
+- `image_mime` is `image/jpeg` or `image/png`
+- `content_sha256` is 64 lowercase hex characters
+- Unique `(home_ai_job_id, content_sha256)`
+- `home_ai_job_id` references `nutrition_capture_jobs` with `ON DELETE CASCADE`
+- No `user_id` column
+- New Gemini meal jobs store their one to three photos only in this table
 
-## Interaction classes changed
+## Legacy image fallback
 
-- `primaryButtonClass`, `secondaryButtonClass`, `dangerButtonClass`, `themeChoiceClass`, and `themeChoiceSelectedClass` use `motion-pressable`
-- `quietButtonClass`, `interactiveRowClass`, `tabClass`, and `selectedTabClass` use `motion-interactive`
-- `interactiveCardClass` and `selectedCardClass` use `motion-card`
-- Desktop tabs and the mobile bottom nav use `motion-interactive`
-- Press scale is `scale(0.985)` on `.motion-pressable:active:not(:disabled)`
-- Card press scale is `scale(0.99)`
-- Hover lift is `translateY(-1px)` only inside `@media (hover: hover) and (pointer: fine)`
-- Sign-in, reset-password, and lock-screen submit buttons keep their zinc colors and now include `motion-pressable`
+- `nutrition_capture_jobs.image_bytes` and `image_mime` stay
+- Labels and historical one-photo meal jobs still use those columns
+- For a meal job, child rows are authoritative when any exist and are not merged with the legacy column
+- When a meal job has no child rows, position 0 falls back to the legacy columns
+- There is no destructive backfill
 
-## Page-enter behavior
+## Client photo limits
 
-- `.page-enter` fades from opacity 0.88 and moves `translateY(3px)` over `--motion-enter` (180ms) ease-out
-- The previous 0.55 starting opacity is gone
-- Route outlets are not keyed and routes are not remounted to play the animation
-- Suspense fallbacks use `RouteFallback`: two pulse bars, `aria-busy`, and `aria-label="Loading"`. There is no delay
+- Count is 1 to 3
+- Zero photos and a fourth photo are invalid
+- Prepared-byte ceiling: `MEAL_PHOTO_SET_CLIENT_MAX_BYTES` = 3,800,000
+- Multipart ceiling: `MEAL_PHOTO_SET_SERVER_MAX_BYTES` = 4,200,000
+- Platform body limit: `MEAL_PHOTO_PLATFORM_PAYLOAD_LIMIT_BYTES` = 4,500,000
+- Client ceiling is below the server ceiling, which is below the platform limit
+- An oversize set fails locally and makes no API call
+- A photo is not dropped to fit
 
-## Pending and loading behavior
+## Preparation policy
 
-- `PendingLoadRegion` keeps children mounted inside `.pending-load`
-- `data-pending="true"` sets opacity 0.6
-- The thin progress bar still uses `animate-pulse`, `role="progressbar"`, and `aria-label="Loading"`
-- `ListPlaceholder` and `NutritionPlaceholder` stay as they were
+- One photo in the set keeps long edge 2000, JPEG quality 0.86, fallback 0.78, and the 3,800,000-byte client ceiling
+- `prepareMealPhoto` alone still uses `MEAL_PHOTO_CLIENT_MAX_BYTES` (4 MiB) for the older single-photo helper
+- Two or three photos use long edge 1600, JPEG quality 0.82, fallback 0.7, and 1,200,000 bytes per photo
+- Changing the count re-prepares the original files before upload
+- JPEG and PNG inputs only. HEIC, HEIF, WebP, and GIF stay unsupported
+- Prepared uploads may normalize to JPEG
+- The set reuses `prepareImage`. There is no second codec and no new image dependency
 
-## Panel and sheet behavior
+## Multipart contract
 
-- Nutrition sheets add `motion-scrim-enter` and `motion-panel-enter`
-- The panel fades from opacity 0.92 and moves 6px over 200ms
-- The scrim fades in over 160ms
-- Close stays immediate. Escape, scrim click, focus restore, and `role="dialog"` stay
+- `POST /api/nutrition/meal/jobs` accepts `image0`, `image1`, and `image2`
+- The current client always sends numbered fields, including a one-photo capture
+- A lone legacy field named `image` is still accepted
+- Legacy plus numbered fields is `MIXED_IMAGE_FIELDS`
+- A gap, including `image3` alone, is `IMAGE_GAP`
+- A fourth image is `TOO_MANY_PHOTOS`
+- Each image is checked for JPEG or PNG magic. One invalid image rejects the request before persistence
+- `userContext` and `provider` stay multipart fields
+- `provider=home_ai` requires exactly one photo or returns 400 `MULTI_PHOTO_UNSUPPORTED` before any Home-AI call
+- `provider=gemini` allows one to three photos
 
-## Notice and form behavior
+## Atomic persistence
 
-- `LoadErrorNotice` adds `motion-notice-enter` and stays `role="alert"` with the existing red text
-- The notice animation runs on mount. There is no shake
-- Checkboxes, radios, and date inputs stay native
-- Health numbers do not count up or interpolate
+- `persistMealCapture` inserts the job and each child image in one `sql.transaction`
+- Gemini does not start during POST
+- Polling still advances the job
+- A failed image insert rolls the job back, so a queued job cannot exist with zero photos
 
-## Chart and reduced-motion behavior
+## Ordering and duplicates
 
-- `usePrefersReducedMotion` reads `prefers-reduced-motion: reduce`
-- Progress line, scatter, and sleep-stage bar charts set `isAnimationActive` from that hook
-- The hook is called before any early return
-- Chart strokes stay `var(--chart-ink)`. Calculations are unchanged
+- Position 0, 1, and 2 are View 1, 2, and 3
+- Gemini receives images in stored position order
+- The app does not infer top or side labels
+- An exact SHA-256 match of prepared bytes is rejected on the client and the server
+- There is no perceptual match. Visually similar different angles are allowed
 
-## Reduced-motion contract
+## Image API
 
-- `prefers-reduced-motion: reduce` sets `animation: none` on `.page-enter`, `.motion-page-enter`, `.motion-panel-enter`, `.motion-scrim-enter`, `.motion-notice-enter`, and `.animate-pulse`
-- It sets `transition: none` on `.motion-interactive`, `.motion-pressable`, `.motion-card`, `.pending-load`, and `.motion-meter`
-- It sets `transform: none` on press and card hover or active states
-- Content stays visible. State changes stay immediate
-- There is no Settings toggle and no stored motion preference
+- `GET /api/nutrition/meal/jobs/:id/image` returns the first image
+- `GET /api/nutrition/meal/jobs/:id/images/:position` returns that view
+- Positions outside 0–2 are HTTP 400 `INVALID_IMAGE`
+- A missing stored image at a position other than 0 is 404
+- Position 0 with no Health image, when the provider is not Gemini, can still proxy Home-AI
+- Health does not claim a durable copy of a Home-AI image
+- Owner auth is unchanged
 
-## Mobile behavior
+## Job imageCount
 
-- Bottom nav stays `fixed inset-x-0 bottom-0` with `env(safe-area-inset-bottom)`
-- Shell variables `--shell-nav-offset`, `--shell-action-bar`, and `--shell-main-pad` are unchanged
-- Press and lift use transform and opacity. Meter width is the only width transition
-- At 390px the demo bottom nav is 390px wide and the page does not overflow horizontally
+- Responses include `imageAvailable` and `imageCount`
+- Count is 0 when no image is stored, 1 for a legacy or single photo, and 1–3 for a multi-photo Gemini job
+- A Home-AI job that exposes one image may report count 1
+- JSON does not include raw bytes or base64
 
-## Appearance boundary
+## Gemini image array
 
-- Color mode and palette behavior are unchanged
-- Durations do not vary by palette
-- Light, Dark, and palette changes stay instant
-- Danger, warning, and success stay semantic
+- `NutritionGeminiRequest` and `GeminiGenerateRequest` accept `images`
+- The singular `image` field remains for a one-image request
+- `geminiInlineParts` sends the prompt text, then one inline image part per view, in order
+- Labels stay one image
+- Ask Health, Weekly Coach, literature, and experiment suggestions stay text-only
 
-## Persistence, API, and backup
+## Meal prompt
 
-- No API, database, backup, or portable-export change
-- No motion environment variable
-- No `localStorage` motion key
-- `ai_usage` stays operational and portable false
+- `mealPhotoPrompt(userContext, imageCount)`
+- Prompt version `meal-photo-v2` is stored in interpretation metadata
+- When `imageCount` is greater than 1, the prompt says the images are the same meal unless the owner context says otherwise, that the views are used together, that the same food must not be counted twice, and that unseen food must not be invented
+- The single-photo sentences and the existing JSON shape stay
+- Output remains one `MealEstimateCandidate`
+- The prompt does not require per-image foods, confidence percentages, or bounding boxes
+
+## ai_usage hash
+
+- One multi-angle analysis is one provider call and one reservation
+- `request_type` stays `nutrition_meal_photo`
+- A retry is a second reservation, not one reservation per image
+- The hash is SHA-256 of `requestType`, model, prompt, and one SHA-256 digest per image, joined by newlines
+- A request with no images still appends an empty digest so description hashes stay the same
+- Changing order or any image bytes changes the hash
+- The ledger stores the hex hash only
+- `AI_NUTRITION_MEAL_MAX_REQUEST_COST_USD` was not raised
+- Actual cost is still clamped to the reservation
+- Three-image token cost stays inside that existing meal reservation
+- There is no second wallet
+
+## Home-AI boundary
+
+- Home-AI meal capture accepts one image
+- The external Home-AI service was not modified
+- Single-photo Gemini and single-photo Home-AI remain
+- A multi-photo set is not sent as only the first photo
+- Multi-photo failure offers Retry Gemini, Edit context, Build meal manually, and Discard capture
+- It does not offer Try local AI
+- The message is: “Local AI can review one photo. This capture has several views, so retry Gemini or build the meal manually.”
+- One-photo failure still offers Try local AI
+
+## Reanalysis
+
+- Gemini reanalysis requeues the same job and does not rewrite `nutrition_capture_images`
+- The next attempt loads the full stored set and gets a new reservation
+- A context-only change does not replace the images
+- Multi-photo reanalysis to Home-AI throws `MULTI_PHOTO_UNSUPPORTED` before `createHomeAiMealJob`
+- One-photo Home-AI reanalysis uses the single stored image, from a child row or the legacy column
+- A Home-AI job with no local image still fails as `MISSING_IMAGE`
+
+## UI
+
+- Capture holds one to three views, each with replace and remove
+- Adding or removing a view re-prepares the set
+- Add, replace, and remove are blocked once a job exists
+- Working copy says it is estimating nutrition from N photos
+- Review shows one image as a single preview
+- More than one image shows the selected view plus thumbnail buttons
+- There is no carousel library
+- The candidate and nutrient review are unchanged
+- Allowed context copy: “Add another angle to give the estimate more visual context.”
+
+## Canonical Nutrition
+
+- Commit schemas are unchanged
+- `commitNutritionMealEstimateRequestSchema` has no `imageCount`
+- Saving writes the reviewed nutrients the owner chose
+- Image count, angle labels, and per-photo observations are not stored on `nutrition_entries`
+- Dismiss deletes the job, and child rows cascade
+
+## Backup and portable export
+
+- `nutrition_capture_images` is operational and `portable: false`
+- It is restored immediately after `nutrition_capture_jobs`
+- Primary key is `home_ai_job_id` and `position`
+- `image_bytes` is bytea and is base64-encoded in the archive, same as other bytea columns
+- Portable export does not include photo bytes
+- Committed captures stay in the full backup
+
+## Demo, auth, and privacy
+
+- The demo stays provider-free and does not upload photos
+- Demo meal capture stays a prepared sample
+- Owner routes stay behind owner auth
+- Image bytes, raw user context, and request bodies are not logged
+- A multi-photo set goes only to Gemini
+- Europe PMC and Home-AI do not receive a multi-photo set
 
 ## Validation
 
-- Tests: 939 passing across 110 files
+- Tests: 947 passing across 111 files
 - `npx tsc -b` passed
 - `npx eslint .` passed
 - `npm run build` passed. The existing Vite chunk-size warning remains
+- Migration `0033_nutrition_capture_images.sql` applied
 
 ## Manual QA
 
-- Demo Today, Nutrition, Training, Body, Progress, Personal Lab, and Ask Health rendered. Nutrition totals stayed the prepared demo values
-- Sign-in rendered, and its submit button uses `motion-pressable`. Reset password showed the invalid-link state without a token
-- Settings, owner pending refresh, owner notices, and Appearance switches showed the lock screen: “Private Health data”
-- At 390px the demo bottom nav stayed fixed and the page did not overflow. Sign-in at 390px did not overflow
-- Emulated `prefers-reduced-motion: reduce` set nav and sign-in transitions to `none`
-- Live Gemini and owner chart animation were not exercised
+- Demo Nutrition opened the prepared meal-photo sample and closed it again. The sample lists rolled oats, blueberries, and Greek yogurt. It does not claim that more photos make calories accurate
+- Owner Nutrition showed the lock screen: “Private Health data”
+- Sign-in rendered the email and password form
+- At 390px, demo Nutrition did not overflow, the bottom nav stayed 390px wide, and the sample still opened. Sign-in at 390px did not overflow
+- Live Gemini, a real multi-photo upload, and owner review were not exercised. The owner lock screen blocks that path without a session. Injected ledger and provider tests cover the provider path
 
 ## Deviations
 
-- Sign-in, reset-password, and the lock-screen action were custom zinc buttons outside `interactive.ts`. They now include `motion-pressable` so those screens get the same press feedback. Their colors are unchanged
-- Suspense fallbacks use `RouteFallback` instead of the text “Loading…”
+- None. The meal cost ceiling was left at its existing default
 
 ## Remaining V2-G work
 
@@ -128,3 +221,4 @@ Snapshot recorded 2026-09-27 after V2-G5 Motion and micro-interactions. This com
 - Route geometry and nested Health Auto Export workout telemetry stay deferred
 - No correction or deletion lifecycle for Health Auto Export workouts
 - Goal-observation experiment suggestions and overnight vital metrics remain deferred from earlier slices
+- Recipe assistance and richer contextual meal estimation, beyond multi-angle photos, remain ideas

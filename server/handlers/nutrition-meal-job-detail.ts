@@ -23,6 +23,12 @@ const JOB_PATH_PREFIX = '/api/nutrition/meal/jobs'
 
 export function nutritionMealJobIdFromRequest(req: ApiRequest): string | null {
   const pathname = requestApiPathname(req)
+  const indexed = pathname.match(/\/images\/\d+$/)
+  if (indexed) {
+    const jobPath = pathname.slice(0, pathname.lastIndexOf('/images/'))
+    const rest = jobPath.startsWith(`${JOB_PATH_PREFIX}/`) ? jobPath.slice(`${JOB_PATH_PREFIX}/`.length) : null
+    return rest && !rest.includes('/') ? rest : null
+  }
   if (pathname.endsWith('/image') || pathname.endsWith('/reanalyze')) {
     const suffix = pathname.endsWith('/image') ? '/image' : '/reanalyze'
     const withoutImage = pathname.slice(0, -suffix.length)
@@ -62,13 +68,15 @@ export default withOwnerAuth(async function nutritionMealJobHandler(req: ApiRequ
       )
       return
     }
-    if (pathname.endsWith('/image')) {
+    const indexedImage = pathname.match(/\/images\/(\d+)$/)
+    if (pathname.endsWith('/image') || indexedImage) {
       if (req.method !== 'GET') {
         res.setHeader('Allow', 'GET')
         sendJson(res, 405, { error: 'Method not allowed' })
         return
       }
-      const image = await getNutritionMealImage(parsed)
+      const position = indexedImage ? Number(indexedImage[1]) : 0
+      const image = await getNutritionMealImage(parsed, undefined, position)
       if (!image) {
         throw new HttpError(404, 'Meal photo is no longer available.')
       }

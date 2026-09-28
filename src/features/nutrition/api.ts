@@ -293,11 +293,14 @@ async function parseMealAction<T>(response: Response): Promise<T> {
 }
 
 export async function createNutritionMealJob(
-  file: File,
+  file: File | File[],
   input?: { userContext?: string; provider?: 'gemini' | 'home_ai' },
 ): Promise<{ id: string; status: 'queued' }> {
+  const files = Array.isArray(file) ? file : [file]
   const form = new FormData()
-  form.set('image', file)
+  files.forEach((item, index) => {
+    form.set(`image${index}`, item)
+  })
   if (input?.userContext) {
     form.set('userContext', input.userContext)
   }
@@ -342,8 +345,11 @@ export async function dismissNutritionCapture(job: PendingNutritionCapture): Pro
   await dismissNutritionLabelJob(job.id)
 }
 
-export function nutritionMealImageUrl(jobId: string): string {
-  return `/api/nutrition/meal/jobs/${jobId}/image`
+export function nutritionMealImageUrl(jobId: string, position = 0): string {
+  if (position <= 0) {
+    return `/api/nutrition/meal/jobs/${jobId}/image`
+  }
+  return `/api/nutrition/meal/jobs/${jobId}/images/${position}`
 }
 
 export type FoodDescriptionReview = DescriptionEstimateCandidate

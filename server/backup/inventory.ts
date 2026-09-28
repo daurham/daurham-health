@@ -1,6 +1,6 @@
 export const BACKUP_FORMAT = 'daurham-health-backup'
 export const BACKUP_FORMAT_VERSION = 1
-export const LATEST_SCHEMA_MIGRATION = '0032_body_capture_inbox.sql'
+export const LATEST_SCHEMA_MIGRATION = '0033_nutrition_capture_images.sql'
 export const PORTABLE_EXPORT_BYTE_LIMIT = 3_500_000
 
 export type ColumnKind = 'uuid' | 'text' | 'date' | 'timestamptz' | 'numeric' | 'int' | 'bool' | 'json' | 'bytea'
@@ -666,6 +666,23 @@ export const BACKUP_TABLES: readonly BackupTable[] = [
       col('image_bytes', 'bytea'),
       col('image_mime', 'text'),
       col('interpretation', 'json'),
+    ],
+  }),
+  table({
+    name: 'nutrition_capture_images',
+    backupClass: 'operational',
+    primaryKey: ['home_ai_job_id', 'position'],
+    seeded: false,
+    portable: false,
+    references: [{ column: 'home_ai_job_id', table: 'nutrition_capture_jobs' }],
+    columns: [
+      col('home_ai_job_id', 'text'),
+      col('position', 'int'),
+      col('source_filename', 'text'),
+      col('image_mime', 'text'),
+      col('image_bytes', 'bytea'),
+      col('content_sha256', 'text'),
+      col('created_at', 'timestamptz'),
     ],
   }),
   table({

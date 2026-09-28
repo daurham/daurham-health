@@ -146,6 +146,12 @@ Observed from the current code and product docs. Where the original rationale is
 **Reason:** V2-G5 may show that a control was pressed or that a surface arrived. It must not make a measurement, total, chart, or goal look more certain, more dramatic, or different from the deterministic value.  
 **Implications:** One CSS vocabulary in `src/index.css` covers press, hover lift, page entry, sheet entry, notices, pending opacity, and meter width. `prefers-reduced-motion: reduce` removes that movement, including the pending opacity transition and chart animation. There is no stored motion preference, no animation library, and no count-up of Health numbers. Appearance still switches immediately.
 
+## Decision: Several photos are one reviewed meal
+
+**Status:** Active  
+**Reason:** V2-G6 lets the owner add up to three views of the same meal so Gemini has more visual context. Those views are evidence for one estimate. They are not separate meals and they are not a saved Nutrition fact.  
+**Implications:** A Gemini meal job stores one to three ordered images in `nutrition_capture_images`. Historical one-photo jobs stay readable from `nutrition_capture_jobs.image_bytes` when no child rows exist. Labels stay on that legacy column. One Gemini attempt is one `ai_usage` reservation, even when the request contains three images. Home-AI accepts one photo. A multi-photo set does not silently send the first photo to Home-AI. The canonical `nutrition_entries` row is still the reviewed value the owner saves. Photo count and angle labels are not stored on that row. Child images belong in the full backup and not in the portable export.
+
 ## Decision: Manual ledger rows are historical
 
 **Status:** Active  

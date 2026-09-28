@@ -516,6 +516,18 @@ export function mealFailureMessage(code: string): string {
       return 'That photo is too large. Try another photo of the meal.'
     case 'MISSING_IMAGE':
       return 'Choose a JPEG or PNG of the meal.'
+    case 'TOO_MANY_PHOTOS':
+      return 'A meal capture can include up to three photos.'
+    case 'IMAGE_GAP':
+      return 'Meal photos must be sent in order, without a missing view.'
+    case 'MIXED_IMAGE_FIELDS':
+      return 'Send either one image or numbered views, not both.'
+    case 'DUPLICATE_IMAGE':
+      return 'That photo is already in this meal. Add a different angle.'
+    case 'MULTI_PHOTO_UNSUPPORTED':
+      return 'Local AI can review one photo. This capture has several views, so retry Gemini or build the meal manually.'
+    case 'PHOTO_SET_TOO_LARGE':
+      return 'These photos are too large to upload together. Try fewer or smaller photos.'
     case 'INVALID_IMAGE':
       return "Couldn't read that photo. Try another JPEG or PNG."
     case 'UNREADABLE_MEAL':
@@ -602,6 +614,7 @@ export type NutritionMealJobResponse = {
     status: 'queued' | 'processing' | 'completed' | 'failed'
     elapsedMs?: number | null
     imageAvailable?: boolean
+    imageCount?: number
   }
   userContext?: string | null
   candidate: MealEstimateCandidate | null

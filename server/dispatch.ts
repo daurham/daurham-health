@@ -320,7 +320,12 @@ export function matchHealthApiRoute(pathname: string): HealthApiRoute | null {
   }
   if (pathname.startsWith('/api/nutrition/meal/jobs/')) {
     const rest = pathname.slice('/api/nutrition/meal/jobs/'.length)
-    if (rest.length > 0 && (rest.split('/').length === 1 || rest.endsWith('/image') || rest.endsWith('/reanalyze'))) {
+    const parts = rest.split('/')
+    if (
+      parts.length === 1 ||
+      (parts.length === 2 && (parts[1] === 'image' || parts[1] === 'reanalyze')) ||
+      (parts.length === 3 && parts[1] === 'images' && /^\d+$/.test(parts[2] ?? ''))
+    ) {
       return 'nutrition-meal-job-detail'
     }
   }

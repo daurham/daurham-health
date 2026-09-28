@@ -12,6 +12,7 @@ import {
   interpretMealPhotoResponse,
   interpretNutritionLabelResponse,
   isGeminiAutoRetryCode,
+  MEAL_PHOTO_PROMPT_VERSION,
   mealPhotoPrompt,
   nutritionLabelPrompt,
   type InterpretationMetadata,
@@ -30,6 +31,7 @@ export type GeminiGenerateRequest = {
   maxOutputTokens: number
   mediaResolution?: MediaResolution
   image?: { mimeType: string; base64: string }
+  images?: Array<{ mimeType: string; base64: string }>
   usageKind?: NutritionGeminiUsageKind
 }
 
@@ -105,18 +107,29 @@ export class GeminiNutritionInterpreter {
     this.labelModel = options.labelModel ?? options.model
   }
 
-  async interpretMealPhoto(input: { image: Uint8Array; mimeType: string; userContext: string | null }): Promise<InterpretedMeal> {
+  async interpretMealPhoto(input: {
+    image?: Uint8Array
+    mimeType?: string
+    images?: Array<{ image: Uint8Array; mimeType: string }>
+    userContext: string | null
+  }): Promise<InterpretedMeal> {
+    const images =
+      input.images && input.images.length > 0
+        ? input.images
+        : input.image && input.mimeType
+          ? [{ image: input.image, mimeType: input.mimeType }]
+          : []
     const result = await this.generate({
       model: this.model,
-      prompt: mealPhotoPrompt(input.userContext),
+      prompt: mealPhotoPrompt(input.userContext, images.length),
       timeoutMs: GEMINI_MEAL_TIMEOUT_MS,
       maxOutputTokens: GEMINI_MEAL_MAX_OUTPUT_TOKENS,
       usageKind: 'meal_photo',
-      image: { mimeType: input.mimeType, base64: Buffer.from(input.image).toString('base64') },
+      images: images.map((item) => ({ mimeType: item.mimeType, base64: Buffer.from(item.image).toString('base64') })),
     })
     return {
       candidate: interpretMealPhotoResponse(result.text, input.userContext, result.model),
-      metadata: metadataFrom(result),
+      metadata: { ...metadataFrom(result), promptVersion: MEAL_PHOTO_PROMPT_VERSION },
     }
   }
 
@@ -177,10 +190,8 @@ async function generateOnce(config: GeminiConfig, request: GeminiGenerateRequest
     retryOptions: { attempts: 1 },
   }
   const ai = new GoogleGenAI({ apiKey: config.apiKey, httpOptions })
-  const parts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [{ text: request.prompt }]
-  if (request.image) {
-    parts.push({ inlineData: { mimeType: request.image.mimeType, data: request.image.base64 } })
-  }
+  const images = request.images ?? (request.image ? [request.image] : [])
+  const parts = geminiInlineParts(request.prompt, images)
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), request.timeoutMs)
   const started = Date.now()
@@ -225,6 +236,13 @@ async function generateOnce(config: GeminiConfig, request: GeminiGenerateRequest
   } finally {
     clearTimeout(timer)
   }
+}
+
+export function geminiInlineParts(
+  prompt: string,
+  images: Array<{ mimeType: string; base64: string }>,
+): Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> {
+  return [{ text: prompt }, ...images.map((image) => ({ inlineData: { mimeType: image.mimeType, data: image.base64 } }))]
 }
 
 function metadataFrom(result: GeminiGenerateResult): InterpretationMetadata {

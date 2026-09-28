@@ -49,7 +49,7 @@ Derived products are not stored as tables. That includes goal status, projection
 ## Important flows
 
 - Today assembles the owner's current Phoenix day from canonical domains. Activity for the current day can be provisional.
-- Nutrition logs foods, recipes, targets, barcode lookups, label photos, meal photos, and text descriptions. Capture jobs can ask Gemini, with Home-AI as an explicit fallback.
+- Nutrition logs foods, recipes, targets, barcode lookups, label photos, meal photos, and text descriptions. A meal capture can include one to three photos of the same meal. Gemini sees every view in one request. Home-AI remains an explicit one-photo fallback.
 - Training stores exercises, templates, and workout sessions. A workout photo becomes a Home-AI transcription job. The owner reviews it before it becomes a session.
 - Body stores manual measurements, an XLSX fit-profile import, and optional measurement cadence. A Shortcut can stage a capture with `POST /api/ingest/body`. That row stays in `body_capture_inbox` until the owner reviews it and saves one ordinary manual measurement. Pending captures are not observations. Setup is `docs/body-shortcut.md`.
 - Apple Health history can be imported from export archives. Ongoing Activity, Sleep, and workout sync arrives as `POST /api/ingest/apple-health` with `APPLE_HEALTH_SYNC_TOKEN`. That token cannot read Health data or post a Body capture. Apple and Health Auto Export workouts stay in Activity. They are not Training sessions. Body intake uses a separate `BODY_CAPTURE_TOKEN` and cannot read or save measurements.

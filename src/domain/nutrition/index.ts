@@ -198,6 +198,7 @@ export {
   GEMINI_LABEL_TIMEOUT_MS,
   normalizeUserContext,
   parseNutritionProvider,
+  MEAL_PHOTO_PROMPT_VERSION,
   mealPhotoPrompt,
   foodDescriptionPrompt,
   nutritionLabelPrompt,

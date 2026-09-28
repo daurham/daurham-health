@@ -183,7 +183,7 @@ function readme(manifest: Pick<BackupManifest, 'createdAt' | 'profile' | 'schema
     'Authentication is recovered separately through the existing owner sign-in.',
     'Photos that live only on Home-AI disk are not included.',
     manifest.profile === 'full'
-      ? 'Gemini capture images stored in nutrition_capture_jobs are included as base64.'
+      ? 'Gemini capture images stored in nutrition_capture_jobs and nutrition_capture_images are included as base64.'
       : 'This portable export omits raw activity samples, raw sleep intervals, capture jobs, and database source-link ids. A USDA food includes its provider key, FoodData Central id, and serving fingerprint. Use the backup CLI for full recovery.',
     '',
     'tables/*.ndjson is the machine-readable copy used for restore.',

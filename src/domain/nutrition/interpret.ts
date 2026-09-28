@@ -74,6 +74,7 @@ export type InterpretationMetadata = {
   providerRequestId?: string | null
   attempt?: number
   failureCode?: string | null
+  promptVersion?: string | null
 }
 
 export type MealPhotoInterpretInput = {
@@ -235,8 +236,20 @@ export function parseNutritionProvider(value: unknown): NutritionProvider {
   return value === 'home_ai' ? 'home_ai' : 'gemini'
 }
 
-export function mealPhotoPrompt(userContext: string | null): string {
+export const MEAL_PHOTO_PROMPT_VERSION = 'meal-photo-v2'
+
+export function mealPhotoPrompt(userContext: string | null, imageCount = 1): string {
+  const views =
+    imageCount > 1
+      ? [
+          'All images show the same meal unless the owner context says otherwise.',
+          'Use the views together to identify foods and estimate portions.',
+          'Do not count the same food twice because it appears in more than one view.',
+          'Do not invent food that is not visible in any view.',
+        ]
+      : []
   const instructions = [
+    ...views,
     'Identify the visible meal and estimate nutrition for the entire consumed plate.',
     'Output JSON only. Do not wrap the JSON in markdown.',
     'Estimate visible portion sizes, then estimate total calories, protein, carbs, fat, and fiber.',
