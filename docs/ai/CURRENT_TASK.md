@@ -1,25 +1,825 @@
-# Current task
+# Current Task — V2-G2 Body Inbox + Shortcut Capture
 
-No active implementation task. Awaiting next task definition.
+Status: ready_for_implementation
 
-Future tasks should replace this file with the sections below. Leave a section explicit when it is empty.
+Baseline commit:
+
+4a049116cf1edd39638059f92693eb8c0e64cc99
+
+Expected baseline:
+
+- V2-F complete
+- V2-G1 ongoing Health Auto Export workout ingestion complete
+- 905 tests passing across 106 files
+- typecheck, lint, and production build passing
+- schema head 0031_experiment_origins.sql
+- Design manual 1.0.37
+- package 1.0.0
+
+Follow AGENTS.md and the persistent files under docs/ai/.
 
 ## Objective
 
-## Background
+Make Body capture substantially easier from an iPhone without replacing the verified Fit Profile XLSX importer or weakening provenance.
 
-## Requirements
+Implement a narrow Body Inbox and an iOS Shortcut-friendly machine intake path:
+
+Shortcut / trusted owner automation
+→ bounded staged Body capture
+→ owner review in Health
+→ existing deterministic Body validation/conversion
+→ canonical body_measurement_sessions + body_metrics
+→ provenance link
+
+The machine intake must never directly create canonical Body measurements.
+
+Core invariant:
+
+External capture can stage evidence. Only an authenticated owner review action can turn it into canonical Body data.
+
+## Product scope
+
+This slice is Body-only.
+
+It is not a generic cross-domain inbox framework and it is not a native iOS app.
+
+Primary use case:
+
+1. An iPhone Shortcut gathers one or more body measurements.
+2. The Shortcut POSTs a small JSON payload to Health.
+3. Health returns a review URL.
+4. The Shortcut opens that URL.
+5. The signed-in owner verifies the values and taps Save.
+6. Health creates one ordinary canonical Body measurement session.
+
+This should reduce Save-to-Files / XLSX friction for day-to-day measurements while keeping the existing XLSX path for historical/device-rich imports.
 
 ## Non-goals
 
-## Existing behavior that must remain unchanged
+Do not implement in this phase:
 
-## Edge cases
+- a native iOS app
+- Apple Developer / HealthKit entitlements
+- a PWA service worker
+- a browser Web Share Target
+- direct Apple Health body ingestion
+- OCR/photo body capture
+- generic Health Inbox items for Nutrition, Training, Sleep, or other domains
+- automatic canonical writes from the Shortcut
+- background AI
+- Gemini/Home-AI involvement
+- body-device quality scoring
+- replacement of Fit Profile XLSX import
+- automatic parsing of arbitrary text messages
+- push notifications
 
-## Implementation constraints
+A true iOS share-sheet target can be evaluated later. The current web app has no manifest/service worker, so do not pretend a native share target exists.
+
+## Schema
+
+Expected migration:
+
+0032_body_capture_inbox.sql
+
+Verify the actual migration head before creating it.
+
+Expected schema after this task:
+
+0032_body_capture_inbox.sql
+
+### New staging table
+
+Add a Body-only staging table, preferably named:
+
+body_capture_inbox
+
+Suggested fields:
+
+- id UUID primary key
+- external_capture_id TEXT not null
+- status TEXT not null
+- captured_at TIMESTAMPTZ not null
+- timezone TEXT not null
+- metrics JSONB not null
+- notes TEXT null
+- source_id UUID not null references data_sources(id)
+- canonical_session_id UUID null references body_measurement_sessions(id)
+- created_at TIMESTAMPTZ not null default now()
+- updated_at TIMESTAMPTZ not null default now()
+- committed_at TIMESTAMPTZ null
+- discarded_at TIMESTAMPTZ null
+
+Allowed status:
+
+- pending
+- committed
+- discarded
+
+Do not add a user_id. This remains a one-owner product.
+
+Use an explicit uniqueness rule that makes external_capture_id idempotent for the Body Shortcut source.
+
+### Data source
+
+Add a dedicated source row/key for staged Shortcut capture, for example:
+
+body_shortcut
+
+The source represents the capture transport/origin. It is not a new owner/account.
+
+Do not overwrite the existing manual source.
+
+## Machine authentication
+
+Add a new server-only secret:
+
+BODY_CAPTURE_TOKEN
+
+Do not reuse APPLE_HEALTH_SYNC_TOKEN.
+
+The Apple ingest token must remain scoped to Apple/HAE ingestion.
+
+BODY_CAPTURE_TOKEN authorizes only the Body machine-intake endpoint defined below.
+
+It must not authorize:
+
+- owner reads
+- Body history reads
+- inbox listing
+- inbox review
+- inbox commit
+- Body edit/delete
+- any other Health API
+
+Never expose the token in browser JavaScript, Settings, logs, responses, demo fixtures, backup, or portable export.
+
+Add the variable name with blank value to .env.example.
+
+## Machine intake API
+
+Use the existing single Vercel function.
+
+Add:
+
+POST /api/ingest/body
+
+This is the only token-authorized Body intake operation.
+
+Wrong methods return 405.
+
+Missing/unconfigured BODY_CAPTURE_TOKEN should fail closed.
+
+Invalid bearer token returns 401.
+
+Do not accept the ordinary owner session as a substitute for the machine token on this ingest route merely because the browser is signed in.
+
+### Request contract
+
+Use a narrow deterministic JSON contract, versioned explicitly.
+
+Suggested request:
+
+{
+  "version": "body-capture-v1",
+  "captureId": "<stable id generated by Shortcut>",
+  "capturedAt": "<offset-aware ISO timestamp>",
+  "timezone": "America/Phoenix",
+  "metrics": [
+    { "key": "weight", "value": 190.4, "unit": "lb" },
+    { "key": "body_fat_percentage", "value": 21.2, "unit": "percent" }
+  ],
+  "notes": null
+}
+
+Accepted metric keys are exactly the existing MANUAL_BODY_METRICS.
+
+Accepted input units are exactly each metric definition's existing manualInputUnits.
+
+Do not create a second unit/range catalog.
+
+Reuse the Body manual domain definitions.
+
+### Capture id
+
+captureId is required.
+
+Bound it to a safe length and character set.
+
+The same captureId for the body_shortcut source is idempotent.
+
+A retry of an identical payload returns the existing inbox item and does not create another row.
+
+A retry with the same captureId but conflicting capturedAt / metrics / notes must fail closed with a conflict response. It must not rewrite the staged evidence silently.
+
+Do not derive identity from weight or other measurement values.
+
+### Captured time
+
+capturedAt must be an offset-aware instant.
+
+Future measurements use the same accepted skew policy as existing Body manual entry.
+
+timezone must currently equal the canonical Health calendar timezone, America/Phoenix.
+
+Do not accept a date-only value.
+
+### Metrics
+
+Require at least one nonblank metric.
+
+Reject duplicate metric keys.
+
+Validate:
+
+- key exists in MANUAL_BODY_METRICS
+- unit is legal for that metric
+- value is finite
+- existing Body manual range rules pass
+
+At intake, store a bounded sanitized representation of the owner-supplied values/units.
+
+Do not canonicalize by inventing missing values.
+
+Missing remains missing.
+
+Zero remains legal only where the existing Body manual validator already permits it.
+
+### Notes
+
+Notes are optional.
+
+Use the existing Body note semantics where possible.
+
+Add an explicit reasonable length bound if one does not already exist.
+
+Do not accept arbitrary nested metadata.
+
+### Response
+
+Return only bounded intake information, for example:
+
+{
+  "accepted": true,
+  "id": "<inbox uuid>",
+  "status": "pending",
+  "reviewPath": "/body/inbox/<uuid>",
+  "duplicate": false
+}
+
+A duplicate retry may return duplicate: true.
+
+Do not return Body history, database IDs other than this inbox item, other inbox rows, token state, or secrets.
+
+## Staging is not canonical
+
+POST /api/ingest/body must not insert into:
+
+- body_measurement_sessions
+- body_metrics
+
+It only creates or resolves a body_capture_inbox row.
+
+No Goal, Today, Progress, Timeline, cadence, or analytics behavior changes from merely staging an item.
+
+A pending inbox item is evidence waiting for owner review, not a measurement.
+
+## Owner Inbox API
+
+Owner APIs require the normal owner session through withOwnerAuth.
+
+Suggested routes:
+
+GET /api/body/inbox
+GET /api/body/inbox/:id
+POST /api/body/inbox/:id/commit
+POST /api/body/inbox/:id/discard
+
+Keep these under the existing one-function dispatcher.
+
+Wrong methods return 405 before doing work as appropriate.
+
+Anonymous: 401.
+Authenticated non-owner: 403.
+APPLE_HEALTH_SYNC_TOKEN: no authority.
+BODY_CAPTURE_TOKEN: no authority on owner inbox routes.
+
+### List
+
+GET /api/body/inbox should be bounded.
+
+Default product view should emphasize pending items.
+
+It may return recent committed/discarded items only if useful, but do not build an unbounded operational log UI.
+
+Include a pending count.
+
+### Detail
+
+Return:
+
+- inbox id
+- status
+- capturedAt
+- timezone
+- staged metrics with owner-facing labels/units
+- notes
+- whether commit/discard actions are available
+- canonicalSessionId only after commit if needed for navigation
+
+Do not return bearer secrets or unrelated Body history.
+
+## Review UI
+
+Add owner route:
+
+/body/inbox/:id
+
+This is a secondary Body surface, not a primary navigation tab.
+
+Body page should show a small Inbox / Captures section when pending items exist, with:
+
+- pending count
+- newest pending items
+- captured time
+- concise metric preview
+- Review action
+
+Do not turn Body into a dashboard of operational noise when the inbox is empty.
+
+### Review form
+
+The review page must allow the owner to:
+
+- inspect capturedAt
+- inspect/edit measurement values before commit
+- remove an individual staged metric before commit
+- add an existing manual metric if useful
+- edit notes
+- discard the staged capture
+- save as canonical Body measurement
+
+Reuse MeasureForm / MANUAL_BODY_METRICS patterns instead of building a contradictory form system.
+
+The review page must clearly say the capture has not been added to Body yet until commit succeeds.
+
+## Commit semantics
+
+POST /api/body/inbox/:id/commit is the only path from staged capture to canonical Body data.
+
+The browser may submit the reviewed values, but the server must validate them again with the existing deterministic Body manual parser.
+
+Do not trust browser-calculated canonical units.
+
+### Canonical write
+
+On commit:
+
+- create exactly one body_measurement_sessions row
+- create the validated body_metrics rows
+- preserve capturedAt as measured_at unless the owner explicitly reviewed/changed it through an allowed UI field
+- use canonical America/Phoenix timezone
+- keep Body value_kind semantics consistent with current manual owner-entered measurements
+- do not manufacture a device name
+
+The owner review makes the final canonical session an owner-reviewed manual Body observation.
+
+Prefer keeping canonical source_id = manual so existing manual correction/edit semantics remain available.
+
+Preserve the Shortcut origin separately with source_record_links from body_shortcut to the created body_measurement_session.
+
+Use entity_type:
+
+body_measurement_session
+
+Store bounded sanitized capture evidence in source_payload.
+
+This allows the canonical session to remain editable as manual while still retaining the staged origin.
+
+### Transaction
+
+Commit must be atomic:
+
+- verify pending inbox state
+- create canonical session
+- insert body metrics
+- insert source_record_link
+- mark inbox committed with canonical_session_id + committed_at
+
+All in one database transaction or an equivalently atomic mechanism.
+
+Do not mark the inbox committed if canonical persistence failed.
+
+Do not create the canonical session and then update the inbox in an unrelated best-effort call.
+
+### Commit idempotency
+
+Repeated commit requests must not create duplicate Body sessions.
+
+If already committed:
+
+- return the existing canonical session/reference
+- do not write again
+
+Use row locking / unique provenance / transactional guards as appropriate.
+
+Concurrent commits of the same inbox item must still yield one canonical measurement session.
+
+### Conflict / stale review
+
+If the item was discarded before commit, commit returns conflict.
+
+If browser review payload is invalid, return 400 and leave the item pending.
+
+The intake machine route cannot mutate a pending row after creation.
+
+## Discard
+
+Discard changes pending -> discarded.
+
+Discarded captures never create canonical Body data.
+
+Discard is idempotent.
+
+A committed capture cannot be discarded through this endpoint.
+
+No automatic hard-delete is required in this phase.
+
+## Canonical edit/delete interaction
+
+Because the final canonical measurement remains a normal manual measurement:
+
+- existing manual edit behavior should continue to work
+- existing manual delete behavior should continue to work
+
+If a committed canonical Body session is later edited, the original Shortcut source payload remains historical provenance.
+
+If that canonical session is deleted, inspect the current source_record_links foreign-key behavior.
+
+Do not leave an invalid dangling canonical_session_id on body_capture_inbox.
+
+Choose and document one explicit safe behavior, such as:
+
+- ON DELETE SET NULL for canonical_session_id while the inbox stays committed as historical capture provenance, or
+- block deletion until the link semantics are handled
+
+Prefer the simplest behavior that preserves database integrity and current manual delete UX.
+
+Do not silently make all Shortcut-origin manual rows read-only.
+
+## Shortcut instructions
+
+Add owner documentation for building the iOS Shortcut manually.
+
+The Shortcut should use ordinary built-in Shortcuts actions only.
+
+Document:
+
+1. Generate UUID
+2. Ask for / obtain the desired measurement values
+3. Current Date for capturedAt
+4. Build Dictionary matching body-capture-v1
+5. Get Contents of URL
+   - POST
+   - https://health.daurham.com/api/ingest/body
+   - JSON request body
+   - Authorization: Bearer <BODY_CAPTURE_TOKEN>
+6. Read reviewPath from the response
+7. Open URL:
+   https://health.daurham.com<reviewPath>
+
+Do not put a real token in repository docs.
+
+Make clear that the owner still reviews and saves in Health.
+
+If Shortcuts cannot supply an exact offset-aware timestamp in the documented actions without extra formatting, document a deterministic format recipe rather than weakening the server timestamp contract.
+
+## Fit Profile XLSX
+
+The existing Fit Profile XLSX workflow remains unchanged:
+
+- deterministic XLSX parser
+- preview
+- selection
+- commit
+- imported rows remain read-only
+- vendor missing sentinels remain missing
+
+Do not route XLSX uploads through Body Inbox.
+
+Body Inbox is the low-friction daily capture path.
+
+Fit Profile remains the rich structured import path.
+
+## Manual Body entry
+
+Existing /body?action=measure remains valid.
+
+Do not make the new inbox required for ordinary manual entry.
+
+Existing cadence, reminders, correction semantics, range checks, units, and metric definitions remain authoritative.
+
+## Today / Progress / Goals
+
+Pending inbox captures do not count as observations.
+
+After commit, the new canonical Body session naturally participates through existing Body queries/calculations.
+
+Do not add separate logic to:
+
+- Today Body
+- Body Progress
+- Theil-Sen trends
+- Goals
+- Compare
+- Timeline
+
+The existing canonical path should make those features update.
+
+This is an important acceptance check: canonical commit should be sufficient.
+
+## Timeline
+
+After commit, the Body measurement should appear exactly as an ordinary body_measurement event through the existing canonical timeline logic.
+
+Do not create a body_capture timeline event.
+
+Pending and discarded inbox items do not appear in Timeline.
+
+## Backup and portable export
+
+body_capture_inbox contains private health staging data.
+
+Add it to the authoritative full backup/restore inventory.
+
+Do not include body_capture_inbox in the portable owner Health export.
+
+The canonical committed body_measurement_sessions / body_metrics remain portable as they already are.
+
+The body_shortcut source and source_record_links remain full-backup provenance.
+
+Verify restore order around:
+
+- data_sources
+- body_measurement_sessions
+- body_capture_inbox
+- source_record_links
+
+A restored committed inbox row must not reference a missing canonical session.
+
+No token is ever backed up.
+
+## Demo
+
+Demo remains compiled, fictional, read-only, and provider-free.
+
+Show a small prepared Body Inbox example only if it improves the portfolio demonstration.
+
+If shown:
+
+- label it clearly as an example capture
+- do not call /api/ingest/body
+- do not expose or simulate a bearer token
+- do not mutate demo Body data
+- no provider call
+
+It is also acceptable for the demo Body page to omit the inbox entirely if reuse would complicate the read-only contract.
+
+## Privacy and security
+
+Treat Body capture payloads as private health data.
+
+Do not log:
+
+- metric values
+- notes
+- BODY_CAPTURE_TOKEN
+- full request bodies
+
+Do not put metric values into:
+
+- URL query parameters
+- reviewPath
+- analytics/event names
+- external provider calls
+
+The review URL contains only the opaque inbox UUID.
+
+No AI/provider receives the capture.
+
+Use normal HTTPS request bodies only.
+
+## Rate / size limits
+
+This is a personal single-owner endpoint, but it is internet-reachable.
+
+Bound:
+
+- JSON request size through existing HTTP body limits
+- captureId length
+- notes length
+- metric count to MANUAL_BODY_METRICS size
+- strings/units
+
+Do not add a process-memory rate limiter and call it security.
+
+The secret bearer token plus strict bounded validation is the primary machine boundary.
+
+If an existing shared durable abuse-control mechanism is appropriate, reuse it only if it does not couple Body capture to AI billing semantics.
 
 ## Tests required
 
+Add focused tests covering at least:
+
+1. migration/table/source constraints.
+2. no user_id.
+3. BODY_CAPTURE_TOKEN is server-only and not a VITE variable.
+4. APPLE_HEALTH_SYNC_TOKEN cannot authorize Body ingest.
+5. BODY_CAPTURE_TOKEN cannot authorize Apple ingest or owner reads.
+6. wrong Body ingest method returns 405.
+7. missing/unconfigured Body token fails closed.
+8. invalid Body token returns 401.
+9. body-capture-v1 accepted.
+10. unknown version rejected.
+11. captureId required/bounded.
+12. capturedAt requires an offset-aware instant.
+13. date-only capturedAt rejected.
+14. future skew uses the existing Body rule.
+15. timezone must be America/Phoenix.
+16. at least one metric required.
+17. unknown metric rejected.
+18. duplicate metric rejected.
+19. invalid unit rejected.
+20. nonfinite value rejected.
+21. existing Body manual range rules reused.
+22. missing metric is not zero-filled.
+23. notes bounded.
+24. arbitrary nested metadata rejected.
+25. identical captureId retry returns one inbox row.
+26. conflicting same captureId fails closed.
+27. ingest route writes no body_measurement_sessions/body_metrics.
+28. owner list/detail require owner auth.
+29. non-owner is 403.
+30. machine token cannot list/read inbox.
+31. pending count/list is bounded.
+32. review detail contains staged values but no secrets.
+33. commit revalidates server-side.
+34. commit writes one manual canonical Body session.
+35. canonical units match existing Body parser.
+36. commit writes source_record_link from body_shortcut.
+37. source payload is bounded/sanitized.
+38. commit marks inbox committed in the same transaction.
+39. failed canonical write leaves inbox pending.
+40. repeated commit returns one canonical session.
+41. concurrent commits produce one canonical session.
+42. discarded item cannot commit.
+43. discard is idempotent.
+44. committed item cannot discard.
+45. existing manual edit still works after Shortcut-origin commit.
+46. existing manual delete behavior remains valid with inbox/provenance references.
+47. pending capture does not affect Today.
+48. pending capture does not affect Body Progress/trends/Goals.
+49. committed capture naturally appears through existing canonical Body views.
+50. committed capture appears once in Timeline as body_measurement.
+51. no body_capture Timeline kind.
+52. XLSX import behavior remains unchanged.
+53. body_capture_inbox is in full backup/restore.
+54. body_capture_inbox is excluded from portable export.
+55. restored committed inbox reference is valid.
+56. no token in backup.
+57. demo remains provider-free/read-only.
+58. no Body values/notes are placed in review URL/query params.
+59. no Gemini/Home-AI/provider path.
+60. existing G1/F1-F5 tests remain green.
+
+Run:
+
+- npm test
+- npx tsc -b
+- npx eslint .
+- npm run build
+
+Apply the new migration using the normal migration command only after tests validate the migration and repository head.
+
+## Manual QA
+
+When owner runtime is available:
+
+1. Add BODY_CAPTURE_TOKEN to local/server environment.
+2. Build the documented iOS Shortcut.
+3. Capture weight only.
+4. Verify POST creates one pending inbox item and opens the opaque review URL.
+5. Verify the Body page shows one pending capture.
+6. Edit the value before save.
+7. Save.
+8. Verify one canonical Body measurement appears.
+9. Verify Progress/Timeline use it naturally.
+10. Retry the same Shortcut payload and verify no duplicate inbox/canonical row.
+11. Send the same captureId with a changed value and verify conflict.
+12. Create then discard another capture; verify no Body observation appears.
+13. Verify ordinary manual Body entry still works.
+14. Verify Fit Profile XLSX preview/commit still works.
+15. Verify machine token cannot read /api/body/inbox.
+16. Verify Apple ingest token cannot use /api/ingest/body.
+17. Verify no values appear in browser URL.
+18. Check 390px Body/inbox review layout.
+19. Run full automated validation.
+
+If production environment is unavailable, exercise the review UI against local fixtures/database and report the owner-runtime gap explicitly.
+
+## Documentation
+
+On completion:
+
+- update HEALTH-PLATFORM-DESIGN-MANUAL.md
+- expected manual version 1.0.38
+- append a historical ledger row; do not rewrite older rows
+- update HEALTH-PLATFORM-V2-LAB-BLUEPRINT.md with V2-G2 Body Inbox + Shortcut Capture
+- update docs/ai/PROJECT.md
+- update docs/ai/DEV_STATE.md
+- update docs/ai/DECISIONS.md
+- update docs/ai/ROADMAP.md
+- update docs/V2-ROADMAP.md live status
+- add/update owner Shortcut setup documentation
+- document BODY_CAPTURE_TOKEN scope
+- document staging vs canonical semantics
+- document idempotency/conflict behavior
+- document edit/delete reference behavior
+- document that native share-sheet targeting remains deferred
+
+Expected schema head:
+
+0032_body_capture_inbox.sql
+
+Package remains:
+
+1.0.0
+
 ## Acceptance criteria
 
+V2-G2 is complete only when:
+
+- an iPhone Shortcut can stage a Body capture with one narrow bearer token
+- the machine route cannot read Health data
+- intake is bounded/idempotent
+- staged capture is not canonical
+- owner review is required
+- commit reuses existing deterministic Body validation/conversion
+- one commit creates exactly one canonical Body measurement session
+- Shortcut origin provenance is retained
+- repeated/concurrent commit cannot duplicate canonical rows
+- discard creates no observation
+- pending/discarded items do not affect analytics
+- ordinary manual entry remains unchanged
+- Fit Profile XLSX remains unchanged
+- committed Body data naturally updates existing Today/Progress/Timeline/Goals paths
+- no values are placed in review URLs
+- no AI is involved
+- full backup includes inbox staging data
+- portable export excludes staging data
+- auth boundaries stay narrow
+- tests pass
+- typecheck passes
+- lint passes
+- production build passes
+- docs are updated
+
 ## Required completion report
+
+Update docs/ai/DEV_STATE.md with:
+
+- baseline commit
+- resulting commit / working-tree state
+- migration/schema head
+- body_capture_inbox schema
+- body_shortcut source
+- token/auth boundary
+- intake version and exact request contract
+- input bounds
+- idempotency/conflict behavior
+- owner inbox routes
+- review UI behavior
+- canonical commit transaction
+- source_record_links provenance
+- edit/delete interaction
+- pending vs canonical analytics boundary
+- Today/Progress/Timeline/Goals behavior
+- XLSX/manual regression status
+- backup/portable export
+- demo
+- tests/count
+- typecheck/lint/build
+- migration application
+- manual QA
+- docs version
+- deviations
+- remaining V2-G work
+
+When finished, reset CURRENT_TASK.md to the standard no-active-task template, commit, and push according to AGENTS.md.
+
+## Final invariant
+
+A Shortcut may deliver a private Body measurement candidate to Health.
+
+Until the signed-in owner reviews and saves it, it is not a Body measurement.
+
+After approval, it becomes one ordinary canonical Body measurement with deterministic units, existing Body semantics, and preserved Shortcut provenance.
