@@ -234,7 +234,7 @@ describe('multi-angle meal photos', () => {
     expect(prompt).toContain('Do not invent food')
     expect(mealPhotoPrompt(null, 1)).toContain('estimate total calories')
     expect(mealPhotoPrompt(null, 1)).toContain('{"name":"Chicken, rice and broccoli"')
-    expect(MEAL_PHOTO_PROMPT_VERSION).toBe('meal-photo-v2')
+    expect(MEAL_PHOTO_PROMPT_VERSION).toBe('meal-photo-v3')
     expect(readFileSync('server/integrations/gemini/client.ts', 'utf8')).toContain('promptVersion: MEAL_PHOTO_PROMPT_VERSION')
     const first = Buffer.from('one').toString('base64')
     const second = Buffer.from('two').toString('base64')

@@ -7,7 +7,9 @@ import {
   isMealRetryCode,
   mealEstimateNutrients,
   mealFailureMessage,
+  mealReviewDiffers,
   scaleMealEstimate,
+  selectedClarificationAnswers,
   validateMealEstimateReview,
   type MealEstimateCandidate,
   type MealEstimateNutrients,
@@ -253,6 +255,34 @@ export function MealCaptureSheet({ date, jobId, onClose, onBack, onLogged, onDis
     setPhase('preview')
   }
 
+  async function refineEstimate(answers: Array<{ id: string; answer: string }>) {
+    if (!activeJobId || answers.length === 0) {
+      return
+    }
+    setError(null)
+    setErrorCode(null)
+    const previousId = activeJobId
+    setPhase('working')
+    setActiveJobId(null)
+    try {
+      const job = await reanalyzeNutritionMealJob(previousId, {
+        provider: 'gemini',
+        clarificationAnswers: answers,
+      })
+      setActiveJobId(job.id)
+    } catch (caught) {
+      setActiveJobId(previousId)
+      if (caught instanceof MealClientError) {
+        setError(mealFailureMessage(caught.code))
+        setErrorCode(caught.code)
+      } else {
+        setError('Meal analysis is temporarily unavailable.')
+        setErrorCode('GEMINI_UNAVAILABLE')
+      }
+      setPhase('failed')
+    }
+  }
+
   async function discardCapture() {
     if (!activeJobId) {
       onDiscarded?.()
@@ -272,11 +302,14 @@ export function MealCaptureSheet({ date, jobId, onClose, onBack, onLogged, onDis
   if (phase === 'review' || manual) {
     return (
       <MealEstimateSheet
+        key={`${activeJobId ?? 'manual'}:${payload?.candidate?.clarifications.map((item) => item.question).join('|') ?? ''}:${payload?.candidate?.name ?? ''}:${payload?.candidate?.calories ?? 0}`}
         date={date}
         jobId={activeJobId}
         candidate={payload?.candidate ?? emptyMealEstimate()}
         imageUrls={reviewImageUrls(activeJobId, payload?.job.imageCount, payload?.job.imageAvailable, views)}
         userContext={payload?.userContext ?? (context.trim() || null)}
+        provider={payload?.job.provider === 'gemini' ? 'gemini' : null}
+        onRefine={activeJobId ? (answers) => void refineEstimate(answers) : undefined}
         onEditContext={activeJobId || views.length > 0 ? editContext : undefined}
         onClose={onClose}
         onBack={() => {
@@ -526,6 +559,8 @@ function MealEstimateSheet({
   candidate,
   imageUrls,
   userContext,
+  provider,
+  onRefine,
   onEditContext,
   onClose,
   onBack,
@@ -537,6 +572,8 @@ function MealEstimateSheet({
   candidate: MealEstimateCandidate
   imageUrls: string[]
   userContext?: string | null
+  provider?: 'gemini' | null
+  onRefine?: (answers: Array<{ id: string; answer: string }>) => void
   onEditContext?: () => void
   onClose: () => void
   onBack: () => void
@@ -550,6 +587,11 @@ function MealEstimateSheet({
   const [values, setValues] = useState<MealEstimateNutrients>(baseline)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [clarificationDrafts, setClarificationDrafts] = useState<Record<string, string>>({})
+  const [confirmRefine, setConfirmRefine] = useState(false)
+  const showClarifications = Boolean(jobId && provider === 'gemini' && candidate.clarifications.length > 0)
+  const answeredClarifications = selectedClarificationAnswers(candidate.clarifications, clarificationDrafts)
+  const reviewEdited = mealReviewDiffers(candidate, { name, ...values })
 
   function applyScale(next: MealPortionScale) {
     setScale(next)
@@ -584,6 +626,18 @@ function MealEstimateSheet({
     } finally {
       setBusy(false)
     }
+  }
+
+  function requestRefine() {
+    if (!onRefine || answeredClarifications.length === 0) {
+      return
+    }
+    if (reviewEdited && !confirmRefine) {
+      setConfirmRefine(true)
+      setError('Refining will replace this unsaved estimate with a new AI estimate. Your current edits are not saved.')
+      return
+    }
+    onRefine(answeredClarifications)
   }
 
   return (
@@ -660,6 +714,66 @@ function MealEstimateSheet({
           ))}
         </select>
       </label>
+      {showClarifications ? (
+        <div className="mt-4">
+          <p className="text-sm font-medium text-zinc-700">Help refine this estimate</p>
+          <p className="mt-1 text-sm text-zinc-600">Answer only what you know. You can save or edit the estimate without refining it.</p>
+          <p className="mt-1 text-sm text-zinc-500">Answering can give the estimate more context.</p>
+          <div className="mt-3 space-y-4">
+            {candidate.clarifications.map((item) => {
+              const draft = clarificationDrafts[item.id] ?? ''
+              return (
+                <div key={item.id}>
+                  <p className="text-sm text-zinc-800">{item.question}</p>
+                  {item.answerKind === 'yes_no' ? (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {(
+                        [
+                          ['yes', 'Yes'],
+                          ['no', 'No'],
+                          ['not_sure', 'Not sure'],
+                        ] as const
+                      ).map(([value, label]) => (
+                        <button
+                          key={value}
+                          type="button"
+                          aria-pressed={draft === value}
+                          className={`min-h-11 rounded-md px-3 text-sm ${draft === value ? 'bg-zinc-900 text-white' : 'border border-zinc-300 bg-white text-zinc-900'}`}
+                          onClick={() => {
+                            setClarificationDrafts((current) => ({ ...current, [item.id]: value }))
+                            setConfirmRefine(false)
+                          }}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <input
+                      className={`${inputClass} mt-2`}
+                      maxLength={160}
+                      value={draft}
+                      placeholder="Optional"
+                      onChange={(event) => {
+                        setClarificationDrafts((current) => ({ ...current, [item.id]: event.target.value }))
+                        setConfirmRefine(false)
+                      }}
+                    />
+                  )}
+                </div>
+              )
+            })}
+          </div>
+          <button
+            type="button"
+            className={`${secondaryClass} mt-3 w-full`}
+            disabled={answeredClarifications.length === 0 || busy}
+            onClick={requestRefine}
+          >
+            Refine estimate
+          </button>
+        </div>
+      ) : null}
       {error ? <p className="mt-3 text-sm text-red-700">{error}</p> : null}
       <div className="mt-4 space-y-2">
         <button type="button" className={primaryClass} disabled={busy} onClick={() => void saveMeal()}>

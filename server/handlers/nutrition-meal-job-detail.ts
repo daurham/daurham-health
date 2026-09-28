@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { normalizeUserContext, parseNutritionProvider } from '../../src/domain/nutrition/interpret.js'
+import { mealFailureMessage } from '../../src/domain/nutrition/meal.js'
 import { dismissNutritionMealJob, getNutritionMealImage, getNutritionMealJob, reanalyzeNutritionMeal } from '../nutrition/meal.js'
 import { withOwnerAuth } from '../auth/with-owner.js'
 import {
@@ -17,6 +18,15 @@ import { HOME_AI_JOB_ID_RE } from '../../src/domain/nutrition/meal.js'
 const reanalyzeSchema = z.object({
   userContext: z.string().max(2000).nullable().optional(),
   provider: z.enum(['gemini', 'home_ai']).optional(),
+  clarificationAnswers: z
+    .array(
+      z.object({
+        id: z.string().trim().min(1).max(16),
+        answer: z.string().max(160),
+      }),
+    )
+    .max(3)
+    .optional(),
 })
 
 const JOB_PATH_PREFIX = '/api/nutrition/meal/jobs'
@@ -56,6 +66,10 @@ export default withOwnerAuth(async function nutritionMealJobHandler(req: ApiRequ
       }
       const body = reanalyzeSchema.safeParse(await readJsonBody(req))
       if (!body.success) {
+        const path = body.error.issues[0]?.path[0]
+        if (path === 'clarificationAnswers') {
+          throw new HttpError(400, mealFailureMessage('CLARIFICATION_ANSWER'), undefined, 'CLARIFICATION_ANSWER')
+        }
         throw new HttpError(400, 'Keep the note under 2000 characters.', undefined, 'CONTEXT_TOO_LONG')
       }
       sendJson(
@@ -64,6 +78,7 @@ export default withOwnerAuth(async function nutritionMealJobHandler(req: ApiRequ
         await reanalyzeNutritionMeal(parsed, {
           userContext: normalizeUserContext(body.data.userContext ?? null),
           provider: parseNutritionProvider(body.data.provider),
+          clarificationAnswers: body.data.clarificationAnswers,
         }),
       )
       return

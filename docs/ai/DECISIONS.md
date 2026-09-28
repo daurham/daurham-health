@@ -158,6 +158,12 @@ Observed from the current code and product docs. Where the original rationale is
 **Reason:** V2-G7 lets Gemini turn pasted recipe text into a list of suggested ingredients. That list is not a Nutrition calculation and it is not a saved Recipe.  
 **Implications:** The request and prompt version are `recipe-assist-v1`. The ledger request type is `nutrition_recipe_assist`. Health does not fetch recipe URLs. The model output cannot carry calories, macros, or food ids. Applying the draft is a separate owner action and does not overwrite notes, finished weight, or a name and servings the owner already typed. Each line stays unresolved until the owner selects a canonical food through the existing ingredient flows. A suggested unit is used only when that food already supports it. `composeRecipe` and `createRecipe` stay the recipe authority. The pasted text and the draft are not stored.
 
+## Decision: A clarification is owner context, not a Nutrition fact
+
+**Status:** Active  
+**Reason:** V2-G8 lets Gemini ask up to three short questions when a meal photo still has an ambiguity the owner can answer. Those questions and answers help the next estimate. They are not measurements, and they are not the saved meal.  
+**Implications:** The meal prompt is `meal-photo-v3`. Clarifications live on the current capture candidate. Health assigns `c1`, `c2`, and `c3`. The owner can save without answering. Refine estimate is the only action that requeues the same job and the same stored photos. That later Gemini attempt is a normal `nutrition_meal_photo` reservation. Home-AI rejects a reanalysis that includes clarification answers. The compiled note stays within the existing 2000-character context ceiling. Canonical `nutrition_entries` still store the reviewed meal the owner saves. There is no clarification table and no backup-inventory change.
+
 ## Decision: Manual ledger rows are historical
 
 **Status:** Active  

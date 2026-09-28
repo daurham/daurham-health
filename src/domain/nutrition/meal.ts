@@ -2,6 +2,12 @@ import { z } from 'zod'
 import { HOME_AI_JOB_ID_RE, isHomeAiJobId } from '../training-transcription.js'
 import type { ReviewFieldError } from '../paper-load.js'
 import { rankFoodsForQuery } from './catalog.js'
+import {
+  MEAL_CLARIFICATION_ANSWER_KINDS,
+  MEAL_CLARIFICATION_KINDS,
+  MEAL_CLARIFICATION_QUESTION_MAX,
+  sanitizeMealClarifications,
+} from './meal-clarifications.js'
 import { snapshotFromDefinition, type NutrientAmount } from './servings.js'
 import type { NutritionFood } from './types.js'
 
@@ -538,6 +544,12 @@ export function mealFailureMessage(code: string): string {
       return 'That meal capture id is invalid.'
     case 'PIPELINE_FAILED':
       return 'Meal photo analysis failed. Try another photo or build the meal manually.'
+    case 'stale_clarification':
+      return 'Those questions changed. Review the latest estimate before refining.'
+    case 'CLARIFICATION_PROVIDER_UNSUPPORTED':
+      return 'Local AI cannot use clarification answers. Refine with Gemini or save this estimate.'
+    case 'CLARIFICATION_ANSWER':
+      return 'Check the clarification answers and try again.'
     default:
       return 'Meal photo analysis failed. Try another photo or build the meal manually.'
   }
@@ -577,6 +589,13 @@ export type MealEstimateNutrients = {
   fiberGrams: number | null
 }
 
+export const mealClarificationSchema = z.object({
+  id: z.string().regex(/^c[1-3]$/),
+  kind: z.enum(MEAL_CLARIFICATION_KINDS),
+  answerKind: z.enum(MEAL_CLARIFICATION_ANSWER_KINDS),
+  question: z.string().trim().min(1).max(MEAL_CLARIFICATION_QUESTION_MAX),
+})
+
 export const mealEstimateCandidateSchema = z.object({
   schemaVersion: z.literal(NUTRITION_MEAL_SCHEMA_VERSION),
   status: z.enum(MEAL_CANDIDATE_STATUSES),
@@ -590,6 +609,7 @@ export const mealEstimateCandidateSchema = z.object({
   carbsGrams: z.number(),
   fatGrams: z.number(),
   fiberGrams: z.number().nullable(),
+  clarifications: z.array(mealClarificationSchema).default([]),
 })
 export type MealEstimateCandidate = z.infer<typeof mealEstimateCandidateSchema>
 
@@ -615,6 +635,7 @@ export type NutritionMealJobResponse = {
     elapsedMs?: number | null
     imageAvailable?: boolean
     imageCount?: number
+    provider?: 'gemini' | 'home_ai'
   }
   userContext?: string | null
   candidate: MealEstimateCandidate | null
@@ -670,6 +691,13 @@ export function mealEstimateUserAdjusted(baseline: MealEstimateNutrients, review
   )
 }
 
+export function mealReviewDiffers(
+  candidate: { name: string } & MealEstimateNutrients,
+  review: { name: string } & MealEstimateNutrients,
+): boolean {
+  return candidate.name.trim() !== review.name.trim() || mealEstimateUserAdjusted(candidate, review)
+}
+
 export function emptyMealEstimate(partial?: Partial<MealEstimateCandidate>): MealEstimateCandidate {
   return mealEstimateCandidateSchema.parse({
     schemaVersion: NUTRITION_MEAL_SCHEMA_VERSION,
@@ -713,6 +741,7 @@ export function sanitizeMealEstimate(raw: unknown, options?: { model?: string | 
     foodsSeen: [...new Set(foodsSeen)],
     assumptions: [...new Set(assumptions)],
     ...nutrients,
+    clarifications: sanitizeMealClarifications(source.clarifications),
   })
 }
 

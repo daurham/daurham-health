@@ -157,6 +157,18 @@ export const GEMINI_MEAL_RESPONSE_SCHEMA = {
     carbsGrams: { type: 'number' },
     fatGrams: { type: 'number' },
     fiberGrams: { type: 'number' },
+    clarifications: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['kind', 'answerKind', 'question'],
+        properties: {
+          kind: { type: 'string' },
+          answerKind: { type: 'string' },
+          question: { type: 'string' },
+        },
+      },
+    },
   },
 } as const
 
@@ -239,7 +251,7 @@ export function parseNutritionProvider(value: unknown): NutritionProvider {
   return value === 'home_ai' ? 'home_ai' : 'gemini'
 }
 
-export const MEAL_PHOTO_PROMPT_VERSION = 'meal-photo-v2'
+export const MEAL_PHOTO_PROMPT_VERSION = 'meal-photo-v3'
 
 export function mealPhotoPrompt(userContext: string | null, imageCount = 1): string {
   const views =
@@ -259,9 +271,17 @@ export function mealPhotoPrompt(userContext: string | null, imageCount = 1): str
     'Visual estimates are approximate. Do not pretend they are exact.',
     'Include major assumptions that materially affect the estimate.',
     'Acknowledge hidden oils or sauces when they are uncertain.',
+    'The owner reviews and may edit the estimate before it is saved.',
     'Use USER-PROVIDED CONTEXT as known information. It should influence the estimate.',
     'Use this shape: {"name":"Chicken, rice and broccoli","foodsSeen":["chicken thigh","white rice","broccoli"],"assumptions":["chicken appears about 5-6 oz","some cooking oil may be present"],"calories":720,"proteinGrams":48,"carbsGrams":76,"fatGrams":25,"fiberGrams":7}',
     'calories and macros must be JSON numbers for the whole meal. Use null for fiber only when it cannot be estimated.',
+    'You may add up to three clarifications, and only when every condition is true: a material ambiguity remains after every supplied image and the owner context; the owner is likely to know the answer; the answer could help interpret this same photographed meal; the question is concise.',
+    'Zero clarifications is valid and common. Do not ask questions solely for engagement. Do not ask a question already answered by owner context.',
+    'Limit clarifications to the same meal: cooking method that is not visible, whether a visible sauce or dressing was eaten, whether oil or butter was added, which of two similar foods it is, or a count the photos do not resolve.',
+    'Do not ask about calorie goals, weight loss, usual eating, today\'s weight, Apple Health, sleep, supplements, activity, training, or any other Health history.',
+    'Do not ask calorie impact or macro impact questions, and do not put a calorie, macro, confidence, probability, or prefilled quantity in a question.',
+    'Do not include an id, confidence, probability, or a recommended answer. Optional shape: "clarifications":[{"kind":"hidden_fat","answerKind":"yes_no","question":"Was oil or butter added after cooking?"}]',
+    'kind is preparation, hidden_fat, sauce, portion, ingredient_identity, or other. answerKind is yes_no or short_text.',
   ].join('\n')
   if (!userContext) {
     return instructions

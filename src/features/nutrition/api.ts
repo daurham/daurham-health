@@ -356,7 +356,11 @@ export type FoodDescriptionReview = DescriptionEstimateCandidate
 
 export async function reanalyzeNutritionMealJob(
   jobId: string,
-  input: { userContext?: string | null; provider?: 'gemini' | 'home_ai' },
+  input: {
+    userContext?: string | null
+    provider?: 'gemini' | 'home_ai'
+    clarificationAnswers?: Array<{ id: string; answer: string }>
+  },
 ): Promise<{ id: string; status: 'queued' }> {
   const response = await healthFetch(`/api/nutrition/meal/jobs/${jobId}/reanalyze`, {
     method: 'POST',

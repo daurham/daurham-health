@@ -2,7 +2,7 @@
 
 These rules apply to every implementation task in this repository.
 
-The current application is the tree described in `docs/ai/DEV_STATE.md`, including Ask Health, Proactive Insights, Weekly Coach, Experiment Suggestions, Literature-Backed Evidence, Body Shortcut capture, Appearance, Nutrition Gemini on the shared AI ledger, reduced-motion interaction, multi-angle meal photos, recipe text drafts, and migration `0033_nutrition_capture_images.sql`. Do not treat an older commit as the product if this handoff says the working application has moved on.
+The current application is the tree described in `docs/ai/DEV_STATE.md`, including Ask Health, Proactive Insights, Weekly Coach, Experiment Suggestions, Literature-Backed Evidence, Body Shortcut capture, Appearance, Nutrition Gemini on the shared AI ledger, reduced-motion interaction, multi-angle meal photos, recipe text drafts, optional meal-photo clarifications, and migration `0033_nutrition_capture_images.sql`. Do not treat an older commit as the product if this handoff says the working application has moved on.
 
 Before changing code:
 

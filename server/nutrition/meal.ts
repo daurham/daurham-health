@@ -34,7 +34,8 @@ import {
   insertEntryWithId,
   listEntriesByMealGroup,
 } from './queries.js'
-import { NutritionInterpretError, normalizeUserContext, parseNutritionProvider } from '../../src/domain/nutrition/interpret.js'
+import { NUTRITION_USER_CONTEXT_MAX, NutritionInterpretError, normalizeUserContext, parseNutritionProvider } from '../../src/domain/nutrition/interpret.js'
+import { parseMealClarificationAnswers, resolveMealClarificationContext } from '../../src/domain/nutrition/meal-clarifications.js'
 import { advanceGeminiCapture, interpretErrorToHttp } from './gemini-jobs.js'
 import {
   findCommittedLabelEntry,
@@ -182,6 +183,7 @@ function asMealResponse(input: {
   elapsedMs?: number | null
   imageAvailable?: boolean
   imageCount?: number
+  provider?: 'gemini' | 'home_ai'
   candidate: MealEstimateCandidate | null
   foods?: NutritionFood[]
   matches?: NutritionMealJobResponse['matches']
@@ -197,6 +199,7 @@ function asMealResponse(input: {
       elapsedMs: input.elapsedMs ?? null,
       imageAvailable: input.imageAvailable ?? false,
       imageCount: input.imageCount ?? (input.imageAvailable ? 1 : 0),
+      provider: input.provider,
     },
     userContext: input.userContext ?? null,
     candidate: input.candidate,
@@ -296,11 +299,22 @@ async function createHomeAiMealJob(
   return { job: { id: job.id, status: 'queued' as const } }
 }
 
+function clarificationHttpError(code: string, status: number): HttpError {
+  return new HttpError(status, mealFailureMessage(code), undefined, code)
+}
+
 export async function reanalyzeNutritionMeal(
   jobId: string,
-  input: { userContext: string | null; provider: 'gemini' | 'home_ai' },
+  input: { userContext: string | null; provider: 'gemini' | 'home_ai'; clarificationAnswers?: unknown },
   client?: HomeAiClient,
 ) {
+  const parsedAnswers = parseMealClarificationAnswers(input.clarificationAnswers)
+  if (!parsedAnswers.ok) {
+    throw clarificationHttpError(parsedAnswers.failure.code, parsedAnswers.failure.status)
+  }
+  if (parsedAnswers.answers.length > 0 && input.provider === 'home_ai') {
+    throw clarificationHttpError('CLARIFICATION_PROVIDER_UNSUPPORTED', 400)
+  }
   const stored = await getLabelJobRecord(jobId)
   if (!stored || stored.captureKind !== NUTRITION_MEAL_CAPTURE_KIND) {
     throw new HttpError(404, mealFailureMessage('JOB_NOT_FOUND'), undefined, 'JOB_NOT_FOUND')
@@ -327,7 +341,27 @@ export async function reanalyzeNutritionMeal(
       client,
     )
   }
-  const queued = await requeueCaptureJob({ jobId, userContext: input.userContext })
+  if (parsedAnswers.answers.length === 0) {
+    const queued = await requeueCaptureJob({ jobId, userContext: input.userContext })
+    if (!queued) {
+      throw new HttpError(404, mealFailureMessage('JOB_NOT_FOUND'), undefined, 'JOB_NOT_FOUND')
+    }
+    return { job: { id: jobId, status: 'queued' as const } }
+  }
+  const resolved = resolveMealClarificationContext({
+    provider: 'gemini',
+    storedUserContext: stored.userContext,
+    clarifications: sanitizeMealEstimate(stored.candidate ?? {}).clarifications,
+    answers: parsedAnswers.answers,
+    contextMax: NUTRITION_USER_CONTEXT_MAX,
+  })
+  if (!resolved.ok) {
+    throw clarificationHttpError(resolved.failure.code, resolved.failure.status)
+  }
+  if (resolved.mode !== 'refine') {
+    throw clarificationHttpError('CLARIFICATION_ANSWER', 400)
+  }
+  const queued = await requeueCaptureJob({ jobId, userContext: resolved.userContext })
   if (!queued) {
     throw new HttpError(404, mealFailureMessage('JOB_NOT_FOUND'), undefined, 'JOB_NOT_FOUND')
   }
@@ -501,6 +535,7 @@ async function mealResponseFromRecord(record: NutritionCaptureJobRecord): Promis
       elapsedMs: record.interpretation.latencyMs ?? null,
       imageAvailable,
       imageCount,
+      provider: record.provider === 'gemini' || record.provider === 'home_ai' ? record.provider : undefined,
       candidate: null,
       userContext: record.userContext,
       failure: {
@@ -518,6 +553,7 @@ async function mealResponseFromRecord(record: NutritionCaptureJobRecord): Promis
         elapsedMs: record.interpretation.latencyMs ?? null,
         imageAvailable,
         imageCount,
+        provider: record.provider === 'gemini' || record.provider === 'home_ai' ? record.provider : undefined,
         candidate: null,
         userContext: record.userContext,
         failure: { code: 'GEMINI_SEMANTIC', message: mealFailureMessage('GEMINI_SEMANTIC') },
@@ -529,6 +565,7 @@ async function mealResponseFromRecord(record: NutritionCaptureJobRecord): Promis
       elapsedMs: record.interpretation.latencyMs ?? null,
       imageAvailable,
       imageCount,
+      provider: record.provider === 'gemini' || record.provider === 'home_ai' ? record.provider : undefined,
       candidate,
       userContext: record.userContext,
     })
@@ -540,6 +577,7 @@ async function mealResponseFromRecord(record: NutritionCaptureJobRecord): Promis
     elapsedMs: record.interpretation.latencyMs ?? null,
     imageAvailable,
     imageCount,
+    provider: record.provider === 'gemini' || record.provider === 'home_ai' ? record.provider : undefined,
     candidate: null,
     userContext: record.userContext,
   })

@@ -153,6 +153,7 @@ export {
   scaleMealEstimate,
   mealEstimateNutrients,
   mealEstimateUserAdjusted,
+  mealReviewDiffers,
   validateMealEstimateReview,
   roundMealCalories,
   roundMealGrams,
@@ -227,6 +228,21 @@ export {
   NutritionInterpretError,
 } from './interpret.js'
 export type { NutritionInterpreter, NutritionProvider, InterpretationMetadata, NutritionGeminiUsageKind } from './interpret.js'
+export {
+  MEAL_CLARIFICATION_KINDS,
+  MEAL_CLARIFICATION_ANSWER_KINDS,
+  MEAL_CLARIFICATION_YES_NO,
+  MEAL_CLARIFICATION_MAX,
+  MEAL_CLARIFICATION_QUESTION_MAX,
+  MEAL_CLARIFICATION_ANSWER_MAX,
+  sanitizeMealClarifications,
+  parseMealClarificationAnswers,
+  compileMealClarificationContext,
+  resolveMealClarificationContext,
+  selectedClarificationAnswers,
+  displayClarificationAnswer,
+} from './meal-clarifications.js'
+export type { MealClarification, MealClarificationAnswer, MealClarificationKind, MealClarificationAnswerKind } from './meal-clarifications.js'
 export type {
   MealPhotoCandidate,
   MealComponent,

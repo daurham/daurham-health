@@ -1,13 +1,13 @@
 # Dev state
 
-Snapshot recorded 2026-09-27 after V2-G7 Recipe Text Draft Assistant. This commit is the current health application.
+Snapshot recorded 2026-09-27 after V2-G8 Meal Clarification Refinement. This commit is the current health application.
 
 ## Git
 
 - Branch: `main`
-- Baseline the task named: `a8cd860cfeb07cdf69ada7368468ea45c3aaf16b` (“Keep several meal photos as one reviewed estimate.”)
-- Parent of this snapshot: `bd71c4a` (“docs: define V2-G7 recipe text draft assistant”)
-- This commit keeps a recipe draft from becoming a saved recipe
+- Baseline the task named: `00da26ce7304d65260dde6e86decd05d80b9dda3` (“Keep a recipe draft from becoming a saved recipe.”)
+- Parent of this snapshot: `3af9650` (“docs: define V2-G8 meal clarification refinement”)
+- This commit treats a meal clarification as an optional owner answer, not a saved meal
 - Finished tasks are committed and pushed
 - Local annotated tag `v1.0.0` points at `7124ca513efa6c833457303ee6ff79d78344fce6`. Whether that tag exists on the remote is unknown
 
@@ -15,154 +15,88 @@ Snapshot recorded 2026-09-27 after V2-G7 Recipe Text Draft Assistant. This commi
 
 - Migration head: `0033_nutrition_capture_images.sql`
 - No migration was added or applied
-- Design manual version: 1.0.44
+- Design manual version: 1.0.45
 - Package version: 1.0.0
 - No new runtime dependency
-- V2-F remains complete. V2-G1 through V2-G6 remain implemented. Goal-observation suggestions remain deferred. Overnight vital metrics remain disabled until a payload is verified
+- V2-F remains complete. V2-G1 through V2-G7 remain implemented. Goal-observation suggestions remain deferred. Overnight vital metrics remain disabled until a payload is verified
 
-## Request and prompt versions
+## Meal prompt
 
-- Request body version: `recipe-assist-v1`
-- Prompt version: `recipe-assist-v1`
-- `ai_usage` request type: `nutrition_recipe_assist`
-- Usage kind: `recipe_assist`
-- Home-AI does not draft recipes
+- Prompt version: `meal-photo-v3`
+- Request type stays `nutrition_meal_photo`
+- Multi-angle instructions remain: one meal, no double counting, no invented unseen food
+- Clarifications are requested only for a material same-meal ambiguity the owner can answer
+- At most three. Zero is valid
+- The prompt forbids Health-goal and history questions, and calorie or macro impact questions
+- The model is not asked for an id, confidence, probability, or a recommended answer
 
-## Source-line packet
+## Clarification candidate
 
-- Newlines become LF
-- Outer whitespace is trimmed
-- Blank lines are dropped
-- Order is preserved
-- At most 80 nonblank lines
-- Each line is capped at 240 characters
-- Refs are L1, L2, L3, and so on
-- Gemini receives the packet, not a second copy of an unbounded document
-- The original text stays in the browser request and is not stored
+- `MealEstimateCandidate.clarifications` is always an array. Missing input becomes `[]`
+- Each item has only `id`, `kind`, `answerKind`, and `question`
+- Kinds: `preparation`, `hidden_fat`, `sauce`, `portion`, `ingredient_identity`, `other`
+- Answer kinds: `yes_no`, `short_text`
+- Health assigns `c1`, `c2`, and `c3` by accepted order. A model-supplied id is ignored
+- Question max 180 characters. Answer max 160 characters. At most three questions and three answers
 
-## Model output
+## Sanitizer
 
-- Allowed fields are title, yieldServings, and ingredients
-- Each ingredient allows sourceRefs, name, quantity, and unit
-- Extra fields, including calories, macros, foodId, and confidence, reject the whole draft
-- Title and yield may be null
-- A present yield must be a positive finite number
-- A present quantity must be a positive finite number
-- At most 40 ingredients
-- Title max 200 characters, name max 120, unit max 40
-- Request text max 6000 characters
-- Blank text is rejected
-- Unknown request versions are rejected
+- Optional clarification output is sanitized independently of the meal nutrients
+- A bad question is dropped. If every question is bad, `clarifications` is `[]`
+- Dropped: blank, longer than 180 characters, unknown kind, unknown answer kind, duplicate normalized question, numeric-only text, a prefilled quantity with a unit, a numbered calorie or macro claim, and a health or medical question
+- “About how many dumplings did you eat?” is kept. “Is this about 4 oz?” and “Was 200 calories of oil added?” are dropped
+- Extra model fields are not copied forward
+- Existing calorie and gram rounding is unchanged
 
-## Source refs
+## Answers
 
-- Every ingredient needs at least one ref that exists in the packet
-- An unknown ref rejects the draft
-- sourceText is built from the packet lines, in packet order
-- Model-supplied source text is not accepted
+- `POST /api/nutrition/meal/jobs/:id/reanalyze` still accepts `{ userContext, provider }`
+- Optional `clarificationAnswers` is `{ id, answer }`, at most three, unique ids
+- Blank answers are omitted
+- `yes_no` accepts `yes`, `no`, and `not_sure`. The client shows “Not sure”
+- `short_text` accepts bounded owner text
+- Question text comes from the stored candidate, not the client
+- An unknown id is HTTP 409 `stale_clarification`
+- `provider=home_ai` with any answer is HTTP 400 `CLARIFICATION_PROVIDER_UNSUPPORTED`, before a Home-AI request
+- One-photo Home-AI reanalysis without answers remains. Multi-photo Home-AI remains rejected
 
-## Model config
+## Context and reanalysis
 
-- `GEMINI_NUTRITION_RECIPE_MODEL`
-- then `GEMINI_NUTRITION_DESCRIPTION_MODEL`
-- then `GEMINI_NUTRITION_MODEL`
-- then the description-model default
-- Timeout 20 seconds, max output tokens 2048
+- One compiler writes `OWNER CONTEXT` and `OWNER CLARIFICATIONS`
+- Only answered questions are included. `not_sure` is shown as “not sure”
+- The compiled note becomes that job’s `user_context`
+- The existing 2000-character ceiling still applies. Overflow is rejected before requeue and makes no Gemini call
+- Requeue uses the same job id, clears `candidate_json`, and does not rewrite `nutrition_capture_images`
+- The next Gemini poll loads the stored photo set in position order and reserves `nutrition_meal_photo`
+- Requeue itself creates no `ai_usage` row
+- An automatic Gemini retry is still a separate reservation
 
-## Cost ledger
+## Review UI
 
-- Shares `AI_MONTHLY_BUDGET_USD`, the 1.5-second interval, and the 8-per-minute gate
-- `AI_NUTRITION_RECIPE_ASSIST_MAX_REQUEST_COST_USD` falls back to the default max request cost
-- One Draft ingredients action is one reservation
-- An automatic Gemini retry is a second reservation
-- Opening the assistant, typing, applying, resolving foods, and saving do not reserve
-- Budget and rate denials are HTTP 429, codes `AI_BUDGET_REACHED` and `AI_RATE_LIMITED`, and make no Gemini call
-- A returned invalid draft is completed
-- A provider or network failure after the call starts stays uncertain
-- A missing Gemini configuration is not charged
-- The stored hash is SHA-256 of the request type, model, and prompt packet
-- Raw recipe text and model output are not stored on `ai_usage`
+- “Help refine this estimate” appears only for a Gemini job that has an active job id and at least one clarification
+- Manual build and a candidate with zero clarifications do not show it
+- Copy: “Answer only what you know. You can save or edit the estimate without refining it.” and “Answering can give the estimate more context.”
+- Refine estimate stays disabled until one answer is present
+- Selecting or typing an answer does not call the provider
+- The request sends only answered ids, with `provider=gemini`, and then uses the existing working state
+- A new candidate replaces the previous question set
+- If the name or nutrients differ from the loaded estimate, Refine estimate first says: “Refining will replace this unsaved estimate with a new AI estimate. Your current edits are not saved.”
+- Save stays available. Clarifications are not required
+- The freeform Add/Edit context flow remains
 
-## API and auth
+## Canonical commit, privacy, backup, and demo
 
-- `POST /api/nutrition/recipes/assist`
-- Other methods return 405 before owner auth
-- Anonymous POST returns 401
-- A signed-in non-owner returns 403
-- Machine ingest tokens have no authority on this route
-- The response is the transient draft
-- The endpoint does not write the database
-
-## New Recipe assistant
-
-- Secondary action: Draft from recipe text
-- Shown only while the new recipe has no ingredient lines
-- Sheet contains a textarea, Draft ingredients, and the review
-- Copy says to paste the ingredient list and that Health does not fetch webpages
-- Copy says the action uses Gemini and the monthly AI budget
-- Failure offers Retry draft and Continue manually
-- Continue manually leaves Name, Notes, Servings, and Finished weight as they were
-
-## Apply draft
-
-- Apply draft is a separate button
-- It does not call Gemini
-- A blank Name takes the suggested title
-- A blank Servings field takes the suggested yield
-- A nonblank Name or Servings value stays
-- Notes stay
-- Finished weight stays
-- If any ingredient line already exists, apply shows: “This recipe already has ingredients. Clear them before applying an AI draft.”
-- Lines are not merged
-
-## Unresolved ingredients
-
-- An applied line shows the suggested name, quantity, unit, and source line
-- It has Resolve food and Remove
-- It is not a NutritionFood
-- Save stays disabled
-- `composeRecipe` does not run
-- No placeholder calories are shown
-
-## Ingredient sheet
-
-- Resolve food opens the existing `RecipeIngredientSheet`
-- The suggested name is the initial search text, capped at 120 characters
-- Search does not run on mount
-- My Foods, USDA, barcode, nutrition label, manual food, and the existing single-food AI flow remain
-- Choosing a food replaces only that unresolved line
-
-## Quantity and unit
-
-- A positive suggested quantity is kept
-- A missing quantity becomes 1
-- The suggested unit is used only when `supportedDisplayUnits` for the chosen food already includes it
-- Otherwise the line uses serving
-- can, bunch, handful, medium, large, and package are not converted into grams
-- The source line stays visible as “Suggested from: …” until save
-- That helper is not written to the recipe tables
-
-## Canonical commit
-
-- After every line is resolved, preview uses `composeRecipe`
-- Save uses the existing `createRecipe` API
-- The payload is food id, amount, and unit
-- The saved recipe is an ordinary Recipe v1
-- Recipe edit and version history are unchanged
-
-## Privacy, URLs, backup, and demo
-
-- Gemini receives the numbered source packet and the prompt
-- It does not receive Health history, the food library, or other recipes
-- Raw text is not logged and not stored in PostgreSQL or localStorage
-- No recipe URL is fetched
-- Backup and portable-export inventories are unchanged
-- `ai_usage` stays operational and out of the portable export
-- The demo stays provider-free and does not call the assist route
+- `commitNutritionMealEstimateRequestSchema` has no clarification fields
+- `nutrition_entries` still store the reviewed meal. Source kind stays `photo_ai`
+- Gemini receives the stored photos, the bounded owner context, and the `meal-photo-v3` prompt
+- It does not receive goals, Body, sleep, Activity, Training, supplements, saved foods, other recipes, or Ask Health chats
+- Answers and images are not logged. They stay on the existing capture job
+- Backup inventory is unchanged. `nutrition_capture_jobs` stays operational and nonportable
+- The demo stays provider-free and does not render the refinement control
 
 ## Validation
 
-- Tests: 956 passing across 112 files
+- Tests: 968 passing across 113 files
 - `npx tsc -b` passed
 - `npx eslint .` passed
 - `npm run build` passed. The existing Vite chunk-size warning remains
@@ -170,10 +104,11 @@ Snapshot recorded 2026-09-27 after V2-G7 Recipe Text Draft Assistant. This commi
 
 ## Manual QA
 
-- `/nutrition/recipes/new` showed the lock screen: “Private Health data”
-- Sign-in rendered the email and password form
-- Live Gemini, applying a draft, resolving foods, and saving a recipe were not clicked. The owner lock screen blocks that path without a session
-- Injected provider and ledger tests cover the draft, the reservation, and the apply rules
+- `/demo` rendered the fictional Today page at desktop and at 390px. It does not call a provider
+- `/sign-in` rendered the email and password form at both widths
+- `/nutrition` showed the lock screen: “Private Health data”
+- Live Gemini, answering a clarification, Refine estimate, and saving a meal were not clicked. The owner lock screen blocks that path without a session
+- Injected sanitizer, answer, context, and source tests cover the refinement state machine
 
 ## Deviations
 
@@ -185,5 +120,4 @@ Snapshot recorded 2026-09-27 after V2-G7 Recipe Text Draft Assistant. This commi
 - Route geometry and nested Health Auto Export workout telemetry stay deferred
 - No correction or deletion lifecycle for Health Auto Export workouts
 - Goal-observation experiment suggestions and overnight vital metrics remain deferred from earlier slices
-- Richer contextual meal estimation, beyond multi-angle photos and recipe text drafts, remains an idea
-- AI editing of an already-saved recipe is not part of this slice
+- AI editing of an already-saved recipe is not part of V2-G7 or V2-G8
