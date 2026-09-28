@@ -6,6 +6,8 @@ import {
   GEMINI_LABEL_TIMEOUT_MS,
   GEMINI_MEAL_MAX_OUTPUT_TOKENS,
   GEMINI_MEAL_TIMEOUT_MS,
+  GEMINI_RECIPE_MAX_OUTPUT_TOKENS,
+  GEMINI_RECIPE_TIMEOUT_MS,
   NutritionInterpretError,
   foodDescriptionPrompt,
   interpretFoodDescriptionResponse,
@@ -99,12 +101,14 @@ export class GeminiNutritionInterpreter {
   private readonly model: string
   private readonly descriptionModel: string
   private readonly labelModel: string
+  private readonly recipeModel: string
 
-  constructor(options: { generate: GeminiGenerate; model: string; descriptionModel?: string; labelModel?: string }) {
+  constructor(options: { generate: GeminiGenerate; model: string; descriptionModel?: string; labelModel?: string; recipeModel?: string }) {
     this.generate = options.generate
     this.model = options.model
     this.descriptionModel = options.descriptionModel ?? options.model
     this.labelModel = options.labelModel ?? options.model
+    this.recipeModel = options.recipeModel ?? options.descriptionModel ?? options.model
   }
 
   async interpretMealPhoto(input: {
@@ -147,6 +151,17 @@ export class GeminiNutritionInterpreter {
     }
   }
 
+  async interpretRecipeAssist(input: { prompt: string }): Promise<{ text: string; model: string }> {
+    const result = await this.generate({
+      model: this.recipeModel,
+      prompt: input.prompt,
+      timeoutMs: GEMINI_RECIPE_TIMEOUT_MS,
+      maxOutputTokens: GEMINI_RECIPE_MAX_OUTPUT_TOKENS,
+      usageKind: 'recipe_assist',
+    })
+    return { text: result.text, model: result.model }
+  }
+
   async interpretNutritionLabel(input: { image: Uint8Array; mimeType: string; userContext: string | null }): Promise<InterpretedLabel> {
     const result = await this.generate({
       model: this.labelModel,
@@ -170,6 +185,7 @@ export async function createGeminiNutritionInterpreter(deps?: Omit<NutritionGemi
     model: config.mealModel,
     descriptionModel: config.descriptionModel,
     labelModel: config.labelModel,
+    recipeModel: config.recipeModel,
     generate: (request) =>
       withGeminiRetry(() =>
         runNutritionGeminiAttempt(config, request, {

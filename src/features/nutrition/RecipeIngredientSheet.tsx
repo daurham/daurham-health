@@ -51,19 +51,24 @@ export function RecipeIngredientSheet({
   onClose,
   onFood,
   onLabel,
+  initialQuery = '',
+  initialStep = 'choose',
 }: {
   onClose: () => void
   onFood: (food: NutritionFood) => void
   onLabel: () => void
+  initialQuery?: string
+  initialStep?: Step
 }) {
-  const [step, setStep] = useState<Step>('choose')
+  const boundedQuery = initialQuery.trim().slice(0, 120)
+  const [step, setStep] = useState<Step>(initialStep)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const returned = useRef(false)
   const saving = useRef(false)
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useState(boundedQuery)
   const [foods, setFoods] = useState<NutritionFood[]>([])
-  const [usdaQuery, setUsdaQuery] = useState('')
+  const [usdaQuery, setUsdaQuery] = useState(boundedQuery)
   const [usdaFoods, setUsdaFoods] = useState<UsdaFoodChoice[]>([])
   const [usdaChoice, setUsdaChoice] = useState<UsdaFoodChoice | null>(null)
   const [portion, setPortion] = useState<UsdaPortionChoice | null>(null)
@@ -79,7 +84,7 @@ export function RecipeIngredientSheet({
   const [packProtein, setPackProtein] = useState('')
   const [packCarbs, setPackCarbs] = useState('')
   const [packFat, setPackFat] = useState('')
-  const [manualName, setManualName] = useState('')
+  const [manualName, setManualName] = useState(boundedQuery)
   const [manualQuantity, setManualQuantity] = useState('1')
   const [manualUnit, setManualUnit] = useState('serving')
   const [manualGrams, setManualGrams] = useState('')

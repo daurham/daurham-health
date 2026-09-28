@@ -2,7 +2,7 @@
 
 Current completion status and implementation order live in `HEALTH-PLATFORM-V2-LAB-BLUEPRINT.md`. The schema head is `0033_nutrition_capture_images.sql`.
 
-Implemented: V2-A Data Capture Foundations, V2-B Personal Lab Core, V2-C Recipes / Batch Meals, V2-D Goals + Projections, V2-E Rich Sleep + Overnight Vitals, V2-F1 Ask Health, V2-F2 Proactive Insights, V2-F3 Weekly Coach Brief, V2-F4 Experiment Suggestions for due Benchmark retests and missing Benchmark baselines, V2-F5 Literature-Backed Evidence Drawer, V2-G1 ongoing Apple workout ingestion, V2-G2 Body Inbox and Shortcut capture, V2-G3 Theme Packs and Appearance, V2-G4 Nutrition Gemini durable cost safety, V2-G5 Motion and micro-interactions, and V2-G6 Multi-Angle Meal Photo Estimation. Goal-observation suggestions are deferred. Overnight vital metrics stay disabled until a payload is verified. V2-F is complete. Native share-sheet targeting is deferred. The schema head is `0033_nutrition_capture_images.sql`.
+Implemented: V2-A Data Capture Foundations, V2-B Personal Lab Core, V2-C Recipes / Batch Meals, V2-D Goals + Projections, V2-E Rich Sleep + Overnight Vitals, V2-F1 Ask Health, V2-F2 Proactive Insights, V2-F3 Weekly Coach Brief, V2-F4 Experiment Suggestions for due Benchmark retests and missing Benchmark baselines, V2-F5 Literature-Backed Evidence Drawer, V2-G1 ongoing Apple workout ingestion, V2-G2 Body Inbox and Shortcut capture, V2-G3 Theme Packs and Appearance, V2-G4 Nutrition Gemini durable cost safety, V2-G5 Motion and micro-interactions, V2-G6 Multi-Angle Meal Photo Estimation, and V2-G7 Recipe Text Draft Assistant. Goal-observation suggestions are deferred. Overnight vital metrics stay disabled until a payload is verified. V2-F is complete. Native share-sheet targeting is deferred. The schema head is `0033_nutrition_capture_images.sql`.
 
 This file began as a post-v1 idea list. It was not part of frozen v1. The numbered sections below keep that older backlog. Sections the blueprint now marks implemented say so. The remaining sections are still ideas, not promises. External retest notifications remain deferred. Nested recipes, batch inventory, and recipe fiber remain deferred.
 
@@ -98,6 +98,6 @@ Frictionless mobile capture/import where technically possible.
 
 Potential:
 
-- multi-angle photo support — implemented as V2-G6. One to three photos of the same meal are one Gemini capture and one reviewed estimate. Home-AI stays one photo. Recipe assistance and richer contextual estimation below are still ideas.
-- recipe assistance
+- multi-angle photo support — implemented as V2-G6. One to three photos of the same meal are one Gemini capture and one reviewed estimate. Home-AI stays one photo.
+- recipe assistance — implemented as V2-G7. Pasted recipe text can become a transient ingredient draft. The owner resolves every food. Gemini does not calculate recipe nutrition or fetch a page.
 - richer contextual estimation

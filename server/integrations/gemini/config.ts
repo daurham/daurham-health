@@ -11,6 +11,7 @@ export type GeminiConfig = {
   descriptionModel: string
   mealModel: string
   labelModel: string
+  recipeModel: string
 }
 
 export async function getGeminiConfig(env: NodeJS.ProcessEnv = process.env): Promise<GeminiConfig> {
@@ -20,10 +21,12 @@ export async function getGeminiConfig(env: NodeJS.ProcessEnv = process.env): Pro
     throw new NutritionInterpretError('GEMINI_NOT_CONFIGURED', 'Meal analysis is temporarily unavailable.')
   }
   const fallback = env.GEMINI_NUTRITION_MODEL?.trim() || ''
+  const descriptionModel = env.GEMINI_NUTRITION_DESCRIPTION_MODEL?.trim() || fallback || GEMINI_DESCRIPTION_MODEL_DEFAULT
   return {
     apiKey,
-    descriptionModel: env.GEMINI_NUTRITION_DESCRIPTION_MODEL?.trim() || fallback || GEMINI_DESCRIPTION_MODEL_DEFAULT,
+    descriptionModel,
     mealModel: env.GEMINI_NUTRITION_MEAL_MODEL?.trim() || fallback || GEMINI_MEAL_MODEL_DEFAULT,
     labelModel: env.GEMINI_NUTRITION_LABEL_MODEL?.trim() || fallback || GEMINI_LABEL_MODEL_DEFAULT,
+    recipeModel: env.GEMINI_NUTRITION_RECIPE_MODEL?.trim() || descriptionModel,
   }
 }

@@ -1,12 +1,21 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import type { NutritionFood } from '@/domain/nutrition'
+import {
+  applyRecipeAssistToBuilder,
+  assistedLinesBlockSave,
+  RECIPE_ASSIST_QUERY_MAX,
+  replaceOneUnresolved,
+  transferSuggestedMeasure,
+  type RecipeAssistDraft,
+} from '@/domain/nutrition/recipe-assist'
 import { composeRecipe, supportedDisplayUnits, type RecipeFoodBasis } from '@/domain/nutrition/recipes'
 import { healthCalendarDateFromNow } from '@/domain/time'
 import { LoadErrorNotice, primaryButtonClass, secondaryButtonClass } from '@/lib'
 import { parseNutritionDateParam } from './date'
 import { formatNumber } from './format'
 import { LabelCaptureSheet } from './LabelCapture'
+import { RecipeAssistSheet } from './RecipeAssistSheet'
 import { RecipeIngredientSheet } from './RecipeIngredientSheet'
 import { RecipePortionSheet } from './RecipePortionSheet'
 import {
@@ -47,6 +56,33 @@ function recipeKcal(value: number): string {
 function macroText(value: number | null, label: string): string {
   if (value == null) return `${label} not fully known`
   return `${formatNumber(value, 1)} g`
+}
+
+function queryForLine(lines: readonly DraftLine[], lineKey: string | null): string {
+  const line = lines.find((item) => item.key === lineKey)
+  return line?.status === 'unresolved' ? line.name : ''
+}
+
+function resolvedFromFood(food: NutritionFood, line: DraftLine | undefined): DraftLine {
+  if (!line || line.status !== 'unresolved') {
+    return { key: line?.key ?? crypto.randomUUID(), status: 'resolved', food, amount: '1', unit: 'serving', suggestion: null }
+  }
+  const measure = transferSuggestedMeasure({
+    quantity: line.quantity,
+    unit: line.unit,
+    supportedUnits: supportedDisplayUnits({
+      baseServingUnitSnapshot: food.servingUnit,
+      baseWeightGramsSnapshot: food.servingGrams,
+    }),
+  })
+  return {
+    key: line.key,
+    status: 'resolved',
+    food,
+    amount: measure.amount,
+    unit: measure.unit,
+    suggestion: line.sourceText,
+  }
 }
 
 function foodBasis(food: NutritionFood): RecipeFoodBasis {
@@ -120,12 +156,26 @@ export function RecipesPage() {
   )
 }
 
-type DraftLine = {
+type ResolvedLine = {
   key: string
+  status: 'resolved'
   food: NutritionFood
   amount: string
   unit: string
+  suggestion: string | null
 }
+
+type UnresolvedLine = {
+  key: string
+  status: 'unresolved'
+  name: string
+  quantity: number | null
+  unit: string | null
+  sourceText: string
+  sourceRefs: string[]
+}
+
+type DraftLine = ResolvedLine | UnresolvedLine
 
 export function NewRecipePage() {
   const navigate = useNavigate()
@@ -135,7 +185,8 @@ export function NewRecipePage() {
   const [finishedWeightG, setFinishedWeightG] = useState('')
   const [lines, setLines] = useState<DraftLine[]>([])
   const [focusKey, setFocusKey] = useState<string | null>(null)
-  const [flow, setFlow] = useState<null | 'sources' | 'label'>(null)
+  const [flow, setFlow] = useState<null | { kind: 'sources' | 'label'; lineKey: string | null }>(null)
+  const [assist, setAssist] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
@@ -150,26 +201,51 @@ export function NewRecipePage() {
     return () => window.removeEventListener('beforeunload', warn)
   }, [lines.length, name, notes])
 
+  const unresolved = lines.some((line) => line.status === 'unresolved')
   const preview = useMemo(() => {
-    if (lines.length === 0) return null
+    if (assistedLinesBlockSave(lines)) return null
     return composeRecipe({
       name: name || 'Preview',
       notes,
       yieldServings: yieldServings.trim() ? Number(yieldServings) : null,
       finishedWeightG: finishedWeightG.trim() ? Number(finishedWeightG) : null,
-      ingredients: lines.map((line) => ({
-        food: foodBasis(line.food),
-        amount: Number(line.amount),
-        unit: line.unit,
-      })),
+      ingredients: lines.flatMap((line) =>
+        line.status === 'resolved' ? [{ food: foodBasis(line.food), amount: Number(line.amount), unit: line.unit }] : [],
+      ),
     })
   }, [finishedWeightG, lines, name, notes, yieldServings])
 
   function addFood(food: NutritionFood) {
+    const lineKey = flow?.lineKey
+    if (lineKey) {
+      setLines((current) =>
+        replaceOneUnresolved(current, lineKey, resolvedFromFood(food, current.find((line) => line.key === lineKey))),
+      )
+      setFocusKey(lineKey)
+      setFlow(null)
+      return
+    }
     const key = crypto.randomUUID()
     setFocusKey(key)
-    setLines((current) => [...current, { key, food, amount: '1', unit: 'serving' }])
+    setLines((current) => [...current, { key, status: 'resolved', food, amount: '1', unit: 'serving', suggestion: null }])
     setFlow(null)
+  }
+
+  function applyDraft(draft: RecipeAssistDraft): string | null {
+    const applied = applyRecipeAssistToBuilder({
+      name,
+      notes,
+      yieldServings,
+      finishedWeightG,
+      ingredientCount: lines.length,
+      draft,
+    })
+    if ('error' in applied) return applied.error
+    setName(applied.name)
+    setYieldServings(applied.yieldServings)
+    setLines(applied.lines)
+    setAssist(false)
+    return null
   }
 
   function move(index: number, direction: -1 | 1) {
@@ -190,12 +266,19 @@ export function NewRecipePage() {
     setSaving(true)
     setError(null)
     try {
+      if (assistedLinesBlockSave(lines)) {
+        setError('Resolve each ingredient before saving.')
+        setSaving(false)
+        return
+      }
       const created = await createRecipe({
         name,
         notes,
         yieldServings: yieldServings.trim() ? Number(yieldServings) : null,
         finishedWeightG: finishedWeightG.trim() ? Number(finishedWeightG) : null,
-        ingredients: lines.map((line) => ({ foodId: line.food.id, amount: Number(line.amount), unit: line.unit })),
+        ingredients: lines.flatMap((line) =>
+          line.status === 'resolved' ? [{ foodId: line.food.id, amount: Number(line.amount), unit: line.unit }] : [],
+        ),
       })
       void navigate(`/nutrition/recipes/${created.id}`)
     } catch (caught) {
@@ -236,53 +319,84 @@ export function NewRecipePage() {
             <input className={fieldClass} inputMode="decimal" value={finishedWeightG} onChange={(event) => setFinishedWeightG(event.target.value)} />
           </label>
         </div>
-        <button type="button" className={secondaryButtonClass} onClick={() => setFlow('sources')}>
-          Add ingredient
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className={secondaryButtonClass} onClick={() => setFlow({ kind: 'sources', lineKey: null })}>
+            Add ingredient
+          </button>
+          {lines.length === 0 ? (
+            <button type="button" className={secondaryButtonClass} onClick={() => setAssist(true)}>
+              Draft from recipe text
+            </button>
+          ) : null}
+        </div>
         <ol className="space-y-3">
           {lines.map((line, index) => (
             <li key={line.key} className="rounded-xl border border-zinc-200 bg-white p-3">
-              <p className="font-medium">{line.food.name}</p>
-              <div className="mt-2 grid grid-cols-[1fr_1fr_auto] gap-2">
-                <input
-                  className={fieldClass}
-                  inputMode="decimal"
-                  aria-label={`Amount for ${line.food.name}`}
-                  autoFocus={line.key === focusKey}
-                  value={line.amount}
-                  onChange={(event) =>
-                    setLines((current) => current.map((item) => (item.key === line.key ? { ...item, amount: event.target.value } : item)))
-                  }
-                />
-                <input
-                  className={fieldClass}
-                  aria-label={`Unit for ${line.food.name}`}
-                  value={line.unit}
-                  onChange={(event) =>
-                    setLines((current) => current.map((item) => (item.key === line.key ? { ...item, unit: event.target.value } : item)))
-                  }
-                />
-                <button type="button" className={secondaryButtonClass} onClick={() => setLines((current) => current.filter((item) => item.key !== line.key))}>
-                  Remove
-                </button>
-              </div>
-              <p className="mt-2 text-sm text-zinc-500">
-                {supportedDisplayUnits({
-                  baseServingUnitSnapshot: line.food.servingUnit,
-                  baseWeightGramsSnapshot: line.food.servingGrams,
-                }).join(', ')}
-              </p>
-              <div className="mt-2 flex gap-2">
-                <button type="button" className={secondaryButtonClass} onClick={() => move(index, -1)} disabled={index === 0}>
-                  Up
-                </button>
-                <button type="button" className={secondaryButtonClass} onClick={() => move(index, 1)} disabled={index === lines.length - 1}>
-                  Down
-                </button>
-              </div>
+              {line.status === 'unresolved' ? (
+                <div className="space-y-2">
+                  <p className="font-medium">{line.name}</p>
+                  <p className="text-sm text-zinc-700">
+                    Suggested {line.quantity ?? 'quantity not stated'}
+                    {line.unit ? ` ${line.unit}` : ''}
+                  </p>
+                  <p className="text-sm text-zinc-600">Suggested from: {line.sourceText}</p>
+                  <p className="text-sm text-zinc-600">Unresolved. This is not a saved food.</p>
+                  <div className="flex flex-wrap gap-2">
+                    <button type="button" className={secondaryButtonClass} onClick={() => setFlow({ kind: 'sources', lineKey: line.key })}>
+                      Resolve food
+                    </button>
+                    <button type="button" className={secondaryButtonClass} onClick={() => setLines((current) => current.filter((item) => item.key !== line.key))}>
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <p className="font-medium">{line.food.name}</p>
+                  <div className="mt-2 grid grid-cols-[1fr_1fr_auto] gap-2">
+                    <input
+                      className={fieldClass}
+                      inputMode="decimal"
+                      aria-label={`Amount for ${line.food.name}`}
+                      autoFocus={line.key === focusKey}
+                      value={line.amount}
+                      onChange={(event) =>
+                        setLines((current) => current.map((item) => (item.key === line.key ? { ...item, amount: event.target.value } : item)))
+                      }
+                    />
+                    <input
+                      className={fieldClass}
+                      aria-label={`Unit for ${line.food.name}`}
+                      value={line.unit}
+                      onChange={(event) =>
+                        setLines((current) => current.map((item) => (item.key === line.key ? { ...item, unit: event.target.value } : item)))
+                      }
+                    />
+                    <button type="button" className={secondaryButtonClass} onClick={() => setLines((current) => current.filter((item) => item.key !== line.key))}>
+                      Remove
+                    </button>
+                  </div>
+                  <p className="mt-2 text-sm text-zinc-500">
+                    {supportedDisplayUnits({
+                      baseServingUnitSnapshot: line.food.servingUnit,
+                      baseWeightGramsSnapshot: line.food.servingGrams,
+                    }).join(', ')}
+                  </p>
+                  {line.suggestion ? <p className="mt-2 text-sm text-zinc-600">Suggested from: {line.suggestion}</p> : null}
+                  <div className="mt-2 flex gap-2">
+                    <button type="button" className={secondaryButtonClass} onClick={() => move(index, -1)} disabled={index === 0}>
+                      Up
+                    </button>
+                    <button type="button" className={secondaryButtonClass} onClick={() => move(index, 1)} disabled={index === lines.length - 1}>
+                      Down
+                    </button>
+                  </div>
+                </>
+              )}
             </li>
           ))}
         </ol>
+        {unresolved ? <p className="text-sm text-zinc-700">Resolve each ingredient before this recipe has nutrition.</p> : null}
         {previewError ? <p className="text-sm text-red-800">{previewError}</p> : null}
         {previewRecipe ? (
           <div className="rounded-xl border border-zinc-200 bg-white p-4">
@@ -294,19 +408,25 @@ export function NewRecipePage() {
           </div>
         ) : null}
         {error ? <p className="text-sm text-red-800">{error}</p> : null}
-        <button type="submit" className={primaryButtonClass} disabled={saving || lines.length === 0 || previewError != null}>
+        <button type="submit" className={primaryButtonClass} disabled={saving || assistedLinesBlockSave(lines) || previewError != null}>
           Save recipe
         </button>
       </form>
-      {flow === 'sources' ? (
-        <RecipeIngredientSheet onClose={() => setFlow(null)} onFood={addFood} onLabel={() => setFlow('label')} />
+      {assist ? <RecipeAssistSheet onClose={() => setAssist(false)} onApply={applyDraft} /> : null}
+      {flow?.kind === 'sources' ? (
+        <RecipeIngredientSheet
+          onClose={() => setFlow(null)}
+          onFood={addFood}
+          onLabel={() => setFlow({ kind: 'label', lineKey: flow.lineKey })}
+          initialQuery={queryForLine(lines, flow.lineKey).slice(0, RECIPE_ASSIST_QUERY_MAX)}
+        />
       ) : null}
-      {flow === 'label' ? (
+      {flow?.kind === 'label' ? (
         <LabelCaptureSheet
           date={healthCalendarDateFromNow()}
           purpose="recipe"
-          onClose={() => setFlow('sources')}
-          onBack={() => setFlow('sources')}
+          onClose={() => setFlow({ kind: 'sources', lineKey: flow.lineKey })}
+          onBack={() => setFlow({ kind: 'sources', lineKey: flow.lineKey })}
           onLogged={() => undefined}
           onSavedFood={addFood}
         />

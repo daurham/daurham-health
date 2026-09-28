@@ -12,6 +12,8 @@ export const GEMINI_NUTRITION_MODEL_DEFAULT = 'gemini-3.5-flash'
 export const GEMINI_DESCRIPTION_MODEL_DEFAULT = 'gemini-3.5-flash-lite'
 export const GEMINI_MEAL_MODEL_DEFAULT = 'gemini-3.5-flash'
 export const GEMINI_LABEL_MODEL_DEFAULT = 'gemini-3.5-flash'
+export const GEMINI_RECIPE_TIMEOUT_MS = 20_000
+export const GEMINI_RECIPE_MAX_OUTPUT_TOKENS = 2048
 export const GEMINI_DESCRIPTION_TIMEOUT_MS = 10_000
 export const GEMINI_MEAL_TIMEOUT_MS = 20_000
 export const GEMINI_LABEL_TIMEOUT_MS = 20_000
@@ -34,13 +36,14 @@ export const GEMINI_FAILURE_CODES = [
 export const GEMINI_TRANSIENT_CODES = ['GEMINI_UNAVAILABLE', 'GEMINI_TIMEOUT', 'GEMINI_QUOTA'] as const
 export const GEMINI_AUTO_RETRY_CODES = ['GEMINI_UNAVAILABLE', 'GEMINI_QUOTA'] as const
 
-export const NUTRITION_GEMINI_USAGE_KINDS = ['description', 'meal_photo', 'nutrition_label'] as const
+export const NUTRITION_GEMINI_USAGE_KINDS = ['description', 'meal_photo', 'nutrition_label', 'recipe_assist'] as const
 export type NutritionGeminiUsageKind = (typeof NUTRITION_GEMINI_USAGE_KINDS)[number]
 
 export const NUTRITION_GEMINI_REQUEST_TYPES = {
   description: 'nutrition_description',
   meal_photo: 'nutrition_meal_photo',
   nutrition_label: 'nutrition_label',
+  recipe_assist: 'nutrition_recipe_assist',
 } as const
 
 export const AI_BUDGET_REACHED = 'AI_BUDGET_REACHED'

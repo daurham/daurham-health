@@ -34,6 +34,7 @@ const CONFIG: GeminiConfig = {
   descriptionModel: 'desc-model',
   mealModel: 'meal-model',
   labelModel: 'label-model',
+  recipeModel: 'recipe-model',
 }
 
 function usageConfig(overrides: Partial<AiUsageConfig> = {}): AiUsageConfig {
@@ -120,6 +121,7 @@ describe('Nutrition Gemini durable usage', () => {
       description: 'nutrition_description',
       meal_photo: 'nutrition_meal_photo',
       nutrition_label: 'nutrition_label',
+      recipe_assist: 'nutrition_recipe_assist',
     })
     const config = readAiUsageConfig({})
     expect(config.monthlyBudgetUsd).toBe(readAiUsageConfig({}).monthlyBudgetUsd)

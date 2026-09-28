@@ -1,3 +1,5 @@
+import type { RecipeAssistDraft } from '@/domain/nutrition/recipe-assist'
+import { RECIPE_ASSIST_VERSION } from '@/domain/nutrition/recipe-assist'
 import { healthFetch, readApiError } from '@/lib'
 
 export type RecipeIngredient = {
@@ -154,6 +156,16 @@ export async function commitRecipeVersion(
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(input),
+    }),
+  )
+}
+
+export async function draftRecipeFromText(text: string): Promise<RecipeAssistDraft> {
+  return parseOk<RecipeAssistDraft>(
+    await healthFetch('/api/nutrition/recipes/assist', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ version: RECIPE_ASSIST_VERSION, text }),
     }),
   )
 }

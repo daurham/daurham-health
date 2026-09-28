@@ -261,7 +261,7 @@ describe('multi-angle meal photos', () => {
     expect(ordered).not.toContain('one')
     expect(readFileSync('server/ai-usage/ledger.ts', 'utf8')).not.toContain('image_bytes')
     const ledger = createMemoryAiUsageLedger()
-    const config: GeminiConfig = { apiKey: 'test', descriptionModel: 'd', mealModel: 'm', labelModel: 'l' }
+    const config: GeminiConfig = { apiKey: 'test', descriptionModel: 'd', mealModel: 'm', labelModel: 'l', recipeModel: 'r' }
     const usage: AiUsageConfig = { ...readAiUsageConfig({}), minIntervalMs: 0, monthlyBudgetUsd: 5 }
     const request: NutritionGeminiRequest = {
       model: 'm',

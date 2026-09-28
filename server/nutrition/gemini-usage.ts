@@ -65,6 +65,9 @@ export function nutritionGeminiReservedUsd(config: AiUsageConfig, kind: Nutritio
   if (kind === 'meal_photo') {
     return config.nutritionMealMaxRequestCostUsd
   }
+  if (kind === 'recipe_assist') {
+    return config.nutritionRecipeAssistMaxRequestCostUsd
+  }
   return config.nutritionLabelMaxRequestCostUsd
 }
 
@@ -74,7 +77,7 @@ export async function runNutritionGeminiAttempt(
   deps: NutritionGeminiAttemptDeps,
 ): Promise<NutritionGeminiResult> {
   const kind = request.usageKind
-  if (kind !== 'description' && kind !== 'meal_photo' && kind !== 'nutrition_label') {
+  if (kind !== 'description' && kind !== 'meal_photo' && kind !== 'nutrition_label' && kind !== 'recipe_assist') {
     throw new NutritionInterpretError('GEMINI_UNAVAILABLE', 'Meal analysis is temporarily unavailable.')
   }
   const usageConfig = deps.usageConfig ?? readAiUsageConfig()

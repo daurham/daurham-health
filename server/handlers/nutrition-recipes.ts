@@ -1,3 +1,4 @@
+import { draftRecipeAssist } from '../nutrition/recipe-assist.js'
 import { archiveRecipe, commitRecipeVersion, createRecipe, getRecipe, getRecipeVersion, listRecipes, previewRecipeEdit, restoreRecipe } from '../nutrition/recipes.js'
 import { logRecipeConsumption } from '../nutrition/recipe-consumption.js'
 import { withOwnerAuth } from '../auth/with-owner.js'
@@ -27,6 +28,15 @@ export function matchRecipeRoute(pathname: string):
 
 export async function handleNutritionRecipes(req: ApiRequest, res: ApiResponse): Promise<void> {
   const pathname = requestApiPathname(req)
+  if (pathname === '/api/nutrition/recipes/assist') {
+    if (req.method !== 'POST') {
+      res.setHeader('Allow', 'POST')
+      sendJson(res, 405, { error: 'Method not allowed' })
+      return
+    }
+    sendJson(res, 200, await draftRecipeAssist(await readJsonBody(req)))
+    return
+  }
   if (pathname === '/api/nutrition/recipe-entries') {
     if (req.method !== 'POST') {
       res.setHeader('Allow', 'POST')
@@ -95,10 +105,19 @@ export async function handleNutritionRecipes(req: ApiRequest, res: ApiResponse):
   sendJson(res, 405, { error: 'Method not allowed' })
 }
 
-export default withOwnerAuth(async function nutritionRecipesHandler(req: ApiRequest, res: ApiResponse) {
+const nutritionRecipesHandler = withOwnerAuth(async function nutritionRecipesHandler(req: ApiRequest, res: ApiResponse) {
   try {
     await handleNutritionRecipes(req, res)
   } catch (error) {
     handleApiError(res, error)
   }
 })
+
+export default async function nutritionRecipesRoute(req: ApiRequest, res: ApiResponse): Promise<void> {
+  if (requestApiPathname(req) === '/api/nutrition/recipes/assist' && req.method !== 'POST') {
+    res.setHeader('Allow', 'POST')
+    sendJson(res, 405, { error: 'Method not allowed' })
+    return
+  }
+  await nutritionRecipesHandler(req, res)
+}

@@ -16,6 +16,7 @@ export type AiUsageConfig = {
   nutritionDescriptionMaxRequestCostUsd: number
   nutritionMealMaxRequestCostUsd: number
   nutritionLabelMaxRequestCostUsd: number
+  nutritionRecipeAssistMaxRequestCostUsd: number
   minIntervalMs: number
   maxPerMinute: number
 }
@@ -37,6 +38,10 @@ export function readAiUsageConfig(env: NodeJS.ProcessEnv = process.env): AiUsage
     ),
     nutritionMealMaxRequestCostUsd: readUsd(env.AI_NUTRITION_MEAL_MAX_REQUEST_COST_USD, AI_USAGE_DEFAULT_MAX_REQUEST_COST_USD),
     nutritionLabelMaxRequestCostUsd: readUsd(env.AI_NUTRITION_LABEL_MAX_REQUEST_COST_USD, AI_USAGE_DEFAULT_MAX_REQUEST_COST_USD),
+    nutritionRecipeAssistMaxRequestCostUsd: readUsd(
+      env.AI_NUTRITION_RECIPE_ASSIST_MAX_REQUEST_COST_USD,
+      AI_USAGE_DEFAULT_MAX_REQUEST_COST_USD,
+    ),
     minIntervalMs: readCount(env.AI_ASK_HEALTH_MIN_INTERVAL_MS, AI_USAGE_MIN_INTERVAL_MS),
     maxPerMinute: readCount(env.AI_ASK_HEALTH_MAX_PER_MINUTE, AI_USAGE_MAX_PER_MINUTE),
   }

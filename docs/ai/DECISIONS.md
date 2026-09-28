@@ -152,6 +152,12 @@ Observed from the current code and product docs. Where the original rationale is
 **Reason:** V2-G6 lets the owner add up to three views of the same meal so Gemini has more visual context. Those views are evidence for one estimate. They are not separate meals and they are not a saved Nutrition fact.  
 **Implications:** A Gemini meal job stores one to three ordered images in `nutrition_capture_images`. Historical one-photo jobs stay readable from `nutrition_capture_jobs.image_bytes` when no child rows exist. Labels stay on that legacy column. One Gemini attempt is one `ai_usage` reservation, even when the request contains three images. Home-AI accepts one photo. A multi-photo set does not silently send the first photo to Home-AI. The canonical `nutrition_entries` row is still the reviewed value the owner saves. Photo count and angle labels are not stored on that row. Child images belong in the full backup and not in the portable export.
 
+## Decision: A recipe draft is not a recipe
+
+**Status:** Active  
+**Reason:** V2-G7 lets Gemini turn pasted recipe text into a list of suggested ingredients. That list is not a Nutrition calculation and it is not a saved Recipe.  
+**Implications:** The request and prompt version are `recipe-assist-v1`. The ledger request type is `nutrition_recipe_assist`. Health does not fetch recipe URLs. The model output cannot carry calories, macros, or food ids. Applying the draft is a separate owner action and does not overwrite notes, finished weight, or a name and servings the owner already typed. Each line stays unresolved until the owner selects a canonical food through the existing ingredient flows. A suggested unit is used only when that food already supports it. `composeRecipe` and `createRecipe` stay the recipe authority. The pasted text and the draft are not stored.
+
 ## Decision: Manual ledger rows are historical
 
 **Status:** Active  
