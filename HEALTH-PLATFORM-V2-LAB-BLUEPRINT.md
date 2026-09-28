@@ -1,9 +1,9 @@
 # Daurham Health — V2 Lab Blueprint
 
-**Status:** V2-A Data Capture Foundations complete. V2-B Personal Lab Core complete (V2-B1 through V2-B4). V2-C Recipes / Batch Meals complete (V2-C1 through V2-C4). V2-D Goals + Projections complete (V2-D1 through V2-D3). V2-E Rich Sleep + Overnight Vitals complete (V2-E1 through V2-E5). Overnight vital metrics remain disabled until a payload is verified. V2-F1 Ask Health conversational analysis is implemented. V2-F2 Proactive Insights are implemented. V2-F3 Weekly Coach Brief is implemented. V2-F4 Experiment Suggestions are implemented for due Benchmark retests and missing Benchmark baselines. Goal-observation suggestions are deferred. V2-F5 Literature-Backed Evidence Drawer is implemented. V2-F Ask Health + Proactive Intelligence is complete. V2-G1 ongoing Apple workout ingestion is implemented.  
+**Status:** V2-A Data Capture Foundations complete. V2-B Personal Lab Core complete (V2-B1 through V2-B4). V2-C Recipes / Batch Meals complete (V2-C1 through V2-C4). V2-D Goals + Projections complete (V2-D1 through V2-D3). V2-E Rich Sleep + Overnight Vitals complete (V2-E1 through V2-E5). Overnight vital metrics remain disabled until a payload is verified. V2-F1 Ask Health conversational analysis is implemented. V2-F2 Proactive Insights are implemented. V2-F3 Weekly Coach Brief is implemented. V2-F4 Experiment Suggestions are implemented for due Benchmark retests and missing Benchmark baselines. Goal-observation suggestions are deferred. V2-F5 Literature-Backed Evidence Drawer is implemented. V2-F Ask Health + Proactive Intelligence is complete. V2-G1 ongoing Apple workout ingestion is implemented. V2-G2 Body Inbox and Shortcut capture is implemented.  
 **Calendar:** America/Phoenix  
 **Package version:** remains `1.0.0`  
-**Schema head:** `0031_experiment_origins.sql`
+**Schema head:** `0032_body_capture_inbox.sql`
 
 This file is the v2 product authority for work after the frozen v1 manual. The frozen manual remains the authority for retained v1 semantics. Where this blueprint intentionally extends the product, it takes precedence over the older post-v1 roadmap in the v1 manual and in `docs/V2-ROADMAP.md`.
 
@@ -51,6 +51,7 @@ The file was not present in the repository when V2-A1 implementation started. Th
    - V2-F Ask Health + Proactive Intelligence — complete
 7. **V2-G Activity workouts**
    - V2-G1 Ongoing Apple workout ingestion — implemented
+   - V2-G2 Body Inbox and Shortcut capture — implemented
 
 Invariant:
 
@@ -524,6 +525,22 @@ V2-G1 is implemented. There is no migration and no second workout table. Schema 
 `POST /api/ingest/apple-health` accepts Health Auto Export JSON v2 `data.workouts` on the existing write-only bearer token. Accepted fields are `id`, `name`, offset-aware `start` and `end`, `duration` in seconds, and optional `activeEnergyBurned`, `distance`, `location`, and `isIndoor`. `activeEnergy` and `totalEnergy` are not active energy. Route geometry, heart-rate streams, cadence, power, and other nested telemetry are ignored. `source_name`, `source_version`, and `device_name` stay null. The Health Auto Export transport is not an observing source.
 
 The provider workout id is stored as `health_auto_export|workout|v2|<id>` and as `external_id`. The same id does not create another row. A cross-source match requires the same start instant, the same end instant, and the same activity identity after formatting normalization. One match keeps the historical row and adds a provenance link. Several matches fail closed for that workout. A later payload that omits a workout does not delete it, and a conflicting id does not rewrite history. Import jobs use strategy `health_auto_export_workouts`. Today lists up to three current Phoenix-day Activity workouts without adding their energy or duration to the daily summary. Timeline still emits one `activity_workout` event per canonical row, and that event stays out of All and out of Training. The demo shows one fictional current-day walk and does not call Health Auto Export.
+
+## Amendment — 2026-09-27T17:24:03-07:00 — V2-G2 Body Inbox and Shortcut Capture
+
+V2-G2 is implemented. Migration `0032_body_capture_inbox.sql` adds `body_capture_inbox` and the `body_shortcut` data source. Schema head is `0032_body_capture_inbox.sql`. Package version remains `1.0.0`. The intake contract is `body-capture-v1`. V2-F stays complete. V2-G1 stays implemented. Goal-observation experiment suggestions remain deferred. Overnight vital metrics remain disabled until a payload is verified.
+
+`POST /api/ingest/body` is authorized only by `BODY_CAPTURE_TOKEN`. That secret is not `APPLE_HEALTH_SYNC_TOKEN`, and neither token can read Health data, list the inbox, or commit a measurement. An owner session does not authorize intake. The route inserts or resolves one `body_capture_inbox` row. It does not insert `body_measurement_sessions` or `body_metrics`.
+
+`captureId` is 1–80 characters from `[A-Za-z0-9_-]`. The same id and the same captured instant, notes, and staged metrics return the existing row with `duplicate: true`. The same id with different evidence returns 409 and does not rewrite the row. `capturedAt` must include a timezone offset. Date-only values are rejected. Future times use the existing 120-second Body skew. `timezone` must be `America/Phoenix`. Metric keys and units are the existing manual Body catalog. Missing metrics stay missing. Notes are optional and at most 2000 characters on this path. The response is `accepted`, the inbox id, `status`, `reviewPath` (`/body/inbox/<uuid>`), and `duplicate`. The review path has no measurement values.
+
+Owner routes use the owner session: list pending captures (at most 20, plus the pending count), detail, commit, and discard. Body shows that list only when something is pending. The review page can change the time, values, notes, and which manual metrics are included, then save or discard. Until save succeeds, the page says the capture is not in Body.
+
+Commit revalidates with the existing manual Body parser. One transaction locks the pending row, inserts one session with source `manual`, `value_kind` `manual`, no device name, and no import job, inserts the metrics, inserts a `source_record_links` row from `body_shortcut` (`body_shortcut|body-capture-v1|<captureId>`, original staged payload), and marks the inbox committed. A repeated or concurrent commit returns that one session. A discarded row cannot be committed. Discard is idempotent and does not reset `discarded_at`. A committed row cannot be discarded.
+
+The saved session stays editable and deletable as a manual measurement. Editing it does not rewrite the Shortcut payload. Deleting it sets `canonical_session_id` to null and leaves the committed inbox row. `source_record_links.entity_id` still has no foreign key, so that provenance link can remain after the session is gone. A second commit does not recreate the deleted session.
+
+Pending and discarded rows are not Today, Progress, Goal, Compare, or Timeline observations. After commit, the canonical session appears through the existing Body queries, once, as `body_measurement`. There is no `body_capture` timeline event. Fit Profile XLSX and `/body?action=measure` are unchanged. The inbox is in the full backup and not in the portable export. Restore order is `data_sources`, then `body_measurement_sessions`, then `body_capture_inbox`, then `source_record_links`. The demo omits the inbox and does not call the intake route. Shortcut setup is `docs/body-shortcut.md`. A native iOS share sheet is not implemented.
 
 
 

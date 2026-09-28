@@ -1,6 +1,8 @@
 import { handleApiError, requestApiPathname, sendJson, type ApiRequest, type ApiResponse } from './http.js'
 import authHandler from './handlers/auth.js'
 import bodyMeasurementsHandler from './handlers/body-measurements.js'
+import bodyInboxHandler from './handlers/body-inbox.js'
+import bodyCaptureIngestHandler from './handlers/body-capture-ingest.js'
 import bodyCadencesHandler from './handlers/body-cadences.js'
 import fitProfileCommitHandler from './handlers/fit-profile-commit.js'
 import fitProfilePreviewHandler from './handlers/fit-profile-preview.js'
@@ -56,6 +58,8 @@ export type HealthApiRoute =
   | 'session'
   | 'auth'
   | 'body-measurements'
+  | 'body-inbox'
+  | 'body-capture-ingest'
   | 'body-cadences'
   | 'fit-profile-preview'
   | 'fit-profile-commit'
@@ -111,6 +115,8 @@ const HANDLERS: Record<HealthApiRoute, HealthApiHandler> = {
   session: sessionHandler,
   auth: authHandler,
   'body-measurements': bodyMeasurementsHandler,
+  'body-inbox': bodyInboxHandler,
+  'body-capture-ingest': bodyCaptureIngestHandler,
   'body-cadences': bodyCadencesHandler,
   'fit-profile-preview': fitProfilePreviewHandler,
   'fit-profile-commit': fitProfileCommitHandler,
@@ -180,6 +186,10 @@ export function matchHealthApiRoute(pathname: string): HealthApiRoute | null {
       return 'session'
     case '/api/body/measurements':
       return 'body-measurements'
+    case '/api/body/inbox':
+      return 'body-inbox'
+    case '/api/ingest/body':
+      return 'body-capture-ingest'
     case '/api/body/import/fit-profile/preview':
       return 'fit-profile-preview'
     case '/api/body/import/fit-profile/commit':
@@ -265,6 +275,9 @@ export function matchHealthApiRoute(pathname: string): HealthApiRoute | null {
   }
   if (pathname === '/api/goals' || pathname.startsWith('/api/goals/')) {
     return 'goals'
+  }
+  if (pathname === '/api/body/inbox' || pathname.startsWith('/api/body/inbox/')) {
+    return 'body-inbox'
   }
   if (pathname === '/api/body/measurements' || pathname.startsWith('/api/body/measurements/')) {
     return 'body-measurements'

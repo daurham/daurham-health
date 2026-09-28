@@ -125,6 +125,86 @@ export async function saveBodyCadence(metricKey: string, intervalDays: number, e
   }
 }
 
+const stagedMetricSchema = z.object({
+  key: z.string(),
+  label: z.string(),
+  value: z.number(),
+  unit: z.string(),
+})
+
+const inboxListSchema = z.object({
+  pendingCount: z.number(),
+  items: z.array(
+    z.object({
+      id: z.string(),
+      capturedAt: z.string(),
+      timezone: z.string(),
+      metrics: z.array(stagedMetricSchema),
+      notes: z.string().nullable(),
+    }),
+  ),
+})
+
+const inboxDetailSchema = z.object({
+  id: z.string(),
+  status: z.string(),
+  capturedAt: z.string(),
+  timezone: z.string(),
+  metrics: z.array(stagedMetricSchema),
+  notes: z.string().nullable(),
+  canCommit: z.boolean(),
+  canDiscard: z.boolean(),
+  canonicalSessionId: z.string().nullable().optional(),
+})
+
+const inboxCommitSchema = z.object({
+  id: z.string(),
+  status: z.literal('committed'),
+  canonicalSessionId: z.string().nullable(),
+  alreadyCommitted: z.boolean(),
+})
+
+export type BodyInboxList = z.infer<typeof inboxListSchema>
+export type BodyInboxDetail = z.infer<typeof inboxDetailSchema>
+
+export async function fetchBodyInbox(): Promise<BodyInboxList> {
+  const response = await healthFetch('/api/body/inbox')
+  if (!response.ok) {
+    throw new Error(await readApiError(response))
+  }
+  return inboxListSchema.parse(await response.json())
+}
+
+export async function fetchBodyInboxItem(id: string): Promise<BodyInboxDetail> {
+  const response = await healthFetch(`/api/body/inbox/${id}`)
+  if (!response.ok) {
+    throw new Error(await readApiError(response))
+  }
+  return inboxDetailSchema.parse(await response.json())
+}
+
+export async function commitBodyInbox(
+  id: string,
+  body: { measuredAt: string; notes: string | null; metrics: Array<{ key: string; value: string; unit: string }> },
+) {
+  const response = await healthFetch(`/api/body/inbox/${id}/commit`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!response.ok) {
+    throw new Error(await readApiError(response))
+  }
+  return inboxCommitSchema.parse(await response.json())
+}
+
+export async function discardBodyInbox(id: string): Promise<void> {
+  const response = await healthFetch(`/api/body/inbox/${id}/discard`, { method: 'POST' })
+  if (!response.ok) {
+    throw new Error(await readApiError(response))
+  }
+}
+
 export async function deleteBodyCadence(metricKey: string): Promise<void> {
   const response = await healthFetch(`/api/body/cadences/${metricKey}`, { method: 'DELETE' })
   if (!response.ok) {

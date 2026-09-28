@@ -42,7 +42,7 @@ Observed from the current code and product docs. Where the original rationale is
 
 **Status:** Active  
 **Reason:** `APPLE_HEALTH_SYNC_TOKEN` authorizes `POST /api/ingest/apple-health`. Docs and tests say it cannot read Health data or call owner routes.  
-**Implications:** Owner handlers must not accept that bearer token as a session.
+**Implications:** Owner handlers must not accept that bearer token as a session. It does not authorize `POST /api/ingest/body`.
 
 ## Decision: Apple workouts are Activity, not Training
 
@@ -121,6 +121,12 @@ Observed from the current code and product docs. Where the original rationale is
 **Status:** Active  
 **Reason:** V2-F5 retrieves published literature only after the owner edits a visible query and chooses Search research. Europe PMC receives that query and the fixed PubMed-and-abstract filters. It does not receive the Ask Health packet. Gemini may paraphrase only the retrieved sources, and model prose with digits is rejected.  
 **Implications:** There is no literature table. Queries, abstracts, and synthesis are not in backup, portable export, or `localStorage`. `literature_synthesis` shares `ai_usage`, `AI_MONTHLY_BUDGET_USD`, and the global rate gate. The Europe PMC request itself is not reserved. Source refs are `pubmed:<PMID>`. Study type is a label, not a score. Literature does not create an Experiment, Goal, insight, or coach brief. `external_research` stays unused until a later task.
+
+## Decision: Shortcut Body capture is staged until the owner saves it
+
+**Status:** Active  
+**Reason:** V2-G2 lets an iPhone Shortcut post a measurement candidate. That post is not a measurement. Only the signed-in owner review creates canonical Body data.  
+**Implications:** `BODY_CAPTURE_TOKEN` authorizes only `POST /api/ingest/body`. It is not the Apple ingest token and it cannot list, read, commit, discard, or edit Body data. Intake writes `body_capture_inbox` only. The same `captureId` with the same evidence returns the existing row. A different payload for that id is a 409 and does not rewrite the row. Commit uses the manual Body parser, source `manual`, and one `body_shortcut` provenance link in the same statement that marks the inbox committed. The session stays editable. Deleting it nulls `canonical_session_id` and does not recreate the row on a later commit. Pending and discarded captures are not observations. The inbox is full-backup only. Native share-sheet targeting is deferred. Setup is `docs/body-shortcut.md`.
 
 ## Decision: Manual ledger rows are historical
 

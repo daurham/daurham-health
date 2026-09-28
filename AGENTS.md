@@ -2,7 +2,7 @@
 
 These rules apply to every implementation task in this repository.
 
-The current application is the tree described in `docs/ai/DEV_STATE.md`, including Ask Health, Proactive Insights, Weekly Coach, Experiment Suggestions, Literature-Backed Evidence, and migration `0031_experiment_origins.sql`. Do not treat an older commit as the product if this handoff says the working application has moved on.
+The current application is the tree described in `docs/ai/DEV_STATE.md`, including Ask Health, Proactive Insights, Weekly Coach, Experiment Suggestions, Literature-Backed Evidence, Body Shortcut capture, and migration `0032_body_capture_inbox.sql`. Do not treat an older commit as the product if this handoff says the working application has moved on.
 
 Before changing code:
 

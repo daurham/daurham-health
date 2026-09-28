@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { displayValueForMetric, FIT_PROFILE_XLSX_ACCEPT } from '@/domain/body-metrics'
 import { metricDefinition, ownerInputNumber } from '@/domain/body-manual'
 import type {
@@ -14,17 +14,35 @@ import {
   deleteBodyCadence,
   deleteManualMeasurement,
   fetchBodyCadences,
+  fetchBodyInbox,
   fetchBodyMeasurements,
   previewFitProfile,
   saveBodyCadence,
   updateManualMeasurement,
   type BodyCadenceItem,
+  type BodyInboxList,
 } from './api'
 import { CadencePanel } from './CadencePanel'
 import { MeasureForm } from './MeasureForm'
 import { customKeysFor, presetForMetric } from './measure-preset'
 import { HEALTH_CALENDAR_TIME_ZONE } from '@/domain/time'
 import { selectedFingerprints, selectionFromPreview } from './import-state'
+
+function formatCaptureTime(iso: string): string {
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: HEALTH_CALENDAR_TIME_ZONE,
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(new Date(iso))
+}
+
+function capturePreview(metrics: BodyInboxList['items'][number]['metrics']): string {
+  const shown = metrics.slice(0, 3).map((metric) => `${metric.label} ${metric.value} ${metric.unit}`)
+  const extra = metrics.length - shown.length
+  return extra > 0 ? `${shown.join(' · ')} · +${extra}` : shown.join(' · ')
+}
 
 function formatNumber(value: number, maxFractionDigits: number): string {
   return value.toLocaleString('en-US', {
@@ -70,23 +88,30 @@ export function BodyPage() {
   const [selected, setSelected] = useState<Record<string, boolean>>({})
   const [busy, setBusy] = useState<'preview' | 'commit' | 'save' | null>(null)
   const [importNotice, setImportNotice] = useState<string | null>(null)
+  const [inbox, setInbox] = useState<BodyInboxList>({ pendingCount: 0, items: [] })
   const [editing, setEditing] = useState<BodyMeasurementSession | null>(null)
   const [formOpen, setFormOpen] = useState(params.get('action') === 'measure')
   const focusKey = params.get('metric')
 
   async function reloadHistory() {
-    const [nextSessions, nextCadences] = await Promise.all([fetchBodyMeasurements(), fetchBodyCadences()])
+    const [nextSessions, nextCadences, nextInbox] = await Promise.all([
+      fetchBodyMeasurements(),
+      fetchBodyCadences(),
+      fetchBodyInbox(),
+    ])
     setSessions(nextSessions)
     setCadences(nextCadences)
+    setInbox(nextInbox)
   }
 
   useEffect(() => {
     let cancelled = false
-    Promise.all([fetchBodyMeasurements(), fetchBodyCadences()])
-      .then(([nextSessions, nextCadences]) => {
+    Promise.all([fetchBodyMeasurements(), fetchBodyCadences(), fetchBodyInbox()])
+      .then(([nextSessions, nextCadences, nextInbox]) => {
         if (!cancelled) {
           setSessions(nextSessions)
           setCadences(nextCadences)
+          setInbox(nextInbox)
         }
       })
       .catch((caught: unknown) => {
@@ -190,6 +215,27 @@ export function BodyPage() {
           Add measurement
         </button>
       </div>
+
+      {inbox.pendingCount > 0 ? (
+        <section className="space-y-3">
+          <h2 className="text-sm font-medium text-zinc-900">
+            Captures · {inbox.pendingCount} pending
+          </h2>
+          <ul className="space-y-2">
+            {inbox.items.map((item) => (
+              <li key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-zinc-200 px-3 py-2">
+                <div className="min-w-0">
+                  <p className="text-sm text-zinc-900">{formatCaptureTime(item.capturedAt)}</p>
+                  <p className="truncate text-sm text-zinc-600">{capturePreview(item.metrics)}</p>
+                </div>
+                <Link to={`/body/inbox/${item.id}`} className={quietButtonClass}>
+                  Review
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       {due.length > 0 ? (
         <ul className="space-y-1 text-sm text-zinc-700">

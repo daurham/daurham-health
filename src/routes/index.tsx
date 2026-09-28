@@ -12,6 +12,7 @@ const RecipeDetailPage = lazy(() => import('@/features/nutrition').then((module)
 const RecipeEditPage = lazy(() => import('@/features/nutrition').then((module) => ({ default: module.RecipeEditPage })))
 const RecipeVersionPage = lazy(() => import('@/features/nutrition').then((module) => ({ default: module.RecipeVersionPage })))
 const BodyPage = lazy(() => import('@/features/body').then((module) => ({ default: module.BodyPage })))
+const BodyInboxPage = lazy(() => import('@/features/body').then((module) => ({ default: module.BodyInboxPage })))
 const SettingsPage = lazy(() => import('@/features/settings').then((module) => ({ default: module.SettingsPage })))
 const SupplementsPage = lazy(() => import('@/features/supplements').then((module) => ({ default: module.SupplementsPage })))
 const ContextPage = lazy(() => import('@/features/context').then((module) => ({ default: module.ContextPage })))
@@ -80,6 +81,7 @@ const router = createBrowserRouter([
       { path: 'training/import', element: <ImportWorkoutPage /> },
       { path: 'training/:sessionId', element: <WorkoutDetailPage /> },
       { path: 'body', element: <BodyPage /> },
+      { path: 'body/inbox/:captureId', element: <BodyInboxPage /> },
       { path: 'settings', element: <SettingsPage /> },
       { path: 'supplements', element: <SupplementsPage /> },
       { path: 'context', element: <ContextPage /> },

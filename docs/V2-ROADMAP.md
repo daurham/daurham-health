@@ -1,8 +1,8 @@
 # V2 roadmap
 
-Current completion status and implementation order live in `HEALTH-PLATFORM-V2-LAB-BLUEPRINT.md`. The schema head is `0031_experiment_origins.sql`.
+Current completion status and implementation order live in `HEALTH-PLATFORM-V2-LAB-BLUEPRINT.md`. The schema head is `0032_body_capture_inbox.sql`.
 
-Implemented: V2-A Data Capture Foundations, V2-B Personal Lab Core, V2-C Recipes / Batch Meals, V2-D Goals + Projections, V2-E Rich Sleep + Overnight Vitals, V2-F1 Ask Health, V2-F2 Proactive Insights, V2-F3 Weekly Coach Brief, V2-F4 Experiment Suggestions for due Benchmark retests and missing Benchmark baselines, V2-F5 Literature-Backed Evidence Drawer, and V2-G1 ongoing Apple workout ingestion. Goal-observation suggestions are deferred. Overnight vital metrics stay disabled until a payload is verified. V2-F is complete. The schema head is `0031_experiment_origins.sql`.
+Implemented: V2-A Data Capture Foundations, V2-B Personal Lab Core, V2-C Recipes / Batch Meals, V2-D Goals + Projections, V2-E Rich Sleep + Overnight Vitals, V2-F1 Ask Health, V2-F2 Proactive Insights, V2-F3 Weekly Coach Brief, V2-F4 Experiment Suggestions for due Benchmark retests and missing Benchmark baselines, V2-F5 Literature-Backed Evidence Drawer, V2-G1 ongoing Apple workout ingestion, and V2-G2 Body Inbox and Shortcut capture. Goal-observation suggestions are deferred. Overnight vital metrics stay disabled until a payload is verified. V2-F is complete. Native share-sheet targeting is deferred. The schema head is `0032_body_capture_inbox.sql`.
 
 This file began as a post-v1 idea list. It was not part of frozen v1. The numbered sections below keep that older backlog. Sections the blueprint now marks implemented say so. The remaining sections are still ideas, not promises. External retest notifications remain deferred. Nested recipes, batch inventory, and recipe fiber remain deferred.
 

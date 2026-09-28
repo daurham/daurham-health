@@ -278,30 +278,60 @@ function parseNotes(value: unknown): string | null {
   return trimmed.length === 0 ? null : trimmed
 }
 
+export type StagedManualMetric = {
+  key: string
+  value: number
+  unit: string
+}
+
+const OFFSET_INSTANT = /^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2}:\d{2})(?:\.\d+)?(?:Z| ?[+-]\d{2}:?\d{2})$/
+
+export function parseOffsetAwareMeasuredAt(value: unknown, now: Date): Date {
+  if (typeof value !== 'string') {
+    throw new BodyInputError('Measurement time is invalid')
+  }
+  const trimmed = value.trim()
+  if (DATE_ONLY.test(trimmed)) {
+    throw new BodyInputError('Measurement time must include a real time')
+  }
+  if (!OFFSET_INSTANT.test(trimmed)) {
+    throw new BodyInputError('Measurement time must include a timezone offset')
+  }
+  return parseMeasuredAt(trimmed, now, false)
+}
+
+export function parseStagedManualMetrics(value: unknown): StagedManualMetric[] {
+  return collectMetrics(value).map((item) => item.staged)
+}
+
 function parseMetricList(value: unknown): PlannedManualMetric[] {
+  return collectMetrics(value).map((item) => item.planned)
+}
+
+function collectMetrics(value: unknown): Array<{ planned: PlannedManualMetric; staged: StagedManualMetric }> {
   if (!Array.isArray(value)) {
     throw new BodyInputError('Enter at least one measurement')
   }
-  const planned: PlannedManualMetric[] = []
+  const collected: Array<{ planned: PlannedManualMetric; staged: StagedManualMetric }> = []
   const seen = new Set<string>()
   for (const item of value) {
     const metric = parseMetricItem(item)
     if (!metric) {
       continue
     }
-    if (seen.has(metric.key)) {
-      throw new BodyInputError(`Duplicate measurement ${metricDefinition(metric.key)?.label ?? metric.key}`)
+    if (seen.has(metric.planned.key)) {
+      throw new BodyInputError(`Duplicate measurement ${metricDefinition(metric.planned.key)?.label ?? metric.planned.key}`)
     }
-    seen.add(metric.key)
-    planned.push(metric)
+    seen.add(metric.planned.key)
+    collected.push(metric)
   }
-  if (planned.length === 0) {
+  if (collected.length === 0) {
     throw new BodyInputError('Enter at least one measurement')
   }
-  return planned
+  return collected
 }
 
-function parseMetricItem(item: unknown): PlannedManualMetric | null {
+function parseMetricItem(item: unknown): { planned: PlannedManualMetric; staged: StagedManualMetric } | null {
   if (item == null || typeof item !== 'object' || Array.isArray(item)) {
     throw new BodyInputError('Measurement entry is invalid')
   }
@@ -321,10 +351,17 @@ function parseMetricItem(item: unknown): PlannedManualMetric | null {
   const unit = normalizeInputUnit(record.unit, definition)
   assertRange(definition, parsed.value)
   return {
-    key: definition.key,
-    value: toCanonical(definition, unit, parsed.value),
-    unit: definition.canonicalUnit,
-    valueKind: 'manual',
+    planned: {
+      key: definition.key,
+      value: toCanonical(definition, unit, parsed.value),
+      unit: definition.canonicalUnit,
+      valueKind: 'manual',
+    },
+    staged: {
+      key: definition.key,
+      value: parsed.value,
+      unit,
+    },
   }
 }
 

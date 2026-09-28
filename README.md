@@ -6,7 +6,7 @@ Personal health record for one owner. Frozen release **v1.0.0** (2026-09-22, Ame
 
 - Owner app: Today, Nutrition, Training, Body, Progress, Activity, Sleep, Timeline, Compare, Checkpoints, Settings, and Supplements. Supplements is not a primary navigation tab.
 - Public demo: `/demo` and the same primary sections under that prefix. It does not use the database, owner APIs, or providers.
-- Sign-in is owner-only. Private APIs reject anonymous callers. The Apple Health ingest token can write `POST /api/ingest/apple-health` and cannot read Health data.
+- Sign-in is owner-only. Private APIs reject anonymous callers. The Apple Health ingest token can write `POST /api/ingest/apple-health` and cannot read Health data. The Body capture token can write `POST /api/ingest/body` and cannot read or save a measurement. Shortcut setup is `docs/body-shortcut.md`.
 
 ## Providers
 
@@ -16,7 +16,7 @@ Personal health record for one owner. Frozen release **v1.0.0** (2026-09-22, Ame
 
 ## Data
 
-- Schema migrations live in `migrations/`. The current migration is `0031_experiment_origins.sql`. Apply them with `npm run migrate`.
+- Schema migrations live in `migrations/`. The current migration is `0032_body_capture_inbox.sql`. Apply them with `npm run migrate`.
 - Full backup, verify, and restore commands are in `docs/BACKUP.md`.
 - Release checks are in `docs/V1-RELEASE-CHECKLIST.md`.
 

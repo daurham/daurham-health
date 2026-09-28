@@ -49,8 +49,8 @@ Derived products are not stored as tables. That includes goal status, projection
 - Today assembles the owner's current Phoenix day from canonical domains. Activity for the current day can be provisional.
 - Nutrition logs foods, recipes, targets, barcode lookups, label photos, meal photos, and text descriptions. Capture jobs can ask Gemini, with Home-AI as an explicit fallback.
 - Training stores exercises, templates, and workout sessions. A workout photo becomes a Home-AI transcription job. The owner reviews it before it becomes a session.
-- Body stores manual measurements, an XLSX fit-profile import, and optional measurement cadence.
-- Apple Health history can be imported from export archives. Ongoing Activity, Sleep, and workout sync arrives as `POST /api/ingest/apple-health` with the ingest bearer token. That token cannot read Health data. Apple and Health Auto Export workouts stay in Activity. They are not Training sessions.
+- Body stores manual measurements, an XLSX fit-profile import, and optional measurement cadence. A Shortcut can stage a capture with `POST /api/ingest/body`. That row stays in `body_capture_inbox` until the owner reviews it and saves one ordinary manual measurement. Pending captures are not observations. Setup is `docs/body-shortcut.md`.
+- Apple Health history can be imported from export archives. Ongoing Activity, Sleep, and workout sync arrives as `POST /api/ingest/apple-health` with `APPLE_HEALTH_SYNC_TOKEN`. That token cannot read Health data or post a Body capture. Apple and Health Auto Export workouts stay in Activity. They are not Training sessions. Body intake uses a separate `BODY_CAPTURE_TOKEN` and cannot read or save measurements.
 - Progress, insights, and the weekly coach read canonical rows and run the existing analytics. They do not create a second copy of those formulas in React.
 - Ask Health, Weekly Coach, and Experiment Suggestion drafts may call Gemini only after an explicit owner action, and only through the `ai_usage` reservation gate.
 
@@ -70,7 +70,7 @@ Ask Health (`ask-health-evidence-v1`, prompt `ask-health-v1`), Weekly Coach (`we
 ## API conventions
 
 - JSON over `/api/...`, routed by `matchHealthApiRoute`.
-- Owner mutations and reads require the owner session, except the ingest route.
+- Owner mutations and reads require the owner session, except the two machine ingest routes.
 - Validation uses Zod and domain parsers. Handlers return `HttpError` statuses.
 - `asOf` dates are `YYYY-MM-DD` in the Health calendar. Historical reads must not include later evidence.
 - Idempotent ingest and import paths keep provenance on `data_sources` and import jobs.

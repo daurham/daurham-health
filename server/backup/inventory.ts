@@ -1,6 +1,6 @@
 export const BACKUP_FORMAT = 'daurham-health-backup'
 export const BACKUP_FORMAT_VERSION = 1
-export const LATEST_SCHEMA_MIGRATION = '0031_experiment_origins.sql'
+export const LATEST_SCHEMA_MIGRATION = '0032_body_capture_inbox.sql'
 export const PORTABLE_EXPORT_BYTE_LIMIT = 3_500_000
 
 export type ColumnKind = 'uuid' | 'text' | 'date' | 'timestamptz' | 'numeric' | 'int' | 'bool' | 'json' | 'bytea'
@@ -358,6 +358,32 @@ export const BACKUP_TABLES: readonly BackupTable[] = [
       col('metadata', 'json'),
       col('created_at', 'timestamptz'),
       col('updated_at', 'timestamptz'),
+    ],
+  }),
+  table({
+    name: 'body_capture_inbox',
+    backupClass: 'operational',
+    primaryKey: ['id'],
+    seeded: false,
+    portable: false,
+    references: [
+      { column: 'source_id', table: 'data_sources' },
+      { column: 'canonical_session_id', table: 'body_measurement_sessions' },
+    ],
+    columns: [
+      col('id', 'uuid'),
+      col('external_capture_id', 'text'),
+      col('status', 'text'),
+      col('captured_at', 'timestamptz'),
+      col('timezone', 'text'),
+      col('metrics', 'json'),
+      col('notes', 'text'),
+      col('source_id', 'uuid'),
+      col('canonical_session_id', 'uuid'),
+      col('created_at', 'timestamptz'),
+      col('updated_at', 'timestamptz'),
+      col('committed_at', 'timestamptz'),
+      col('discarded_at', 'timestamptz'),
     ],
   }),
   table({
