@@ -128,6 +128,12 @@ Observed from the current code and product docs. Where the original rationale is
 **Reason:** V2-G2 lets an iPhone Shortcut post a measurement candidate. That post is not a measurement. Only the signed-in owner review creates canonical Body data.  
 **Implications:** `BODY_CAPTURE_TOKEN` authorizes only `POST /api/ingest/body`. It is not the Apple ingest token and it cannot list, read, commit, discard, or edit Body data. Intake writes `body_capture_inbox` only. The same `captureId` with the same evidence returns the existing row. A different payload for that id is a 409 and does not rewrite the row. Commit uses the manual Body parser, source `manual`, and one `body_shortcut` provenance link in the same statement that marks the inbox committed. An untouched review keeps the staged instant, including seconds and fractions. Only an explicit measurement-time edit replaces it, and that edit keeps the entered seconds. The session stays editable. Deleting it nulls `canonical_session_id` and does not recreate the row on a later commit. Pending and discarded captures are not observations. The inbox is full-backup only. Native share-sheet targeting is deferred. Setup is `docs/body-shortcut.md`.
 
+## Decision: Appearance is a browser preference, not Health data
+
+**Status:** Active  
+**Reason:** V2-G3 lets the owner choose a color mode and a palette. Those choices change chrome. They do not change measurements, thresholds, analytics, chart calculations, or the meaning of danger, warning, and success.  
+**Implications:** `health-theme` stores `light` or `dark`. System is the absence of that key, including an invalid value. `health-palette` stores `classic`, `forest`, `ocean`, `sunset`, or `plum`. An absent or invalid palette is Classic. The inline script in `index.html` applies both before React mounts, using the same allowlist. `ThemeSync` follows `prefers-color-scheme` only while System is selected, and it applies `storage` events for those two keys. There is no theme table, API, backup row, or portable-export field. Motion stays deferred.
+
 ## Decision: Manual ledger rows are historical
 
 **Status:** Active  

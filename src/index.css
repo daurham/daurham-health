@@ -70,6 +70,88 @@ html.dark {
   --chart-soft: #d4d4d8;
 }
 
+/* Palettes change accent chrome only. Danger, warning, and success stay on the
+   base rules above so a pack cannot turn a warning into a decorative hue. */
+html[data-health-palette='classic'] {
+  --health-accent: oklch(0.44 0.08 250);
+  --health-accent-muted: oklch(0.94 0.02 250);
+  --health-accent-fg: #fff;
+  --health-info: oklch(0.5 0.07 230);
+  --chart-ink: var(--health-accent);
+}
+
+html[data-health-palette='forest'] {
+  --health-accent: oklch(0.42 0.08 195);
+  --health-accent-muted: oklch(0.94 0.03 195);
+  --health-accent-fg: #fff;
+  --health-info: oklch(0.48 0.06 200);
+  --chart-ink: var(--health-accent);
+}
+
+html[data-health-palette='ocean'] {
+  --health-accent: oklch(0.46 0.14 235);
+  --health-accent-muted: oklch(0.94 0.03 235);
+  --health-accent-fg: #fff;
+  --health-info: oklch(0.5 0.08 220);
+  --chart-ink: var(--health-accent);
+}
+
+html[data-health-palette='sunset'] {
+  --health-accent: oklch(0.5 0.13 48);
+  --health-accent-muted: oklch(0.95 0.03 55);
+  --health-accent-fg: #fff;
+  --health-info: oklch(0.48 0.06 40);
+  --chart-ink: var(--health-accent);
+}
+
+html[data-health-palette='plum'] {
+  --health-accent: oklch(0.46 0.12 330);
+  --health-accent-muted: oklch(0.95 0.03 330);
+  --health-accent-fg: #fff;
+  --health-info: oklch(0.48 0.07 310);
+  --chart-ink: var(--health-accent);
+}
+
+html.dark[data-health-palette='classic'] {
+  --health-accent: oklch(0.72 0.08 250);
+  --health-accent-muted: oklch(0.32 0.03 250);
+  --health-accent-fg: #18181b;
+  --health-info: oklch(0.74 0.07 230);
+  --chart-ink: var(--health-accent);
+}
+
+html.dark[data-health-palette='forest'] {
+  --health-accent: oklch(0.76 0.08 195);
+  --health-accent-muted: oklch(0.32 0.04 195);
+  --health-accent-fg: #18181b;
+  --health-info: oklch(0.74 0.05 200);
+  --chart-ink: var(--health-accent);
+}
+
+html.dark[data-health-palette='ocean'] {
+  --health-accent: oklch(0.76 0.11 235);
+  --health-accent-muted: oklch(0.32 0.05 235);
+  --health-accent-fg: #18181b;
+  --health-info: oklch(0.76 0.06 220);
+  --chart-ink: var(--health-accent);
+}
+
+html.dark[data-health-palette='sunset'] {
+  --health-accent: oklch(0.78 0.11 55);
+  --health-accent-muted: oklch(0.34 0.05 50);
+  --health-accent-fg: #18181b;
+  --health-info: oklch(0.78 0.05 45);
+  --chart-ink: var(--health-accent);
+}
+
+html.dark[data-health-palette='plum'] {
+  --health-accent: oklch(0.76 0.1 330);
+  --health-accent-muted: oklch(0.33 0.05 330);
+  --health-accent-fg: #18181b;
+  --health-info: oklch(0.76 0.06 310);
+  --chart-ink: var(--health-accent);
+}
+
 .theme-scrim {
   background: rgb(24 24 27 / 0.45);
 }

@@ -1,6 +1,6 @@
 # Daurham Health — V2 Lab Blueprint
 
-**Status:** V2-A Data Capture Foundations complete. V2-B Personal Lab Core complete (V2-B1 through V2-B4). V2-C Recipes / Batch Meals complete (V2-C1 through V2-C4). V2-D Goals + Projections complete (V2-D1 through V2-D3). V2-E Rich Sleep + Overnight Vitals complete (V2-E1 through V2-E5). Overnight vital metrics remain disabled until a payload is verified. V2-F1 Ask Health conversational analysis is implemented. V2-F2 Proactive Insights are implemented. V2-F3 Weekly Coach Brief is implemented. V2-F4 Experiment Suggestions are implemented for due Benchmark retests and missing Benchmark baselines. Goal-observation suggestions are deferred. V2-F5 Literature-Backed Evidence Drawer is implemented. V2-F Ask Health + Proactive Intelligence is complete. V2-G1 ongoing Apple workout ingestion is implemented. V2-G2 Body Inbox and Shortcut capture is implemented.  
+**Status:** V2-A Data Capture Foundations complete. V2-B Personal Lab Core complete (V2-B1 through V2-B4). V2-C Recipes / Batch Meals complete (V2-C1 through V2-C4). V2-D Goals + Projections complete (V2-D1 through V2-D3). V2-E Rich Sleep + Overnight Vitals complete (V2-E1 through V2-E5). Overnight vital metrics remain disabled until a payload is verified. V2-F1 Ask Health conversational analysis is implemented. V2-F2 Proactive Insights are implemented. V2-F3 Weekly Coach Brief is implemented. V2-F4 Experiment Suggestions are implemented for due Benchmark retests and missing Benchmark baselines. Goal-observation suggestions are deferred. V2-F5 Literature-Backed Evidence Drawer is implemented. V2-F Ask Health + Proactive Intelligence is complete. V2-G1 ongoing Apple workout ingestion is implemented. V2-G2 Body Inbox and Shortcut capture is implemented. V2-G3 Theme Packs and Appearance is implemented.  
 **Calendar:** America/Phoenix  
 **Package version:** remains `1.0.0`  
 **Schema head:** `0032_body_capture_inbox.sql`
@@ -52,6 +52,7 @@ The file was not present in the repository when V2-A1 implementation started. Th
 7. **V2-G Activity workouts**
    - V2-G1 Ongoing Apple workout ingestion — implemented
    - V2-G2 Body Inbox and Shortcut capture — implemented
+   - V2-G3 Theme Packs and Appearance — implemented
 
 Invariant:
 
@@ -547,6 +548,14 @@ Pending and discarded rows are not Today, Progress, Goal, Compare, or Timeline o
 V2-G2 stays implemented. There is no new migration. Schema head remains `0032_body_capture_inbox.sql`. Package version remains `1.0.0`. V2-F stays complete. V2-G1 stays implemented.
 
 The staged `capturedAt` is the canonical `measured_at` unless the owner edits the measurement-time field. Rendering that field, or editing weight, another metric, or notes, does not change the instant. Seconds and fractional seconds survive an untouched save. The time control accepts seconds. An explicit edit is interpreted in America/Phoenix and keeps the entered seconds. Fractional seconds are not edited in the control; they remain only on the untouched path. Commit still revalidates the submitted instant with the existing Body parser and future-skew rule.
+
+## Amendment — 2026-09-27T18:12:06-07:00 — V2-G3 Theme Packs and Appearance
+
+V2-G3 is implemented. There is no migration. Schema head remains `0032_body_capture_inbox.sql`. Package version remains `1.0.0`. V2-F stays complete. V2-G1 stays implemented. V2-G2 stays implemented, including exact staged-time preservation. Goal-observation experiment suggestions remain deferred. Overnight vital metrics remain disabled until a payload is verified. Motion and micro-interactions remain deferred.
+
+Appearance is two independent browser preferences. Color mode is System, Light, or Dark. System is the absence of `health-theme`. Stored `light` and `dark` stay explicit and do not follow later operating-system changes. Choosing System again removes the key and resumes live `prefers-color-scheme` updates. The palette key is `health-palette`. The ids are `classic`, `forest`, `ocean`, `sunset`, and `plum`. An absent or invalid palette is Classic. Mode and palette do not derive from each other.
+
+`index.html` applies the resolved mode and an allowlisted palette before React mounts. `ThemeSync` applies the same contract on mount, on a system color-scheme change while System is selected, and on `storage` events for those two keys. Settings shows the stored preference. System stays selected when the operating system is dark. Danger, warning, and success stay semantic. Charts use `--chart-ink`, which follows the accent token. Chart calculations are unchanged. The demo and the sign-in pages use the same appearance. There is no theme table, owner API, backup row, or portable-export field.
 
 
 

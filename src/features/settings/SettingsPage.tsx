@@ -3,7 +3,21 @@ import { Link } from 'react-router-dom'
 import { parseAppleHealthFile, previewAppleHealth } from '@/domain/apple-health'
 import { formatCalendarRange } from '@/domain/calendar-format'
 import { healthCalendarDateFromNow } from '@/domain/time'
-import { applyDocumentTheme, readThemePreference, resolveTheme, writeThemePreference, type ThemeChoice } from '@/theme'
+import {
+  HEALTH_PALETTES,
+  MODE_LABELS,
+  PALETTE_LABELS,
+  PALETTE_STORAGE_KEY,
+  THEME_MODE_PREFERENCES,
+  THEME_STORAGE_KEY,
+  applyStoredAppearance,
+  readPalettePreference,
+  readThemePreference,
+  writePalettePreference,
+  writeThemePreference,
+  type HealthPalette,
+  type ThemeModePreference,
+} from '@/theme'
 import {
   healthFetch,
   primaryButtonClass,
@@ -23,52 +37,84 @@ function formatCount(value: number): string {
   return value.toLocaleString('en-US')
 }
 
-function currentTheme(): ThemeChoice {
-  if (typeof document === 'undefined') {
-    return 'light'
-  }
-  if (document.documentElement.classList.contains('dark')) {
-    return 'dark'
-  }
-  const stored = typeof localStorage === 'undefined' ? null : readThemePreference(localStorage)
-  const prefersDark =
-    typeof window !== 'undefined' && typeof window.matchMedia === 'function'
-      ? window.matchMedia('(prefers-color-scheme: dark)').matches
-      : false
-  return resolveTheme(stored, prefersDark)
+function storedMode(): ThemeModePreference {
+  return typeof localStorage === 'undefined' ? 'system' : readThemePreference(localStorage)
+}
+
+function storedPalette(): HealthPalette {
+  return typeof localStorage === 'undefined' ? 'classic' : readPalettePreference(localStorage)
+}
+
+function prefersDark(): boolean {
+  return typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+    ? window.matchMedia('(prefers-color-scheme: dark)').matches
+    : false
 }
 
 function AppearanceSection() {
-  const [theme, setTheme] = useState<ThemeChoice>(() => currentTheme())
+  const [mode, setMode] = useState<ThemeModePreference>(storedMode)
+  const [palette, setPalette] = useState<HealthPalette>(storedPalette)
 
-  function choose(next: ThemeChoice) {
-    writeThemePreference(localStorage, next)
-    applyDocumentTheme(next, document.documentElement)
-    setTheme(next)
+  useEffect(() => {
+    function onStorage(event: StorageEvent) {
+      if (event.key !== THEME_STORAGE_KEY && event.key !== PALETTE_STORAGE_KEY && event.key !== null) {
+        return
+      }
+      setMode(storedMode())
+      setPalette(storedPalette())
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, [])
+
+  function paint() {
+    applyStoredAppearance(localStorage, prefersDark(), document.documentElement)
   }
 
   return (
-    <section className="space-y-3 rounded-lg border border-zinc-200 bg-white p-4">
+    <section className="min-w-0 space-y-4 rounded-lg border border-zinc-200 bg-white p-4">
       <h2 className="text-base font-semibold">Appearance</h2>
-      <div className="grid grid-cols-2 gap-2">
-        <button
-          type="button"
-          aria-pressed={theme === 'light'}
-          aria-label="Switch to light mode"
-          onClick={() => choose('light')}
-          className={theme === 'light' ? themeChoiceSelectedClass : themeChoiceClass}
-        >
-          Light
-        </button>
-        <button
-          type="button"
-          aria-pressed={theme === 'dark'}
-          aria-label="Switch to dark mode"
-          onClick={() => choose('dark')}
-          className={theme === 'dark' ? themeChoiceSelectedClass : themeChoiceClass}
-        >
-          Dark
-        </button>
+      <div className="space-y-2">
+        <p className="text-sm text-zinc-600">Mode</p>
+        <div className="grid grid-cols-3 gap-2">
+          {THEME_MODE_PREFERENCES.map((choice) => (
+            <button
+              key={choice}
+              type="button"
+              aria-pressed={mode === choice}
+              aria-label={choice === 'light' ? 'Switch to light mode' : choice === 'dark' ? 'Switch to dark mode' : 'Use system appearance'}
+              onClick={() => {
+                writeThemePreference(localStorage, choice)
+                paint()
+                setMode(choice)
+              }}
+              className={mode === choice ? themeChoiceSelectedClass : themeChoiceClass}
+            >
+              {MODE_LABELS[choice]}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="space-y-2">
+        <p className="text-sm text-zinc-600">Palette</p>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {HEALTH_PALETTES.map((choice) => (
+            <button
+              key={choice}
+              type="button"
+              aria-pressed={palette === choice}
+              aria-label={`Use ${PALETTE_LABELS[choice]} palette`}
+              onClick={() => {
+                writePalettePreference(localStorage, choice)
+                paint()
+                setPalette(choice)
+              }}
+              className={palette === choice ? themeChoiceSelectedClass : themeChoiceClass}
+            >
+              {PALETTE_LABELS[choice]}
+            </button>
+          ))}
+        </div>
       </div>
     </section>
   )

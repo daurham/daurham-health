@@ -1,17 +1,32 @@
 import { useEffect } from 'react'
-import { applyDocumentTheme, applyStoredTheme, readThemePreference, resolveTheme } from '@/theme'
+import { syncAppearance } from '@/theme'
 
 export function ThemeSync() {
   useEffect(() => {
     const media = window.matchMedia('(prefers-color-scheme: dark)')
-    applyStoredTheme(localStorage, media.matches, document.documentElement)
-    function onChange() {
-      if (readThemePreference(localStorage) == null) {
-        applyDocumentTheme(resolveTheme(null, media.matches), document.documentElement)
-      }
+    const root = document.documentElement
+    function paint(reason: 'mount' | 'media' | 'storage', storageKey?: string | null) {
+      syncAppearance({
+        storage: localStorage,
+        prefersDark: media.matches,
+        root,
+        reason,
+        storageKey,
+      })
     }
-    media.addEventListener('change', onChange)
-    return () => media.removeEventListener('change', onChange)
+    function onMedia() {
+      paint('media')
+    }
+    function onStorage(event: StorageEvent) {
+      paint('storage', event.key)
+    }
+    paint('mount')
+    media.addEventListener('change', onMedia)
+    window.addEventListener('storage', onStorage)
+    return () => {
+      media.removeEventListener('change', onMedia)
+      window.removeEventListener('storage', onStorage)
+    }
   }, [])
   return null
 }

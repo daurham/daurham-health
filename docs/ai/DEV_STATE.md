@@ -1,152 +1,103 @@
 # Dev state
 
-Snapshot recorded 2026-09-27 after the V2-G2 capture-time correction. This commit is the current health application.
+Snapshot recorded 2026-09-27 after V2-G3 Appearance. This commit is the current health application.
 
 ## Git
 
 - Branch: `main`
-- Baseline the task named: `8a0bce97c32aa3bdf9f049d82ff21091e9b0d510` (“Stage Shortcut Body captures until the owner saves a measurement.”)
-- Parent of this snapshot: `e6e6d27` (“docs: correct G2 capture timestamp preservation”)
-- This commit keeps the staged Shortcut instant when the owner saves without editing the measurement time
+- Baseline the task named: `00428baac215716f2eee6504a16f53fe1f9bf8bb` (“Keep a Shortcut capture's exact time unless the owner edits it.”)
+- Parent of this snapshot: `8b2ad7a` (“docs: define V2-G3 theme packs”)
+- This commit adds browser-local color mode and palette preferences
 - Finished tasks are committed and pushed
 - Local annotated tag `v1.0.0` points at `7124ca513efa6c833457303ee6ff79d78344fce6`. Whether that tag exists on the remote is unknown
 
 ## Schema
 
 - Migration head: `0032_body_capture_inbox.sql`
-- Applied with `npm run migrate` on 2026-09-27
-- Design manual version: 1.0.39
+- No migration was added or applied for Appearance
+- Design manual version: 1.0.40
 - Package version: 1.0.0
-- V2-F remains complete. V2-G1 remains implemented. Goal-observation suggestions remain deferred. Overnight vital metrics remain disabled until a payload is verified
+- V2-F remains complete. V2-G1 remains implemented. V2-G2 remains implemented, including exact staged-time preservation. Goal-observation suggestions remain deferred. Overnight vital metrics remain disabled until a payload is verified
 
-## Staging table
+## Mode preference
 
-- `body_capture_inbox` has no `user_id`
-- Status is `pending`, `committed`, or `discarded`
-- Unique `(source_id, external_capture_id)` for the `body_shortcut` source
-- `canonical_session_id` references `body_measurement_sessions` with `ON DELETE SET NULL`
-- A committed row may keep a null session id after the owner deletes the measurement. `committed_at` stays set
-- Notes are at most 2000 characters. Metrics are a JSON array of 1–14 staged entries
-- Timezone check is `America/Phoenix`
+- Storage key: `health-theme`
+- Allowlist: `system`, `light`, `dark`
+- System is the absence of the key. `writeThemePreference('system')` calls `removeItem`
+- Stored `light` and `dark` stay as those strings
+- An absent or invalid value reads as `system`
+- Explicit Light ignores a dark operating system. Explicit Dark ignores a light operating system
+- While System is selected, a later `prefers-color-scheme` change updates the document without a reload
+- An explicit mode ignores later operating-system changes until the owner chooses System again
 
-## Source
+## Palette
 
-- New data source key: `body_shortcut` (`Body Shortcut`, kind `shortcut`)
-- The canonical session uses the existing `manual` source so edit and delete stay available
-- Shortcut origin is a `source_record_links` row, not the session source
+- Storage key: `health-palette`
+- Ids: `classic`, `forest`, `ocean`, `sunset`, `plum`
+- An absent or invalid value reads as `classic`
+- Writing a palette stores that id, including `classic`
+- Removing the key resolves Classic
+- Palette does not follow color mode, and color mode does not follow palette
 
-## Token
+## Pre-render bootstrap
 
-- `BODY_CAPTURE_TOKEN` is server-only. It is blank in `.env.example` and is not a `VITE_` variable
-- It authorizes only `POST /api/ingest/body`
-- Missing token is 503. A wrong bearer is 401. A non-POST with a valid token is 405
-- An owner session does not authorize intake
-- `APPLE_HEALTH_SYNC_TOKEN` does not authorize Body intake. `BODY_CAPTURE_TOKEN` does not authorize Apple ingest or any owner route
-- The token is not in the browser, Settings, responses, demo, backup, or portable export
+- `index.html` reads only `health-theme` and `health-palette`
+- `dark` is stored dark, or anything other than stored light when `prefers-color-scheme: dark` matches
+- The palette is applied only after an allowlist check. Unknown values become `classic`
+- The script toggles `html.dark`, sets `colorScheme`, and sets `data-health-palette`
+- It does not copy an arbitrary stored string into a class name
 
-## Intake
+## ThemeSync
 
-- Contract `body-capture-v1`
-- Fields: `version`, `captureId`, `capturedAt`, `timezone`, `metrics`, `notes`
-- `captureId` is 1–80 characters from `[A-Za-z0-9_-]`
-- `capturedAt` must include a timezone offset (`Z`, `±HH:MM`, `±HHMM`, or `YYYY-MM-DD HH:mm:ss ±HHMM`). Date-only values are rejected
-- Future times use the existing Body skew of 120 seconds
-- `timezone` must be `America/Phoenix`
-- Metric keys and units are `MANUAL_BODY_METRICS` and each metric's `manualInputUnits`. There is no second catalog
-- At least one metric. Duplicate keys, unknown keys, illegal units, and non-finite values are rejected
-- Body fat may be 0. Other metrics must be greater than 0. Missing metrics are not stored as zero
-- Staged values keep the owner-supplied number and normalized unit. They are not pre-converted to kilograms or centimeters
-- Notes are optional. The 2000-character bound is on capture and inbox commit. Ordinary manual `parseNotes` is unchanged
-- Unknown top-level fields and extra metric fields are rejected
-- Response: `{ accepted: true, id, status, reviewPath, duplicate }`
-- `reviewPath` is `/body/inbox/<uuid>` with no query string and no measurement values
+- `src/theme-sync.tsx` still wraps the app from `src/main.tsx`
+- Mount applies the stored appearance
+- A media-query change applies only when the stored mode is System
+- A `window` `storage` event applies `health-theme` and `health-palette`
+- Other storage keys are ignored
+- A cleared palette key resolves Classic. A cleared theme key resumes System and follows the current media query
 
-## Idempotency
+## Semantic color and charts
 
-- The same `captureId` and the same captured instant, notes, and staged metrics return the existing inbox row with `duplicate: true`
-- The same `captureId` with different evidence returns 409 and does not update the row
-- Identity is not derived from weight
+- Palette rules set accent, accent-muted, accent-fg, info, and `--chart-ink`
+- `--health-danger`, `--health-warning`, and `--health-success` stay on the base light and dark rules
+- Classic light and dark accent values match the previous default
+- `--chart-ink` is `var(--health-accent)`. Progress charts already stroke and fill that token. Chart calculations are unchanged
 
-## Owner inbox
+## Settings
 
-- `GET /api/body/inbox` returns pending items, at most 20, plus `pendingCount`
-- `GET /api/body/inbox/:id` returns status, captured time, timezone, staged metrics with labels, notes, `canCommit`, `canDiscard`, and `canonicalSessionId` only after commit
-- `POST /api/body/inbox/:id/commit` and `POST /api/body/inbox/:id/discard`
-- Anonymous is 401. A non-owner is 403. Neither machine token is accepted
-- Body shows Captures only when `pendingCount` is greater than 0: count, time, a short metric preview, and Review
-- `/body/inbox/:id` is a secondary page, not a tab
-- The review page says the capture is not in Body until save succeeds. The owner can change the measured time, edit values, remove or add a manual metric, edit notes, discard, or save
-- Kilograms and centimeters are converted into the form's pounds and inches before display. Commit parses those owner-facing numbers again
-- The measurement-time field shows Phoenix time with seconds (`step=1`)
-- Save submits the stored `capturedAt` until the owner changes that field. Editing weight, another metric, or notes does not replace it
-- Seconds and fractional seconds on the staged instant stay intact on that untouched path
-- An explicit time edit is parsed as America/Phoenix and keeps the entered seconds. The HTML control does not edit fractional seconds
-- Commit still revalidates `measuredAt` with the existing Body parser and the 120-second future skew
-- Shortcut setup is `docs/body-shortcut.md`. A native share sheet is not implemented
+- Appearance offers Mode (System, Light, Dark) and Palette (Classic, Forest, Ocean, Sunset, Plum)
+- The pressed button is the stored preference, not the resolved `html.dark` class
+- With no `localStorage`, static render shows System and Classic pressed
+- A choice applies immediately. There is no Save button
+- Controls use `aria-pressed`, `min-h-11`, and wrapping grids (`grid-cols-3` for mode, `grid-cols-2` for palette)
+- Another tab's `storage` event refreshes the pressed state through the theme helpers
 
-## Commit
+## Demo and auth
 
-- Commit is the only path from a staged capture to canonical Body data
-- The server revalidates with `parseManualCreate`. Invalid review input is 400 and the row stays pending
-- One statement locks the inbox row, inserts one `body_measurement_sessions` row (`source` manual, timezone America/Phoenix, `device_name` null, `import_job_id` null), inserts `body_metrics` with `value_kind` `manual`, inserts the provenance link, and marks the inbox committed with `canonical_session_id` and `committed_at`
-- A failed statement leaves the inbox pending
-- A repeated commit returns the existing session and does not write again
-- Concurrent commits wait on `FOR UPDATE`. The second sees `committed` and inserts nothing
-- A discarded row cannot be committed
-- Discard of a pending row is idempotent. A second discard does not reset `discarded_at`
-- A committed row cannot be discarded. There is no hard delete of the inbox row
-- Provenance fingerprint: `body_shortcut|body-capture-v1|<captureId>`
-- `entity_type` is `body_measurement_session`
-- `source_payload` is the original staged capture built from the inbox row, not the edited review values
-- The inbox `metrics` column is not rewritten on commit
+- Demo, sign-in, and reset-password use the same document appearance
+- Demo stays read-only. It has no separate palette store and does not call an owner API for theme
+- Signed-in Settings was not exercised. `/settings` still stops at the owner lock screen
 
-## Edit and delete
+## Persistence
 
-- The committed session remains a normal manual measurement. Existing PATCH and DELETE still apply
-- Editing the session does not rewrite the Shortcut payload
-- Deleting the session sets `canonical_session_id` to null. The inbox row stays `committed`
-- `source_record_links.entity_id` has no foreign key, so that link can remain after the session is gone
-- A later commit does not recreate the deleted session
-
-## Analytics
-
-- Pending and discarded rows are not loaded by Today, Progress, Goals, Compare, or Timeline
-- After commit, the canonical session participates through existing Body queries
-- Timeline has no `body_capture` kind. The measurement appears once as `body_measurement`
-- Fit Profile XLSX is unchanged and does not use the inbox
-- `/body?action=measure` does not require the inbox
-
-## Backup and demo
-
-- `body_capture_inbox` is in the full backup, `portable: false`
-- Canonical sessions and metrics stay portable
-- `body_shortcut` and `source_record_links` stay full-backup provenance
-- Restore order follows inventory: `data_sources`, `body_measurement_sessions`, `body_capture_inbox`, `source_record_links`
-- A committed inbox row that points at a missing session fails backup verification
-- No token is in the backup
-- The demo omits the inbox. It does not call `/api/ingest/body` or mention `BODY_CAPTURE_TOKEN`
+- Only `health-theme` and `health-palette` are stored
+- No Health data, auth, owner identity, or page state goes through the theme system
+- No theme preference in PostgreSQL, backup, or portable export
 
 ## Validation
 
-- Tests: 923 passing across 108 files
+- Tests: 927 passing across 108 files
 - `npx tsc -b` passed as part of `npm run build`
 - `npx eslint .` passed
 - `npm run build` passed. The existing Vite chunk-size warning remains
-- No migration was added or applied for this correction. Schema head stays `0032_body_capture_inbox.sql`
-- Signed-in review QA was not run. `/body/inbox/:id` still stops at the owner lock screen. The untouched and edited time paths are covered by the pure review helper
-
-## Capture time
-
-- The first review implementation formatted `capturedAt` to minute precision and always rebuilt `:00` on save. An untouched save could change `12:04:37.456` into `12:04:00`
-- `reviewCommitMeasuredAt` returns the stored instant when `measuredAtEdited` is false. The flag starts false and becomes true only from the time input's change event
-- `phoenixDateTimeLocal` includes seconds. `measuredAtFromPhoenixLocal` keeps a provided seconds component
+- Browser check on the local demo: empty storage with a dark operating system painted Classic dark; explicit Light plus Forest stayed light with the forest accent and the existing danger, warning, and success values; System plus Plum followed the dark operating system; an invalid palette attribute resolved to Classic; Progress charts still use `--chart-ink`
+- At 390px, demo Today, Nutrition, Training, Body, Progress, Ask Health, and Lab did not overflow. Sign-in and reset-password rendered. Desktop demo at 927px did not overflow
+- Owner Appearance controls were not clicked. The lock screen blocks `/settings`
 
 ## Deviations
 
-- Canonical `source_id` is `manual`. Shortcut origin is only the `source_record_links` row. That keeps the existing edit and delete checks
-- Ordinary manual notes stay unbounded. The 2000-character bound applies to capture intake and inbox commit
-- After the owner deletes a committed session, `canonical_session_id` becomes null and a repeated commit does not create a replacement session
-- An explicit time edit does not preserve fractional seconds. Those remain only when the time field is untouched
+- System is stored by deleting `health-theme` rather than writing a third value. Existing `light` and `dark` values stay valid
+- `readThemePreference` returns `system` when the key is absent. `resolveTheme(null, …)` still follows the operating system
 
 ## Remaining V2-G work
 
@@ -154,3 +105,4 @@ Snapshot recorded 2026-09-27 after the V2-G2 capture-time correction. This commi
 - Route geometry and nested Health Auto Export workout telemetry stay deferred
 - No correction or deletion lifecycle for Health Auto Export workouts
 - Goal-observation experiment suggestions and overnight vital metrics remain deferred from earlier slices
+- Motion and micro-interactions remain deferred

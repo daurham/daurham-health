@@ -28,6 +28,8 @@ Vite, React 19, React Router 7, and Tailwind 4. Routes live in `src/routes/index
 
 The demo reuses domain builders and feature components under a `/demo` prefix. Demo modules must not call owner APIs or providers.
 
+Appearance is two browser preferences, `health-theme` and `health-palette`. System, Light, and Dark are independent of Classic, Forest, Ocean, Sunset, and Plum. They change accent chrome. They are not owner records, and they are not in backup or portable export.
+
 ## Server
 
 One Vercel function, `api/index.ts`, dispatches every `/api/*` request through `server/dispatch.ts`. Handlers live in `server/handlers/`. Domain services live under `server/<area>/`. Server TypeScript imports use `.js` specifiers.

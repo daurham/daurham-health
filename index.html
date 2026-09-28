@@ -11,8 +11,13 @@
         try {
           var stored = localStorage.getItem('health-theme')
           var dark = stored === 'dark' || (stored !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches)
-          document.documentElement.classList.toggle('dark', dark)
-          document.documentElement.style.colorScheme = dark ? 'dark' : 'light'
+          var palettes = { classic: 1, forest: 1, ocean: 1, sunset: 1, plum: 1 }
+          var palette = localStorage.getItem('health-palette')
+          if (!palettes[palette]) palette = 'classic'
+          var root = document.documentElement
+          root.classList.toggle('dark', dark)
+          root.style.colorScheme = dark ? 'dark' : 'light'
+          root.setAttribute('data-health-palette', palette)
         } catch (e) {}
       })()
     </script>

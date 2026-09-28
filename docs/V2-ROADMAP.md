@@ -2,7 +2,7 @@
 
 Current completion status and implementation order live in `HEALTH-PLATFORM-V2-LAB-BLUEPRINT.md`. The schema head is `0032_body_capture_inbox.sql`.
 
-Implemented: V2-A Data Capture Foundations, V2-B Personal Lab Core, V2-C Recipes / Batch Meals, V2-D Goals + Projections, V2-E Rich Sleep + Overnight Vitals, V2-F1 Ask Health, V2-F2 Proactive Insights, V2-F3 Weekly Coach Brief, V2-F4 Experiment Suggestions for due Benchmark retests and missing Benchmark baselines, V2-F5 Literature-Backed Evidence Drawer, V2-G1 ongoing Apple workout ingestion, and V2-G2 Body Inbox and Shortcut capture. Goal-observation suggestions are deferred. Overnight vital metrics stay disabled until a payload is verified. V2-F is complete. Native share-sheet targeting is deferred. The schema head is `0032_body_capture_inbox.sql`.
+Implemented: V2-A Data Capture Foundations, V2-B Personal Lab Core, V2-C Recipes / Batch Meals, V2-D Goals + Projections, V2-E Rich Sleep + Overnight Vitals, V2-F1 Ask Health, V2-F2 Proactive Insights, V2-F3 Weekly Coach Brief, V2-F4 Experiment Suggestions for due Benchmark retests and missing Benchmark baselines, V2-F5 Literature-Backed Evidence Drawer, V2-G1 ongoing Apple workout ingestion, V2-G2 Body Inbox and Shortcut capture, and V2-G3 Theme Packs and Appearance. Goal-observation suggestions are deferred. Overnight vital metrics stay disabled until a payload is verified. V2-F is complete. Native share-sheet targeting is deferred. Motion and micro-interactions remain deferred. The schema head is `0032_body_capture_inbox.sql`.
 
 This file began as a post-v1 idea list. It was not part of frozen v1. The numbered sections below keep that older backlog. Sections the blueprint now marks implemented say so. The remaining sections are still ideas, not promises. External retest notifications remain deferred. Nested recipes, batch inventory, and recipe fiber remain deferred.
 
@@ -65,8 +65,7 @@ Ask Health (V2-F1) explains deterministic evidence. Proactive Insights (V2-F2) s
 
 ### 5. Theme packs / personalization
 
-Beyond Light / Dark, potential palettes such as Classic, Forest, Ocean,
-Sunset, and Plum. Keep semantic tokens and accessibility.
+Implemented as V2-G3. System, Light, and Dark stay independent of Classic, Forest, Ocean, Sunset, and Plum. Palettes change accent chrome. Danger, warning, and success stay semantic. Preferences stay in the browser.
 
 ### 6. Motion / micro-interactions
 
