@@ -1,6 +1,6 @@
 # Daurham Health — V2 Lab Blueprint
 
-**Status:** V2-A Data Capture Foundations complete. V2-B Personal Lab Core complete (V2-B1 through V2-B4). V2-C Recipes / Batch Meals complete (V2-C1 through V2-C4). V2-D Goals + Projections complete (V2-D1 through V2-D3). V2-E Rich Sleep + Overnight Vitals complete (V2-E1 through V2-E5). Overnight vital metrics remain disabled until a payload is verified. V2-F1 Ask Health conversational analysis is implemented. V2-F2 Proactive Insights are implemented. V2-F3 Weekly Coach Brief is implemented. V2-F4 Experiment Suggestions are implemented for due Benchmark retests and missing Benchmark baselines. Goal-observation suggestions are deferred. V2-F5 Literature-Backed Evidence Drawer is implemented. V2-F Ask Health + Proactive Intelligence is complete. V2-G1 ongoing Apple workout ingestion is implemented. V2-G2 Body Inbox and Shortcut capture is implemented. V2-G3 Theme Packs and Appearance is implemented. V2-G4 Nutrition Gemini durable cost safety is implemented.  
+**Status:** V2-A Data Capture Foundations complete. V2-B Personal Lab Core complete (V2-B1 through V2-B4). V2-C Recipes / Batch Meals complete (V2-C1 through V2-C4). V2-D Goals + Projections complete (V2-D1 through V2-D3). V2-E Rich Sleep + Overnight Vitals complete (V2-E1 through V2-E5). Overnight vital metrics remain disabled until a payload is verified. V2-F1 Ask Health conversational analysis is implemented. V2-F2 Proactive Insights are implemented. V2-F3 Weekly Coach Brief is implemented. V2-F4 Experiment Suggestions are implemented for due Benchmark retests and missing Benchmark baselines. Goal-observation suggestions are deferred. V2-F5 Literature-Backed Evidence Drawer is implemented. V2-F Ask Health + Proactive Intelligence is complete. V2-G1 ongoing Apple workout ingestion is implemented. V2-G2 Body Inbox and Shortcut capture is implemented. V2-G3 Theme Packs and Appearance is implemented. V2-G4 Nutrition Gemini durable cost safety is implemented. V2-G5 Motion and micro-interactions is implemented.  
 **Calendar:** America/Phoenix  
 **Package version:** remains `1.0.0`  
 **Schema head:** `0032_body_capture_inbox.sql`
@@ -54,6 +54,7 @@ The file was not present in the repository when V2-A1 implementation started. Th
    - V2-G2 Body Inbox and Shortcut capture — implemented
    - V2-G3 Theme Packs and Appearance — implemented
    - V2-G4 Nutrition Gemini durable cost safety — implemented
+   - V2-G5 Motion and micro-interactions — implemented
 
 Invariant:
 
@@ -565,6 +566,14 @@ V2-G4 is implemented. There is no migration. Schema head remains `0032_body_capt
 Nutrition description, meal-photo, and label Gemini attempts now share `ai_usage`, `AI_MONTHLY_BUDGET_USD`, and the global 1.5-second / 8-per-minute rate gate with Ask Health, Weekly Coach, Experiment Suggestions, and literature synthesis. The request types are `nutrition_description`, `nutrition_meal_photo`, and `nutrition_label`. Each provider attempt reserves before the network call. An automatic retry is a second attempt and needs its own reservation. It does not bypass the rate gate or the monthly ceiling. A local budget or rate denial makes no Gemini call. Those denials use `AI_BUDGET_REACHED` and `AI_RATE_LIMITED`, not `GEMINI_QUOTA`. A synchronous description denial is HTTP 429. A queued meal or label denial finishes as failed and retryable. The saved image stays available for a later reanalysis.
 
 A response Gemini returns is completed even when the Nutrition parser later rejects it. A timeout or provider error after the call begins stays uncertain. A missing Gemini configuration does not create a charged row. The stored request hash is a SHA-256 digest of the request type, model, prompt, and image digest. The ledger does not store description text, user context, filenames, or image bytes. Home-AI remains an explicit provider and creates no `ai_usage` row. Requeueing a job does not reserve. The later Gemini attempt does. Reviewed Nutrition commit behavior is unchanged. `ai_usage` stays in the full backup and out of the portable export.
+
+## Amendment — 2026-09-27T19:03:16-07:00 — V2-G5 Motion and micro-interactions
+
+V2-G5 is implemented. There is no migration. Schema head remains `0032_body_capture_inbox.sql`. Package version remains `1.0.0`. V2-F stays complete. V2-G1, V2-G2, V2-G3, and V2-G4 stay implemented. Goal-observation experiment suggestions remain deferred. Overnight vital metrics remain disabled until a payload is verified. Native share-sheet targeting remains deferred.
+
+Motion is presentation. It does not change a Health value, a threshold, a chart calculation, or how certain a fact looks. Shared controls use `motion-pressable`, `motion-interactive`, and `motion-card` in `src/index.css`. A press scales to 0.985. A card press scales to 0.99. A one-pixel hover lift applies only for a fine pointer. Page entry fades from opacity 0.88 and moves 3px. Sheet entry moves 6px and lasts 200ms. Closing a sheet stays immediate. Notices fade in once on mount. Pending content stays mounted and drops to opacity 0.6. Nutrient and macro meters transition width from the real ratio. Progress charts animate only when `prefers-reduced-motion` is not `reduce`.
+
+`prefers-reduced-motion: reduce` sets `animation: none` on page, panel, scrim, and notice entry and on `animate-pulse`. It sets `transition: none` on interactive, pressable, card, pending, and meter motion. It sets `transform: none` on press and card hover. Content stays visible. State changes stay immediate. There is no Settings motion toggle and no `localStorage` motion key. Light, Dark, and palette changes stay instant. Durations do not vary by palette. Weight, calories, macros, steps, sleep, strength, goal progress, experiment results, and benchmark values do not count up. History lists do not animate their order. Navigation does not wait for an animation, and route outlets are not remounted to play one. No animation library was added.
 
 
 

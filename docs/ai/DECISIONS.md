@@ -138,7 +138,13 @@ Observed from the current code and product docs. Where the original rationale is
 
 **Status:** Active  
 **Reason:** V2-G3 lets the owner choose a color mode and a palette. Those choices change chrome. They do not change measurements, thresholds, analytics, chart calculations, or the meaning of danger, warning, and success.  
-**Implications:** `health-theme` stores `light` or `dark`. System is the absence of that key, including an invalid value. `health-palette` stores `classic`, `forest`, `ocean`, `sunset`, or `plum`. An absent or invalid palette is Classic. The inline script in `index.html` applies both before React mounts, using the same allowlist. `ThemeSync` follows `prefers-color-scheme` only while System is selected, and it applies `storage` events for those two keys. There is no theme table, API, backup row, or portable-export field. Motion stays deferred.
+**Implications:** `health-theme` stores `light` or `dark`. System is the absence of that key, including an invalid value. `health-palette` stores `classic`, `forest`, `ocean`, `sunset`, or `plum`. An absent or invalid palette is Classic. The inline script in `index.html` applies both before React mounts, using the same allowlist. `ThemeSync` follows `prefers-color-scheme` only while System is selected, and it applies `storage` events for those two keys. There is no theme table, API, backup row, or portable-export field. Motion is a separate presentation layer and does not store a preference.
+
+## Decision: Motion explains interaction and does not change a Health fact
+
+**Status:** Active  
+**Reason:** V2-G5 may show that a control was pressed or that a surface arrived. It must not make a measurement, total, chart, or goal look more certain, more dramatic, or different from the deterministic value.  
+**Implications:** One CSS vocabulary in `src/index.css` covers press, hover lift, page entry, sheet entry, notices, pending opacity, and meter width. `prefers-reduced-motion: reduce` removes that movement, including the pending opacity transition and chart animation. There is no stored motion preference, no animation library, and no count-up of Health numbers. Appearance still switches immediately.
 
 ## Decision: Manual ledger rows are historical
 

@@ -460,7 +460,7 @@ function NutrientMeter({
       aria-valuemax={target}
       aria-valuenow={consumed}
     >
-      <div className="h-full rounded-full bg-accent" style={{ width: `${width}%` }} />
+      <div className="motion-meter h-full rounded-full bg-accent" style={{ width: `${width}%` }} />
     </div>
   )
 }

@@ -46,7 +46,7 @@ export function NutritionSheet({
       <button
         type="button"
         aria-label="Close"
-        className="theme-scrim absolute inset-0"
+        className="theme-scrim motion-scrim-enter absolute inset-0"
         onClick={onClose}
       />
       <div
@@ -56,7 +56,7 @@ export function NutritionSheet({
         aria-labelledby={headingId}
         tabIndex={-1}
         className={cn(
-          'relative z-10 flex w-full flex-col overflow-hidden bg-white shadow-xl',
+          'motion-panel-enter relative z-10 flex w-full flex-col overflow-hidden bg-white shadow-xl',
           'rounded-t-2xl md:max-h-[90dvh] md:max-w-lg md:rounded-xl',
           mobileLayout === 'stable' ? 'max-md:h-[90%] max-md:max-h-[90%]' : 'max-h-[90dvh]',
         )}

@@ -221,22 +221,150 @@ html.dark[data-health-palette='plum'] {
   }
 }
 
-.page-enter {
-  animation: page-enter 180ms ease-out;
+:root {
+  --motion-press: 120ms;
+  --motion-state: 160ms;
+  --motion-enter: 180ms;
+  --motion-panel: 200ms;
+}
+
+.motion-interactive {
+  transition:
+    color var(--motion-state) ease,
+    background-color var(--motion-state) ease,
+    border-color var(--motion-state) ease,
+    opacity var(--motion-state) ease;
+}
+
+.motion-pressable {
+  transition:
+    color var(--motion-state) ease,
+    background-color var(--motion-state) ease,
+    border-color var(--motion-state) ease,
+    opacity var(--motion-press) ease,
+    transform var(--motion-press) ease;
+}
+
+.motion-pressable:active:not(:disabled) {
+  transform: scale(0.985);
+}
+
+.motion-card {
+  transition:
+    color var(--motion-state) ease,
+    background-color var(--motion-state) ease,
+    border-color var(--motion-state) ease,
+    transform var(--motion-state) ease;
+}
+
+.motion-card:active {
+  transform: scale(0.99);
+}
+
+.page-enter,
+.motion-page-enter {
+  animation: page-enter var(--motion-enter) ease-out;
+}
+
+.motion-panel-enter {
+  animation: panel-enter var(--motion-panel) ease-out;
+}
+
+.motion-scrim-enter {
+  animation: scrim-enter var(--motion-state) ease-out;
+}
+
+.motion-notice-enter {
+  animation: notice-enter var(--motion-state) ease-out;
+}
+
+.pending-load {
+  transition: opacity var(--motion-state) ease;
+}
+
+.pending-load[data-pending='true'] {
+  opacity: 0.6;
+}
+
+.motion-meter {
+  transition: width var(--motion-state) ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .motion-card:hover {
+    transform: translateY(-1px);
+  }
+
+  .motion-card:hover:active {
+    transform: scale(0.99);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .page-enter,
+  .motion-page-enter,
+  .motion-panel-enter,
+  .motion-scrim-enter,
+  .motion-notice-enter,
   .animate-pulse {
     animation: none;
+  }
+
+  .motion-interactive,
+  .motion-pressable,
+  .motion-card,
+  .pending-load,
+  .motion-meter {
+    transition: none;
+  }
+
+  .motion-pressable:active,
+  .motion-pressable:active:not(:disabled),
+  .motion-card:hover,
+  .motion-card:active,
+  .motion-card:hover:active {
+    transform: none;
   }
 }
 
 @keyframes page-enter {
   from {
-    opacity: 0.55;
+    opacity: 0.88;
+    transform: translateY(3px);
   }
   to {
     opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes panel-enter {
+  from {
+    opacity: 0.92;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes scrim-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes notice-enter {
+  from {
+    opacity: 0.88;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
   }
 }

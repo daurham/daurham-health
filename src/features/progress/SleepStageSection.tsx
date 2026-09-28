@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { SleepStageAnalytics, SleepStageNightPoint } from '@/domain/sleep'
+import { usePrefersReducedMotion } from '@/lib'
 import { formatSleepDuration } from './activity-sleep-copy'
 import { formatCalendarDate } from './format'
 
@@ -40,6 +41,7 @@ function direction(value: number): string {
 }
 
 function StageChart({ points, nightPath }: { points: SleepStageNightPoint[]; nightPath: (date: string) => string }) {
+  const chartMotion = !usePrefersReducedMotion()
   const navigate = useNavigate()
   if (points.length === 0) {
     return null
@@ -85,10 +87,10 @@ function StageChart({ points, nightPath }: { points: SleepStageNightPoint[]; nig
                 )
               }}
             />
-            <Bar dataKey="remPct" stackId="stage" fill={STAGE_COLORS.rem} name="REM" />
-            <Bar dataKey="corePct" stackId="stage" fill={STAGE_COLORS.core} name="Core" />
-            <Bar dataKey="deepPct" stackId="stage" fill={STAGE_COLORS.deep} name="Deep" />
-            <Bar dataKey="unspecifiedPct" stackId="stage" fill={STAGE_COLORS.unspecified} name="Unspecified" />
+            <Bar dataKey="remPct" stackId="stage" fill={STAGE_COLORS.rem} name="REM" isAnimationActive={chartMotion} />
+            <Bar dataKey="corePct" stackId="stage" fill={STAGE_COLORS.core} name="Core" isAnimationActive={chartMotion} />
+            <Bar dataKey="deepPct" stackId="stage" fill={STAGE_COLORS.deep} name="Deep" isAnimationActive={chartMotion} />
+            <Bar dataKey="unspecifiedPct" stackId="stage" fill={STAGE_COLORS.unspecified} name="Unspecified" isAnimationActive={chartMotion} />
           </BarChart>
         </ResponsiveContainer>
       </div>

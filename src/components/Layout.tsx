@@ -2,7 +2,7 @@ import { Suspense } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { LockedScreen, useAuth } from '@/auth'
 import { AppSurfaceProvider } from '@/lib/app-prefix'
-import { cn, quietButtonClass, selectedTabClass, SHELL_MAX_WIDTH_CLASS, tabClass } from '@/lib'
+import { cn, quietButtonClass, RouteFallback, selectedTabClass, SHELL_MAX_WIDTH_CLASS, tabClass } from '@/lib'
 import type { NavItem } from '@/types'
 
 const navItems: NavItem[] = [
@@ -130,13 +130,13 @@ export function Layout() {
         )}
       >
         {publicAuthRoute ? (
-          <Suspense fallback={<p className="text-zinc-600">Loading…</p>}>
+          <Suspense fallback={<RouteFallback />}>
             <Outlet />
           </Suspense>
         ) : demoRoute ? (
           <AppSurfaceProvider prefix="/demo" readOnly>
             <DemoBanner status={status} />
-            <Suspense fallback={<p className="text-zinc-600">Loading…</p>}>
+            <Suspense fallback={<RouteFallback />}>
               <Outlet />
             </Suspense>
           </AppSurfaceProvider>
@@ -165,7 +165,7 @@ export function Layout() {
             }}
           />
         ) : (
-          <Suspense fallback={<p className="text-zinc-600">Loading…</p>}>
+          <Suspense fallback={<RouteFallback />}>
             <Outlet />
           </Suspense>
         )}
@@ -183,7 +183,7 @@ export function Layout() {
                 end={item.to === '/' || item.to === '/demo'}
                 className={({ isActive }) =>
                   cn(
-                    'flex min-h-12 cursor-pointer items-center justify-center whitespace-nowrap px-1 text-center text-xs font-medium',
+                    'motion-interactive flex min-h-12 cursor-pointer items-center justify-center whitespace-nowrap px-1 text-center text-xs font-medium',
                     isActive ? 'text-accent' : 'text-zinc-500 hover:text-zinc-900',
                   )
                 }

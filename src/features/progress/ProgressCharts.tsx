@@ -12,6 +12,7 @@ import {
   YAxis,
 } from 'recharts'
 import { kilogramsToPounds } from '@/domain/units'
+import { usePrefersReducedMotion } from '@/lib'
 import { finiteChartDomain } from './chart-domain'
 import { formatCalendarDate, formatDurationSec, formatReps } from './format'
 
@@ -69,6 +70,7 @@ export function EstimatedStrengthChart({
     reps: number
   }>
 }) {
+  const chartMotion = !usePrefersReducedMotion()
   const data: StrengthPoint[] = points.map((point) => ({
     date: point.date,
     estimatedLb: asLb(point.estimated1RmKg),
@@ -101,7 +103,7 @@ export function EstimatedStrengthChart({
               )
             }}
           />
-          <Line type="linear" dataKey="estimatedLb" stroke="var(--chart-ink)" strokeWidth={2} dot={{ r: 3 }} />
+          <Line type="linear" dataKey="estimatedLb" stroke="var(--chart-ink)" strokeWidth={2} dot={{ r: 3 }} isAnimationActive={chartMotion} />
         </LineChart>
       </ResponsiveContainer>
     </ChartFrame>
@@ -130,6 +132,7 @@ export function PerformanceFrontierChart({
   frontier: Array<{ loadKg: number; reps: number | null; durationSec: number | null; date: string }>
   mode: 'reps' | 'duration'
 }) {
+  const chartMotion = !usePrefersReducedMotion()
   const historyData = toFrontierData(history, 'history', mode)
   const frontierData = toFrontierData(frontier, 'frontier', mode)
   const yLabel = mode === 'reps' ? 'Reps' : 'Duration (s)'
@@ -170,8 +173,8 @@ export function PerformanceFrontierChart({
               return tooltipBox(`${formatCalendarDate(item.date)} · ${performed}`)
             }}
           />
-          <Scatter data={historyData} fill="var(--chart-soft)" name="Performed" />
-          <Scatter data={frontierData} fill="var(--chart-ink)" name="Frontier" />
+          <Scatter data={historyData} fill="var(--chart-soft)" name="Performed" isAnimationActive={chartMotion} />
+          <Scatter data={frontierData} fill="var(--chart-ink)" name="Frontier" isAnimationActive={chartMotion} />
         </ScatterChart>
       </ResponsiveContainer>
     </ChartFrame>
@@ -183,6 +186,7 @@ export function LoggedCaloriesChart({
 }: {
   points: Array<{ date: string; calories: number; targetCalories: number | null }>
 }) {
+  const chartMotion = !usePrefersReducedMotion()
   if (points.length < 2) {
     return null
   }
@@ -234,8 +238,8 @@ export function LoggedCaloriesChart({
             {constantTarget != null ? (
               <ReferenceLine y={constantTarget} stroke="var(--chart-soft)" strokeDasharray="4 4" />
             ) : null}
-            <Scatter data={points} fill="var(--chart-ink)" name="Calories" />
-            {varyingTargets.length > 0 ? <Scatter data={varyingTargets} fill="var(--chart-soft)" name="Target" /> : null}
+            <Scatter data={points} fill="var(--chart-ink)" name="Calories" isAnimationActive={chartMotion} />
+            {varyingTargets.length > 0 ? <Scatter data={varyingTargets} fill="var(--chart-soft)" name="Target" isAnimationActive={chartMotion} /> : null}
           </ScatterChart>
         </ResponsiveContainer>
       </div>
@@ -250,6 +254,7 @@ export function WeightHistoryChart({
   points: Array<{ date: string; valueLb: number }>
   trendAvailable?: boolean
 }) {
+  const chartMotion = !usePrefersReducedMotion()
   if (points.length < 2) {
     return null
   }
@@ -286,7 +291,7 @@ export function WeightHistoryChart({
               return tooltipBox(`${formatCalendarDate(item.date)} · ${item.valueLb} lb`)
             }}
           />
-          <Line type="linear" dataKey="valueLb" stroke="var(--chart-ink)" strokeWidth={2} dot={{ r: 3 }} connectNulls={false} />
+          <Line type="linear" dataKey="valueLb" stroke="var(--chart-ink)" strokeWidth={2} dot={{ r: 3 }} connectNulls={false} isAnimationActive={chartMotion} />
         </LineChart>
       </ResponsiveContainer>
     </ChartFrame>

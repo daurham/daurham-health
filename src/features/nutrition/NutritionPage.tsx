@@ -682,7 +682,7 @@ function MacroProgressRow({
           aria-valuenow={Math.round(ratio * 100)}
         >
           <div
-            className={cn('h-full rounded-full', ratio > 1.15 ? 'bg-warning' : 'bg-accent')}
+            className={cn('motion-meter h-full rounded-full', ratio > 1.15 ? 'bg-warning' : 'bg-accent')}
             style={{ width: `${Math.round(Math.min(ratio, 1) * 100)}%` }}
           />
         </div>

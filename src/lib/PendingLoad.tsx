@@ -18,7 +18,7 @@ export function PendingLoadRegion({
           <div className="h-full w-1/3 animate-pulse bg-zinc-700" />
         </div>
       ) : null}
-      <div className={pending ? 'opacity-60 transition-opacity duration-150' : 'transition-opacity duration-150'}>
+      <div className="pending-load" data-pending={pending ? 'true' : 'false'}>
         {children}
       </div>
     </div>

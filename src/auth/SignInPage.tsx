@@ -114,7 +114,7 @@ export function SignInPage() {
             <button
               type="submit"
               disabled={submitting}
-              className="inline-flex min-h-11 w-full items-center justify-center rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:bg-zinc-300"
+              className="motion-pressable inline-flex min-h-11 w-full items-center justify-center rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:bg-zinc-300"
             >
               {submitting ? 'Sending…' : 'Send password link'}
             </button>
@@ -150,7 +150,7 @@ export function SignInPage() {
           <button
             type="submit"
             disabled={submitting}
-            className="inline-flex min-h-11 w-full items-center justify-center rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:bg-zinc-300"
+            className="motion-pressable inline-flex min-h-11 w-full items-center justify-center rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:bg-zinc-300"
           >
             {submitting ? 'Signing in…' : 'Sign in'}
           </button>

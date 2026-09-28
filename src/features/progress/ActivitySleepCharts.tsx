@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { ComposedChart, CartesianGrid, Line, ResponsiveContainer, Scatter, Tooltip, XAxis, YAxis } from 'recharts'
 import type { ActivityChartPoint } from '@/domain/activity'
 import type { SleepChartPoint } from '@/domain/sleep'
+import { usePrefersReducedMotion } from '@/lib'
 import { formatSleepDuration } from './activity-sleep-copy'
 import { formatCalendarDate } from './format'
 
@@ -20,6 +21,7 @@ export function ActivityMetricChart({
   points: ActivityChartPoint[]
   valueLabel: (value: number) => string
 }) {
+  const chartMotion = !usePrefersReducedMotion()
   const observed = points.some((point) => point.value != null)
   if (!observed) {
     return null
@@ -55,8 +57,8 @@ export function ActivityMetricChart({
               return tooltipBox(item.provisional ? `Today · ${label} so far` : `${formatCalendarDate(item.date)} · ${label}`)
             }}
           />
-          <Line type="linear" dataKey="completed" stroke="var(--chart-ink)" strokeWidth={2} dot={{ r: 2 }} connectNulls={false} />
-          <Scatter dataKey="todayValue" fill="var(--chart-soft)" />
+          <Line type="linear" dataKey="completed" stroke="var(--chart-ink)" strokeWidth={2} dot={{ r: 2 }} connectNulls={false} isAnimationActive={chartMotion} />
+          <Scatter dataKey="todayValue" fill="var(--chart-soft)" isAnimationActive={chartMotion} />
         </ComposedChart>
       </ResponsiveContainer>
     </div>
@@ -64,6 +66,7 @@ export function ActivityMetricChart({
 }
 
 export function SleepDurationChart({ points, nightPath }: { points: SleepChartPoint[]; nightPath?: (date: string) => string }) {
+  const chartMotion = !usePrefersReducedMotion()
   const navigate = useNavigate()
   const data = points.map((point) => ({
     ...point,
@@ -128,8 +131,9 @@ export function SleepDurationChart({ points, nightPath }: { points: SleepChartPo
             strokeWidth={2}
             dot={{ r: 2 }}
             connectNulls={false}
+            isAnimationActive={chartMotion}
           />
-          <Scatter dataKey="partialMinutes" fill="var(--chart-soft)" />
+          <Scatter dataKey="partialMinutes" fill="var(--chart-soft)" isAnimationActive={chartMotion} />
         </ComposedChart>
       </ResponsiveContainer>
     </div>

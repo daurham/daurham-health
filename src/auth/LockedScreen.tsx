@@ -19,7 +19,7 @@ export function LockedScreen({
         <Link
           to={action.to}
           state={action.state}
-          className="inline-flex min-h-11 items-center justify-center rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white"
+          className="motion-pressable inline-flex min-h-11 items-center justify-center rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white"
         >
           {action.label}
         </Link>

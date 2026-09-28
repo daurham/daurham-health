@@ -17,7 +17,8 @@ export {
 export type { AtomicTransitionState } from './atomic-resource'
 export { PendingLoadRegion } from './PendingLoad'
 export { LoadErrorNotice } from './LoadErrorNotice'
-export { ListPlaceholder, NutritionPlaceholder } from './PagePlaceholder'
+export { ListPlaceholder, NutritionPlaceholder, RouteFallback } from './PagePlaceholder'
+export { usePrefersReducedMotion } from './reduced-motion'
 export {
   dangerButtonClass,
   interactiveCardClass,
