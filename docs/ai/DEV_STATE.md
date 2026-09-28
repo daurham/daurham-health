@@ -1,13 +1,13 @@
 # Dev state
 
-Snapshot recorded 2026-09-27 after V2-G2 Body Inbox and Shortcut capture. This commit is the current health application.
+Snapshot recorded 2026-09-27 after the V2-G2 capture-time correction. This commit is the current health application.
 
 ## Git
 
 - Branch: `main`
-- Baseline the task named: `4a049116cf1edd39638059f92693eb8c0e64cc99` (“Ingest Health Auto Export workouts into the existing Activity records.”)
-- Parent of this snapshot: `b242fa7` (“docs: define V2-G2 body inbox shortcut capture”)
-- This commit stages Shortcut Body captures and saves them as ordinary manual measurements after owner review
+- Baseline the task named: `8a0bce97c32aa3bdf9f049d82ff21091e9b0d510` (“Stage Shortcut Body captures until the owner saves a measurement.”)
+- Parent of this snapshot: `e6e6d27` (“docs: correct G2 capture timestamp preservation”)
+- This commit keeps the staged Shortcut instant when the owner saves without editing the measurement time
 - Finished tasks are committed and pushed
 - Local annotated tag `v1.0.0` points at `7124ca513efa6c833457303ee6ff79d78344fce6`. Whether that tag exists on the remote is unknown
 
@@ -15,7 +15,7 @@ Snapshot recorded 2026-09-27 after V2-G2 Body Inbox and Shortcut capture. This c
 
 - Migration head: `0032_body_capture_inbox.sql`
 - Applied with `npm run migrate` on 2026-09-27
-- Design manual version: 1.0.38
+- Design manual version: 1.0.39
 - Package version: 1.0.0
 - V2-F remains complete. V2-G1 remains implemented. Goal-observation suggestions remain deferred. Overnight vital metrics remain disabled until a payload is verified
 
@@ -77,6 +77,11 @@ Snapshot recorded 2026-09-27 after V2-G2 Body Inbox and Shortcut capture. This c
 - `/body/inbox/:id` is a secondary page, not a tab
 - The review page says the capture is not in Body until save succeeds. The owner can change the measured time, edit values, remove or add a manual metric, edit notes, discard, or save
 - Kilograms and centimeters are converted into the form's pounds and inches before display. Commit parses those owner-facing numbers again
+- The measurement-time field shows Phoenix time with seconds (`step=1`)
+- Save submits the stored `capturedAt` until the owner changes that field. Editing weight, another metric, or notes does not replace it
+- Seconds and fractional seconds on the staged instant stay intact on that untouched path
+- An explicit time edit is parsed as America/Phoenix and keeps the entered seconds. The HTML control does not edit fractional seconds
+- Commit still revalidates `measuredAt` with the existing Body parser and the 120-second future skew
 - Shortcut setup is `docs/body-shortcut.md`. A native share sheet is not implemented
 
 ## Commit
@@ -123,18 +128,25 @@ Snapshot recorded 2026-09-27 after V2-G2 Body Inbox and Shortcut capture. This c
 
 ## Validation
 
-- Tests: 922 passing across 108 files
-- `npx tsc -b` passed
+- Tests: 923 passing across 108 files
+- `npx tsc -b` passed as part of `npm run build`
 - `npx eslint .` passed
 - `npm run build` passed. The existing Vite chunk-size warning remains
-- `npm run migrate` applied `0032_body_capture_inbox.sql`
-- Owner review UI was not exercised while signed in. `/body` and `/body/inbox/:id` stop at the owner lock screen. The review URL has no query string. Demo Body at 390px shows no Captures section and does not overflow. Demo Body does not call `/api/ingest/body`
+- No migration was added or applied for this correction. Schema head stays `0032_body_capture_inbox.sql`
+- Signed-in review QA was not run. `/body/inbox/:id` still stops at the owner lock screen. The untouched and edited time paths are covered by the pure review helper
+
+## Capture time
+
+- The first review implementation formatted `capturedAt` to minute precision and always rebuilt `:00` on save. An untouched save could change `12:04:37.456` into `12:04:00`
+- `reviewCommitMeasuredAt` returns the stored instant when `measuredAtEdited` is false. The flag starts false and becomes true only from the time input's change event
+- `phoenixDateTimeLocal` includes seconds. `measuredAtFromPhoenixLocal` keeps a provided seconds component
 
 ## Deviations
 
 - Canonical `source_id` is `manual`. Shortcut origin is only the `source_record_links` row. That keeps the existing edit and delete checks
 - Ordinary manual notes stay unbounded. The 2000-character bound applies to capture intake and inbox commit
 - After the owner deletes a committed session, `canonical_session_id` becomes null and a repeated commit does not create a replacement session
+- An explicit time edit does not preserve fractional seconds. Those remain only when the time field is untouched
 
 ## Remaining V2-G work
 

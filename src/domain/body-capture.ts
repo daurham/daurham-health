@@ -16,7 +16,7 @@ export const BODY_INBOX_LIST_LIMIT = 20
 
 const CAPTURE_ID = /^[A-Za-z0-9_-]{1,80}$/
 const INBOX_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-const LOCAL_MEASURED_AT = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2})(?::\d{2})?$/
+const LOCAL_MEASURED_AT = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2})(?::(\d{2}))?$/
 const CAPTURE_FIELDS = new Set(['version', 'captureId', 'capturedAt', 'timezone', 'metrics', 'notes'])
 const METRIC_FIELDS = new Set(['key', 'value', 'unit'])
 
@@ -135,13 +135,15 @@ export function phoenixDateTimeLocal(iso: string): string {
       day: '2-digit',
       hour: '2-digit',
       minute: '2-digit',
+      second: '2-digit',
       hourCycle: 'h23',
     })
       .formatToParts(date)
       .map((part) => [part.type, part.value]),
   )
   const hour = parts.hour === '24' ? '00' : parts.hour
-  return `${parts.year}-${parts.month}-${parts.day}T${hour}:${parts.minute}`
+  const second = parts.second ?? '00'
+  return `${parts.year}-${parts.month}-${parts.day}T${hour}:${parts.minute}:${second}`
 }
 
 export function measuredAtFromPhoenixLocal(local: string): string {
@@ -149,7 +151,18 @@ export function measuredAtFromPhoenixLocal(local: string): string {
   if (!match?.[1]) {
     throw new BodyInputError('Measurement time must include a real time')
   }
-  return `${match[1]}:00-07:00`
+  return `${match[1]}:${match[2] ?? '00'}-07:00`
+}
+
+export function reviewCommitMeasuredAt(input: {
+  originalCapturedAt: string
+  measuredAtLocal: string
+  measuredAtEdited: boolean
+}): string {
+  if (!input.measuredAtEdited) {
+    return input.originalCapturedAt
+  }
+  return measuredAtFromPhoenixLocal(input.measuredAtLocal)
 }
 
 function metricKey(metrics: readonly StagedManualMetric[]): string {

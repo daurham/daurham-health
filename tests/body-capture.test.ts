@@ -26,6 +26,7 @@ import {
   measuredAtFromPhoenixLocal,
   parseBodyCapture,
   phoenixDateTimeLocal,
+  reviewCommitMeasuredAt,
   stagedFormValue,
 } from '../src/domain/body-capture.ts'
 import { BodyInputError, parseManualCreate } from '../src/domain/body-manual.ts'
@@ -196,10 +197,68 @@ describe('body capture contract', () => {
     expect(path).not.toContain('morning')
     expect(bodyShortcutFingerprint('shortcut-weight-1')).toBe('body_shortcut|body-capture-v1|shortcut-weight-1')
     expect(stagedFormValue({ key: 'weight', value: 80, unit: 'kg' })).not.toBe('80')
-    expect(phoenixDateTimeLocal('2026-09-27T19:00:00.000Z')).toBe('2026-09-27T12:00')
+    expect(phoenixDateTimeLocal('2026-09-27T19:00:00.000Z')).toBe('2026-09-27T12:00:00')
     expect(measuredAtFromPhoenixLocal('2026-09-27T12:00')).toBe('2026-09-27T12:00:00-07:00')
+    expect(measuredAtFromPhoenixLocal('2026-09-27T12:04:37')).toBe('2026-09-27T12:04:37-07:00')
     expect(reviewMeasurePreset(['weight'])).toEqual({ preset: 'weight', customKeys: [] })
     expect(reviewMeasurePreset(['weight', 'waist_circumference']).preset).toBe('custom')
+  })
+
+  it('keeps the staged instant unless the owner edits the measurement time', () => {
+    const seconds = '2026-09-27T19:04:37.000Z'
+    const fractional = '2026-09-27T19:04:37.456Z'
+    const displayed = phoenixDateTimeLocal(fractional)
+    expect(displayed).toBe('2026-09-27T12:04:37')
+    expect(displayed.endsWith(':37')).toBe(true)
+    const untouched = {
+      measuredAtLocal: displayed,
+      measuredAtEdited: false,
+    }
+    expect(reviewCommitMeasuredAt({ originalCapturedAt: seconds, ...untouched, measuredAtLocal: phoenixDateTimeLocal(seconds) })).toBe(seconds)
+    expect(reviewCommitMeasuredAt({ originalCapturedAt: fractional, ...untouched })).toBe(fractional)
+    expect(new Date(reviewCommitMeasuredAt({ originalCapturedAt: fractional, ...untouched })).toISOString()).toBe(fractional)
+    const changedWeight = parseManualCreate(
+      {
+        measuredAt: reviewCommitMeasuredAt({ originalCapturedAt: fractional, ...untouched }),
+        notes: null,
+        metrics: [{ key: 'weight', value: '191', unit: 'lb' }],
+      },
+      NOW,
+    )
+    expect(changedWeight.measuredAt.toISOString()).toBe(fractional)
+    expect(changedWeight.metrics[0]).toMatchObject({ unit: 'kg', valueKind: 'manual' })
+    const changedNotes = parseManualCreate(
+      {
+        measuredAt: reviewCommitMeasuredAt({ originalCapturedAt: fractional, ...untouched }),
+        notes: 'after breakfast',
+        metrics: [{ key: 'weight', value: '190.4', unit: 'lb' }],
+      },
+      NOW,
+    )
+    expect(changedNotes.measuredAt.toISOString()).toBe(fractional)
+    expect(changedNotes.notes).toBe('after breakfast')
+    const edited = reviewCommitMeasuredAt({
+      originalCapturedAt: fractional,
+      measuredAtLocal: '2026-09-27T12:05:08',
+      measuredAtEdited: true,
+    })
+    expect(edited).toBe('2026-09-27T12:05:08-07:00')
+    expect(new Date(edited).toISOString()).toBe('2026-09-27T19:05:08.000Z')
+    const future = reviewCommitMeasuredAt({
+      originalCapturedAt: fractional,
+      measuredAtLocal: '2026-09-27T13:05:00',
+      measuredAtEdited: true,
+    })
+    expect(() =>
+      parseManualCreate(
+        { measuredAt: future, notes: null, metrics: [{ key: 'weight', value: '190.4', unit: 'lb' }] },
+        NOW,
+      ),
+    ).toThrow('Future measurements are not recorded')
+    const page = readFileSync('src/features/body/BodyInboxPage.tsx', 'utf8')
+    expect(page).toContain('step={1}')
+    expect(page).toContain('reviewCommitMeasuredAt')
+    expect(page).toContain('setMeasuredAtEdited(true)')
   })
 })
 

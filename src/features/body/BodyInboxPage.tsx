@@ -1,10 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import {
-  measuredAtFromPhoenixLocal,
-  phoenixDateTimeLocal,
-  stagedFormValue,
-} from '@/domain/body-capture'
+import { phoenixDateTimeLocal, reviewCommitMeasuredAt, stagedFormValue } from '@/domain/body-capture'
 import { dangerButtonClass, quietButtonClass } from '@/lib'
 import { commitBodyInbox, discardBodyInbox, fetchBodyInboxItem, type BodyInboxDetail } from './api'
 import { MeasureForm } from './MeasureForm'
@@ -18,6 +14,7 @@ export function BodyInboxPage() {
   const navigate = useNavigate()
   const [item, setItem] = useState<BodyInboxDetail | null>(null)
   const [measuredAt, setMeasuredAt] = useState('')
+  const [measuredAtEdited, setMeasuredAtEdited] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState<'save' | 'discard' | null>(null)
@@ -29,6 +26,7 @@ export function BodyInboxPage() {
         if (!cancelled) {
           setItem(next)
           setMeasuredAt(phoenixDateTimeLocal(next.capturedAt))
+          setMeasuredAtEdited(false)
         }
       })
       .catch((caught: unknown) => {
@@ -90,8 +88,12 @@ export function BodyInboxPage() {
             <input
               className={`${fieldClass} mt-1`}
               type="datetime-local"
+              step={1}
               value={measuredAt}
-              onChange={(event) => setMeasuredAt(event.target.value)}
+              onChange={(event) => {
+                setMeasuredAt(event.target.value)
+                setMeasuredAtEdited(true)
+              }}
             />
           </label>
           <MeasureForm
@@ -108,7 +110,11 @@ export function BodyInboxPage() {
               setError(null)
               try {
                 await commitBodyInbox(item.id, {
-                  measuredAt: measuredAtFromPhoenixLocal(measuredAt),
+                  measuredAt: reviewCommitMeasuredAt({
+                    originalCapturedAt: item.capturedAt,
+                    measuredAtLocal: measuredAt,
+                    measuredAtEdited,
+                  }),
                   notes: body.notes,
                   metrics: body.metrics,
                 })

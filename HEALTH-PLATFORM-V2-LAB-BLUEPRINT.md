@@ -542,6 +542,12 @@ The saved session stays editable and deletable as a manual measurement. Editing 
 
 Pending and discarded rows are not Today, Progress, Goal, Compare, or Timeline observations. After commit, the canonical session appears through the existing Body queries, once, as `body_measurement`. There is no `body_capture` timeline event. Fit Profile XLSX and `/body?action=measure` are unchanged. The inbox is in the full backup and not in the portable export. Restore order is `data_sources`, then `body_measurement_sessions`, then `body_capture_inbox`, then `source_record_links`. The demo omits the inbox and does not call the intake route. Shortcut setup is `docs/body-shortcut.md`. A native iOS share sheet is not implemented.
 
+## Amendment — 2026-09-27T18:00:05-07:00 — V2-G2 capture time stays exact
+
+V2-G2 stays implemented. There is no new migration. Schema head remains `0032_body_capture_inbox.sql`. Package version remains `1.0.0`. V2-F stays complete. V2-G1 stays implemented.
+
+The staged `capturedAt` is the canonical `measured_at` unless the owner edits the measurement-time field. Rendering that field, or editing weight, another metric, or notes, does not change the instant. Seconds and fractional seconds survive an untouched save. The time control accepts seconds. An explicit edit is interpreted in America/Phoenix and keeps the entered seconds. Fractional seconds are not edited in the control; they remain only on the untouched path. Commit still revalidates the submitted instant with the existing Body parser and future-skew rule.
+
 
 
 
