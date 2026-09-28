@@ -733,7 +733,7 @@ function BodyCard({ view }: { view: TodayViewModel }) {
       )}
       {copy && due ? (
         <div className="mt-3">
-          <p className="font-medium text-zinc-900">{copy.title}</p>
+          <p className="font-medium text-red-600">{copy.title}</p>
           <p className="text-zinc-600">{copy.detail}</p>
           {copy.more ? <p className="text-zinc-600">{copy.more}</p> : null}
           {body.goalSupport ? <p className="text-zinc-600">{body.goalSupport}</p> : null}
