@@ -13,6 +13,9 @@ export type AiUsageConfig = {
   weeklyCoachMaxRequestCostUsd: number
   experimentSuggestionMaxRequestCostUsd: number
   literatureMaxRequestCostUsd: number
+  nutritionDescriptionMaxRequestCostUsd: number
+  nutritionMealMaxRequestCostUsd: number
+  nutritionLabelMaxRequestCostUsd: number
   minIntervalMs: number
   maxPerMinute: number
 }
@@ -28,6 +31,12 @@ export function readAiUsageConfig(env: NodeJS.ProcessEnv = process.env): AiUsage
       AI_USAGE_DEFAULT_MAX_REQUEST_COST_USD,
     ),
     literatureMaxRequestCostUsd: readUsd(env.AI_LITERATURE_MAX_REQUEST_COST_USD, AI_USAGE_DEFAULT_MAX_REQUEST_COST_USD),
+    nutritionDescriptionMaxRequestCostUsd: readUsd(
+      env.AI_NUTRITION_DESCRIPTION_MAX_REQUEST_COST_USD,
+      AI_USAGE_DEFAULT_MAX_REQUEST_COST_USD,
+    ),
+    nutritionMealMaxRequestCostUsd: readUsd(env.AI_NUTRITION_MEAL_MAX_REQUEST_COST_USD, AI_USAGE_DEFAULT_MAX_REQUEST_COST_USD),
+    nutritionLabelMaxRequestCostUsd: readUsd(env.AI_NUTRITION_LABEL_MAX_REQUEST_COST_USD, AI_USAGE_DEFAULT_MAX_REQUEST_COST_USD),
     minIntervalMs: readCount(env.AI_ASK_HEALTH_MIN_INTERVAL_MS, AI_USAGE_MIN_INTERVAL_MS),
     maxPerMinute: readCount(env.AI_ASK_HEALTH_MAX_PER_MINUTE, AI_USAGE_MAX_PER_MINUTE),
   }

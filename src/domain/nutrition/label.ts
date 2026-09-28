@@ -402,7 +402,14 @@ export function validateLabelReview(draft: LabelReviewDraft): ReviewFieldError[]
 }
 
 export function isLabelRetryCode(code: string): boolean {
-  return code === 'HOME_AI_UNAVAILABLE' || code === 'TIMED_OUT' || code.startsWith('GEMINI_') || code.startsWith('HOME_AI_')
+  return (
+    code === 'HOME_AI_UNAVAILABLE' ||
+    code === 'TIMED_OUT' ||
+    code.startsWith('GEMINI_') ||
+    code.startsWith('HOME_AI_') ||
+    code === 'AI_BUDGET_REACHED' ||
+    code === 'AI_RATE_LIMITED'
+  )
 }
 
 export function labelFailureMessage(code: string): string {
@@ -415,6 +422,10 @@ export function labelFailureMessage(code: string): string {
     case 'GEMINI_UNAVAILABLE':
     case 'GEMINI_TIMEOUT':
       return 'Label analysis is temporarily unavailable.'
+    case 'AI_BUDGET_REACHED':
+      return "This month's AI budget is used up."
+    case 'AI_RATE_LIMITED':
+      return 'AI requests are coming too quickly. Try again in a moment.'
     case 'GEMINI_SCHEMA':
     case 'GEMINI_SEMANTIC':
       return "We couldn't confidently read this label."

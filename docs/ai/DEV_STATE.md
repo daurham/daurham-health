@@ -1,103 +1,122 @@
 # Dev state
 
-Snapshot recorded 2026-09-27 after V2-G3 Appearance. This commit is the current health application.
+Snapshot recorded 2026-09-27 after V2-G4 Nutrition Gemini durable cost safety. This commit is the current health application.
 
 ## Git
 
 - Branch: `main`
-- Baseline the task named: `00428baac215716f2eee6504a16f53fe1f9bf8bb` (“Keep a Shortcut capture's exact time unless the owner edits it.”)
-- Parent of this snapshot: `8b2ad7a` (“docs: define V2-G3 theme packs”)
-- This commit adds browser-local color mode and palette preferences
+- Baseline the task named: `80cd7642fb7a5ebd8683f81f6d4e97f1768a846b` (“Keep Appearance in the browser so palettes do not change Health data.”)
+- Parent of this snapshot: `d7a644e` (“docs: define V2-G4 nutrition AI cost safety”)
+- This commit puts Nutrition Gemini attempts on the shared `ai_usage` ledger
 - Finished tasks are committed and pushed
 - Local annotated tag `v1.0.0` points at `7124ca513efa6c833457303ee6ff79d78344fce6`. Whether that tag exists on the remote is unknown
 
 ## Schema
 
 - Migration head: `0032_body_capture_inbox.sql`
-- No migration was added or applied for Appearance
-- Design manual version: 1.0.40
+- No migration was added or applied
+- Design manual version: 1.0.41
 - Package version: 1.0.0
-- V2-F remains complete. V2-G1 remains implemented. V2-G2 remains implemented, including exact staged-time preservation. Goal-observation suggestions remain deferred. Overnight vital metrics remain disabled until a payload is verified
+- V2-F remains complete. V2-G1, V2-G2, and V2-G3 remain implemented. Goal-observation suggestions remain deferred. Overnight vital metrics remain disabled until a payload is verified
 
-## Mode preference
+## Request types
 
-- Storage key: `health-theme`
-- Allowlist: `system`, `light`, `dark`
-- System is the absence of the key. `writeThemePreference('system')` calls `removeItem`
-- Stored `light` and `dark` stay as those strings
-- An absent or invalid value reads as `system`
-- Explicit Light ignores a dark operating system. Explicit Dark ignores a light operating system
-- While System is selected, a later `prefers-color-scheme` change updates the document without a reload
-- An explicit mode ignores later operating-system changes until the owner chooses System again
+- `nutrition_description`
+- `nutrition_meal_photo`
+- `nutrition_label`
+- Constants live in `NUTRITION_GEMINI_REQUEST_TYPES` in `src/domain/nutrition/interpret.ts`
+- The interpreter sets `usageKind` to `description`, `meal_photo`, or `nutrition_label`. The kind is not inferred from the prompt
 
-## Palette
+## Max-request cost
 
-- Storage key: `health-palette`
-- Ids: `classic`, `forest`, `ocean`, `sunset`, `plum`
-- An absent or invalid value reads as `classic`
-- Writing a palette stores that id, including `classic`
-- Removing the key resolves Classic
-- Palette does not follow color mode, and color mode does not follow palette
+- `AI_NUTRITION_DESCRIPTION_MAX_REQUEST_COST_USD`
+- `AI_NUTRITION_MEAL_MAX_REQUEST_COST_USD`
+- `AI_NUTRITION_LABEL_MAX_REQUEST_COST_USD`
+- Blank or invalid values fall back to `AI_USAGE_DEFAULT_MAX_REQUEST_COST_USD` (0.05)
+- All three use `AI_MONTHLY_BUDGET_USD`, `minIntervalMs`, and `maxPerMinute` from `readAiUsageConfig`
+- There is no second Nutrition wallet. `AI_WARNING_BUDGET_USD` is still not a gate
 
-## Pre-render bootstrap
+## Reservation placement
 
-- `index.html` reads only `health-theme` and `health-palette`
-- `dark` is stored dark, or anything other than stored light when `prefers-color-scheme: dark` matches
-- The palette is applied only after an allowlist check. Unknown values become `classic`
-- The script toggles `html.dark`, sets `colorScheme`, and sets `data-health-palette`
-- It does not copy an arbitrary stored string into a class name
+- `createGeminiNutritionInterpreter` resolves Gemini config first, then each `generateOnce` attempt goes through `runNutritionGeminiAttempt`
+- Order for an attempt: hash, reserve, provider call, finalize
+- The network call is outside the reservation transaction
+- Ask Health, Weekly Coach, Experiment Suggestions, and literature synthesis still reserve in their own gates and then call `generateWithGemini`. They are not double-reserved
+- `server/integrations/gemini/client.ts` does not name `ai_usage`
 
-## ThemeSync
+## Request hash
 
-- `src/theme-sync.tsx` still wraps the app from `src/main.tsx`
-- Mount applies the stored appearance
-- A media-query change applies only when the stored mode is System
-- A `window` `storage` event applies `health-theme` and `health-palette`
-- Other storage keys are ignored
-- A cleared palette key resolves Classic. A cleared theme key resumes System and follows the current media query
+- SHA-256 of request type, model, prompt, and a SHA-256 digest of the image bytes when an image is present
+- The stored value is the hex digest
+- Description text, user context, filenames, and image bytes are not columns
 
-## Semantic color and charts
+## Description, meal photo, and label
 
-- Palette rules set accent, accent-muted, accent-fg, info, and `--chart-ink`
-- `--health-danger`, `--health-warning`, and `--health-success` stay on the base light and dark rules
-- Classic light and dark accent values match the previous default
-- `--chart-ink` is `var(--health-accent)`. Progress charts already stroke and fill that token. Chart calculations are unchanged
+- Synchronous food-description preview uses the same gated generate path
+- Queued meal and label jobs claim a row, then interpret through that path
+- A reviewed commit does not call Gemini and does not reserve
+- Interpretation metadata still records provider, model, and token counts on the job
 
-## Settings
+## Retry
 
-- Appearance offers Mode (System, Light, Dark) and Palette (Classic, Forest, Ocean, Sunset, Plum)
-- The pressed button is the stored preference, not the resolved `html.dark` class
-- With no `localStorage`, static render shows System and Classic pressed
-- A choice applies immediately. There is no Save button
-- Controls use `aria-pressed`, `min-h-11`, and wrapping grids (`grid-cols-3` for mode, `grid-cols-2` for palette)
-- Another tab's `storage` event refreshes the pressed state through the theme helpers
+- `GEMINI_UNAVAILABLE` and `GEMINI_QUOTA` still auto-retry once
+- Each of those attempts has its own reservation
+- The retry uses the same rate gate and monthly budget
+- `GEMINI_SCHEMA` and `GEMINI_SEMANTIC` are not newly retried
+- If the first attempt is uncertain and the retry is denied, the first row stays uncertain and the denial code is the surfaced error
 
-## Demo and auth
+## Budget and rate denial
 
-- Demo, sign-in, and reset-password use the same document appearance
-- Demo stays read-only. It has no separate palette store and does not call an owner API for theme
-- Signed-in Settings was not exercised. `/settings` still stops at the owner lock screen
+- Codes: `AI_BUDGET_REACHED` and `AI_RATE_LIMITED`
+- Zero provider calls
+- Description preview maps both to HTTP 429
+- A claimed meal or label job finishes `failed` with that code. It does not stay `processing`
+- Both codes are retryable in the meal and label UI
+- They are not `GEMINI_QUOTA`
 
-## Persistence
+## Returned invalid output
 
-- Only `health-theme` and `health-palette` are stored
-- No Health data, auth, owner identity, or page state goes through the theme system
-- No theme preference in PostgreSQL, backup, or portable export
+- A Gemini response that fails JSON, schema, or semantic checks completes the reservation
+- Empty provider text thrown as `GEMINI_SCHEMA` inside the attempt is completed
+- Actual cost uses `boundedProviderCostUsd` and cannot exceed the reservation
+- Missing token counts keep the reserved maximum
+
+## Uncertain and missing config
+
+- Timeout, transport failure, and provider 5xx after the call begins mark the reservation uncertain
+- `getGeminiConfig` runs before any reservation. A missing key throws `GEMINI_NOT_CONFIGURED` and creates no row
+- If a reserved attempt then reports `GEMINI_NOT_CONFIGURED`, that reservation is released
+- A reservation infrastructure throw before the provider call becomes `GEMINI_UNAVAILABLE` and does not call Gemini
+
+## Home-AI
+
+- Description, meal, label, and Home-AI reanalysis do not create `ai_usage` rows
+- Home-AI does not use the Gemini rate gate
+
+## Jobs and reanalysis
+
+- A completed, failed, committed, or freshly processing job poll does not start another Gemini attempt
+- `requeueCaptureJob` only sets the job back to `queued`. It does not reserve
+- The next Gemini poll of that job reserves
+- A budget or rate denial after claim records the failed code and leaves the image for a later reanalysis
+
+## Backup
+
+- `ai_usage` stays operational, `portable: false`, in the full backup only
+- No inventory change
 
 ## Validation
 
-- Tests: 927 passing across 108 files
+- Tests: 936 passing across 109 files
 - `npx tsc -b` passed as part of `npm run build`
 - `npx eslint .` passed
 - `npm run build` passed. The existing Vite chunk-size warning remains
-- Browser check on the local demo: empty storage with a dark operating system painted Classic dark; explicit Light plus Forest stayed light with the forest accent and the existing danger, warning, and success values; System plus Plum followed the dark operating system; an invalid palette attribute resolved to Classic; Progress charts still use `--chart-ink`
-- At 390px, demo Today, Nutrition, Training, Body, Progress, Ask Health, and Lab did not overflow. Sign-in and reset-password rendered. Desktop demo at 927px did not overflow
-- Owner Appearance controls were not clicked. The lock screen blocks `/settings`
+- Owner and live Gemini budget QA was not run. Attempt, denial, completion, and uncertain states were covered with an injected ledger and provider
 
 ## Deviations
 
-- System is stored by deleting `health-theme` rather than writing a third value. Existing `light` and `dark` values stay valid
-- `readThemePreference` returns `system` when the key is absent. `resolveTheme(null, …)` still follows the operating system
+- A failure inside `ledger.reserve` is reported as `GEMINI_UNAVAILABLE`. That code was already auto-retried once and is already retryable in the photo UI. No usage row is written
+- `advanceGeminiCapture` accepts optional ports so tests can simulate claim and finish without a database. Production callers omit them
 
 ## Remaining V2-G work
 

@@ -89,8 +89,8 @@ Observed from the current code and product docs. Where the original rationale is
 ## Decision: AI spend for Ask Health and Weekly Coach shares one ledger
 
 **Status:** Active  
-**Reason:** `ai_usage` records reservations. Both features use `AI_MONTHLY_BUDGET_USD`. The reserve query does not filter by `request_type`, so the rate limit is shared. Nutrition Gemini is documented as outside this ledger.  
-**Implications:** Do not add a second monthly wallet for Weekly Coach. Do not put cache hits on the ledger. `AI_WARNING_BUDGET_USD` does not block a call.
+**Reason:** `ai_usage` records reservations. Ask Health, Weekly Coach, Experiment Suggestions, literature synthesis, and Nutrition Gemini use `AI_MONTHLY_BUDGET_USD`. The reserve query does not filter by `request_type`, so the rate limit is shared.  
+**Implications:** Do not add a second monthly wallet. Do not put cache hits on the ledger. `AI_WARNING_BUDGET_USD` does not block a call. Home-AI is not a Gemini call and is not reserved here.
 
 ## Decision: Model output is not Health history
 
@@ -127,6 +127,12 @@ Observed from the current code and product docs. Where the original rationale is
 **Status:** Active  
 **Reason:** V2-G2 lets an iPhone Shortcut post a measurement candidate. That post is not a measurement. Only the signed-in owner review creates canonical Body data.  
 **Implications:** `BODY_CAPTURE_TOKEN` authorizes only `POST /api/ingest/body`. It is not the Apple ingest token and it cannot list, read, commit, discard, or edit Body data. Intake writes `body_capture_inbox` only. The same `captureId` with the same evidence returns the existing row. A different payload for that id is a 409 and does not rewrite the row. Commit uses the manual Body parser, source `manual`, and one `body_shortcut` provenance link in the same statement that marks the inbox committed. An untouched review keeps the staged instant, including seconds and fractions. Only an explicit measurement-time edit replaces it, and that edit keeps the entered seconds. The session stays editable. Deleting it nulls `canonical_session_id` and does not recreate the row on a later commit. Pending and discarded captures are not observations. The inbox is full-backup only. Native share-sheet targeting is deferred. Setup is `docs/body-shortcut.md`.
+
+## Decision: Nutrition Gemini shares the durable AI ledger
+
+**Status:** Active  
+**Reason:** V2-G4 closes the gap where Nutrition Gemini could call the provider without an `ai_usage` reservation. Description, meal-photo, and label attempts are paid Gemini calls. Home-AI is a separate service and has no accepted monetary contract.  
+**Implications:** Request types are `nutrition_description`, `nutrition_meal_photo`, and `nutrition_label`. Each attempt reserves against `AI_MONTHLY_BUDGET_USD` and the global rate gate before the network call. An automatic retry reserves again. `AI_BUDGET_REACHED` and `AI_RATE_LIMITED` are local denials, not `GEMINI_QUOTA`. A returned unusable response is completed. A provider failure after the call begins stays uncertain. Missing Gemini configuration is not charged. The ledger stores a SHA-256 request hash, not the description, context, filename, or image. Requeueing a capture does not reserve. Home-AI still does not.
 
 ## Decision: Appearance is a browser preference, not Health data
 

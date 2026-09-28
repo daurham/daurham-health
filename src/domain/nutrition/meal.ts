@@ -436,7 +436,7 @@ export function isMealConnectivityCode(code: string): boolean {
 }
 
 export function isMealRetryCode(code: string): boolean {
-  return isMealConnectivityCode(code) || code.startsWith('GEMINI_')
+  return isMealConnectivityCode(code) || code.startsWith('GEMINI_') || code === 'AI_BUDGET_REACHED' || code === 'AI_RATE_LIMITED'
 }
 
 function mealErrorCode(body: unknown): string {
@@ -501,6 +501,10 @@ export function mealFailureMessage(code: string): string {
     case 'GEMINI_UNAVAILABLE':
     case 'GEMINI_TIMEOUT':
       return 'Meal analysis is temporarily unavailable.'
+    case 'AI_BUDGET_REACHED':
+      return "This month's AI budget is used up."
+    case 'AI_RATE_LIMITED':
+      return 'AI requests are coming too quickly. Try again in a moment.'
     case 'GEMINI_SCHEMA':
     case 'GEMINI_SEMANTIC':
       return "We couldn't confidently interpret this meal."

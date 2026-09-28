@@ -10,9 +10,17 @@ import {
   getLabelJobRecord,
   type NutritionCaptureJobRecord,
 } from './label-jobs.js'
-import { createGeminiNutritionInterpreter } from '../integrations/gemini/client.js'
+import { createGeminiNutritionInterpreter, type GeminiNutritionInterpreter } from '../integrations/gemini/client.js'
 
 const PROCESSING_STALE_MS = 45_000
+
+type CapturePorts = {
+  claimCaptureJob: typeof claimCaptureJob
+  getCaptureImage: typeof getCaptureImage
+  finishCaptureInterpretation: typeof finishCaptureInterpretation
+  getLabelJobRecord: typeof getLabelJobRecord
+  createInterpreter: () => Promise<Pick<GeminiNutritionInterpreter, 'interpretMealPhoto' | 'interpretNutritionLabel'>>
+}
 
 export function interpretErrorToHttp(error: unknown, kind: 'meal' | 'label' | 'description'): HttpError {
   if (error instanceof HttpError) {
@@ -25,13 +33,28 @@ export function interpretErrorToHttp(error: unknown, kind: 'meal' | 'label' | 'd
         : kind === 'description'
           ? descriptionFailureMessage(error.code)
           : mealFailureMessage(error.code)
-    const status = error.code === 'GEMINI_NOT_CONFIGURED' ? 503 : error.code === 'CONTEXT_TOO_LONG' ? 400 : 502
+    const status =
+      error.code === 'AI_BUDGET_REACHED' || error.code === 'AI_RATE_LIMITED'
+        ? 429
+        : error.code === 'GEMINI_NOT_CONFIGURED'
+          ? 503
+          : error.code === 'CONTEXT_TOO_LONG'
+            ? 400
+            : 502
     return new HttpError(status, message, undefined, error.code)
   }
   return new HttpError(502, kind === 'label' ? labelFailureMessage('GEMINI_UNAVAILABLE') : mealFailureMessage('GEMINI_UNAVAILABLE'), undefined, 'GEMINI_UNAVAILABLE')
 }
 
-export async function advanceGeminiCapture(job: NutritionCaptureJobRecord): Promise<NutritionCaptureJobRecord> {
+export async function advanceGeminiCapture(
+  job: NutritionCaptureJobRecord,
+  ports?: Partial<CapturePorts>,
+): Promise<NutritionCaptureJobRecord> {
+  const claim = ports?.claimCaptureJob ?? claimCaptureJob
+  const loadImage = ports?.getCaptureImage ?? getCaptureImage
+  const finish = ports?.finishCaptureInterpretation ?? finishCaptureInterpretation
+  const reload = ports?.getLabelJobRecord ?? getLabelJobRecord
+  const createInterpreter = ports?.createInterpreter ?? createGeminiNutritionInterpreter
   if (job.provider !== 'gemini') {
     return job
   }
@@ -41,29 +64,29 @@ export async function advanceGeminiCapture(job: NutritionCaptureJobRecord): Prom
   if (job.status === 'processing' && Date.now() - Date.parse(job.updatedAt) < PROCESSING_STALE_MS) {
     return job
   }
-  const claimed = await claimCaptureJob(job.id)
+  const claimed = await claim(job.id)
   if (!claimed) {
-    return (await getLabelJobRecord(job.id)) ?? job
+    return (await reload(job.id)) ?? job
   }
-  const image = await getCaptureImage(job.id)
+  const image = await loadImage(job.id)
   if (!image) {
-    await finishCaptureInterpretation({
+    await finish({
       jobId: job.id,
       status: 'failed',
       failureMessage: job.captureKind === 'nutrition_label' ? labelFailureMessage('MISSING_IMAGE') : mealFailureMessage('MISSING_IMAGE'),
       metadata: { provider: 'gemini', failureCode: 'MISSING_IMAGE' },
     })
-    return (await getLabelJobRecord(job.id)) ?? job
+    return (await reload(job.id)) ?? job
   }
   try {
-    const interpreter = await createGeminiNutritionInterpreter()
+    const interpreter = await createInterpreter()
     if (job.captureKind === 'nutrition_label') {
       const interpreted = await interpreter.interpretNutritionLabel({
         image: image.bytes,
         mimeType: image.mimeType,
         userContext: job.userContext,
       })
-      await finishCaptureInterpretation({
+      await finish({
         jobId: job.id,
         status: 'completed',
         candidate: interpreted.candidate,
@@ -75,7 +98,7 @@ export async function advanceGeminiCapture(job: NutritionCaptureJobRecord): Prom
         mimeType: image.mimeType,
         userContext: job.userContext,
       })
-      await finishCaptureInterpretation({
+      await finish({
         jobId: job.id,
         status: 'completed',
         candidate: interpreted.candidate,
@@ -84,12 +107,12 @@ export async function advanceGeminiCapture(job: NutritionCaptureJobRecord): Prom
     }
   } catch (error) {
     const httpError = interpretErrorToHttp(error, job.captureKind === 'nutrition_label' ? 'label' : 'meal')
-    await finishCaptureInterpretation({
+    await finish({
       jobId: job.id,
       status: 'failed',
       failureMessage: httpError.message,
       metadata: { provider: 'gemini', failureCode: httpError.code ?? 'GEMINI_UNAVAILABLE' },
     })
   }
-  return (await getLabelJobRecord(job.id)) ?? job
+  return (await reload(job.id)) ?? job
 }

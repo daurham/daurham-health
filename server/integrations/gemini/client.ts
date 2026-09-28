@@ -20,6 +20,8 @@ import type { DescriptionEstimateCandidate } from '../../../src/domain/nutrition
 import type { MealEstimateCandidate } from '../../../src/domain/nutrition/meal.js'
 import type { NutritionLabelCandidate } from '../../../src/domain/nutrition/label.js'
 import { getGeminiConfig, type GeminiConfig } from './config.js'
+import { runNutritionGeminiAttempt, type NutritionGeminiAttemptDeps } from '../../nutrition/gemini-usage.js'
+import type { NutritionGeminiUsageKind } from '../../../src/domain/nutrition/interpret.js'
 
 export type GeminiGenerateRequest = {
   model: string
@@ -28,6 +30,7 @@ export type GeminiGenerateRequest = {
   maxOutputTokens: number
   mediaResolution?: MediaResolution
   image?: { mimeType: string; base64: string }
+  usageKind?: NutritionGeminiUsageKind
 }
 
 export type GeminiGenerateResult = {
@@ -108,6 +111,7 @@ export class GeminiNutritionInterpreter {
       prompt: mealPhotoPrompt(input.userContext),
       timeoutMs: GEMINI_MEAL_TIMEOUT_MS,
       maxOutputTokens: GEMINI_MEAL_MAX_OUTPUT_TOKENS,
+      usageKind: 'meal_photo',
       image: { mimeType: input.mimeType, base64: Buffer.from(input.image).toString('base64') },
     })
     return {
@@ -122,6 +126,7 @@ export class GeminiNutritionInterpreter {
       prompt: foodDescriptionPrompt(input.text),
       timeoutMs: GEMINI_DESCRIPTION_TIMEOUT_MS,
       maxOutputTokens: GEMINI_DESCRIPTION_MAX_OUTPUT_TOKENS,
+      usageKind: 'description',
     })
     return {
       candidate: interpretFoodDescriptionResponse(result.text, input.text.trim()),
@@ -136,6 +141,7 @@ export class GeminiNutritionInterpreter {
       timeoutMs: GEMINI_LABEL_TIMEOUT_MS,
       maxOutputTokens: GEMINI_LABEL_MAX_OUTPUT_TOKENS,
       mediaResolution: MediaResolution.MEDIA_RESOLUTION_HIGH,
+      usageKind: 'nutrition_label',
       image: { mimeType: input.mimeType, base64: Buffer.from(input.image).toString('base64') },
     })
     return {
@@ -145,13 +151,19 @@ export class GeminiNutritionInterpreter {
   }
 }
 
-export async function createGeminiNutritionInterpreter(): Promise<GeminiNutritionInterpreter> {
+export async function createGeminiNutritionInterpreter(deps?: Omit<NutritionGeminiAttemptDeps, 'call'>): Promise<GeminiNutritionInterpreter> {
   const config = await getGeminiConfig()
   return new GeminiNutritionInterpreter({
     model: config.mealModel,
     descriptionModel: config.descriptionModel,
     labelModel: config.labelModel,
-    generate: (request) => generateWithGemini(config, request),
+    generate: (request) =>
+      withGeminiRetry(() =>
+        runNutritionGeminiAttempt(config, request, {
+          ...deps,
+          call: (active, next) => generateOnce(active, { ...next, usageKind: next.usageKind }),
+        }),
+      ),
   })
 }
 

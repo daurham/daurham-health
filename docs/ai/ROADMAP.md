@@ -1,6 +1,6 @@
 # Roadmap
 
-This file records only what the repository already states. The current application is the health-app tree that includes Ask Health, Proactive Insights, Weekly Coach, Experiment Suggestions, Literature-Backed Evidence, ongoing Health Auto Export workouts, Body Shortcut capture, Appearance, and migration `0032_body_capture_inbox.sql`. The v2 authority is `HEALTH-PLATFORM-V2-LAB-BLUEPRINT.md`. The design manual is `HEALTH-PLATFORM-DESIGN-MANUAL.md` at version 1.0.40. `docs/V2-ROADMAP.md` keeps the older backlog and now marks the slices the blueprint has implemented.
+This file records only what the repository already states. The current application is the health-app tree that includes Ask Health, Proactive Insights, Weekly Coach, Experiment Suggestions, Literature-Backed Evidence, ongoing Health Auto Export workouts, Body Shortcut capture, Appearance, and migration `0032_body_capture_inbox.sql`. The v2 authority is `HEALTH-PLATFORM-V2-LAB-BLUEPRINT.md`. The design manual is `HEALTH-PLATFORM-DESIGN-MANUAL.md` at version 1.0.41. `docs/V2-ROADMAP.md` keeps the older backlog and now marks the slices the blueprint has implemented.
 
 ## Completed / existing functionality
 
@@ -19,6 +19,7 @@ Frozen v1.0.0, then the v2 slices the blueprint marks implemented:
 - V2-G1 Ongoing Apple workout ingestion: Health Auto Export JSON v2 workout objects write `activity_workouts`. They stay Activity and never become Training.
 - V2-G2 Body Inbox and Shortcut capture: `POST /api/ingest/body` stages a capture. The owner review saves one manual Body measurement and keeps the staged instant unless the owner edits the time. Native share-sheet targeting is deferred.
 - V2-G3 Appearance: System, Light, and Dark, plus Classic, Forest, Ocean, Sunset, and Plum. Preferences stay in the browser. Motion and micro-interactions remain deferred.
+- V2-G4 Nutrition Gemini durable cost safety: description, meal-photo, and label attempts share `ai_usage`. Home-AI stays outside it.
 
 Also present from v1 and the import work: Nutrition, Training, Body, Progress, Activity, Sleep, Timeline, Compare, checkpoints, Apple Health archive import, Health Auto Export ingest, Gemini nutrition capture, Home-AI transcription, backup and portable export, and the public demo.
 
@@ -34,7 +35,6 @@ Named by the current manual or blueprint, and not marked implemented:
 - External retest notifications remain deferred (`docs/V2-ROADMAP.md` and the blueprint).
 - Nested recipes, batch inventory, and recipe fiber remain deferred.
 - Notifications, push, email, and background model calls for Weekly Coach are deferred.
-- Nutrition Gemini is not on the `ai_usage` ledger yet.
 
 `docs/V2-ROADMAP.md` also lists motion, shortcut or share-sheet ingestion, richer meal photos, more health sources, and a Health Inbox. Theme packs are implemented as V2-G3. The file itself calls the remaining items post-v1 ideas, not promises. How many of those ideas are still wanted is unknown. Do not treat that file as the build order.
 

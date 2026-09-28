@@ -1,6 +1,6 @@
 # Daurham Health — V2 Lab Blueprint
 
-**Status:** V2-A Data Capture Foundations complete. V2-B Personal Lab Core complete (V2-B1 through V2-B4). V2-C Recipes / Batch Meals complete (V2-C1 through V2-C4). V2-D Goals + Projections complete (V2-D1 through V2-D3). V2-E Rich Sleep + Overnight Vitals complete (V2-E1 through V2-E5). Overnight vital metrics remain disabled until a payload is verified. V2-F1 Ask Health conversational analysis is implemented. V2-F2 Proactive Insights are implemented. V2-F3 Weekly Coach Brief is implemented. V2-F4 Experiment Suggestions are implemented for due Benchmark retests and missing Benchmark baselines. Goal-observation suggestions are deferred. V2-F5 Literature-Backed Evidence Drawer is implemented. V2-F Ask Health + Proactive Intelligence is complete. V2-G1 ongoing Apple workout ingestion is implemented. V2-G2 Body Inbox and Shortcut capture is implemented. V2-G3 Theme Packs and Appearance is implemented.  
+**Status:** V2-A Data Capture Foundations complete. V2-B Personal Lab Core complete (V2-B1 through V2-B4). V2-C Recipes / Batch Meals complete (V2-C1 through V2-C4). V2-D Goals + Projections complete (V2-D1 through V2-D3). V2-E Rich Sleep + Overnight Vitals complete (V2-E1 through V2-E5). Overnight vital metrics remain disabled until a payload is verified. V2-F1 Ask Health conversational analysis is implemented. V2-F2 Proactive Insights are implemented. V2-F3 Weekly Coach Brief is implemented. V2-F4 Experiment Suggestions are implemented for due Benchmark retests and missing Benchmark baselines. Goal-observation suggestions are deferred. V2-F5 Literature-Backed Evidence Drawer is implemented. V2-F Ask Health + Proactive Intelligence is complete. V2-G1 ongoing Apple workout ingestion is implemented. V2-G2 Body Inbox and Shortcut capture is implemented. V2-G3 Theme Packs and Appearance is implemented. V2-G4 Nutrition Gemini durable cost safety is implemented.  
 **Calendar:** America/Phoenix  
 **Package version:** remains `1.0.0`  
 **Schema head:** `0032_body_capture_inbox.sql`
@@ -53,6 +53,7 @@ The file was not present in the repository when V2-A1 implementation started. Th
    - V2-G1 Ongoing Apple workout ingestion — implemented
    - V2-G2 Body Inbox and Shortcut capture — implemented
    - V2-G3 Theme Packs and Appearance — implemented
+   - V2-G4 Nutrition Gemini durable cost safety — implemented
 
 Invariant:
 
@@ -556,6 +557,14 @@ V2-G3 is implemented. There is no migration. Schema head remains `0032_body_capt
 Appearance is two independent browser preferences. Color mode is System, Light, or Dark. System is the absence of `health-theme`. Stored `light` and `dark` stay explicit and do not follow later operating-system changes. Choosing System again removes the key and resumes live `prefers-color-scheme` updates. The palette key is `health-palette`. The ids are `classic`, `forest`, `ocean`, `sunset`, and `plum`. An absent or invalid palette is Classic. Mode and palette do not derive from each other.
 
 `index.html` applies the resolved mode and an allowlisted palette before React mounts. `ThemeSync` applies the same contract on mount, on a system color-scheme change while System is selected, and on `storage` events for those two keys. Settings shows the stored preference. System stays selected when the operating system is dark. Danger, warning, and success stay semantic. Charts use `--chart-ink`, which follows the accent token. Chart calculations are unchanged. The demo and the sign-in pages use the same appearance. There is no theme table, owner API, backup row, or portable-export field.
+
+## Amendment — 2026-09-27T18:36:24-07:00 — V2-G4 Nutrition Gemini durable cost safety
+
+V2-G4 is implemented. There is no migration. Schema head remains `0032_body_capture_inbox.sql`. Package version remains `1.0.0`. V2-F stays complete. V2-G1, V2-G2, and V2-G3 stay implemented. Goal-observation experiment suggestions remain deferred. Overnight vital metrics remain disabled until a payload is verified. Motion and micro-interactions remain deferred.
+
+Nutrition description, meal-photo, and label Gemini attempts now share `ai_usage`, `AI_MONTHLY_BUDGET_USD`, and the global 1.5-second / 8-per-minute rate gate with Ask Health, Weekly Coach, Experiment Suggestions, and literature synthesis. The request types are `nutrition_description`, `nutrition_meal_photo`, and `nutrition_label`. Each provider attempt reserves before the network call. An automatic retry is a second attempt and needs its own reservation. It does not bypass the rate gate or the monthly ceiling. A local budget or rate denial makes no Gemini call. Those denials use `AI_BUDGET_REACHED` and `AI_RATE_LIMITED`, not `GEMINI_QUOTA`. A synchronous description denial is HTTP 429. A queued meal or label denial finishes as failed and retryable. The saved image stays available for a later reanalysis.
+
+A response Gemini returns is completed even when the Nutrition parser later rejects it. A timeout or provider error after the call begins stays uncertain. A missing Gemini configuration does not create a charged row. The stored request hash is a SHA-256 digest of the request type, model, prompt, and image digest. The ledger does not store description text, user context, filenames, or image bytes. Home-AI remains an explicit provider and creates no `ai_usage` row. Requeueing a job does not reserve. The later Gemini attempt does. Reviewed Nutrition commit behavior is unchanged. `ai_usage` stays in the full backup and out of the portable export.
 
 
 

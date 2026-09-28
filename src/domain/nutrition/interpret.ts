@@ -34,6 +34,26 @@ export const GEMINI_FAILURE_CODES = [
 export const GEMINI_TRANSIENT_CODES = ['GEMINI_UNAVAILABLE', 'GEMINI_TIMEOUT', 'GEMINI_QUOTA'] as const
 export const GEMINI_AUTO_RETRY_CODES = ['GEMINI_UNAVAILABLE', 'GEMINI_QUOTA'] as const
 
+export const NUTRITION_GEMINI_USAGE_KINDS = ['description', 'meal_photo', 'nutrition_label'] as const
+export type NutritionGeminiUsageKind = (typeof NUTRITION_GEMINI_USAGE_KINDS)[number]
+
+export const NUTRITION_GEMINI_REQUEST_TYPES = {
+  description: 'nutrition_description',
+  meal_photo: 'nutrition_meal_photo',
+  nutrition_label: 'nutrition_label',
+} as const
+
+export const AI_BUDGET_REACHED = 'AI_BUDGET_REACHED'
+export const AI_RATE_LIMITED = 'AI_RATE_LIMITED'
+
+export function nutritionBudgetMessage(): string {
+  return "This month's AI budget is used up."
+}
+
+export function nutritionRateMessage(): string {
+  return 'AI requests are coming too quickly. Try again in a moment.'
+}
+
 export class NutritionInterpretError extends Error {
   readonly code: string
 
@@ -269,6 +289,12 @@ export function nutritionLabelPrompt(userContext: string | null): string {
 }
 
 export function descriptionFailureMessage(code: string): string {
+  if (code === AI_BUDGET_REACHED) {
+    return nutritionBudgetMessage()
+  }
+  if (code === AI_RATE_LIMITED) {
+    return nutritionRateMessage()
+  }
   if (code === 'GEMINI_SCHEMA' || code === 'GEMINI_SEMANTIC') {
     return "We couldn't confidently interpret this description."
   }

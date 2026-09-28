@@ -214,12 +214,18 @@ export {
   GEMINI_DESCRIPTION_RESPONSE_SCHEMA,
   GEMINI_LABEL_RESPONSE_SCHEMA,
   descriptionFailureMessage,
+  NUTRITION_GEMINI_REQUEST_TYPES,
+  NUTRITION_GEMINI_USAGE_KINDS,
+  AI_BUDGET_REACHED,
+  AI_RATE_LIMITED,
+  nutritionBudgetMessage,
+  nutritionRateMessage,
   isGeminiFailureCode,
   isGeminiTransientCode,
   isGeminiAutoRetryCode,
   NutritionInterpretError,
 } from './interpret.js'
-export type { NutritionInterpreter, NutritionProvider, InterpretationMetadata } from './interpret.js'
+export type { NutritionInterpreter, NutritionProvider, InterpretationMetadata, NutritionGeminiUsageKind } from './interpret.js'
 export type {
   MealPhotoCandidate,
   MealComponent,
