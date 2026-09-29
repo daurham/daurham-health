@@ -23,6 +23,16 @@ export type GoalView = {
   pausedAt: string | null
   completedAt: string | null
   displayName: string
+  selector: {
+    goalKind: string
+    bodyMetricKey: string | null
+    exerciseDefinitionId: string | null
+    benchmarkDefinitionId: string | null
+    benchmarkProtocolVersionId: string | null
+    benchmarkRequirementId: string | null
+    supplementId: string | null
+    trainingMinDistanceM?: number | null
+  }
   selectorContext: { archived: boolean; message: string | null }
   currentVersion: GoalVersionView
   versions: GoalVersionView[]
@@ -34,6 +44,16 @@ export type GoalView = {
     relation: 'above_range' | 'below_range' | 'inside_range' | null
     provisional: { value: number; unit: string; label: 'so far' } | null
     strengthSource: { loadLb: number; reps: number; formula: 'epley'; sessionId: string; setId: string } | null
+    trainingSource: {
+      sessionId: string
+      setId: string
+      exerciseId: string
+      reps: number | null
+      durationSec: number | null
+      distanceM: number | null
+      completed: boolean | null
+      derivedValue: number
+    } | null
     label: string | null
     coverage: {
       observedDays: number
@@ -58,7 +78,15 @@ export type GoalView = {
 
 export type GoalCatalog = {
   bodyMetrics: Array<{ key: string; label: string; unit: string }>
-  exercises: Array<{ id: string; name: string }>
+  exercises: Array<{
+    id: string
+    name: string
+    is_active: boolean
+    measurement_kind: string
+    load_type: string
+    performance_type: string
+    analytics_load_type: string
+  }>
   supplements: Array<{ id: string; name: string }>
   benchmarkOutcomes: Array<{
     definition_id: string
