@@ -614,14 +614,14 @@ export function GoalDetailPage() {
       <section className="rounded-lg border border-zinc-200 bg-white p-4">
         <h2 className="text-sm font-semibold">Remove goal</h2>
         <p className="mt-1 text-sm text-zinc-600">
-          Removes this goal from active views while preserving its target history and any experiment references.
+          Unreferenced mistaken goals are removed. Goals used by Experiment history are retired from default views so their historical references stay valid.
         </p>
         <button
           type="button"
           className={`${dangerButtonClass} mt-3`}
           disabled={busy}
           onClick={() => {
-            if (!window.confirm('Remove this goal? Its historical versions will be preserved.')) return
+            if (!window.confirm('Remove this goal? A goal used by Experiment history will be retired instead of removed.')) return
             setBusy(true)
             setError(null)
             void removeGoal(goalId)
