@@ -17,10 +17,28 @@ import {
   type CoachTaskStatus,
   type CoachTaskView,
   type CoachVerificationMode,
+  type CoachDifficulty,
   type RecentCoachRule,
 } from '../../src/domain/coach.js'
 import { bodyReminderCopy, measureHref, selectTodayBodyReminder } from '../../src/domain/body-cadence.js'
 import { healthCalendarDateFromNow } from '../../src/domain/time.js'
+import { addCalendarDays } from '../../src/domain/progress/dates.js'
+import {
+  STRETCH_CONFIG,
+  stretchCandidates,
+  stretchChallengeExpiresOn,
+  parseStretchMetadata,
+  type StretchHistoryEntry,
+} from '../../src/domain/coach-stretch.js'
+import {
+  bestStretchAttempt,
+  hasStretchBaselineSource,
+  stretchObservations,
+  type StretchExerciseDefinition,
+  type StretchObservationSnapshot,
+  type StretchPerformanceObservation,
+  type StretchSetRecord,
+} from '../../src/domain/progress/stretch-performance.js'
 import { loadCadenceEvidence } from '../body/cadence-service.js'
 import { getDailyContext } from '../context/service.js'
 import { getSql, type Sql } from '../db.js'
@@ -51,9 +69,10 @@ type CoachTaskRow = {
   target_value: string | number | null
   target_unit: string | null
   baseline_value: string | number | null
-  difficulty: 'routine' | 'standard' | 'weekly'
-  reward_band: 'routine' | 'standard' | 'weekly'
+  difficulty: CoachDifficulty
+  reward_band: CoachDifficulty
   status: CoachTaskStatus
+  accepted_at: string | Date | null
   completed_at: string | Date | null
   closed_at: string | Date | null
   metadata: Record<string, unknown> | null
@@ -89,6 +108,7 @@ const TASK_COLUMNS = `
   difficulty,
   reward_band,
   status,
+  accepted_at,
   completed_at,
   closed_at,
   metadata,
@@ -151,6 +171,190 @@ async function recentRules(sql: Sql, today: string): Promise<RecentCoachRule[]> 
     [today],
   )) as Array<{ rule_key: string; starts_on: string }>
   return rows.map((row) => ({ ruleKey: row.rule_key, startsOn: row.starts_on }))
+}
+
+async function loadStretchObservations(
+  sql: Sql,
+  start: string,
+  end: string,
+  now: Date,
+): Promise<StretchPerformanceObservation[]> {
+  // The session timestamp is canonical capture time; the date independently bounds
+  // performance. A historical date alone never proves post-acceptance work.
+  const rows = (await sql.query(
+    `SELECT sets.id::text AS set_id, sessions.id::text AS session_id,
+            session_exercises.id::text AS session_exercise_id,
+            exercises.id::text AS exercise_id, sessions.workout_date::text AS session_date,
+            to_char(sessions.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS session_created_at,
+            sessions.session_type,
+            session_exercises.position AS session_exercise_position,
+            sets.set_number, sets.set_type, sets.load_state, sets.weight_kg::text AS weight_kg,
+            sets.reps, sets.duration_sec, sets.left_reps, sets.right_reps,
+            sets.left_duration_sec, sets.right_duration_sec,
+            exercises.name, exercises.external_id, exercises.performance_type,
+            exercises.analytics_load_type, exercises.analytics_rep_mode,
+            exercises.measurement_kind, exercises.load_type, exercises.unilateral
+       FROM workout_sets sets
+       JOIN workout_session_exercises session_exercises ON session_exercises.id = sets.workout_session_exercise_id
+       JOIN workout_sessions sessions ON sessions.id = session_exercises.workout_session_id
+       JOIN exercise_definitions exercises ON exercises.id = session_exercises.exercise_definition_id
+      WHERE sessions.session_type IN ('programmed', 'ad_hoc', 'experiment')
+        AND sessions.workout_date BETWEEN $1::date AND $2::date
+        AND sessions.created_at <= $3::timestamptz
+      ORDER BY sessions.workout_date, sessions.created_at, sessions.id,
+               session_exercises.position, sets.set_number, sets.id`,
+    [start, end, now.toISOString()],
+  )) as Array<Record<string, unknown>>
+  const exercises = new Map<string, StretchExerciseDefinition>()
+  const sets: StretchSetRecord[] = []
+  for (const row of rows) {
+    const exerciseId = String(row.exercise_id)
+    exercises.set(exerciseId, {
+      id: exerciseId,
+      name: String(row.name),
+      externalId: row.external_id == null ? null : String(row.external_id),
+      performanceType: row.performance_type as StretchExerciseDefinition['performanceType'],
+      analyticsLoadType: row.analytics_load_type as StretchExerciseDefinition['analyticsLoadType'],
+      analyticsRepMode: row.analytics_rep_mode as StretchExerciseDefinition['analyticsRepMode'],
+      measurementKind: String(row.measurement_kind),
+      loadType: String(row.load_type),
+      unilateral: row.unilateral === true,
+    })
+    // Keep PostgreSQL microseconds: Date.toISOString would truncate them and
+    // make the exact canonical-source guard reject genuine Training records.
+    const sessionCreatedAt = String(row.session_created_at)
+    sets.push({
+      setId: String(row.set_id),
+      sessionId: String(row.session_id),
+      sessionExerciseId: String(row.session_exercise_id),
+      exerciseId,
+      sessionDate: String(row.session_date),
+      sessionCreatedAt,
+      sessionType: String(row.session_type),
+      sessionExercisePosition: Number(row.session_exercise_position),
+      setNumber: Number(row.set_number),
+      setType: String(row.set_type),
+      loadState: String(row.load_state),
+      weightKg: numberOrNull(row.weight_kg),
+      reps: numberOrNull(row.reps),
+      durationSec: numberOrNull(row.duration_sec),
+      leftReps: numberOrNull(row.left_reps),
+      rightReps: numberOrNull(row.right_reps),
+      leftDurationSec: numberOrNull(row.left_duration_sec),
+      rightDurationSec: numberOrNull(row.right_duration_sec),
+    })
+  }
+  return stretchObservations(sets, [...exercises.values()]).map((observation) => {
+    const exercise = exercises.get(observation.exerciseId)!
+    return {
+      ...observation,
+      evidence: {
+        ...observation.evidence,
+        performanceType: exercise.performanceType,
+        analyticsLoadType: exercise.analyticsLoadType,
+        analyticsRepMode: exercise.analyticsRepMode,
+        exerciseLoadType: exercise.loadType,
+      },
+    }
+  })
+}
+
+async function loadStretchHistory(sql: Sql, date: string): Promise<StretchHistoryEntry[]> {
+  const rows = (await sql.query(
+    `SELECT starts_on::text AS starts_on, metadata
+       FROM coach_tasks
+      WHERE task_kind = 'stretch_quest' AND starts_on <= $1::date
+      ORDER BY starts_on DESC, created_at DESC, id`,
+    [date],
+  )) as Array<{ starts_on: string; metadata: Record<string, unknown> }>
+  return rows.flatMap((row) => {
+    const stretch = row.metadata?.stretch as Record<string, unknown> | undefined
+    if (!stretch || typeof stretch.exerciseId !== 'string') return []
+    const strategy = stretch.strategy
+    if (strategy !== 'strength_e1rm' && strategy !== 'reps' && strategy !== 'duration') return []
+    return [{ startsOn: row.starts_on, exerciseId: stretch.exerciseId, strategy }]
+  })
+}
+
+async function loadCurrentStretch(sql: Sql, date: string): Promise<CoachTaskRow | null> {
+  const rows = (await sql.query(
+    `SELECT ${TASK_COLUMNS}
+       FROM coach_tasks
+      WHERE task_kind = 'stretch_quest' AND starts_on <= $1::date
+      ORDER BY CASE WHEN status IN ('offered', 'active') THEN 0 ELSE 1 END,
+               starts_on DESC, created_at DESC, id
+      LIMIT 1`,
+    [date],
+  )) as CoachTaskRow[]
+  return rows[0] ?? null
+}
+
+async function ensureStretch(sql: Sql, date: string, now: Date): Promise<void> {
+  const current = await loadCurrentStretch(sql, date)
+  if (current?.status === 'offered' || current?.status === 'active') return
+  const [observations, history, goalResult, context] = await Promise.all([
+    loadStretchObservations(sql, addCalendarDays(date, -STRETCH_CONFIG.baselineDays), date, now),
+    loadStretchHistory(sql, date),
+    listGoals(),
+    getDailyContext(date),
+  ])
+  const candidates = stretchCandidates({
+    date,
+    observations,
+    history,
+    goals: goalResult.goals.map((goal) => ({
+      id: goal.id,
+      kind: goal.goalKind,
+      status: goal.status,
+      exerciseDefinitionId: goal.selector?.exerciseDefinitionId ?? null,
+    })),
+    contextTags: context?.tags ?? [],
+  })
+  const candidate = candidates[0]
+  if (!candidate) return
+  const id = randomUUID()
+  const fingerprint = coachPeriodFingerprint('stretch_quest', date, candidate.ruleKey, candidate.ruleVersion)
+  // Separate statements matter: after waiting for the lock, READ COMMITTED takes
+  // a fresh snapshot for INSERT. The guarded INSERT covers terminal-state races
+  // as well as the database's single-current-Stretch unique index.
+  await sql.transaction([
+    sql.query(`SELECT pg_advisory_xact_lock(73498215)`),
+    sql.query(
+      `WITH inserted AS (
+         INSERT INTO coach_tasks (
+           id, task_kind, rule_key, rule_version, domain, title, detail,
+           starts_on, expires_on, period_fingerprint, goal_id,
+           verification_mode, action_kind, action_href,
+           target_value, target_unit, baseline_value, difficulty, reward_band,
+           metadata, status, created_at, updated_at
+         )
+         SELECT $1::uuid, $2, $3, $4::int, $5, $6, $7,
+                $8::date, $9::date, $10, $11::uuid, $12, $13, $14,
+                $15::numeric, $16, $17::numeric, $18, $19,
+                $20::jsonb, 'offered', $21::timestamptz, $21::timestamptz
+          WHERE NOT EXISTS (
+                  SELECT 1 FROM coach_tasks
+                   WHERE task_kind = 'stretch_quest' AND status IN ('offered', 'active')
+                )
+            AND NOT EXISTS (
+                  SELECT 1 FROM coach_tasks
+                   WHERE task_kind = 'stretch_quest' AND starts_on > ($8::date - $23::int)
+                )
+         ON CONFLICT DO NOTHING
+         RETURNING id
+       )
+       INSERT INTO coach_task_events (
+         id, task_id, event_kind, occurred_at, evidence_kind, evidence, idempotency_key
+       ) SELECT $22::uuid, id, 'offered', $21::timestamptz, 'none', '{}'::jsonb, 'offered'
+           FROM inserted`,
+      [id, candidate.taskKind, candidate.ruleKey, candidate.ruleVersion,
+        candidate.domain, candidate.title, candidate.detail, candidate.startsOn,
+        candidate.expiresOn, fingerprint, candidate.goalId, candidate.verificationMode,
+        candidate.actionKind, candidate.actionHref, candidate.targetValue, candidate.targetUnit,
+        candidate.baselineValue, candidate.difficulty, candidate.rewardBand,
+        JSON.stringify(candidate.metadata), now.toISOString(), randomUUID(), STRETCH_CONFIG.cooldownDays],
+    ),
+  ])
 }
 
 async function latestEvidenceKind(sql: Sql, taskId: string): Promise<CoachEvidenceKind | null> {
@@ -681,11 +885,177 @@ async function manualTrainingProgress(
   }
 }
 
+function stretchMetadata(row: CoachTaskRow): Record<string, unknown> | null {
+  return parseStretchMetadata(metadataOf(row))
+}
+
+async function stretchBaselineExists(sql: Sql, row: CoachTaskRow, now: Date): Promise<boolean> {
+  const baseline = stretchMetadata(row)?.baseline
+  if (!baseline || typeof baseline !== 'object' || Array.isArray(baseline)) return false
+  const snapshot = baseline as StretchObservationSnapshot
+  if (typeof snapshot.date !== 'string') return false
+  const observations = await loadStretchObservations(sql, snapshot.date, snapshot.date, now)
+  return hasStretchBaselineSource(observations, snapshot)
+}
+
+async function stretchProgress(
+  sql: Sql,
+  row: CoachTaskRow,
+  today: string,
+  now: Date,
+): Promise<{ progress: CoachProgress; evidence: CompletionEvidence | null }> {
+  const metadata = stretchMetadata(row)
+  const target = numberOrNull(row.target_value)
+  const acceptedAt = instantOrNull(row.accepted_at)
+  const acceptedOn = metadata?.acceptedOn
+  const strategy = metadata?.strategy
+  const exerciseId = metadata?.exerciseId
+  const empty = { current: null, target, unit: row.target_unit, label: null }
+  if (!acceptedAt || typeof acceptedOn !== 'string' || typeof exerciseId !== 'string' ||
+      (strategy !== 'strength_e1rm' && strategy !== 'reps' && strategy !== 'duration')) {
+    return { progress: empty, evidence: null }
+  }
+  const challengeEnd = new Date(`${addCalendarDays(row.expires_on, 1)}T07:00:00.000Z`)
+  const cutoff = new Date(Math.min(now.getTime(), challengeEnd.getTime() - 1))
+  const observations = await loadStretchObservations(sql, acceptedOn, row.expires_on, cutoff)
+  const frozenEvidence = parseStretchMetadata(metadataOf(row))?.baseline.evidence as Record<string, unknown> | undefined
+  const compatible = observations.filter((observation) => {
+    const attemptEvidence = observation.evidence as Record<string, unknown>
+    return observation.measurementKind === metadata?.measurementKind && observation.perSide === metadata?.perSide &&
+      ['performanceType', 'analyticsLoadType', 'analyticsRepMode', 'exerciseLoadType']
+        .every((key) => frozenEvidence?.[key] === attemptEvidence[key])
+  })
+  const best = bestStretchAttempt(compatible, {
+    exerciseId, strategy, acceptedAt, acceptedOn, expiresOn: row.expires_on, asOf: today, now: now.toISOString(),
+  })
+  const value = best?.value ?? null
+  const baseline = numberOrNull(row.baseline_value)
+  const newBest = value != null && baseline != null && value > baseline
+  const reached = value != null && target != null && value >= target
+  return {
+    progress: {
+      current: value,
+      target,
+      unit: row.target_unit,
+      label: value == null ? 'No qualifying attempt yet' : newBest && !reached ? 'New PR · Quest not conquered yet' : 'Best qualifying attempt',
+    },
+    evidence: reached && best
+      ? {
+          evidenceKind: 'deterministic_canonical',
+          sourceType: 'workout_set',
+          sourceId: best.sourceSet.setId,
+          evidence: {
+            ...best.evidence,
+            acceptedAt,
+            acceptedOn,
+            challengeExpiresOn: row.expires_on,
+            sessionCreatedAt: best.sourceSet.sessionCreatedAt,
+            loadState: best.sourceSet.loadState,
+            measurementKind: best.measurementKind,
+            target,
+            baseline,
+            difficulty: row.difficulty,
+            rewardBand: row.reward_band,
+          },
+        }
+      : null,
+  }
+}
+
+async function transitionStretch(
+  sql: Sql,
+  row: CoachTaskRow,
+  status: 'active' | 'completed' | 'passed' | 'failed' | 'expired',
+  now: Date,
+  evidence?: CompletionEvidence,
+  reason?: string,
+): Promise<boolean> {
+  const eventKind = status === 'active' ? 'accepted' : status
+  const acceptedOn = healthCalendarDateFromNow(now)
+  const expiresOn = status === 'active' ? stretchChallengeExpiresOn(acceptedOn) : row.expires_on
+  const metadata = status === 'active'
+    ? { ...metadataOf(row), stretch: { ...stretchMetadata(row), acceptedOn, challengeExpiresOn: expiresOn } }
+    : metadataOf(row)
+  const detail = evidence?.evidence ?? (reason ? { reason } : {})
+  const baseline = parseStretchMetadata(metadataOf(row))?.baseline
+  const source = (status === 'active' ? baseline?.evidence : evidence?.evidence) as Record<string, unknown> | undefined
+  const sourceDate = status === 'active' ? baseline?.date : source?.date
+  const sourceCreatedAt = status === 'active' ? baseline?.sourceCreatedAt : source?.sessionCreatedAt
+  const sourceMeasurement = status === 'active' ? baseline?.measurementKind : source?.measurementKind
+  // This single statement makes state and its append-only event one transaction.
+  // A competing mutation can only append evidence if it won the transition.
+  const changed = (await sql.query(
+    `WITH changed AS (
+       UPDATE coach_tasks
+          SET status = $2,
+              accepted_at = CASE WHEN $2 = 'active' THEN $3::timestamptz ELSE accepted_at END,
+              expires_on = $4::date, metadata = $5::jsonb,
+              completed_at = CASE WHEN $2 = 'completed' THEN $3::timestamptz ELSE completed_at END,
+              closed_at = CASE WHEN $2 = 'active' THEN NULL ELSE $3::timestamptz END,
+              updated_at = $3::timestamptz
+        WHERE id = $1::uuid AND task_kind = 'stretch_quest' AND status = $6
+          AND ($2 NOT IN ('active', 'completed') OR EXISTS (
+            SELECT 1
+              FROM workout_sets sets
+              JOIN workout_session_exercises session_exercises ON session_exercises.id = sets.workout_session_exercise_id
+              JOIN workout_sessions sessions ON sessions.id = session_exercises.workout_session_id
+              JOIN exercise_definitions exercises ON exercises.id = session_exercises.exercise_definition_id
+             WHERE sets.id = $13::uuid AND sessions.id = $14::uuid
+               AND session_exercises.id = $15::uuid AND exercises.id = $16::uuid
+               AND sets.set_type = 'working'
+               AND sets.weight_kg IS NOT DISTINCT FROM $17::numeric
+               AND sets.reps IS NOT DISTINCT FROM $18::int
+               AND sets.duration_sec IS NOT DISTINCT FROM $19::int
+               AND sets.left_reps IS NOT DISTINCT FROM $20::int
+               AND sets.right_reps IS NOT DISTINCT FROM $21::int
+               AND sets.left_duration_sec IS NOT DISTINCT FROM $22::int
+               AND sets.right_duration_sec IS NOT DISTINCT FROM $23::int
+               AND sessions.workout_date = $24::date
+               AND sessions.created_at = $25::timestamptz
+               AND exercises.measurement_kind = $26
+               AND exercises.performance_type = $28
+               AND exercises.analytics_load_type = $29
+               AND exercises.analytics_rep_mode = $30
+               AND exercises.load_type = $31
+               AND sessions.session_type IN ('programmed', 'ad_hoc', 'experiment')
+               AND (($27 = 'strength_e1rm' AND sets.load_state = 'external'
+                     AND exercises.performance_type = 'loaded_reps' AND exercises.analytics_load_type = 'external')
+                 OR ($27 IN ('reps', 'duration') AND sets.load_state IN ('bodyweight', 'none')
+                     AND exercises.load_type IN ('bodyweight', 'none')
+                     AND exercises.analytics_load_type IN ('bodyweight', 'none')
+                     AND exercises.performance_type NOT IN ('loaded_reps', 'assisted_reps', 'distance')))
+          ))
+        RETURNING id
+     ), event AS (
+       INSERT INTO coach_task_events (
+         id, task_id, event_kind, occurred_at, evidence_kind, source_type,
+         source_id, evidence, idempotency_key
+       ) SELECT $7::uuid, id, $8, $3::timestamptz, $9, $10, $11, $12::jsonb, $8
+           FROM changed
+       ON CONFLICT (task_id, idempotency_key) DO NOTHING
+     ) SELECT id::text AS id FROM changed`,
+    [row.id, status, now.toISOString(), expiresOn, JSON.stringify(metadata), row.status,
+      randomUUID(), eventKind, evidence?.evidenceKind ?? 'none', evidence?.sourceType ?? null,
+      evidence?.sourceId ?? null, JSON.stringify(detail),
+      source?.setId ?? null, source?.sessionId ?? null, source?.sessionExerciseId ?? null,
+      source?.exerciseId ?? null, source?.loadKg ?? null, source?.reps ?? null,
+      source?.durationSec ?? null, source?.leftReps ?? null, source?.rightReps ?? null,
+      source?.leftDurationSec ?? null, source?.rightDurationSec ?? null,
+      sourceDate ?? null, sourceCreatedAt ?? null, sourceMeasurement ?? null,
+      parseStretchMetadata(metadataOf(row))?.strategy ?? null,
+      source?.performanceType ?? null, source?.analyticsLoadType ?? null,
+      source?.analyticsRepMode ?? null, source?.exerciseLoadType ?? null],
+  )) as Array<{ id: string }>
+  return changed.length > 0
+}
+
 async function evaluateTask(
   sql: Sql,
   row: CoachTaskRow,
   today: string,
+  now = new Date(),
 ): Promise<{ progress: CoachProgress | null; evidence: CompletionEvidence | null }> {
+  if (row.task_kind === 'stretch_quest') return stretchProgress(sql, row, today, now)
   const target = numberOrNull(row.target_value)
   const rule = completionRule(row)
 
@@ -820,30 +1190,61 @@ async function expireTask(sql: Sql, row: CoachTaskRow) {
   })
 }
 
-async function reconcile(sql: Sql, today: string) {
+async function reconcile(sql: Sql, today: string, now: Date) {
   const rows = (await sql.query(
     `SELECT ${TASK_COLUMNS}
        FROM coach_tasks
-      WHERE status = 'active'
+      WHERE (status = 'active' OR (task_kind = 'stretch_quest' AND status = 'offered'))
         AND starts_on <= $1::date
       ORDER BY starts_on, id`,
     [today],
   )) as CoachTaskRow[]
   for (const row of rows) {
-    const evaluated = await evaluateTask(sql, row, today)
+    if (row.task_kind === 'stretch_quest' && row.status === 'offered') {
+      if (row.expires_on < today) {
+        await transitionStretch(sql, row, 'expired', now, undefined, 'offer_window_ended')
+      } else if (!(await stretchBaselineExists(sql, row, now))) {
+        await transitionStretch(sql, row, 'expired', now, undefined, 'baseline_source_unavailable')
+      }
+      continue
+    }
+    const evaluated = await evaluateTask(sql, row, today, now)
     if (evaluated.evidence) {
-      await completeTask(sql, row, evaluated.evidence)
+      if (row.task_kind === 'stretch_quest') {
+        await transitionStretch(sql, row, 'completed', now, evaluated.evidence)
+      } else {
+        await completeTask(sql, row, evaluated.evidence)
+      }
       continue
     }
     if (row.expires_on < today) {
-      await expireTask(sql, row)
+      if (row.task_kind === 'stretch_quest') {
+        await transitionStretch(sql, row, 'failed', now, undefined, 'challenge_window_ended')
+      } else {
+        await expireTask(sql, row)
+      }
     }
   }
 }
 
-async function toView(sql: Sql, row: CoachTaskRow, today: string): Promise<CoachTaskView> {
-  const evaluated = row.status === 'active' ? await evaluateTask(sql, row, today) : { progress: null, evidence: null }
+async function toView(sql: Sql, row: CoachTaskRow, today: string, now: Date): Promise<CoachTaskView> {
+  const evaluated = row.status === 'active' ? await evaluateTask(sql, row, today, now) : { progress: null, evidence: null }
   const completedEvidence = row.status === 'completed' ? await latestEvidenceKind(sql, row.id) : null
+  let progress = evaluated.progress
+  if (row.task_kind === 'stretch_quest' && row.status === 'completed') {
+    const events = (await sql.query(
+      `SELECT evidence FROM coach_task_events
+        WHERE task_id = $1::uuid AND event_kind = 'completed'
+        ORDER BY occurred_at DESC, id DESC LIMIT 1`,
+      [row.id],
+    )) as Array<{ evidence: Record<string, unknown> }>
+    progress = {
+      current: numberOrNull(events[0]?.evidence.value),
+      target: numberOrNull(row.target_value),
+      unit: row.target_unit,
+      label: 'Verified by Training',
+    }
+  }
   return {
     id: row.id,
     taskKind: row.task_kind,
@@ -864,23 +1265,28 @@ async function toView(sql: Sql, row: CoachTaskRow, today: string): Promise<Coach
     difficulty: row.difficulty,
     rewardBand: row.reward_band,
     status: row.status,
+    acceptedAt: instantOrNull(row.accepted_at),
     completedAt: instantOrNull(row.completed_at),
     closedAt: instantOrNull(row.closed_at),
     metadata: metadataOf(row),
-    progress: evaluated.progress,
-    evidenceLabel: evidenceLabel(completedEvidence),
+    progress,
+    evidenceLabel: row.task_kind === 'stretch_quest' && (row.status === 'completed' || evaluated.progress?.current != null)
+      ? 'Verified by Training'
+      : evidenceLabel(completedEvidence),
   }
 }
 
-async function currentState(sql: Sql, date: string): Promise<CoachState> {
+async function currentState(sql: Sql, date: string, now: Date): Promise<CoachState> {
   const week = coachWeek(date)
-  const [weeklyRow, dailyRow] = await Promise.all([
+  const [weeklyRow, dailyRow, stretchRow] = await Promise.all([
     loadTaskForPeriod(sql, 'weekly_focus', week.start),
     loadTaskForPeriod(sql, 'daily_quest', date),
+    loadCurrentStretch(sql, date),
   ])
-  const [weeklyFocus, dailyQuest] = await Promise.all([
-    weeklyRow ? toView(sql, weeklyRow, date) : Promise.resolve(null),
-    dailyRow ? toView(sql, dailyRow, date) : Promise.resolve(null),
+  const [weeklyFocus, dailyQuest, stretchQuest] = await Promise.all([
+    weeklyRow ? toView(sql, weeklyRow, date, now) : Promise.resolve(null),
+    dailyRow ? toView(sql, dailyRow, date, now) : Promise.resolve(null),
+    stretchRow ? toView(sql, stretchRow, date, now) : Promise.resolve(null),
   ])
   return {
     date,
@@ -888,36 +1294,47 @@ async function currentState(sql: Sql, date: string): Promise<CoachState> {
     weekEnd: week.end,
     weeklyFocus,
     dailyQuest,
-    activeCount: [weeklyFocus, dailyQuest].filter((item) => item?.status === 'active').length,
+    stretchQuest,
+    activeCount: [weeklyFocus, dailyQuest, stretchQuest].filter((item) => item?.status === 'active' || item?.status === 'offered').length,
   }
 }
 
 export async function readCoach(now = new Date()): Promise<CoachState> {
   const date = healthCalendarDateFromNow(now)
   const sql = await getSql()
-  await reconcile(sql, date)
-  return currentState(sql, date)
+  await reconcile(sql, date, now)
+  return currentState(sql, date, now)
 }
 
 export async function ensureCoach(now = new Date()): Promise<CoachState> {
   const date = healthCalendarDateFromNow(now)
   const week = coachWeek(date)
   const sql = await getSql()
-  await reconcile(sql, date)
+  await reconcile(sql, date, now)
   const recent = await recentRules(sql, date)
   const [weekly, daily] = await Promise.all([weeklyCandidates(date), dailyCandidates(date)])
   await ensurePeriodTask(sql, 'weekly_focus', week.start, weekly, [], date)
   await ensurePeriodTask(sql, 'daily_quest', date, daily, recent, date)
-  await reconcile(sql, date)
-  return currentState(sql, date)
+  await ensureStretch(sql, date, now)
+  await reconcile(sql, date, now)
+  return currentState(sql, date, now)
 }
 
 export async function passCoachTask(id: string, now = new Date()): Promise<CoachState> {
   const date = healthCalendarDateFromNow(now)
   const sql = await getSql()
+  await reconcile(sql, date, now)
   const row = await loadTask(sql, id)
   if (!row) throw new HttpError(404, 'Coach task not found')
-  if (row.status === 'passed') return currentState(sql, date)
+  if (row.status === 'passed') return currentState(sql, date, now)
+  if (row.task_kind === 'stretch_quest') {
+    if (row.status !== 'offered') throw new HttpError(409, 'Only an offered Stretch Quest can be passed')
+    const changed = await transitionStretch(sql, row, 'passed', now)
+    if (!changed && (await loadTask(sql, id))?.status !== 'passed') {
+      throw new HttpError(409, 'Stretch Quest is no longer offered')
+    }
+    return currentState(sql, date, now)
+  }
   if (row.status !== 'active') throw new HttpError(409, 'Only an active Coach task can be passed')
   await sql.transaction([
     sql.query(
@@ -934,7 +1351,44 @@ export async function passCoachTask(id: string, now = new Date()): Promise<Coach
       [randomUUID(), id],
     ),
   ])
-  return currentState(sql, date)
+  return currentState(sql, date, now)
+}
+
+export async function acceptCoachTask(id: string, now = new Date()): Promise<CoachState> {
+  const date = healthCalendarDateFromNow(now)
+  const sql = await getSql()
+  await reconcile(sql, date, now)
+  const row = await loadTask(sql, id)
+  if (!row) throw new HttpError(404, 'Coach task not found')
+  if (row.task_kind !== 'stretch_quest') throw new HttpError(409, 'Only a Stretch Quest can be accepted')
+  if (row.accepted_at != null) return currentState(sql, date, now)
+  if (row.status !== 'offered') throw new HttpError(409, 'This Stretch offer is no longer available')
+  const current = await loadCurrentStretch(sql, date)
+  if (current?.id !== row.id) throw new HttpError(409, 'This Stretch offer is no longer current')
+  const changed = await transitionStretch(sql, row, 'active', now)
+  if (!changed && (await loadTask(sql, id))?.accepted_at == null) {
+    await reconcile(sql, date, now)
+    throw new HttpError(409, 'This Stretch offer is no longer available')
+  }
+  return currentState(sql, date, now)
+}
+
+export async function endCoachTask(id: string, now = new Date()): Promise<CoachState> {
+  const date = healthCalendarDateFromNow(now)
+  const sql = await getSql()
+  await reconcile(sql, date, now)
+  const row = await loadTask(sql, id)
+  if (!row) throw new HttpError(404, 'Coach task not found')
+  if (row.task_kind !== 'stretch_quest') throw new HttpError(409, 'Only an accepted Stretch Quest can be ended')
+  if (row.status === 'failed') return currentState(sql, date, now)
+  if (row.status !== 'active' || row.accepted_at == null) {
+    throw new HttpError(409, 'Only an accepted active Stretch Quest can be ended')
+  }
+  const changed = await transitionStretch(sql, row, 'failed', now, undefined, 'owner_ended')
+  if (!changed && (await loadTask(sql, id))?.status !== 'failed') {
+    throw new HttpError(409, 'This Stretch Quest is no longer active')
+  }
+  return currentState(sql, date, now)
 }
 
 export async function logCoachTraining(id: string, body: unknown, now = new Date()): Promise<CoachState> {
@@ -942,9 +1396,10 @@ export async function logCoachTraining(id: string, body: unknown, now = new Date
   if (!parsed.success) throw new HttpError(400, parsed.error.issues[0]?.message ?? 'Invalid Training log')
   const date = healthCalendarDateFromNow(now)
   const sql = await getSql()
+  await reconcile(sql, date, now)
   const row = await loadTask(sql, id)
   if (!row) throw new HttpError(404, 'Coach task not found')
-  if (row.status === 'completed') return currentState(sql, date)
+  if (row.status === 'completed') return currentState(sql, date, now)
   if (row.status !== 'active' || row.verification_mode !== 'training_log') {
     throw new HttpError(409, 'This Coach task is not awaiting a Training log')
   }
@@ -995,7 +1450,7 @@ export async function logCoachTraining(id: string, body: unknown, now = new Date
             {
               setNumber: 1,
               setType: 'working',
-              loadState: rule.training.loadType === 'bodyweight' ? 'bodyweight' : 'none',
+              loadState: 'bodyweight',
               weightLb: null,
               reps: set.reps,
               durationSec: set.durationSec,
@@ -1061,7 +1516,7 @@ export async function logCoachTraining(id: string, body: unknown, now = new Date
     }
   }
 
-  return currentState(sql, date)
+  return currentState(sql, date, now)
 }
 
 export async function logCoachSelfReport(id: string, body: unknown, now = new Date()): Promise<CoachState> {
@@ -1069,9 +1524,10 @@ export async function logCoachSelfReport(id: string, body: unknown, now = new Da
   if (!parsed.success) throw new HttpError(400, parsed.error.issues[0]?.message ?? 'Invalid Coach log')
   const date = healthCalendarDateFromNow(now)
   const sql = await getSql()
+  await reconcile(sql, date, now)
   const row = await loadTask(sql, id)
   if (!row) throw new HttpError(404, 'Coach task not found')
-  if (row.status === 'completed') return currentState(sql, date)
+  if (row.status === 'completed') return currentState(sql, date, now)
   if (row.status !== 'active' || row.verification_mode !== 'owner_self_report') {
     throw new HttpError(409, 'This Coach task is not awaiting an owner report')
   }
@@ -1111,5 +1567,5 @@ export async function logCoachSelfReport(id: string, body: unknown, now = new Da
       ],
     ),
   ])
-  return currentState(sql, date)
+  return currentState(sql, date, now)
 }

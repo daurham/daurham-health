@@ -25,6 +25,14 @@ export function passCoachTask(taskId: string): Promise<CoachState> {
   return send(`/api/coach/tasks/${taskId}/pass`, 'POST', {})
 }
 
+export function acceptCoachTask(taskId: string): Promise<CoachState> {
+  return send(`/api/coach/tasks/${taskId}/accept`, 'POST', {})
+}
+
+export function endCoachTask(taskId: string): Promise<CoachState> {
+  return send(`/api/coach/tasks/${taskId}/end`, 'POST', {})
+}
+
 export function logCoachTraining(
   taskId: string,
   body: {

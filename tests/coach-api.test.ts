@@ -5,12 +5,15 @@ import type { HealthOwnerConfig } from '../server/auth/config.ts'
 import { withOwnerAuth } from '../server/auth/with-owner.ts'
 import { matchHealthApiRoute } from '../server/dispatch.ts'
 import { handleCoach, matchCoachRoute } from '../server/handlers/coach.ts'
+import { HttpError } from '../server/http.ts'
 import { wrapNodeResponse, type ApiRequest, type ApiResponse } from '../server/http.ts'
 
 const service = vi.hoisted(() => ({
   ensureCoach: vi.fn(),
   readCoach: vi.fn(),
   passCoachTask: vi.fn(),
+  acceptCoachTask: vi.fn(),
+  endCoachTask: vi.fn(),
   logCoachTraining: vi.fn(),
   logCoachSelfReport: vi.fn(),
 }))
@@ -66,6 +69,8 @@ describe('Coach API routing', () => {
     service.ensureCoach.mockResolvedValue(state)
     service.readCoach.mockResolvedValue(state)
     service.passCoachTask.mockResolvedValue(state)
+    service.acceptCoachTask.mockResolvedValue(state)
+    service.endCoachTask.mockResolvedValue(state)
     service.logCoachTraining.mockResolvedValue(state)
     service.logCoachSelfReport.mockResolvedValue(state)
   })
@@ -100,5 +105,22 @@ describe('Coach API routing', () => {
     expect(service.passCoachTask).toHaveBeenCalledWith(TASK)
     expect(service.logCoachTraining).toHaveBeenCalledWith(TASK, { submissionId: TASK, actualValue: 10 })
     expect(service.logCoachSelfReport).toHaveBeenCalledWith(TASK, { submissionId: TASK, durationMin: 10 })
+  })
+
+  it.each(['accept', 'end', 'pass'] as const)('protects the %s lifecycle mutation and validates methods', async (action) => {
+    const url = `/api/coach/tasks/${TASK}/${action}`
+    const owner = { id: 'owner-1', email: 'owner@example.com' }
+    expect(matchCoachRoute(url)).toEqual({ kind: 'task', id: TASK, action })
+    expect(matchHealthApiRoute(url)).toBe('coach')
+    expect((await call('POST', url, null)).status()).toBe(401)
+    expect((await call('POST', url, { id: 'other', email: 'other@example.com' })).status()).toBe(403)
+    const wrong = await call('GET', url, owner)
+    expect(wrong.status()).toBe(405)
+    expect(wrong.allow()).toBe('POST')
+    expect((await call('POST', url, owner)).status()).toBe(200)
+    const mutation = action === 'accept' ? service.acceptCoachTask : action === 'end' ? service.endCoachTask : service.passCoachTask
+    expect(mutation).toHaveBeenCalledWith(TASK)
+    mutation.mockRejectedValueOnce(new HttpError(409, 'Invalid lifecycle transition'))
+    expect((await call('POST', url, owner)).status()).toBe(409)
   })
 })
