@@ -1,6 +1,6 @@
 export const BACKUP_FORMAT = 'daurham-health-backup'
 export const BACKUP_FORMAT_VERSION = 1
-export const LATEST_SCHEMA_MIGRATION = '0033_nutrition_capture_images.sql'
+export const LATEST_SCHEMA_MIGRATION = '0034_secondary_nutrients_and_goal_archive.sql'
 export const PORTABLE_EXPORT_BYTE_LIMIT = 3_500_000
 
 export type ColumnKind = 'uuid' | 'text' | 'date' | 'timestamptz' | 'numeric' | 'int' | 'bool' | 'json' | 'bytea'
@@ -175,6 +175,7 @@ export const BACKUP_TABLES: readonly BackupTable[] = [
       col('carbs', 'numeric'),
       col('fat', 'numeric'),
       col('fiber', 'numeric'),
+      col('sodium_mg', 'numeric'),
       col('source_kind', 'text'),
       col('is_staple', 'bool'),
       col('archived', 'bool'),
@@ -221,6 +222,8 @@ export const BACKUP_TABLES: readonly BackupTable[] = [
       col('protein_g', 'numeric'),
       col('carbs_g', 'numeric'),
       col('fat_g', 'numeric'),
+      col('fiber_g', 'numeric'),
+      col('sodium_mg', 'numeric'),
       col('calculation_version', 'text'),
       col('source_id', 'uuid'),
       col('created_at', 'timestamptz'),
@@ -254,10 +257,14 @@ export const BACKUP_TABLES: readonly BackupTable[] = [
       col('base_protein_g_snapshot', 'numeric'),
       col('base_carbs_g_snapshot', 'numeric'),
       col('base_fat_g_snapshot', 'numeric'),
+      col('base_fiber_g_snapshot', 'numeric'),
+      col('base_sodium_mg_snapshot', 'numeric'),
       col('line_calories_kcal', 'numeric'),
       col('line_protein_g', 'numeric'),
       col('line_carbs_g', 'numeric'),
       col('line_fat_g', 'numeric'),
+      col('line_fiber_g', 'numeric'),
+      col('line_sodium_mg', 'numeric'),
       col('created_at', 'timestamptz'),
     ],
   }),
@@ -276,6 +283,7 @@ export const BACKUP_TABLES: readonly BackupTable[] = [
       col('carbs_target', 'numeric'),
       col('fat_target', 'numeric'),
       col('fiber_target', 'numeric'),
+      col('sodium_target_mg', 'numeric'),
       col('created_at', 'timestamptz'),
       col('updated_at', 'timestamptz'),
     ],
@@ -307,6 +315,7 @@ export const BACKUP_TABLES: readonly BackupTable[] = [
       col('carbs', 'numeric'),
       col('fat', 'numeric'),
       col('fiber', 'numeric'),
+      col('sodium_mg', 'numeric'),
       col('source_kind', 'text'),
       col('notes', 'text'),
       col('created_at', 'timestamptz'),
@@ -942,6 +951,7 @@ export const BACKUP_TABLES: readonly BackupTable[] = [
       col('source_id', 'uuid'),
       col('paused_at', 'timestamptz'),
       col('completed_at', 'timestamptz'),
+      col('archived_at', 'timestamptz'),
       col('created_at', 'timestamptz'),
       col('updated_at', 'timestamptz'),
     ],
