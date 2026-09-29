@@ -94,7 +94,9 @@ describe('today supplements', () => {
       }),
     ])
     expect(taken).toContain('Supplements complete')
-    expect(taken).toContain('Clear Creatine')
+    expect(taken).toContain('1/1 taken')
+    expect(taken).toContain('Review')
+    expect(taken).not.toContain('Clear Creatine')
 
     const skipped = html([
       supplement({
@@ -102,8 +104,9 @@ describe('today supplements', () => {
       }),
     ])
     expect(skipped).toContain('Supplements recorded · 1 skipped')
-    expect(skipped).toContain('Skipped')
-    expect(skipped).toContain('data-state="skipped"')
+    expect(skipped).toContain('0 taken · 1 skipped')
+    expect(skipped).toContain('Review')
+    expect(skipped).not.toContain('data-state="skipped"')
 
     const multiple = buildTodayView(sources([
       supplement(),
