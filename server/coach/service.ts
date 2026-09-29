@@ -193,6 +193,7 @@ async function loadStretchObservations(
             sets.set_number, sets.set_type, sets.load_state, sets.weight_kg::text AS weight_kg,
             sets.reps, sets.duration_sec, sets.left_reps, sets.right_reps,
             sets.left_duration_sec, sets.right_duration_sec,
+            sets.distance_m::text AS distance_m, sets.completed,
             exercises.name, exercises.external_id, exercises.performance_type,
             exercises.analytics_load_type, exercises.analytics_rep_mode,
             exercises.measurement_kind, exercises.load_type, exercises.unilateral
@@ -244,6 +245,8 @@ async function loadStretchObservations(
       rightReps: numberOrNull(row.right_reps),
       leftDurationSec: numberOrNull(row.left_duration_sec),
       rightDurationSec: numberOrNull(row.right_duration_sec),
+      distanceM: numberOrNull(row.distance_m),
+      completed: row.completed == null ? null : row.completed === true,
     })
   }
   return stretchObservations(sets, [...exercises.values()]).map((observation) => {
@@ -273,7 +276,13 @@ async function loadStretchHistory(sql: Sql, date: string): Promise<StretchHistor
     const stretch = row.metadata?.stretch as Record<string, unknown> | undefined
     if (!stretch || typeof stretch.exerciseId !== 'string') return []
     const strategy = stretch.strategy
-    if (strategy !== 'strength_e1rm' && strategy !== 'reps' && strategy !== 'duration') return []
+    if (
+      strategy !== 'strength_e1rm' &&
+      strategy !== 'reps' &&
+      strategy !== 'duration' &&
+      strategy !== 'distance' &&
+      strategy !== 'pace'
+    ) return []
     return [{ startsOn: row.starts_on, exerciseId: stretch.exerciseId, strategy }]
   })
 }
@@ -309,6 +318,7 @@ async function ensureStretch(sql: Sql, date: string, now: Date): Promise<void> {
       kind: goal.goalKind,
       status: goal.status,
       exerciseDefinitionId: goal.selector?.exerciseDefinitionId ?? null,
+      trainingMinDistanceM: goal.selector?.trainingMinDistanceM ?? null,
     })),
     contextTags: context?.tags ?? [],
   })
@@ -914,7 +924,13 @@ async function stretchProgress(
   const exerciseId = metadata?.exerciseId
   const empty = { current: null, target, unit: row.target_unit, label: null }
   if (!acceptedAt || typeof acceptedOn !== 'string' || typeof exerciseId !== 'string' ||
-      (strategy !== 'strength_e1rm' && strategy !== 'reps' && strategy !== 'duration')) {
+      (
+        strategy !== 'strength_e1rm' &&
+        strategy !== 'reps' &&
+        strategy !== 'duration' &&
+        strategy !== 'distance' &&
+        strategy !== 'pace'
+      )) {
     return { progress: empty, evidence: null }
   }
   const challengeEnd = new Date(`${addCalendarDays(row.expires_on, 1)}T07:00:00.000Z`)
@@ -927,13 +943,23 @@ async function stretchProgress(
       ['performanceType', 'analyticsLoadType', 'analyticsRepMode', 'exerciseLoadType']
         .every((key) => frozenEvidence?.[key] === attemptEvidence[key])
   })
+  const minimumDistanceM = strategy === 'pace'
+    ? numberOrNull(parseStretchMetadata(metadataOf(row))?.baseline.evidence.distanceM)
+    : null
   const best = bestStretchAttempt(compatible, {
-    exerciseId, strategy, acceptedAt, acceptedOn, expiresOn: row.expires_on, asOf: today, now: now.toISOString(),
+    exerciseId,
+    strategy,
+    acceptedAt,
+    acceptedOn,
+    expiresOn: row.expires_on,
+    asOf: today,
+    now: now.toISOString(),
+    minimumDistanceM,
   })
   const value = best?.value ?? null
   const baseline = numberOrNull(row.baseline_value)
-  const newBest = value != null && baseline != null && value > baseline
-  const reached = value != null && target != null && value >= target
+  const newBest = value != null && baseline != null && (strategy === 'pace' ? value < baseline : value > baseline)
+  const reached = value != null && target != null && (strategy === 'pace' ? value <= target : value >= target)
   return {
     progress: {
       current: value,
@@ -1012,6 +1038,8 @@ async function transitionStretch(
                AND sets.right_reps IS NOT DISTINCT FROM $21::int
                AND sets.left_duration_sec IS NOT DISTINCT FROM $22::int
                AND sets.right_duration_sec IS NOT DISTINCT FROM $23::int
+               AND sets.distance_m IS NOT DISTINCT FROM $32::numeric
+               AND sets.completed IS NOT DISTINCT FROM $33::boolean
                AND sessions.workout_date = $24::date
                AND sessions.created_at = $25::timestamptz
                AND exercises.measurement_kind = $26
@@ -1025,7 +1053,14 @@ async function transitionStretch(
                  OR ($27 IN ('reps', 'duration') AND sets.load_state IN ('bodyweight', 'none')
                      AND exercises.load_type IN ('bodyweight', 'none')
                      AND exercises.analytics_load_type IN ('bodyweight', 'none')
-                     AND exercises.performance_type NOT IN ('loaded_reps', 'assisted_reps', 'distance')))
+                     AND exercises.performance_type NOT IN ('loaded_reps', 'assisted_reps', 'distance', 'skill'))
+                 OR ($27 IN ('distance', 'pace') AND sets.load_state = 'bodyweight'
+                     AND exercises.load_type = 'none'
+                     AND exercises.analytics_load_type = 'none'
+                     AND exercises.performance_type = 'distance'
+                     AND exercises.measurement_kind IN ('distance', 'distance_duration')
+                     AND sets.distance_m IS NOT NULL
+                     AND ($27 <> 'pace' OR sets.duration_sec IS NOT NULL)))
           ))
         RETURNING id
      ), event AS (
@@ -1046,7 +1081,8 @@ async function transitionStretch(
       sourceDate ?? null, sourceCreatedAt ?? null, sourceMeasurement ?? null,
       parseStretchMetadata(metadataOf(row))?.strategy ?? null,
       source?.performanceType ?? null, source?.analyticsLoadType ?? null,
-      source?.analyticsRepMode ?? null, source?.exerciseLoadType ?? null],
+      source?.analyticsRepMode ?? null, source?.exerciseLoadType ?? null,
+      source?.distanceM ?? null, source?.completed ?? null],
   )) as Array<{ id: string }>
   return changed.length > 0
 }
