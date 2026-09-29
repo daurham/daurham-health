@@ -16,7 +16,7 @@ Snapshot recorded 2026-09-29 after **V2-H2C — Personal Lab + Coach Polish**, o
 - `coach_task_events` supports failed events. State changes and Stretch events are atomic and deduplicated by lifecycle key.
 - A partial unique index enforces one offered/active Stretch for the single owner.
 - Existing one-Daily-per-date and one-Weekly-per-week indexes remain unchanged.
-- The owner applied `0035_coach_tasks.sql` before H2B implementation and `0036_stretch_quests.sql` after H2B review. H2C migration `0037_coach_lab_snoozes.sql` is committed and validated in disposable PostgreSQL 14, but has **not** been applied to production yet.
+- The owner applied `0035_coach_tasks.sql`, `0036_stretch_quests.sql`, and `0037_coach_lab_snoozes.sql`. Production schema is now at migration head `0037_coach_lab_snoozes.sql`.
 - `coach_lab_snoozes` stores Coach-only presentation state: Lab item kind, stable source key, exact source fingerprint, Phoenix `snoozed_until`, and timestamps. It does not store Lab suggestion content or canonical evidence.
 - Backup and portable export include Coach task/event history plus `coach_lab_snoozes`; inventory schema head is `0037_coach_lab_snoozes.sql`.
 

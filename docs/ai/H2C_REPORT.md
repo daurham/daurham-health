@@ -48,7 +48,7 @@ The migration creates `coach_lab_snoozes` with:
 - unique item-kind/source-key/fingerprint identity
 - validation constraints and an expiry index
 
-The migration was applied only to disposable PostgreSQL 14 during validation. It has **not** been applied to the owner's production database as part of implementation.
+The migration was applied to disposable PostgreSQL 14 during validation and was subsequently applied by the owner to the production database. Production is now at migration head `0037_coach_lab_snoozes.sql`.
 
 ## Derived Lab attention
 
@@ -144,7 +144,7 @@ The validated production/test code was fast-forwarded to `main`. The temporary H
 
 ## Manual QA / limitations
 
-No authenticated production browser click-through was performed during this completion pass. UI regression/static rendering covers the Coach priority/inbox states, narrow/mobile-safe markup, route cleanup, Escape/focus behavior, and reduced-motion contract. Production schema migration `0037` remains the only deployment step.
+No authenticated production browser click-through was performed during this completion pass. UI regression/static rendering covers the Coach priority/inbox states, narrow/mobile-safe markup, route cleanup, Escape/focus behavior, and reduced-motion contract. Production schema migration `0037` has now been applied.
 
 ## Follow-up
 
