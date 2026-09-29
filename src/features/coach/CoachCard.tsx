@@ -116,14 +116,21 @@ export function CoachCard({
                 )}
               </div>
               {weekly.status === 'active' ? (
-                <button
-                  type="button"
-                  className="shrink-0 text-xs font-medium text-zinc-500 hover:text-zinc-900"
-                  disabled={actionPending}
-                  onClick={() => void pass(weekly)}
-                >
-                  Not this week
-                </button>
+                <div className="flex shrink-0 flex-col items-end gap-1">
+                  {weekly.actionHref ? (
+                    <Link to={prefixedPath(prefix, weekly.actionHref)} className="text-xs font-medium text-zinc-700 hover:underline">
+                      Open
+                    </Link>
+                  ) : null}
+                  <button
+                    type="button"
+                    className="text-xs font-medium text-zinc-500 hover:text-zinc-900"
+                    disabled={actionPending}
+                    onClick={() => void pass(weekly)}
+                  >
+                    Not this week
+                  </button>
+                </div>
               ) : null}
             </div>
           </div>
