@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<HealthData locale="en_US">
+  <ExportDate value="2026-09-21 12:00:00 -0700"/>
+
+  <Record type="HKQuantityTypeIdentifierStepCount" sourceName="iPhone" sourceVersion="26.0" startDate="2026-09-20 08:00:00 -0700" endDate="2026-09-20 09:00:00 -0700" value="1000" unit="count"/>
+  <Record type="HKQuantityTypeIdentifierStepCount" sourceName="iPhone" sourceVersion="26.0" startDate="2026-09-20 08:00:00 -0700" endDate="2026-09-20 09:00:00 -0700" value="1000" unit="count"/>
+  <Record type="HKQuantityTypeIdentifierStepCount" sourceName="Apple Watch" sourceVersion="26.0" startDate="2026-09-20 08:00:00 -0700" endDate="2026-09-20 09:00:00 -0700" value="950" unit="count"/>
+  <Record type="HKQuantityTypeIdentifierActiveEnergyBurned" sourceName="Apple Watch" sourceVersion="26.0" startDate="2026-09-20 08:00:00 -0700" endDate="2026-09-20 09:00:00 -0700" value="150" unit="Cal"/>
+  <Record type="HKQuantityTypeIdentifierAppleExerciseTime" sourceName="Apple Watch" sourceVersion="26.0" startDate="2026-09-20 08:00:00 -0700" endDate="2026-09-20 09:00:00 -0700" value="30" unit="min"/>
+  <Record type="HKQuantityTypeIdentifierDistanceWalkingRunning" sourceName="iPhone" sourceVersion="26.0" startDate="2026-09-20 08:00:00 -0700" endDate="2026-09-20 09:00:00 -0700" value="1.2" unit="km"/>
+  <Record type="HKQuantityTypeIdentifierRestingHeartRate" sourceName="Apple Watch" sourceVersion="26.0" startDate="2026-09-20 07:00:00 -0700" endDate="2026-09-20 07:05:00 -0700" value="54" unit="count/min"/>
+
+  <Record type="HKCategoryTypeIdentifierSleepAnalysis" sourceName="Apple Watch" sourceVersion="26.0" startDate="2026-09-19 23:00:00 -0700" endDate="2026-09-19 23:30:00 -0700" value="HKCategoryValueSleepAnalysisInBed"/>
+  <Record type="HKCategoryTypeIdentifierSleepAnalysis" sourceName="Apple Watch" sourceVersion="26.0" startDate="2026-09-19 23:30:00 -0700" endDate="2026-09-20 00:30:00 -0700" value="HKCategoryValueSleepAnalysisAsleepCore"/>
+  <Record type="HKCategoryTypeIdentifierSleepAnalysis" sourceName="Apple Watch" sourceVersion="26.0" startDate="2026-09-20 00:30:00 -0700" endDate="2026-09-20 01:15:00 -0700" value="HKCategoryValueSleepAnalysisAsleepDeep"/>
+  <Record type="HKCategoryTypeIdentifierSleepAnalysis" sourceName="Apple Watch" sourceVersion="26.0" startDate="2026-09-20 01:15:00 -0700" endDate="2026-09-20 02:00:00 -0700" value="HKCategoryValueSleepAnalysisAsleepREM"/>
+  <Record type="HKCategoryTypeIdentifierSleepAnalysis" sourceName="Apple Watch" sourceVersion="26.0" startDate="2026-09-20 02:00:00 -0700" endDate="2026-09-20 02:05:00 -0700" value="HKCategoryValueSleepAnalysisAwake"/>
+  <Record type="HKCategoryTypeIdentifierSleepAnalysis" sourceName="Apple Watch" sourceVersion="26.0" startDate="2026-09-20 02:05:00 -0700" endDate="2026-09-20 03:00:00 -0700" value="HKCategoryValueSleepAnalysisAsleepUnspecified"/>
+  <Record type="HKCategoryTypeIdentifierSleepAnalysis" sourceName="Apple Watch" sourceVersion="26.0" startDate="2026-09-20 03:00:00 -0700" endDate="2026-09-20 03:15:00 -0700" value="HKCategoryValueSleepAnalysisHibernating"/>
+
+  <Workout workoutActivityType="HKWorkoutActivityTypeTraditionalStrengthTraining" duration="45" durationUnit="min" sourceName="Apple Watch" sourceVersion="26.0" startDate="2026-09-20 17:00:00 -0700" endDate="2026-09-20 17:45:00 -0700"/>
+
+  <Record type="HKQuantityTypeIdentifierFlightsClimbed" sourceName="iPhone" startDate="2026-09-20 08:00:00 -0700" endDate="2026-09-20 09:00:00 -0700" value="3" unit="count"/>
+  <Record type="HKQuantityTypeIdentifierBodyMass" sourceName="Withings" startDate="2026-09-20 07:00:00 -0700" endDate="2026-09-20 07:00:00 -0700" value="190" unit="lb"/>
+  <Record type="HKQuantityTypeIdentifierDietaryEnergyConsumed" sourceName="Food App" startDate="2026-09-20 12:00:00 -0700" endDate="2026-09-20 12:00:00 -0700" value="500" unit="Cal"/>
+  <Record type="HKQuantityTypeIdentifierDietaryProtein" sourceName="Food App" startDate="2026-09-20 12:00:00 -0700" endDate="2026-09-20 12:00:00 -0700" value="40" unit="g"/>
+  <Record sourceName="Broken" startDate="not-a-date" value="1" unit="count"/>
+</HealthData>
