@@ -33,6 +33,7 @@ export type GoalView = {
     difference: number | null
     relation: 'above_range' | 'below_range' | 'inside_range' | null
     provisional: { value: number; unit: string; label: 'so far' } | null
+    strengthSource: { loadLb: number; reps: number; formula: 'epley'; sessionId: string; setId: string } | null
     label: string | null
     coverage: {
       observedDays: number
@@ -94,7 +95,7 @@ export function createGoal(body: unknown): Promise<GoalView> {
   return send('/api/goals', 'POST', body)
 }
 
-export function removeGoal(id: string): Promise<{ ok: true }> {
+export function removeGoal(id: string): Promise<{ ok: true; disposition: 'deleted' | 'archived' }> {
   return send(`/api/goals/${id}`, 'DELETE')
 }
 
