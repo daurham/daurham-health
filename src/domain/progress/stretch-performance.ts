@@ -9,12 +9,12 @@ import {
 } from './exercise-performance.js'
 import { addCalendarDays } from './dates.js'
 import { isCalendarDate } from '../training.js'
-import { kilogramsToPounds } from '../units.js'
+import { kilogramsToPounds, metersToMiles, secondsPerMile } from '../units.js'
 import type { CanonicalEvidence, CanonicalSetRecord, ProgressExerciseDefinition } from './types.js'
 
-export const STRETCH_STRATEGIES = ['strength_e1rm', 'reps', 'duration'] as const
+export const STRETCH_STRATEGIES = ['strength_e1rm', 'reps', 'duration', 'distance', 'pace'] as const
 export type StretchStrategy = (typeof STRETCH_STRATEGIES)[number]
-export type StretchUnit = 'lb' | 'reps' | 'sec'
+export type StretchUnit = 'lb' | 'reps' | 'sec' | 'mi' | 'sec/mi'
 
 /** These records are loaded only from existing canonical Training tables. */
 export type StretchSetRecord = CanonicalSetRecord & { sessionType: string }
@@ -92,57 +92,84 @@ export function stretchObservations(
       !set.setId || !set.sessionId || !set.sessionExerciseId
     ) return []
 
-    let strategy: StretchStrategy
-    let value: number | null
-    let unit: StretchUnit
-    let strengthEvidence: Partial<StretchPerformanceEvidence> = {}
+    const baseEvidence = () => ({
+      ...evidenceFromSet(set),
+      domain: 'training' as const,
+      sessionId: set.sessionId,
+      sessionExerciseId: set.sessionExerciseId,
+      setId: set.setId,
+      exerciseId: set.exerciseId,
+    })
+    const make = (
+      strategy: StretchStrategy,
+      value: number,
+      unit: StretchUnit,
+      extra: Partial<StretchPerformanceEvidence> = {},
+    ): StretchPerformanceObservation => ({
+      strategy,
+      exerciseId: exercise.id,
+      exerciseName: exercise.name,
+      measurementKind: exercise.measurementKind,
+      perSide: exercise.measurementKind.endsWith('_per_side'),
+      date: set.sessionDate,
+      value,
+      unit,
+      sourceCreatedAt: set.sessionCreatedAt,
+      sourceSet: set,
+      evidence: {
+        ...baseEvidence(),
+        strategy,
+        value,
+        unit,
+        ...extra,
+      },
+    })
+
     const isReps = exercise.measurementKind === 'reps' || exercise.measurementKind === 'reps_per_side'
     const isDuration = exercise.measurementKind === 'duration' || exercise.measurementKind === 'duration_per_side'
     if (supportsLoadedRepStrength(exercise) && isReps) {
       const estimate = estimatedStrengthForSet(set, exercise)
       if (!estimate || estimate.confidence !== 'high') return []
-      strategy = 'strength_e1rm'
-      value = kilogramsToPounds(estimate.value)
-      unit = 'lb'
-      strengthEvidence = {
+      const value = kilogramsToPounds(estimate.value)
+      return [make('strength_e1rm', value, 'lb', {
         estimated1RmKg: estimate.value,
         formula: estimate.formula,
         confidence: 'high',
         strengthReps: estimate.sourceSet.reps,
+      })]
+    }
+
+    if (
+      (exercise.measurementKind === 'distance' || exercise.measurementKind === 'distance_duration') &&
+      exercise.performanceType === 'distance' &&
+      exercise.analyticsLoadType === 'none'
+    ) {
+      const distanceM = set.distanceM
+      if (distanceM == null || !Number.isFinite(distanceM) || distanceM <= 0) return []
+      const observations: StretchPerformanceObservation[] = [
+        make('distance', metersToMiles(distanceM), 'mi', { distanceM }),
+      ]
+      if (exercise.measurementKind === 'distance_duration' && set.durationSec != null && set.durationSec > 0) {
+        const pace = secondsPerMile(distanceM, set.durationSec)
+        if (pace != null && metersToMiles(distanceM) >= 0.5) {
+          observations.push(make('pace', pace, 'sec/mi', { distanceM, durationSec: set.durationSec }))
+        }
       }
-    } else {
-      if (!isUnloaded(exercise, set)) return []
-      if (isReps) {
-        if (exercise.performanceType !== 'other' && exercise.performanceType !== 'bodyweight_reps') return []
-        strategy = 'reps'
-        value = strengthRepsForSet(set, perSideDefinition(exercise))
-        unit = 'reps'
-      } else if (isDuration) {
-        if (exercise.performanceType !== 'other' && exercise.performanceType !== 'timed') return []
-        strategy = 'duration'
-        value = timedDurationSecForSet(set, perSideDefinition(exercise))
-        unit = 'sec'
-      } else return []
+      return observations
     }
-    if (value == null || !Number.isFinite(value) || value <= 0) return []
-    const evidence: StretchPerformanceEvidence = {
-      ...evidenceFromSet(set),
-      domain: 'training',
-      sessionId: set.sessionId,
-      sessionExerciseId: set.sessionExerciseId,
-      setId: set.setId,
-      exerciseId: set.exerciseId,
-      strategy,
-      value,
-      unit,
-      ...strengthEvidence,
+
+    if (!isUnloaded(exercise, set)) return []
+    if (isReps) {
+      if (exercise.performanceType !== 'other' && exercise.performanceType !== 'bodyweight_reps') return []
+      const value = strengthRepsForSet(set, perSideDefinition(exercise))
+      return value == null || value <= 0 ? [] : [make('reps', value, 'reps')]
     }
-    return [{
-      strategy, exerciseId: exercise.id, exerciseName: exercise.name,
-      measurementKind: exercise.measurementKind, perSide: exercise.measurementKind.endsWith('_per_side'),
-      date: set.sessionDate, value, unit, sourceCreatedAt: set.sessionCreatedAt,
-      sourceSet: set, evidence,
-    }]
+    if (isDuration) {
+      if (exercise.performanceType !== 'other' && exercise.performanceType !== 'timed') return []
+      const value = timedDurationSecForSet(set, perSideDefinition(exercise))
+      return value == null || value <= 0 ? [] : [make('duration', value, 'sec')]
+    }
+    return []
   })
 }
 
@@ -156,9 +183,12 @@ export function stretchObservationSnapshot(observation: StretchPerformanceObserv
 }
 
 function bestObservation(observations: readonly StretchPerformanceObservation[]): StretchPerformanceObservation | null {
-  return [...observations].sort((left, right) =>
-    right.value - left.value || compareSetChronology(left.sourceSet, right.sourceSet),
-  )[0] ?? null
+  return [...observations].sort((left, right) => {
+    const comparison = left.strategy === 'pace' && right.strategy === 'pace'
+      ? left.value - right.value
+      : right.value - left.value
+    return comparison || compareSetChronology(left.sourceSet, right.sourceSet)
+  })[0] ?? null
 }
 
 /** A qualifying appearance uses the existing session + session-exercise identity. */
@@ -193,6 +223,7 @@ export type StretchAttemptWindow = {
   expiresOn: string
   asOf: string
   now?: string
+  minimumDistanceM?: number | null
 }
 
 /**
@@ -210,7 +241,9 @@ export function bestStretchAttempt(
   if (!Number.isFinite(acceptedInstant) || Number.isNaN(nowInstant)) return null
   return bestObservation(observations.filter((item) => {
     const created = Date.parse(item.sourceCreatedAt)
-    return item.exerciseId === window.exerciseId && item.strategy === window.strategy &&
+    const distanceEligible = window.strategy !== 'pace' || window.minimumDistanceM == null ||
+      (item.evidence.distanceM != null && item.evidence.distanceM + Number.EPSILON >= window.minimumDistanceM)
+    return item.exerciseId === window.exerciseId && item.strategy === window.strategy && distanceEligible &&
       item.date >= window.acceptedOn && item.date <= window.expiresOn && item.date <= window.asOf &&
       created > acceptedInstant && created < challengeEnd && created <= nowInstant
   }))
@@ -229,7 +262,7 @@ export function hasStretchBaselineSource(
     item.sourceCreatedAt === baseline.sourceCreatedAt &&
     item.measurementKind === baseline.measurementKind && item.perSide === baseline.perSide &&
     (['loadKg', 'reps', 'strengthReps', 'durationSec', 'leftReps', 'rightReps', 'leftDurationSec', 'rightDurationSec',
-      'performanceType', 'analyticsLoadType', 'analyticsRepMode', 'exerciseLoadType'] as const)
+      'distanceM', 'completed', 'performanceType', 'analyticsLoadType', 'analyticsRepMode', 'exerciseLoadType'] as const)
       .every((field) => (item.evidence[field] ?? null) === (baseline.evidence[field] ?? null)),
   )
 }
