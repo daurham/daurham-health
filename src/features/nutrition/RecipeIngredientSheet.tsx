@@ -38,6 +38,8 @@ type AiDraft = {
   protein: string
   carbs: string
   fat: string
+  fiber: string
+  sodium: string
   provider: 'gemini' | 'home_ai'
   model: string | null
   originalName: string
@@ -45,6 +47,8 @@ type AiDraft = {
   originalProtein: number
   originalCarbs: number
   originalFat: number
+  originalFiber: number | null
+  originalSodium: number | null
 }
 
 export function RecipeIngredientSheet({
@@ -243,8 +247,8 @@ export function RecipeIngredientSheet({
       protein: String(review.proteinGrams),
       carbs: String(review.carbsGrams),
       fat: String(review.fatGrams),
-      fiber: review.fiberGrams == null ? null : String(review.fiberGrams),
-      sodium: review.sodiumMg == null ? null : String(review.sodiumMg),
+      fiber: review.fiberGrams == null ? '' : String(review.fiberGrams),
+      sodium: review.sodiumMg == null ? '' : String(review.sodiumMg),
       provider,
       model: review.model ?? null,
       originalName: review.name,
@@ -266,6 +270,8 @@ export function RecipeIngredientSheet({
     const protein = Number(ai.protein)
     const carbs = Number(ai.carbs)
     const fat = Number(ai.fat)
+    const fiber = ai.fiber.trim() ? Number(ai.fiber) : null
+    const sodium = ai.sodium.trim() ? Number(ai.sodium) : null
     const saved = await run(() =>
       saveAiReusableFood({
         name: ai.name,
@@ -277,6 +283,8 @@ export function RecipeIngredientSheet({
         protein,
         carbs,
         fat,
+        fiber,
+        sodium,
         provider: ai.provider,
         model: ai.model,
         originalCalories: ai.originalCalories,
@@ -285,6 +293,8 @@ export function RecipeIngredientSheet({
           protein !== ai.originalProtein ||
           carbs !== ai.originalCarbs ||
           fat !== ai.originalFat ||
+          fiber !== ai.originalFiber ||
+          sodium !== ai.originalSodium ||
           ai.name.trim() !== ai.originalName.trim(),
       }),
     )
