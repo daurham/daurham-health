@@ -27,6 +27,10 @@ const KIND_LABELS: Record<GoalKind, string> = {
 }
 
 
+function isTrainingPerformanceGoal(kind: GoalKind): boolean {
+  return ['training_reps','training_duration','training_distance','training_pace','training_skill'].includes(kind)
+}
+
 function compatibleTrainingExercise(kind: GoalKind, exercise: GoalCatalog['exercises'][number]): boolean {
   if (kind === 'strength_e1rm') return exercise.performance_type === 'loaded_reps' && exercise.analytics_load_type === 'external'
   if (kind === 'training_reps') return ['reps','reps_per_side'].includes(exercise.measurement_kind) && !(exercise.performance_type === 'loaded_reps' && exercise.analytics_load_type === 'external')
@@ -311,7 +315,7 @@ function CreateGoalForm({ catalog, asOf, onCreated }: { catalog: GoalCatalog; as
         : targetMode === 'at_most' ? null : Number(targetMin)
     const effectiveTargetMax = kind === 'training_pace' ? paceTarget
       : targetMode === 'at_least' ? null : Number(targetMax)
-    const isExerciseGoal = kind === 'strength_e1rm' || kind.startsWith('training_')
+    const isExerciseGoal = kind === 'strength_e1rm' || isTrainingPerformanceGoal(kind)
     const body = {
       goalKind: kind,
       startedOn,
@@ -366,7 +370,7 @@ function CreateGoalForm({ catalog, asOf, onCreated }: { catalog: GoalCatalog; as
           </select>
         </label>
       ) : null}
-      {kind === 'strength_e1rm' || kind.startsWith('training_') ? (
+      {kind === 'strength_e1rm' || isTrainingPerformanceGoal(kind) ? (
         <label className="block text-sm">
           Exercise
           <select className={fieldClass} value={exerciseId} onChange={(event) => setExerciseId(event.target.value)}>
