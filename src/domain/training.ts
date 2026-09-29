@@ -261,6 +261,20 @@ export const workoutTemplateSchema = z.object({
 
 export type WorkoutTemplate = z.infer<typeof workoutTemplateSchema>
 
+
+export const ownerRoutineExerciseInputSchema = z.object({
+  exerciseDefinitionId: uuidSchema,
+  plannedSets: z.int().positive().max(20),
+  prescription: templatePrescriptionSchema,
+})
+
+export const ownerRoutineInputSchema = z.object({
+  name: z.string().trim().min(1, 'Routine name is required').max(120),
+  exercises: z.array(ownerRoutineExerciseInputSchema).min(1, 'A routine needs at least one exercise').max(30),
+})
+
+export type OwnerRoutineInput = z.infer<typeof ownerRoutineInputSchema>
+
 export const workoutSetRowSchema = z.object({
   id: uuidSchema,
   workout_session_exercise_id: uuidSchema,
