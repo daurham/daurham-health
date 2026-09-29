@@ -208,6 +208,7 @@ export function NutritionPage() {
       carbs: snapshot.carbs,
       fat: snapshot.fat,
       fiber: snapshot.fiber,
+      sodiumMg: snapshot.sodiumMg,
       sourceKind: 'manual',
       notes: null,
       mealGroupId: null,
@@ -278,6 +279,7 @@ export function NutritionPage() {
         carbs: restored.carbs,
         fat: restored.fat,
         fiber: restored.fiber,
+        sodiumMg: restored.sodiumMg,
         notes: restored.notes,
         sourceKind: restored.sourceKind,
       })
@@ -634,7 +636,10 @@ function SummaryCard({ day, onSetTargets }: { day: NutritionDayPayload; onSetTar
         <MacroProgressRow label="Protein" total={day.totals.protein} target={target?.proteinTarget ?? null} unit="g" />
         <MacroProgressRow label="Carbs" total={day.totals.carbs} target={target?.carbsTarget ?? null} unit="g" />
         <MacroProgressRow label="Fat" total={day.totals.fat} target={target?.fatTarget ?? null} unit="g" />
-        <MacroProgressRow label="Fiber" total={day.totals.fiber} target={target?.fiberTarget ?? null} unit="g" secondary />
+        <div className="grid grid-cols-2 gap-3">
+          <MacroProgressRow label="Fiber" total={day.totals.fiber} target={target?.fiberTarget ?? null} unit="g" secondary />
+          <MacroProgressRow label="Sodium" total={day.totals.sodiumMg} target={target?.sodiumTargetMg ?? null} unit="mg" secondary />
+        </div>
       </div>
       <button type="button" onClick={onSetTargets} className="mt-4 text-sm font-medium text-zinc-800 underline">
         {target ? 'Update targets' : 'Set targets'}
@@ -654,7 +659,7 @@ function MacroProgressRow({
   label: string
   total: NutrientTotal
   target: number | null
-  unit: 'kcal' | 'g'
+  unit: 'kcal' | 'g' | 'mg'
   emphasize?: boolean
   secondary?: boolean
 }) {
