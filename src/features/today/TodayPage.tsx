@@ -577,9 +577,13 @@ function NutritionTotals({
   const calories = totals.calories.status === 'available' ? totals.calories.value : null
   const calorieRemainder = remainingHeadline(totals.calories, target?.calories ?? null, 'kcal')
   const macros = [
-    { label: 'Protein', total: totals.protein, target: target?.protein ?? null },
-    { label: 'Carbs', total: totals.carbs, target: target?.carbs ?? null },
-    { label: 'Fat', total: totals.fat, target: target?.fat ?? null },
+    { label: 'Protein', total: totals.protein, target: target?.protein ?? null, unit: 'g' as const },
+    { label: 'Carbs', total: totals.carbs, target: target?.carbs ?? null, unit: 'g' as const },
+    { label: 'Fat', total: totals.fat, target: target?.fat ?? null, unit: 'g' as const },
+  ]
+  const secondary = [
+    { label: 'Fiber', total: totals.fiber, target: target?.fiber ?? null, unit: 'g' as const },
+    { label: 'Sodium', total: totals.sodium, target: target?.sodium ?? null, unit: 'mg' as const },
   ]
   return (
     <div>
@@ -591,12 +595,12 @@ function NutritionTotals({
       <ul className="mt-3 space-y-2">
         {macros.map((row) => {
           const consumed = row.total.status === 'available' ? row.total.value : null
-          const remainder = remainingHeadline(row.total, row.target, 'g')
+          const remainder = remainingHeadline(row.total, row.target, row.unit)
           return (
             <li key={row.label}>
               <div className="flex items-baseline justify-between gap-3">
                 <span>
-                  {row.label} {macroHeadline(row.total, row.target, 'g')}
+                  {row.label} {macroHeadline(row.total, row.target, row.unit)}
                 </span>
                 {remainder ? <span className="shrink-0 text-zinc-500">{remainder}</span> : null}
               </div>
@@ -605,6 +609,9 @@ function NutritionTotals({
           )
         })}
       </ul>
+      <p className="mt-3 text-xs text-zinc-500">
+        {secondary.map((row) => `${row.label} ${macroHeadline(row.total, row.target, row.unit)}`).join(' · ')}
+      </p>
     </div>
   )
 }
