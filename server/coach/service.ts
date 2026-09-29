@@ -1045,7 +1045,7 @@ async function transitionStretch(
                      AND exercises.analytics_load_type = 'none'
                      AND exercises.performance_type = 'distance'
                      AND sets.distance_m > 0
-                     AND ($27 <> 'pace' OR sets.duration_sec > 0))))
+                     AND ($27 <> 'pace' OR sets.duration_sec > 0)))))
           ))
         RETURNING id
      ), event AS (
