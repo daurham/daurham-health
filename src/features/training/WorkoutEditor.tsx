@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect } from 'react'
+import { distanceToMeters, secondsPerMile } from '@/domain/units'
 import { formatPrescription } from '@/domain/training'
 import type { ExerciseDefinition, LoadState, MeasurementKind, OwnerExerciseRequest } from '@/domain/training'
 import { OWNER_EXERCISE_LOAD_TYPES, MEASUREMENT_KINDS } from '@/domain/training'
@@ -455,20 +456,26 @@ function ExerciseCard({
   )
 }
 
+function isNoLoadMeasurement(kind: MeasurementKind): boolean {
+  return kind === 'distance' || kind === 'distance_duration' || kind === 'completion'
+}
+
+function measurementLabel(kind: MeasurementKind): string {
+  if (kind === 'reps') return 'Reps'
+  if (kind === 'duration') return 'Seconds'
+  if (kind === 'reps_per_side') return 'Left / Right'
+  if (kind === 'duration_per_side') return 'Left s / Right s'
+  if (kind === 'distance') return 'Distance'
+  if (kind === 'distance_duration') return 'Time + distance'
+  return 'Skill'
+}
+
 function SetHeader({ measurementKind }: { measurementKind: MeasurementKind }) {
-  const measurement =
-    measurementKind === 'reps'
-      ? 'Reps'
-      : measurementKind === 'duration'
-        ? 'Seconds'
-        : measurementKind === 'reps_per_side'
-          ? 'Left / Right'
-          : 'Left s / Right s'
   return (
-    <div className="grid grid-cols-[2.5rem_minmax(0,1fr)_minmax(0,1.2fr)] gap-2 text-xs uppercase tracking-wide text-zinc-500">
+    <div className="grid grid-cols-[2.5rem_minmax(0,1fr)_minmax(0,1.4fr)] gap-2 text-xs uppercase tracking-wide text-zinc-500">
       <span>Set</span>
-      <span>Weight</span>
-      <span>{measurement}</span>
+      <span>{isNoLoadMeasurement(measurementKind) ? '' : 'Weight'}</span>
+      <span>{measurementLabel(measurementKind)}</span>
     </div>
   )
 }
@@ -490,18 +497,23 @@ function SetRow({
   fieldErrors: ReviewFieldError[]
   onChange: (set: DraftSet) => void
 }) {
+  const noLoad = isNoLoadMeasurement(measurementKind)
   const loadPath = `exercises.${exerciseIndex}.sets.${setIndex}.weightLb`
   const measurementPath =
-    measurementKind === 'duration'
+    measurementKind === 'duration' || measurementKind === 'distance_duration'
       ? `exercises.${exerciseIndex}.sets.${setIndex}.durationSec`
-      : measurementKind === 'reps_per_side'
-        ? `exercises.${exerciseIndex}.sets.${setIndex}.leftReps`
-        : measurementKind === 'duration_per_side'
-          ? `exercises.${exerciseIndex}.sets.${setIndex}.leftDurationSec`
-          : `exercises.${exerciseIndex}.sets.${setIndex}.reps`
-  const loadMessage = fieldError(fieldErrors, loadPath)
+      : measurementKind === 'distance'
+        ? `exercises.${exerciseIndex}.sets.${setIndex}.distance`
+        : measurementKind === 'completion'
+          ? `exercises.${exerciseIndex}.sets.${setIndex}.completed`
+          : measurementKind === 'reps_per_side'
+            ? `exercises.${exerciseIndex}.sets.${setIndex}.leftReps`
+            : measurementKind === 'duration_per_side'
+              ? `exercises.${exerciseIndex}.sets.${setIndex}.leftDurationSec`
+              : `exercises.${exerciseIndex}.sets.${setIndex}.reps`
+  const loadMessage = noLoad ? null : fieldError(fieldErrors, loadPath)
   const measurementMessage = fieldError(fieldErrors, measurementPath)
-  const inherited = interpretation.source === 'inherited' && interpretation.resolvedLoad != null
+  const inherited = !noLoad && interpretation.source === 'inherited' && interpretation.resolvedLoad != null
   const displayLoadState = inherited ? resolvedLoadState(interpretation.resolvedLoad) : set.loadState
   const resolvedWeight = resolvedWeightLb(interpretation.resolvedLoad)
   const displayWeight =
@@ -514,46 +526,45 @@ function SetRow({
   }
 
   function onLoadState(loadState: LoadState) {
-    patch({
-      loadState,
-      weightLb: loadState === 'external' ? set.weightLb : '',
-    })
+    patch({ loadState, weightLb: loadState === 'external' ? set.weightLb : '' })
   }
 
   return (
-    <div className="grid grid-cols-[2.5rem_minmax(0,1fr)_minmax(0,1.2fr)] items-start gap-2">
+    <div className="grid grid-cols-[2.5rem_minmax(0,1fr)_minmax(0,1.4fr)] items-start gap-2">
       <span className="mt-3 text-sm font-medium text-zinc-700">{set.setNumber}</span>
-      <div data-field-path={loadPath} tabIndex={-1} className="min-w-0 outline-none">
-        <div className="flex gap-1">
-          <select
-            className={cn(
-              'min-h-11 rounded-md border bg-white px-1 text-base md:text-sm',
-              loadMessage ? 'border-red-500 bg-red-50' : 'border-zinc-300',
-              inherited && 'text-zinc-500',
-            )}
-            value={displayLoadState}
-            onChange={(event) => onLoadState(event.target.value as LoadState)}
-            aria-label={`Set ${set.setNumber} load`}
-          >
-            <option value="external">lb</option>
-            <option value="bodyweight">BW</option>
-            <option value="unknown">?</option>
-          </select>
-          <input
-            type="number"
-            min={0}
-            step="0.5"
-            inputMode="decimal"
-            disabled={displayLoadState !== 'external'}
-            className={cn(inputClass, loadMessage && errorInputClass, inherited && 'text-zinc-500')}
-            value={displayWeight}
-            aria-label={`Set ${set.setNumber} weight`}
-            onChange={(event) => patch({ loadState: 'external', weightLb: event.target.value })}
-          />
+      {noLoad ? <div className="min-h-11" aria-hidden="true" /> : (
+        <div data-field-path={loadPath} tabIndex={-1} className="min-w-0 outline-none">
+          <div className="flex gap-1">
+            <select
+              className={cn(
+                'min-h-11 rounded-md border bg-white px-1 text-base md:text-sm',
+                loadMessage ? 'border-red-500 bg-red-50' : 'border-zinc-300',
+                inherited && 'text-zinc-500',
+              )}
+              value={displayLoadState}
+              onChange={(event) => onLoadState(event.target.value as LoadState)}
+              aria-label={`Set ${set.setNumber} load`}
+            >
+              <option value="external">lb</option>
+              <option value="bodyweight">BW</option>
+              <option value="unknown">?</option>
+            </select>
+            <input
+              type="number"
+              min={0}
+              step="0.5"
+              inputMode="decimal"
+              disabled={displayLoadState !== 'external'}
+              className={cn(inputClass, loadMessage && errorInputClass, inherited && 'text-zinc-500')}
+              value={displayWeight}
+              aria-label={`Set ${set.setNumber} weight`}
+              onChange={(event) => patch({ loadState: 'external', weightLb: event.target.value })}
+            />
+          </div>
+          {inherited ? <p className="mt-0.5 text-[11px] leading-tight text-zinc-500">inherited</p> : null}
+          {loadMessage ? <p className="mt-0.5 text-xs text-red-700">{loadMessage}</p> : null}
         </div>
-        {inherited ? <p className="mt-0.5 text-[11px] leading-tight text-zinc-500">inherited</p> : null}
-        {loadMessage ? <p className="mt-0.5 text-xs text-red-700">{loadMessage}</p> : null}
-      </div>
+      )}
       <div data-field-path={measurementPath} tabIndex={-1} className="min-w-0 outline-none">
         <MeasurementInputs
           set={set}
@@ -565,6 +576,18 @@ function SetRow({
       </div>
     </div>
   )
+}
+
+function pacePreview(set: DraftSet): string | null {
+  const distance = Number(set.distance ?? '')
+  const duration = Number(set.durationSec)
+  if (!Number.isFinite(distance) || !Number.isFinite(duration) || distance <= 0 || duration <= 0) return null
+  const pace = secondsPerMile(distanceToMeters(distance, set.distanceUnit ?? 'mi'), duration)
+  if (pace == null) return null
+  const rounded = Math.round(pace)
+  const minutes = Math.floor(rounded / 60)
+  const seconds = String(rounded % 60).padStart(2, '0')
+  return `${minutes}:${seconds}/mi`
 }
 
 function MeasurementInputs({
@@ -580,77 +603,44 @@ function MeasurementInputs({
 }) {
   const fieldClass = cn(inputClass, invalid && errorInputClass)
   if (measurementKind === 'reps') {
-    return (
-      <input
-        type="number"
-        min={0}
-        inputMode="numeric"
-        className={fieldClass}
-        value={set.reps}
-        aria-label={`Set ${set.setNumber} reps`}
-        onChange={(event) => onChange({ ...set, reps: event.target.value })}
-      />
-    )
+    return <input type="number" min={0} inputMode="numeric" className={fieldClass} value={set.reps} aria-label={`Set ${set.setNumber} reps`} onChange={(event) => onChange({ ...set, reps: event.target.value })} />
   }
   if (measurementKind === 'duration') {
-    return (
-      <input
-        type="number"
-        min={0}
-        inputMode="numeric"
-        className={fieldClass}
-        value={set.durationSec}
-        aria-label={`Set ${set.setNumber} seconds`}
-        onChange={(event) => onChange({ ...set, durationSec: event.target.value })}
-      />
-    )
+    return <input type="number" min={0} inputMode="numeric" className={fieldClass} value={set.durationSec} aria-label={`Set ${set.setNumber} seconds`} onChange={(event) => onChange({ ...set, durationSec: event.target.value })} />
   }
   if (measurementKind === 'reps_per_side') {
-    return (
-      <div className="grid grid-cols-2 gap-1">
-        <input
-          type="number"
-          min={0}
-          inputMode="numeric"
-          className={fieldClass}
-          value={set.leftReps}
-          aria-label={`Set ${set.setNumber} left reps`}
-          onChange={(event) => onChange({ ...set, leftReps: event.target.value })}
-        />
-        <input
-          type="number"
-          min={0}
-          inputMode="numeric"
-          className={fieldClass}
-          value={set.rightReps}
-          aria-label={`Set ${set.setNumber} right reps`}
-          onChange={(event) => onChange({ ...set, rightReps: event.target.value })}
-        />
-      </div>
-    )
-  }
-  return (
-    <div className="grid grid-cols-2 gap-1">
-      <input
-        type="number"
-        min={0}
-        inputMode="numeric"
-        className={fieldClass}
-        value={set.leftDurationSec}
-        aria-label={`Set ${set.setNumber} left seconds`}
-        onChange={(event) => onChange({ ...set, leftDurationSec: event.target.value })}
-      />
-      <input
-        type="number"
-        min={0}
-        inputMode="numeric"
-        className={fieldClass}
-        value={set.rightDurationSec}
-        aria-label={`Set ${set.setNumber} right seconds`}
-        onChange={(event) => onChange({ ...set, rightDurationSec: event.target.value })}
-      />
+    return <div className="grid grid-cols-2 gap-1">
+      <input type="number" min={0} inputMode="numeric" className={fieldClass} value={set.leftReps} aria-label={`Set ${set.setNumber} left reps`} onChange={(event) => onChange({ ...set, leftReps: event.target.value })} />
+      <input type="number" min={0} inputMode="numeric" className={fieldClass} value={set.rightReps} aria-label={`Set ${set.setNumber} right reps`} onChange={(event) => onChange({ ...set, rightReps: event.target.value })} />
     </div>
-  )
+  }
+  if (measurementKind === 'duration_per_side') {
+    return <div className="grid grid-cols-2 gap-1">
+      <input type="number" min={0} inputMode="numeric" className={fieldClass} value={set.leftDurationSec} aria-label={`Set ${set.setNumber} left seconds`} onChange={(event) => onChange({ ...set, leftDurationSec: event.target.value })} />
+      <input type="number" min={0} inputMode="numeric" className={fieldClass} value={set.rightDurationSec} aria-label={`Set ${set.setNumber} right seconds`} onChange={(event) => onChange({ ...set, rightDurationSec: event.target.value })} />
+    </div>
+  }
+  if (measurementKind === 'completion') {
+    return <div className="grid grid-cols-2 gap-1">
+      <button type="button" className={cn('min-h-11 rounded-md border px-2 text-sm', set.completed === true ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-300')} onClick={() => onChange({ ...set, loadState: 'bodyweight', weightLb: '', completed: true })}>Achieved</button>
+      <button type="button" className={cn('min-h-11 rounded-md border px-2 text-sm', set.completed === false ? 'border-zinc-900 bg-zinc-100' : 'border-zinc-300')} onClick={() => onChange({ ...set, loadState: 'bodyweight', weightLb: '', completed: false })}>Not yet</button>
+    </div>
+  }
+  if (measurementKind === 'distance') {
+    return <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-1">
+      <input type="number" min="0" step="0.01" inputMode="decimal" className={fieldClass} value={set.distance ?? ''} aria-label={`Set ${set.setNumber} distance`} onChange={(event) => onChange({ ...set, loadState: 'bodyweight', weightLb: '', distance: event.target.value })} />
+      <select className="min-h-11 rounded-md border border-zinc-300 bg-white px-2 text-sm" value={set.distanceUnit ?? 'mi'} aria-label={`Set ${set.setNumber} distance unit`} onChange={(event) => onChange({ ...set, distanceUnit: event.target.value as 'mi' | 'km' })}><option value="mi">mi</option><option value="km">km</option></select>
+    </div>
+  }
+  const preview = pacePreview(set)
+  return <div className="space-y-1">
+    <input type="number" min="0" inputMode="numeric" className={fieldClass} value={set.durationSec} aria-label={`Set ${set.setNumber} seconds`} placeholder="seconds" onChange={(event) => onChange({ ...set, loadState: 'bodyweight', weightLb: '', durationSec: event.target.value })} />
+    <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-1">
+      <input type="number" min="0" step="0.01" inputMode="decimal" className={inputClass} value={set.distance ?? ''} aria-label={`Set ${set.setNumber} optional distance`} placeholder="distance (optional)" onChange={(event) => onChange({ ...set, loadState: 'bodyweight', weightLb: '', distance: event.target.value })} />
+      <select className="min-h-11 rounded-md border border-zinc-300 bg-white px-2 text-sm" value={set.distanceUnit ?? 'mi'} aria-label={`Set ${set.setNumber} distance unit`} onChange={(event) => onChange({ ...set, distanceUnit: event.target.value as 'mi' | 'km' })}><option value="mi">mi</option><option value="km">km</option></select>
+    </div>
+    {preview ? <p className="text-xs text-zinc-500">Pace {preview}</p> : null}
+  </div>
 }
 
 const MEASUREMENT_LABELS: Record<MeasurementKind, string> = {
@@ -658,6 +648,9 @@ const MEASUREMENT_LABELS: Record<MeasurementKind, string> = {
   duration: 'Duration',
   reps_per_side: 'Reps each side',
   duration_per_side: 'Duration each side',
+  distance: 'Distance',
+  distance_duration: 'Distance + duration',
+  completion: 'Skill / milestone',
 }
 
 function ExercisePicker({
@@ -687,6 +680,7 @@ function ExercisePicker({
     return active.filter((exercise) => exercise.name.toLowerCase().includes(needle)).slice(0, 8)
   }, [catalog, query])
   const perSide = measurementKind === 'reps_per_side' || measurementKind === 'duration_per_side'
+  const noLoad = isNoLoadMeasurement(measurementKind)
 
   async function createExercise() {
     if (!onCreateExercise || name.trim() === '') {
@@ -699,7 +693,7 @@ function ExercisePicker({
       const created = await onCreateExercise({
         name: name.trim(),
         measurementKind,
-        loadType,
+        loadType: noLoad ? 'none' : loadType,
         unilateral: perSide,
       })
       onSelect(created)
@@ -769,20 +763,22 @@ function ExercisePicker({
                   ))}
                 </select>
               </label>
-              <label className="block text-sm font-medium text-zinc-700">
-                Load
-                <select
-                  className={cn(inputClass, 'mt-1')}
-                  value={loadType}
-                  onChange={(event) => setLoadType(event.target.value as (typeof OWNER_EXERCISE_LOAD_TYPES)[number])}
-                >
-                  {OWNER_EXERCISE_LOAD_TYPES.map((kind) => (
-                    <option key={kind} value={kind}>
-                      {kind.split('_').join(' ')}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              {noLoad ? <p className="text-sm text-zinc-500">No external load is recorded for this measurement.</p> : (
+                <label className="block text-sm font-medium text-zinc-700">
+                  Load
+                  <select
+                    className={cn(inputClass, 'mt-1')}
+                    value={loadType}
+                    onChange={(event) => setLoadType(event.target.value as (typeof OWNER_EXERCISE_LOAD_TYPES)[number])}
+                  >
+                    {OWNER_EXERCISE_LOAD_TYPES.map((kind) => (
+                      <option key={kind} value={kind}>
+                        {kind.split('_').join(' ')}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
               <p className="text-sm text-zinc-500">{perSide ? 'Each side is recorded separately.' : 'Both sides share one count.'}</p>
               {error ? <p className="text-sm text-red-700">{error}</p> : null}
               <div className="flex gap-2">
