@@ -169,12 +169,18 @@ function normalizeRawCandidate(raw: unknown): unknown {
     return raw
   }
   const record = raw as Record<string, unknown>
+  const rawFields = record.fields && typeof record.fields === 'object' && !Array.isArray(record.fields)
+    ? (record.fields as Record<string, unknown>)
+    : record.fields
   return {
     schemaVersion: record.schemaVersion ?? record.schema_version ?? NUTRITION_LABEL_SCHEMA_VERSION,
     status: record.status ?? 'review_required',
     pipeline: record.pipeline ?? NUTRITION_LABEL_PIPELINE,
     model: record.model ?? null,
-    fields: record.fields,
+    fields:
+      rawFields && typeof rawFields === 'object' && !Array.isArray(rawFields)
+        ? { sodiumMg: missingField(), ...rawFields }
+        : rawFields,
     ambiguities: record.ambiguities ?? [],
     warnings: record.warnings ?? [],
   }
