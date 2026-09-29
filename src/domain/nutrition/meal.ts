@@ -611,7 +611,7 @@ export const mealEstimateCandidateSchema = z.object({
   carbsGrams: z.number(),
   fatGrams: z.number(),
   fiberGrams: z.number().nullable(),
-  sodiumMg: z.number().nullable(),
+  sodiumMg: z.number().nullable().optional().default(null),
   clarifications: z.array(mealClarificationSchema).default([]),
 })
 export type MealEstimateCandidate = z.infer<typeof mealEstimateCandidateSchema>
@@ -627,7 +627,7 @@ export const commitNutritionMealEstimateRequestSchema = z.object({
   carbsGrams: z.number().min(0),
   fatGrams: z.number().min(0),
   fiberGrams: z.number().min(0).nullable(),
-  sodiumMg: z.number().min(0).nullable(),
+  sodiumMg: z.number().min(0).nullable().optional().default(null),
   portionScale: z.number().optional(),
 })
 export type CommitNutritionMealEstimateRequest = z.input<typeof commitNutritionMealEstimateRequestSchema>
