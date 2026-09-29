@@ -7,6 +7,7 @@ export const PERFORMANCE_TYPES = [
   'assisted_reps',
   'timed',
   'distance',
+  'skill',
   'other',
 ] as const
 export type PerformanceType = (typeof PERFORMANCE_TYPES)[number]
@@ -88,6 +89,8 @@ export type CanonicalEvidence = {
   rightReps?: number | null
   leftDurationSec?: number | null
   rightDurationSec?: number | null
+  distanceM?: number | null
+  completed?: boolean | null
 }
 
 export type ProgressExerciseDefinition = {
@@ -119,6 +122,8 @@ export type CanonicalSetRecord = {
   rightReps: number | null
   leftDurationSec: number | null
   rightDurationSec: number | null
+  distanceM: number | null
+  completed: boolean | null
 }
 
 export type AnalyzableWorkingSet = CanonicalSetRecord & {
