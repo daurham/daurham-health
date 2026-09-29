@@ -1,4 +1,4 @@
-import { Suspense } from 'react'
+import { Suspense, useEffect, useRef } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { LockedScreen, useAuth } from '@/auth'
 import { AppSurfaceProvider } from '@/lib/app-prefix'
@@ -45,6 +45,13 @@ export function Layout() {
   const demoRoute = location.pathname === '/demo' || location.pathname.startsWith('/demo/')
   const showOwnerChrome = !demoRoute && (status === 'owner' || status === 'unauthorized')
   const items = demoRoute ? demoNavItems : navItems
+  const mobileMenuRef = useRef<HTMLDetailsElement>(null)
+
+  useEffect(() => {
+    if (mobileMenuRef.current) {
+      mobileMenuRef.current.open = false
+    }
+  }, [location.pathname, location.search])
 
   return (
     <div className="min-h-dvh bg-zinc-50 text-zinc-900">
@@ -77,7 +84,7 @@ export function Layout() {
                   Sign out
                 </button>
               </div>
-              <details className="relative md:hidden">
+              <details ref={mobileMenuRef} className="relative md:hidden">
                 <summary className="cursor-pointer list-none rounded-md px-2 py-1 text-sm text-zinc-600 marker:content-none hover:bg-zinc-100 hover:text-zinc-900 [&::-webkit-details-marker]:hidden">
                   Menu
                 </summary>
