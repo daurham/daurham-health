@@ -123,8 +123,8 @@ export type CanonicalSetRecord = {
   rightReps: number | null
   leftDurationSec: number | null
   rightDurationSec: number | null
-  distanceM: number | null
-  completed: boolean | null
+  distanceM?: number | null
+  completed?: boolean | null
 }
 
 export type AnalyzableWorkingSet = CanonicalSetRecord & {
