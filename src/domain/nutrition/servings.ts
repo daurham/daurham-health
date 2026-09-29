@@ -4,7 +4,7 @@ export type NutrientAmount = {
   carbs: number | null
   fat: number | null
   fiber: number | null
-  sodium: number | null
+  sodium?: number | null
 }
 
 const GRAMS_ONLY = /^\s*(\d+(?:\.\d+)?)\s*g(?:rams?)?\s*$/i
