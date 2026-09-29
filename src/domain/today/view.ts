@@ -136,6 +136,8 @@ export type TodayNutrientTarget = {
   protein: number
   carbs: number | null
   fat: number | null
+  fiber: number | null
+  sodium: number | null
 }
 
 export type TodayViewModel = {
@@ -389,6 +391,8 @@ export function buildTodayView(sources: TodaySources): TodayViewModel {
             protein: target.proteinTarget,
             carbs: target.carbsTarget,
             fat: target.fatTarget,
+            fiber: target.fiberTarget,
+            sodium: target.sodiumTarget,
           }
         : null,
     },
