@@ -904,6 +904,7 @@ export async function commitNutritionMealEstimate(body: unknown): Promise<{ entr
     carbsGrams: input.carbsGrams,
     fatGrams: input.fatGrams,
     fiberGrams: input.fiberGrams,
+    sodiumMg: input.sodiumMg,
   }
   const jobId = input.jobId
   let baseline = reviewed
@@ -928,6 +929,7 @@ export async function commitNutritionMealEstimate(body: unknown): Promise<{ entr
         carbsGrams: estimate.carbsGrams,
         fatGrams: estimate.fatGrams,
         fiberGrams: estimate.fiberGrams,
+        sodiumMg: estimate.sodiumMg,
       }
       model = estimate.model ?? stored.interpretation.model ?? null
     }
@@ -986,6 +988,7 @@ export async function commitNutritionMealEstimate(body: unknown): Promise<{ entr
     reviewed.carbsGrams,
     reviewed.fatGrams,
     reviewed.fiberGrams,
+    reviewed.sodiumMg,
     'photo_ai',
     'Reviewed from meal photo estimate.',
     null,
