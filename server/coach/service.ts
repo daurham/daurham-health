@@ -46,7 +46,7 @@ import { loadCoachLabState, snoozeCoachLabPresentation } from './lab.js'
 import { coachTaskAttentionReason } from '../../src/domain/coach-lab.js'
 import { listGoals } from '../goals/service.js'
 import { HttpError } from '../http.js'
-import { ensureOwnerExercise } from '../training/owner-exercises.js'
+import { ensureOwnerExercise, getExerciseDefinition } from '../training/owner-exercises.js'
 import {
   buildSessionInsertQueries,
   parseManualWorkoutRequest,
@@ -1469,12 +1469,28 @@ export async function logCoachTraining(id: string, body: unknown, now = new Date
 
   const meetsTarget = parsed.data.actualValue >= rule.training.targetValue
   if (!existing[0]) {
-    const exercise = await ensureOwnerExercise({
-      name: rule.training.exerciseName,
-      measurementKind: rule.training.measurementKind,
-      loadType: rule.training.loadType,
-      unilateral: false,
-    })
+    const builtInExternalId =
+      rule.training.exerciseName === 'Running' && rule.training.measurementKind === 'distance_duration'
+        ? 'EX18'
+        : rule.training.exerciseName === 'Hiking' && rule.training.measurementKind === 'distance_duration'
+          ? 'EX19'
+          : null
+    let exercise
+    if (builtInExternalId) {
+      const builtInRows = (await sql.query(
+        `SELECT id::text AS id FROM exercise_definitions WHERE external_id = $1 AND is_active LIMIT 1`,
+        [builtInExternalId],
+      )) as Array<{ id: string }>
+      if (!builtInRows[0]?.id) throw new HttpError(503, 'Canonical Running/Hiking definitions are unavailable. Apply pending migrations.')
+      exercise = await getExerciseDefinition(builtInRows[0].id)
+    } else {
+      exercise = await ensureOwnerExercise({
+        name: rule.training.exerciseName,
+        measurementKind: rule.training.measurementKind,
+        loadType: rule.training.loadType,
+        unilateral: false,
+      })
+    }
     const set =
       rule.training.valueKind === 'reps'
         ? { reps: Math.round(parsed.data.actualValue), durationSec: null }
@@ -1508,6 +1524,9 @@ export async function logCoachTraining(id: string, body: unknown, now = new Date
               rightReps: null,
               leftDurationSec: null,
               rightDurationSec: null,
+              distance: rule.training.allowDistance ? parsed.data.distance ?? null : null,
+              distanceUnit: rule.training.allowDistance && parsed.data.distance != null ? parsed.data.distanceUnit ?? 'mi' : null,
+              completed: null,
               notes: null,
             },
           ],
