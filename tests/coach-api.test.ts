@@ -16,6 +16,7 @@ const service = vi.hoisted(() => ({
   endCoachTask: vi.fn(),
   logCoachTraining: vi.fn(),
   logCoachSelfReport: vi.fn(),
+  snoozeCoachLabItem: vi.fn(),
 }))
 
 vi.mock('../server/coach/service.ts', () => service)
@@ -73,6 +74,7 @@ describe('Coach API routing', () => {
     service.endCoachTask.mockResolvedValue(state)
     service.logCoachTraining.mockResolvedValue(state)
     service.logCoachSelfReport.mockResolvedValue(state)
+    service.snoozeCoachLabItem.mockResolvedValue({ ...state, snoozedUntil: '2026-10-06' })
   })
 
   it('matches root, ensure, and task actions through the single API dispatcher', () => {
@@ -82,6 +84,8 @@ describe('Coach API routing', () => {
     expect(matchCoachRoute('/api/coach/tasks/not-a-uuid/pass')).toBeNull()
     expect(matchHealthApiRoute('/api/coach')).toBe('coach')
     expect(matchHealthApiRoute('/api/coach/ensure')).toBe('coach')
+    expect(matchCoachRoute('/api/coach/lab/snooze')).toEqual({ kind: 'lab-snooze' })
+    expect(matchHealthApiRoute('/api/coach/lab/snooze')).toBe('coach')
     expect(matchHealthApiRoute(`/api/coach/tasks/${TASK}/log-training`)).toBe('coach')
   })
 
@@ -122,5 +126,20 @@ describe('Coach API routing', () => {
     expect(mutation).toHaveBeenCalledWith(TASK)
     mutation.mockRejectedValueOnce(new HttpError(409, 'Invalid lifecycle transition'))
     expect((await call('POST', url, owner)).status()).toBe(409)
+  })
+
+  it('protects Lab snoozes, passes exact identity, validates methods and returns stale conflicts', async () => {
+    const url = '/api/coach/lab/snooze'
+    const owner = { id: 'owner-1', email: 'owner@example.com' }
+    const body = { kind: 'benchmark_retest', sourceKey: 'benchmark-retest:benchmark:protocol', sourceFingerprint: 'a'.repeat(64) }
+    expect((await call('POST', url, null, body)).status()).toBe(401)
+    expect((await call('POST', url, { id: 'other', email: 'other@example.com' }, body)).status()).toBe(403)
+    const wrong = await call('GET', url, owner)
+    expect(wrong.status()).toBe(405)
+    expect(wrong.allow()).toBe('POST')
+    expect((await call('POST', url, owner, body)).status()).toBe(200)
+    expect(service.snoozeCoachLabItem).toHaveBeenCalledWith(body)
+    service.snoozeCoachLabItem.mockRejectedValueOnce(new HttpError(409, 'Stale Lab fingerprint'))
+    expect((await call('POST', url, owner, body)).status()).toBe(409)
   })
 })

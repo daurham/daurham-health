@@ -4,7 +4,7 @@ import { buildBackupArchive, restoreStatements, verifyBackupArchive, type Backup
 
 describe('Coach backup inventory', () => {
   it('advances the schema head and keeps Coach history portable', () => {
-    expect(LATEST_SCHEMA_MIGRATION).toBe('0036_stretch_quests.sql')
+    expect(LATEST_SCHEMA_MIGRATION).toBe('0037_coach_lab_snoozes.sql')
     const tasks = backupTable('coach_tasks')
     const events = backupTable('coach_task_events')
     expect(tasks?.portable).toBe(true)
@@ -57,5 +57,20 @@ describe('Coach backup inventory', () => {
     const insert = restored.find((statement) => statement.text.startsWith('INSERT INTO coach_tasks '))
     expect(insert?.text).toContain('accepted_at')
     expect(restored.some((statement) => statement.text.startsWith('INSERT INTO coach_task_events '))).toBe(true)
+  })
+
+  it.each(['full', 'portable'] as const)('round-trips exact owner Lab snooze identities and timestamps in %s archives', (profile) => {
+    const instant = '2026-09-29T19:00:00.123456Z'
+    const rows: BackupRow[] = ['benchmark_retest', 'experiment_suggestion'].map((kind, index) => ({
+      id: `${String(index + 1).padStart(8, '0')}-1111-4111-8111-111111111111`,
+      item_kind: kind, source_key: `${kind}:source`, source_fingerprint: String(index + 1).repeat(64),
+      snoozed_until: '2026-10-06', created_at: instant, updated_at: instant,
+    }))
+    expect(backupTable('coach_lab_snoozes')).toMatchObject({ portable: true, references: [] })
+    const archive = buildBackupArchive({ profile, rowsByTable: { coach_lab_snoozes: rows }, createdAt: instant, schemaMigration: LATEST_SCHEMA_MIGRATION, appVersionOrCommit: 'test' })
+    const verified = verifyBackupArchive(archive)
+    expect(verified.errors).toEqual([])
+    expect(verified.tables.coach_lab_snoozes).toEqual(rows)
+    expect(restoreStatements(verified.tables).find((statement) => statement.text.startsWith('INSERT INTO coach_lab_snoozes '))?.text).toContain('source_fingerprint')
   })
 })

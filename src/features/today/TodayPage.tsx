@@ -1,11 +1,10 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { AskHealthLink } from '@/features/ask-health/AskHealthLink'
 import { formatBodyMass } from '@/domain/body-metrics'
 import { bodyReminderCopy, measureHref } from '@/domain/body-cadence'
 import { NUTRITION_CONFIG, type NutritionDayTotals, type NutritionFood } from '@/domain/nutrition'
 import { formatWeekdayCalendarDate, formatCalendarRange } from '@/domain/calendar-format'
-import { otherRetestsPhrase, retestAgePhrase } from '@/domain/lab-retests'
 import { sessionIntentLabel } from '@/domain/training'
 import { dailyContextTagLabel } from '@/domain/context'
 import type { TodayViewModel } from '@/domain/today'
@@ -37,6 +36,7 @@ import { CoachCard } from '@/features/coach/CoachCard'
 import { ensureCoach } from '@/features/coach/api'
 import type { CoachState } from '@/domain/coach'
 import { todayShouldReloadAfterNutrition, type TodayNutritionOutcome } from './nutrition-refresh'
+import { notifyHealthDataChanged, subscribeHealthDataChanges } from '@/lib/health-changes'
 
 function formatCount(value: number): string {
   return Math.round(value).toLocaleString('en-US')
@@ -54,19 +54,39 @@ export function TodayPage() {
   const load = useCallback((_key: string, signal: AbortSignal) => fetchToday(signal), [])
   const resource = useAtomicKeyedResource({ requestedKey: 'today', load })
   const view = resource.data
+  const coachRequests = useRef({ generation: 0 })
+  const retryToday = useRef(resource.retry)
+  retryToday.current = resource.retry
 
   const loadCoach = useCallback(async () => {
     if (readOnly) return
+    const generation = ++coachRequests.current.generation
     setCoachPending(true)
     setCoachError(null)
     try {
-      setCoach(await ensureCoach())
+      const next = await ensureCoach()
+      if (generation === coachRequests.current.generation) setCoach(next)
     } catch (caught) {
-      setCoachError(caught instanceof Error ? caught.message : 'Coach is unavailable.')
+      if (generation === coachRequests.current.generation) {
+        setCoachError(caught instanceof Error ? caught.message : 'Coach is unavailable.')
+      }
     } finally {
-      setCoachPending(false)
+      if (generation === coachRequests.current.generation) setCoachPending(false)
     }
   }, [readOnly])
+
+  useEffect(() => {
+    if (readOnly) return
+    const requests = coachRequests.current
+    const unsubscribe = subscribeHealthDataChanges(() => {
+      retryToday.current()
+      void loadCoach()
+    })
+    return () => {
+      unsubscribe()
+      ++requests.generation
+    }
+  }, [readOnly, loadCoach])
 
   useEffect(() => {
     if (view?.date && !readOnly) {
@@ -99,16 +119,16 @@ export function TodayPage() {
           {view ? (
             <TodayBoard
               view={view}
-              onNutritionChanged={() => {
-                resource.retry()
-                void loadCoach()
-              }}
-              onSupplementsChanged={() => resource.retry()}
+              onNutritionChanged={notifyHealthDataChanged}
+              onSupplementsChanged={notifyHealthDataChanged}
               coach={coach}
               coachPending={coachPending}
               coachError={coachError}
               onCoachState={(next) => {
+                ++coachRequests.current.generation
                 setCoach(next)
+                setCoachPending(false)
+                setCoachError(null)
                 resource.retry()
               }}
             />
@@ -203,7 +223,6 @@ export function TodayBoard({
         <BodyCard view={view} />
       </div>
       <ContextCard view={view} />
-      <LabRetestCard view={view} />
       <LabCard view={view} />
       {view.changedItems.length > 0 ? (
         <section className="rounded-lg border border-zinc-200 bg-white p-4">
@@ -232,34 +251,6 @@ export function TodayBoard({
         </section>
       ) : null}
     </div>
-  )
-}
-
-function LabRetestCard({ view }: { view: TodayViewModel }) {
-  const readOnly = useDemoReadOnly()
-  const prefix = useAppPathPrefix()
-  const retest = view.lab.retest
-  if (readOnly || !retest || retest.status !== 'due' || !retest.latestResult || retest.daysSinceResult == null) {
-    return null
-  }
-  const primary = retest.latestResult.primaryValues.map((item) => `${item.value} ${item.unit}`).join(' · ')
-  const others = otherRetestsPhrase(view.lab.otherDueRetestCount)
-  return (
-    <section className="rounded-lg border border-zinc-200 bg-white p-4">
-      <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Personal Lab</h2>
-      <p className="mt-3 text-sm font-medium text-zinc-900">Retest suggested</p>
-      <p className="mt-1 text-sm text-zinc-900">{retest.benchmarkTitle}</p>
-      <p className="mt-0.5 text-sm text-zinc-600">Protocol v{retest.protocolVersion}</p>
-      <p className="mt-2 text-sm text-zinc-700">
-        Last result
-        {primary ? ` ${primary}` : ''} · {retestAgePhrase(retest.daysSinceResult)}
-      </p>
-      {view.lab.goalSupport ? <p className="mt-1 text-sm text-zinc-600">{view.lab.goalSupport}</p> : null}
-      {others ? <p className="mt-1 text-sm text-zinc-600">{others}</p> : null}
-      <Link to={prefixedPath(prefix, `/lab/benchmarks/${retest.benchmarkDefinitionId}`)} className={`${quietButtonClass} mt-3`}>
-        Open benchmark
-      </Link>
-    </section>
   )
 }
 

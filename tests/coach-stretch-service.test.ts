@@ -17,6 +17,8 @@ const state = vi.hoisted(() => ({
 vi.mock('../server/goals/service.ts', () => ({ listGoals: async () => ({ goals: [] }) }))
 vi.mock('../server/body/cadence-service.ts', () => ({ loadCadenceEvidence: async () => ({ configs: [], observations: [] }) }))
 vi.mock('../server/context/service.ts', () => ({ getDailyContext: async () => ({ tags: state.tags }) }))
+vi.mock('../server/lab/retests.ts', () => ({ listBenchmarkRetests: async () => ({ retests: [] }), listRetestExperimentLinks: async () => [] }))
+vi.mock('../server/lab/suggestions.ts', () => ({ listExperimentSuggestions: async () => ({ suggestions: [] }), loadSuggestionInput: async () => ({ protocols: [], covers: [], goals: [] }) }))
 
 function fromCandidate(params: unknown[], stretch: boolean): Row {
   return {

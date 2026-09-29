@@ -5,7 +5,10 @@ import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
 import type { CoachState, CoachTaskView } from '../src/domain/coach.ts'
 import { CoachCard, CoachInbox } from '../src/features/coach/CoachCard.tsx'
-import { formatStretchValue, selectPrimaryCoachTask } from '../src/features/coach/presentation.ts'
+import { formatStretchValue, pendingStretchAcknowledgement, selectPrimaryCoachItem, selectPrimaryCoachTask } from '../src/features/coach/presentation.ts'
+import type { CoachLabItem } from '../src/domain/coach-lab.ts'
+import { AppSurfaceProvider } from '../src/lib/app-prefix.ts'
+import { CoachDialog } from '../src/features/coach/CoachDialog.tsx'
 
 function task(overrides: Partial<CoachTaskView> = {}): CoachTaskView {
   return {
@@ -137,6 +140,8 @@ function stretch(overrides: Partial<CoachTaskView> = {}): CoachTaskView {
     difficulty: 'stretch',
     rewardBand: 'stretch',
     status: 'offered',
+    completedAt: overrides.status === 'completed' ? '2026-09-29T20:00:00Z' : null,
+    closedAt: ['completed', 'passed', 'failed', 'expired'].includes(overrides.status ?? '') ? '2026-09-29T20:00:00Z' : null,
     metadata: { stretch: { strategy: 'strength_e1rm' } },
     progress: { current: null, target: 122.5, unit: 'lb', label: null },
     ...overrides,
@@ -218,7 +223,8 @@ describe('Stretch Quest Today integration', () => {
     expect(html).toContain('122.5 lb e1RM')
     expect(html).toContain('Verified by Training')
     expect(html).toContain('>Got it<')
-    expect(selectPrimaryCoachTask(coach, null)?.id).toBe(completed.id)
+    expect(selectPrimaryCoachTask(coach, null)?.id).toBe(coach.dailyQuest?.id)
+    expect(selectPrimaryCoachTask({ ...coach, dailyQuest: null }, null)?.id).toBe(completed.id)
     expect(selectPrimaryCoachTask(coach, completed.id)?.id).toBe(coach.dailyQuest?.id)
   })
 
@@ -237,7 +243,7 @@ describe('Stretch Quest Today integration', () => {
     const html = renderToStaticMarkup(
       <MemoryRouter><CoachInbox state={state({ stretchQuest: stretch() })} onClose={() => undefined} actions={inboxActions} /></MemoryRouter>,
     )
-    expect(html.indexOf('aria-label="Stretch Quest"')).toBeLessThan(html.indexOf('aria-label="Today"'))
+    expect(html.indexOf('aria-label="Stretch"')).toBeLessThan(html.indexOf('aria-label="Today"'))
     expect(html.indexOf('aria-label="Today"')).toBeLessThan(html.indexOf('aria-label="This week"'))
     expect(html).toContain('100 jumping jacks')
     expect(html).toContain('>Log it<')
@@ -260,16 +266,115 @@ describe('Stretch Quest Today integration', () => {
   it('fits a narrow Coach surface and uses the shared reduced-motion accomplishment contract', () => {
     const card = readFileSync('src/features/coach/CoachCard.tsx', 'utf8')
     const css = readFileSync('src/index.css', 'utf8')
-    const html = markup(state({ stretchQuest: stretch({ status: 'completed' }) }))
+    const html = markup(state({ stretchQuest: stretch() }))
     const reduced = css.slice(css.indexOf('@media (prefers-reduced-motion: reduce)'))
     expect(html).toContain('grid-cols-2')
     expect(html).toContain('min-w-0')
     expect(card).toContain('flex flex-wrap gap-3')
-    expect(card).toContain('max-h-[80vh] w-full overflow-y-auto')
+    expect(readFileSync('src/features/coach/CoachDialog.tsx', 'utf8')).toContain('max-h-[90dvh] w-full overflow-y-auto')
     expect(card).toContain('motion-notice-enter')
     expect(card).toContain('without a reward')
     expect(reduced).toContain('.motion-notice-enter')
     expect(reduced).toContain('animation: none')
     expect(card).not.toMatch(/animate-bounce|animate-ping|requestAnimationFrame|setInterval/)
+  })
+})
+function lab(overrides: Partial<CoachLabItem> = {}): CoachLabItem {
+  return { kind: 'benchmark_retest', sourceKey: 'benchmark:b1:p1', sourceFingerprint: 'a'.repeat(64), title: 'Retest Bench Press', detail: 'Your benchmark retest is due.', attentionReason: 'due', urgency: 'due', href: '/lab/benchmarks/b1', ...overrides }
+}
+
+function primaryIdentity(coach: CoachState, pendingAck: string | null = null) {
+  const primary = selectPrimaryCoachItem(coach, pendingAck)
+  return primary?.kind === 'task' ? primary.task.id : primary?.item.sourceKey ?? null
+}
+
+describe('Personal Lab Coach attention', () => {
+  it('uses the complete current-action priority without letting completion acknowledgement block Lab', () => {
+    const due = lab()
+    const available = lab({ sourceKey: 'benchmark:b2:p1', urgency: 'available', attentionReason: 'lab' })
+    const suggestion = lab({ kind: 'experiment_suggestion', sourceKey: 'suggestion:c1', urgency: 'normal', attentionReason: 'lab', href: '/lab/suggestions/c1' })
+    const active = stretch({ status: 'active' })
+    const offered = stretch()
+    const completed = stretch({ status: 'completed' })
+    expect(primaryIdentity(state({ stretchQuest: active, labItems: [due, available, suggestion] }))).toBe(active.id)
+    expect(primaryIdentity(state({ stretchQuest: offered, labItems: [due, available, suggestion] }))).toBe(due.sourceKey)
+    expect(primaryIdentity(state({ stretchQuest: offered, labItems: [available, suggestion] }))).toBe(offered.id)
+    expect(primaryIdentity(state({ labItems: [available, suggestion] }))).toBe(state().dailyQuest?.id)
+    expect(primaryIdentity(state({ dailyQuest: null, labItems: [available, suggestion] }))).toBe(available.sourceKey)
+    expect(primaryIdentity(state({ dailyQuest: null, labItems: [suggestion] }))).toBe(suggestion.sourceKey)
+    expect(primaryIdentity(state({ stretchQuest: completed, labItems: [due] }), completed.id)).toBe(due.sourceKey)
+    expect(primaryIdentity(state({ stretchQuest: completed, dailyQuest: null, labItems: [] }), null)).toBeNull()
+    expect(primaryIdentity(state({ stretchQuest: completed, dailyQuest: null, labItems: [] }), completed.id)).toBe(completed.id)
+  })
+
+  it('shows exactly one primary Lab item and leaves displaced Daily actionable in the inbox', () => {
+    const coach = state({ labItems: [lab()], stretchQuest: stretch() })
+    const html = markup(coach)
+    expect((html.match(/data-coach-primary=/g) ?? []).length).toBe(1)
+    expect(html).toContain('data-coach-primary="lab"')
+    expect(html).toContain('Retest Bench Press')
+    expect(html).toContain('>Open benchmark<')
+    expect(html).toContain('>Not now<')
+    expect(html).not.toContain('100 jumping jacks')
+    expect(html).not.toContain('>Accept<')
+    const inbox = renderToStaticMarkup(<MemoryRouter><CoachInbox state={coach} onClose={() => undefined} actions={inboxActions} /></MemoryRouter>)
+    expect(inbox).toContain('100 jumping jacks')
+    expect(inbox).toContain('>Log it<')
+    expect(inbox).toContain('>Accept<')
+    for (const [earlier, later] of [['Stretch', 'Today'], ['Today', 'Lab'], ['Lab', 'This week']]) {
+      expect(inbox.indexOf(`aria-label="${earlier}"`)).toBeGreaterThan(-1)
+      expect(inbox.indexOf(`aria-label="${earlier}"`)).toBeLessThan(inbox.indexOf(`aria-label="${later}"`))
+    }
+  })
+
+  it('bounds Lab to three items, renders only populated sections, and preserves all prefixed routes', () => {
+    const items = [lab(), lab({ sourceKey: 'b2', title: 'Retest two' }), lab({ kind: 'experiment_suggestion', sourceKey: 's1', urgency: 'normal', title: 'Review experiment one', href: '/lab/suggestions/s1' }), lab({ sourceKey: 'b4', title: 'Hidden fourth retest' })]
+    const html = renderToStaticMarkup(<MemoryRouter><AppSurfaceProvider prefix="/demo" readOnly={false}><CoachInbox state={state({ dailyQuest: null, weeklyFocus: null, labItems: items, labOverflowCount: 2 })} onClose={() => undefined} actions={inboxActions} /></AppSurfaceProvider></MemoryRouter>)
+    expect(html).toContain('aria-label="Lab"')
+    expect(html).not.toContain('aria-label="Stretch"')
+    expect(html).not.toContain('aria-label="Today"')
+    expect(html).not.toContain('aria-label="This week"')
+    expect(html).not.toContain('Hidden fourth retest')
+    expect(html).toContain('Open Lab · 3 more')
+    expect(html).toContain('href="/demo/lab"')
+    expect(html).toContain('href="/demo/lab/benchmarks/b1"')
+    expect(html).toContain('href="/demo/lab/suggestions/s1"')
+    expect(html).toContain('>Review experiment<')
+    expect(html).not.toContain('Accept experiment')
+    expect(html).not.toContain('XP')
+  })
+
+  it('keeps Weekly-only compact and truly empty Coach quiet without prior-day acknowledgements', () => {
+    const weekly = markup(state({ dailyQuest: null }))
+    expect(weekly).toContain('Focus this week')
+    expect(weekly).not.toContain('data-coach-primary')
+    expect(markup(state({ dailyQuest: null, weeklyFocus: null, activeCount: 0 }))).toBe('')
+    const old = stretch({ status: 'completed', completedAt: '2026-09-28T20:00:00Z', closedAt: '2026-09-28T20:00:00Z' })
+    const quiet = state({ dailyQuest: null, weeklyFocus: null, stretchQuest: old, activeCount: 0 })
+    expect(pendingStretchAcknowledgement(quiet, null)).toBeNull()
+    expect(markup(quiet)).toBe('')
+    const phoenixPreviousDay = stretch({ status: 'completed', completedAt: '2026-09-29T01:00:00Z' })
+    expect(pendingStretchAcknowledgement(state({ stretchQuest: phoenixPreviousDay }), null)).toBeNull()
+  })
+
+  it('uses accessible shared dialogs with Escape, focus restoration, containment, and route cleanup', () => {
+    const html = renderToStaticMarkup(<CoachDialog title="Coach inbox" onClose={() => undefined}><button type="button">Review</button></CoachDialog>)
+    expect(html).toContain('role="dialog"')
+    expect(html).toContain('aria-modal="true"')
+    expect(html).toContain('aria-labelledby=')
+    expect(html).toContain('tabindex="-1"')
+    expect(html).toContain('Close Coach inbox')
+    const dialog = readFileSync('src/features/coach/CoachDialog.tsx', 'utf8')
+    const card = readFileSync('src/features/coach/CoachCard.tsx', 'utf8')
+    expect(dialog).toContain("event.key === 'Escape'")
+    expect(dialog).toContain("event.key !== 'Tab'")
+    expect(dialog).toContain("document.addEventListener('focusin'")
+    expect(dialog).toContain('previous.isConnected')
+    expect(dialog).toContain('previous.focus()')
+    expect(dialog).toContain('quietButtonClass')
+    expect(card).toContain('[location.key]')
+    expect(card).toContain('onClick={actions.onNavigate}')
+    expect(card).toContain('data-coach-initial-focus')
+    expect(card).toContain('Keep going')
   })
 })

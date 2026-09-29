@@ -187,6 +187,7 @@ export function matchHealthApiRoute(pathname: string): HealthApiRoute | null {
       return 'backup-export'
     case '/api/coach':
     case '/api/coach/ensure':
+    case '/api/coach/lab/snooze':
       return 'coach'
     case '/api/session':
       return 'session'

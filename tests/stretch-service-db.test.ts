@@ -6,6 +6,7 @@ import path from 'node:path'
 import { Pool } from 'pg'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { poundsToKilograms } from '../src/domain/units.ts'
+import { buildBenchmarkRetestView, type BenchmarkRetestView } from '../src/domain/lab-retests.ts'
 
 // Production SQL, disposable local database. Never read DATABASE_URL or owner data.
 const BIN = '/usr/lib/postgresql/14/bin'
@@ -16,13 +17,15 @@ const AFTER = new Date('2026-09-29T21:00:00.000Z')
 type Row = Record<string, unknown>
 type DeferredQuery = PromiseLike<Row[]> & { text: string; params: unknown[] }
 
-const database = vi.hoisted(() => ({ sql: null as unknown }))
+const database = vi.hoisted(() => ({ sql: null as unknown, retests: [] as BenchmarkRetestView[] }))
 vi.mock('../server/db.ts', () => ({ getSql: async () => database.sql }))
 vi.mock('../server/goals/service.ts', () => ({ listGoals: async () => ({ goals: [] }) }))
 vi.mock('../server/body/cadence-service.ts', () => ({ loadCadenceEvidence: async () => ({ configs: [], observations: [] }) }))
 vi.mock('../server/context/service.ts', () => ({ getDailyContext: async () => ({ tags: [] }) }))
+vi.mock('../server/lab/retests.ts', () => ({ listBenchmarkRetests: async () => ({ retests: database.retests }), listRetestExperimentLinks: async () => [] }))
+vi.mock('../server/lab/suggestions.ts', () => ({ listExperimentSuggestions: async () => ({ suggestions: [] }), loadSuggestionInput: async () => ({ protocols: [], covers: [], goals: [] }) }))
 
-import { acceptCoachTask, endCoachTask, ensureCoach, passCoachTask, readCoach } from '../server/coach/service.ts'
+import { acceptCoachTask, endCoachTask, ensureCoach, passCoachTask, readCoach, snoozeCoachLabItem } from '../server/coach/service.ts'
 
 let directory = ''
 let started = false
@@ -117,6 +120,7 @@ describe.skipIf(!existsSync(`${BIN}/initdb`))('Stretch production service on dis
     `)
     await pool.query(readFileSync('migrations/0035_coach_tasks.sql', 'utf8'))
     await pool.query(readFileSync('migrations/0036_stretch_quests.sql', 'utf8'))
+    await pool.query(readFileSync('migrations/0037_coach_lab_snoozes.sql', 'utf8'))
   }, 60_000)
 
   afterAll(async () => {
@@ -126,7 +130,8 @@ describe.skipIf(!existsSync(`${BIN}/initdb`))('Stretch production service on dis
   })
 
   beforeEach(async () => {
-    await pool.query('TRUNCATE coach_task_events, coach_tasks, workout_sets, workout_session_exercises, workout_sessions, exercise_definitions')
+    database.retests = []
+    await pool.query('TRUNCATE coach_lab_snoozes, coach_task_events, coach_tasks, workout_sets, workout_session_exercises, workout_sessions, exercise_definitions')
     await pool.query(`INSERT INTO exercise_definitions
       (id, name, external_id, performance_type, analytics_load_type, analytics_rep_mode, measurement_kind, load_type, unilateral)
       VALUES ($1, 'Bench Press', NULL, 'loaded_reps', 'external', 'standard', 'reps', 'barbell', false)`, [EXERCISE])
@@ -192,5 +197,39 @@ describe.skipIf(!existsSync(`${BIN}/initdb`))('Stretch production service on dis
     expect((await readCoach(NOW)).stretchQuest?.status).toBe('expired')
     expect((await pool.query(`SELECT evidence FROM coach_task_events
       WHERE task_id = $1 AND event_kind = 'expired'`, [quest.id])).rows[0].evidence.reason).toBe('baseline_source_unavailable')
+  })
+
+  it('executes fingerprint snoozes concurrently, preserves retry dates and never creates Coach commitments', async () => {
+    const protocol = { benchmarkDefinitionId: EXERCISE, benchmarkTitle: 'Real SQL retest', protocolVersionId: 'protocol-1',
+      protocolVersion: 1, minimumRetestDays: 7, suggestedRetestDays: 14 }
+    const result = { id: 'result-1', benchmarkDefinitionId: EXERCISE, protocolVersionId: 'protocol-1',
+      status: 'valid', resultDate: '2026-09-01', createdAt: '2026-09-01T19:00:00Z', primaryValues: [] }
+    database.retests = [buildBenchmarkRetestView(protocol, [result], '2026-09-29')]
+    const item = (await readCoach(NOW)).labItems![0]
+    const payload = { kind: item.kind, sourceKey: item.sourceKey, sourceFingerprint: item.sourceFingerprint }
+    const states = await Promise.all(Array.from({ length: 8 }, () => snoozeCoachLabItem(payload, NOW)))
+    expect(states.every((state) => state.snoozedUntil === '2026-10-06' && state.labItems?.length === 0)).toBe(true)
+    expect((await pool.query('SELECT count(*)::int AS n FROM coach_lab_snoozes')).rows[0].n).toBe(1)
+    expect((await pool.query('SELECT count(*)::int AS n FROM coach_tasks')).rows[0].n).toBe(0)
+    expect((await pool.query('SELECT count(*)::int AS n FROM coach_task_events')).rows[0].n).toBe(0)
+    expect((await snoozeCoachLabItem(payload, new Date('2026-10-01T19:00:00Z'))).snoozedUntil).toBe('2026-10-06')
+    expect((await readCoach(new Date('2026-10-06T07:00:00Z'))).labItems?.[0].sourceFingerprint).toBe(item.sourceFingerprint)
+    expect((await snoozeCoachLabItem(payload, new Date('2026-10-06T19:00:00Z'))).snoozedUntil).toBe('2026-10-13')
+    database.retests = [buildBenchmarkRetestView(protocol, [{ ...result, id: 'result-2', resultDate: '2026-09-10' }], '2026-09-29')]
+    const changed = (await readCoach(NOW)).labItems![0]
+    expect(changed.sourceFingerprint).not.toBe(item.sourceFingerprint)
+    await expect(snoozeCoachLabItem(payload, NOW)).rejects.toMatchObject({ statusCode: 409 })
+    await snoozeCoachLabItem({ kind: changed.kind, sourceKey: changed.sourceKey, sourceFingerprint: changed.sourceFingerprint }, NOW)
+    expect((await pool.query('SELECT count(*)::int AS n FROM coach_lab_snoozes')).rows[0].n).toBe(2)
+  })
+
+  it('enforces snooze kind/key/fingerprint constraints in the real migration', async () => {
+    const text = `INSERT INTO coach_lab_snoozes (item_kind, source_key, source_fingerprint, snoozed_until)
+      VALUES ($1, $2, $3, '2026-10-06')`
+    await expect(pool.query(text, ['unsupported', 'benchmark:key', 'a'.repeat(64)])).rejects.toThrow(/coach_lab_snoozes_kind_allowed/)
+    await expect(pool.query(text, ['benchmark_retest', 'bad key', 'a'.repeat(64)])).rejects.toThrow(/coach_lab_snoozes_source_key_present/)
+    await expect(pool.query(text, ['benchmark_retest', 'benchmark:key', 'not-a-fingerprint'])).rejects.toThrow(/coach_lab_snoozes_fingerprint_valid/)
+    await pool.query(text, ['benchmark_retest', 'benchmark:key', 'a'.repeat(64)])
+    await expect(pool.query(text, ['benchmark_retest', 'benchmark:key', 'a'.repeat(64)])).rejects.toThrow(/coach_lab_snoozes_identity_unique/)
   })
 })

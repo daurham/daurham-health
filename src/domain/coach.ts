@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { addCalendarDays } from './progress/dates.js'
 import type { DailyContextTagKey } from './context.js'
+import type { CoachAttentionReason, CoachLabItem } from './coach-lab.js'
 
 export const COACH_RULE_VERSION = 1 as const
 
@@ -54,6 +55,7 @@ export type CoachTaskView = {
   difficulty: CoachDifficulty
   rewardBand: CoachDifficulty
   status: CoachTaskStatus
+  attentionReason?: CoachAttentionReason
   acceptedAt?: string | null
   completedAt: string | null
   closedAt: string | null
@@ -69,6 +71,8 @@ export type CoachState = {
   weeklyFocus: CoachTaskView | null
   dailyQuest: CoachTaskView | null
   stretchQuest?: CoachTaskView | null
+  labItems?: CoachLabItem[]
+  labOverflowCount?: number
   activeCount: number
 }
 

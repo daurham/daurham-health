@@ -8,6 +8,7 @@ import {
   logCoachTraining,
   passCoachTask,
   readCoach,
+  snoozeCoachLabItem,
 } from '../coach/service.js'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -15,11 +16,13 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 type CoachRoute =
   | { kind: 'root' }
   | { kind: 'ensure' }
+  | { kind: 'lab-snooze' }
   | { kind: 'task'; id: string; action: 'accept' | 'end' | 'pass' | 'log-training' | 'log-self-report' }
 
 export function matchCoachRoute(pathname: string): CoachRoute | null {
   if (pathname === '/api/coach') return { kind: 'root' }
   if (pathname === '/api/coach/ensure') return { kind: 'ensure' }
+  if (pathname === '/api/coach/lab/snooze') return { kind: 'lab-snooze' }
   const match = /^\/api\/coach\/tasks\/([^/]+)\/(accept|end|pass|log-training|log-self-report)$/.exec(pathname)
   if (!match || !UUID.test(match[1] ?? '')) return null
   return {
@@ -59,6 +62,11 @@ export async function handleCoach(req: ApiRequest, res: ApiResponse) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST')
     sendJson(res, 405, { error: 'Method not allowed' })
+    return
+  }
+
+  if (route.kind === 'lab-snooze') {
+    sendJson(res, 200, await snoozeCoachLabItem(await readJsonBody(req)))
     return
   }
 

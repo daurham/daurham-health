@@ -42,6 +42,8 @@ vi.mock('../server/body/cadence-service.ts', () => ({
 vi.mock('../server/context/service.ts', () => ({
   getDailyContext: async () => null,
 }))
+vi.mock('../server/lab/retests.ts', () => ({ listBenchmarkRetests: async () => ({ retests: [] }), listRetestExperimentLinks: async () => [] }))
+vi.mock('../server/lab/suggestions.ts', () => ({ listExperimentSuggestions: async () => ({ suggestions: [] }), loadSuggestionInput: async () => ({ protocols: [], covers: [], goals: [] }) }))
 
 vi.mock('../server/training/owner-exercises.ts', () => ({
   ensureOwnerExercise: async () => ({

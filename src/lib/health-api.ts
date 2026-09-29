@@ -1,3 +1,5 @@
+import { isCoachRelevantMutation, notifyHealthDataChanged } from './health-changes'
+
 export const OWNER_AUTH_REQUIRED = 'health:owner-auth-required'
 
 const LEAKED_ERROR = /database_url|postgres:\/\/|api[_-]?key|bearer\s+|select\s+.+\s+from|insert\s+into|syntax error at|\bat\s+\S+\.(?:ts|js):\d+/i
@@ -28,6 +30,8 @@ export async function healthFetch(input: RequestInfo | URL, init?: RequestInit):
   if (response.status === 401 && typeof window !== 'undefined' && !requestUrl(input).includes('/api/auth/')) {
     window.dispatchEvent(new CustomEvent(OWNER_AUTH_REQUIRED))
   }
+  const method = init?.method ?? (typeof Request !== 'undefined' && input instanceof Request ? input.method : 'GET')
+  if (response.ok && isCoachRelevantMutation(requestUrl(input), method)) notifyHealthDataChanged()
   return response
 }
 

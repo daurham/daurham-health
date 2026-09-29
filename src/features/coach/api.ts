@@ -1,16 +1,27 @@
 import type { CoachState } from '@/domain/coach'
+import type { CoachLabItem } from '@/domain/coach-lab'
 import { healthFetch, readApiError } from '@/lib'
 
-async function send(path: string, method: 'GET' | 'POST', body?: unknown): Promise<CoachState> {
+export class CoachApiError extends Error {
+  readonly status: number
+
+  constructor(message: string, status: number) {
+    super(message)
+    this.name = 'CoachApiError'
+    this.status = status
+  }
+}
+
+async function send<T extends CoachState = CoachState>(path: string, method: 'GET' | 'POST', body?: unknown): Promise<T> {
   const response = await healthFetch(path, {
     method,
     headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body),
   })
   if (!response.ok) {
-    throw new Error(await readApiError(response))
+    throw new CoachApiError(await readApiError(response), response.status)
   }
-  return (await response.json()) as CoachState
+  return (await response.json()) as T
 }
 
 export function fetchCoach(): Promise<CoachState> {
@@ -56,4 +67,12 @@ export function logCoachSelfReport(
   },
 ): Promise<CoachState> {
   return send(`/api/coach/tasks/${taskId}/log-self-report`, 'POST', body)
+}
+
+export function snoozeCoachLabItem(item: Pick<CoachLabItem, 'kind' | 'sourceKey' | 'sourceFingerprint'>): Promise<CoachState & { snoozedUntil: string }> {
+  return send('/api/coach/lab/snooze', 'POST', {
+    kind: item.kind,
+    sourceKey: item.sourceKey,
+    sourceFingerprint: item.sourceFingerprint,
+  })
 }

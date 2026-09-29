@@ -42,6 +42,8 @@ import {
 import { loadCadenceEvidence } from '../body/cadence-service.js'
 import { getDailyContext } from '../context/service.js'
 import { getSql, type Sql } from '../db.js'
+import { loadCoachLabState, snoozeCoachLabPresentation } from './lab.js'
+import { coachTaskAttentionReason } from '../../src/domain/coach-lab.js'
 import { listGoals } from '../goals/service.js'
 import { HttpError } from '../http.js'
 import { ensureOwnerExercise } from '../training/owner-exercises.js'
@@ -1273,6 +1275,7 @@ async function toView(sql: Sql, row: CoachTaskRow, today: string, now: Date): Pr
     evidenceLabel: row.task_kind === 'stretch_quest' && (row.status === 'completed' || evaluated.progress?.current != null)
       ? 'Verified by Training'
       : evidenceLabel(completedEvidence),
+    attentionReason: coachTaskAttentionReason({ taskKind: row.task_kind, goalId: row.goal_id, metadata: metadataOf(row), ruleKey: row.rule_key }),
   }
 }
 
@@ -1283,10 +1286,11 @@ async function currentState(sql: Sql, date: string, now: Date): Promise<CoachSta
     loadTaskForPeriod(sql, 'daily_quest', date),
     loadCurrentStretch(sql, date),
   ])
-  const [weeklyFocus, dailyQuest, stretchQuest] = await Promise.all([
+  const [weeklyFocus, dailyQuest, stretchQuest, lab] = await Promise.all([
     weeklyRow ? toView(sql, weeklyRow, date, now) : Promise.resolve(null),
     dailyRow ? toView(sql, dailyRow, date, now) : Promise.resolve(null),
     stretchRow ? toView(sql, stretchRow, date, now) : Promise.resolve(null),
+    loadCoachLabState(sql, date),
   ])
   return {
     date,
@@ -1295,6 +1299,8 @@ async function currentState(sql: Sql, date: string, now: Date): Promise<CoachSta
     weeklyFocus,
     dailyQuest,
     stretchQuest,
+    labItems: lab.labItems,
+    labOverflowCount: lab.labOverflowCount,
     activeCount: [weeklyFocus, dailyQuest, stretchQuest].filter((item) => item?.status === 'active' || item?.status === 'offered').length,
   }
 }
@@ -1304,6 +1310,14 @@ export async function readCoach(now = new Date()): Promise<CoachState> {
   const sql = await getSql()
   await reconcile(sql, date, now)
   return currentState(sql, date, now)
+}
+
+export async function snoozeCoachLabItem(body: unknown, now = new Date()): Promise<CoachState & { snoozedUntil: string }> {
+  const date = healthCalendarDateFromNow(now)
+  const sql = await getSql()
+  await reconcile(sql, date, now)
+  const snoozedUntil = await snoozeCoachLabPresentation(sql, body, date, now)
+  return { ...await currentState(sql, date, now), snoozedUntil }
 }
 
 export async function ensureCoach(now = new Date()): Promise<CoachState> {

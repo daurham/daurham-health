@@ -7,6 +7,8 @@ import { buildTodayView, type TodaySources } from '../src/domain/today/index.ts'
 import { RetestList, RetestSection } from '../src/features/lab/RetestSection.tsx'
 import { TodayBoard } from '../src/features/today/TodayPage.tsx'
 import { AppSurfaceProvider } from '../src/lib/app-prefix.ts'
+import { deriveCoachLabItems } from '../src/domain/coach-lab.ts'
+import { coachWeek } from '../src/domain/coach.ts'
 
 const BENCHMARK = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
 const VERSION = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
@@ -63,6 +65,10 @@ function today(retests: BenchmarkRetestView[], readOnly = false): string {
     bodyWeights: [],
     lab: { experiments: [], retests, coveredBenchmarkIds: [] },
   }
+  const view = buildTodayView(sources)
+  const week = coachWeek(view.date)
+  const coach = { date: view.date, weekStart: week.start, weekEnd: week.end, weeklyFocus: null, dailyQuest: null,
+    labItems: deriveCoachLabItems({ retests, suggestions: [] }), activeCount: 0 }
   return renderToStaticMarkup(
     React.createElement(
       MemoryRouter,
@@ -70,7 +76,7 @@ function today(retests: BenchmarkRetestView[], readOnly = false): string {
       React.createElement(AppSurfaceProvider, {
         prefix: readOnly ? '/demo' : '',
         readOnly,
-        children: React.createElement(TodayBoard, { view: buildTodayView(sources) }),
+        children: React.createElement(TodayBoard, { view, coach: readOnly ? null : coach, onCoachState: readOnly ? undefined : () => undefined }),
       }),
     ),
   )
@@ -107,18 +113,23 @@ describe('retest copy', () => {
     expect(list).not.toContain('Not yet at the minimum interval.')
   })
 
-  it('shows only a due retest on Today and hides it in demo', () => {
+  it('surfaces due/available retests once through Coach and hides owner attention in demo', () => {
     const due = today([sample('2026-12-03'), sample('2026-09-20'), sample('2026-09-20', {}, false)])
     expect(due).toContain('Personal Lab')
     expect(due).toContain('Retest suggested')
     expect(due).toContain('Push-up 10-minute capacity')
-    expect(due).toContain('Protocol v2')
-    expect(due).toContain('67 reps')
+    expect(due).toContain('protocol v2')
+    expect((due.match(/data-coach-primary=/g) ?? []).length).toBe(1)
+    expect((due.match(/Retest suggested/g) ?? []).length).toBe(1)
     expect(due).toContain('Open benchmark')
     expect(due).not.toContain('Not yet at the minimum interval.')
     expect(due).not.toContain('establish a baseline')
     expect(due.toLowerCase()).not.toContain('overdue')
     expect(due).not.toContain('Needs attention')
+    const available = today([sample('2026-10-16')])
+    expect(available).toContain('Retest available')
+    expect(available).toContain('Open benchmark')
+    expect(today([sample('2026-09-20')])).not.toContain('Open benchmark')
     const demo = today([sample('2026-12-03')], true)
     expect(demo).not.toContain('Retest suggested')
     expect(demo).not.toContain('Open benchmark')

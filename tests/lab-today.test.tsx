@@ -46,6 +46,22 @@ const experiment = (status: 'scheduled' | 'active', title: string): TodayLabExpe
 })
 
 describe('today personal lab', () => {
+  it('keeps retest data without rendering duplicate standalone attention', () => {
+    const view = buildTodayView(sources([experiment('active', 'Existing experiment')]))
+    view.lab.retest = {
+      benchmarkDefinitionId: 'benchmark', benchmarkTitle: 'Duplicate retest', protocolVersionId: 'version', protocolVersion: 1,
+      status: 'due', latestResult: { id: 'result', resultDate: '2026-09-01', primaryValues: [] },
+      minimumRetestDays: 7, suggestedRetestDays: 14, minimumDate: '2026-09-08', suggestedDate: '2026-09-15',
+      daysSinceResult: 25, daysUntilMinimum: -18, daysUntilSuggested: -11,
+    }
+    const html = renderToStaticMarkup(<MemoryRouter><TodayBoard view={view} /></MemoryRouter>)
+    expect(view.lab.retest.status).toBe('due')
+    expect(html).not.toContain('Duplicate retest')
+    expect(html).not.toContain('Retest suggested')
+    expect(html).toContain('Existing experiment')
+    expect(html).toContain('href="/lab"')
+  })
+
   it('shows scheduled and active experiments without a due reminder', () => {
     expect(buildTodayView(sources()).lab.experiments).toEqual([])
     expect(board()).not.toContain('Open Lab')
