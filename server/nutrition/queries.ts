@@ -76,6 +76,7 @@ export function mapFoodRow(row: FoodRow): NutritionFood {
     carbs: asNumber(row.carbs),
     fat: asNumber(row.fat),
     fiber: asNumber(row.fiber),
+    sodiumMg: asNumber(row.sodium_mg),
     sourceKind: row.source_kind as NutritionFood['sourceKind'],
     isStaple: Boolean(row.is_staple),
     archived: Boolean(row.archived),
@@ -129,16 +130,17 @@ export function mapTargetRow(row: TargetRow): NutritionTarget {
     carbsTarget: asNumber(row.carbs_target),
     fatTarget: asNumber(row.fat_target),
     fiberTarget: asNumber(row.fiber_target),
+    sodiumTargetMg: asNumber(row.sodium_target_mg),
     createdAt: asIso(row.created_at),
     updatedAt: asIso(row.updated_at),
   }
 }
 
 const FOOD_COLUMNS = `id, name, brand, barcode, catalog_kind, serving_quantity, serving_unit, serving_grams,
-         calories, protein, carbs, fat, fiber, source_kind, is_staple, archived, notes, created_at, updated_at`
+         calories, protein, carbs, fat, fiber, sodium_mg, source_kind, is_staple, archived, notes, created_at, updated_at`
 
 const ENTRY_COLUMNS = `id, log_date, consumed_at, timezone, meal, food_id, food_name, brand, serving_quantity,
-         serving_unit, grams, calories, protein, carbs, fat, fiber, source_kind, notes, meal_group_id,
+         serving_unit, grams, calories, protein, carbs, fat, fiber, sodium_mg, source_kind, notes, meal_group_id,
          recipe_version_id, recipe_portion_kind, recipe_portion_amount, recipe_fraction, created_at, updated_at`
 
 const ENTRY_READ_COLUMNS = ENTRY_COLUMNS.split(',')
@@ -184,8 +186,8 @@ export const GET_FOOD_BY_BARCODES_SQL = `SELECT ${FOOD_COLUMNS}
 
 export const INSERT_FOOD_SQL = `INSERT INTO nutrition_foods (
            name, brand, barcode, catalog_kind, serving_quantity, serving_unit, serving_grams,
-           calories, protein, carbs, fat, fiber, source_kind, is_staple, notes
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+           calories, protein, carbs, fat, fiber, sodium_mg, source_kind, is_staple, notes
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
          RETURNING ${FOOD_COLUMNS}`
 
 export const UPDATE_FOOD_SQL = `UPDATE nutrition_foods SET
@@ -257,19 +259,19 @@ export const UPDATE_ENTRY_SQL = `UPDATE nutrition_entries SET
 
 export const DELETE_ENTRY_SQL = `DELETE FROM nutrition_entries WHERE id = $1 RETURNING id`
 
-export const TARGET_FOR_DATE_SQL = `SELECT id, effective_from, calories_target, protein_target, carbs_target, fat_target, fiber_target, created_at, updated_at
+export const TARGET_FOR_DATE_SQL = `SELECT id, effective_from, calories_target, protein_target, carbs_target, fat_target, fiber_target, sodium_target_mg, created_at, updated_at
          FROM nutrition_targets
          WHERE effective_from <= $1
          ORDER BY effective_from DESC
          LIMIT 1`
 
-export const LIST_ALL_TARGETS_SQL = `SELECT id, effective_from, calories_target, protein_target, carbs_target, fat_target, fiber_target, created_at, updated_at
+export const LIST_ALL_TARGETS_SQL = `SELECT id, effective_from, calories_target, protein_target, carbs_target, fat_target, fiber_target, sodium_target_mg, created_at, updated_at
          FROM nutrition_targets
          ORDER BY effective_from ASC, created_at ASC`
 
 export const UPSERT_TARGET_SQL = `INSERT INTO nutrition_targets (
-           effective_from, calories_target, protein_target, carbs_target, fat_target, fiber_target
-         ) VALUES ($1,$2,$3,$4,$5,$6)
+           effective_from, calories_target, protein_target, carbs_target, fat_target, fiber_target, sodium_target_mg
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7)
          ON CONFLICT (effective_from) DO UPDATE SET
            calories_target = EXCLUDED.calories_target,
            protein_target = EXCLUDED.protein_target,
@@ -277,7 +279,7 @@ export const UPSERT_TARGET_SQL = `INSERT INTO nutrition_targets (
            fat_target = EXCLUDED.fat_target,
            fiber_target = EXCLUDED.fiber_target,
            updated_at = now()
-         RETURNING id, effective_from, calories_target, protein_target, carbs_target, fat_target, fiber_target, created_at, updated_at`
+         RETURNING id, effective_from, calories_target, protein_target, carbs_target, fat_target, fiber_target, sodium_target_mg, created_at, updated_at`
 
 export const LIST_STAPLES_SQL = `SELECT ${FOOD_COLUMNS}
          FROM nutrition_foods
