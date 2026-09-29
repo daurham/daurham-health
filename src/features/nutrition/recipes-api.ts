@@ -19,10 +19,14 @@ export type RecipeIngredient = {
   baseProteinGSnapshot: number | null
   baseCarbsGSnapshot: number | null
   baseFatGSnapshot: number | null
+  baseFiberGSnapshot: number | null
+  baseSodiumMgSnapshot: number | null
   lineCaloriesKcal: number
   lineProteinG: number | null
   lineCarbsG: number | null
   lineFatG: number | null
+  lineFiberG: number | null
+  lineSodiumMg: number | null
   supportedUnits: string[]
 }
 
@@ -52,6 +56,8 @@ export type RecipeDetail = {
     proteinG: number | null
     carbsG: number | null
     fatG: number | null
+    fiberG: number | null
+    sodiumMg: number | null
     calculationVersion: string
     createdAt: string
     ingredients: RecipeIngredient[]
@@ -103,9 +109,9 @@ export type RecipePreview = {
     to: { amount: number; unit: string; basis: RecipeBasis } | null
   }>
   ingredientBasisChanges: RecipePreview['ingredientChanges']
-  currentWholeNutrition: { caloriesKcal: number | null; proteinG: number | null; carbsG: number | null; fatG: number | null }
-  candidateWholeNutrition: { caloriesKcal: number | null; proteinG: number | null; carbsG: number | null; fatG: number | null } | null
-  nutritionDelta: { caloriesKcal: number | null; proteinG: number | null; carbsG: number | null; fatG: number | null }
+  currentWholeNutrition: { caloriesKcal: number | null; proteinG: number | null; carbsG: number | null; fatG: number | null; fiberG: number | null; sodiumMg: number | null }
+  candidateWholeNutrition: { caloriesKcal: number | null; proteinG: number | null; carbsG: number | null; fatG: number | null; fiberG: number | null; sodiumMg: number | null } | null
+  nutritionDelta: { caloriesKcal: number | null; proteinG: number | null; carbsG: number | null; fatG: number | null; fiberG: number | null; sodiumMg: number | null }
   warnings: string[]
   canCommit: boolean
   previewFingerprint: string | null
@@ -117,6 +123,8 @@ type RecipeBasis = {
   proteinG: number | null
   carbsG: number | null
   fatG: number | null
+  fiberG: number | null
+  sodiumMg: number | null
 }
 
 export async function previewRecipeChange(
