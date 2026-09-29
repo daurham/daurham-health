@@ -46,7 +46,7 @@ import { loadCoachLabState, snoozeCoachLabPresentation } from './lab.js'
 import { coachTaskAttentionReason } from '../../src/domain/coach-lab.js'
 import { listGoals } from '../goals/service.js'
 import { HttpError } from '../http.js'
-import { ensureOwnerExercise } from '../training/owner-exercises.js'
+import { ensureOwnerExercise, getExerciseDefinitionByExternalId } from '../training/owner-exercises.js'
 import {
   buildSessionInsertQueries,
   parseManualWorkoutRequest,
@@ -1433,12 +1433,16 @@ export async function logCoachTraining(id: string, body: unknown, now = new Date
 
   const meetsTarget = parsed.data.actualValue >= rule.training.targetValue
   if (!existing[0]) {
-    const exercise = await ensureOwnerExercise({
-      name: rule.training.exerciseName,
-      measurementKind: rule.training.measurementKind,
-      loadType: rule.training.loadType,
-      unilateral: false,
-    })
+    const seededActivityId = row.rule_key === 'manual:run:15m' ? 'EX18' : row.rule_key === 'manual:hike:20m' ? 'EX19' : null
+    const exercise = seededActivityId
+      ? await getExerciseDefinitionByExternalId(seededActivityId)
+      : await ensureOwnerExercise({
+          name: rule.training.exerciseName,
+          measurementKind: rule.training.measurementKind,
+          loadType: rule.training.loadType,
+          unilateral: false,
+        })
+    if (!exercise) throw new HttpError(503, 'Canonical Training activity is unavailable. Apply pending migrations.')
     const set =
       rule.training.valueKind === 'reps'
         ? { reps: Math.round(parsed.data.actualValue), durationSec: null }
@@ -1472,6 +1476,9 @@ export async function logCoachTraining(id: string, body: unknown, now = new Date
               rightReps: null,
               leftDurationSec: null,
               rightDurationSec: null,
+              distance: rule.training.allowDistance ? parsed.data.distance ?? null : null,
+              distanceUnit: rule.training.allowDistance && parsed.data.distance != null ? (parsed.data.distanceUnit ?? null) : null,
+              completed: null,
               notes: null,
             },
           ],
