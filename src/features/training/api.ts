@@ -8,6 +8,7 @@ import {
   exerciseDefinitionSchema,
   type ManualWorkoutRequest,
   type OwnerExerciseRequest,
+  type OwnerRoutineInput,
   type WorkoutSession,
   type WorkoutSessionSummary,
   type WorkoutTemplate,
@@ -146,4 +147,26 @@ export async function commitImportedSession(
     throw new Error(await readApiError(response))
   }
   return createSessionResponseSchema.parse(await response.json()).session
+}
+
+
+export async function createOwnerRoutine(input: OwnerRoutineInput): Promise<WorkoutTemplate> {
+  const response = await healthFetch('/api/training/templates', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+  })
+  if (!response.ok) throw new Error(await readApiError(response))
+  return templateListResponseSchema.shape.templates.element.parse((await response.json()).template)
+}
+
+export async function reviseOwnerRoutine(id: string, input: OwnerRoutineInput): Promise<WorkoutTemplate> {
+  const response = await healthFetch(`/api/training/templates/${id}`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+  })
+  if (!response.ok) throw new Error(await readApiError(response))
+  return templateListResponseSchema.shape.templates.element.parse((await response.json()).template)
+}
+
+export async function archiveOwnerRoutine(id: string): Promise<void> {
+  const response = await healthFetch(`/api/training/templates/${id}`, { method: 'DELETE' })
+  if (!response.ok) throw new Error(await readApiError(response))
 }
