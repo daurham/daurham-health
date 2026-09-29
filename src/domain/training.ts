@@ -318,6 +318,7 @@ export const workoutSessionExerciseRowSchema = z.object({
   slot_id: z.string().min(1).nullable(),
   exercise_external_id: z.string().min(1).nullable(),
   exercise_name: nonemptyText('Exercise name'),
+  measurement_kind: measurementKindSchema.optional(),
   notes: z.string().nullable(),
   metadata: jsonRecordSchema,
   created_at: timestamptzSchema,
@@ -332,6 +333,7 @@ export const workoutSessionExerciseSchema = z.object({
   slotId: z.string().min(1).nullable(),
   exerciseExternalId: z.string().min(1).nullable(),
   exerciseName: nonemptyText('Exercise name'),
+  measurementKind: measurementKindSchema.optional(),
   notes: z.string().nullable(),
   sets: z.array(workoutSetSchema).min(1),
 })
