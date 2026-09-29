@@ -383,9 +383,9 @@ export const LIST_ENTRIES_BETWEEN_SQL = `SELECT ${ENTRY_READ_COLUMNS}
 
 export const INSERT_RECIPE_ENTRY_SQL = `INSERT INTO nutrition_entries (
            log_date, consumed_at, timezone, meal, food_id, food_name, brand,
-           serving_quantity, serving_unit, grams, calories, protein, carbs, fat, fiber,
+           serving_quantity, serving_unit, grams, calories, protein, carbs, fat, fiber, sodium_mg,
            source_kind, notes, recipe_version_id, recipe_portion_kind, recipe_portion_amount, recipe_fraction
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
          RETURNING ${ENTRY_COLUMNS}`
 
 export async function listEntriesForDate(date: string): Promise<NutritionEntry[]> {
