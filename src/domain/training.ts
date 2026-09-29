@@ -312,8 +312,8 @@ export const workoutSetSchema = z
     rightReps: nonnegativeInt.nullable(),
     leftDurationSec: nonnegativeInt.nullable(),
     rightDurationSec: nonnegativeInt.nullable(),
-    distanceM: z.number().nonnegative().nullable(),
-    completed: z.boolean().nullable(),
+    distanceM: z.number().nonnegative().nullable().optional().default(null),
+    completed: z.boolean().nullable().optional().default(null),
     notes: z.string().nullable(),
   })
   .superRefine((set, ctx) => addSetInvariantIssues(set, ctx))
@@ -684,8 +684,8 @@ export type DraftSetFields = {
   transcribedWeightLb?: string
 }
 
-function parseOptionalNumber(value: string): number | null {
-  const trimmed = value.trim()
+function parseOptionalNumber(value: string | undefined): number | null {
+  const trimmed = (value ?? '').trim()
   if (trimmed === '') {
     return null
   }
@@ -714,7 +714,7 @@ export function isDraftSetUntouched(set: DraftSetFields): boolean {
     set.rightReps.trim() === '' &&
     set.leftDurationSec.trim() === '' &&
     set.rightDurationSec.trim() === '' &&
-    set.distance.trim() === '' &&
+    (set.distance ?? '').trim() === '' &&
     set.completed == null &&
     set.notes.trim() === ''
   )
@@ -736,7 +736,7 @@ export function draftSetToManualInput(
     leftDurationSec: parseOptionalInt(set.leftDurationSec),
     rightDurationSec: parseOptionalInt(set.rightDurationSec),
     distance: parseOptionalNumber(set.distance),
-    distanceUnit: set.distance.trim() === '' ? null : set.distanceUnit,
+    distanceUnit: (set.distance ?? '').trim() === '' ? null : (set.distanceUnit ?? 'mi'),
     completed: set.completed,
     notes: set.notes.trim() === '' ? null : set.notes.trim(),
   }
