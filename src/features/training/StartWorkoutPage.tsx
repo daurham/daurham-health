@@ -133,7 +133,7 @@ export function StartWorkoutPage() {
             {' / '}
             Start Workout
           </p>
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight">Choose Template</h1>
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight">Start workout</h1>
         </div>
         {error ? (
           <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
@@ -141,24 +141,60 @@ export function StartWorkoutPage() {
           </p>
         ) : null}
         {loading ? (
-          <p className="text-sm text-zinc-600">Loading templates…</p>
+          <p className="text-sm text-zinc-600">Loading routines…</p>
         ) : (
-          <ul className="space-y-3">
-            {templates.map((template) => (
-              <li key={template.id}>
-                <button
-                  type="button"
-                  className={`w-full px-4 py-4 text-left ${interactiveCardClass}`}
-                  onClick={() => setDraft(draftFromTemplate(template))}
-                >
-                  <p className="font-semibold">{template.name}</p>
-                  <p className="mt-1 text-sm text-zinc-500">
-                    Routine {template.routineCode} · v{template.version}
-                  </p>
-                </button>
-              </li>
-            ))}
-          </ul>
+          <div className="space-y-6">
+            <section>
+              <h2 className="text-sm font-semibold text-zinc-700">Built-in routines</h2>
+              <ul className="mt-3 space-y-3">
+                {templates.filter((template) => template.originKind === 'seeded').map((template) => (
+                  <li key={template.id}>
+                    <button
+                      type="button"
+                      className={`w-full px-4 py-4 text-left ${interactiveCardClass}`}
+                      onClick={() => setDraft(draftFromTemplate(template))}
+                    >
+                      <p className="font-semibold">{template.name}</p>
+                      <p className="mt-1 text-sm text-zinc-500">Routine {template.routineCode} · v{template.version}</p>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+            <section>
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-sm font-semibold text-zinc-700">Saved routines</h2>
+                <Link to="/training/routines" className="text-sm text-zinc-500 hover:underline">Manage</Link>
+              </div>
+              {templates.some((template) => template.originKind === 'owner') ? (
+                <ul className="mt-3 space-y-3">
+                  {templates.filter((template) => template.originKind === 'owner').map((template) => (
+                    <li key={template.id}>
+                      <button
+                        type="button"
+                        className={`w-full px-4 py-4 text-left ${interactiveCardClass}`}
+                        onClick={() => setDraft(draftFromTemplate(template))}
+                      >
+                        <p className="font-semibold">{template.name}</p>
+                        <p className="mt-1 text-sm text-zinc-500">Saved routine · v{template.version}</p>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : <p className="mt-2 text-sm text-zinc-500">No Saved Routines yet.</p>}
+            </section>
+            <section>
+              <h2 className="text-sm font-semibold text-zinc-700">Empty workout</h2>
+              <button
+                type="button"
+                className={`mt-3 w-full px-4 py-4 text-left ${interactiveCardClass}`}
+                onClick={() => setDraft(draftForAdHocWorkout())}
+              >
+                <p className="font-semibold">Empty workout</p>
+                <p className="mt-1 text-sm text-zinc-500">Add exercises as you go.</p>
+              </button>
+            </section>
+          </div>
         )}
       </section>
     )
