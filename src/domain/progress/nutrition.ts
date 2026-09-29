@@ -131,7 +131,7 @@ function targetSnapshot(target: NutritionTarget | null): NutritionDayTarget | nu
     carbs: target.carbsTarget,
     fat: target.fatTarget,
     fiber: target.fiberTarget,
-    sodium: target.sodiumTarget,
+    sodium: target.sodiumTarget ?? null,
   }
 }
 
