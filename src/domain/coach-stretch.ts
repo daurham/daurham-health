@@ -33,6 +33,7 @@ export type StretchGoal = {
   kind: string
   status: string
   exerciseDefinitionId: string | null
+  trainingMinDistanceM?: number | null
 }
 
 export type StretchTaskMetadata = {
@@ -60,7 +61,7 @@ const evidenceSchema = z.object({
   exerciseId: z.string().min(1),
   strategy: z.enum(STRETCH_STRATEGIES),
   value: z.number().positive(),
-  unit: z.enum(['lb', 'reps', 'sec']),
+  unit: z.enum(['lb', 'reps', 'sec', 'mi', 'sec/mi']),
   date: calendarDateSchema.optional(),
   loadKg: z.number().nullable().optional(),
   reps: z.number().nullable().optional(),
@@ -96,7 +97,7 @@ const metadataSchema = z.object({
     perSide: z.boolean(),
     date: calendarDateSchema,
     value: z.number().positive(),
-    unit: z.enum(['lb', 'reps', 'sec']),
+    unit: z.enum(['lb', 'reps', 'sec', 'mi', 'sec/mi']),
     sourceCreatedAt: z.string().refine((value) => Number.isFinite(Date.parse(value))),
     evidence: evidenceSchema,
   }),
@@ -105,7 +106,15 @@ const metadataSchema = z.object({
   acceptedOn: calendarDateSchema.optional(),
   challengeExpiresOn: calendarDateSchema.optional(),
 }).passthrough().superRefine((value, ctx) => {
-  const expectedUnit = value.strategy === 'strength_e1rm' ? 'lb' : value.strategy === 'reps' ? 'reps' : 'sec'
+  const expectedUnit = value.strategy === 'strength_e1rm'
+    ? 'lb'
+    : value.strategy === 'reps'
+      ? 'reps'
+      : value.strategy === 'duration'
+        ? 'sec'
+        : value.strategy === 'distance'
+          ? 'mi'
+          : 'sec/mi'
   if (value.baseline.exerciseId !== value.exerciseId || value.baseline.strategy !== value.strategy ||
     value.baseline.evidence.exerciseId !== value.exerciseId || value.baseline.evidence.strategy !== value.strategy ||
     value.baseline.unit !== expectedUnit || value.baseline.evidence.unit !== expectedUnit ||
@@ -142,6 +151,16 @@ export function stretchTarget(strategy: StretchStrategy, baseline: number): numb
   if (strategy === 'strength_e1rm') {
     const target = Math.ceil(baseline * 1.02 * 2) / 2
     return Number.isFinite(target) ? target : null
+  }
+  if (strategy === 'distance') {
+    const step = 0.05
+    const target = Math.max(Math.ceil((baseline * 1.05) / step - Number.EPSILON) * step, baseline + step)
+    const rounded = Math.round(target * 100) / 100
+    return rounded <= baseline * 1.1 + Number.EPSILON * baseline ? rounded : null
+  }
+  if (strategy === 'pace') {
+    const target = Math.floor(baseline * 0.98)
+    return target > 0 && target < baseline ? target : null
   }
   if (!Number.isInteger(baseline)) return null
   const step = strategy === 'duration' ? 5 : 1
@@ -205,10 +224,21 @@ export function stretchCandidates(input: StretchCandidateInput): CoachCandidate[
     const observation = baseline.observation
     const target = stretchTarget(observation.strategy, observation.value)
     if (target == null) return []
-    const goal = observation.strategy === 'strength_e1rm'
-      ? [...(input.goals ?? [])].filter((item) => item.kind === 'strength_e1rm' && item.status === 'active' &&
-        item.exerciseDefinitionId === observation.exerciseId).sort((left, right) => left.id.localeCompare(right.id))[0]
-      : undefined
+    const goalKind = observation.strategy === 'strength_e1rm'
+      ? 'strength_e1rm'
+      : observation.strategy === 'reps'
+        ? 'training_reps'
+        : observation.strategy === 'duration'
+          ? 'training_duration'
+          : observation.strategy === 'distance'
+            ? 'training_distance'
+            : 'training_pace'
+    const goal = [...(input.goals ?? [])]
+      .filter((item) => item.kind === goalKind && item.status === 'active' &&
+        item.exerciseDefinitionId === observation.exerciseId &&
+        (observation.strategy !== 'pace' || item.trainingMinDistanceM == null ||
+          ((observation.evidence.distanceM ?? 0) + Number.EPSILON >= item.trainingMinDistanceM)))
+      .sort((left, right) => left.id.localeCompare(right.id))[0]
     const age = calendarDaysBetween(baseline.latestDate, date)
     const metadata: StretchTaskMetadata = {
       ruleVersion: STRETCH_RULE_VERSION, strategy: observation.strategy,
@@ -218,14 +248,24 @@ export function stretchCandidates(input: StretchCandidateInput): CoachCandidate[
       baseline: stretchObservationSnapshot(observation),
       latestAppearanceOn: baseline.latestDate, qualifyingAppearances: baseline.appearances,
     }
-    const measurement = observation.strategy === 'strength_e1rm' ? 'estimate' : observation.strategy === 'reps' ? 'reps' : 'hold'
+    const measurement = observation.strategy === 'strength_e1rm'
+      ? 'estimate'
+      : observation.strategy === 'reps'
+        ? 'reps'
+        : observation.strategy === 'duration'
+          ? 'hold'
+          : observation.strategy === 'distance'
+            ? 'distance'
+            : 'pace'
     return [{
       taskKind: 'stretch_quest', ruleKey: `stretch:${observation.strategy}:${observation.exerciseId}`,
       ruleVersion: STRETCH_RULE_VERSION, domain: 'training',
       title: `Improve your ${observation.exerciseName} ${measurement}`,
       detail: observation.strategy === 'strength_e1rm'
         ? 'e1RM is estimated. The target is not a load to put on the bar. Any valid high-confidence weight × rep combination counts.'
-        : `One qualifying Training working set counts.${observation.perSide ? ' Both sides must be completed; the lower side counts.' : ''}`,
+        : observation.strategy === 'pace'
+          ? `One continuous Training set must cover at least the frozen baseline distance and meet the pace target.`
+          : `One qualifying Training working set counts.${observation.perSide ? ' Both sides must be completed; the lower side counts.' : ''}`,
       startsOn: date, expiresOn: metadata.offerExpiresOn, goalId: goal?.id ?? null,
       verificationMode: 'canonical', actionKind: 'open', actionHref: '/training',
       targetValue: target, targetUnit: observation.unit, baselineValue: observation.value,
