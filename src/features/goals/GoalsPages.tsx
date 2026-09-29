@@ -582,6 +582,7 @@ export function GoalDetailPage() {
       <section className="rounded-lg border border-zinc-200 bg-white p-4">
         <h2 className="text-sm font-semibold">Current target · v{goal.currentVersion.version}</h2>
         <p className="mt-1 text-sm">{formatGoalTarget(goal.currentVersion)}</p>
+        {goal.goalKind === 'training_pace' && goal.selector.trainingMinDistanceM ? <p className="text-sm text-zinc-600">Minimum continuous distance {metersToMiles(goal.selector.trainingMinDistanceM).toFixed(2)} mi</p> : null}
         {goal.currentVersion.targetDate ? <p className="text-sm text-zinc-600">Target date {goal.currentVersion.targetDate}</p> : <p className="text-sm text-zinc-600">No target date</p>}
         {goal.currentVersion.evaluationWindowDays ? <p className="text-sm text-zinc-600">{goal.currentVersion.evaluationWindowDays}-day window</p> : null}
         {goal.currentVersion.notes ? <p className="mt-2 text-sm text-zinc-700">{goal.currentVersion.notes}</p> : null}
@@ -590,6 +591,11 @@ export function GoalDetailPage() {
           <p className="mt-1 text-sm text-zinc-600">
             e1RM is derived from {formatGoalQuantity(goal.evidence.strengthSource.loadLb, 'lb')} × {goal.evidence.strengthSource.reps} reps
             {' '}using the Epley formula; it is not a literal set at the displayed e1RM.
+          </p>
+        ) : null}
+        {goal.evidence.trainingSource ? (
+          <p className="mt-2 text-sm text-zinc-600">
+            Verified by Training · <Link className="underline" to={`/training/${goal.evidence.trainingSource.sessionId}`}>Open source workout</Link>
           </p>
         ) : null}
         {relation ? <p className="text-sm text-zinc-600">{relation}</p> : null}
@@ -635,18 +641,47 @@ export function GoalDetailPage() {
             ))}
           </select>
         </label>
-        {targetMode !== 'at_most' ? (
-          <label className="block text-sm">
-            Minimum
-            <input className={fieldClass} inputMode="decimal" value={targetMin} onChange={(event) => setTargetMin(event.target.value)} />
-          </label>
-        ) : null}
-        {targetMode !== 'at_least' ? (
-          <label className="block text-sm">
-            Maximum
-            <input className={fieldClass} inputMode="decimal" value={targetMax} onChange={(event) => setTargetMax(event.target.value)} />
-          </label>
-        ) : null}
+        {goal.goalKind === 'training_skill' ? (
+          <p className="rounded-md bg-zinc-50 px-3 py-2 text-sm text-zinc-700">Target remains: achieve this skill once.</p>
+        ) : goal.goalKind === 'training_duration' ? (
+          <div className="grid grid-cols-2 gap-2">
+            <label className="block text-sm">Minutes
+              <input className={fieldClass} type="number" min="0" value={Math.floor((Number(targetMin) || 0) / 60)}
+                onChange={(event) => setTargetMin(String((Number(event.target.value)||0)*60 + ((Number(targetMin)||0)%60)))} />
+            </label>
+            <label className="block text-sm">Seconds
+              <input className={fieldClass} type="number" min="0" max="59" value={(Number(targetMin)||0)%60}
+                onChange={(event) => setTargetMin(String(Math.floor((Number(targetMin)||0)/60)*60 + (Number(event.target.value)||0)))} />
+            </label>
+          </div>
+        ) : goal.goalKind === 'training_pace' ? (
+          <div>
+            <p className="text-sm">Target pace per mile</p>
+            <div className="mt-1 grid grid-cols-2 gap-2">
+              <label className="block text-sm">Minutes
+                <input className={fieldClass} type="number" min="0" value={Math.floor((Number(targetMax) || 0) / 60)}
+                  onChange={(event) => setTargetMax(String((Number(event.target.value)||0)*60 + ((Number(targetMax)||0)%60)))} />
+              </label>
+              <label className="block text-sm">Seconds
+                <input className={fieldClass} type="number" min="0" max="59" value={(Number(targetMax)||0)%60}
+                  onChange={(event) => setTargetMax(String(Math.floor((Number(targetMax)||0)/60)*60 + (Number(event.target.value)||0)))} />
+              </label>
+            </div>
+          </div>
+        ) : (
+          <>
+            {targetMode !== 'at_most' ? (
+              <label className="block text-sm">{goal.goalKind === 'training_distance' ? 'Distance (mi)' : goal.goalKind === 'training_reps' ? 'Reps' : 'Minimum'}
+                <input className={fieldClass} inputMode="decimal" value={targetMin} onChange={(event) => setTargetMin(event.target.value)} />
+              </label>
+            ) : null}
+            {targetMode !== 'at_least' ? (
+              <label className="block text-sm">Maximum
+                <input className={fieldClass} inputMode="decimal" value={targetMax} onChange={(event) => setTargetMax(event.target.value)} />
+              </label>
+            ) : null}
+          </>
+        )}
         {definition && !definition.pointMetric ? (
           <label className="block text-sm">
             Window (days)
