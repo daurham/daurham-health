@@ -818,17 +818,36 @@ export async function reviseGoal(id: string, body: unknown) {
 
 export async function archiveGoal(id: string) {
   const sql = await getSql()
-  const rows = (await sql.query(
-    `UPDATE goals
-     SET archived_at = COALESCE(archived_at, now()), updated_at = now()
-     WHERE id = $1::uuid
-     RETURNING id::text AS id`,
+  const references = (await sql.query(
+    `SELECT experiment_id::text AS experiment_id
+     FROM experiment_goals
+     WHERE goal_id = $1::uuid
+     LIMIT 1`,
     [id],
-  )) as Array<{ id?: string }>
-  if (!rows[0]?.id) {
+  )) as Array<{ experiment_id?: string }>
+
+  if (references.length > 0) {
+    const rows = (await sql.query(
+      `UPDATE goals
+       SET archived_at = COALESCE(archived_at, now()), updated_at = now()
+       WHERE id = $1::uuid
+       RETURNING id::text AS id`,
+      [id],
+    )) as Array<{ id?: string }>
+    if (!rows[0]?.id) {
+      throw new HttpError(404, 'Goal not found')
+    }
+    return { ok: true as const, disposition: 'archived' as const }
+  }
+
+  const deleted = (await sql.transaction([
+    sql.query(`DELETE FROM goal_versions WHERE goal_id = $1::uuid`, [id]),
+    sql.query(`DELETE FROM goals WHERE id = $1::uuid RETURNING id::text AS id`, [id]),
+  ])) as [unknown, Array<{ id?: string }>]
+  if (!deleted[1]?.[0]?.id) {
     throw new HttpError(404, 'Goal not found')
   }
-  return { ok: true as const }
+  return { ok: true as const, disposition: 'deleted' as const }
 }
 
 export async function changeGoalLifecycle(id: string, action: GoalLifecycleAction) {
