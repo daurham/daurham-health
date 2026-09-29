@@ -115,7 +115,7 @@ describe.skipIf(!existsSync(`${BIN}/initdb`))('Stretch production service on dis
         id UUID PRIMARY KEY, workout_session_exercise_id UUID NOT NULL REFERENCES workout_session_exercises(id) ON DELETE CASCADE,
         set_number INT NOT NULL, set_type TEXT NOT NULL, load_state TEXT NOT NULL,
         weight_kg NUMERIC, reps INT, duration_sec INT, left_reps INT, right_reps INT,
-        left_duration_sec INT, right_duration_sec INT
+        left_duration_sec INT, right_duration_sec INT, distance_m NUMERIC, completed BOOLEAN
       );
     `)
     await pool.query(readFileSync('migrations/0035_coach_tasks.sql', 'utf8'))
