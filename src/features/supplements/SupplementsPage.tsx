@@ -185,6 +185,12 @@ function SupplementCard({
   const [adherenceDate, setAdherenceDate] = useState(addCalendarDays(today, -1))
   const [adherenceScheduleId, setAdherenceScheduleId] = useState(record.schedules[0]?.id ?? '')
   const openSchedules = record.schedules.filter((schedule) => schedule.effectiveThrough == null)
+  const summaryDose = openSchedules.length > 0
+    ? openSchedules.slice(0, 2).map((schedule) => {
+        const dose = formatPlannedDose(schedule.doseAmount, schedule.doseUnit)
+        return schedule.slotLabel ? `${dose} · ${schedule.slotLabel}` : dose
+      }).join(' · ')
+    : 'No active dose schedule'
 
   useEffect(() => {
     setName(record.name)
@@ -223,7 +229,18 @@ function SupplementCard({
   })
 
   return (
-    <article className="space-y-4 rounded-lg border border-zinc-200 bg-white p-4">
+    <details className="group overflow-hidden rounded-lg border border-zinc-200 bg-white">
+      <summary className="motion-interactive flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 marker:content-none hover:bg-zinc-50 [&::-webkit-details-marker]:hidden">
+        <div className="min-w-0">
+          <h2 className="truncate text-base font-semibold tracking-tight">{record.name}</h2>
+          <p className="truncate text-sm text-zinc-600">
+            {statusLabel(record.status)} · {summaryDose}
+          </p>
+        </div>
+        <span className="shrink-0 text-sm font-medium text-zinc-500 group-open:hidden">Manage</span>
+        <span className="hidden shrink-0 text-sm font-medium text-zinc-500 group-open:inline">Close</span>
+      </summary>
+      <article className="space-y-4 border-t border-zinc-200 p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold tracking-tight">{record.name}</h2>
@@ -386,7 +403,8 @@ function SupplementCard({
         Delete supplement
       </button>
       {openSchedules.length === 0 ? <p className="text-sm text-zinc-500">No open schedule. Add a dose to plan future days.</p> : null}
-    </article>
+      </article>
+    </details>
   )
 }
 
