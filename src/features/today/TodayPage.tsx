@@ -143,9 +143,6 @@ export function TodayBoard({
   const prefix = useAppPathPrefix()
   return (
     <div className="space-y-3">
-      <div className="flex justify-end">
-        <AskHealthLink />
-      </div>
       {onCoachState ? (
         <CoachCard
           state={coach ?? null}
@@ -154,6 +151,9 @@ export function TodayBoard({
           onState={onCoachState}
         />
       ) : null}
+      <div className="flex justify-end">
+        <AskHealthLink />
+      </div>
       {view.pendingItems.length > 0 || view.goalAttention.length > 0 ? (
         <section className="rounded-lg border border-zinc-200 bg-white p-4">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Needs attention</h2>
