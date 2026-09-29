@@ -275,21 +275,36 @@ export async function reviseOwnerRoutine(templateId: string, body: unknown): Pro
   const number = Number(current.version)
   if (!Number.isInteger(number) || number < 1) throw new HttpError(409, 'Saved Routine version is invalid')
   const nextId = randomUUID()
+  const transition = sql.query(
+    `WITH retired AS (
+       UPDATE workout_templates
+          SET is_active = false, updated_at = now()
+        WHERE id = $1::uuid AND origin_kind = 'owner' AND is_active
+        RETURNING routine_code
+     )
+     INSERT INTO workout_templates (
+       id, routine_code, version, name, metadata, is_active, origin_kind, created_at, updated_at
+     )
+     SELECT $2::uuid, routine_code, $3, $4, '{}'::jsonb, true, 'owner', now(), now()
+       FROM retired
+     RETURNING id::text AS id`,
+    [templateId, nextId, String(number + 1), request.name],
+  )
+  const slotQueries = request.exercises.map((item, index) => sql.query(
+    `INSERT INTO workout_template_exercises (
+       id, workout_template_id, exercise_definition_id, slot_id, position, planned_sets, prescription, metadata
+     ) VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5::int, $6::int, $7::jsonb, '{}'::jsonb)`,
+    [randomUUID(), nextId, item.exerciseDefinitionId, `owner-${index + 1}`, index + 1, item.plannedSets, JSON.stringify(item.prescription)],
+  ))
   try {
-    const results = await sql.transaction([
-      sql.query(
-        `UPDATE workout_templates SET is_active = false, updated_at = now()
-         WHERE id = $1::uuid AND origin_kind = 'owner' AND is_active
-         RETURNING id::text AS id`,
-        [templateId],
-      ),
-      ...ownerRoutineQueries(sql, { id: nextId, routineCode: current.routine_code, version: String(number + 1), request }),
-    ]) as Array<Array<{ id?: string }>>
+    const results = await sql.transaction([transition, ...slotQueries]) as Array<Array<{ id?: string }>>
     if (!results[0]?.[0]?.id) throw new HttpError(409, 'Saved Routine changed since editing began')
   } catch (error) {
     if (error instanceof HttpError) throw error
     const message = formatDatabaseError(error)
-    if (message.includes('workout_templates_one_active_owner_version_idx') || message.includes('duplicate')) {
+    if (message.includes('workout_templates_one_active_owner_version_idx') ||
+        message.includes('workout_templates_routine_version_key') ||
+        message.includes('foreign key')) {
       throw new HttpError(409, 'Saved Routine changed since editing began')
     }
     throw error
