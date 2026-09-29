@@ -655,7 +655,7 @@ async function manualTrainingProgress(
         AND lower(exercises.name) = lower($3)
         AND exercises.measurement_kind = $4
       GROUP BY sessions.id, sessions.workout_date, sessions.created_at
-      ORDER BY sessions.workout_date DESC, sessions.created_at DESC
+      ORDER BY ${valueSql} DESC, sessions.workout_date DESC, sessions.created_at DESC
       LIMIT 1`,
     [row.starts_on, row.expires_on, manual.training.exerciseName, manual.training.measurementKind],
   )) as Array<{ session_id: string; actual: string | null }>
@@ -906,7 +906,7 @@ export async function ensureCoach(now = new Date()): Promise<CoachState> {
   await reconcile(sql, date)
   const recent = await recentRules(sql, date)
   const [weekly, daily] = await Promise.all([weeklyCandidates(date), dailyCandidates(date)])
-  await ensurePeriodTask(sql, 'weekly_focus', week.start, weekly, recent, date)
+  await ensurePeriodTask(sql, 'weekly_focus', week.start, weekly, [], date)
   await ensurePeriodTask(sql, 'daily_quest', date, daily, recent, date)
   await reconcile(sql, date)
   return currentState(sql, date)
@@ -1049,18 +1049,10 @@ export async function logCoachTraining(id: string, body: unknown, now = new Date
     }
     await sql.transaction(queries)
   } else if (meetsTarget) {
-    await completeTask(sql, row, {
-      evidenceKind: 'training_session',
-      sourceType: 'workout_session',
-      sourceId: existing[0].id,
-      evidence: {
-        actualValue: parsed.data.actualValue,
-        targetValue: rule.training.targetValue,
-        unit: row.target_unit,
-        distance: rule.training.allowDistance ? parsed.data.distance ?? null : null,
-        distanceUnit: rule.training.allowDistance ? parsed.data.distanceUnit ?? null : null,
-      },
-    })
+    const canonical = await manualTrainingProgress(sql, row)
+    if (canonical.evidence) {
+      await completeTask(sql, row, canonical.evidence)
+    }
   }
 
   return currentState(sql, date)
