@@ -236,3 +236,28 @@ Observed from the current code and product docs. Where the original rationale is
 **Status:** Active
 **Reason:** H2A's duration presets attempted `loadState = none`, which is not in the canonical Training load-state enum and fails the real parser.
 **Implications:** Coach presets for `loadType = none` or bodyweight emit the existing `bodyweight` set state with no external load. No measurement family or Training API contract changes. A real-parser regression covers yoga logging.
+
+
+## Decision: Personal Lab Coach attention remains derived
+
+**Status:** Active  
+**Reason:** Benchmark retest state and Experiment Suggestion eligibility already have deterministic authorities, and Experiment Suggestions intentionally remain derived until accepted.  
+**Implications:** H2C does not persist Lab suggestion content in `coach_tasks`. Coach derives current Lab attention from existing Lab services and persists only Coach-specific snooze presentation state. Surfacing/opening an item does not create an Experiment or canonical Health fact.
+
+## Decision: Lab snoozes are fingerprint-scoped Phoenix presentation state
+
+**Status:** Active  
+**Reason:** “Not now” should reduce repeated attention without permanently hiding a materially changed Lab opportunity.  
+**Implications:** `coach_lab_snoozes` keys item kind + stable source key + exact fingerprint and hides that fingerprint for seven Phoenix calendar days. A changed result, protocol, retest state, or suggestion fingerprint can surface immediately. Snoozing never mutates Lab, Goal, Experiment, or benchmark truth.
+
+## Decision: Coach has one deterministic primary-attention order
+
+**Status:** Active  
+**Reason:** Today should present one meaningful next action rather than competing cards.  
+**Implications:** Primary order is accepted active Stretch → due Lab retest → offered Stretch → active Daily Quest → available Lab retest → Experiment Suggestion → bounded current-period acknowledgement. Weekly Focus stays a compact strip. Inbox order is Stretch / Today / Lab / This week.
+
+## Decision: Canonical owner mutations invalidate Today and Coach in-app
+
+**Status:** Active  
+**Reason:** Coach truth can change after Training, Nutrition, Body, Activity/import, Goal, Context, Supplement, and Lab mutations. Continuous polling is unnecessary.  
+**Implications:** Successful relevant owner mutations emit a coalesced client event. Today and Coach reload from their canonical server authorities. Preview/draft requests, failed mutations, Coach ensure, and Lab snooze itself do not emit the canonical-change event.

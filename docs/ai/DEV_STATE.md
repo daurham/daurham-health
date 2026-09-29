@@ -1,23 +1,24 @@
 # Dev state
 
-Snapshot recorded 2026-09-29 after **V2-H2B — Stretch Quests**, on top of V2-H2A Coach Core + Today. This is the current health application.
+Snapshot recorded 2026-09-29 after **V2-H2C — Personal Lab + Coach Polish**, on top of V2-H2A Coach Core + Today and V2-H2B Stretch Quests. This is the current health application.
 
 ## Git and runtime
 
 - Branch: `main`; package version remains 1.0.0.
-- H2B extends the H2A tree whose implementation contract was `6bb3b4ed5000ca79fa6b4535cf084d265cd94d56`.
+- H2C extends the deployed H2A/H2B Coach tree and reuses the existing Personal Lab retest and Experiment Suggestion authorities.
 - No new runtime dependency, provider request type, scheduler, or Vercel function was added.
-- Implementation validation and publication details are in `docs/ai/H2B_REPORT.md`.
+- H2B validation/publication details remain in `docs/ai/H2B_REPORT.md`; H2C details are in `docs/ai/H2C_REPORT.md`.
 
 ## Schema and deployment
 
-- Migration head: `0036_stretch_quests.sql`.
+- Migration head: `0037_coach_lab_snoozes.sql`.
 - H2B adds `stretch_quest`, `offered` / `failed`, nullable `accepted_at`, and the frozen `stretch` difficulty/reward band to the existing Coach ledger.
 - `coach_task_events` supports failed events. State changes and Stretch events are atomic and deduplicated by lifecycle key.
 - A partial unique index enforces one offered/active Stretch for the single owner.
 - Existing one-Daily-per-date and one-Weekly-per-week indexes remain unchanged.
-- The owner applied `0035_coach_tasks.sql` before H2B implementation and applied `0036_stretch_quests.sql` after H2B review. Production schema is now at migration head `0036_stretch_quests.sql`.
-- Backup and portable export include `accepted_at`, frozen metadata, every Stretch state, and exact completion history. No table was added to the inventory.
+- The owner applied `0035_coach_tasks.sql` before H2B implementation and `0036_stretch_quests.sql` after H2B review. H2C migration `0037_coach_lab_snoozes.sql` is committed and validated in disposable PostgreSQL 14, but has **not** been applied to production yet.
+- `coach_lab_snoozes` stores Coach-only presentation state: Lab item kind, stable source key, exact source fingerprint, Phoenix `snoozed_until`, and timestamps. It does not store Lab suggestion content or canonical evidence.
+- Backup and portable export include Coach task/event history plus `coach_lab_snoozes`; inventory schema head is `0037_coach_lab_snoozes.sql`.
 
 ## Existing H2A behavior
 
@@ -59,11 +60,33 @@ Snapshot recorded 2026-09-29 after **V2-H2B — Stretch Quests**, on top of V2-H
 - All new Stretch offers are suppressed for `sick`, `pain`, `rest_day`, `unusual_physical_labor`, `unusual_stress`, `poor_sleep_opportunity`, or `baby_night_interruption`.
 - Existing challenges stay frozen. Absence of a suppression tag does not imply medical readiness.
 
+## Personal Lab Coach integration
+
+- Personal Lab eligibility remains derived. Coach calls the existing benchmark-retest and Experiment Suggestion authorities; it does not copy suggestions into `coach_tasks`.
+- Coach can surface current `due` and `available` benchmark retests plus existing deterministic `benchmark_missing_baseline` / `benchmark_retest_due` Experiment Suggestions.
+- A direct actionable retest suppresses the equivalent due-retest Experiment Suggestion only inside Coach presentation; the Lab Suggestions page remains unchanged.
+- Experiment Suggestion listing remains provider-free. Today/Coach does not call Gemini, Home-AI, Europe PMC, or reserve `ai_usage`. The existing explicit `Draft proposal` action remains the only suggestion-AI path.
+- Derived Lab attention carries stable source identity/fingerprint, title/detail, urgency, attention reason, href, and benchmark/suggestion ids as appropriate.
+- `Not now` persists only the exact current fingerprint for seven Phoenix calendar days. It hides while current date is earlier than `snoozed_until` and may resurface on that date if still eligible.
+- A changed canonical result, protocol, retest state, or Experiment Suggestion fingerprint is not hidden by an older snooze.
+- Snooze mutations rederive the current item and return a stale conflict when the supplied fingerprint is no longer current. Identical retries are idempotent and do not extend the original snooze.
+- Lab surfacing, opening, snoozing, and accepting a suggestion are not rewardable Coach completions and issue no XP.
+
+## Coach priority and polish
+
+- Primary action order is: accepted active Stretch → due Lab retest → offered Stretch → active Daily Quest → available Lab retest → Experiment Suggestion → bounded current-period completion acknowledgement.
+- Weekly Focus remains a compact strip outside primary competition. Displaced Daily Quest remains actionable in the Coach inbox.
+- Inbox hierarchy is Stretch / Today / Lab / This week. Lab presentation is bounded to three visible items total; overflow links to Personal Lab.
+- The former standalone Today retest card is removed to avoid duplicate retest attention. Scheduled/active/review-ready Experiment status remains as a lower Today surface.
+- Coach dialogs share keyboard/focus behavior: Escape closes, Tab is contained, focus is restored when feasible, and route changes close overlays. Existing app-prefix routing is preserved.
+- Shared reduced-motion classes remain authoritative; Coach does not animate health/performance numbers.
+- Canonical owner mutations publish one coalesced in-app change signal so Today and Coach refresh after relevant Training, Nutrition, Body, Activity/import, Goal, Context, Supplement, and Lab changes without polling.
+
 ## Today and Coach inbox
 
 - One combined Coach surface; Weekly Focus remains the compact top strip.
-- Active Stretch, then offered Stretch, then Daily Quest occupy the primary action slot. A newly completed Stretch can be acknowledged with Got it and collapses to a compact result.
-- The inbox orders Stretch / Today / This week and keeps the Daily Quest actionable while Stretch owns the primary slot.
+- The finalized primary ordering includes derived Personal Lab attention as documented above; a due retest can outrank an offered Stretch, while an accepted Stretch remains highest priority.
+- The inbox orders Stretch / Today / Lab / This week and keeps Daily Quest actionable when Stretch or Lab owns the primary slot.
 - Offer displays baseline, target, timing, measurement explanation, Accept / Pass. Active displays best attempt, target, expiry, Open Training / End quest.
 - Ending confirms that the quest closes without a reward and Training PRs remain. Terminal labels are neutral.
 - Accomplishment motion uses existing CSS; reduced motion stays globally controlled and numbers do not animate.
@@ -71,17 +94,16 @@ Snapshot recorded 2026-09-29 after **V2-H2B — Stretch Quests**, on top of V2-H
 
 ## Validation and manual QA
 
-- Full final Linux/Postgres checks and exact counts are recorded in `H2B_REPORT.md`. Post-implementation review verified that the production/test code blobs on `main` match the successful validation tree; only documentation and the temporary validation workflow differ.
+- H2C validation at `af009ad9d5580e535d6542041967c0ee313d5e94` passed on Linux/Node 22/PostgreSQL 14: **1,241 passed, 1 skipped across 128 test files**, plus typecheck, ESLint, and production build. The same production/test code was fast-forwarded to `main`; the temporary validation workflow was removed afterward.
 - Local Windows typecheck, ESLint, build, domain/service/API/UI/backup checks passed. Vite runner mode avoids the sandbox's native config-bundler ancestor traversal restriction.
-- Real PostgreSQL tests exercise actual migration constraints, concurrent generation, canonical microsecond accept/completion guards, idempotency, cooldown, and deletion behavior in disposable databases.
-- Browser QA used an in-memory synthetic fixture at desktop and 390×844: acceptance, end confirmation, neutral result, below-target PR, completion acknowledgement, inbox priority, and per-side duration presentation.
-- The synthetic browser fixture called no owner API/database/provider. Authenticated production click-through and real owner data were not used. Reduced-motion behavior is covered by the shared CSS regression and Coach UI tests.
+- Real PostgreSQL tests exercise H2B lifecycle constraints plus H2C `coach_lab_snoozes` constraints, concurrent snooze upserts, idempotency, seven-day resurfacing, and changed-fingerprint behavior in disposable databases.
+- H2C source/UI regression covers primary/inbox hierarchy, mobile-safe markup, overlay navigation cleanup, focus containment/restoration, Escape behavior, and reduced motion. No authenticated production browser click-through was performed during this completion pass.
+- Tests and synthetic rendering call no owner production database or provider; authenticated production click-through and real owner data remain a manual QA limitation.
 
 ## Retained invariants and next phases
 
 One-owner auth, Phoenix calendar, single Vercel function, canonical Goal/version semantics, Apple workouts as Activity only, Personal Lab, Body, Sleep, Nutrition, Supplements, backup/export integrity, Appearance and shared motion remain intact.
 
-- H2C: Personal Lab integration and Coach polish.
 - H2D: Goals + Training measurement expansion (distance/pace/skills and richer reps/duration Goal kinds) + lightweight routines. The Stretch strategy interface is reusable for these later additions.
 - H3: XP / reward wallet, lifetime and spendable XP, purchases.
 - H4: themes and progression polish.

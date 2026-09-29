@@ -2,7 +2,7 @@
 
 These rules apply to every implementation task in this repository.
 
-The current application is the tree described in `docs/ai/DEV_STATE.md`, including Ask Health, Proactive Insights, Weekly Coach, Experiment Suggestions, Literature-Backed Evidence, Body Shortcut capture, Appearance, Nutrition Gemini on the shared AI ledger, reduced-motion interaction, multi-angle meal photos, recipe text drafts, optional meal-photo clarifications, V2-H1 Nutrition micronutrients and daily UX cleanup, V2-H2A deterministic Coach/Today with structured manual quest logging, V2-H2B canonical Stretch Quests, and migration `0036_stretch_quests.sql`. Do not treat an older commit as the product if this handoff says the working application has moved on.
+The current application is the tree described in `docs/ai/DEV_STATE.md`, including Ask Health, Proactive Insights, Weekly Coach, Experiment Suggestions, Literature-Backed Evidence, Body Shortcut capture, Appearance, Nutrition Gemini on the shared AI ledger, reduced-motion interaction, multi-angle meal photos, recipe text drafts, optional meal-photo clarifications, V2-H1 Nutrition micronutrients and daily UX cleanup, V2-H2A deterministic Coach/Today with structured manual quest logging, V2-H2B canonical Stretch Quests, V2-H2C derived Personal Lab Coach attention and Coach polish, and migration `0037_coach_lab_snoozes.sql`. Do not treat an older commit as the product if this handoff says the working application has moved on.
 
 Before changing code:
 
