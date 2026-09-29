@@ -42,7 +42,7 @@ ALTER TABLE workout_sets
     AND (right_reps IS NULL OR right_reps >= 0)
     AND (left_duration_sec IS NULL OR left_duration_sec >= 0)
     AND (right_duration_sec IS NULL OR right_duration_sec >= 0)
-    AND (distance_m IS NULL OR distance_m >= 0)
+    AND (distance_m IS NULL OR distance_m > 0)
   );
 
 ALTER TABLE workout_sets
