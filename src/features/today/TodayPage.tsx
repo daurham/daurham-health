@@ -296,6 +296,7 @@ function SupplementsCard({ view, onChanged }: { view: TodayViewModel; onChanged?
   const [items, setItems] = useState(supplements?.items ?? [])
   const [error, setError] = useState<string | null>(null)
   const [pendingId, setPendingId] = useState<string | null>(null)
+  const [expandedResolved, setExpandedResolved] = useState(false)
 
   useEffect(() => {
     setItems(supplements?.items ?? [])
@@ -308,6 +309,8 @@ function SupplementsCard({ view, onChanged }: { view: TodayViewModel; onChanged?
   const counts = aggregateOccurrenceStates(items.map((item) => item.state))
   const summary = supplementDaySummary(counts)
   const summaryText = supplementSummaryText(summary)
+  const resolved = items.length > 0 && counts.unknownCount === 0
+  const showItems = !resolved || expandedResolved
 
   async function record(item: TodaySupplementItem, action: 'taken' | 'skipped' | 'clear') {
     const previous = items
@@ -340,12 +343,19 @@ function SupplementsCard({ view, onChanged }: { view: TodayViewModel; onChanged?
     <section className="min-w-0 rounded-lg border border-zinc-200 bg-white p-4">
       <div className="flex items-baseline justify-between gap-3">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Supplements</h2>
-        <p className="text-sm text-zinc-600">{summary.kind === 'complete' ? `✓ ${summaryText}` : summaryText}</p>
+        <div className="flex items-center gap-2">
+          <p className="text-sm text-zinc-600">{summary.kind === 'complete' ? `✓ ${summaryText}` : summaryText}</p>
+          {resolved ? (
+            <button type="button" className={quietButtonClass} onClick={() => setExpandedResolved((value) => !value)}>
+              {expandedResolved ? 'Collapse' : 'Review'}
+            </button>
+          ) : null}
+        </div>
       </div>
       {items.length === 0 ? (
         <p className="mt-2 text-sm text-zinc-800">Nothing scheduled today</p>
-      ) : (
-        <ul className="mt-2 space-y-1">
+      ) : showItems ? (
+        <ul className="motion-notice mt-2 space-y-1">
           {items.map((item) => (
             <li key={item.scheduleId} className="flex items-center gap-2" data-state={item.state}>
               {readOnly ? (
@@ -733,7 +743,7 @@ function BodyCard({ view }: { view: TodayViewModel }) {
       )}
       {copy && due ? (
         <div className="mt-3">
-          <p className="font-medium text-red-600">{copy.title}</p>
+          <p className="font-semibold text-amber-800">{copy.title}</p>
           <p className="text-zinc-600">{copy.detail}</p>
           {copy.more ? <p className="text-zinc-600">{copy.more}</p> : null}
           {body.goalSupport ? <p className="text-zinc-600">{body.goalSupport}</p> : null}
