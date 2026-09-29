@@ -6,7 +6,7 @@ import { resolveNutritionTarget } from '../nutrition/targets.js'
 import type { NutritionMeal } from '../nutrition/config.js'
 import type { NutritionEntry, NutritionTarget } from '../nutrition/types.js'
 
-export const NUTRITION_PROGRESS_NUTRIENTS = ['calories', 'protein', 'carbs', 'fat', 'fiber'] as const
+export const NUTRITION_PROGRESS_NUTRIENTS = ['calories', 'protein', 'carbs', 'fat', 'fiber', 'sodium'] as const
 export type NutritionProgressNutrient = (typeof NUTRITION_PROGRESS_NUTRIENTS)[number]
 
 export type NutritionNutrientObservation = {
@@ -20,6 +20,7 @@ export type NutritionDayTarget = {
   carbs: number | null
   fat: number | null
   fiber: number | null
+  sodium: number | null
 }
 
 export type NutritionDailyObservation = {
@@ -30,6 +31,7 @@ export type NutritionDailyObservation = {
   carbs: NutritionNutrientObservation
   fat: NutritionNutrientObservation
   fiber: NutritionNutrientObservation
+  sodium: NutritionNutrientObservation
   target: NutritionDayTarget | null
   evidence: {
     entryIds: string[]
@@ -70,6 +72,7 @@ export type NutritionPeriodSummary = {
   carbs: NutritionMacroPeriodStat
   fat: NutritionMacroPeriodStat
   fiber: NutritionMacroPeriodStat
+  sodium: NutritionMacroPeriodStat
   observations: NutritionDailyObservation[]
   evidence: NutritionPeriodEvidence
 }
@@ -93,6 +96,7 @@ export type NutritionDayEventData = {
   carbs: NutritionNutrientObservation
   fat: NutritionNutrientObservation
   fiber: NutritionNutrientObservation
+  sodium: NutritionNutrientObservation
   targetContext: NutritionDayTarget | null
   entries: NutritionDayEntrySnapshot[]
 }
@@ -127,6 +131,7 @@ function targetSnapshot(target: NutritionTarget | null): NutritionDayTarget | nu
     carbs: target.carbsTarget,
     fat: target.fatTarget,
     fiber: target.fiberTarget,
+    sodium: target.sodiumTarget,
   }
 }
 
@@ -203,6 +208,7 @@ export function emptyNutritionPeriodSummary(calendarDays: number): NutritionPeri
     carbs: { averageOnObservedDays: null, observedDays: 0, targetContext: null },
     fat: { averageOnObservedDays: null, observedDays: 0, targetContext: null },
     fiber: { averageOnObservedDays: null, observedDays: 0, targetContext: null },
+    sodium: { averageOnObservedDays: null, observedDays: 0, targetContext: null },
     observations: [],
     evidence: { dates: [], entryIds: [], mealGroupIds: [] },
   }
@@ -239,6 +245,7 @@ export function nutritionDailyObservations(input: {
         carbs: asProgressNutrient(totals.carbs.status, totals.carbs.value),
         fat: asProgressNutrient(totals.fat.status, totals.fat.value),
         fiber: asProgressNutrient(totals.fiber.status, totals.fiber.value),
+        sodium: asProgressNutrient(totals.sodium.status, totals.sodium.value),
         target: targetSnapshot(resolveNutritionTarget(input.targets, date)),
         evidence: {
           entryIds: dayEntries.map((entry) => entry.id),
@@ -270,6 +277,7 @@ export function nutritionPeriodSummary(input: {
     carbs: macroStat(observations, 'carbs'),
     fat: macroStat(observations, 'fat'),
     fiber: macroStat(observations, 'fiber'),
+    sodium: macroStat(observations, 'sodium'),
     observations,
     evidence: periodEvidence(observations),
   }
@@ -331,6 +339,7 @@ export function nutritionDayEventData(
     carbs: observation.carbs,
     fat: observation.fat,
     fiber: observation.fiber,
+    sodium: observation.sodium,
     targetContext: observation.target,
     entries: nutritionDayEntrySnapshots(dayEntries),
   }
