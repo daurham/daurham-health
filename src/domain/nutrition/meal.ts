@@ -405,8 +405,9 @@ export function mealReviewTotals(
       carbs: sum.carbs == null || part.carbs == null ? null : sum.carbs + part.carbs,
       fat: sum.fat == null || part.fat == null ? null : sum.fat + part.fat,
       fiber: sum.fiber == null || part.fiber == null ? null : sum.fiber + part.fiber,
+      sodiumMg: sum.sodiumMg == null || part.sodiumMg == null ? null : sum.sodiumMg + part.sodiumMg,
     }),
-    { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 } satisfies NutrientAmount,
+    { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sodiumMg: 0 } satisfies NutrientAmount,
   )
 }
 
@@ -587,6 +588,7 @@ export type MealEstimateNutrients = {
   carbsGrams: number
   fatGrams: number
   fiberGrams: number | null
+  sodiumMg: number | null
 }
 
 export const mealClarificationSchema = z.object({
@@ -609,6 +611,7 @@ export const mealEstimateCandidateSchema = z.object({
   carbsGrams: z.number(),
   fatGrams: z.number(),
   fiberGrams: z.number().nullable(),
+  sodiumMg: z.number().nullable(),
   clarifications: z.array(mealClarificationSchema).default([]),
 })
 export type MealEstimateCandidate = z.infer<typeof mealEstimateCandidateSchema>
@@ -624,6 +627,7 @@ export const commitNutritionMealEstimateRequestSchema = z.object({
   carbsGrams: z.number().min(0),
   fatGrams: z.number().min(0),
   fiberGrams: z.number().min(0).nullable(),
+  sodiumMg: z.number().min(0).nullable(),
   portionScale: z.number().optional(),
 })
 export type CommitNutritionMealEstimateRequest = z.input<typeof commitNutritionMealEstimateRequestSchema>
@@ -667,6 +671,7 @@ export function mealEstimateNutrients(input: MealEstimateNutrients): MealEstimat
     carbsGrams: roundMealGrams(input.carbsGrams) ?? 0,
     fatGrams: roundMealGrams(input.fatGrams) ?? 0,
     fiberGrams: roundMealGrams(input.fiberGrams),
+    sodiumMg: roundMealGrams(input.sodiumMg),
   }
 }
 
@@ -678,6 +683,7 @@ export function scaleMealEstimate(baseline: MealEstimateNutrients, scale: number
     carbsGrams: baseline.carbsGrams * factor,
     fatGrams: baseline.fatGrams * factor,
     fiberGrams: baseline.fiberGrams == null ? null : baseline.fiberGrams * factor,
+    sodiumMg: baseline.sodiumMg == null ? null : baseline.sodiumMg * factor,
   })
 }
 
@@ -687,7 +693,8 @@ export function mealEstimateUserAdjusted(baseline: MealEstimateNutrients, review
     baseline.proteinGrams !== reviewed.proteinGrams ||
     baseline.carbsGrams !== reviewed.carbsGrams ||
     baseline.fatGrams !== reviewed.fatGrams ||
-    baseline.fiberGrams !== reviewed.fiberGrams
+    baseline.fiberGrams !== reviewed.fiberGrams ||
+    baseline.sodiumMg !== reviewed.sodiumMg
   )
 }
 
@@ -712,6 +719,7 @@ export function emptyMealEstimate(partial?: Partial<MealEstimateCandidate>): Mea
     carbsGrams: 0,
     fatGrams: 0,
     fiberGrams: null,
+    sodiumMg: null,
     ...partial,
   })
 }
@@ -730,6 +738,7 @@ export function sanitizeMealEstimate(raw: unknown, options?: { model?: string | 
     carbsGrams: asNumber(source.carbsGrams ?? source.carbs) ?? 0,
     fatGrams: asNumber(source.fatGrams ?? source.fat) ?? 0,
     fiberGrams: asNumber(source.fiberGrams ?? source.fiber),
+    sodiumMg: asNumber(source.sodiumMg ?? source.sodium),
   })
   const name = asText(typeof source.name === 'string' ? source.name : null) ?? foodsSeen[0] ?? 'Meal'
   return mealEstimateCandidateSchema.parse({
