@@ -10,6 +10,8 @@ export type RecipePortionBasis = {
   proteinG: number | null
   carbsG: number | null
   fatG: number | null
+  fiberG: number | null
+  sodiumMg: number | null
   yieldServings: number | null
   finishedWeightG: number | null
 }
@@ -90,7 +92,8 @@ export function resolveRecipePortion(
       protein: version.proteinG,
       carbs: version.carbsG,
       fat: version.fatG,
-      fiber: null,
+      fiber: version.fiberG,
+      sodiumMg: version.sodiumMg,
     },
     fraction,
   )
