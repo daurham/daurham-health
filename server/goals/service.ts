@@ -46,6 +46,7 @@ type GoalRow = {
   supplement_id: string | null
   paused_at: string | null
   completed_at: string | null
+  archived_at: string | null
   created_at: string
   updated_at: string
   exercise_name: string | null
@@ -127,6 +128,7 @@ const GOAL_SELECT = `
          goals.supplement_id::text AS supplement_id,
          goals.paused_at::text AS paused_at,
          goals.completed_at::text AS completed_at,
+         goals.archived_at::text AS archived_at,
          goals.created_at::text AS created_at,
          goals.updated_at::text AS updated_at,
          exercises.name AS exercise_name,
@@ -296,7 +298,7 @@ async function readGoalRows(sql: Sql, id?: string): Promise<GoalRow[]> {
   if (id) {
     return (await sql.query(`${GOAL_SELECT} WHERE goals.id = $1::uuid`, [id])) as GoalRow[]
   }
-  return (await sql.query(`${GOAL_SELECT} ORDER BY goals.created_at DESC, goals.id`, [])) as GoalRow[]
+  return (await sql.query(`${GOAL_SELECT} WHERE goals.archived_at IS NULL ORDER BY goals.created_at DESC, goals.id`, [])) as GoalRow[]
 }
 
 async function readVersions(sql: Sql, goalId: string): Promise<VersionRow[]> {
@@ -812,6 +814,21 @@ export async function reviseGoal(id: string, body: unknown) {
     throw error
   }
   return getGoal(id)
+}
+
+export async function archiveGoal(id: string) {
+  const sql = await getSql()
+  const rows = (await sql.query(
+    `UPDATE goals
+     SET archived_at = COALESCE(archived_at, now()), updated_at = now()
+     WHERE id = $1::uuid
+     RETURNING id::text AS id`,
+    [id],
+  )) as Array<{ id?: string }>
+  if (!rows[0]?.id) {
+    throw new HttpError(404, 'Goal not found')
+  }
+  return { ok: true as const }
 }
 
 export async function changeGoalLifecycle(id: string, action: GoalLifecycleAction) {
