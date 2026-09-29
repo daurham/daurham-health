@@ -14,11 +14,13 @@ const BY_EXTERNAL_ID: ReadonlyMap<
 > = new Map(
   TRAINING_EXERCISE_SEEDS.map((seed) => {
     const timed = seed.measurementKind === 'duration' || seed.measurementKind === 'duration_per_side'
+    const distance = seed.measurementKind === 'distance' || seed.measurementKind === 'distance_duration'
+    const skill = seed.measurementKind === 'completion'
     return [
       seed.externalId,
       {
-        performanceType: timed ? 'timed' : 'loaded_reps',
-        analyticsLoadType: 'external',
+        performanceType: skill ? 'skill' : distance ? 'distance' : timed ? 'timed' : 'loaded_reps',
+        analyticsLoadType: distance || skill ? 'none' : 'external',
         analyticsRepMode: PER_SIDE_EXTERNAL_IDS.has(seed.externalId) ? 'per_side' : 'standard',
       },
     ] as const
