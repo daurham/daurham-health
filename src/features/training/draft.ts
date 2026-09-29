@@ -146,7 +146,12 @@ export function draftFromTemplate(template: WorkoutTemplate, now = new Date()): 
 
 export function addDraftSet(exercise: DraftExercise): DraftExercise {
   const nextNumber = exercise.sets.reduce((max, set) => Math.max(max, set.setNumber), 0) + 1
-  return { ...exercise, sets: [...exercise.sets, emptyDraftSet(nextNumber)] }
+  const set = emptyDraftSet(nextNumber)
+  if (['distance', 'distance_duration', 'completion'].includes(exercise.measurementKind)) {
+    set.loadState = 'bodyweight'
+    set.transcribedLoadState = 'bodyweight'
+  }
+  return { ...exercise, sets: [...exercise.sets, set] }
 }
 
 function parseOptionalPositive(value: string): number | null {
