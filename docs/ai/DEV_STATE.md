@@ -16,7 +16,7 @@ Snapshot recorded 2026-09-29 after **V2-H2B — Stretch Quests**, on top of V2-H
 - `coach_task_events` supports failed events. State changes and Stretch events are atomic and deduplicated by lifecycle key.
 - A partial unique index enforces one offered/active Stretch for the single owner.
 - Existing one-Daily-per-date and one-Weekly-per-week indexes remain unchanged.
-- H2B migration was applied only to disposable PostgreSQL 14 databases in Linux CI, never to the owner's production database. Apply any pending `0035_coach_tasks.sql` / `0036_stretch_quests.sql` migrations before running deployed H2B code.
+- The owner applied `0035_coach_tasks.sql` to production before H2B implementation began. H2B migration `0036_stretch_quests.sql` was applied only to disposable PostgreSQL 14 databases in Linux CI and is still pending in production.
 - Backup and portable export include `accepted_at`, frozen metadata, every Stretch state, and exact completion history. No table was added to the inventory.
 
 ## Existing H2A behavior
@@ -71,7 +71,7 @@ Snapshot recorded 2026-09-29 after **V2-H2B — Stretch Quests**, on top of V2-H
 
 ## Validation and manual QA
 
-- Full final Linux/Postgres checks and exact counts are recorded in `H2B_REPORT.md`.
+- Full final Linux/Postgres checks and exact counts are recorded in `H2B_REPORT.md`. Post-implementation review verified that the production/test code blobs on `main` match the successful validation tree; only documentation and the temporary validation workflow differ.
 - Local Windows typecheck, ESLint, build, domain/service/API/UI/backup checks passed. Vite runner mode avoids the sandbox's native config-bundler ancestor traversal restriction.
 - Real PostgreSQL tests exercise actual migration constraints, concurrent generation, canonical microsecond accept/completion guards, idempotency, cooldown, and deletion behavior in disposable databases.
 - Browser QA used an in-memory synthetic fixture at desktop and 390×844: acceptance, end confirmation, neutral result, below-target PR, completion acknowledgement, inbox priority, and per-side duration presentation.

@@ -36,7 +36,7 @@ Documentation: `AGENTS.md`, `docs/ai/DEV_STATE.md`, `docs/ai/DECISIONS.md`, `doc
 
 ## Migration and ledger
 
-The exact new migration is `0036_stretch_quests.sql`; inventory/schema head is 36. It was applied only in disposable PostgreSQL 14 databases in Linux CI. The owner's production database was neither read nor mutated. Apply pending 0035/0036 migrations before deployed H2B code runs.
+The exact new migration is `0036_stretch_quests.sql`; inventory/schema head is 36. It was applied only in disposable PostgreSQL 14 databases in Linux CI. The owner's production database was neither read nor mutated by H2B implementation. The owner had already applied `0035_coach_tasks.sql` before H2B began; only `0036_stretch_quests.sql` remains pending for the deployed H2B code.
 
 Existing `coach_tasks` gains `stretch_quest`, offered/failed statuses, nullable `accepted_at`, and the frozen stretch difficulty/reward band. Existing `coach_task_events` gains failed events. Constraints enforce Stretch acceptance/state coherence and prohibit Stretch-only fields/states on Daily/Weekly tasks. A partial unique index permits one offered/active Stretch. Existing Daily/Weekly indexes remain. No extra table or Vercel function was introduced.
 
@@ -115,6 +115,6 @@ Browser QA used synthetic in-memory fixtures at desktop and 390×844: offered ac
 
 DEV_STATE now records the resulting H2B product, deployment prerequisite, test approach, and H2D/H3 follow-up. DECISIONS records canonical provenance, Phoenix timing, the rounded-target cap resolution, and the canonical unloaded-load-state fix. AGENTS describes the current H2B/schema-36 baseline. CURRENT_TASK is reset to No active implementation task. No product-manual rewrite or historical ledger amendment was needed.
 
-Final publication SHA and push confirmation are supplied in the implementation handoff and exported report after GitHub records the commit. The isolated validation workflow is not included in the final product tree; final code blobs match the passing validation commit.
+The initial H2B publication was pushed to `main` as `2e2eb51d061ed709216efaffde899a911b017740`. A later review may add documentation-only commits without changing the validated H2B production/test code. The isolated validation workflow is not included in the final product tree; final code blobs match the passing validation commit.
 
 Local Windows .git writes are denied in this session even after the repository write grant. Therefore publication uses the connected GitHub API without force-pushing. Local source files contain the completed implementation, but local HEAD/index remain at the original checkout until synchronized. Temporary synthetic QA files under work/h2b-qa are excluded from the product commit; sandbox policy blocked their cleanup. No deployment or production migration was performed.
