@@ -108,6 +108,7 @@ export type GeminiDescriptionItem = {
   carbsGrams: number
   fatGrams: number
   fiberGrams: number | null
+  sodiumMg: number | null
   assumption: string | null
 }
 
@@ -126,6 +127,7 @@ export type GeminiMealResponse = {
   carbsGrams: number
   fatGrams: number
   fiberGrams: number | null
+  sodiumMg: number | null
 }
 
 export type GeminiLabelResponse = {
@@ -141,6 +143,7 @@ export type GeminiLabelResponse = {
   carbsGrams: number | null
   fatGrams: number | null
   fiberGrams: number | null
+  sodiumMg: number | null
   barcode: string | null
   ambiguities: string[]
 }
@@ -157,6 +160,7 @@ export const GEMINI_MEAL_RESPONSE_SCHEMA = {
     carbsGrams: { type: 'number' },
     fatGrams: { type: 'number' },
     fiberGrams: { type: 'number' },
+    sodiumMg: { type: 'number' },
     clarifications: {
       type: 'array',
       items: {
@@ -192,6 +196,7 @@ export const GEMINI_DESCRIPTION_RESPONSE_SCHEMA = {
           carbsGrams: { type: 'number' },
           fatGrams: { type: 'number' },
           fiberGrams: { type: 'number' },
+    sodiumMg: { type: 'number' },
           assumption: { type: 'string' },
         },
       },
@@ -215,6 +220,7 @@ export const GEMINI_LABEL_RESPONSE_SCHEMA = {
     carbsGrams: { type: 'number' },
     fatGrams: { type: 'number' },
     fiberGrams: { type: 'number' },
+    sodiumMg: { type: 'number' },
     basis: { type: 'string', enum: ['per_serving', 'per_container', 'per_100g'] },
     barcode: { type: 'string' },
     ambiguities: { type: 'array', items: { type: 'string' } },
@@ -267,14 +273,14 @@ export function mealPhotoPrompt(userContext: string | null, imageCount = 1): str
     ...views,
     'Identify the visible meal and estimate nutrition for the entire consumed plate.',
     'Output JSON only. Do not wrap the JSON in markdown.',
-    'Estimate visible portion sizes, then estimate total calories, protein, carbs, fat, and fiber.',
+    'Estimate visible portion sizes, then estimate total calories, protein, carbs, fat, fiber, and sodium.',
     'Visual estimates are approximate. Do not pretend they are exact.',
     'Include major assumptions that materially affect the estimate.',
     'Acknowledge hidden oils or sauces when they are uncertain.',
     'The owner reviews and may edit the estimate before it is saved.',
     'Use USER-PROVIDED CONTEXT as known information. It should influence the estimate.',
-    'Use this shape: {"name":"Chicken, rice and broccoli","foodsSeen":["chicken thigh","white rice","broccoli"],"assumptions":["chicken appears about 5-6 oz","some cooking oil may be present"],"calories":720,"proteinGrams":48,"carbsGrams":76,"fatGrams":25,"fiberGrams":7}',
-    'calories and macros must be JSON numbers for the whole meal. Use null for fiber only when it cannot be estimated.',
+    'Use this shape: {"name":"Chicken, rice and broccoli","foodsSeen":["chicken thigh","white rice","broccoli"],"assumptions":["chicken appears about 5-6 oz","some cooking oil may be present"],"calories":720,"proteinGrams":48,"carbsGrams":76,"fatGrams":25,"fiberGrams":7,"sodiumMg":820}',
+    'calories and macros must be JSON numbers for the whole meal. Use null for fiber or sodium when it cannot be estimated.',
     'You may add up to three clarifications, and only when every condition is true: a material ambiguity remains after every supplied image and the owner context; the owner is likely to know the answer; the answer could help interpret this same photographed meal; the question is concise.',
     'Zero clarifications is valid and common. Do not ask questions solely for engagement. Do not ask a question already answered by owner context.',
     'Limit clarifications to the same meal: cooking method that is not visible, whether a visible sauce or dressing was eaten, whether oil or butter was added, which of two similar foods it is, or a count the photos do not resolve.',
@@ -296,11 +302,11 @@ export function foodDescriptionPrompt(text: string): string {
     'Keep recognizable composite foods intact. "2 slices supreme pizza" is one component, not crust, sauce, cheese, and toppings.',
     'Decompose only when the user named distinct foods. "2 slices supreme pizza with a side salad and ranch" is pizza, salad, and ranch.',
     'Preserve the user\'s natural units. Do not require grams. estimatedGrams is optional supporting evidence.',
-    'Estimate calories, protein, carbs, fat, and fiber for each useful component.',
+    'Estimate calories, protein, carbs, fat, fiber, and sodium for each useful component.',
     'Health will sum those component estimates. Do not invent a separate authoritative meal total.',
     'Include major assumptions that materially affect the estimate. Do not pretend estimates are exact.',
-    'Use this shape: {"name":"Wagyu beef with onion and broccoli","items":[{"name":"ground wagyu beef","quantity":0.5,"unit":"lb","estimatedGrams":227,"calories":650,"proteinGrams":45,"carbsGrams":0,"fatGrams":50,"fiberGrams":0,"assumption":null}],"assumptions":[]}',
-    'quantity and macros must be JSON numbers. Use null for quantity only when unknown. Use null for fiber only when it cannot be estimated.',
+    'Use this shape: {"name":"Wagyu beef with onion and broccoli","items":[{"name":"ground wagyu beef","quantity":0.5,"unit":"lb","estimatedGrams":227,"calories":650,"proteinGrams":45,"carbsGrams":0,"fatGrams":50,"fiberGrams":0,"sodiumMg":180,"assumption":null}],"assumptions":[]}',
+    'quantity and macros must be JSON numbers. Use null for quantity only when unknown. Use null for fiber or sodium when it cannot be estimated.',
     '',
     'Food description:',
     text,
@@ -314,7 +320,7 @@ export function nutritionLabelPrompt(userContext: string | null): string {
     'Do not infer missing numeric nutrients.',
     'Use USER-PROVIDED CONTEXT only as supporting evidence.',
     'If user context conflicts with a visible number, flag the conflict and keep the visible number.',
-    'Use this shape: {"productName":"Yogurt","brand":null,"servingQuantity":1,"servingUnit":"container","servingGrams":150,"servingsPerContainer":1,"basis":"per_serving","calories":120,"proteinGrams":12,"carbsGrams":15,"fatGrams":2,"fiberGrams":null,"barcode":null,"ambiguities":[]}',
+    'Use this shape: {"productName":"Yogurt","brand":null,"servingQuantity":1,"servingUnit":"container","servingGrams":150,"servingsPerContainer":1,"basis":"per_serving","calories":120,"proteinGrams":12,"carbsGrams":15,"fatGrams":2,"fiberGrams":null,"sodiumMg":90,"barcode":null,"ambiguities":[]}',
     'basis must be per_serving, per_container, or per_100g when that is visible.',
     'Use JSON null when a value is not visible. Do not invent it.',
   ].join('\n')
@@ -399,7 +405,7 @@ function providerItems(source: Record<string, unknown>): unknown[] {
 
 function hasNutrientTotals(value: unknown): boolean {
   const row = asRecord(value)
-  return ['calories', 'protein', 'carbs', 'fat', 'fiber', 'kcal', 'proteinGrams', 'carbsGrams', 'fatGrams'].some(
+  return ['calories', 'protein', 'carbs', 'fat', 'fiber', 'sodium', 'sodiumMg', 'kcal', 'proteinGrams', 'carbsGrams', 'fatGrams'].some(
     (key) => typeof row[key] === 'number',
   )
 }
@@ -428,6 +434,7 @@ export function normalizeGeminiDescriptionRaw(raw: unknown, original: string): u
         carbsGrams: firstPresent(row, ['carbsGrams', 'carbs']),
         fatGrams: firstPresent(row, ['fatGrams', 'fat']),
         fiberGrams: firstPresent(row, ['fiberGrams', 'fiber']),
+        sodiumMg: firstPresent(row, ['sodiumMg', 'sodium']),
         assumption: [note, evidence].filter((value): value is string => Boolean(value)).join('; ') || null,
       }
     }),
@@ -537,6 +544,7 @@ export function normalizeGeminiMealEstimateRaw(raw: unknown): unknown {
     carbsGrams: firstPresent(source, ['carbsGrams', 'carbs']),
     fatGrams: firstPresent(source, ['fatGrams', 'fat']),
     fiberGrams: firstPresent(source, ['fiberGrams', 'fiber']),
+    sodiumMg: firstPresent(source, ['sodiumMg', 'sodium']),
   }
 }
 
@@ -624,6 +632,7 @@ export function normalizeGeminiLabelRaw(raw: unknown): unknown {
       carbsGrams: asLabelNumber(fields.carbsGrams),
       fatGrams: asLabelNumber(fields.fatGrams),
       fiberGrams: asLabelNumber(fields.fiberGrams),
+      sodiumMg: asLabelNumber(fields.sodiumMg),
       basis: { value: basisValue, status: basisStatus },
       barcode: asLabelString(fields.barcode),
     },
@@ -728,5 +737,5 @@ export function summarizeInterpretationUsage(
 
 export function schemaMentionsNutrientTotals(schema: unknown): boolean {
   const encoded = JSON.stringify(schema)
-  return /"(?:calories|protein|carbs|fat|fiber|kcal)"/.test(encoded)
+  return /"(?:calories|protein|carbs|fat|fiber|sodium|sodiumMg|kcal)"/.test(encoded)
 }
