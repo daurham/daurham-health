@@ -155,7 +155,7 @@ export function candidateFromProviderSnapshot(
         unit: unitFromText ?? 'serving',
         grams: servingGrams,
       },
-      nutrition: perServing,
+      nutrition: { ...perServing, sodium: perServing.sodium ?? null },
       sourceBasis: { kind: 'per_serving', perServing: true, per100g: per100g != null },
       per100g,
       warnings,
@@ -176,7 +176,7 @@ export function candidateFromProviderSnapshot(
         unit: unitFromText ?? 'serving',
         grams: servingGrams,
       },
-      nutrition: derived,
+      nutrition: { ...derived, sodium: derived.sodium ?? null },
       sourceBasis: { kind: 'per_100g_derived', perServing: false, per100g: true },
       per100g,
       warnings,
@@ -319,7 +319,7 @@ export function applyHundredGramServing(candidate: PackagedFoodCandidate): Packa
   return {
     ...candidate,
     serving: { quantity: 1, unit: '100 g', grams: 100 },
-    nutrition: { ...candidate.per100g },
+    nutrition: { ...candidate.per100g, sodium: candidate.per100g.sodium ?? null },
     sourceBasis: { kind: 'per_100g_derived', perServing: false, per100g: true },
     warnings: candidate.warnings.filter((warning) => !warning.includes('Choose serving size')),
     complete: Boolean(candidate.name),
@@ -334,7 +334,7 @@ export function applyGramServing(candidate: PackagedFoodCandidate, grams: number
   return {
     ...candidate,
     serving: { quantity: 1, unit: candidate.serving.unit ?? 'serving', grams },
-    nutrition: { ...nutrition },
+    nutrition: { ...nutrition, sodium: nutrition.sodium ?? null },
     sourceBasis: { kind: 'per_100g_derived', perServing: false, per100g: true },
     warnings: [
       ...candidate.warnings.filter((warning) => !warning.includes('Choose serving size')),
