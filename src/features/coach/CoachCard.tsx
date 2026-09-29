@@ -4,6 +4,7 @@ import type { CoachState, CoachTaskView } from '@/domain/coach'
 import type { CoachLabItem } from '@/domain/coach-lab'
 import { primaryButtonClass, quietButtonClass } from '@/lib'
 import { prefixedPath, useAppPathPrefix } from '@/lib/app-prefix'
+import { metersToMiles } from '@/domain/units'
 import { CoachDialog } from './CoachDialog'
 import { acceptCoachTask, CoachApiError, endCoachTask, fetchCoach, logCoachSelfReport, logCoachTraining, passCoachTask, snoozeCoachLabItem } from './api'
 import { coachDateLabel, formatStretchValue, isCurrentResolvedCoachTask, pendingStretchAcknowledgement, selectPrimaryCoachItem } from './presentation'
@@ -220,8 +221,13 @@ function StretchContent({ task, actions }: { task: CoachTaskView; actions: Coach
     ? task.metadata.stretch as Record<string, unknown>
     : null
   const isStrength = metadata?.strategy === 'strength_e1rm'
+  const isPace = metadata?.strategy === 'pace'
+  const baselineMeta = metadata?.baseline && typeof metadata.baseline === 'object' ? metadata.baseline as Record<string, unknown> : null
+  const evidenceMeta = baselineMeta?.evidence && typeof baselineMeta.evidence === 'object' ? baselineMeta.evidence as Record<string, unknown> : null
+  const paceMinimumDistance = typeof evidenceMeta?.distanceM === 'number' ? metersToMiles(evidenceMeta.distanceM) : null
   const best = task.progress?.current ?? null
-  const newPr = task.status === 'active' && best != null && task.baselineValue != null && best > task.baselineValue
+  const newPr = task.status === 'active' && best != null && task.baselineValue != null &&
+    (isPace ? best < task.baselineValue : best > task.baselineValue)
   const completed = task.status === 'completed'
   if (task.status !== 'active' && task.status !== 'offered' && !completed) return <StretchSummary task={task} />
   return (
@@ -244,7 +250,11 @@ function StretchContent({ task, actions }: { task: CoachTaskView; actions: Coach
           <p className="mt-2 text-xs text-zinc-500">{task.status === 'offered' ? 'Offer expires' : 'Challenge ends'} {coachDateLabel(task.expiresOn)} · {task.status === 'offered' ? '7 days to attempt after acceptance' : 'Verified by Training'}</p>
           {task.status === 'offered' ? (
             <p className="mt-2 text-xs leading-relaxed text-zinc-600">
-              {isStrength ? 'e1RM is estimated performance, not the literal load to put on the bar. Any valid high-confidence weight × rep combination can count.' : 'Measured from one qualifying working set saved in Training.'}
+              {isStrength
+                ? 'e1RM is estimated performance, not the literal load to put on the bar. Any valid high-confidence weight × rep combination can count.'
+                : isPace
+                  ? `Pace comes from one continuous Training set.${paceMinimumDistance == null ? '' : ` Cover at least ${paceMinimumDistance.toLocaleString('en-US', { maximumFractionDigits: 2 })} mi.`}`
+                  : 'Measured from one qualifying working set saved in Training.'}
               {metadata?.perSide === true ? ' Both sides must be completed; the lower side counts.' : null}
             </p>
           ) : isStrength ? <p className="mt-2 text-xs leading-relaxed text-zinc-600">The e1RM target is an estimate, not a prescribed bar load. Any valid high-confidence weight × rep combination can count.</p> : null}
