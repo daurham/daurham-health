@@ -298,6 +298,9 @@ export function matchHealthApiRoute(pathname: string): HealthApiRoute | null {
   if (pathname === '/api/auth' || pathname.startsWith('/api/auth/')) {
     return 'auth'
   }
+  if (isSingleSegmentAfter(pathname, '/api/training/templates/')) {
+    return 'training-templates'
+  }
   if (isSingleSegmentAfter(pathname, '/api/training/exercises/')) {
     return 'training-exercises'
   }
