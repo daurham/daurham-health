@@ -1,5 +1,5 @@
 import { formatCompactCalendarDate } from '@/domain/calendar-format'
-import { kilogramsToPounds } from '@/domain/units'
+import { formatPaceSecondsPerMile, kilogramsToPounds, metersToMiles, secondsPerMile } from '@/domain/units'
 import type { LoadState, TemplatePrescription } from '@/domain/training'
 import { formatPrescription } from '@/domain/training'
 
@@ -40,7 +40,16 @@ export function formatSetPerformance(input: {
   rightReps: number | null
   leftDurationSec: number | null
   rightDurationSec: number | null
+  distanceM?: number | null
+  completed?: boolean | null
 }): string {
+  if (input.completed != null) return input.completed ? 'Achieved' : 'Not yet'
+  if (input.distanceM != null && input.durationSec != null) {
+    const miles = metersToMiles(input.distanceM)
+    const pace = secondsPerMile(input.distanceM, input.durationSec)
+    return `${miles.toFixed(2)} mi · ${input.durationSec}s${pace == null ? '' : ` · ${formatPaceSecondsPerMile(pace)}`}`
+  }
+  if (input.distanceM != null) return `${metersToMiles(input.distanceM).toFixed(2)} mi`
   if (input.reps != null) {
     return `${input.reps}`
   }
