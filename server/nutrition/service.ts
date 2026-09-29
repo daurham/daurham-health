@@ -134,6 +134,7 @@ export async function saveNutritionTarget(body: unknown): Promise<NutritionTarge
     input.carbsTarget ?? null,
     input.fatTarget ?? null,
     input.fiberTarget ?? null,
+    input.sodiumTarget ?? null,
   ])
 }
 
@@ -153,6 +154,7 @@ export async function createNutritionFood(body: unknown): Promise<NutritionFood>
       input.carbs ?? null,
       input.fat ?? null,
       input.fiber ?? null,
+      input.sodium ?? null,
       input.sourceKind,
       input.isStaple,
       input.notes ?? null,
@@ -191,6 +193,8 @@ export async function patchNutritionFood(id: string, body: unknown): Promise<Nut
       input.fat ?? null,
       input.fiber !== undefined,
       input.fiber ?? null,
+      input.sodium !== undefined,
+      input.sodium ?? null,
       input.isStaple ?? null,
       input.archived ?? null,
       input.notes !== undefined,
@@ -221,6 +225,7 @@ async function snapshotForCreate(input: z.infer<typeof nutritionEntryCreateSchem
   carbs: number | null
   fat: number | null
   fiber: number | null
+  sodium: number | null
   grams: number | null
 }> {
   let food: NutritionFood | null = null
@@ -246,6 +251,7 @@ async function snapshotForCreate(input: z.infer<typeof nutritionEntryCreateSchem
         carbs: food.carbs,
         fat: food.fat,
         fiber: food.fiber,
+        sodium: food.sodium,
         servingGrams: food.servingGrams,
       },
       { quantity: input.servingQuantity, grams: input.grams ?? null },
@@ -260,6 +266,7 @@ async function snapshotForCreate(input: z.infer<typeof nutritionEntryCreateSchem
       carbs: snapshot.carbs,
       fat: snapshot.fat,
       fiber: snapshot.fiber,
+      sodium: snapshot.sodium,
       grams: input.grams !== undefined ? input.grams ?? null : snapshot.grams,
     }
   }
@@ -276,6 +283,7 @@ async function snapshotForCreate(input: z.infer<typeof nutritionEntryCreateSchem
     carbs: input.carbs ?? null,
     fat: input.fat ?? null,
     fiber: input.fiber ?? null,
+    sodium: input.sodium ?? null,
     grams: input.grams ?? null,
   }
 }
@@ -309,6 +317,7 @@ export async function createNutritionEntry(body: unknown): Promise<NutritionEntr
     snapshot.carbs,
     snapshot.fat,
     snapshot.fiber,
+    snapshot.sodium,
     input.sourceKind,
     input.notes ?? null,
   ])
@@ -347,6 +356,7 @@ export async function patchNutritionEntry(id: string, body: unknown): Promise<Nu
   let carbs = input.carbs !== undefined ? input.carbs : existing.carbs
   let fat = input.fat !== undefined ? input.fat : existing.fat
   let fiber = input.fiber !== undefined ? input.fiber : existing.fiber
+  let sodium = input.sodium !== undefined ? input.sodium : existing.sodium
   let grams = input.grams !== undefined ? input.grams : existing.grams
   if (shouldRescale) {
     const snapshot = rescaleLoggedSnapshot(existing, {
@@ -358,6 +368,7 @@ export async function patchNutritionEntry(id: string, body: unknown): Promise<Nu
     carbs = snapshot.carbs
     fat = snapshot.fat
     fiber = snapshot.fiber
+    sodium = snapshot.sodium
     grams = snapshot.grams
   }
   const updated = await updateEntry([
@@ -383,6 +394,8 @@ export async function patchNutritionEntry(id: string, body: unknown): Promise<Nu
     fat,
     input.fiber !== undefined || shouldRescale,
     fiber,
+    input.sodium !== undefined || shouldRescale,
+    sodium,
     input.notes !== undefined,
     input.notes ?? null,
   ])
@@ -502,6 +515,7 @@ export async function savePackagedFoodAndLog(body: unknown): Promise<{
         input.carbs ?? null,
         input.fat ?? null,
         input.fiber ?? null,
+        input.sodium ?? null,
         'barcode',
         input.isStaple,
         input.notes ?? null,
@@ -544,6 +558,7 @@ export async function savePackagedFoodAndLog(body: unknown): Promise<{
       carbs: food.carbs,
       fat: food.fat,
       fiber: food.fiber,
+      sodium: food.sodium,
       servingGrams: food.servingGrams,
     },
     { quantity: logQuantity },
@@ -565,6 +580,7 @@ export async function savePackagedFoodAndLog(body: unknown): Promise<{
       snapshot.carbs,
       snapshot.fat,
       snapshot.fiber,
+      snapshot.sodium,
       'barcode',
       null,
     ])
