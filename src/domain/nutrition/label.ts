@@ -52,7 +52,7 @@ export const nutritionLabelFieldsSchema = z.object({
   carbsGrams: extractedNumber,
   fatGrams: extractedNumber,
   fiberGrams: extractedNumber,
-  sodiumMg: extractedNumber,
+  sodiumMg: extractedNumber.optional().default({ value: null, status: 'missing' }),
   basis: extractedBasis,
   barcode: extractedString,
 })
@@ -485,7 +485,7 @@ export const nutritionLabelComparisonSchema = z.object({
       carbs: z.number().nullable(),
       fat: z.number().nullable(),
       fiber: z.number().nullable(),
-      sodiumMg: z.number().nullable(),
+      sodiumMg: z.number().nullable().optional().default(null),
       source: z.string(),
     })
     .nullable(),
