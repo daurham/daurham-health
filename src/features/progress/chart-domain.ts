@@ -11,3 +11,11 @@ export function finiteChartDomain(values: readonly number[]): [number, number] |
   const pad = Math.max(spread * 0.2, Math.abs(mid) * 0.02, 2)
   return [min - pad, max + pad]
 }
+
+
+/** Human-readable whole-number axis labels without mutating the underlying series. */
+export function formatIntegerChartTick(value: unknown): string {
+  const parsed = typeof value === 'number' ? value : Number(value)
+  if (!Number.isFinite(parsed)) return ''
+  return Math.round(parsed).toLocaleString('en-US')
+}
