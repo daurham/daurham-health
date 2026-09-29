@@ -115,6 +115,37 @@ export async function createOwnerExercise(body: unknown): Promise<{ exercise: Ex
   return { exercise: mapExercise(row) }
 }
 
+
+export async function ensureOwnerExercise(
+  request: OwnerExerciseRequest,
+): Promise<ExerciseDefinition> {
+  const coherence = ownerExerciseCoherenceError(request)
+  if (coherence) {
+    throw new HttpError(400, coherence)
+  }
+  const sql = await getSql()
+  const rows = await queryOrUnavailable(() =>
+    sql.query(
+      `SELECT ${EXERCISE_COLUMNS}
+       FROM exercise_definitions
+       WHERE external_id IS NULL
+         AND metadata->>'origin' = 'owner'
+         AND is_active = true
+         AND lower(name) = lower($1)
+         AND measurement_kind = $2
+         AND load_type = $3
+         AND unilateral = $4
+       ORDER BY created_at
+       LIMIT 1`,
+      [request.name, request.measurementKind, request.loadType, request.unilateral],
+    ),
+  )
+  if (rows[0]) {
+    return mapExercise(rows[0])
+  }
+  return (await createOwnerExercise(request)).exercise
+}
+
 export async function updateOwnerExercise(
   id: string,
   body: unknown,
