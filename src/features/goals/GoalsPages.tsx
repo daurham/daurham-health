@@ -274,6 +274,11 @@ function CreateGoalForm({ catalog, asOf, onCreated }: { catalog: GoalCatalog; as
   const [targetMode, setTargetMode] = useState(definition?.modes[0] ?? 'at_least')
   const [targetMin, setTargetMin] = useState('')
   const [targetMax, setTargetMax] = useState('')
+  const [durationMinutes, setDurationMinutes] = useState('10')
+  const [durationSeconds, setDurationSeconds] = useState('0')
+  const [paceDistanceMi, setPaceDistanceMi] = useState('2')
+  const [paceMinutes, setPaceMinutes] = useState('10')
+  const [paceSecondsPart, setPaceSecondsPart] = useState('0')
   const [targetDate, setTargetDate] = useState('')
   const [windowDays, setWindowDays] = useState(String(definition?.defaultWindow ?? ''))
   const [notes, setNotes] = useState('')
@@ -286,6 +291,9 @@ function CreateGoalForm({ catalog, asOf, onCreated }: { catalog: GoalCatalog; as
     setKind(next)
     setTargetMode(nextDefinition?.modes[0] ?? 'at_least')
     setWindowDays(nextDefinition?.defaultWindow == null ? '' : String(nextDefinition.defaultWindow))
+    const compatible = catalog.exercises.find((exercise) => compatibleTrainingExercise(next, exercise))
+    if (compatible) setExerciseId(compatible.id)
+    if (next === 'training_skill') setTargetMin('1')
   }
 
   async function onSubmit(event: FormEvent) {
@@ -296,18 +304,27 @@ function CreateGoalForm({ catalog, asOf, onCreated }: { catalog: GoalCatalog; as
     const benchmark = catalog.benchmarkOutcomes.find(
       (item) => `${item.definition_id}|${item.version_id}|${item.requirement_id}` === benchmarkKey,
     )
+    const durationTarget = Math.max(0, Number(durationMinutes) || 0) * 60 + Math.max(0, Number(durationSeconds) || 0)
+    const paceTarget = paceSeconds(paceMinutes, paceSecondsPart)
+    const effectiveTargetMin = kind === 'training_skill' ? 1
+      : kind === 'training_duration' ? durationTarget
+        : targetMode === 'at_most' ? null : Number(targetMin)
+    const effectiveTargetMax = kind === 'training_pace' ? paceTarget
+      : targetMode === 'at_least' ? null : Number(targetMax)
+    const isExerciseGoal = kind === 'strength_e1rm' || kind.startsWith('training_')
     const body = {
       goalKind: kind,
       startedOn,
       bodyMetricKey: kind === 'body_metric' ? bodyMetricKey : null,
-      exerciseDefinitionId: kind === 'strength_e1rm' ? exerciseId : null,
+      exerciseDefinitionId: isExerciseGoal ? exerciseId : null,
+      trainingMinDistanceM: kind === 'training_pace' ? milesToMeters(Number(paceDistanceMi)) : null,
       supplementId: kind === 'supplement_adherence' ? supplementId : null,
       benchmarkDefinitionId: benchmark?.definition_id ?? null,
       benchmarkProtocolVersionId: benchmark?.version_id ?? null,
       benchmarkRequirementId: benchmark?.requirement_id ?? null,
       targetMode,
-      targetMin: targetMode === 'at_most' ? null : Number(targetMin),
-      targetMax: targetMode === 'at_least' ? null : Number(targetMax),
+      targetMin: effectiveTargetMin,
+      targetMax: effectiveTargetMax,
       targetDate: targetDate || null,
       evaluationWindowDays: definition?.pointMetric ? null : Number(windowDays),
       notes: notes || null,
@@ -349,16 +366,20 @@ function CreateGoalForm({ catalog, asOf, onCreated }: { catalog: GoalCatalog; as
           </select>
         </label>
       ) : null}
-      {kind === 'strength_e1rm' ? (
+      {kind === 'strength_e1rm' || kind.startsWith('training_') ? (
         <label className="block text-sm">
           Exercise
           <select className={fieldClass} value={exerciseId} onChange={(event) => setExerciseId(event.target.value)}>
-            {catalog.exercises.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name}
-              </option>
+            {catalog.exercises.filter((item) => compatibleTrainingExercise(kind, item)).map((item) => (
+              <option key={item.id} value={item.id}>{item.name}</option>
             ))}
           </select>
+        </label>
+      ) : null}
+      {kind === 'training_pace' ? (
+        <label className="block text-sm">
+          Minimum continuous distance (mi)
+          <input className={fieldClass} type="number" min="0.01" step="0.01" value={paceDistanceMi} onChange={(event) => setPaceDistanceMi(event.target.value)} required />
         </label>
       ) : null}
       {kind === 'benchmark_result' ? (
@@ -403,18 +424,37 @@ function CreateGoalForm({ catalog, asOf, onCreated }: { catalog: GoalCatalog; as
           ))}
         </select>
       </label>
-      {targetMode !== 'at_most' ? (
-        <label className="block text-sm">
-          Minimum
-          <input className={fieldClass} inputMode="decimal" value={targetMin} onChange={(event) => setTargetMin(event.target.value)} required />
-        </label>
-      ) : null}
-      {targetMode !== 'at_least' ? (
-        <label className="block text-sm">
-          Maximum
-          <input className={fieldClass} inputMode="decimal" value={targetMax} onChange={(event) => setTargetMax(event.target.value)} required />
-        </label>
-      ) : null}
+      {kind === 'training_skill' ? (
+        <p className="rounded-md bg-zinc-50 px-3 py-2 text-sm text-zinc-700">Target: achieve this skill once.</p>
+      ) : kind === 'training_duration' ? (
+        <div className="grid grid-cols-2 gap-2">
+          <label className="block text-sm">Minutes<input className={fieldClass} type="number" min="0" value={durationMinutes} onChange={(event)=>setDurationMinutes(event.target.value)} /></label>
+          <label className="block text-sm">Seconds<input className={fieldClass} type="number" min="0" max="59" value={durationSeconds} onChange={(event)=>setDurationSeconds(event.target.value)} /></label>
+        </div>
+      ) : kind === 'training_pace' ? (
+        <div>
+          <p className="text-sm">Target pace per mile</p>
+          <div className="mt-1 grid grid-cols-2 gap-2">
+            <label className="block text-sm">Minutes<input className={fieldClass} type="number" min="0" value={paceMinutes} onChange={(event)=>setPaceMinutes(event.target.value)} /></label>
+            <label className="block text-sm">Seconds<input className={fieldClass} type="number" min="0" max="59" value={paceSecondsPart} onChange={(event)=>setPaceSecondsPart(event.target.value)} /></label>
+          </div>
+        </div>
+      ) : (
+        <>
+          {targetMode !== 'at_most' ? (
+            <label className="block text-sm">
+              {kind === 'training_distance' ? 'Distance (mi)' : kind === 'training_reps' ? 'Reps' : 'Minimum'}
+              <input className={fieldClass} inputMode="decimal" value={targetMin} onChange={(event) => setTargetMin(event.target.value)} required />
+            </label>
+          ) : null}
+          {targetMode !== 'at_least' ? (
+            <label className="block text-sm">
+              Maximum
+              <input className={fieldClass} inputMode="decimal" value={targetMax} onChange={(event) => setTargetMax(event.target.value)} required />
+            </label>
+          ) : null}
+        </>
+      )}
       {definition && !definition.pointMetric ? (
         <label className="block text-sm">
           Window (days)
