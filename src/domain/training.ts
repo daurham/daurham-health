@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { poundsToKilograms } from './units.js'
+import { distanceToMeters, poundsToKilograms } from './units.js'
 
 const uuidSchema = z.uuid()
 const timestamptzSchema = z.coerce.date()
@@ -81,6 +81,9 @@ export const MEASUREMENT_KINDS = [
   'duration',
   'reps_per_side',
   'duration_per_side',
+  'distance',
+  'distance_duration',
+  'completion',
 ] as const
 
 export const measurementKindSchema = z.enum(MEASUREMENT_KINDS)
@@ -157,6 +160,9 @@ export const templatePrescriptionSchema = z
     max: z.number().optional(),
     min_sec: z.number().optional(),
     max_sec: z.number().optional(),
+    min_distance: z.number().optional(),
+    max_distance: z.number().optional(),
+    distance_unit: z.enum(['mi', 'km']).optional(),
   })
   .passthrough()
 
@@ -210,7 +216,9 @@ export const workoutTemplateRowSchema = z.object({
   name: nonemptyText('Template name'),
   metadata: jsonRecordSchema,
   is_active: z.boolean(),
+  origin_kind: z.enum(['seeded', 'owner']).default('seeded'),
   created_at: timestamptzSchema,
+  updated_at: timestamptzSchema.optional(),
 })
 
 export type WorkoutTemplateRow = z.infer<typeof workoutTemplateRowSchema>
@@ -247,6 +255,7 @@ export const workoutTemplateSchema = z.object({
   name: nonemptyText('Template name'),
   metadata: jsonRecordSchema,
   isActive: z.boolean(),
+  originKind: z.enum(['seeded', 'owner']).default('seeded'),
   exercises: z.array(workoutTemplateExerciseSchema),
 })
 
@@ -265,6 +274,8 @@ export const workoutSetRowSchema = z.object({
   right_reps: nullableInt(),
   left_duration_sec: nullableInt(),
   right_duration_sec: nullableInt(),
+  distance_m: nullableNumber(),
+  completed: z.boolean().nullable().optional().default(null),
   notes: z.string().nullable(),
   metadata: jsonRecordSchema,
   created_at: timestamptzSchema,
@@ -287,6 +298,8 @@ export const workoutSetSchema = z
     rightReps: nonnegativeInt.nullable(),
     leftDurationSec: nonnegativeInt.nullable(),
     rightDurationSec: nonnegativeInt.nullable(),
+    distanceM: z.number().nonnegative().nullable(),
+    completed: z.boolean().nullable(),
     notes: z.string().nullable(),
   })
   .superRefine((set, ctx) => addSetInvariantIssues(set, ctx))
@@ -416,9 +429,13 @@ type SetMeasurementFields = {
   rightReps: number | null
   leftDurationSec: number | null
   rightDurationSec: number | null
+  distanceM?: number | null
+  distance?: number | null
+  distanceUnit?: 'mi' | 'km' | null
+  completed?: boolean | null
 }
 
-export type MeasurementFamily = 'reps' | 'duration' | 'reps_per_side' | 'duration_per_side' | 'mixed' | 'empty'
+export type MeasurementFamily = 'reps' | 'duration' | 'reps_per_side' | 'duration_per_side' | 'distance' | 'distance_duration' | 'completion' | 'mixed' | 'empty'
 
 export function measurementFamilyOf(set: {
   reps: number | null
@@ -427,28 +444,28 @@ export function measurementFamilyOf(set: {
   rightReps: number | null
   leftDurationSec: number | null
   rightDurationSec: number | null
+  distanceM?: number | null
+  distance?: number | null
+  completed?: boolean | null
 }): MeasurementFamily {
   const hasReps = set.reps != null
   const hasDuration = set.durationSec != null
   const hasUnilateralReps = set.leftReps != null || set.rightReps != null
   const hasUnilateralDuration = set.leftDurationSec != null || set.rightDurationSec != null
-  const present = [hasReps, hasDuration, hasUnilateralReps, hasUnilateralDuration].filter(Boolean).length
-  if (present === 0) {
-    return 'empty'
+  const hasDistance = (set.distanceM ?? set.distance) != null
+  const hasCompletion = set.completed != null
+  if (hasCompletion) {
+    return hasReps || hasDuration || hasUnilateralReps || hasUnilateralDuration || hasDistance ? 'mixed' : 'completion'
   }
-  if (present > 1) {
-    return 'mixed'
-  }
-  if (hasReps) {
-    return 'reps'
-  }
-  if (hasDuration) {
-    return 'duration'
-  }
-  if (hasUnilateralReps) {
-    return 'reps_per_side'
-  }
-  return 'duration_per_side'
+  if (hasDuration && hasDistance && !hasReps && !hasUnilateralReps && !hasUnilateralDuration) return 'distance_duration'
+  const present = [hasReps, hasDuration, hasUnilateralReps, hasUnilateralDuration, hasDistance].filter(Boolean).length
+  if (present === 0) return 'empty'
+  if (present > 1) return 'mixed'
+  if (hasReps) return 'reps'
+  if (hasDuration) return 'duration'
+  if (hasUnilateralReps) return 'reps_per_side'
+  if (hasUnilateralDuration) return 'duration_per_side'
+  return 'distance'
 }
 
 function addLoadIssues(
@@ -481,14 +498,14 @@ function addMeasurementFamilyIssues(set: SetMeasurementFields, ctx: z.Refinement
   if (family === 'empty') {
     ctx.addIssue({
       code: 'custom',
-      message: 'Each set needs reps or duration',
+      message: 'Each set needs a measurement',
     })
     return
   }
   if (family === 'mixed') {
     ctx.addIssue({
       code: 'custom',
-      message: 'A set cannot mix reps, duration, bilateral, and unilateral values',
+      message: 'A set cannot mix unrelated measurement values',
     })
   }
 }
@@ -512,6 +529,9 @@ export const manualWorkoutSetValuesSchema = z.object({
   rightReps: nullableNonnegativeInt,
   leftDurationSec: nullableNonnegativeInt,
   rightDurationSec: nullableNonnegativeInt,
+  distance: nullableNonnegativeNumber,
+  distanceUnit: z.enum(['mi', 'km']).nullable().default('mi'),
+  completed: z.boolean().nullable(),
   notes: optionalNotesSchema,
 })
 
@@ -526,6 +546,8 @@ export const manualWorkoutSetInputSchema = manualWorkoutSetValuesSchema.superRef
       rightReps: set.rightReps,
       leftDurationSec: set.leftDurationSec,
       rightDurationSec: set.rightDurationSec,
+      distance: set.distance,
+      completed: set.completed,
     },
     ctx,
     'weightLb',
@@ -597,6 +619,8 @@ export type CanonicalWorkoutSetInsert = {
   rightReps: number | null
   leftDurationSec: number | null
   rightDurationSec: number | null
+  distanceM: number | null
+  completed: boolean | null
   notes: string | null
 }
 
@@ -612,6 +636,8 @@ export function toCanonicalSetInsert(set: ManualWorkoutSetInput): CanonicalWorko
     rightReps: set.rightReps,
     leftDurationSec: set.leftDurationSec,
     rightDurationSec: set.rightDurationSec,
+    distanceM: set.distance != null && set.distanceUnit ? distanceToMeters(set.distance, set.distanceUnit) : null,
+    completed: set.completed ?? null,
     notes: set.notes ?? null,
   }
 }
@@ -625,6 +651,9 @@ export type DraftSetFields = {
   rightReps: string
   leftDurationSec: string
   rightDurationSec: string
+  distance: string
+  distanceUnit: 'mi' | 'km'
+  completed: boolean | null
   notes: string
   transcribedLoadState?: LoadState
   transcribedWeightLb?: string
@@ -660,6 +689,8 @@ export function isDraftSetUntouched(set: DraftSetFields): boolean {
     set.rightReps.trim() === '' &&
     set.leftDurationSec.trim() === '' &&
     set.rightDurationSec.trim() === '' &&
+    set.distance.trim() === '' &&
+    set.completed == null &&
     set.notes.trim() === ''
   )
 }
@@ -679,6 +710,9 @@ export function draftSetToManualInput(
     rightReps: parseOptionalInt(set.rightReps),
     leftDurationSec: parseOptionalInt(set.leftDurationSec),
     rightDurationSec: parseOptionalInt(set.rightDurationSec),
+    distance: parseOptionalNumber(set.distance),
+    distanceUnit: set.distance.trim() === '' ? null : set.distanceUnit,
+    completed: set.completed,
     notes: set.notes.trim() === '' ? null : set.notes.trim(),
   }
 }
@@ -719,6 +753,8 @@ export function workoutSetFromRow(row: WorkoutSetRow): WorkoutSet {
     rightReps: row.right_reps,
     leftDurationSec: row.left_duration_sec,
     rightDurationSec: row.right_duration_sec,
+    distanceM: row.distance_m,
+    completed: row.completed ?? null,
     notes: row.notes,
   })
 }
@@ -837,14 +873,18 @@ export function ownerExerciseAnalyticsDefaults(
   measurementKind: MeasurementKind,
   unilateral: boolean,
 ): {
-  performanceType: 'other'
+  performanceType: 'other' | 'distance' | 'skill'
   analyticsLoadType: 'none'
   analyticsRepMode: 'standard' | 'per_side'
 } {
   const perSide =
     unilateral || measurementKind === 'reps_per_side' || measurementKind === 'duration_per_side'
   return {
-    performanceType: 'other',
+    performanceType: measurementKind === 'distance' || measurementKind === 'distance_duration'
+      ? 'distance'
+      : measurementKind === 'completion'
+        ? 'skill'
+        : 'other',
     analyticsLoadType: 'none',
     analyticsRepMode: perSide ? 'per_side' : 'standard',
   }
@@ -930,6 +970,14 @@ export function planOwnerExercisePatch(input: {
 
 export function formatPrescription(plannedSets: number | null, prescription: TemplatePrescription): string {
   const setsLabel = plannedSets == null ? '' : `${plannedSets} × `
+  if (prescription.measurement === 'completion') return `${setsLabel}skill attempt`.trim()
+  if (prescription.measurement === 'distance' || prescription.measurement === 'distance_duration') {
+    const min = prescription.min_distance
+    const max = prescription.max_distance
+    const unit = prescription.distance_unit ?? 'mi'
+    const distance = min != null && max != null ? `${min}–${max} ${unit}` : min != null ? `≥ ${min} ${unit}` : 'distance'
+    return prescription.measurement === 'distance_duration' ? `${setsLabel}${distance} + time`.trim() : `${setsLabel}${distance}`.trim()
+  }
   if (prescription.measurement === 'duration' || prescription.measurement === 'duration_per_side') {
     const min = prescription.min_sec
     const max = prescription.max_sec
