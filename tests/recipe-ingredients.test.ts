@@ -88,6 +88,7 @@ const turkey = {
   carbs: 0,
   fat: 8,
   fiber: 0,
+  sodium: null,
   portions: [
     { label: '100 g', amount: 100, unit: 'g', grams: 100 },
     { label: '1 cup (156 g)', amount: 1, unit: 'cup', grams: 156 },
@@ -124,10 +125,11 @@ function foodRow(params: unknown[]) {
     carbs: params[10],
     fat: params[11],
     fiber: params[12],
-    source_kind: params[13],
+    sodium: params[13],
+    source_kind: params[14],
     is_staple: false,
     archived: false,
-    notes: params[15],
+    notes: params[16],
     created_at: '2026-09-27T16:00:00.000Z',
     updated_at: '2026-09-27T16:00:00.000Z',
   }
@@ -273,7 +275,7 @@ describe('recipe ingredient creation', () => {
     })
     expect(candidate?.portions.map((portion) => portion.label)).toEqual(['100 g', '1 cup'])
     expect(candidate?.servingGrams).toBe(100)
-    expect(scalePer100Grams({ calories: 10, protein: 1, carbs: null, fat: null, fiber: null }, 240).calories).toBe(24)
+    expect(scalePer100Grams({ calories: 10, protein: 1, carbs: null, fat: null, fiber: null, sodium: null }, 240).calories).toBe(24)
   })
 
   it('saves one reviewed AI food and ignores an estimate that was not accepted', async () => {
