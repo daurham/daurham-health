@@ -4,7 +4,7 @@ import { readJsonBody, requestApiPathname, sendJson, type ApiRequest, type ApiRe
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
-async function templatesHandler(req: ApiRequest, res: ApiResponse) {
+export async function handleTrainingTemplates(req: ApiRequest, res: ApiResponse) {
   const pathname = requestApiPathname(req)
   const detail = /^\/api\/training\/templates\/([^/]+)$/.exec(pathname)
   if (pathname === '/api/training/templates') {
@@ -37,4 +37,4 @@ async function templatesHandler(req: ApiRequest, res: ApiResponse) {
   sendJson(res, 405, { error: 'Method not allowed' })
 }
 
-export default withOwnerAuth(templatesHandler)
+export default withOwnerAuth(handleTrainingTemplates)
