@@ -363,7 +363,7 @@ export function prepareManualSession(input: {
   }
 }
 
-function buildSessionInsertQueries(
+export function buildSessionInsertQueries(
   sql: Awaited<ReturnType<typeof getSql>>,
   prepared: PreparedManualSession,
 ) {
