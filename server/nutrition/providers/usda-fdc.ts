@@ -8,6 +8,7 @@ const NUTRIENT_IDS = {
   carbs: 1005,
   fat: 1004,
   fiber: 1079,
+  sodium: 1093,
 } as const
 
 export type UsdaPortion = {
@@ -28,6 +29,7 @@ export type UsdaFoodCandidate = {
   carbs: number | null
   fat: number | null
   fiber: number | null
+  sodium: number | null
   portions: UsdaPortion[]
 }
 
@@ -107,6 +109,7 @@ export function usdaCandidateFromFood(food: Record<string, unknown>): UsdaFoodCa
     carbs: nutrientValue(food, NUTRIENT_IDS.carbs),
     fat: nutrientValue(food, NUTRIENT_IDS.fat),
     fiber: nutrientValue(food, NUTRIENT_IDS.fiber),
+    sodium: nutrientValue(food, NUTRIENT_IDS.sodium),
     portions: usdaPortions(food),
   }
 }
