@@ -409,6 +409,7 @@ function LabelReviewSheet({
         carbs: draft.carbsGrams,
         fat: draft.fatGrams,
         fiber: draft.fiberGrams,
+        sodium: draft.sodiumMg,
         servingGrams: draft.servingGrams,
       },
       { quantity: draft.logQuantity },
@@ -451,6 +452,7 @@ function LabelReviewSheet({
         carbsGrams: draft.carbsGrams,
         fatGrams: draft.fatGrams,
         fiberGrams: draft.fiberGrams,
+        sodiumMg: draft.sodiumMg,
         basis: draft.basis === '' ? 'unknown' : draft.basis,
         barcode: draft.barcode.trim() || null,
         logQuantity: draft.logQuantity,
@@ -641,6 +643,7 @@ function LabelReviewSheet({
           <Field id="label-carbsGrams" label="Carbs g" value={draft.carbsGrams == null ? '' : String(draft.carbsGrams)} inputMode="decimal" onChange={(value) => setField('carbsGrams', value.trim() === '' ? null : Number(value))} />
           <Field id="label-fatGrams" label="Fat g" value={draft.fatGrams == null ? '' : String(draft.fatGrams)} inputMode="decimal" onChange={(value) => setField('fatGrams', value.trim() === '' ? null : Number(value))} />
           <Field id="label-fiberGrams" label="Fiber g" value={draft.fiberGrams == null ? '' : String(draft.fiberGrams)} inputMode="decimal" onChange={(value) => setField('fiberGrams', value.trim() === '' ? null : Number(value))} />
+          <Field id="label-sodiumMg" label="Sodium mg" value={draft.sodiumMg == null ? '' : String(draft.sodiumMg)} inputMode="decimal" onChange={(value) => setField('sodiumMg', value.trim() === '' ? null : Number(value))} />
         </div>
         <Field id="label-barcode" label="Barcode" value={draft.barcode} error={errorFor('barcode')} inputMode="numeric" onChange={(value) => setField('barcode', value)} />
 
