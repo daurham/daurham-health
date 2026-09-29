@@ -4,15 +4,22 @@ import { describe, expect, it } from 'vitest'
 import { TRAINING_EXERCISE_SEEDS, TRAINING_TEMPLATE_SEEDS } from '../src/domain/training-library.ts'
 
 const sql = readFileSync(path.join('migrations', '0003_training.sql'), 'utf8')
+const h2d = readFileSync(path.join('migrations', '0038_training_measurements_goals_routines.sql'), 'utf8')
 
 describe('training seeds', () => {
-  it('maps EX01–EX17 into 0003', () => {
-    expect(TRAINING_EXERCISE_SEEDS).toHaveLength(17)
-    for (const exercise of TRAINING_EXERCISE_SEEDS) {
+  it('keeps EX01–EX17 in 0003 and adds Running/Hiking in H2D', () => {
+    expect(TRAINING_EXERCISE_SEEDS).toHaveLength(19)
+    for (const exercise of TRAINING_EXERCISE_SEEDS.slice(0, 17)) {
       expect(sql).toContain(`'${exercise.externalId}'`)
       expect(sql).toContain(`'${exercise.name}'`)
       expect(sql).toContain(`'${exercise.measurementKind}'`)
       expect(sql).toContain(`'${exercise.loadType}'`)
+    }
+    for (const exercise of TRAINING_EXERCISE_SEEDS.slice(17)) {
+      expect(h2d).toContain(`'${exercise.externalId}'`)
+      expect(h2d).toContain(`'${exercise.name}'`)
+      expect(h2d).toContain(`'${exercise.measurementKind}'`)
+      expect(h2d).toContain(`'${exercise.loadType}'`)
     }
     expect(sql).toContain("unilateral BOOLEAN NOT NULL DEFAULT false")
     expect(sql).toContain("'EX11'")
