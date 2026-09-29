@@ -867,10 +867,10 @@ export function latestSessionE1rm(
   return {
     e1rmKg: latest.estimated1RmKg,
     observedOn: latest.date,
-    sourceLoadKg: latest.loadKg,
-    sourceReps: latest.reps,
+    sourceLoadKg: latest.sourceSet.weightKg,
+    sourceReps: latest.sourceSet.reps,
     sourceSessionId: latest.sessionId,
-    sourceSetId: latest.setId,
+    sourceSetId: latest.sourceSet.setId,
   }
 }
 
