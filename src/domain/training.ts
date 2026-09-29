@@ -302,8 +302,8 @@ export const workoutSetSchema = z
     rightReps: nonnegativeInt.nullable(),
     leftDurationSec: nonnegativeInt.nullable(),
     rightDurationSec: nonnegativeInt.nullable(),
-    distanceM: z.number().positive().nullable(),
-    completed: z.boolean().nullable(),
+    distanceM: z.number().positive().nullable().optional().transform((value) => value ?? null),
+    completed: z.boolean().nullable().optional().transform((value) => value ?? null),
     notes: z.string().nullable(),
   })
   .superRefine((set, ctx) => addSetInvariantIssues(set, ctx))
