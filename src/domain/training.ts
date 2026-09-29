@@ -675,9 +675,9 @@ export type DraftSetFields = {
   rightReps: string
   leftDurationSec: string
   rightDurationSec: string
-  distance: string
-  distanceUnit: DistanceUnit
-  completed: boolean | null
+  distance?: string
+  distanceUnit?: DistanceUnit
+  completed?: boolean | null
   notes: string
   transcribedLoadState?: LoadState
   transcribedWeightLb?: string
@@ -713,7 +713,7 @@ export function isDraftSetUntouched(set: DraftSetFields): boolean {
     set.rightReps.trim() === '' &&
     set.leftDurationSec.trim() === '' &&
     set.rightDurationSec.trim() === '' &&
-    set.distance.trim() === '' &&
+    (set.distance?.trim() ?? '') === '' &&
     set.completed == null &&
     set.notes.trim() === ''
   )
@@ -734,8 +734,8 @@ export function draftSetToManualInput(
     rightReps: parseOptionalInt(set.rightReps),
     leftDurationSec: parseOptionalInt(set.leftDurationSec),
     rightDurationSec: parseOptionalInt(set.rightDurationSec),
-    distance: parseOptionalNumber(set.distance),
-    distanceUnit: set.distanceUnit,
+    distance: parseOptionalNumber(set.distance ?? ''),
+    distanceUnit: set.distanceUnit ?? 'mi',
     completed: set.completed,
     notes: set.notes.trim() === '' ? null : set.notes.trim(),
   }
