@@ -846,10 +846,13 @@ export async function getSession(sessionId: string): Promise<SessionDetailRespon
   }
 
   const exerciseRows = await sql.query(
-    `SELECT id, workout_session_id, exercise_definition_id, position, slot_id,
-            exercise_external_id, exercise_name, notes, metadata, created_at
-     FROM workout_session_exercises
-     WHERE workout_session_id = $1
+    `SELECT session_exercises.id, session_exercises.workout_session_id, session_exercises.exercise_definition_id,
+            session_exercises.position, session_exercises.slot_id, session_exercises.exercise_external_id,
+            session_exercises.exercise_name, definitions.measurement_kind,
+            session_exercises.notes, session_exercises.metadata, session_exercises.created_at
+     FROM workout_session_exercises session_exercises
+     JOIN exercise_definitions definitions ON definitions.id = session_exercises.exercise_definition_id
+     WHERE session_exercises.workout_session_id = $1
      ORDER BY position`,
     [sessionId],
   )
@@ -888,6 +891,7 @@ export async function getSession(sessionId: string): Promise<SessionDetailRespon
       slotId: exercise.slot_id,
       exerciseExternalId: exercise.exercise_external_id,
       exerciseName: exercise.exercise_name,
+      measurementKind: exercise.measurement_kind,
       notes: exercise.notes,
       sets: setsByExercise.get(exercise.id) ?? [],
     })),
