@@ -99,7 +99,10 @@ export function TodayPage() {
           {view ? (
             <TodayBoard
               view={view}
-              onNutritionChanged={() => resource.retry()}
+              onNutritionChanged={() => {
+                resource.retry()
+                void loadCoach()
+              }}
               onSupplementsChanged={() => resource.retry()}
               coach={coach}
               coachPending={coachPending}
