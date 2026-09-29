@@ -106,7 +106,7 @@ export type RecentCoachRule = {
 
 export type CoachTrainingPreset = {
   exerciseName: string
-  measurementKind: 'reps' | 'duration'
+  measurementKind: 'reps' | 'duration' | 'distance_duration'
   loadType: 'bodyweight' | 'none'
   sessionName: string
   valueKind: 'reps' | 'duration_min'
