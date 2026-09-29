@@ -14,6 +14,7 @@ export type PackagedCandidateNutrition = {
   carbs: number | null
   fat: number | null
   fiber: number | null
+  sodium: number | null
 }
 
 export type PackagedFoodCandidate = {
@@ -49,6 +50,8 @@ export type PackagedProviderNutrients = {
   fat100g: number | null
   fiberServing: number | null
   fiber100g: number | null
+  sodiumServing: number | null
+  sodium100g: number | null
 }
 
 /** Provider-independent snapshot used to build a candidate. Not OFF JSON. */
@@ -82,6 +85,7 @@ function servingNutrients(n: PackagedProviderNutrients): NutrientAmount | null {
     carbs: n.carbsServing,
     fat: n.fatServing,
     fiber: n.fiberServing,
+    sodium: n.sodiumServing,
   }
 }
 
@@ -95,6 +99,7 @@ function per100gNutrients(n: PackagedProviderNutrients): NutrientAmount | null {
     carbs: n.carbs100g,
     fat: n.fat100g,
     fiber: n.fiber100g,
+    sodium: n.sodium100g,
   }
 }
 
@@ -191,7 +196,7 @@ export function candidateFromProviderSnapshot(
         unit: null,
         grams: null,
       },
-      nutrition: { calories: null, protein: null, carbs: null, fat: null, fiber: null },
+      nutrition: { calories: null, protein: null, carbs: null, fat: null, fiber: null, sodium: null },
       sourceBasis: { kind: 'per_100g_unspecified', perServing: false, per100g: true },
       per100g,
       warnings,
@@ -210,7 +215,7 @@ export function candidateFromProviderSnapshot(
       unit: unitFromText ?? 'serving',
       grams: servingGrams,
     },
-    nutrition: { calories: null, protein: null, carbs: null, fat: null, fiber: null },
+    nutrition: { calories: null, protein: null, carbs: null, fat: null, fiber: null, sodium: null },
     sourceBasis: { kind: 'missing', perServing: false, per100g: false },
     per100g: null,
     warnings,
@@ -270,6 +275,7 @@ export type PackagedReviewInput = {
   carbs?: number | null
   fat?: number | null
   fiber?: number | null
+  sodium?: number | null
   logDate: string
   timezone?: string
   logQuantity?: number
