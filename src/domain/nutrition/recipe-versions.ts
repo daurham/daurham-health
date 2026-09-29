@@ -48,6 +48,8 @@ export type RecipeVersionSnapshot = {
   proteinG: number | null
   carbsG: number | null
   fatG: number | null
+  fiberG: number | null
+  sodiumMg: number | null
   calculationVersion: string
   ingredients: RecipeLine[]
 }
