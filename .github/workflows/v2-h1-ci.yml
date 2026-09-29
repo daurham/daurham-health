@@ -1,0 +1,21 @@
+name: V2 H1 validation
+on:
+  push:
+    branches:
+      - chatgpt/v2-h1
+  workflow_dispatch:
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test -- --run
+      - run: npx tsc -b
+      - run: npx eslint .
+      - run: npm run build
