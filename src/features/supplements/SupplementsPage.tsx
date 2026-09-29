@@ -223,7 +223,20 @@ function SupplementCard({
   })
 
   return (
-    <article className="space-y-4 rounded-lg border border-zinc-200 bg-white p-4">
+    <details className="group rounded-lg border border-zinc-200 bg-white">
+      <summary className="motion-interactive flex cursor-pointer list-none items-start justify-between gap-3 px-4 py-3 marker:content-none [&::-webkit-details-marker]:hidden">
+        <div className="min-w-0">
+          <h2 className="truncate text-base font-semibold tracking-tight">{record.name}</h2>
+          <p className="mt-0.5 truncate text-sm text-zinc-600">
+            {statusLabel(record.status)}
+            {record.schedules[0] ? ` · ${formatPlannedDose(record.schedules[0].doseAmount, record.schedules[0].doseUnit)}` : ''}
+            {record.schedules[0]?.slotLabel ? ` · ${record.schedules[0].slotLabel}` : ''}
+          </p>
+        </div>
+        <span className="shrink-0 text-sm text-zinc-500 group-open:hidden">Details</span>
+        <span className="hidden shrink-0 text-sm text-zinc-500 group-open:inline">Close</span>
+      </summary>
+      <div className="space-y-4 border-t border-zinc-100 p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold tracking-tight">{record.name}</h2>
@@ -386,7 +399,8 @@ function SupplementCard({
         Delete supplement
       </button>
       {openSchedules.length === 0 ? <p className="text-sm text-zinc-500">No open schedule. Add a dose to plan future days.</p> : null}
-    </article>
+      </div>
+    </details>
   )
 }
 
