@@ -13,7 +13,7 @@ import {
 } from 'recharts'
 import { kilogramsToPounds } from '@/domain/units'
 import { usePrefersReducedMotion } from '@/lib'
-import { finiteChartDomain } from './chart-domain'
+import { finiteChartDomain, formatIntegerChartTick } from './chart-domain'
 import { formatCalendarDate, formatDurationSec, formatReps } from './format'
 
 function asLb(kg: number): number {
@@ -220,7 +220,9 @@ export function LoggedCaloriesChart({
             <YAxis
               dataKey="calories"
               unit=" kcal"
-              domain={domain}
+              domain={[Math.max(0, Math.floor(domain[0])), Math.ceil(domain[1])]}
+              allowDecimals={false}
+              tickFormatter={formatIntegerChartTick}
               tick={{ fill: 'var(--chart-muted)', fontSize: 11 }}
               width={64}
             />
