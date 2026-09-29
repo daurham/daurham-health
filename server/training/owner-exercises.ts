@@ -94,7 +94,7 @@ export async function createOwnerExercise(body: unknown): Promise<{ exercise: Ex
          performance_type, analytics_load_type, analytics_rep_mode
        ) VALUES (
          $1::uuid, NULL, $2, $3, $4, $5, $6::jsonb,
-         'other', 'none', $7
+         $7, $8, $9
        )
        RETURNING ${EXERCISE_COLUMNS}`,
       [
@@ -104,6 +104,8 @@ export async function createOwnerExercise(body: unknown): Promise<{ exercise: Ex
         request.loadType,
         request.unilateral,
         JSON.stringify(OWNER_EXERCISE_ORIGIN),
+        analytics.performanceType,
+        analytics.analyticsLoadType,
         analytics.analyticsRepMode,
       ],
     ),
@@ -177,13 +179,22 @@ export async function updateOwnerExercise(
                measurement_kind = $3,
                load_type = $4,
                unilateral = $5,
-               performance_type = 'other',
-               analytics_load_type = 'none',
-               analytics_rep_mode = $6,
+               performance_type = $6,
+               analytics_load_type = $7,
+               analytics_rep_mode = $8,
                updated_at = now()
            WHERE id = $1::uuid
            RETURNING ${EXERCISE_COLUMNS}`,
-          [id, plan.name, plan.measurementKind, plan.loadType, plan.unilateral, plan.analytics.analyticsRepMode],
+          [
+            id,
+            plan.name,
+            plan.measurementKind,
+            plan.loadType,
+            plan.unilateral,
+            plan.analytics.performanceType,
+            plan.analytics.analyticsLoadType,
+            plan.analytics.analyticsRepMode,
+          ],
         ),
   )
   const row = rows[0]
