@@ -291,9 +291,9 @@ function SessionDetail({
                 <li key={set.id} className="flex justify-between gap-3 text-sm">
                   <span className="text-zinc-500">Set {set.setNumber}</span>
                   <span className="font-medium">
-                    {formatLoad(set.loadState, set.weightKg)}
-                    {' · '}
-                    {formatSetPerformance(set)}
+                    {['distance', 'distance_duration', 'completion'].includes(exercise.measurementKind)
+                      ? formatSetPerformance(set)
+                      : `${formatLoad(set.loadState, set.weightKg)} · ${formatSetPerformance(set)}`}
                   </span>
                 </li>
               ))}
