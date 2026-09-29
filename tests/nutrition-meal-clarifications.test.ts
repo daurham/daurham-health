@@ -327,8 +327,8 @@ describe('clarification reanalysis boundaries', () => {
     const commit = meal.slice(meal.indexOf('export async function commitNutritionMealEstimate'))
     expect(commit).not.toContain('clarification')
     expect(commit).toContain("'photo_ai'")
-    expect(readdirSync('migrations')).toContain('0034_nutrition_micros_goal_archive.sql')
-    expect(LATEST_SCHEMA_MIGRATION).toBe('0034_nutrition_micros_goal_archive.sql')
+    expect(readdirSync('migrations')).toContain('0035_coach_tasks.sql')
+    expect(LATEST_SCHEMA_MIGRATION).toBe('0035_coach_tasks.sql')
     expect(BACKUP_TABLES.map((table) => table.name)).not.toContain('meal_clarifications')
     expect(BACKUP_TABLES.find((table) => table.name === 'nutrition_capture_jobs')).toMatchObject({
       backupClass: 'operational',
