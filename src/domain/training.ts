@@ -551,9 +551,9 @@ export const manualWorkoutSetValuesSchema = z.object({
   rightReps: nullableNonnegativeInt,
   leftDurationSec: nullableNonnegativeInt,
   rightDurationSec: nullableNonnegativeInt,
-  distance: z.number().positive().nullable(),
-  distanceUnit: distanceUnitSchema.nullable(),
-  completed: z.boolean().nullable(),
+  distance: z.number().positive().nullable().optional().transform((value) => value ?? null),
+  distanceUnit: distanceUnitSchema.nullable().optional().transform((value) => value ?? null),
+  completed: z.boolean().nullable().optional().transform((value) => value ?? null),
   notes: optionalNotesSchema,
 })
 
