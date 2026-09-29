@@ -20,6 +20,8 @@ export type PaperSetFields = {
   rightReps: string | number | null | undefined
   leftDurationSec: string | number | null | undefined
   rightDurationSec: string | number | null | undefined
+  distance?: string | number | null | undefined
+  completed?: boolean | null | undefined
   notes?: string | number | null | undefined
   transcribedLoadState?: LoadState
   transcribedWeightLb?: string
@@ -71,7 +73,9 @@ export function paperSetHasPerformance(set: PaperSetFields): boolean {
     asTrimmed(set.leftReps) !== '' ||
     asTrimmed(set.rightReps) !== '' ||
     asTrimmed(set.leftDurationSec) !== '' ||
-    asTrimmed(set.rightDurationSec) !== ''
+    asTrimmed(set.rightDurationSec) !== '' ||
+    asTrimmed(set.distance) !== '' ||
+    set.completed != null
   )
 }
 
@@ -136,23 +140,23 @@ export function resolvedWeightLb(load: PaperLoad | null): number | null {
   return load?.kind === 'external' ? load.weightLb : null
 }
 
-function measurementField(kind: MeasurementKind): 'reps' | 'durationSec' | 'leftReps' | 'leftDurationSec' {
+function measurementField(kind: MeasurementKind): string {
   if (kind === 'duration') {
     return 'durationSec'
   }
   if (kind === 'reps_per_side') {
     return 'leftReps'
   }
-  if (kind === 'duration_per_side') {
-    return 'leftDurationSec'
-  }
+  if (kind === 'duration_per_side') return 'leftDurationSec'
+  if (kind === 'distance' || kind === 'distance_duration') return 'distance'
+  if (kind === 'completion') return 'completed'
   return 'reps'
 }
 
 function measurementRequiredMessage(kind: MeasurementKind): string {
-  if (kind === 'duration' || kind === 'duration_per_side') {
-    return 'Time required for this completed set.'
-  }
+  if (kind === 'duration' || kind === 'duration_per_side' || kind === 'distance_duration') return 'Time required for this completed set.'
+  if (kind === 'distance') return 'Distance required for this completed set.'
+  if (kind === 'completion') return 'Record whether the skill was achieved.'
   return 'Reps required for this completed set.'
 }
 
@@ -170,7 +174,7 @@ export function validateInterpretedPaperSets<T extends PaperSetFields>(
     if (item.omitted) {
       return
     }
-    if (item.resolvedLoad == null) {
+    if (item.resolvedLoad == null && !['distance', 'distance_duration', 'completion'].includes(measurementKind)) {
       errors.push({
         path: paperSetFieldPath(exerciseIndex, setIndex, 'weightLb'),
         message: 'Load required — no previous load exists to inherit.',
@@ -194,6 +198,9 @@ export function fieldErrorCountSummary(count: number): string {
 }
 
 export function measurementKindFromPaperSet(set: PaperSetFields): MeasurementKind {
+  if (set.completed != null) return 'completion'
+  if (asTrimmed(set.distance) !== '' && asTrimmed(set.durationSec) !== '') return 'distance_duration'
+  if (asTrimmed(set.distance) !== '') return 'distance'
   if (asTrimmed(set.leftDurationSec) !== '' || asTrimmed(set.rightDurationSec) !== '') {
     return 'duration_per_side'
   }
@@ -233,6 +240,8 @@ export function applyPaperInheritanceToManualRequest(
           rightReps: set.rightReps,
           leftDurationSec: set.leftDurationSec,
           rightDurationSec: set.rightDurationSec,
+          distance: set.distance,
+          completed: set.completed,
           notes: set.notes,
         })),
       )
