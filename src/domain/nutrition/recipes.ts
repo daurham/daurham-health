@@ -1,4 +1,4 @@
-export const RECIPE_CALCULATION_VERSION = 'recipe-v1'
+export const RECIPE_CALCULATION_VERSION = 'recipe-v2'
 
 const NAME_MAX = 200
 const NOTES_MAX = 2000
@@ -26,6 +26,8 @@ export type RecipeFoodBasis = {
   protein: number | null
   carbs: number | null
   fat: number | null
+  fiber: number | null
+  sodiumMg: number | null
   sourceKind: string | null
   barcode: string | null
   archived?: boolean
@@ -53,10 +55,14 @@ export type RecipeLine = {
   baseProteinGSnapshot: number | null
   baseCarbsGSnapshot: number | null
   baseFatGSnapshot: number | null
+  baseFiberGSnapshot: number | null
+  baseSodiumMgSnapshot: number | null
   lineCaloriesKcal: number
   lineProteinG: number | null
   lineCarbsG: number | null
   lineFatG: number | null
+  lineFiberG: number | null
+  lineSodiumMg: number | null
 }
 
 export type ComposedRecipe = {
@@ -68,6 +74,8 @@ export type ComposedRecipe = {
   proteinG: number | null
   carbsG: number | null
   fatG: number | null
+  fiberG: number | null
+  sodiumMg: number | null
   calculationVersion: typeof RECIPE_CALCULATION_VERSION
   ingredients: RecipeLine[]
 }
@@ -136,6 +144,8 @@ export function composeRecipe(input: {
     const baseProtein = ingredient.food.protein
     const baseCarbs = ingredient.food.carbs
     const baseFat = ingredient.food.fat
+    const baseFiber = ingredient.food.fiber
+    const baseSodiumMg = ingredient.food.sodiumMg
     lines.push({
       position: index + 1,
       foodId: ingredient.food.id,
@@ -152,10 +162,14 @@ export function composeRecipe(input: {
       baseProteinGSnapshot: baseProtein,
       baseCarbsGSnapshot: baseCarbs,
       baseFatGSnapshot: baseFat,
+      baseFiberGSnapshot: baseFiber,
+      baseSodiumMgSnapshot: baseSodiumMg,
       lineCaloriesKcal: baseCalories * scale.scaleFactor,
       lineProteinG: baseProtein == null ? null : baseProtein * scale.scaleFactor,
       lineCarbsG: baseCarbs == null ? null : baseCarbs * scale.scaleFactor,
       lineFatG: baseFat == null ? null : baseFat * scale.scaleFactor,
+      lineFiberG: baseFiber == null ? null : baseFiber * scale.scaleFactor,
+      lineSodiumMg: baseSodiumMg == null ? null : baseSodiumMg * scale.scaleFactor,
     })
   }
   return {
@@ -167,12 +181,14 @@ export function composeRecipe(input: {
     proteinG: sumKnown(lines.map((line) => line.lineProteinG)),
     carbsG: sumKnown(lines.map((line) => line.lineCarbsG)),
     fatG: sumKnown(lines.map((line) => line.lineFatG)),
+    fiberG: sumKnown(lines.map((line) => line.lineFiberG)),
+    sodiumMg: sumKnown(lines.map((line) => line.lineSodiumMg)),
     calculationVersion: RECIPE_CALCULATION_VERSION,
     ingredients: lines,
   }
 }
 
-const FORBIDDEN_KEYS = ['calories', 'protein', 'carbs', 'fat', 'scaleFactor', 'caloriesKcal', 'proteinG', 'carbsG', 'fatG']
+const FORBIDDEN_KEYS = ['calories', 'protein', 'carbs', 'fat', 'fiber', 'sodium', 'sodiumMg', 'scaleFactor', 'caloriesKcal', 'proteinG', 'carbsG', 'fatG', 'fiberG']
 
 export function recipeFoodIds(body: unknown): string[] | { error: string } {
   if (body == null || typeof body !== 'object' || Array.isArray(body)) {
