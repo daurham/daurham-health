@@ -54,7 +54,7 @@ import {
   fieldErrorCountSummary,
   fieldErrorsForPaperExercises,
 } from '../../src/domain/paper-load.js'
-import { formatDatabaseError, getSql } from '../db.js'
+import { formatDatabaseError, getSql, type Sql } from '../db.js'
 import { HttpError } from '../http.js'
 import type { HomeAiClient } from '../integrations/home-ai/client.js'
 import { getHomeAiClient } from '../integrations/home-ai/client.js'
@@ -208,7 +208,7 @@ function parseOwnerRoutine(body: unknown): OwnerRoutineInput {
   return parsed.data
 }
 
-async function validateOwnerRoutineExercises(sql: Sql, request: OwnerRoutineInput): Promise<Map<string, ExerciseDefinition>> {
+async function validateOwnerRoutineExercises(request: OwnerRoutineInput): Promise<Map<string, ExerciseDefinition>> {
   const exercises = await loadExercisesById(request.exercises.map((item) => item.exerciseDefinitionId))
   for (const item of request.exercises) {
     const exercise = exercises.get(item.exerciseDefinitionId)
@@ -249,7 +249,7 @@ function ownerRoutineQueries(sql: Sql, input: {
 export async function createOwnerRoutine(body: unknown): Promise<{ template: WorkoutTemplate }> {
   const request = parseOwnerRoutine(body)
   const sql = await getSql()
-  await validateOwnerRoutineExercises(sql, request)
+  await validateOwnerRoutineExercises(request)
   const id = randomUUID()
   const routineCode = `owner:${randomUUID()}`
   await sql.transaction(ownerRoutineQueries(sql, { id, routineCode, version: '1', request }))
@@ -262,7 +262,7 @@ export async function createOwnerRoutine(body: unknown): Promise<{ template: Wor
 export async function reviseOwnerRoutine(templateId: string, body: unknown): Promise<{ template: WorkoutTemplate }> {
   const request = parseOwnerRoutine(body)
   const sql = await getSql()
-  await validateOwnerRoutineExercises(sql, request)
+  await validateOwnerRoutineExercises(request)
   const currentRows = (await sql.query(
     `SELECT id::text AS id, routine_code, version, origin_kind, is_active
      FROM workout_templates WHERE id = $1::uuid LIMIT 1`,
