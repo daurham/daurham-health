@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { ARM_CADENCE_KEYS, FULL_CIRCUMFERENCE_KEYS, MANUAL_BODY_METRICS } from '@/domain/body-manual'
+import { healthCalendarDateFromNow } from '@/domain/time'
 import type { BodyCadenceItem } from './api'
 import { quietButtonClass, secondaryButtonClass } from '@/lib'
 
@@ -23,8 +24,16 @@ export function CadencePanel({
   const [drafts, setDrafts] = useState<Record<string, string>>({})
   const [error, setError] = useState<string | null>(null)
   const [expanded, setExpanded] = useState(false)
-  const attention = items.filter((item) => item.status !== 'current')
+  const today = healthCalendarDateFromNow()
+  const attention = items.filter((item) => item.status !== 'current' && item.dueDate <= today)
+  const overdueCount = attention.filter((item) => item.daysOverdue > 0).length
   const activeCount = items.length
+  const nextDue =
+    items
+      .filter((item) => item.dueDate > today)
+      .slice()
+      .sort((left, right) => left.dueDate.localeCompare(right.dueDate))[0]?.dueDate ?? null
+  const attentionKeys = new Set(attention.map((item) => item.metricKey))
 
   async function run(action: () => Promise<void>) {
     setError(null)
@@ -46,13 +55,17 @@ export function CadencePanel({
           <div>
             <p className={attention.length > 0 ? 'font-semibold text-amber-800' : 'font-medium text-zinc-900'}>
               {attention.length > 0
-                ? `${attention.length} measurement${attention.length === 1 ? '' : 's'} need attention`
+                ? `${attention.length} measurement${attention.length === 1 ? '' : 's'} due${overdueCount > 0 ? ` · ${overdueCount} overdue` : ''}`
                 : activeCount > 0
                   ? 'Measurements are current'
                   : 'No measurement schedule configured'}
             </p>
             <p className="mt-0.5 text-xs text-zinc-500">
-              {activeCount > 0 ? `${activeCount} scheduled metric${activeCount === 1 ? '' : 's'}` : 'Turn on a cadence below when you are ready.'}
+              {activeCount === 0
+                ? 'Turn on a cadence below when you are ready.'
+                : nextDue
+                  ? `${activeCount} scheduled metric${activeCount === 1 ? '' : 's'} · next due ${nextDue}`
+                  : `${activeCount} scheduled metric${activeCount === 1 ? '' : 's'}`}
             </p>
           </div>
           <button type="button" className={quietButtonClass} onClick={() => setExpanded((value) => !value)}>
@@ -89,11 +102,11 @@ export function CadencePanel({
           return (
             <li
               key={definition.key}
-              className={`flex flex-wrap items-center justify-between gap-3 px-3 py-2 ${current && current.status !== 'current' ? 'bg-amber-50/70' : ''}`}
+              className={`flex flex-wrap items-center justify-between gap-3 px-3 py-2 ${current && attentionKeys.has(current.metricKey) ? 'bg-amber-50/70' : ''}`}
             >
               <div>
                 <p className="font-medium">{definition.label}</p>
-                <p className={current && current.status !== 'current' ? 'text-xs font-semibold text-amber-800' : 'text-xs text-zinc-500'}>
+                <p className={current && attentionKeys.has(current.metricKey) ? 'text-xs font-semibold text-amber-800' : 'text-xs text-zinc-500'}>
                   {current ? statusText(current) : 'Off'}
                 </p>
               </div>
