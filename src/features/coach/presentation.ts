@@ -39,6 +39,13 @@ export function selectPrimaryCoachTask(state: CoachState, acknowledgedStretchId:
 
 export function formatStretchValue(task: CoachTaskView, value: number | null): string {
   if (value == null) return 'No qualifying attempt yet'
+  if (task.targetUnit === 'sec/mi') {
+    const rounded = Math.round(value)
+    return `${Math.floor(rounded / 60)}:${String(rounded % 60).padStart(2, '0')}/mi`
+  }
+  if (task.targetUnit === 'mi') {
+    return `${value.toLocaleString('en-US', { maximumFractionDigits: 2 })} mi`
+  }
   const formatted = value.toLocaleString('en-US', { maximumFractionDigits: task.targetUnit === 'lb' ? 1 : 0 })
   return `${formatted} ${task.targetUnit === 'lb' ? 'lb e1RM' : task.targetUnit === 'sec' ? 'sec' : 'reps'}`
 }
