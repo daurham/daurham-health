@@ -410,6 +410,7 @@ export function manualRuleByKey(ruleKey: string): GeneralCoachRule | null {
 }
 
 export const coachTrainingLogSchema = z.object({
+  submissionId: z.string().uuid(),
   actualValue: z.number().positive(),
   distance: z.number().positive().nullable().optional(),
   distanceUnit: z.enum(['mi', 'km']).nullable().optional(),
@@ -417,6 +418,7 @@ export const coachTrainingLogSchema = z.object({
 })
 
 export const coachSelfReportSchema = z.object({
+  submissionId: z.string().uuid(),
   durationMin: z.number().positive().max(1440).nullable().optional(),
   note: z.string().trim().max(500).nullable().optional(),
   description: z.string().trim().max(160).nullable().optional(),
