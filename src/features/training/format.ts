@@ -1,5 +1,5 @@
 import { formatCompactCalendarDate } from '@/domain/calendar-format'
-import { kilogramsToPounds } from '@/domain/units'
+import { kilogramsToPounds, metersToMiles, secondsPerMile } from '@/domain/units'
 import type { LoadState, TemplatePrescription } from '@/domain/training'
 import { formatPrescription } from '@/domain/training'
 
@@ -33,6 +33,11 @@ export function formatLoad(loadState: LoadState, weightKg: number | null): strin
   return `${formatPounds(weightKg)} lb`
 }
 
+export function formatPaceSecondsPerMile(value: number): string {
+  const rounded = Math.round(value)
+  return `${Math.floor(rounded / 60)}:${String(rounded % 60).padStart(2, '0')}/mi`
+}
+
 export function formatSetPerformance(input: {
   reps: number | null
   durationSec: number | null
@@ -40,7 +45,21 @@ export function formatSetPerformance(input: {
   rightReps: number | null
   leftDurationSec: number | null
   rightDurationSec: number | null
+  distanceM?: number | null
+  completed?: boolean | null
 }): string {
+  if (input.completed != null) {
+    return input.completed ? 'Achieved' : 'Not yet'
+  }
+  if (input.distanceM != null) {
+    const miles = metersToMiles(input.distanceM)
+    const distance = `${miles.toLocaleString('en-US', { maximumFractionDigits: 2 })} mi`
+    if (input.durationSec != null && input.durationSec > 0) {
+      const pace = secondsPerMile(input.distanceM, input.durationSec)
+      return pace == null ? `${distance} · ${input.durationSec}s` : `${distance} · ${input.durationSec}s · ${formatPaceSecondsPerMile(pace)}`
+    }
+    return distance
+  }
   if (input.reps != null) {
     return `${input.reps}`
   }
