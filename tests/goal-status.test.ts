@@ -42,6 +42,7 @@ function evidence(current: number | null, partial: Partial<GoalEvidence> = {}): 
     difference: null,
     relation: null,
     provisional: null,
+    strengthSource: null,
     coverage: null,
     ...partial,
   }
