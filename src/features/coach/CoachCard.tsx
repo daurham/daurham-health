@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom'
 import type { CoachState, CoachTaskView } from '@/domain/coach'
 import type { CoachLabItem } from '@/domain/coach-lab'
 import { primaryButtonClass, quietButtonClass } from '@/lib'
+import { metersToMiles } from '@/domain/units'
 import { prefixedPath, useAppPathPrefix } from '@/lib/app-prefix'
 import { CoachDialog } from './CoachDialog'
 import { acceptCoachTask, CoachApiError, endCoachTask, fetchCoach, logCoachSelfReport, logCoachTraining, passCoachTask, snoozeCoachLabItem } from './api'
@@ -221,7 +222,12 @@ function StretchContent({ task, actions }: { task: CoachTaskView; actions: Coach
     : null
   const isStrength = metadata?.strategy === 'strength_e1rm'
   const best = task.progress?.current ?? null
-  const newPr = task.status === 'active' && best != null && task.baselineValue != null && best > task.baselineValue
+  const lowerIsBetter = metadata?.strategy === 'pace'
+  const newPr = task.status === 'active' && best != null && task.baselineValue != null &&
+    (lowerIsBetter ? best < task.baselineValue : best > task.baselineValue)
+  const paceMinimumDistanceM = metadata?.strategy === 'pace' && metadata.baseline && typeof metadata.baseline === 'object'
+    ? Number(((metadata.baseline as Record<string, unknown>).evidence as Record<string, unknown> | undefined)?.distanceM)
+    : Number.NaN
   const completed = task.status === 'completed'
   if (task.status !== 'active' && task.status !== 'offered' && !completed) return <StretchSummary task={task} />
   return (
@@ -240,6 +246,9 @@ function StretchContent({ task, actions }: { task: CoachTaskView; actions: Coach
         </>
       ) : (
         <>
+          {metadata?.strategy === 'pace' && Number.isFinite(paceMinimumDistanceM) && paceMinimumDistanceM > 0
+            ? <p className="mt-2 text-xs text-zinc-500">Minimum continuous distance {metersToMiles(paceMinimumDistanceM).toFixed(2)} mi</p>
+            : null}
           {newPr ? <p className="mt-2 text-sm text-zinc-600">Quest not conquered yet.</p> : null}
           <p className="mt-2 text-xs text-zinc-500">{task.status === 'offered' ? 'Offer expires' : 'Challenge ends'} {coachDateLabel(task.expiresOn)} · {task.status === 'offered' ? '7 days to attempt after acceptance' : 'Verified by Training'}</p>
           {task.status === 'offered' ? (
