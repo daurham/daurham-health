@@ -574,7 +574,7 @@ function unitFor(kind: GoalKind, selector: GoalSelector, context: GoalValidation
     if (!context.exercise.active) return fail('That exercise is archived.')
     return 'lb'
   }
-  if (kind.startsWith('training_')) {
+  if (kind === 'training_reps' || kind === 'training_duration' || kind === 'training_distance' || kind === 'training_pace' || kind === 'training_skill') {
     const exercise = context.exercise
     if (!exercise || exercise.id !== selector.exerciseDefinitionId) return fail('Choose an exercise.')
     if (!exercise.active) return fail('That exercise is archived.')
