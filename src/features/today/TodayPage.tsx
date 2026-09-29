@@ -296,9 +296,13 @@ function SupplementsCard({ view, onChanged }: { view: TodayViewModel; onChanged?
   const [items, setItems] = useState(supplements?.items ?? [])
   const [error, setError] = useState<string | null>(null)
   const [pendingId, setPendingId] = useState<string | null>(null)
+  const [expanded, setExpanded] = useState(true)
 
   useEffect(() => {
-    setItems(supplements?.items ?? [])
+    const nextItems = supplements?.items ?? []
+    setItems(nextItems)
+    const nextCounts = aggregateOccurrenceStates(nextItems.map((item) => item.state))
+    setExpanded(nextCounts.unknownCount > 0 || nextCounts.scheduledCount === 0)
   }, [supplements])
 
   if (!supplements) {
@@ -308,6 +312,11 @@ function SupplementsCard({ view, onChanged }: { view: TodayViewModel; onChanged?
   const counts = aggregateOccurrenceStates(items.map((item) => item.state))
   const summary = supplementDaySummary(counts)
   const summaryText = supplementSummaryText(summary)
+  const resolved = counts.scheduledCount > 0 && counts.unknownCount === 0
+  const resolvedText =
+    counts.skippedCount > 0
+      ? `${counts.takenCount} taken · ${counts.skippedCount} skipped`
+      : `✓ ${counts.takenCount}/${counts.scheduledCount} complete`
 
   async function record(item: TodaySupplementItem, action: 'taken' | 'skipped' | 'clear') {
     const previous = items
@@ -337,77 +346,98 @@ function SupplementsCard({ view, onChanged }: { view: TodayViewModel; onChanged?
   }
 
   return (
-    <section className="min-w-0 rounded-lg border border-zinc-200 bg-white p-4">
-      <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Supplements</h2>
-        <p className="text-sm text-zinc-600">{summary.kind === 'complete' ? `✓ ${summaryText}` : summaryText}</p>
-      </div>
-      {items.length === 0 ? (
-        <p className="mt-2 text-sm text-zinc-800">Nothing scheduled today</p>
-      ) : (
-        <ul className="mt-2 space-y-1">
-          {items.map((item) => (
-            <li key={item.scheduleId} className="flex items-center gap-2" data-state={item.state}>
-              {readOnly ? (
-                <span className="inline-flex min-h-11 min-w-11 items-center justify-center text-lg" aria-hidden="true">
-                  {item.state === 'taken' ? '☑' : '☐'}
-                </span>
-              ) : (
-                <label className="inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center">
-                  <input
-                    type="checkbox"
-                    className="h-6 w-6"
-                    checked={item.state === 'taken'}
-                    disabled={pendingId === item.scheduleId}
-                    aria-label={item.state === 'taken' ? `Clear ${item.name}` : `Mark ${item.name} taken`}
-                    onChange={() => {
-                      void record(item, checkboxAdherenceAction(item.state))
-                    }}
-                  />
-                </label>
-              )}
-              <div className="min-w-0 flex-1">
-                <p className={item.state === 'skipped' ? 'text-sm text-zinc-500' : 'text-sm text-zinc-900'}>
-                  {item.name}
-                  {item.slotLabel ? <span className="text-zinc-500"> · {item.slotLabel}</span> : null}
-                </p>
-                {item.state === 'skipped' ? <p className="text-sm text-zinc-500">Skipped</p> : null}
-              </div>
-              <p className="shrink-0 text-sm text-zinc-700">{shownDose(item)}</p>
-              {readOnly ? null : item.state === 'unknown' ? (
-                <button
-                  type="button"
-                  className={quietButtonClass}
-                  disabled={pendingId === item.scheduleId}
-                  onClick={() => {
-                    void record(item, 'skipped')
-                  }}
-                >
-                  Skip
-                </button>
-              ) : null}
-              {readOnly ? null : item.state === 'skipped' ? (
-                <button
-                  type="button"
-                  className={quietButtonClass}
-                  disabled={pendingId === item.scheduleId}
-                  onClick={() => {
-                    void record(item, 'clear')
-                  }}
-                >
-                  Clear
-                </button>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      )}
-      {error ? <p className="mt-2 text-sm text-red-700">{error}</p> : null}
-      {readOnly ? null : (
-        <div className="mt-2">
-          <QuietAction to="/supplements">Manage</QuietAction>
+    <section className="motion-interactive min-w-0 rounded-lg border border-zinc-200 bg-white p-4" data-resolved={resolved}>
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Supplements</h2>
+          <p className={resolved && counts.skippedCount === 0 ? 'mt-1 text-sm font-medium text-success' : 'mt-1 text-sm text-zinc-600'}>
+            {resolved ? resolvedText : summary.kind === 'complete' ? `✓ ${summaryText}` : summaryText}
+          </p>
         </div>
-      )}
+        {resolved ? (
+          <button
+            type="button"
+            className={quietButtonClass}
+            aria-expanded={expanded}
+            onClick={() => setExpanded((value) => !value)}
+          >
+            {expanded ? 'Collapse' : 'Review'}
+          </button>
+        ) : null}
+      </div>
+
+      {expanded ? (
+        <div className="motion-panel-enter">
+          {items.length === 0 ? (
+            <p className="mt-2 text-sm text-zinc-800">Nothing scheduled today</p>
+          ) : (
+            <ul className="mt-2 space-y-1">
+              {items.map((item) => (
+                <li key={item.scheduleId} className="flex items-center gap-2" data-state={item.state}>
+                  {readOnly ? (
+                    <span className="inline-flex min-h-11 min-w-11 items-center justify-center text-lg" aria-hidden="true">
+                      {item.state === 'taken' ? '☑' : '☐'}
+                    </span>
+                  ) : (
+                    <label className="inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center">
+                      <input
+                        type="checkbox"
+                        className="h-6 w-6"
+                        checked={item.state === 'taken'}
+                        disabled={pendingId === item.scheduleId}
+                        aria-label={item.state === 'taken' ? `Clear ${item.name}` : `Mark ${item.name} taken`}
+                        onChange={() => {
+                          void record(item, checkboxAdherenceAction(item.state))
+                        }}
+                      />
+                    </label>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className={item.state === 'skipped' ? 'text-sm text-zinc-500' : 'text-sm text-zinc-900'}>
+                      {item.name}
+                      {item.slotLabel ? <span className="text-zinc-500"> · {item.slotLabel}</span> : null}
+                    </p>
+                    {item.state === 'skipped' ? <p className="text-sm text-zinc-500">Skipped</p> : null}
+                  </div>
+                  <p className="shrink-0 text-sm text-zinc-700">{shownDose(item)}</p>
+                  {readOnly ? null : item.state === 'unknown' ? (
+                    <button
+                      type="button"
+                      className={quietButtonClass}
+                      disabled={pendingId === item.scheduleId}
+                      onClick={() => {
+                        void record(item, 'skipped')
+                      }}
+                    >
+                      Skip
+                    </button>
+                  ) : null}
+                  {readOnly ? null : item.state === 'skipped' ? (
+                    <button
+                      type="button"
+                      className={quietButtonClass}
+                      disabled={pendingId === item.scheduleId}
+                      onClick={() => {
+                        void record(item, 'clear')
+                      }}
+                    >
+                      Clear
+                    </button>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
+          {error ? <p className="mt-2 text-sm text-red-700">{error}</p> : null}
+          {readOnly ? null : (
+            <div className="mt-2">
+              <QuietAction to="/supplements">Manage</QuietAction>
+            </div>
+          )}
+        </div>
+      ) : error ? (
+        <p className="mt-2 text-sm text-red-700">{error}</p>
+      ) : null}
     </section>
   )
 }
