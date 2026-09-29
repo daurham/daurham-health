@@ -94,6 +94,10 @@ export function createGoal(body: unknown): Promise<GoalView> {
   return send('/api/goals', 'POST', body)
 }
 
+export function removeGoal(id: string): Promise<{ ok: true }> {
+  return send(`/api/goals/${id}`, 'DELETE')
+}
+
 export function reviseGoal(id: string, body: unknown): Promise<GoalView> {
   return send(`/api/goals/${id}/versions`, 'POST', body)
 }
