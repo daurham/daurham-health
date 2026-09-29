@@ -104,7 +104,10 @@ export function TodayPage() {
               coach={coach}
               coachPending={coachPending}
               coachError={coachError}
-              onCoachState={setCoach}
+              onCoachState={(next) => {
+                setCoach(next)
+                resource.retry()
+              }}
             />
           ) : (
             <div className="h-64 animate-pulse rounded-lg bg-zinc-200" aria-busy="true" aria-label="Loading today" />
