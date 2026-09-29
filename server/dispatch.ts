@@ -301,6 +301,9 @@ export function matchHealthApiRoute(pathname: string): HealthApiRoute | null {
   if (isSingleSegmentAfter(pathname, '/api/training/exercises/')) {
     return 'training-exercises'
   }
+  if (isSingleSegmentAfter(pathname, '/api/training/templates/')) {
+    return 'training-templates'
+  }
   if (isSingleSegmentAfter(pathname, '/api/training/sessions/')) {
     return 'training-session-detail'
   }
