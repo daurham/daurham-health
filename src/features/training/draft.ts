@@ -78,6 +78,9 @@ export function emptyDraftSet(setNumber: number): DraftSet {
     rightReps: '',
     leftDurationSec: '',
     rightDurationSec: '',
+    distance: '',
+    distanceUnit: 'mi',
+    completed: null,
     notes: '',
     transcribedLoadState: 'external',
     transcribedWeightLb: '',
@@ -129,7 +132,14 @@ export function draftFromTemplate(template: WorkoutTemplate, now = new Date()): 
       plannedSets: slot.plannedSets,
       prescription: slot.prescription,
       notes: '',
-      sets: Array.from({ length: slot.plannedSets ?? 1 }, (_, index) => emptyDraftSet(index + 1)),
+      sets: Array.from({ length: slot.plannedSets ?? 1 }, (_, index) => {
+        const set = emptyDraftSet(index + 1)
+        if (['distance', 'distance_duration', 'completion'].includes(slot.exercise.measurementKind)) {
+          set.loadState = 'bodyweight'
+          set.transcribedLoadState = 'bodyweight'
+        }
+        return set
+      }),
     })),
   }
 }
@@ -250,6 +260,11 @@ export function draftExerciseFromDefinition(exercise: {
   name: string
   measurementKind: MeasurementKind
 }): DraftExercise {
+  const initial = emptyDraftSet(1)
+  if (exercise.measurementKind === 'distance' || exercise.measurementKind === 'distance_duration' || exercise.measurementKind === 'completion') {
+    initial.loadState = 'bodyweight'
+    initial.transcribedLoadState = 'bodyweight'
+  }
   return {
     exerciseDefinitionId: exercise.id,
     slotId: null,
@@ -258,7 +273,7 @@ export function draftExerciseFromDefinition(exercise: {
     plannedSets: null,
     prescription: { measurement: exercise.measurementKind },
     notes: '',
-    sets: [emptyDraftSet(1)],
+    sets: [initial],
   }
 }
 
@@ -283,9 +298,15 @@ export function draftFromSession(session: WorkoutSession, template: WorkoutTempl
           ? 'duration_per_side'
           : exercise.sets.some((set) => set.leftReps != null || set.rightReps != null)
             ? 'reps_per_side'
-            : exercise.sets.some((set) => set.durationSec != null)
-              ? 'duration'
-              : 'reps'),
+            : exercise.sets.some((set) => set.completed != null)
+              ? 'completion'
+              : exercise.sets.some((set) => set.distanceM != null && set.durationSec != null)
+                ? 'distance_duration'
+                : exercise.sets.some((set) => set.distanceM != null)
+                  ? 'distance'
+                  : exercise.sets.some((set) => set.durationSec != null)
+                    ? 'duration'
+                    : 'reps'),
       plannedSets: template?.exercises.find((slot) => slot.slotId === exercise.slotId)?.plannedSets ?? exercise.sets.length,
       prescription: template?.exercises.find((slot) => slot.slotId === exercise.slotId)?.prescription ?? { measurement: 'reps' },
       notes: exercise.notes ?? '',
@@ -300,6 +321,9 @@ export function draftFromSession(session: WorkoutSession, template: WorkoutTempl
         rightReps: numberField(set.rightReps),
         leftDurationSec: numberField(set.leftDurationSec),
         rightDurationSec: numberField(set.rightDurationSec),
+        distance: set.distanceM == null ? '' : String(Math.round((set.distanceM / 1609.344) * 100) / 100),
+        distanceUnit: 'mi',
+        completed: set.completed,
         notes: set.notes ?? '',
         transcribedLoadState: set.loadState,
         transcribedWeightLb: set.weightKg == null ? '' : String(Math.round(kilogramsToPounds(set.weightKg) * 10) / 10),
