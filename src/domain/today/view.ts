@@ -392,7 +392,7 @@ export function buildTodayView(sources: TodaySources): TodayViewModel {
             carbs: target.carbsTarget,
             fat: target.fatTarget,
             fiber: target.fiberTarget,
-            sodium: target.sodiumTarget,
+            sodium: target.sodiumTarget ?? null,
           }
         : null,
     },
