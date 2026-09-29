@@ -28,6 +28,7 @@ export type NutritionFood = {
   carbs: number | null
   fat: number | null
   fiber: number | null
+  sodium: number | null
   sourceKind: NutritionFoodSourceKind
   isStaple: boolean
   archived: boolean
@@ -53,6 +54,7 @@ export type NutritionEntry = {
   carbs: number | null
   fat: number | null
   fiber: number | null
+  sodium: number | null
   sourceKind: NutritionSourceKind
   notes: string | null
   mealGroupId: string | null
@@ -74,6 +76,7 @@ export type NutritionTarget = {
   carbsTarget: number | null
   fatTarget: number | null
   fiberTarget: number | null
+  sodiumTarget: number | null
   createdAt: string
   updatedAt: string
 }
@@ -165,6 +168,7 @@ export const nutritionFoodCreateSchema = z.object({
   carbs: optionalFinite('carbs').optional(),
   fat: optionalFinite('fat').optional(),
   fiber: optionalFinite('fiber').optional(),
+  sodium: optionalFinite('sodium').optional(),
   sourceKind: foodSourceKindSchema.optional().default('manual'),
   isStaple: z.boolean().optional().default(false),
   notes: optionalTrimmed(NUTRITION_CONFIG.notesMax).optional(),
@@ -183,6 +187,7 @@ export const nutritionFoodPatchSchema = z
     carbs: optionalFinite('carbs').optional(),
     fat: optionalFinite('fat').optional(),
     fiber: optionalFinite('fiber').optional(),
+  sodium: optionalFinite('sodium').optional(),
     isStaple: z.boolean().optional(),
     archived: z.boolean().optional(),
     notes: optionalTrimmed(NUTRITION_CONFIG.notesMax).optional(),
@@ -226,6 +231,7 @@ export const nutritionEntryCreateSchema = z.object({
   carbs: optionalFinite('carbs').optional().default(null),
   fat: optionalFinite('fat').optional().default(null),
   fiber: optionalFinite('fiber').optional().default(null),
+  sodium: optionalFinite('sodium').optional().default(null),
   sourceKind: sourceKindSchema.optional().default('manual'),
   notes: optionalTrimmed(NUTRITION_CONFIG.notesMax).optional(),
 }).refine((value) => value.calories != null || value.foodId != null, {
@@ -255,6 +261,7 @@ export const nutritionEntryPatchSchema = z
     carbs: optionalFinite('carbs').optional(),
     fat: optionalFinite('fat').optional(),
     fiber: optionalFinite('fiber').optional(),
+  sodium: optionalFinite('sodium').optional(),
     notes: optionalTrimmed(NUTRITION_CONFIG.notesMax).optional(),
   })
   .refine((value) => Object.values(value).some((item) => item !== undefined), {
@@ -297,6 +304,7 @@ export const nutritionTargetCreateSchema = z.object({
   carbsTarget: optionalFinite('carbsTarget').optional().default(null),
   fatTarget: optionalFinite('fatTarget').optional().default(null),
   fiberTarget: optionalFinite('fiberTarget').optional().default(null),
+  sodiumTarget: optionalFinite('sodiumTarget').optional().default(null),
 })
 
 export type NutritionTargetCreate = z.input<typeof nutritionTargetCreateSchema>
