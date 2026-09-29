@@ -246,7 +246,7 @@ describe('sleep personal baselines', () => {
     expect(next.baselineMedian).not.toBe(first.baselineMedian)
     expect(next.deviation).toBe(397 - 410)
     expect(readFileSync('src/domain/sleep/baseline.ts', 'utf8')).not.toMatch(/INSERT|UPDATE|sleep_baselines|sleep_deviations/)
-    expect(LATEST_SCHEMA_MIGRATION).toBe('0034_nutrition_micros_goal_archive.sql')
+    expect(LATEST_SCHEMA_MIGRATION).toBe('0035_coach_tasks.sql')
     expect(readFileSync('server/backup/inventory.ts', 'utf8')).not.toContain('sleep_baselines')
     expect(readFileSync('server/backup/format.ts', 'utf8')).not.toContain('sleep_baselines')
   })
