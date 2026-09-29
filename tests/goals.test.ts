@@ -91,6 +91,34 @@ describe('goal creation', () => {
     }
   })
 
+  it('validates Training performance Goal kinds against canonical exercise semantics', () => {
+    const repsContext = context({ exercise: { id: EXERCISE, name: 'Push-up', active: true, measurementKind: 'reps', performanceType: 'bodyweight_reps', analyticsLoadType: 'bodyweight' } })
+    expect(validateGoalCreate(base('training_reps', { exerciseDefinitionId: EXERCISE, targetMin: 40 }), repsContext)).toMatchObject({ targetUnit: 'reps', trainingMinDistanceM: null })
+    expect(validateGoalCreate(base('training_reps', { exerciseDefinitionId: EXERCISE, targetMin: 40.5 }), repsContext)).toEqual({ error: 'A reps target must be a whole number.' })
+
+    const durationContext = context({ exercise: { id: EXERCISE, name: 'Plank', active: true, measurementKind: 'duration', performanceType: 'timed', analyticsLoadType: 'none' } })
+    expect(validateGoalCreate(base('training_duration', { exerciseDefinitionId: EXERCISE, targetMin: 120 }), durationContext)).toMatchObject({ targetUnit: 'sec' })
+
+    const distanceContext = context({ exercise: { id: EXERCISE, name: 'Run', active: true, measurementKind: 'distance_duration', performanceType: 'distance', analyticsLoadType: 'none' } })
+    expect(validateGoalCreate(base('training_distance', { exerciseDefinitionId: EXERCISE, targetMin: 3.1 }), distanceContext)).toMatchObject({ targetUnit: 'mi' })
+    expect(validateGoalCreate(base('training_pace', {
+      exerciseDefinitionId: EXERCISE, trainingMinDistanceM: 3218.688,
+      targetMode: 'at_most', targetMin: null, targetMax: 600,
+    }), distanceContext)).toMatchObject({ targetUnit: 'sec/mi', trainingMinDistanceM: 3218.688 })
+    expect(validateGoalCreate(base('training_pace', {
+      exerciseDefinitionId: EXERCISE, targetMode: 'at_most', targetMin: null, targetMax: 600,
+    }), distanceContext)).toEqual({ error: 'A pace goal needs a positive minimum distance.' })
+
+    const skillContext = context({ exercise: { id: EXERCISE, name: 'Handstand', active: true, measurementKind: 'completion', performanceType: 'skill', analyticsLoadType: 'none' } })
+    expect(validateGoalCreate(base('training_skill', { exerciseDefinitionId: EXERCISE, targetMin: 1 }), skillContext)).toMatchObject({ targetUnit: 'completion', targetMin: 1 })
+    expect(validateGoalCreate(base('training_skill', { exerciseDefinitionId: EXERCISE, targetMin: 2 }), skillContext)).toEqual({ error: 'A skill goal target is one completed milestone.' })
+
+    const strengthContext = context({ exercise: { id: EXERCISE, name: 'Bench', active: true, measurementKind: 'reps', performanceType: 'loaded_reps', analyticsLoadType: 'external' } })
+    expect(validateGoalCreate(base('training_reps', { exerciseDefinitionId: EXERCISE, targetMin: 10 }), strengthContext)).toEqual({
+      error: 'Choose an exercise where reps alone are the performance measure.',
+    })
+  })
+
   it('rejects the wrong selector for a kind and writes no target', () => {
     expect(validateGoalCreate(base('body_metric', { bodyMetricKey: 'weight', exerciseDefinitionId: EXERCISE, targetMode: 'at_most', targetMin: null, targetMax: 175 }), context())).toEqual({
       error: 'A body goal uses only its body metric.',
