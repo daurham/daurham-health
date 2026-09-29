@@ -33,6 +33,8 @@ export type RecipeBasisView = {
   proteinG: number | null
   carbsG: number | null
   fatG: number | null
+  fiberG: number | null
+  sodiumMg: number | null
 }
 
 export type RecipeVersionSnapshot = {
@@ -194,6 +196,8 @@ export function previewRecipeVersion(input: {
         proteinG: candidate.proteinG,
         carbsG: candidate.carbsG,
         fatG: candidate.fatG,
+        fiberG: candidate.fiberG,
+        sodiumMg: candidate.sodiumMg,
         ingredients: candidate.ingredients.map((line) => ({
           foodId: line.foodId,
           amount: line.amount,
@@ -206,10 +210,14 @@ export function previewRecipeVersion(input: {
           protein: line.baseProteinGSnapshot,
           carbs: line.baseCarbsGSnapshot,
           fat: line.baseFatGSnapshot,
+          fiber: line.baseFiberGSnapshot,
+          sodiumMg: line.baseSodiumMgSnapshot,
           lineCaloriesKcal: line.lineCaloriesKcal,
           lineProteinG: line.lineProteinG,
           lineCarbsG: line.lineCarbsG,
           lineFatG: line.lineFatG,
+          lineFiberG: line.lineFiberG,
+          lineSodiumMg: line.lineSodiumMg,
         })),
       })
     : null
@@ -230,6 +238,8 @@ export function previewRecipeVersion(input: {
       proteinG: delta(currentWhole.proteinG, candidateWhole?.proteinG ?? null),
       carbsG: delta(currentWhole.carbsG, candidateWhole?.carbsG ?? null),
       fatG: delta(currentWhole.fatG, candidateWhole?.fatG ?? null),
+      fiberG: delta(currentWhole.fiberG, candidateWhole?.fiberG ?? null),
+      sodiumMg: delta(currentWhole.sodiumMg, candidateWhole?.sodiumMg ?? null),
     },
     warnings,
     canCommit: status === 'ready' && fingerprint != null,
@@ -250,6 +260,8 @@ export function recipePreviewFingerprint(value: {
   proteinG: number | null
   carbsG: number | null
   fatG: number | null
+  fiberG: number | null
+  sodiumMg: number | null
   ingredients: Array<{
     foodId: string | null
     amount: number
@@ -262,10 +274,14 @@ export function recipePreviewFingerprint(value: {
     protein: number | null
     carbs: number | null
     fat: number | null
+    fiber: number | null
+    sodiumMg: number | null
     lineCaloriesKcal: number
     lineProteinG: number | null
     lineCarbsG: number | null
     lineFatG: number | null
+    lineFiberG: number | null
+    lineSodiumMg: number | null
   }>
 }): string {
   return JSON.stringify([
@@ -280,6 +296,8 @@ export function recipePreviewFingerprint(value: {
     value.proteinG,
     value.carbsG,
     value.fatG,
+    value.fiberG,
+    value.sodiumMg,
     value.ingredients.map((line) => [
       line.foodId,
       line.amount,
@@ -292,10 +310,14 @@ export function recipePreviewFingerprint(value: {
       line.protein,
       line.carbs,
       line.fat,
+      line.fiber,
+      line.sodiumMg,
       line.lineCaloriesKcal,
       line.lineProteinG,
       line.lineCarbsG,
       line.lineFatG,
+      line.lineFiberG,
+      line.lineSodiumMg,
     ]),
   ])
 }
@@ -443,6 +465,8 @@ function basisFromLine(line: RecipeLine): RecipeBasisView {
     proteinG: line.baseProteinGSnapshot,
     carbsG: line.baseCarbsGSnapshot,
     fatG: line.baseFatGSnapshot,
+    fiberG: line.baseFiberGSnapshot,
+    sodiumMg: line.baseSodiumMgSnapshot,
   }
 }
 
@@ -456,6 +480,8 @@ function basisFromFood(food: RecipeFoodBasis): RecipeBasisView {
     proteinG: food.protein,
     carbsG: food.carbs,
     fatG: food.fat,
+    fiberG: food.fiber,
+    sodiumMg: food.sodiumMg,
   }
 }
 
@@ -469,6 +495,8 @@ function emptyBasis(name: string): RecipeBasisView {
     proteinG: null,
     carbsG: null,
     fatG: null,
+    fiberG: null,
+    sodiumMg: null,
   }
 }
 
@@ -481,12 +509,14 @@ function sameBasis(left: RecipeBasisView, right: RecipeBasisView): boolean {
     sameQuantity(left.caloriesKcal, right.caloriesKcal) &&
     sameQuantity(left.proteinG, right.proteinG) &&
     sameQuantity(left.carbsG, right.carbsG) &&
-    sameQuantity(left.fatG, right.fatG)
+    sameQuantity(left.fatG, right.fatG) &&
+    sameQuantity(left.fiberG, right.fiberG) &&
+    sameQuantity(left.sodiumMg, right.sodiumMg)
   )
 }
 
-function nutritionOf(value: { caloriesKcal: number; proteinG: number | null; carbsG: number | null; fatG: number | null }): RecipeNutrition {
-  return { caloriesKcal: value.caloriesKcal, proteinG: value.proteinG, carbsG: value.carbsG, fatG: value.fatG }
+function nutritionOf(value: { caloriesKcal: number; proteinG: number | null; carbsG: number | null; fatG: number | null; fiberG: number | null; sodiumMg: number | null }): RecipeNutrition {
+  return { caloriesKcal: value.caloriesKcal, proteinG: value.proteinG, carbsG: value.carbsG, fatG: value.fatG, fiberG: value.fiberG, sodiumMg: value.sodiumMg }
 }
 
 function delta(current: number | null, next: number | null): number | null {
@@ -499,7 +529,7 @@ function sameQuantity(left: number | null, right: number | null): boolean {
   return left === right
 }
 
-const FORBIDDEN = ['calories', 'protein', 'carbs', 'fat', 'scaleFactor', 'caloriesKcal', 'proteinG', 'carbsG', 'fatG']
+const FORBIDDEN = ['calories', 'protein', 'carbs', 'fat', 'fiber', 'sodium', 'sodiumMg', 'scaleFactor', 'caloriesKcal', 'proteinG', 'carbsG', 'fatG', 'fiberG']
 
 function forbiddenRecipeKey(record: Record<string, unknown>): boolean {
   return FORBIDDEN.some((key) => key in record)
