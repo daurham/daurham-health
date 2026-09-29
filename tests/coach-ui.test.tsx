@@ -77,7 +77,7 @@ describe('Today Coach UI', () => {
     )
     expect(html).toContain('Focus this week')
     expect(html).toContain('Complete 3 training sessions this week')
-    expect(html).toContain(&quot;Today&#x27;s quest&quot;)
+    expect(html).toContain("Today&#x27;s quest")
     expect(html).toContain('100 jumping jacks')
     expect(html).toContain('Logs to Training')
     expect(html).toContain('Log it')
