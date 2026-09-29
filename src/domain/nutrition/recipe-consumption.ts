@@ -29,6 +29,8 @@ export type ResolvedRecipePortion = {
   protein: number | null
   carbs: number | null
   fat: number | null
+  fiber: number | null
+  sodiumMg: number | null
   description: string
   servingQuantity: number
   servingUnit: string
@@ -112,6 +114,8 @@ export function resolveRecipePortion(
     protein: scaled.protein,
     carbs: scaled.carbs,
     fat: scaled.fat,
+    fiber: scaled.fiber,
+    sodiumMg: scaled.sodiumMg,
     description,
     servingQuantity: amount,
     servingUnit,
