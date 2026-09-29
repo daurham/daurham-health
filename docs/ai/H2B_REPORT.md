@@ -36,7 +36,7 @@ Documentation: `AGENTS.md`, `docs/ai/DEV_STATE.md`, `docs/ai/DECISIONS.md`, `doc
 
 ## Migration and ledger
 
-The exact new migration is `0036_stretch_quests.sql`; inventory/schema head is 36. It was applied only in disposable PostgreSQL 14 databases in Linux CI. The owner's production database was neither read nor mutated by H2B implementation. The owner had already applied `0035_coach_tasks.sql` before H2B began; only `0036_stretch_quests.sql` remains pending for the deployed H2B code.
+The exact new migration is `0036_stretch_quests.sql`; inventory/schema head is 36. H2B implementation itself applied it only in disposable PostgreSQL 14 databases in Linux CI. After review, the owner applied `0036_stretch_quests.sql` to production. Production is now at schema head 36.
 
 Existing `coach_tasks` gains `stretch_quest`, offered/failed statuses, nullable `accepted_at`, and the frozen stretch difficulty/reward band. Existing `coach_task_events` gains failed events. Constraints enforce Stretch acceptance/state coherence and prohibit Stretch-only fields/states on Daily/Weekly tasks. A partial unique index permits one offered/active Stretch. Existing Daily/Weekly indexes remain. No extra table or Vercel function was introduced.
 

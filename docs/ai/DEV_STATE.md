@@ -16,7 +16,7 @@ Snapshot recorded 2026-09-29 after **V2-H2B — Stretch Quests**, on top of V2-H
 - `coach_task_events` supports failed events. State changes and Stretch events are atomic and deduplicated by lifecycle key.
 - A partial unique index enforces one offered/active Stretch for the single owner.
 - Existing one-Daily-per-date and one-Weekly-per-week indexes remain unchanged.
-- The owner applied `0035_coach_tasks.sql` to production before H2B implementation began. H2B migration `0036_stretch_quests.sql` was applied only to disposable PostgreSQL 14 databases in Linux CI and is still pending in production.
+- The owner applied `0035_coach_tasks.sql` before H2B implementation and applied `0036_stretch_quests.sql` after H2B review. Production schema is now at migration head `0036_stretch_quests.sql`.
 - Backup and portable export include `accepted_at`, frozen metadata, every Stretch state, and exact completion history. No table was added to the inventory.
 
 ## Existing H2A behavior
