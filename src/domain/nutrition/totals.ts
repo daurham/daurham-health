@@ -15,6 +15,7 @@ export type NutritionDayTotals = {
   carbs: NutrientTotal
   fat: NutrientTotal
   fiber: NutrientTotal
+  sodium: NutrientTotal
 }
 
 export type NutritionTotable = {
@@ -23,6 +24,7 @@ export type NutritionTotable = {
   carbs: number | null
   fat: number | null
   fiber: number | null
+  sodium: number | null
 }
 
 /**
@@ -63,6 +65,7 @@ export function nutritionDayTotals(entries: readonly NutritionTotable[]): Nutrit
     carbs: totalFor(entries.map((entry) => entry.carbs)),
     fat: totalFor(entries.map((entry) => entry.fat)),
     fiber: totalFor(entries.map((entry) => entry.fiber)),
+    sodium: totalFor(entries.map((entry) => entry.sodium)),
   }
 }
 
