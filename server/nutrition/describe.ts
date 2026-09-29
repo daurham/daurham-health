@@ -28,6 +28,7 @@ export function descriptionEstimateFingerprint(input: {
   carbsGrams: number
   fatGrams: number
   fiberGrams: number | null
+  sodiumMg: number | null
 }): string {
   const body = JSON.stringify({
     text: input.text.trim().toLowerCase().replace(/\s+/g, ' '),
@@ -38,6 +39,7 @@ export function descriptionEstimateFingerprint(input: {
     carbsGrams: input.carbsGrams,
     fatGrams: input.fatGrams,
     fiberGrams: input.fiberGrams,
+    sodiumMg: input.sodiumMg,
   })
   return `nutrition-describe-estimate-v1|${createHash('sha256').update(body).digest('hex')}`
 }
@@ -93,6 +95,7 @@ export async function commitFoodDescription(body: unknown): Promise<{ entries: N
     carbsGrams: input.carbsGrams,
     fatGrams: input.fatGrams,
     fiberGrams: input.fiberGrams,
+    sodiumMg: input.sodiumMg,
   }
   const interpreted = input.items && input.items.length > 0
     ? sanitizeDescriptionEstimate({ name: input.name, items: input.items, original: input.text })
@@ -104,6 +107,7 @@ export async function commitFoodDescription(body: unknown): Promise<{ entries: N
         carbsGrams: interpreted.carbsGrams,
         fatGrams: interpreted.fatGrams,
         fiberGrams: interpreted.fiberGrams,
+        sodiumMg: interpreted.sodiumMg,
       }
     : reviewed
   const resolved = resolveEntryLogDate({
@@ -172,6 +176,7 @@ export async function commitFoodDescription(body: unknown): Promise<{ entries: N
     reviewed.carbsGrams,
     reviewed.fatGrams,
     reviewed.fiberGrams,
+    reviewed.sodiumMg,
     'manual',
     'Reviewed from a food description estimate.',
     null,
