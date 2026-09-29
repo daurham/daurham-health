@@ -33,6 +33,9 @@ import {
 import { recordSupplementAdherence } from '@/features/supplements/api'
 import { prefixedPath, useAppPathPrefix, useDemoReadOnly } from '@/lib/app-prefix'
 import { fetchToday } from './api'
+import { CoachCard } from '@/features/coach/CoachCard'
+import { ensureCoach } from '@/features/coach/api'
+import type { CoachState } from '@/domain/coach'
 import { todayShouldReloadAfterNutrition, type TodayNutritionOutcome } from './nutrition-refresh'
 
 function formatCount(value: number): string {
@@ -44,9 +47,33 @@ function countLabel(count: number, singular: string, plural: string): string {
 }
 
 export function TodayPage() {
+  const readOnly = useDemoReadOnly()
+  const [coach, setCoach] = useState<CoachState | null>(null)
+  const [coachPending, setCoachPending] = useState(false)
+  const [coachError, setCoachError] = useState<string | null>(null)
   const load = useCallback((_key: string, signal: AbortSignal) => fetchToday(signal), [])
   const resource = useAtomicKeyedResource({ requestedKey: 'today', load })
   const view = resource.data
+
+  const loadCoach = useCallback(async () => {
+    if (readOnly) return
+    setCoachPending(true)
+    setCoachError(null)
+    try {
+      setCoach(await ensureCoach())
+    } catch (caught) {
+      setCoachError(caught instanceof Error ? caught.message : 'Coach is unavailable.')
+    } finally {
+      setCoachPending(false)
+    }
+  }, [readOnly])
+
+  useEffect(() => {
+    if (view?.date && !readOnly) {
+      void loadCoach()
+    }
+  }, [view?.date, readOnly, loadCoach])
+
   return (
     <section className="min-w-0">
       <div className="flex items-start justify-between gap-3">
@@ -58,7 +85,10 @@ export function TodayPage() {
         </div>
         <button
           type="button"
-          onClick={() => resource.retry()}
+          onClick={() => {
+            resource.retry()
+            void loadCoach()
+          }}
           className="inline-flex min-h-11 shrink-0 items-center text-sm font-medium text-zinc-600 hover:text-zinc-900"
         >
           {resource.isPending && view ? 'Refreshing' : '↻ Refresh'}
@@ -71,6 +101,10 @@ export function TodayPage() {
               view={view}
               onNutritionChanged={() => resource.retry()}
               onSupplementsChanged={() => resource.retry()}
+              coach={coach}
+              coachPending={coachPending}
+              coachError={coachError}
+              onCoachState={setCoach}
             />
           ) : (
             <div className="h-64 animate-pulse rounded-lg bg-zinc-200" aria-busy="true" aria-label="Loading today" />
@@ -93,10 +127,18 @@ export function TodayBoard({
   view,
   onNutritionChanged,
   onSupplementsChanged,
+  coach,
+  coachPending,
+  coachError,
+  onCoachState,
 }: {
   view: TodayViewModel
   onNutritionChanged?: () => void
   onSupplementsChanged?: () => void
+  coach?: CoachState | null
+  coachPending?: boolean
+  coachError?: string | null
+  onCoachState?: (state: CoachState) => void
 }) {
   const prefix = useAppPathPrefix()
   return (
@@ -104,6 +146,14 @@ export function TodayBoard({
       <div className="flex justify-end">
         <AskHealthLink />
       </div>
+      {onCoachState ? (
+        <CoachCard
+          state={coach ?? null}
+          pending={coachPending}
+          error={coachError}
+          onState={onCoachState}
+        />
+      ) : null}
       {view.pendingItems.length > 0 || view.goalAttention.length > 0 ? (
         <section className="rounded-lg border border-zinc-200 bg-white p-4">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Needs attention</h2>
