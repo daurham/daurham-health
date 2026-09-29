@@ -171,6 +171,22 @@ export const TRAINING_EXERCISE_SEEDS: readonly ExerciseSeed[] = [
     unilateral: false,
     equipmentLoad: 'one_dumbbell',
   },
+  {
+    externalId: 'EX18',
+    name: 'Running',
+    measurementKind: 'distance_duration',
+    loadType: 'none',
+    unilateral: false,
+    equipmentLoad: 'none',
+  },
+  {
+    externalId: 'EX19',
+    name: 'Hiking',
+    measurementKind: 'distance_duration',
+    loadType: 'none',
+    unilateral: false,
+    equipmentLoad: 'none',
+  },
 ]
 
 function reps(slotId: string, externalId: string, position: number, plannedSets: number, min: number, max: number): TemplateSlotSeed {
