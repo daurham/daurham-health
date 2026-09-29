@@ -203,9 +203,10 @@ export const UPDATE_FOOD_SQL = `UPDATE nutrition_foods SET
            carbs = CASE WHEN $14::boolean THEN $15 ELSE carbs END,
            fat = CASE WHEN $16::boolean THEN $17 ELSE fat END,
            fiber = CASE WHEN $18::boolean THEN $19 ELSE fiber END,
-           is_staple = COALESCE($20, is_staple),
-           archived = COALESCE($21, archived),
-           notes = CASE WHEN $22::boolean THEN $23 ELSE notes END,
+           sodium_mg = CASE WHEN $20::boolean THEN $21 ELSE sodium_mg END,
+           is_staple = COALESCE($22, is_staple),
+           archived = COALESCE($23, archived),
+           notes = CASE WHEN $24::boolean THEN $25 ELSE notes END,
            updated_at = now()
          WHERE id = $1
          RETURNING ${FOOD_COLUMNS}`
@@ -227,16 +228,16 @@ export const GET_ENTRY_SQL = `SELECT ${ENTRY_READ_COLUMNS} FROM ${ENTRY_READ_FRO
 
 export const INSERT_ENTRY_SQL = `INSERT INTO nutrition_entries (
            log_date, consumed_at, timezone, meal, food_id, food_name, brand,
-           serving_quantity, serving_unit, grams, calories, protein, carbs, fat, fiber,
+           serving_quantity, serving_unit, grams, calories, protein, carbs, fat, fiber, sodium_mg,
            source_kind, notes
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
          RETURNING ${ENTRY_COLUMNS}`
 
 export const INSERT_ENTRY_WITH_ID_SQL = `INSERT INTO nutrition_entries (
            id, log_date, consumed_at, timezone, meal, food_id, food_name, brand,
-           serving_quantity, serving_unit, grams, calories, protein, carbs, fat, fiber,
+           serving_quantity, serving_unit, grams, calories, protein, carbs, fat, fiber, sodium_mg,
            source_kind, notes, meal_group_id
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
          RETURNING ${ENTRY_COLUMNS}`
 
 export const UPDATE_ENTRY_SQL = `UPDATE nutrition_entries SET
@@ -253,7 +254,8 @@ export const UPDATE_ENTRY_SQL = `UPDATE nutrition_entries SET
            carbs = CASE WHEN $17::boolean THEN $18 ELSE carbs END,
            fat = CASE WHEN $19::boolean THEN $20 ELSE fat END,
            fiber = CASE WHEN $21::boolean THEN $22 ELSE fiber END,
-           notes = CASE WHEN $23::boolean THEN $24 ELSE notes END,
+           sodium_mg = CASE WHEN $23::boolean THEN $24 ELSE sodium_mg END,
+           notes = CASE WHEN $25::boolean THEN $26 ELSE notes END,
            updated_at = now()
          WHERE id = $1
          RETURNING ${ENTRY_COLUMNS}`
@@ -279,6 +281,7 @@ export const UPSERT_TARGET_SQL = `INSERT INTO nutrition_targets (
            carbs_target = EXCLUDED.carbs_target,
            fat_target = EXCLUDED.fat_target,
            fiber_target = EXCLUDED.fiber_target,
+           sodium_target_mg = EXCLUDED.sodium_target_mg,
            updated_at = now()
          RETURNING id, effective_from, calories_target, protein_target, carbs_target, fat_target, fiber_target, sodium_target_mg, created_at, updated_at`
 
