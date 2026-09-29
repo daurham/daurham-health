@@ -56,6 +56,7 @@ export function scalePer100Grams(
     carbs: number | null
     fat: number | null
     fiber: number | null
+    sodiumMg: number | null
   },
   grams: number,
 ): {
@@ -64,6 +65,7 @@ export function scalePer100Grams(
   carbs: number | null
   fat: number | null
   fiber: number | null
+  sodiumMg: number | null
 } {
   const factor = grams / 100
   const scale = (value: number | null) => (value == null ? null : value * factor)
@@ -73,6 +75,7 @@ export function scalePer100Grams(
     carbs: scale(per100.carbs),
     fat: scale(per100.fat),
     fiber: scale(per100.fiber),
+    sodiumMg: scale(per100.sodiumMg),
   }
 }
 
@@ -157,6 +160,8 @@ export function descriptionFoodProvenance(input: {
   protein: number | null
   carbs: number | null
   fat: number | null
+  fiber: number | null
+  sodiumMg: number | null
   servingQuantity: number
   servingUnit: string
   servingGrams: number | null
@@ -174,6 +179,8 @@ export function descriptionFoodProvenance(input: {
       protein: input.protein,
       carbs: input.carbs,
       fat: input.fat,
+      fiber: input.fiber,
+      sodiumMg: input.sodiumMg,
       servingQuantity: input.servingQuantity,
       servingUnit: input.servingUnit,
       servingGrams: input.servingGrams,
