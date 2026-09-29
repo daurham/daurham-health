@@ -212,3 +212,27 @@ Observed from the current code and product docs. Where the original rationale is
 **Reason:** Today is a frequently opened surface and must not spend money or produce unstable assignments. The app already has deterministic Goal, Body, Nutrition, Activity, Training, and Context authorities.  
 **Implications:** H2A uses a fixed versioned rule registry, deterministic scoring/tie-breaking, recent repetition penalties, and frozen task rows. Opening/ensuring Coach does not call Gemini, Home-AI, Europe PMC, or reserve `ai_usage`. Passing consumes the period and never rerolls another task for that same day/week.
 
+
+## Decision: Stretch challenges freeze canonical Training evidence
+
+**Status:** Active
+**Reason:** H2B challenges are explicit accepted performance thresholds, not Daily Quest self-report.
+**Implications:** Only existing canonical working sets qualify. Strength reuses high-confidence Epley; unloaded reps/duration use a single working set and minimum completed side. Offered baseline edits/deletions invalidate the offer. Acceptance freezes the target; completion uses currently existing post-acceptance evidence and an atomic source guard. Later deletion preserves historical Coach completion provenance but removes the canonical evidence from current Training analytics. H3 owns any future reward reconciliation.
+
+## Decision: Stretch timing is a Phoenix calendar contract
+
+**Status:** Active
+**Reason:** Rare offers must not reroll or extend on refresh/pass/failure/completion.
+**Implications:** Eight-date offer cooldown, three-date inclusive offer availability, seven-date inclusive accepted challenge window. One current offered/active Stretch is enforced in PostgreSQL. Canonical workout date and session creation instant must both fit the challenge window; a backdated capture after expiry cannot complete. Full database timestamp precision is preserved for exact source checks.
+
+## Decision: Rounded Stretch targets fail closed at the difficulty cap
+
+**Status:** Active
+**Reason:** CURRENT_TASK's duration example 20→25 seconds conflicts with its mandatory maximum 110% baseline rule; 25 seconds is 125% of 20. The explicit cap is the governing product constraint.
+**Implications:** Reps +5%/whole-rep/+1 and duration +5%/five-second/+5 targets are generated only when all bounds can be satisfied. Otherwise no candidate is emitted. Baseline 20 sec is ineligible; 95→100 sec and 10→11 reps are valid. This interpretation is tested and recorded as the task-contract resolution.
+
+## Decision: Unloaded Coach logs use the established Training load state
+
+**Status:** Active
+**Reason:** H2A's duration presets attempted `loadState = none`, which is not in the canonical Training load-state enum and fails the real parser.
+**Implications:** Coach presets for `loadType = none` or bodyweight emit the existing `bodyweight` set state with no external load. No measurement family or Training API contract changes. A real-parser regression covers yoga logging.

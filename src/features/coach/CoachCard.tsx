@@ -4,10 +4,13 @@ import type { CoachState, CoachTaskView } from '@/domain/coach'
 import { primaryButtonClass, quietButtonClass } from '@/lib'
 import { prefixedPath, useAppPathPrefix } from '@/lib/app-prefix'
 import {
+  acceptCoachTask,
+  endCoachTask,
   logCoachSelfReport,
   logCoachTraining,
   passCoachTask,
 } from './api'
+import { coachDateLabel, formatStretchValue, selectPrimaryCoachTask } from './presentation'
 
 function progressText(task: CoachTaskView): string | null {
   const progress = task.progress
@@ -17,9 +20,7 @@ function progressText(task: CoachTaskView): string | null {
     if (progress.unit === 'steps') {
       return `${Math.round(progress.current).toLocaleString('en-US')} / ${Math.round(progress.target).toLocaleString('en-US')}`
     }
-    if (progress.unit === 'g') {
-      return `${Math.round(progress.current)} / ${Math.round(progress.target)} g`
-    }
+    if (progress.unit === 'g') return `${Math.round(progress.current)} / ${Math.round(progress.target)} g`
     if (progress.unit === 'sessions' || progress.unit === 'session') {
       return `${Math.round(progress.current)} / ${Math.round(progress.target)} ${progress.target === 1 ? 'session' : 'sessions'}`
     }
@@ -29,6 +30,7 @@ function progressText(task: CoachTaskView): string | null {
 }
 
 function verificationCopy(task: CoachTaskView): string {
+  if (task.taskKind === 'stretch_quest') return 'Verified by Training'
   if (task.verificationMode === 'canonical') return 'Verified by Health'
   if (task.verificationMode === 'training_log') return 'Logs to Training'
   return 'Reported by you'
@@ -36,9 +38,23 @@ function verificationCopy(task: CoachTaskView): string {
 
 function resolvedCopy(task: CoachTaskView): string {
   if (task.status === 'completed') return task.evidenceLabel ?? 'Complete'
+  if (task.taskKind === 'stretch_quest') {
+    if (task.status === 'passed') return 'Passed'
+    if (task.status === 'failed') return 'Challenge ended'
+    if (task.status === 'expired') return 'Offer expired'
+  }
   if (task.status === 'passed') return task.taskKind === 'weekly_focus' ? 'Skipped this week' : 'Passed today'
   if (task.status === 'expired') return 'Expired'
   return ''
+}
+
+type CoachActions = {
+  pending: boolean
+  onPass: (task: CoachTaskView) => void
+  onAccept: (task: CoachTaskView) => void
+  onEnd: (task: CoachTaskView) => void
+  onLog: (task: CoachTaskView) => void
+  onAcknowledge: (task: CoachTaskView) => void
 }
 
 export function CoachCard({
@@ -55,9 +71,10 @@ export function CoachCard({
   const prefix = useAppPathPrefix()
   const [inboxOpen, setInboxOpen] = useState(false)
   const [logTask, setLogTask] = useState<CoachTaskView | null>(null)
+  const [endTask, setEndTask] = useState<CoachTaskView | null>(null)
+  const [acknowledgedStretchId, setAcknowledgedStretchId] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [actionPending, setActionPending] = useState(false)
-
 
   if (!state && !error) {
     return pending ? <div className="h-24 animate-pulse rounded-lg bg-zinc-200" aria-label="Loading Coach" /> : null
@@ -72,15 +89,18 @@ export function CoachCard({
   }
 
   const weekly = state.weeklyFocus
-  const daily = state.dailyQuest
-  const hasVisible = weekly != null || daily != null
-  if (!hasVisible) return null
+  const stretch = state.stretchQuest
+  const primary = selectPrimaryCoachTask(state, acknowledgedStretchId)
+  const visibleCount = [weekly, state.dailyQuest, stretch].filter(Boolean).length
+  if (visibleCount === 0) return null
+  const compactStretch = stretch && stretch.id !== primary?.id ? stretch : null
 
-  async function pass(task: CoachTaskView) {
+  async function update(task: CoachTaskView, operation: (id: string) => Promise<CoachState>) {
     setActionPending(true)
     setActionError(null)
     try {
-      onState(await passCoachTask(task.id))
+      onState(await operation(task.id))
+      setEndTask(null)
     } catch (caught) {
       setActionError(caught instanceof Error ? caught.message : 'Could not update Coach')
     } finally {
@@ -88,14 +108,23 @@ export function CoachCard({
     }
   }
 
+  const actions: CoachActions = {
+    pending: actionPending,
+    onPass: (task) => void update(task, passCoachTask),
+    onAccept: (task) => void update(task, acceptCoachTask),
+    onEnd: (task) => { setInboxOpen(false); setActionError(null); setEndTask(task) },
+    onLog: (task) => { setInboxOpen(false); setLogTask(task) },
+    onAcknowledge: (task) => { setAcknowledgedStretchId(task.id); setInboxOpen(false) },
+  }
+
   return (
     <>
-      <section className="overflow-hidden rounded-lg border border-zinc-200 bg-white">
+      <section className="overflow-hidden rounded-lg border border-zinc-200 bg-white" aria-label="Coach">
         <div className="flex items-center justify-between gap-3 px-4 pt-4">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Coach</h2>
-          {state.activeCount > 1 ? (
+          {visibleCount > 1 ? (
             <button type="button" className={quietButtonClass} onClick={() => setInboxOpen(true)}>
-              Coach · {state.activeCount}
+              {state.activeCount > 0 ? `Coach · ${state.activeCount}` : 'Coach inbox'}
             </button>
           ) : null}
         </div>
@@ -111,116 +140,162 @@ export function CoachCard({
                     <p className="mt-0.5 text-sm text-zinc-600">{weekly.detail}</p>
                     {progressText(weekly) ? <p className="mt-1 text-xs font-medium text-zinc-600">{progressText(weekly)}</p> : null}
                   </>
-                ) : (
-                  <p className="mt-1 text-xs font-medium text-zinc-500">{resolvedCopy(weekly)}</p>
-                )}
+                ) : <p className="mt-1 text-xs font-medium text-zinc-500">{resolvedCopy(weekly)}</p>}
               </div>
               {weekly.status === 'active' ? (
                 <div className="flex shrink-0 flex-col items-end gap-1">
                   {weekly.actionHref ? (
-                    <Link to={prefixedPath(prefix, weekly.actionHref)} className="text-xs font-medium text-zinc-700 hover:underline">
-                      Open
-                    </Link>
+                    <Link to={prefixedPath(prefix, weekly.actionHref)} className="min-h-11 inline-flex items-center text-xs font-medium text-zinc-700 hover:underline">Open</Link>
                   ) : null}
-                  <button
-                    type="button"
-                    className="text-xs font-medium text-zinc-500 hover:text-zinc-900"
-                    disabled={actionPending}
-                    onClick={() => void pass(weekly)}
-                  >
-                    Not this week
-                  </button>
+                  <button type="button" className="min-h-11 text-xs font-medium text-zinc-500 hover:text-zinc-900" disabled={actionPending} onClick={() => actions.onPass(weekly)}>Not this week</button>
                 </div>
               ) : null}
             </div>
           </div>
         ) : null}
 
-        {daily ? (
-          <div className="p-4">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Today's quest</p>
-            {daily.status === 'active' ? (
-              <>
-                <p className="mt-1 text-lg font-semibold tracking-tight text-zinc-900">{daily.title}</p>
-                <p className="mt-1 text-sm text-zinc-600">{daily.detail}</p>
-                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-500">
-                  <span>{verificationCopy(daily)}</span>
-                  {progressText(daily) ? <span>{progressText(daily)}</span> : null}
-                </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {daily.actionKind === 'open' && daily.actionHref ? (
-                    <Link to={prefixedPath(prefix, daily.actionHref)} className={primaryButtonClass}>
-                      Open
-                    </Link>
-                  ) : (
-                    <button type="button" className={primaryButtonClass} onClick={() => setLogTask(daily)}>
-                      Log it
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    className={quietButtonClass}
-                    disabled={actionPending}
-                    onClick={() => void pass(daily)}
-                  >
-                    Pass
-                  </button>
-                </div>
-              </>
-            ) : (
-              <div className="motion-notice mt-1 flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-medium text-zinc-900">
-                    {daily.status === 'completed' ? '✓ Quest complete' : resolvedCopy(daily)}
-                  </p>
-                  <p className="mt-0.5 text-xs text-zinc-500">{daily.title}</p>
-                </div>
-                {daily.status === 'completed' && daily.evidenceLabel ? (
-                  <span className="shrink-0 text-xs text-zinc-500">{daily.evidenceLabel}</span>
-                ) : null}
-              </div>
-            )}
+        {primary ? (
+          <div className="p-4" data-coach-primary={primary.taskKind}>
+            <CoachTaskContent task={primary} actions={actions} />
           </div>
         ) : null}
-        {actionError ? <p className="px-4 pb-4 text-sm text-red-700">{actionError}</p> : null}
+        {compactStretch ? <div className="mx-4 mb-4 border-t border-zinc-100 pt-3"><StretchSummary task={compactStretch} /></div> : null}
+        {actionError ? <p className="px-4 pb-4 text-sm text-red-700" role="alert">{actionError}</p> : null}
       </section>
 
-      {inboxOpen ? (
-        <CoachInbox state={state} onClose={() => setInboxOpen(false)} />
+      {inboxOpen ? <CoachInbox state={state} onClose={() => setInboxOpen(false)} actions={actions} error={actionError} /> : null}
+      {endTask ? (
+        <div className="motion-scrim-enter fixed inset-0 z-50 flex items-end bg-black/30 sm:items-center sm:justify-center" role="presentation">
+          <section className="motion-panel-enter w-full rounded-t-2xl bg-white p-4 shadow-xl sm:max-w-md sm:rounded-2xl" role="dialog" aria-modal="true" aria-label="End Stretch Quest">
+            <h2 className="text-lg font-semibold tracking-tight">End quest?</h2>
+            <p className="mt-2 text-sm text-zinc-600">This challenge will close without a reward. Any Training PR you achieved stays in your Training history. There is no penalty.</p>
+            {actionError ? <p className="mt-3 text-sm text-red-700" role="alert">{actionError}</p> : null}
+            <div className="mt-4 flex flex-wrap gap-3">
+              <button type="button" className={primaryButtonClass} disabled={actionPending} onClick={() => void update(endTask, endCoachTask)}>{actionPending ? 'Ending…' : 'End quest'}</button>
+              <button type="button" className={quietButtonClass} disabled={actionPending} onClick={() => setEndTask(null)}>Keep going</button>
+            </div>
+          </section>
+        </div>
       ) : null}
       {logTask ? (
-        <CoachLogSheet
-          task={logTask}
-          onClose={() => setLogTask(null)}
-          onSaved={(next) => {
-            setLogTask(null)
-            onState(next)
-          }}
-        />
+        <CoachLogSheet task={logTask} onClose={() => setLogTask(null)} onSaved={(next) => { setLogTask(null); onState(next) }} />
       ) : null}
     </>
   )
 }
 
-function CoachInbox({ state, onClose }: { state: CoachState; onClose: () => void }) {
-  const rows = [state.dailyQuest, state.weeklyFocus].filter((task): task is CoachTaskView => task != null)
+function CoachTaskContent({ task, actions }: { task: CoachTaskView; actions: CoachActions }) {
+  const prefix = useAppPathPrefix()
+  if (task.taskKind === 'stretch_quest') return <StretchContent task={task} actions={actions} />
   return (
-    <div className="fixed inset-0 z-50 flex items-end bg-black/30 sm:items-center sm:justify-center" role="presentation">
-      <section className="max-h-[80vh] w-full overflow-y-auto rounded-t-2xl bg-white p-4 shadow-xl sm:max-w-md sm:rounded-2xl" role="dialog" aria-modal="true" aria-label="Coach inbox">
+    <>
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">{task.taskKind === 'weekly_focus' ? 'This week' : "Today's quest"}</p>
+      {task.status === 'active' ? (
+        <>
+          <p className="mt-1 text-lg font-semibold tracking-tight text-zinc-900">{task.title}</p>
+          <p className="mt-1 text-sm text-zinc-600">{task.detail}</p>
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-500">
+            <span>{verificationCopy(task)}</span>
+            {progressText(task) ? <span>{progressText(task)}</span> : null}
+          </div>
+          <div className="mt-3 flex flex-wrap gap-3">
+            {task.actionKind === 'open' && task.actionHref ? (
+              <Link to={prefixedPath(prefix, task.actionHref)} className={primaryButtonClass}>Open</Link>
+            ) : <button type="button" className={primaryButtonClass} disabled={actions.pending} onClick={() => actions.onLog(task)}>Log it</button>}
+            <button type="button" className={quietButtonClass} disabled={actions.pending} onClick={() => actions.onPass(task)}>{task.taskKind === 'weekly_focus' ? 'Not this week' : 'Pass'}</button>
+          </div>
+        </>
+      ) : (
+        <div className="motion-notice-enter mt-1 flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-zinc-900">{task.status === 'completed' ? '✓ Quest complete' : resolvedCopy(task)}</p>
+            <p className="mt-0.5 text-xs text-zinc-500">{task.title}</p>
+          </div>
+          {task.status === 'completed' && task.evidenceLabel ? <span className="text-xs text-zinc-500">{task.evidenceLabel}</span> : null}
+        </div>
+      )}
+    </>
+  )
+}
+
+function StretchContent({ task, actions }: { task: CoachTaskView; actions: CoachActions }) {
+  const prefix = useAppPathPrefix()
+  const metadata = task.metadata.stretch && typeof task.metadata.stretch === 'object'
+    ? task.metadata.stretch as Record<string, unknown>
+    : null
+  const isStrength = metadata?.strategy === 'strength_e1rm'
+  const best = task.progress?.current ?? null
+  const newPr = task.status === 'active' && best != null && task.baselineValue != null && best > task.baselineValue
+  const completed = task.status === 'completed'
+  if (task.status !== 'active' && task.status !== 'offered' && !completed) return <StretchSummary task={task} />
+  return (
+    <div className={completed ? 'motion-notice-enter' : undefined}>
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Stretch Quest</p>
+      <p className="mt-1 text-lg font-semibold tracking-tight text-zinc-900">{completed ? '✓ Stretch conquered' : task.title}</p>
+      {completed ? <p className="mt-1 text-sm text-zinc-600">{task.title}</p> : <p className="mt-1 text-sm text-zinc-600">{task.detail}</p>}
+      <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+        <div className="min-w-0"><dt className="text-xs text-zinc-500">{completed ? 'Achieved' : task.status === 'offered' ? 'Baseline' : newPr ? 'New PR' : 'Best attempt'}</dt><dd className="mt-0.5 font-semibold text-zinc-900">{formatStretchValue(task, task.status === 'offered' ? task.baselineValue : best)}</dd></div>
+        <div className="min-w-0"><dt className="text-xs text-zinc-500">Target</dt><dd className="mt-0.5 font-semibold text-zinc-900">{formatStretchValue(task, task.targetValue)}</dd></div>
+      </dl>
+      {completed ? (
+        <>
+          <p className="mt-2 text-xs text-zinc-500">Verified by Training</p>
+          <button type="button" className={`${quietButtonClass} mt-2`} onClick={() => actions.onAcknowledge(task)}>Got it</button>
+        </>
+      ) : (
+        <>
+          {newPr ? <p className="mt-2 text-sm text-zinc-600">Quest not conquered yet.</p> : null}
+          <p className="mt-2 text-xs text-zinc-500">{task.status === 'offered' ? 'Offer expires' : 'Challenge ends'} {coachDateLabel(task.expiresOn)} · {task.status === 'offered' ? '7 days to attempt after acceptance' : 'Verified by Training'}</p>
+          {task.status === 'offered' ? (
+            <p className="mt-2 text-xs leading-relaxed text-zinc-600">
+              {isStrength ? 'e1RM is estimated performance, not the literal load to put on the bar. Any valid high-confidence weight × rep combination can count.' : 'Measured from one qualifying working set saved in Training.'}
+              {metadata?.perSide === true ? ' Both sides must be completed; the lower side counts.' : null}
+            </p>
+          ) : isStrength ? <p className="mt-2 text-xs leading-relaxed text-zinc-600">The e1RM target is an estimate, not a prescribed bar load. Any valid high-confidence weight × rep combination can count.</p> : null}
+          <div className="mt-3 flex flex-wrap gap-3">
+            {task.status === 'offered' ? (
+              <>
+                <button type="button" className={primaryButtonClass} disabled={actions.pending} onClick={() => actions.onAccept(task)}>Accept</button>
+                <button type="button" className={quietButtonClass} disabled={actions.pending} onClick={() => actions.onPass(task)}>Pass</button>
+              </>
+            ) : (
+              <>
+                <Link to={prefixedPath(prefix, task.actionHref ?? '/training')} className={primaryButtonClass}>Open Training</Link>
+                <button type="button" className={quietButtonClass} disabled={actions.pending} onClick={() => actions.onEnd(task)}>End quest</button>
+              </>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+function StretchSummary({ task }: { task: CoachTaskView }) {
+  return (
+    <div className="min-w-0">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Stretch Quest</p>
+      <p className="mt-1 text-sm font-medium text-zinc-900">{task.status === 'completed' ? '✓ Stretch conquered' : resolvedCopy(task)}</p>
+      <p className="mt-0.5 text-xs text-zinc-500">{task.title}</p>
+      {task.status === 'completed' ? <p className="mt-1 text-xs text-zinc-500">Achieved {formatStretchValue(task, task.progress?.current ?? null)} · Target {formatStretchValue(task, task.targetValue)} · Verified by Training</p> : null}
+    </div>
+  )
+}
+
+export function CoachInbox({ state, onClose, actions, error }: { state: CoachState; onClose: () => void; actions: CoachActions; error?: string | null }) {
+  const rows = [state.stretchQuest, state.dailyQuest, state.weeklyFocus].filter((task): task is CoachTaskView => task != null)
+  return (
+    <div className="motion-scrim-enter fixed inset-0 z-50 flex items-end bg-black/30 sm:items-center sm:justify-center" role="presentation">
+      <section className="motion-panel-enter max-h-[80vh] w-full overflow-y-auto rounded-t-2xl bg-white p-4 shadow-xl sm:max-w-md sm:rounded-2xl" role="dialog" aria-modal="true" aria-label="Coach inbox">
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-lg font-semibold tracking-tight">Coach</h2>
           <button type="button" className={quietButtonClass} onClick={onClose}>Close</button>
         </div>
+        {error ? <p className="mt-3 text-sm text-red-700" role="alert">{error}</p> : null}
         <ul className="mt-4 divide-y divide-zinc-200">
           {rows.map((task) => (
-            <li key={task.id} className="py-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-                {task.taskKind === 'daily_quest' ? 'Today' : 'This week'}
-              </p>
-              <p className="mt-1 text-sm font-medium text-zinc-900">{task.title}</p>
-              <p className="mt-1 text-sm text-zinc-600">
-                {task.status === 'active' ? verificationCopy(task) : resolvedCopy(task)}
-              </p>
+            <li key={task.id} className="py-3" aria-label={task.taskKind === 'stretch_quest' ? 'Stretch Quest' : task.taskKind === 'daily_quest' ? 'Today' : 'This week'}>
+              <CoachTaskContent task={task} actions={actions} />
             </li>
           ))}
         </ul>
@@ -228,7 +303,6 @@ function CoachInbox({ state, onClose }: { state: CoachState; onClose: () => void
     </div>
   )
 }
-
 function CoachLogSheet({
   task,
   onClose,

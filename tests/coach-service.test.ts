@@ -61,8 +61,10 @@ vi.mock('../server/training/owner-exercises.ts', () => ({
   }),
 }))
 
-vi.mock('../server/training/service.ts', () => ({
-  parseManualWorkoutRequest: (body: unknown) => body,
+vi.mock('../server/training/service.ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../server/training/service.ts')>()
+  return {
+  parseManualWorkoutRequest: actual.parseManualWorkoutRequest,
   prepareManualSession: (input: {
     request: { workoutDate: string; exercises: Array<{ sets: Array<{ reps: number | null; durationSec: number | null }> }> }
     sessionId: string
@@ -80,7 +82,8 @@ vi.mock('../server/training/service.ts', () => ({
   ) => [
     sql.query('INSERT INTO workout_sessions /* coach-test */', [prepared.sessionId, prepared.actual]),
   ],
-}))
+  }
+})
 
 function taskFromParams(params: unknown[]) {
   const now = '2026-09-29T19:00:00.000Z'
@@ -186,7 +189,7 @@ vi.mock('../server/db.ts', () => ({
           return state.bodySession ? [state.bodySession] : []
         }
 
-        if (text.includes('FROM coach_tasks') && text.includes("WHERE status = 'active'")) {
+        if (text.includes('FROM coach_tasks') && text.includes("WHERE (status = 'active'")) {
           return state.tasks.filter((task) => task.status === 'active')
         }
 
@@ -383,6 +386,24 @@ describe('Coach persistence service', () => {
     expect(state.events.some((event) => event.evidence_kind === 'training_session')).toBe(false)
   })
 
+  it('logs unloaded duration presets through the real canonical Training request parser', async () => {
+    seedSelfReportTask()
+    const row = state.tasks[0]!
+    Object.assign(row, {
+      rule_key: 'manual:yoga:10m',
+      domain: 'training',
+      verification_mode: 'training_log',
+      action_kind: 'log_training',
+      metadata: { general: true },
+    })
+    const result = await logCoachTraining(row.id, {
+      submissionId: '44444444-4444-4444-8444-444444444444',
+      actualValue: 10,
+    }, NOW)
+    expect(state.workout?.actual).toBe(10)
+    expect(result.dailyQuest?.status).toBe('completed')
+  })
+
   it('logs a physical quest through canonical ad-hoc Training and completes from that source', async () => {
     const ensured = await ensureCoach(NOW)
     const quest = ensured.dailyQuest!
@@ -476,4 +497,3 @@ describe('Coach automatic completion authorities', () => {
     expect(second.dailyQuest?.status).toBe('completed')
   })
 })
-

@@ -38,7 +38,7 @@ function walkApiGraph(): { file: string; specifiers: string[] }[] {
     }
     seen.add(file)
     const specifiers = specifiersIn(file)
-    visited.push({ file: path.relative(ROOT, file), specifiers })
+    visited.push({ file: path.relative(ROOT, file).split(path.sep).join('/'), specifiers })
     for (const specifier of specifiers) {
       if (!specifier.startsWith('.')) {
         continue
@@ -55,7 +55,7 @@ describe('Vercel function module specifiers', () => {
 
   it('exposes a single Hobby-safe Serverless Function entrypoint', () => {
     const apiRoot = path.join(ROOT, 'api')
-    const apiFiles = listFiles(apiRoot).map((file) => path.relative(ROOT, file))
+    const apiFiles = listFiles(apiRoot).map((file) => path.relative(ROOT, file).split(path.sep).join('/'))
     expect(apiFiles).toEqual(['api/index.ts'])
     const leftoverDirs = readdirSync(apiRoot, { withFileTypes: true })
       .filter((entry) => entry.isDirectory())

@@ -4,10 +4,10 @@ import type { DailyContextTagKey } from './context.js'
 
 export const COACH_RULE_VERSION = 1 as const
 
-export const COACH_TASK_KINDS = ['weekly_focus', 'daily_quest'] as const
+export const COACH_TASK_KINDS = ['weekly_focus', 'daily_quest', 'stretch_quest'] as const
 export type CoachTaskKind = (typeof COACH_TASK_KINDS)[number]
 
-export const COACH_TASK_STATUSES = ['active', 'completed', 'passed', 'expired'] as const
+export const COACH_TASK_STATUSES = ['offered', 'active', 'completed', 'passed', 'failed', 'expired'] as const
 export type CoachTaskStatus = (typeof COACH_TASK_STATUSES)[number]
 
 export const COACH_VERIFICATION_MODES = ['canonical', 'training_log', 'owner_self_report'] as const
@@ -24,7 +24,7 @@ export const COACH_EVIDENCE_KINDS = [
 ] as const
 export type CoachEvidenceKind = (typeof COACH_EVIDENCE_KINDS)[number]
 
-export const COACH_DIFFICULTIES = ['routine', 'standard', 'weekly'] as const
+export const COACH_DIFFICULTIES = ['routine', 'standard', 'weekly', 'stretch'] as const
 export type CoachDifficulty = (typeof COACH_DIFFICULTIES)[number]
 
 export type CoachProgress = {
@@ -54,11 +54,12 @@ export type CoachTaskView = {
   difficulty: CoachDifficulty
   rewardBand: CoachDifficulty
   status: CoachTaskStatus
+  acceptedAt?: string | null
   completedAt: string | null
   closedAt: string | null
   metadata: Record<string, unknown>
   progress: CoachProgress | null
-  evidenceLabel: 'Verified by Health' | 'Logged in Training' | 'Reported by you' | null
+  evidenceLabel: 'Verified by Health' | 'Verified by Training' | 'Logged in Training' | 'Reported by you' | null
 }
 
 export type CoachState = {
@@ -67,6 +68,7 @@ export type CoachState = {
   weekEnd: string
   weeklyFocus: CoachTaskView | null
   dailyQuest: CoachTaskView | null
+  stretchQuest?: CoachTaskView | null
   activeCount: number
 }
 

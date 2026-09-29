@@ -1,6 +1,6 @@
 export const BACKUP_FORMAT = 'daurham-health-backup'
 export const BACKUP_FORMAT_VERSION = 1
-export const LATEST_SCHEMA_MIGRATION = '0035_coach_tasks.sql'
+export const LATEST_SCHEMA_MIGRATION = '0036_stretch_quests.sql'
 export const PORTABLE_EXPORT_BYTE_LIMIT = 3_500_000
 
 export type ColumnKind = 'uuid' | 'text' | 'date' | 'timestamptz' | 'numeric' | 'int' | 'bool' | 'json' | 'bytea'
@@ -1010,6 +1010,7 @@ export const BACKUP_TABLES: readonly BackupTable[] = [
       col('difficulty', 'text'),
       col('reward_band', 'text'),
       col('status', 'text'),
+      col('accepted_at', 'timestamptz'),
       col('completed_at', 'timestamptz'),
       col('closed_at', 'timestamptz'),
       col('metadata', 'json'),

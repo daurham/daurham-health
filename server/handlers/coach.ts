@@ -1,6 +1,8 @@
 import { withOwnerAuth } from '../auth/with-owner.js'
 import { requestApiPathname, readJsonBody, sendJson, type ApiRequest, type ApiResponse } from '../http.js'
 import {
+  acceptCoachTask,
+  endCoachTask,
   ensureCoach,
   logCoachSelfReport,
   logCoachTraining,
@@ -13,17 +15,17 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 type CoachRoute =
   | { kind: 'root' }
   | { kind: 'ensure' }
-  | { kind: 'task'; id: string; action: 'pass' | 'log-training' | 'log-self-report' }
+  | { kind: 'task'; id: string; action: 'accept' | 'end' | 'pass' | 'log-training' | 'log-self-report' }
 
 export function matchCoachRoute(pathname: string): CoachRoute | null {
   if (pathname === '/api/coach') return { kind: 'root' }
   if (pathname === '/api/coach/ensure') return { kind: 'ensure' }
-  const match = /^\/api\/coach\/tasks\/([^/]+)\/(pass|log-training|log-self-report)$/.exec(pathname)
+  const match = /^\/api\/coach\/tasks\/([^/]+)\/(accept|end|pass|log-training|log-self-report)$/.exec(pathname)
   if (!match || !UUID.test(match[1] ?? '')) return null
   return {
     kind: 'task',
     id: match[1]!,
-    action: match[2] as 'pass' | 'log-training' | 'log-self-report',
+    action: match[2] as 'accept' | 'end' | 'pass' | 'log-training' | 'log-self-report',
   }
 }
 
@@ -60,6 +62,14 @@ export async function handleCoach(req: ApiRequest, res: ApiResponse) {
     return
   }
 
+  if (route.action === 'accept') {
+    sendJson(res, 200, await acceptCoachTask(route.id))
+    return
+  }
+  if (route.action === 'end') {
+    sendJson(res, 200, await endCoachTask(route.id))
+    return
+  }
   if (route.action === 'pass') {
     sendJson(res, 200, await passCoachTask(route.id))
     return
