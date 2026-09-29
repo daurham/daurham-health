@@ -3,6 +3,8 @@ name: V2 H1 Validation
 on:
   push:
     branches: [main]
+    paths:
+      - '.github/workflows/v2-h1-validation.yml'
 
 jobs:
   validate:
