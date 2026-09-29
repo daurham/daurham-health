@@ -704,7 +704,7 @@ function QuantityControls({
 function ScaledPreview({
   preview,
 }: {
-  preview: { calories: number; protein: number | null; carbs: number | null; fat: number | null; fiber: number | null; sodium: number | null }
+  preview: { calories: number; protein: number | null; carbs: number | null; fat: number | null; fiber: number | null; sodium?: number | null }
 }) {
   return (
     <dl className="mt-4 grid grid-cols-2 gap-2 text-sm">
