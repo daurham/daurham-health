@@ -104,6 +104,7 @@ export function mapEntryRow(row: EntryRow): NutritionEntry {
     carbs: asNumber(row.carbs),
     fat: asNumber(row.fat),
     fiber: asNumber(row.fiber),
+    sodium: asNumber(row.sodium),
     sourceKind: row.source_kind as NutritionEntry['sourceKind'],
     notes: row.notes == null || row.notes === '' ? null : String(row.notes),
     mealGroupId: row.meal_group_id == null ? null : String(row.meal_group_id),
@@ -186,7 +187,7 @@ export const GET_FOOD_BY_BARCODES_SQL = `SELECT ${FOOD_COLUMNS}
 
 export const INSERT_FOOD_SQL = `INSERT INTO nutrition_foods (
            name, brand, barcode, catalog_kind, serving_quantity, serving_unit, serving_grams,
-           calories, protein, carbs, fat, fiber, source_kind, is_staple, notes
+           calories, protein, carbs, fat, fiber, sodium, source_kind, is_staple, notes
          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
          RETURNING ${FOOD_COLUMNS}`
 
