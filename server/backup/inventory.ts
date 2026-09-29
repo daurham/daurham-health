@@ -1,6 +1,6 @@
 export const BACKUP_FORMAT = 'daurham-health-backup'
 export const BACKUP_FORMAT_VERSION = 1
-export const LATEST_SCHEMA_MIGRATION = '0037_coach_lab_snoozes.sql'
+export const LATEST_SCHEMA_MIGRATION = '0038_training_measurements_goals_routines.sql'
 export const PORTABLE_EXPORT_BYTE_LIMIT = 3_500_000
 
 export type ColumnKind = 'uuid' | 'text' | 'date' | 'timestamptz' | 'numeric' | 'int' | 'bool' | 'json' | 'bytea'
@@ -129,7 +129,9 @@ export const BACKUP_TABLES: readonly BackupTable[] = [
       col('name', 'text'),
       col('metadata', 'json'),
       col('is_active', 'bool'),
+      col('origin_kind', 'text'),
       col('created_at', 'timestamptz'),
+      col('updated_at', 'timestamptz'),
     ],
   }),
   table({
@@ -626,6 +628,8 @@ export const BACKUP_TABLES: readonly BackupTable[] = [
       col('right_reps', 'int'),
       col('left_duration_sec', 'int'),
       col('right_duration_sec', 'int'),
+      col('distance_m', 'numeric'),
+      col('completed', 'bool'),
       col('notes', 'text'),
       col('metadata', 'json'),
       col('created_at', 'timestamptz'),
@@ -948,6 +952,7 @@ export const BACKUP_TABLES: readonly BackupTable[] = [
       col('benchmark_protocol_version_id', 'uuid'),
       col('benchmark_requirement_id', 'uuid'),
       col('supplement_id', 'uuid'),
+      col('training_min_distance_m', 'numeric'),
       col('source_id', 'uuid'),
       col('paused_at', 'timestamptz'),
       col('completed_at', 'timestamptz'),
