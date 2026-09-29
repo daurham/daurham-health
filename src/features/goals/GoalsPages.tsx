@@ -1,9 +1,10 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { coverageLabel } from '@/domain/goal-status'
 import { formatGoalQuantity, formatGoalTarget, goalKindDefinition, GOAL_KINDS, type GoalKind } from '@/domain/goals'
 import type { GoalProjection } from '@/domain/goal-projection'
 import { healthCalendarDateFromNow } from '@/domain/time'
+import { metersToMiles, milesToMeters } from '@/domain/units'
 import { dangerButtonClass, LoadErrorNotice, primaryButtonClass, quietButtonClass, secondaryButtonClass } from '@/lib'
 import { changeGoalStatus, createGoal, fetchGoal, fetchGoals, removeGoal, reviseGoal, type GoalCatalog, type GoalView } from './api'
 
@@ -18,6 +19,26 @@ const KIND_LABELS: Record<GoalKind, string> = {
   nutrition_protein: 'Protein',
   sleep_duration: 'Sleep duration',
   supplement_adherence: 'Supplement adherence',
+  training_reps: 'Training reps',
+  training_duration: 'Training duration',
+  training_distance: 'Training distance',
+  training_pace: 'Training pace',
+  training_skill: 'Training skill',
+}
+
+
+function compatibleTrainingExercise(kind: GoalKind, exercise: GoalCatalog['exercises'][number]): boolean {
+  if (kind === 'strength_e1rm') return exercise.performance_type === 'loaded_reps' && exercise.analytics_load_type === 'external'
+  if (kind === 'training_reps') return ['reps','reps_per_side'].includes(exercise.measurement_kind) && !(exercise.performance_type === 'loaded_reps' && exercise.analytics_load_type === 'external')
+  if (kind === 'training_duration') return ['duration','duration_per_side','distance_duration'].includes(exercise.measurement_kind)
+  if (kind === 'training_distance') return ['distance','distance_duration'].includes(exercise.measurement_kind)
+  if (kind === 'training_pace') return exercise.measurement_kind === 'distance_duration'
+  if (kind === 'training_skill') return exercise.measurement_kind === 'completion'
+  return true
+}
+
+function paceSeconds(minutes: string, seconds: string): number {
+  return Math.max(0, Number(minutes) || 0) * 60 + Math.max(0, Number(seconds) || 0)
 }
 
 function projectionDateLabel(iso: string): string {
