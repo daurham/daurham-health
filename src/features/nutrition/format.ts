@@ -93,29 +93,35 @@ export function progressRatio(consumed: number | null, target: number | null): n
 export function remainingHeadline(
   consumed: NutrientTotal,
   target: number | null,
-  unit: 'kcal' | 'g',
+  unit: 'kcal' | 'g' | 'mg',
 ): string | null {
   if (target == null || consumed.status !== 'available' || consumed.value == null) {
     return null
   }
   const delta = target - consumed.value
+  const digits = unit === 'mg' ? 0 : unit === 'kcal' ? 0 : 1
   if (delta >= 0) {
-    return unit === 'kcal' ? `${formatNumber(delta, 0)} remaining` : `${formatNumber(delta)} left`
+    return `${formatNumber(delta, digits)} ${unit === 'kcal' ? 'remaining' : `${unit} left`}`
   }
-  return unit === 'kcal' ? `+${formatNumber(-delta, 0)}` : `+${formatNumber(-delta)} g`
+  return `+${formatNumber(-delta, digits)} ${unit}`
 }
 
-export function macroHeadline(consumed: NutrientTotal, target: number | null, unit: 'kcal' | 'g'): string {
+export function macroHeadline(
+  consumed: NutrientTotal,
+  target: number | null,
+  unit: 'kcal' | 'g' | 'mg',
+): string {
   if (unit === 'kcal') {
     return caloriesHeadline(consumed, target)
   }
+  const digits = unit === 'mg' ? 0 : 1
   if (consumed.status !== 'available' || consumed.value == null) {
-    return target == null ? '—' : `— / ${formatNumber(target)} g`
+    return target == null ? '—' : `— / ${formatNumber(target, digits)} ${unit}`
   }
   if (target == null) {
-    return `${formatNumber(consumed.value)} g recorded`
+    return `${formatNumber(consumed.value, digits)} ${unit} recorded`
   }
-  return `${formatNumber(consumed.value)} / ${formatNumber(target)} g`
+  return `${formatNumber(consumed.value, digits)} / ${formatNumber(target, digits)} ${unit}`
 }
 
 export function catalogKindLabel(kind: NutritionCatalogKind): string {
