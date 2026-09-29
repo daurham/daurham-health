@@ -4,8 +4,8 @@ import { coverageLabel } from '@/domain/goal-status'
 import { formatGoalQuantity, formatGoalTarget, goalKindDefinition, GOAL_KINDS, type GoalKind } from '@/domain/goals'
 import type { GoalProjection } from '@/domain/goal-projection'
 import { healthCalendarDateFromNow } from '@/domain/time'
-import { LoadErrorNotice, primaryButtonClass, quietButtonClass, secondaryButtonClass } from '@/lib'
-import { changeGoalStatus, createGoal, fetchGoal, fetchGoals, reviseGoal, type GoalCatalog, type GoalView } from './api'
+import { dangerButtonClass, LoadErrorNotice, primaryButtonClass, quietButtonClass, secondaryButtonClass } from '@/lib'
+import { changeGoalStatus, createGoal, fetchGoal, fetchGoals, removeGoal, reviseGoal, type GoalCatalog, type GoalView } from './api'
 
 const fieldClass = 'w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm'
 
@@ -605,6 +605,30 @@ export function GoalDetailPage() {
           Save revised goal
         </button>
       </form>
+      <section className="rounded-lg border border-zinc-200 bg-white p-4">
+        <h2 className="text-sm font-semibold">Remove goal</h2>
+        <p className="mt-1 text-sm text-zinc-600">
+          Removes this goal from active views while preserving its target history and any experiment references.
+        </p>
+        <button
+          type="button"
+          className={`${dangerButtonClass} mt-3`}
+          disabled={busy}
+          onClick={() => {
+            if (!window.confirm('Remove this goal? Its historical versions will be preserved.')) return
+            setBusy(true)
+            setError(null)
+            void removeGoal(goalId)
+              .then(() => navigate('/goals'))
+              .catch((caught: unknown) => {
+                setError(caught instanceof Error ? caught.message : 'Could not remove this goal')
+                setBusy(false)
+              })
+          }}
+        >
+          Remove goal
+        </button>
+      </section>
       <section className="space-y-2">
         <h2 className="text-sm font-semibold">Target history</h2>
         {goal.versions.map((version) => (
