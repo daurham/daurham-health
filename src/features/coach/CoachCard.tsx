@@ -240,6 +240,7 @@ function CoachLogSheet({
     : null
   const selfReportKind = typeof task.metadata.selfReportKind === 'string' ? task.metadata.selfReportKind : null
   const defaultValue = task.targetValue == null ? '' : String(task.targetValue)
+  const [submissionId] = useState(() => globalThis.crypto.randomUUID())
   const [actualValue, setActualValue] = useState(defaultValue)
   const [durationMin, setDurationMin] = useState(task.targetUnit === 'min' ? defaultValue : '')
   const [distance, setDistance] = useState('')
@@ -254,7 +255,6 @@ function CoachLogSheet({
     setPending(true)
     setError(null)
     try {
-      const submissionId = globalThis.crypto.randomUUID()
       const next =
         task.actionKind === 'log_training'
           ? await logCoachTraining(task.id, {
