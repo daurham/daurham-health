@@ -70,7 +70,7 @@ const MASS_GRAMS: Record<string, number> = {
   pounds: 453.59237,
 }
 
-const NUTRIENT_KEYS = new Set(['calories', 'protein', 'carbs', 'fat', 'fiber', 'kcal'])
+const NUTRIENT_KEYS = new Set(['calories', 'protein', 'carbs', 'fat', 'fiber', 'sodium', 'sodiumMg', 'kcal'])
 
 export function foodDescriptionOffer(query: string): boolean {
   const text = query.trim()
@@ -309,6 +309,7 @@ function addNutrients(current: NutrientAmount | null, next: NutrientAmount): Nut
     carbs: current?.carbs == null || next.carbs == null ? null : current.carbs + next.carbs,
     fat: current?.fat == null || next.fat == null ? null : current.fat + next.fat,
     fiber: current?.fiber == null || next.fiber == null ? null : current.fiber + next.fiber,
+    sodium: current?.sodium == null || next.sodium == null ? null : current.sodium + next.sodium,
   }
 }
 
@@ -340,6 +341,7 @@ export function descriptionComponentTotals(
         carbs: component.food.carbs,
         fat: component.food.fat,
         fiber: component.food.fiber,
+        sodium: component.food.sodium,
         servingGrams: component.food.servingGrams,
       },
       { quantity: component.quantity ?? 1, grams: portion.grams },
@@ -362,6 +364,7 @@ export const descriptionEstimateItemSchema = z.object({
   carbsGrams: z.number(),
   fatGrams: z.number(),
   fiberGrams: z.number().nullable(),
+  sodiumMg: z.number().nullable(),
   assumption: z.string().nullable(),
 })
 export type DescriptionEstimateItem = z.infer<typeof descriptionEstimateItemSchema>
@@ -376,6 +379,7 @@ export const descriptionEstimateCandidateSchema = z.object({
   carbsGrams: z.number(),
   fatGrams: z.number(),
   fiberGrams: z.number().nullable(),
+  sodiumMg: z.number().nullable(),
   model: z.string().nullable().optional(),
 })
 export type DescriptionEstimateCandidate = z.infer<typeof descriptionEstimateCandidateSchema>
@@ -395,6 +399,7 @@ export const commitNutritionDescriptionEstimateRequestSchema = z.object({
   carbsGrams: z.number().min(0),
   fatGrams: z.number().min(0),
   fiberGrams: z.number().min(0).nullable(),
+  sodiumMg: z.number().min(0).nullable(),
   portionScale: z.number().optional(),
   items: z.array(descriptionEstimateItemSchema).optional(),
 })
@@ -426,6 +431,7 @@ export function descriptionEstimateItemNutrients(item: DescriptionEstimateItem):
     carbsGrams: item.carbsGrams,
     fatGrams: item.fatGrams,
     fiberGrams: item.fiberGrams,
+    sodiumMg: item.sodiumMg,
   })
 }
 
@@ -435,6 +441,7 @@ export function sumDescriptionEstimateItems(items: readonly DescriptionEstimateI
   let carbsGrams = 0
   let fatGrams = 0
   let fiberGrams: number | null = 0
+  let sodiumMg: number | null = 0
   for (const item of items) {
     calories += item.calories
     proteinGrams += item.proteinGrams
@@ -445,8 +452,13 @@ export function sumDescriptionEstimateItems(items: readonly DescriptionEstimateI
     } else {
       fiberGrams += item.fiberGrams
     }
+    if (item.sodiumMg == null || sodiumMg == null) {
+      sodiumMg = null
+    } else {
+      sodiumMg += item.sodiumMg
+    }
   }
-  return mealEstimateNutrients({ calories, proteinGrams, carbsGrams, fatGrams, fiberGrams })
+  return mealEstimateNutrients({ calories, proteinGrams, carbsGrams, fatGrams, fiberGrams, sodiumMg })
 }
 
 export function canScaleDescriptionItem(baseline: DescriptionEstimateItem, quantity: number | null, unit: string): boolean {
@@ -479,6 +491,7 @@ export function scaleDescriptionItem(
     carbsGrams: Math.max(0, baseline.carbsGrams * factor),
     fatGrams: Math.max(0, baseline.fatGrams * factor),
     fiberGrams: baseline.fiberGrams == null ? null : Math.max(0, baseline.fiberGrams * factor),
+    sodiumMg: baseline.sodiumMg == null ? null : Math.max(0, baseline.sodiumMg * factor),
   }
 }
 
@@ -556,6 +569,7 @@ export function sanitizeDescriptionEstimate(
         carbsGrams: Math.max(0, asFiniteNumber(row.carbsGrams ?? row.carbs) ?? 0),
         fatGrams: Math.max(0, asFiniteNumber(row.fatGrams ?? row.fat) ?? 0),
         fiberGrams: asFiniteNumber(row.fiberGrams ?? row.fiber),
+        sodiumMg: asFiniteNumber(row.sodiumMg ?? row.sodium),
       }),
     )
   }
