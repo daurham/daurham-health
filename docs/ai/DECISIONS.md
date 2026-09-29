@@ -188,3 +188,27 @@ Observed from the current code and product docs. Where the original rationale is
 **Reason:** Marking a bad Goal complete is not a correction. Unreferenced Goal identity and versions can be removed, but an Experiment may hold an immutable reference through `experiment_goals`.  
 **Implications:** `DELETE /api/goals/:id` physically deletes an unreferenced Goal and its versions. A referenced Goal is archived with `archived_at` instead, disappears from default Goal/Ask surfaces, and remains resolvable for historical evidence.
 
+## Decision: Coach assignments are persistent, but Health facts stay canonical
+
+**Status:** Active  
+**Reason:** H2A needs stable Weekly Focus and Daily Quest assignments that do not reroll on refresh, while Health measurements and Goal status already have canonical authorities.  
+**Implications:** `coach_tasks` freezes the selected assignment, target snapshot, rule version, difficulty, and reward band. `coach_task_events` records lifecycle/provenance. Coach does not persist a second Goal status, Nutrition total, Activity total, Body measurement, or Training best. Automatic completion always re-reads the canonical domain.
+
+## Decision: Physical manual quests become canonical Training
+
+**Status:** Active  
+**Reason:** Actions such as jumping jacks, yoga, shadow boxing, running, hiking, and general cardio are useful only if completion also improves the owner's Training history instead of becoming an unverifiable checkbox.  
+**Implications:** Reps/duration Coach quests create or reuse compatible owner exercises and save ordinary `ad_hoc` Training sessions. Run/hike distance is optional Coach evidence only until Training gains a distance measurement family. One submission UUID prevents duplicate Training sessions on retry. Below-target work may be logged without falsely completing the quest.
+
+## Decision: Non-Training manual quests stay explicit self-report evidence
+
+**Status:** Active  
+**Reason:** Meal prep and health journaling do not map honestly to an existing canonical Health measurement. Creating fake Nutrition consumption or overwriting Daily Context would corrupt meaning.  
+**Implications:** These quests append `owner_self_report` Coach evidence. Meal prep does not create an eaten Nutrition entry. Health-journal notes do not mutate Daily Context. UI copy may say “Reported by you”; it must not imply sensor/canonical verification.
+
+## Decision: Coach generation is deterministic and provider-free
+
+**Status:** Active  
+**Reason:** Today is a frequently opened surface and must not spend money or produce unstable assignments. The app already has deterministic Goal, Body, Nutrition, Activity, Training, and Context authorities.  
+**Implications:** H2A uses a fixed versioned rule registry, deterministic scoring/tie-breaking, recent repetition penalties, and frozen task rows. Opening/ensuring Coach does not call Gemini, Home-AI, Europe PMC, or reserve `ai_usage`. Passing consumes the period and never rerolls another task for that same day/week.
+
