@@ -87,6 +87,12 @@ export function emptyDraftSet(setNumber: number): DraftSet {
   }
 }
 
+type TranscriptionDraftSet = Omit<DraftSet, 'distance' | 'distanceUnit' | 'completed'> & {
+  distance?: string
+  distanceUnit?: 'mi' | 'km'
+  completed?: boolean | null
+}
+
 export function draftFromTranscription(
   draft: {
     workoutDate: string
@@ -95,7 +101,7 @@ export function draftFromTranscription(
     painLevel: number | null
     bodyweightLb: string
     notes: string
-    exercises: DraftExercise[]
+    exercises: Array<Omit<DraftExercise, 'sets'> & { sets: TranscriptionDraftSet[] }>
   },
   template: WorkoutTemplate | null,
 ): WorkoutDraft {
@@ -109,7 +115,15 @@ export function draftFromTranscription(
     painLevel: draft.painLevel,
     bodyweightLb: draft.bodyweightLb,
     notes: draft.notes,
-    exercises: draft.exercises,
+    exercises: draft.exercises.map((exercise) => ({
+      ...exercise,
+      sets: exercise.sets.map((set) => ({
+        ...set,
+        distance: set.distance ?? '',
+        distanceUnit: set.distanceUnit ?? 'mi',
+        completed: set.completed ?? null,
+      })),
+    })),
   }
 }
 
