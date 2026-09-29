@@ -627,7 +627,7 @@ export async function commitNutritionLabel(body: unknown): Promise<{
             carbs: food.carbs,
             fat: food.fat,
             fiber: food.fiber,
-            sodium: food.sodium,
+            sodium: food.sodium ?? null,
             servingGrams: food.servingGrams,
           }
         : undefined,

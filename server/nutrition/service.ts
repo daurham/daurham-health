@@ -266,7 +266,7 @@ async function snapshotForCreate(input: z.infer<typeof nutritionEntryCreateSchem
       carbs: snapshot.carbs,
       fat: snapshot.fat,
       fiber: snapshot.fiber,
-      sodium: snapshot.sodium,
+      sodium: snapshot.sodium ?? null,
       grams: input.grams !== undefined ? input.grams ?? null : snapshot.grams,
     }
   }

@@ -56,6 +56,7 @@ export function scalePer100Grams(
     carbs: number | null
     fat: number | null
     fiber: number | null
+    sodium?: number | null
   },
   grams: number,
 ): {
@@ -64,6 +65,7 @@ export function scalePer100Grams(
   carbs: number | null
   fat: number | null
   fiber: number | null
+  sodium: number | null
 } {
   const factor = grams / 100
   const scale = (value: number | null) => (value == null ? null : value * factor)
@@ -73,6 +75,7 @@ export function scalePer100Grams(
     carbs: scale(per100.carbs),
     fat: scale(per100.fat),
     fiber: scale(per100.fiber),
+    sodium: scale(per100.sodium ?? null),
   }
 }
 
