@@ -1,4 +1,5 @@
 import {
+  archiveGoal,
   changeGoalLifecycle,
   createGoal,
   getGoal,
@@ -82,8 +83,12 @@ export async function handleGoals(req: ApiRequest, res: ApiResponse): Promise<vo
     sendJson(res, 200, await changeGoalLifecycle(route.id, route.action))
     return
   }
+  if (req.method === 'DELETE') {
+    sendJson(res, 200, await archiveGoal(route.id))
+    return
+  }
   if (req.method !== 'GET') {
-    res.setHeader('Allow', 'GET')
+    res.setHeader('Allow', 'GET, DELETE')
     sendJson(res, 405, { error: 'Method not allowed' })
     return
   }
