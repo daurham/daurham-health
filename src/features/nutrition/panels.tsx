@@ -704,7 +704,7 @@ function QuantityControls({
 function ScaledPreview({
   preview,
 }: {
-  preview: { calories: number; protein: number | null; carbs: number | null; fat: number | null; fiber: number | null }
+  preview: { calories: number; protein: number | null; carbs: number | null; fat: number | null; fiber: number | null; sodium: number | null }
 }) {
   return (
     <dl className="mt-4 grid grid-cols-2 gap-2 text-sm">
@@ -712,6 +712,8 @@ function ScaledPreview({
       <PreviewStat label="Protein" value={formatGrams(preview.protein) ?? '—'} />
       <PreviewStat label="Carbs" value={formatGrams(preview.carbs) ?? '—'} />
       <PreviewStat label="Fat" value={formatGrams(preview.fat) ?? '—'} />
+      <PreviewStat label="Fiber" value={formatGrams(preview.fiber) ?? '—'} />
+      <PreviewStat label="Sodium" value={preview.sodium == null ? '—' : `${Math.round(preview.sodium).toLocaleString('en-US')} mg`} />
     </dl>
   )
 }
@@ -748,6 +750,7 @@ function ManualEntrySheet({
   const [carbs, setCarbs] = useState('')
   const [fat, setFat] = useState('')
   const [fiber, setFiber] = useState('')
+  const [sodium, setSodium] = useState('')
   const [notes, setNotes] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -768,6 +771,7 @@ function ManualEntrySheet({
         carbs: optionalNumber(carbs),
         fat: optionalNumber(fat),
         fiber: optionalNumber(fiber),
+        sodium: optionalNumber(sodium),
       }
       const food = await createNutritionFood({
         name: name.trim(),
@@ -829,6 +833,7 @@ function ManualEntrySheet({
           <OptionalMacro id="manual-carbs" label="Carbs g" value={carbs} onChange={setCarbs} />
           <OptionalMacro id="manual-fat" label="Fat g" value={fat} onChange={setFat} />
           <OptionalMacro id="manual-fiber" label="Fiber g" value={fiber} onChange={setFiber} />
+          <OptionalMacro id="manual-sodium" label="Sodium mg" value={sodium} onChange={setSodium} />
         </div>
         <Field label="Notes" htmlFor="manual-notes">
           <input id="manual-notes" className={inputClass} value={notes} onChange={(event) => setNotes(event.target.value)} />
@@ -859,6 +864,7 @@ export function EntryEditorSheet({
   const [carbs, setCarbs] = useState(entry.carbs == null ? '' : String(entry.carbs))
   const [fat, setFat] = useState(entry.fat == null ? '' : String(entry.fat))
   const [fiber, setFiber] = useState(entry.fiber == null ? '' : String(entry.fiber))
+  const [sodium, setSodium] = useState(entry.sodium == null ? '' : String(entry.sodium))
   const [meal, setMeal] = useState(entry.meal ?? '')
   const [notes, setNotes] = useState(entry.notes ?? '')
   const [busy, setBusy] = useState(false)
@@ -876,7 +882,8 @@ export function EntryEditorSheet({
         optionalNumber(protein) !== entry.protein ||
         optionalNumber(carbs) !== entry.carbs ||
         optionalNumber(fat) !== entry.fat ||
-        optionalNumber(fiber) !== entry.fiber
+        optionalNumber(fiber) !== entry.fiber ||
+        optionalNumber(sodium) !== entry.sodium
       const saved = await patchNutritionEntry(entry.id, {
         servingQuantity: quantity,
         foodName: linked ? undefined : foodName.trim(),
@@ -889,6 +896,7 @@ export function EntryEditorSheet({
               carbs: optionalNumber(carbs),
               fat: optionalNumber(fat),
               fiber: optionalNumber(fiber),
+              sodium: optionalNumber(sodium),
             }
           : {}),
       })
@@ -965,6 +973,7 @@ export function EntryEditorSheet({
           <OptionalMacro id="entry-carbs" label="Carbs g" value={carbs} onChange={setCarbs} />
           <OptionalMacro id="entry-fat" label="Fat g" value={fat} onChange={setFat} />
           <OptionalMacro id="entry-fiber" label="Fiber g" value={fiber} onChange={setFiber} />
+          <OptionalMacro id="entry-sodium" label="Sodium mg" value={sodium} onChange={setSodium} />
         </div>
         <Field label="Meal" htmlFor="entry-meal">
           <select id="entry-meal" className={inputClass} value={meal} onChange={(event) => setMeal(event.target.value)}>
@@ -1005,6 +1014,7 @@ export function TargetSheet({
   const [carbs, setCarbs] = useState('')
   const [fat, setFat] = useState('')
   const [fiber, setFiber] = useState('')
+  const [sodium, setSodium] = useState('')
   const [effectiveFrom, setEffectiveFrom] = useState(date)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -1020,6 +1030,7 @@ export function TargetSheet({
         carbsTarget: optionalNumber(carbs),
         fatTarget: optionalNumber(fat),
         fiberTarget: optionalNumber(fiber),
+        sodiumTarget: optionalNumber(sodium),
       })
       onSaved()
       onClose()
@@ -1063,6 +1074,7 @@ export function TargetSheet({
           <OptionalMacro id="target-carbs" label="Carbs g" value={carbs} onChange={setCarbs} />
           <OptionalMacro id="target-fat" label="Fat g" value={fat} onChange={setFat} />
           <OptionalMacro id="target-fiber" label="Fiber g" value={fiber} onChange={setFiber} />
+          <OptionalMacro id="target-sodium" label="Sodium mg" value={sodium} onChange={setSodium} />
         </div>
         {error ? <p className="text-sm text-red-700">{error}</p> : null}
       </div>
@@ -1087,6 +1099,7 @@ export function FoodEditorSheet({
   const [carbs, setCarbs] = useState(food.carbs == null ? '' : String(food.carbs))
   const [fat, setFat] = useState(food.fat == null ? '' : String(food.fat))
   const [fiber, setFiber] = useState(food.fiber == null ? '' : String(food.fiber))
+  const [sodium, setSodium] = useState(food.sodium == null ? '' : String(food.sodium))
   const [staple, setStaple] = useState(food.isStaple)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -1104,6 +1117,7 @@ export function FoodEditorSheet({
         carbs: optionalNumber(carbs),
         fat: optionalNumber(fat),
         fiber: optionalNumber(fiber),
+        sodium: optionalNumber(sodium),
         isStaple: staple,
       })
       onSaved(saved)
@@ -1146,6 +1160,7 @@ export function FoodEditorSheet({
           <OptionalMacro id="food-carbs" label="Carbs g" value={carbs} onChange={setCarbs} />
           <OptionalMacro id="food-fat" label="Fat g" value={fat} onChange={setFat} />
           <OptionalMacro id="food-fiber" label="Fiber g" value={fiber} onChange={setFiber} />
+          <OptionalMacro id="food-sodium" label="Sodium mg" value={sodium} onChange={setSodium} />
         </div>
         <label className="flex min-h-11 items-center gap-2 text-sm">
           <input type="checkbox" checked={staple} onChange={(event) => setStaple(event.target.checked)} />
@@ -1165,7 +1180,7 @@ function emptyCandidate(barcode: string): PackagedFoodCandidate {
     name: null,
     brand: null,
     serving: { quantity: 1, unit: 'serving', grams: null },
-    nutrition: { calories: null, protein: null, carbs: null, fat: null, fiber: null },
+    nutrition: { calories: null, protein: null, carbs: null, fat: null, fiber: null, sodium: null },
     sourceBasis: { kind: 'missing', perServing: false, per100g: false },
     per100g: null,
     warnings: ['Not found in the product database.'],
@@ -1198,6 +1213,7 @@ function PackagedReviewSheet({
   const [carbs, setCarbs] = useState(candidate.nutrition.carbs == null ? '' : String(candidate.nutrition.carbs))
   const [fat, setFat] = useState(candidate.nutrition.fat == null ? '' : String(candidate.nutrition.fat))
   const [fiber, setFiber] = useState(candidate.nutrition.fiber == null ? '' : String(candidate.nutrition.fiber))
+  const [sodium, setSodium] = useState(candidate.nutrition.sodium == null ? '' : String(candidate.nutrition.sodium))
   const [errors, setErrors] = useState<ReviewFieldError[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -1225,6 +1241,7 @@ function PackagedReviewSheet({
     setCarbs(next.nutrition.carbs == null ? '' : String(next.nutrition.carbs))
     setFat(next.nutrition.fat == null ? '' : String(next.nutrition.fat))
     setFiber(next.nutrition.fiber == null ? '' : String(next.nutrition.fiber))
+    setSodium(next.nutrition.sodium == null ? '' : String(next.nutrition.sodium))
     setErrors([])
   }
 
@@ -1262,6 +1279,7 @@ function PackagedReviewSheet({
         carbs: optionalNumber(carbs),
         fat: optionalNumber(fat),
         fiber: optionalNumber(fiber),
+        sodium: optionalNumber(sodium),
         logDate: date,
         timezone: NUTRITION_CONFIG.calendarTimeZone,
         logQuantity: 1,
@@ -1361,6 +1379,7 @@ function PackagedReviewSheet({
               setCarbs(next.nutrition.carbs == null ? '' : String(next.nutrition.carbs))
               setFat(next.nutrition.fat == null ? '' : String(next.nutrition.fat))
               setFiber(next.nutrition.fiber == null ? '' : String(next.nutrition.fiber))
+    setSodium(next.nutrition.sodium == null ? '' : String(next.nutrition.sodium))
             }
           }}
         />
@@ -1397,6 +1416,7 @@ function PackagedReviewSheet({
           <OptionalMacro id="review-carbs" label="Carbs g" value={carbs} onChange={setCarbs} />
           <OptionalMacro id="review-fat" label="Fat g" value={fat} onChange={setFat} />
           <OptionalMacro id="review-fiber" label="Fiber g" value={fiber} onChange={setFiber} />
+          <OptionalMacro id="review-sodium" label="Sodium mg" value={sodium} onChange={setSodium} />
         </div>
         <p className="text-sm text-zinc-500">Source · Open Food Facts</p>
         {error ? <p className="text-sm text-red-700">{error}</p> : null}
