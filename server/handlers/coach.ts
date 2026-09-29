@@ -27,7 +27,7 @@ export function matchCoachRoute(pathname: string): CoachRoute | null {
   }
 }
 
-async function handleCoach(req: ApiRequest, res: ApiResponse) {
+export async function handleCoach(req: ApiRequest, res: ApiResponse) {
   const route = matchCoachRoute(requestApiPathname(req))
   if (!route) {
     sendJson(res, 404, { error: 'Not found' })
