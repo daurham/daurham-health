@@ -63,15 +63,22 @@ vi.mock('../server/training/owner-exercises.ts', () => ({
 
 vi.mock('../server/training/service.ts', () => ({
   parseManualWorkoutRequest: (body: unknown) => body,
-  prepareManualSession: (input: { request: { workoutDate: string }; sessionId: string }) => ({
-    sessionId: input.sessionId,
-    workoutDate: input.request.workoutDate,
-  }),
+  prepareManualSession: (input: {
+    request: { workoutDate: string; exercises: Array<{ sets: Array<{ reps: number | null; durationSec: number | null }> }> }
+    sessionId: string
+  }) => {
+    const set = input.request.exercises[0]?.sets[0]
+    return {
+      sessionId: input.sessionId,
+      workoutDate: input.request.workoutDate,
+      actual: set?.reps ?? ((set?.durationSec ?? 0) / 60),
+    }
+  },
   buildSessionInsertQueries: (
     sql: { query: (text: string, params?: unknown[]) => Promise<unknown> },
-    prepared: { sessionId: string },
+    prepared: { sessionId: string; actual: number },
   ) => [
-    sql.query('INSERT INTO workout_sessions /* coach-test */', [prepared.sessionId]),
+    sql.query('INSERT INTO workout_sessions /* coach-test */', [prepared.sessionId, prepared.actual]),
   ],
 }))
 
@@ -141,7 +148,7 @@ vi.mock('../server/db.ts', () => ({
     const sql = {
       query: async (text: string, params: unknown[] = []) => {
         if (text.includes('INSERT INTO workout_sessions /* coach-test */')) {
-          state.workout = { id: String(params[0]), actual: 100 }
+          state.workout = { id: String(params[0]), actual: Number(params[1]) }
           return []
         }
 
@@ -325,6 +332,20 @@ describe('Coach persistence service', () => {
     }, NOW)
     expect(result.dailyQuest?.status).toBe('completed')
     expect(state.events.some((event) => event.evidence_kind === 'owner_self_report')).toBe(true)
+  })
+
+  it('logs below-target physical work without falsely completing the quest', async () => {
+    const ensured = await ensureCoach(NOW)
+    const quest = ensured.dailyQuest!
+    const result = await logCoachTraining(
+      quest.id,
+      { submissionId: '77777777-7777-4777-8777-777777777777', actualValue: 80 },
+      NOW,
+    )
+    expect(state.workout?.actual).toBe(80)
+    expect(result.dailyQuest?.status).toBe('active')
+    expect(result.dailyQuest?.progress?.current).toBe(80)
+    expect(state.events.some((event) => event.evidence_kind === 'training_session')).toBe(false)
   })
 
   it('logs a physical quest through canonical ad-hoc Training and completes from that source', async () => {
