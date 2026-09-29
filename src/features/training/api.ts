@@ -11,6 +11,7 @@ import {
   type WorkoutSession,
   type WorkoutSessionSummary,
   type WorkoutTemplate,
+  workoutTemplateSchema,
 } from '@/domain/training'
 import {
   createTranscriptionJobResponseSchema,
@@ -48,6 +49,37 @@ export async function fetchTemplates(): Promise<WorkoutTemplate[]> {
     throw new Error(await readApiError(response))
   }
   return templateListResponseSchema.parse(await response.json()).templates
+}
+
+export async function createRoutine(input: {
+  name: string
+  slots: Array<{ exerciseDefinitionId: string; plannedSets: number; prescription: Record<string, unknown> }>
+}): Promise<WorkoutTemplate> {
+  const response = await healthFetch('/api/training/templates', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+  if (!response.ok) throw new Error(await readApiError(response))
+  return workoutTemplateSchema.parse((await response.json()).template)
+}
+
+export async function reviseRoutine(templateId: string, input: {
+  name: string
+  slots: Array<{ exerciseDefinitionId: string; plannedSets: number; prescription: Record<string, unknown> }>
+}): Promise<WorkoutTemplate> {
+  const response = await healthFetch(`/api/training/templates/${templateId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+  if (!response.ok) throw new Error(await readApiError(response))
+  return workoutTemplateSchema.parse((await response.json()).template)
+}
+
+export async function archiveRoutine(templateId: string): Promise<void> {
+  const response = await healthFetch(`/api/training/templates/${templateId}`, { method: 'DELETE' })
+  if (!response.ok) throw new Error(await readApiError(response))
 }
 
 export async function fetchSessions(): Promise<WorkoutSessionSummary[]> {
