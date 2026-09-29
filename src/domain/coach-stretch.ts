@@ -33,6 +33,7 @@ export type StretchGoal = {
   kind: string
   status: string
   exerciseDefinitionId: string | null
+  trainingMinDistanceM?: number | null
 }
 
 export type StretchTaskMetadata = {
@@ -225,7 +226,10 @@ export function stretchCandidates(input: StretchCandidateInput): CoachCandidate[
             : observation.strategy === 'pace' ? 'training_pace' : null
     const goal = goalKind
       ? [...(input.goals ?? [])].filter((item) => item.kind === goalKind && item.status === 'active' &&
-        item.exerciseDefinitionId === observation.exerciseId).sort((left, right) => left.id.localeCompare(right.id))[0]
+        item.exerciseDefinitionId === observation.exerciseId &&
+        (observation.strategy !== 'pace' || item.trainingMinDistanceM == null ||
+          (observation.sourceSet.distanceM ?? 0) >= item.trainingMinDistanceM))
+        .sort((left, right) => left.id.localeCompare(right.id))[0]
       : undefined
     const age = calendarDaysBetween(baseline.latestDate, date)
     const metadata: StretchTaskMetadata = {
