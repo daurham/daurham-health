@@ -364,7 +364,7 @@ export const descriptionEstimateItemSchema = z.object({
   carbsGrams: z.number(),
   fatGrams: z.number(),
   fiberGrams: z.number().nullable(),
-  sodiumMg: z.number().nullable(),
+  sodiumMg: z.number().nullable().optional().default(null),
   assumption: z.string().nullable(),
 })
 export type DescriptionEstimateItem = z.infer<typeof descriptionEstimateItemSchema>
@@ -379,7 +379,7 @@ export const descriptionEstimateCandidateSchema = z.object({
   carbsGrams: z.number(),
   fatGrams: z.number(),
   fiberGrams: z.number().nullable(),
-  sodiumMg: z.number().nullable(),
+  sodiumMg: z.number().nullable().optional().default(null),
   model: z.string().nullable().optional(),
 })
 export type DescriptionEstimateCandidate = z.infer<typeof descriptionEstimateCandidateSchema>
@@ -399,7 +399,7 @@ export const commitNutritionDescriptionEstimateRequestSchema = z.object({
   carbsGrams: z.number().min(0),
   fatGrams: z.number().min(0),
   fiberGrams: z.number().min(0).nullable(),
-  sodiumMg: z.number().min(0).nullable(),
+  sodiumMg: z.number().min(0).nullable().optional().default(null),
   portionScale: z.number().optional(),
   items: z.array(descriptionEstimateItemSchema).optional(),
 })
