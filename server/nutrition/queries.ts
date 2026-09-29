@@ -104,6 +104,7 @@ export function mapEntryRow(row: EntryRow): NutritionEntry {
     carbs: asNumber(row.carbs),
     fat: asNumber(row.fat),
     fiber: asNumber(row.fiber),
+    sodiumMg: asNumber(row.sodium_mg),
     sourceKind: row.source_kind as NutritionEntry['sourceKind'],
     notes: row.notes == null || row.notes === '' ? null : String(row.notes),
     mealGroupId: row.meal_group_id == null ? null : String(row.meal_group_id),
