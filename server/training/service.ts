@@ -839,6 +839,262 @@ async function loadTemplateForEdit(templateId: string): Promise<WorkoutTemplate>
   })
 }
 
+
+function parseOwnerRoutine(body: unknown): OwnerRoutineRequest {
+  const parsed = ownerRoutineRequestSchema.safeParse(body)
+  if (!parsed.success) {
+    throw new HttpError(400, parsed.error.issues[0]?.message ?? 'Invalid Saved Routine')
+  }
+  return parsed.data
+}
+
+async function validateOwnerRoutineExercises(
+  request: OwnerRoutineRequest,
+): Promise<Map<string, ExerciseDefinition>> {
+  const byId = await loadExercisesById(request.slots.map((slot) => slot.exerciseDefinitionId))
+  for (const slot of request.slots) {
+    const exercise = byId.get(slot.exerciseDefinitionId)
+    if (!exercise || !exercise.isActive) {
+      throw new HttpError(400, 'Saved Routines can use only active exercises.')
+    }
+    if (slot.prescription.measurement !== exercise.measurementKind) {
+      throw new HttpError(
+        400,
+        `${exercise.name} prescription must use ${exercise.measurementKind.replaceAll('_', ' ')}.`,
+      )
+    }
+  }
+  return byId
+}
+
+function ownerRoutineSlotQueries(
+  sql: Awaited<ReturnType<typeof getSql>>,
+  templateId: string,
+  request: OwnerRoutineRequest,
+) {
+  return request.slots.map((slot, index) =>
+    sql.query(
+      `INSERT INTO workout_template_exercises (
+         id, workout_template_id, exercise_definition_id, slot_id, position, planned_sets, prescription, metadata
+       ) VALUES (
+         $1::uuid, $2::uuid, $3::uuid, $4, $5::int, $6::int, $7::jsonb, '{}'::jsonb
+       )`,
+      [
+        randomUUID(),
+        templateId,
+        slot.exerciseDefinitionId,
+        `O${String(index + 1).padStart(2, '0')}`,
+        index + 1,
+        slot.plannedSets,
+        JSON.stringify(slot.prescription),
+      ],
+    ),
+  )
+}
+
+export async function createOwnerRoutine(body: unknown): Promise<WorkoutTemplate> {
+  const request = parseOwnerRoutine(body)
+  await validateOwnerRoutineExercises(request)
+  const sql = await getSql()
+  const id = randomUUID()
+  const routineCode = `owner:${randomUUID()}`
+  const now = new Date().toISOString()
+  try {
+    await sql.transaction([
+      sql.query(
+        `INSERT INTO workout_templates (
+           id, routine_code, version, name, metadata, is_active, origin_kind, created_at, updated_at
+         ) VALUES ($1::uuid, $2, '1', $3, '{}'::jsonb, true, 'owner', $4::timestamptz, $4::timestamptz)`,
+        [id, routineCode, request.name, now],
+      ),
+      ...ownerRoutineSlotQueries(sql, id, request),
+    ])
+  } catch (error) {
+    if (asMissingRelation(error)) {
+      throw new HttpError(503, TABLES_UNAVAILABLE)
+    }
+    throw new HttpError(500, 'Saved Routine could not be created')
+  }
+  return loadTemplateById(id)
+}
+
+export async function reviseOwnerRoutine(templateId: string, body: unknown): Promise<WorkoutTemplate> {
+  const request = parseOwnerRoutine(body)
+  await validateOwnerRoutineExercises(request)
+  const sql = await getSql()
+  const before = (await queryOrUnavailable(() =>
+    sql.query(
+      `SELECT origin_kind, is_active FROM workout_templates WHERE id = $1::uuid LIMIT 1`,
+      [templateId],
+    ),
+  )) as Array<{ origin_kind?: string; is_active?: boolean }>
+  if (!before[0]) {
+    throw new HttpError(404, 'Saved Routine was not found')
+  }
+  if (before[0].origin_kind !== 'owner') {
+    throw new HttpError(409, 'Built-in routines cannot be changed.')
+  }
+  if (before[0].is_active !== true) {
+    throw new HttpError(409, 'Saved Routine changed since editing began.')
+  }
+
+  const nextId = randomUUID()
+  const now = new Date().toISOString()
+  try {
+    await sql.transaction([
+      sql.query(
+        `WITH deactivated AS (
+           UPDATE workout_templates
+              SET is_active = false, updated_at = $4::timestamptz
+            WHERE id = $1::uuid AND origin_kind = 'owner' AND is_active = true
+            RETURNING routine_code, version
+         )
+         INSERT INTO workout_templates (
+           id, routine_code, version, name, metadata, is_active, origin_kind, created_at, updated_at
+         )
+         SELECT $2::uuid, routine_code, (version::integer + 1)::text, $3, '{}'::jsonb,
+                true, 'owner', $4::timestamptz, $4::timestamptz
+         FROM deactivated
+         WHERE version ~ '^[0-9]+
+  const existing = await getSession(sessionId)
+  const request = parseManualWorkoutRequest(body)
+  const typeError = sessionTypeEditError(existing.session.sessionType, request.sessionType)
+  if (typeError) {
+    throw new HttpError(typeError.status, typeError.message)
+  }
+  const exercisesById = await loadExercisesById(
+    request.exercises.map((exercise) => exercise.exerciseDefinitionId),
+  )
+  let template: WorkoutTemplate | null = null
+  let nextRequest = request
+  if (existing.session.sessionType === 'ad_hoc') {
+    nextRequest = { ...request, workoutTemplateId: null, sessionType: 'ad_hoc', experimentId: null, benchmarkProtocolVersionId: null }
+  } else if (existing.session.sessionType === 'experiment') {
+    nextRequest = {
+      ...request,
+      workoutTemplateId: null,
+      sessionType: 'experiment',
+      experimentId: existing.session.experimentId ?? null,
+      benchmarkProtocolVersionId: existing.session.benchmarkProtocolVersionId ?? null,
+    }
+  } else {
+    const templateError = programmedTemplateEditError(existing.session.workoutTemplateId, request.workoutTemplateId)
+    if (templateError) {
+      throw new HttpError(409, templateError)
+    }
+    const templateId = existing.session.workoutTemplateId
+    if (templateId == null) {
+      throw new HttpError(400, 'A programmed workout needs a template.')
+    }
+    template = await loadTemplateForEdit(templateId)
+    nextRequest = { ...request, workoutTemplateId: templateId, sessionType: 'programmed', sessionName: null }
+  }
+  const prepared = prepareManualSession({
+    request: nextRequest,
+    exercisesById,
+    template,
+    sessionId,
+    sourceKind: existing.session.sourceKind,
+    metadata: existing.session.metadata,
+  })
+  const sql = await getSql()
+  try {
+    await sql.transaction([
+      sql.query(UPDATE_WORKOUT_SESSION_SQL, [
+        prepared.sessionId,
+        prepared.workoutDate,
+        prepared.workoutTemplateId,
+        prepared.routineCode,
+        prepared.templateVersion,
+        prepared.templateName,
+        prepared.durationMin == null ? null : decimalString(prepared.durationMin),
+        prepared.effort,
+        prepared.painLevel,
+        prepared.bodyweightKg == null ? null : decimalString(prepared.bodyweightKg),
+        prepared.notes,
+        JSON.stringify(prepared.metadata),
+        prepared.sessionName,
+      ]),
+      sql.query(DELETE_WORKOUT_SESSION_EXERCISES_SQL, [prepared.sessionId]),
+      ...buildSessionInsertQueries(sql, prepared).slice(1),
+    ])
+  } catch (error) {
+    if (asMissingRelation(error)) {
+      throw new HttpError(503, TABLES_UNAVAILABLE)
+    }
+    throw new HttpError(500, 'Workout could not be saved')
+  }
+  return getSession(prepared.sessionId)
+}
+
+export async function deleteManualSession(sessionId: string): Promise<void> {
+  await getSession(sessionId)
+  const sql = await getSql()
+  try {
+    await sql.transaction([
+      sql.query(DETACH_TRANSCRIPTION_SESSION_SQL, [sessionId]),
+      sql.query(DELETE_WORKOUT_SESSION_SQL, [sessionId]),
+    ])
+  } catch (error) {
+    if (asMissingRelation(error)) {
+      throw new HttpError(503, TABLES_UNAVAILABLE)
+    }
+    throw new HttpError(500, 'Workout could not be deleted')
+  }
+}
+
+         RETURNING id::text AS id`,
+        [templateId, nextId, request.name, now],
+      ),
+      ...ownerRoutineSlotQueries(sql, nextId, request),
+    ])
+  } catch (error) {
+    if (asMissingRelation(error)) {
+      throw new HttpError(503, TABLES_UNAVAILABLE)
+    }
+    const after = (await sql.query(
+      `SELECT origin_kind, is_active FROM workout_templates WHERE id = $1::uuid LIMIT 1`,
+      [templateId],
+    )) as Array<{ origin_kind?: string; is_active?: boolean }>
+    if (!after[0] || after[0].origin_kind !== 'owner' || after[0].is_active !== true) {
+      throw new HttpError(409, 'Saved Routine changed since editing began.')
+    }
+    throw new HttpError(500, 'Saved Routine could not be revised')
+  }
+  try {
+    return await loadTemplateById(nextId)
+  } catch {
+    throw new HttpError(409, 'Saved Routine changed since editing began.')
+  }
+}
+
+export async function archiveOwnerRoutine(templateId: string): Promise<{ ok: true }> {
+  const sql = await getSql()
+  const rows = (await queryOrUnavailable(() =>
+    sql.query(
+      `UPDATE workout_templates
+          SET is_active = false, updated_at = now()
+        WHERE id = $1::uuid AND origin_kind = 'owner' AND is_active = true
+        RETURNING id::text AS id`,
+      [templateId],
+    ),
+  )) as Array<{ id?: string }>
+  if (!rows[0]?.id) {
+    const existing = (await sql.query(
+      `SELECT origin_kind, is_active FROM workout_templates WHERE id = $1::uuid LIMIT 1`,
+      [templateId],
+    )) as Array<{ origin_kind?: string; is_active?: boolean }>
+    if (!existing[0]) {
+      throw new HttpError(404, 'Saved Routine was not found')
+    }
+    if (existing[0].origin_kind !== 'owner') {
+      throw new HttpError(409, 'Built-in routines cannot be changed.')
+    }
+    throw new HttpError(409, 'Saved Routine is no longer current.')
+  }
+  return { ok: true }
+}
+
 export async function updateManualSession(sessionId: string, body: unknown): Promise<SessionDetailResponse> {
   const existing = await getSession(sessionId)
   const request = parseManualWorkoutRequest(body)
