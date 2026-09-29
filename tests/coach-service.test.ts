@@ -22,15 +22,21 @@ const state = vi.hoisted(() => ({
   tasks: [] as TestTask[],
   events: [] as TestEvent[],
   workout: null as null | { id: string; actual: number },
+  goals: [] as Array<Record<string, unknown>>,
+  cadence: { configs: [] as Array<Record<string, unknown>>, observations: [] as Array<Record<string, unknown>> },
+  activitySteps: null as number | null,
+  proteinTotal: null as number | null,
+  trainingSessions: [] as Array<{ id: string; workout_date: string }>,
+  bodySession: null as null | { session_id: string; measured_date: string },
   transactionCount: 0,
 }))
 
 vi.mock('../server/goals/service.ts', () => ({
-  listGoals: async () => ({ goals: [], asOf: '2026-09-29', catalog: {} }),
+  listGoals: async () => ({ goals: state.goals, asOf: '2026-09-29', catalog: {} }),
 }))
 
 vi.mock('../server/body/cadence-service.ts', () => ({
-  loadCadenceEvidence: async () => ({ configs: [], observations: [] }),
+  loadCadenceEvidence: async () => state.cadence,
 }))
 
 vi.mock('../server/context/service.ts', () => ({
@@ -148,7 +154,29 @@ vi.mock('../server/db.ts', () => ({
         }
 
         if (text.includes('SELECT id::text AS id, workout_date::text AS workout_date')) {
-          return []
+          return state.trainingSessions
+        }
+
+        if (text.includes('FROM activity_daily_summaries') && text.includes('summary_date = $1::date')) {
+          return state.activitySteps == null ? [] : [{ steps: String(state.activitySteps) }]
+        }
+
+        if (text.includes('FROM activity_daily_summaries') && text.includes('summary_date BETWEEN')) {
+          return state.activitySteps == null ? [] : [{ steps: String(state.activitySteps) }]
+        }
+
+        if (text.includes('FROM nutrition_entries') && text.includes('WHERE log_date = $1::date')) {
+          return [{ unknown: state.proteinTotal == null, total: state.proteinTotal == null ? null : String(state.proteinTotal) }]
+        }
+
+        if (text.includes('FROM nutrition_entries') && text.includes('log_date BETWEEN')) {
+          return state.proteinTotal == null
+            ? []
+            : [{ date: '2026-09-29', unknown: false, total: String(state.proteinTotal) }]
+        }
+
+        if (text.includes('FROM body_metrics') && text.includes('measurement_session_id')) {
+          return state.bodySession ? [state.bodySession] : []
         }
 
         if (text.includes('FROM coach_tasks') && text.includes("WHERE status = 'active'")) {
@@ -231,10 +259,6 @@ vi.mock('../server/db.ts', () => ({
           return task ? [{ id: task.id }] : []
         }
 
-        if (text.includes('FROM nutrition_entries') || text.includes('FROM activity_daily_summaries') || text.includes('FROM body_metrics')) {
-          return []
-        }
-
         return []
       },
       transaction: async (queries: Promise<unknown>[]) => {
@@ -260,6 +284,12 @@ describe('Coach persistence service', () => {
     state.tasks = []
     state.events = []
     state.workout = null
+    state.goals = []
+    state.cadence = { configs: [], observations: [] }
+    state.activitySteps = null
+    state.proteinTotal = null
+    state.trainingSessions = []
+    state.bodySession = null
     state.transactionCount = 0
   })
 
@@ -311,3 +341,83 @@ describe('Coach persistence service', () => {
     expect(state.events.filter((event) => event.evidence_kind === 'training_session')).toHaveLength(1)
   })
 })
+
+function goal(kind: 'training_frequency' | 'activity_steps' | 'nutrition_protein', target: number) {
+  return {
+    id: `goal-${kind}`,
+    status: 'active',
+    goalKind: kind,
+    selector: { bodyMetricKey: null },
+    currentVersion: {
+      targetMode: 'at_least',
+      targetMin: target,
+      targetMax: null,
+    },
+    goalStatus: {
+      deadlineState: 'future_no_projection',
+      targetState: 'below_target',
+    },
+  }
+}
+
+describe('Coach automatic completion authorities', () => {
+  beforeEach(() => {
+    state.tasks = []
+    state.events = []
+    state.workout = null
+    state.goals = []
+    state.cadence = { configs: [], observations: [] }
+    state.activitySteps = null
+    state.proteinTotal = null
+    state.trainingSessions = []
+    state.bodySession = null
+    state.transactionCount = 0
+  })
+
+  it('completes an Activity steps quest from the canonical day summary', async () => {
+    state.goals = [goal('activity_steps', 8000)]
+    state.activitySteps = 9000
+    const result = await ensureCoach(NOW)
+    expect(result.dailyQuest?.ruleKey).toContain('goal:steps-today:')
+    expect(result.dailyQuest?.status).toBe('completed')
+    expect(state.events.some((event) => event.evidence_kind === 'deterministic_canonical')).toBe(true)
+  })
+
+  it('completes a protein quest only from a known canonical Nutrition total', async () => {
+    state.goals = [goal('nutrition_protein', 160)]
+    state.proteinTotal = 170
+    const result = await ensureCoach(NOW)
+    expect(result.dailyQuest?.ruleKey).toContain('goal:protein-today:')
+    expect(result.dailyQuest?.status).toBe('completed')
+  })
+
+  it('completes a Training-frequency quest from a canonical session', async () => {
+    state.goals = [goal('training_frequency', 3)]
+    state.trainingSessions = [{ id: '55555555-5555-4555-8555-555555555555', workout_date: '2026-09-29' }]
+    const result = await ensureCoach(NOW)
+    expect(result.dailyQuest?.ruleKey).toContain('goal:training-session:')
+    expect(result.dailyQuest?.status).toBe('completed')
+  })
+
+  it('completes a due Body quest only after a new canonical measurement appears', async () => {
+    state.cadence = {
+      configs: [{ metricKey: 'chest_circumference', intervalDays: 7, enabledFrom: '2026-09-01' }],
+      observations: [{
+        metricKey: 'chest_circumference',
+        calendarDate: '2026-09-15',
+        measuredAt: '2026-09-15T15:00:00.000Z',
+      }],
+    }
+    const first = await ensureCoach(NOW)
+    expect(first.dailyQuest?.ruleKey).toBe('body-cadence:chest_circumference')
+    expect(first.dailyQuest?.status).toBe('active')
+
+    state.bodySession = {
+      session_id: '66666666-6666-4666-8666-666666666666',
+      measured_date: '2026-09-29',
+    }
+    const second = await ensureCoach(NOW)
+    expect(second.dailyQuest?.status).toBe('completed')
+  })
+})
+
