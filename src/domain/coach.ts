@@ -411,10 +411,14 @@ export function manualRuleByKey(ruleKey: string): GeneralCoachRule | null {
 
 export const coachTrainingLogSchema = z.object({
   submissionId: z.string().uuid(),
-  actualValue: z.number().positive(),
-  distance: z.number().positive().nullable().optional(),
+  actualValue: z.number().positive().max(100_000),
+  distance: z.number().positive().max(10_000).nullable().optional(),
   distanceUnit: z.enum(['mi', 'km']).nullable().optional(),
   note: z.string().trim().max(500).nullable().optional(),
+}).superRefine((value, ctx) => {
+  if (value.distance != null && value.distanceUnit == null) {
+    ctx.addIssue({ code: 'custom', path: ['distanceUnit'], message: 'Choose a distance unit.' })
+  }
 })
 
 export const coachSelfReportSchema = z.object({
