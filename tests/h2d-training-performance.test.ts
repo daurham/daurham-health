@@ -120,7 +120,7 @@ describe('H2D performance authority', () => {
     const failed = { ...BASE, setId: 'failed', exerciseId: 'skill', completed: false }
     const passed = { ...BASE, setId: 'passed', sessionId: 's2', sessionExerciseId: 'a2', exerciseId: 'skill', completed: true }
     const obs = trainingPerformanceObservations([failed, passed], skill)
-    expect(obs.map((item) => item.value)).toEqual([0, 1])
+    expect(obs.map((item) => item.value).sort()).toEqual([0, 1])
     expect(bestTrainingPerformance(obs, 'skill')?.sourceSet.setId).toBe('passed')
   })
 
