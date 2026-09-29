@@ -115,7 +115,7 @@ export function resolveRecipePortion(
     carbs: scaled.carbs,
     fat: scaled.fat,
     fiber: scaled.fiber,
-    sodium: scaled.sodium,
+    sodium: scaled.sodium ?? null,
     description,
     servingQuantity: amount,
     servingUnit,
