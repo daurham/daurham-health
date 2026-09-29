@@ -63,7 +63,7 @@ export type GoalSelector = {
   benchmarkProtocolVersionId: string | null
   benchmarkRequirementId: string | null
   supplementId: string | null
-  trainingMinDistanceM: number | null
+  trainingMinDistanceM?: number | null
 }
 
 export type GoalTarget = {
@@ -679,7 +679,7 @@ export function sameGoalSelector(left: GoalSelector, right: GoalSelector): boole
     left.benchmarkProtocolVersionId === right.benchmarkProtocolVersionId &&
     left.benchmarkRequirementId === right.benchmarkRequirementId &&
     left.supplementId === right.supplementId &&
-    left.trainingMinDistanceM === right.trainingMinDistanceM
+    (left.trainingMinDistanceM ?? null) === (right.trainingMinDistanceM ?? null)
   )
 }
 
@@ -874,7 +874,7 @@ export function goalEvidence(input: {
   activityRows: readonly ActivityDailyRow[]
   proteinDays: readonly { date: string; protein: number | null; logged: boolean }[]
   sleepNights: readonly { date: string; minutes: number | null; analysisEligible: boolean; partial: boolean }[]
-  training: {
+  training?: {
     value: number
     observedOn: string
     sessionId: string
