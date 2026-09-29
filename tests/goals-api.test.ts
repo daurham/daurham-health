@@ -13,6 +13,7 @@ const service = vi.hoisted(() => ({
   getGoal: vi.fn(),
   createGoal: vi.fn(),
   reviseGoal: vi.fn(),
+  archiveGoal: vi.fn(),
   changeGoalLifecycle: vi.fn(),
   readGoalProjection: vi.fn(),
 }))
@@ -66,6 +67,7 @@ describe('goal API auth', () => {
     service.createGoal.mockResolvedValue({ id: GOAL })
     service.getGoal.mockResolvedValue({ id: GOAL })
     service.reviseGoal.mockResolvedValue({ id: GOAL })
+    service.archiveGoal.mockResolvedValue({ ok: true, disposition: 'deleted' })
     service.changeGoalLifecycle.mockResolvedValue({ id: GOAL, status: 'paused' })
     service.readGoalProjection.mockResolvedValue({ id: GOAL, state: 'not_applicable' })
   })
@@ -81,11 +83,13 @@ describe('goal API auth', () => {
     expect(service.createGoal).not.toHaveBeenCalled()
   })
 
-  it('lets the owner list, create, revise, and pause', async () => {
+  it('lets the owner list, create, revise, remove, and pause', async () => {
     const owner = { id: 'owner-1', email: 'owner@example.com' }
     expect((await call('GET', '/api/goals', owner)).status()).toBe(200)
     expect((await call('POST', '/api/goals', owner, { goalKind: 'body_metric' })).status()).toBe(201)
     expect((await call('POST', `/api/goals/${GOAL}/versions`, owner, { sourceVersionId: GOAL })).status()).toBe(201)
+    expect((await call('DELETE', `/api/goals/${GOAL}`, owner)).status()).toBe(200)
+    expect(service.archiveGoal).toHaveBeenCalledWith(GOAL)
     expect((await call('POST', `/api/goals/${GOAL}/pause`, owner, {})).status()).toBe(200)
     expect(service.changeGoalLifecycle).toHaveBeenCalledWith(GOAL, 'pause')
     expect((await call('GET', `/api/goals/${GOAL}/projection`, owner)).status()).toBe(200)
