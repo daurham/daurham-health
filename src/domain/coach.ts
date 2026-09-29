@@ -324,7 +324,7 @@ export function coachPeriodFingerprint(
   kind: CoachTaskKind,
   startsOn: string,
   ruleKey: string,
-  ruleVersion = COACH_RULE_VERSION,
+  ruleVersion: number = COACH_RULE_VERSION,
 ): string {
   return `coach:${kind}:${startsOn}:${ruleKey}:v${ruleVersion}`
 }
