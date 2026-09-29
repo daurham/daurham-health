@@ -50,6 +50,20 @@ function parseOwnerExerciseRequest(body: unknown): OwnerExerciseRequest {
   return parsed.data
 }
 
+export async function getExerciseDefinitionByExternalId(externalId: string): Promise<ExerciseDefinition | null> {
+  const sql = await getSql()
+  const rows = await queryOrUnavailable(() =>
+    sql.query(
+      `SELECT ${EXERCISE_COLUMNS}
+       FROM exercise_definitions
+       WHERE external_id = $1 AND is_active = true
+       LIMIT 1`,
+      [externalId],
+    ),
+  )
+  return rows[0] ? mapExercise(rows[0]) : null
+}
+
 export async function getExerciseDefinition(id: string): Promise<ExerciseDefinition> {
   const sql = await getSql()
   const rows = await queryOrUnavailable(() =>
