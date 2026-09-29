@@ -1,8 +1,26 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+type TestTask = {
+  id: string
+  task_kind: string
+  rule_key: string
+  starts_on: string
+  status: string
+  completed_at: string | null
+  closed_at: string | null
+  [key: string]: unknown
+}
+
+type TestEvent = {
+  task_id: string
+  event_kind: string
+  evidence_kind: string
+  idempotency_key: string
+}
+
 const state = vi.hoisted(() => ({
-  tasks: [] as Array<Record<string, any>>,
-  events: [] as Array<Record<string, any>>,
+  tasks: [] as TestTask[],
+  events: [] as TestEvent[],
   workout: null as null | { id: string; actual: number },
   transactionCount: 0,
 }))
@@ -39,8 +57,14 @@ vi.mock('../server/training/owner-exercises.ts', () => ({
 
 vi.mock('../server/training/service.ts', () => ({
   parseManualWorkoutRequest: (body: unknown) => body,
-  prepareManualSession: ({ request, sessionId }: any) => ({ sessionId, workoutDate: request.workoutDate }),
-  buildSessionInsertQueries: (sql: any, prepared: any) => [
+  prepareManualSession: (input: { request: { workoutDate: string }; sessionId: string }) => ({
+    sessionId: input.sessionId,
+    workoutDate: input.request.workoutDate,
+  }),
+  buildSessionInsertQueries: (
+    sql: { query: (text: string, params?: unknown[]) => Promise<unknown> },
+    prepared: { sessionId: string },
+  ) => [
     sql.query('INSERT INTO workout_sessions /* coach-test */', [prepared.sessionId]),
   ],
 }))
