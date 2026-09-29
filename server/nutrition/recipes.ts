@@ -417,8 +417,8 @@ export async function createRecipe(body: unknown): Promise<RecipeDetail> {
            $1::uuid, $2::uuid, $3::integer, $4::uuid, $5::numeric, $6, $7::numeric,
            $8, $9, $10,
            $11::numeric, $12, $13::numeric,
-           $14::numeric, $15::numeric, $16::numeric, $17::numeric,
-           $18::numeric, $19::numeric, $20::numeric, $21::numeric, $22::timestamptz
+           $14::numeric, $15::numeric, $16::numeric, $17::numeric, $18::numeric, $19::numeric,
+           $20::numeric, $21::numeric, $22::numeric, $23::numeric, $24::numeric, $25::numeric, $26::timestamptz
          )`,
         [
           ingredientIds[index],
@@ -566,7 +566,7 @@ async function readRecipe(sql: Sql, id: string, versionNumber?: number): Promise
   )) as HistoryRow[]
   const versions = (await sql.query(
     `SELECT id::text AS id, version, is_current, name, notes, yield_servings, finished_weight_g,
-            calories_kcal, protein_g, carbs_g, fat_g, calculation_version, created_at
+            calories_kcal, protein_g, carbs_g, fat_g, fiber_g, sodium_mg, calculation_version, created_at
      FROM recipe_versions
      WHERE recipe_id = $1::uuid AND ${versionNumber == null ? 'is_current' : 'version = $2::integer'}
      LIMIT 1`,
@@ -578,8 +578,8 @@ async function readRecipe(sql: Sql, id: string, versionNumber?: number): Promise
     `SELECT id::text AS id, position, food_id::text AS food_id, amount, unit, scale_factor,
             food_name_snapshot, food_source_type_snapshot, food_source_external_id_snapshot,
             base_serving_amount_snapshot, base_serving_unit_snapshot, base_weight_grams_snapshot,
-            base_calories_kcal_snapshot, base_protein_g_snapshot, base_carbs_g_snapshot, base_fat_g_snapshot,
-            line_calories_kcal, line_protein_g, line_carbs_g, line_fat_g
+            base_calories_kcal_snapshot, base_protein_g_snapshot, base_carbs_g_snapshot, base_fat_g_snapshot, base_fiber_g_snapshot, base_sodium_mg_snapshot,
+            line_calories_kcal, line_protein_g, line_carbs_g, line_fat_g, line_fiber_g, line_sodium_mg
      FROM recipe_version_ingredients
      WHERE recipe_version_id = $1::uuid
      ORDER BY position ASC`,
