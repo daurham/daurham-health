@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { CoachState, CoachTaskView } from '@/domain/coach'
 import { primaryButtonClass, quietButtonClass } from '@/lib'
@@ -58,10 +58,6 @@ export function CoachCard({
   const [actionError, setActionError] = useState<string | null>(null)
   const [actionPending, setActionPending] = useState(false)
 
-  const tasks = useMemo(
-    () => [state?.dailyQuest ?? null, state?.weeklyFocus ?? null].filter((task): task is CoachTaskView => task != null),
-    [state],
-  )
 
   if (!state && !error) {
     return pending ? <div className="h-24 animate-pulse rounded-lg bg-zinc-200" aria-label="Loading Coach" /> : null
