@@ -471,6 +471,8 @@ export async function createRecipe(body: unknown): Promise<RecipeDetail> {
       proteinG: composed.proteinG,
       carbsG: composed.carbsG,
       fatG: composed.fatG,
+      fiberG: composed.fiberG,
+      sodiumMg: composed.sodiumMg,
       calculationVersion: composed.calculationVersion,
       createdAt: instant(version.created_at) ?? now,
       ingredients: composed.ingredients.map((line, index) => ({
