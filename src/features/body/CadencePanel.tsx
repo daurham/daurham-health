@@ -22,6 +22,9 @@ export function CadencePanel({
   const byKey = new Map(items.map((item) => [item.metricKey, item]))
   const [drafts, setDrafts] = useState<Record<string, string>>({})
   const [error, setError] = useState<string | null>(null)
+  const [expanded, setExpanded] = useState(false)
+  const attention = items.filter((item) => item.status !== 'current')
+  const activeCount = items.length
 
   async function run(action: () => Promise<void>) {
     setError(null)
@@ -37,6 +40,25 @@ export function CadencePanel({
       <div>
         <h2 className="text-lg font-semibold tracking-tight">Measurement schedule</h2>
         <p className="mt-1 text-sm text-zinc-600">This controls when Health reminds you to measure. Nothing is scheduled until you turn it on.</p>
+      </div>
+      <div className="rounded-lg border border-zinc-200 bg-white px-4 py-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className={attention.length > 0 ? 'font-semibold text-amber-800' : 'font-medium text-zinc-900'}>
+              {attention.length > 0
+                ? `${attention.length} measurement${attention.length === 1 ? '' : 's'} need attention`
+                : activeCount > 0
+                  ? 'Measurements are current'
+                  : 'No measurement schedule configured'}
+            </p>
+            <p className="mt-0.5 text-xs text-zinc-500">
+              {activeCount > 0 ? `${activeCount} scheduled metric${activeCount === 1 ? '' : 's'}` : 'Turn on a cadence below when you are ready.'}
+            </p>
+          </div>
+          <button type="button" className={quietButtonClass} onClick={() => setExpanded((value) => !value)}>
+            {expanded ? 'Hide schedule' : 'View schedule'}
+          </button>
+        </div>
       </div>
       <div className="flex flex-wrap gap-2">
         <button
@@ -60,15 +82,20 @@ export function CadencePanel({
           Full measurements · 30 days
         </button>
       </div>
-      <ul className="divide-y divide-zinc-200 rounded-lg border border-zinc-200 bg-white">
+      {expanded ? <ul className="divide-y divide-zinc-200 rounded-lg border border-zinc-200 bg-white">
         {MANUAL_BODY_METRICS.map((definition) => {
           const current = byKey.get(definition.key)
           const draft = drafts[definition.key] ?? (current ? String(current.intervalDays) : '')
           return (
-            <li key={definition.key} className="flex flex-wrap items-center justify-between gap-3 px-3 py-2">
+            <li
+              key={definition.key}
+              className={`flex flex-wrap items-center justify-between gap-3 px-3 py-2 ${current && current.status !== 'current' ? 'bg-amber-50/70' : ''}`}
+            >
               <div>
                 <p className="font-medium">{definition.label}</p>
-                <p className="text-xs text-zinc-500">{current ? statusText(current) : 'Off'}</p>
+                <p className={current && current.status !== 'current' ? 'text-xs font-semibold text-amber-800' : 'text-xs text-zinc-500'}>
+                  {current ? statusText(current) : 'Off'}
+                </p>
               </div>
               <div className="flex items-center gap-2">
                 <label className="text-sm text-zinc-600">
@@ -107,7 +134,7 @@ export function CadencePanel({
             </li>
           )
         })}
-      </ul>
+      </ul> : null}
       {error ? <p className="text-sm text-red-800">{error}</p> : null}
     </section>
   )
