@@ -169,3 +169,22 @@ Observed from the current code and product docs. Where the original rationale is
 **Status:** Active  
 **Reason:** Implementation notes in this repo say not to rewrite older design-manual ledger rows or older “not implemented” sentences inside past amendments. New work adds a new row and a new amendment.  
 **Implications:** A status correction belongs in the live status paragraph and a new ledger row, not in an older row.
+
+## Decision: Nutrition micronutrients preserve unknown evidence
+
+**Status:** Active  
+**Reason:** V2-H1 makes fiber and sodium first-class optional nutrients across foods, entries, providers, AI review, recipes, Today, Nutrition, and Progress. A missing nutrient is not evidence of zero.  
+**Implications:** Fiber is stored in grams and sodium in milligrams. Provider units are converted at their boundary. Daily and recipe totals become incomplete when any contributing canonical item lacks the nutrient. Do not substitute zero or display a partial sum as a complete total.
+
+## Decision: Strength Goals use canonical Training e1RM evidence
+
+**Status:** Active  
+**Reason:** A `strength_e1rm` Goal is evaluated from current canonical Training sets through the existing Epley estimated-1RM calculation. A displayed e1RM can therefore exceed the literal load lifted in its source set.  
+**Implications:** Goal/Progress strength state must not use a separately synchronized max-weight or achievement table. Source load, reps, session, and set are provenance for the derived value. Deleting the canonical Training session removes that evidence through existing cascades and the next read recomputes from what remains. Activity workouts never qualify.
+
+## Decision: Mistaken Goals delete unless immutable history references them
+
+**Status:** Active  
+**Reason:** Marking a bad Goal complete is not a correction. Unreferenced Goal identity and versions can be removed, but an Experiment may hold an immutable reference through `experiment_goals`.  
+**Implications:** `DELETE /api/goals/:id` physically deletes an unreferenced Goal and its versions. A referenced Goal is archived with `archived_at` instead, disappears from default Goal/Ask surfaces, and remains resolvable for historical evidence.
+
