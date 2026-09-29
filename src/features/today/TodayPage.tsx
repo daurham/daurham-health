@@ -411,6 +411,12 @@ function SupplementsCard({ view, onChanged }: { view: TodayViewModel; onChanged?
             </li>
           ))}
         </ul>
+      ) : (
+        <p className="mt-1 text-sm text-zinc-500">
+          {counts.skippedCount > 0
+            ? `${counts.takenCount} taken · ${counts.skippedCount} skipped`
+            : `${counts.takenCount}/${counts.scheduledCount} taken`}
+        </p>
       )}
       {error ? <p className="mt-2 text-sm text-red-700">{error}</p> : null}
       {readOnly ? null : (
