@@ -74,17 +74,17 @@ export function TrainingPage() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Training</h1>
-          <p className="mt-2 text-zinc-600">Log a programmed routine, an ad-hoc session, or a workout photo.</p>
+          <p className="mt-2 text-zinc-600">Start a routine, build an empty workout, or import a workout photo.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Link to="/training/new" className={primaryButtonClass}>
-            Start Programmed Workout
+            Start workout
           </Link>
-          <Link to="/training/new?type=ad_hoc" className={secondaryButtonClass}>
-            Ad-hoc Workout
+          <Link to="/training/routines" className={secondaryButtonClass}>
+            Manage routines
           </Link>
           <Link to="/training/import" className={secondaryButtonClass}>
-            Import Workout Photo
+            Import workout photo
           </Link>
         </div>
       </div>
