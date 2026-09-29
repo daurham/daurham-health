@@ -34,6 +34,8 @@ export function snapshotFromUnknownProduct(product: Record<string, unknown>, bar
       fat100g: nutrient(nutriments, 'fat_100g'),
       fiberServing: nutrient(nutriments, 'fiber_serving'),
       fiber100g: nutrient(nutriments, 'fiber_100g'),
+      sodiumServing: nutrient(nutriments, 'sodium_serving'),
+      sodium100g: nutrient(nutriments, 'sodium_100g'),
     },
   }
 }
