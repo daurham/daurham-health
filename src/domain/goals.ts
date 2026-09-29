@@ -667,6 +667,13 @@ export type GoalEvidence = {
   difference: number | null
   relation: 'above_range' | 'below_range' | 'inside_range' | null
   provisional: { value: number; unit: string; label: 'so far' } | null
+  strengthBasis: {
+    sessionId: string
+    setId: string
+    weightKg: number
+    reps: number
+    formula: 'epley'
+  } | null
   coverage: {
     observedDays: number
     windowDays: number
@@ -729,7 +736,7 @@ export function goalEvidence(input: {
   target: GoalTarget
   asOf: string
   body: { value: number; unit: string; observedOn: string } | null
-  strength: { e1rmKg: number; observedOn: string } | null
+  strength: { e1rmKg: number; observedOn: string; sessionId: string; setId: string; weightKg: number; reps: number } | null
   benchmark: { value: number; unit: string; observedOn: string } | null
   sessionDates: readonly string[]
   activityRows: readonly ActivityDailyRow[]
@@ -747,6 +754,7 @@ export function goalEvidence(input: {
     unit,
     observedOn: null as string | null,
     provisional: null as GoalEvidence['provisional'],
+    strengthBasis: null as GoalEvidence['strengthBasis'],
     coverage: null as GoalEvidence['coverage'],
   }
   if (input.goalKind === 'body_metric') {
@@ -758,6 +766,13 @@ export function goalEvidence(input: {
     if (input.strength) {
       base.current = kilogramsToPounds(input.strength.e1rmKg)
       base.observedOn = input.strength.observedOn
+      base.strengthBasis = {
+        sessionId: input.strength.sessionId,
+        setId: input.strength.setId,
+        weightKg: input.strength.weightKg,
+        reps: input.strength.reps,
+        formula: 'epley',
+      }
     }
   } else if (input.goalKind === 'benchmark_result') {
     if (input.benchmark && input.benchmark.unit === unit) {
@@ -829,13 +844,20 @@ export function goalEvidence(input: {
 export function latestSessionE1rm(
   setsBySession: ReadonlyArray<readonly CanonicalSetRecord[]>,
   exercise: ProgressExerciseDefinition,
-): { e1rmKg: number; observedOn: string } | null {
+): { e1rmKg: number; observedOn: string; sessionId: string; setId: string; weightKg: number; reps: number } | null {
   const points = sessionStrengthHistory(setsBySession, exercise)
   const latest = points.length === 0 ? null : points[points.length - 1]
   if (!latest) {
     return null
   }
-  return { e1rmKg: latest.estimated1RmKg, observedOn: latest.date }
+  return {
+    e1rmKg: latest.estimated1RmKg,
+    observedOn: latest.date,
+    sessionId: latest.sessionId,
+    setId: latest.sourceSet.setId,
+    weightKg: latest.sourceSet.weightKg,
+    reps: latest.sourceSet.reps,
+  }
 }
 
 export const FUTURE_GOAL_KINDS = [
