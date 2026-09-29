@@ -493,6 +493,11 @@ function addLoadIssues(
   }
 }
 
+export function measurementKindAcceptsFamily(kind: MeasurementKind, family: MeasurementFamily): boolean {
+  if (kind === 'distance_duration') return family === 'duration' || family === 'distance_duration'
+  return kind === family
+}
+
 function addMeasurementFamilyIssues(set: SetMeasurementFields, ctx: z.RefinementCtx): void {
   const family = measurementFamilyOf(set)
   if (family === 'empty') {
@@ -507,6 +512,10 @@ function addMeasurementFamilyIssues(set: SetMeasurementFields, ctx: z.Refinement
       code: 'custom',
       message: 'A set cannot mix unrelated measurement values',
     })
+  }
+  const distance = set.distanceM ?? set.distance
+  if (distance != null && distance <= 0) {
+    ctx.addIssue({ code: 'custom', path: ['distance'], message: 'Distance must be greater than zero' })
   }
 }
 
@@ -529,9 +538,9 @@ export const manualWorkoutSetValuesSchema = z.object({
   rightReps: nullableNonnegativeInt,
   leftDurationSec: nullableNonnegativeInt,
   rightDurationSec: nullableNonnegativeInt,
-  distance: nullableNonnegativeNumber,
-  distanceUnit: z.enum(['mi', 'km']).nullable().default('mi'),
-  completed: z.boolean().nullable(),
+  distance: nullableNonnegativeNumber.optional().default(null),
+  distanceUnit: z.enum(['mi', 'km']).nullable().optional().default(null),
+  completed: z.boolean().nullable().optional().default(null),
   notes: optionalNotesSchema,
 })
 
