@@ -4,6 +4,7 @@ export type NutrientAmount = {
   carbs: number | null
   fat: number | null
   fiber: number | null
+  sodium: number | null
 }
 
 const GRAMS_ONLY = /^\s*(\d+(?:\.\d+)?)\s*g(?:rams?)?\s*$/i
@@ -48,6 +49,7 @@ export function scaleNutrients(base: NutrientAmount, multiplier: number): Nutrie
     carbs: base.carbs == null ? null : asFinite(base.carbs, 'carbs') * factor,
     fat: base.fat == null ? null : asFinite(base.fat, 'fat') * factor,
     fiber: base.fiber == null ? null : asFinite(base.fiber, 'fiber') * factor,
+    sodium: base.sodium == null ? null : asFinite(base.sodium, 'sodium') * factor,
   }
 }
 
@@ -121,6 +123,7 @@ export function rescaleLoggedSnapshot(
       carbs: existing.carbs == null ? null : existing.carbs * perServing,
       fat: existing.fat == null ? null : existing.fat * perServing,
       fiber: existing.fiber == null ? null : existing.fiber * perServing,
+      sodium: existing.sodium == null ? null : existing.sodium * perServing,
       servingGrams: existing.grams == null ? null : existing.grams * perServing,
     },
     { quantity: next.quantity, grams: next.grams },
