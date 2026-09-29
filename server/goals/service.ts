@@ -46,6 +46,7 @@ type GoalRow = {
   supplement_id: string | null
   paused_at: string | null
   completed_at: string | null
+  archived_at: string | null
   created_at: string
   updated_at: string
   exercise_name: string | null
@@ -296,7 +297,7 @@ async function readGoalRows(sql: Sql, id?: string): Promise<GoalRow[]> {
   if (id) {
     return (await sql.query(`${GOAL_SELECT} WHERE goals.id = $1::uuid`, [id])) as GoalRow[]
   }
-  return (await sql.query(`${GOAL_SELECT} ORDER BY goals.created_at DESC, goals.id`, [])) as GoalRow[]
+  return (await sql.query(`${GOAL_SELECT} WHERE goals.archived_at IS NULL ORDER BY goals.created_at DESC, goals.id`, [])) as GoalRow[]
 }
 
 async function readVersions(sql: Sql, goalId: string): Promise<VersionRow[]> {
@@ -556,6 +557,7 @@ function presentGoal(
     startedOn: row.started_on,
     pausedAt: row.paused_at,
     completedAt: row.completed_at,
+    archivedAt: row.archived_at,
     displayName: name,
     selector: selectorFrom(row),
     selectorContext: selectorContext(row),
@@ -812,6 +814,42 @@ export async function reviseGoal(id: string, body: unknown) {
     throw error
   }
   return getGoal(id)
+}
+
+export async function removeGoal(id: string): Promise<{ disposition: 'deleted' | 'archived' }> {
+  const sql = await getSql()
+  const rows = await readGoalRows(sql, id)
+  const row = rows[0]
+  if (!row) {
+    throw new HttpError(404, 'Goal not found')
+  }
+  if (row.archived_at) {
+    return { disposition: 'archived' }
+  }
+
+  const references = (await sql.query(
+    `SELECT experiment_id::text AS experiment_id FROM experiment_goals WHERE goal_id = $1::uuid LIMIT 1`,
+    [id],
+  )) as Array<{ experiment_id: string }>
+
+  if (references.length > 0) {
+    const updated = (await sql.query(
+      `UPDATE goals SET archived_at = $2::timestamptz, updated_at = $2::timestamptz
+       WHERE id = $1::uuid AND archived_at IS NULL
+       RETURNING id::text AS id`,
+      [id, new Date().toISOString()],
+    )) as Array<{ id?: string }>
+    if (!updated[0]?.id) {
+      throw new HttpError(409, 'Goal changed since editing began.', undefined, STALE)
+    }
+    return { disposition: 'archived' }
+  }
+
+  await sql.transaction([
+    sql.query(`DELETE FROM goal_versions WHERE goal_id = $1::uuid`, [id]),
+    sql.query(`DELETE FROM goals WHERE id = $1::uuid`, [id]),
+  ])
+  return { disposition: 'deleted' }
 }
 
 export async function changeGoalLifecycle(id: string, action: GoalLifecycleAction) {
