@@ -9,7 +9,16 @@ export const GOAL_STATUS_CALCULATION_VERSION = 'goal-status-v1'
 export const GOAL_DEADLINE_SOON_DAYS = 7
 export const GOAL_ATTENTION_LIMIT = 2
 
-const POINT_KINDS = new Set<GoalKind>(['body_metric', 'strength_e1rm', 'benchmark_result'])
+const POINT_KINDS = new Set<GoalKind>([
+  'body_metric',
+  'strength_e1rm',
+  'benchmark_result',
+  'training_reps',
+  'training_duration',
+  'training_distance',
+  'training_pace',
+  'training_skill',
+])
 
 export type GoalTargetState = 'satisfied' | 'below_target' | 'above_target' | 'outside_range_low' | 'outside_range_high' | 'unknown'
 
