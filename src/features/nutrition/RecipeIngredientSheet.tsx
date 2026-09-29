@@ -243,6 +243,8 @@ export function RecipeIngredientSheet({
       protein: String(review.proteinGrams),
       carbs: String(review.carbsGrams),
       fat: String(review.fatGrams),
+      fiber: review.fiberGrams == null ? null : String(review.fiberGrams),
+      sodium: review.sodiumMg == null ? null : String(review.sodiumMg),
       provider,
       model: review.model ?? null,
       originalName: review.name,
@@ -250,6 +252,8 @@ export function RecipeIngredientSheet({
       originalProtein: review.proteinGrams,
       originalCarbs: review.carbsGrams,
       originalFat: review.fatGrams,
+      originalFiber: review.fiberGrams,
+      originalSodium: review.sodiumMg,
     })
     setStep(looksLikeCompositeFoodDescription(description, review.items.length) ? 'ai' : 'ai-review')
   }
