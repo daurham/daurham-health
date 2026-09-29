@@ -20,6 +20,8 @@ export type PaperSetFields = {
   rightReps: string | number | null | undefined
   leftDurationSec: string | number | null | undefined
   rightDurationSec: string | number | null | undefined
+  distance?: string | number | null | undefined
+  completed?: boolean | null | undefined
   notes?: string | number | null | undefined
   transcribedLoadState?: LoadState
   transcribedWeightLb?: string
@@ -71,7 +73,9 @@ export function paperSetHasPerformance(set: PaperSetFields): boolean {
     asTrimmed(set.leftReps) !== '' ||
     asTrimmed(set.rightReps) !== '' ||
     asTrimmed(set.leftDurationSec) !== '' ||
-    asTrimmed(set.rightDurationSec) !== ''
+    asTrimmed(set.rightDurationSec) !== '' ||
+    asTrimmed(set.distance) !== '' ||
+    set.completed != null
   )
 }
 
@@ -136,9 +140,15 @@ export function resolvedWeightLb(load: PaperLoad | null): number | null {
   return load?.kind === 'external' ? load.weightLb : null
 }
 
-function measurementField(kind: MeasurementKind): 'reps' | 'durationSec' | 'leftReps' | 'leftDurationSec' {
-  if (kind === 'duration') {
+function measurementField(kind: MeasurementKind): 'reps' | 'durationSec' | 'leftReps' | 'leftDurationSec' | 'distance' | 'completed' {
+  if (kind === 'duration' || kind === 'distance_duration') {
     return 'durationSec'
+  }
+  if (kind === 'distance') {
+    return 'distance'
+  }
+  if (kind === 'completion') {
+    return 'completed'
   }
   if (kind === 'reps_per_side') {
     return 'leftReps'
@@ -150,8 +160,14 @@ function measurementField(kind: MeasurementKind): 'reps' | 'durationSec' | 'left
 }
 
 function measurementRequiredMessage(kind: MeasurementKind): string {
-  if (kind === 'duration' || kind === 'duration_per_side') {
+  if (kind === 'duration' || kind === 'duration_per_side' || kind === 'distance_duration') {
     return 'Time required for this completed set.'
+  }
+  if (kind === 'distance') {
+    return 'Distance required for this completed set.'
+  }
+  if (kind === 'completion') {
+    return 'Choose whether the skill was achieved.'
   }
   return 'Reps required for this completed set.'
 }
@@ -194,6 +210,15 @@ export function fieldErrorCountSummary(count: number): string {
 }
 
 export function measurementKindFromPaperSet(set: PaperSetFields): MeasurementKind {
+  if (set.completed != null) {
+    return 'completion'
+  }
+  if (asTrimmed(set.distance) !== '' && asTrimmed(set.durationSec) !== '') {
+    return 'distance_duration'
+  }
+  if (asTrimmed(set.distance) !== '') {
+    return 'distance'
+  }
   if (asTrimmed(set.leftDurationSec) !== '' || asTrimmed(set.rightDurationSec) !== '') {
     return 'duration_per_side'
   }
@@ -233,6 +258,8 @@ export function applyPaperInheritanceToManualRequest(
           rightReps: set.rightReps,
           leftDurationSec: set.leftDurationSec,
           rightDurationSec: set.rightDurationSec,
+          distance: set.distance,
+          completed: set.completed,
           notes: set.notes,
         })),
       )
