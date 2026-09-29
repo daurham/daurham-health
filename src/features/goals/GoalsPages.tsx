@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { coverageLabel } from '@/domain/goal-status'
 import { formatGoalQuantity, formatGoalTarget, goalKindDefinition, GOAL_KINDS, type GoalKind } from '@/domain/goals'
