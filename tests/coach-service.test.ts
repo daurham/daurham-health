@@ -315,6 +315,41 @@ describe('Coach persistence service', () => {
     expect(state.tasks.filter((task) => task.task_kind === 'daily_quest')).toHaveLength(1)
   })
 
+  it('expires an unresolved prior-period task once and does not reuse it for today', async () => {
+    state.tasks.push({
+      id: '88888888-8888-4888-8888-888888888888',
+      task_kind: 'daily_quest',
+      rule_key: 'manual:yoga:10m',
+      rule_version: 1,
+      domain: 'training',
+      title: '10 minutes of yoga',
+      detail: 'Old quest',
+      starts_on: '2026-09-28',
+      expires_on: '2026-09-28',
+      period_fingerprint: 'coach:daily_quest:2026-09-28:manual:yoga:10m:v1',
+      goal_id: null,
+      verification_mode: 'training_log',
+      action_kind: 'log_training',
+      action_href: null,
+      target_value: '10',
+      target_unit: 'min',
+      baseline_value: null,
+      difficulty: 'routine',
+      reward_band: 'routine',
+      status: 'active',
+      completed_at: null,
+      closed_at: null,
+      metadata: { general: true },
+      created_at: '2026-09-28T00:00:00.000Z',
+      updated_at: '2026-09-28T00:00:00.000Z',
+    })
+    const result = await ensureCoach(NOW)
+    const old = state.tasks.find((task) => task.id === '88888888-8888-4888-8888-888888888888')
+    expect(old?.status).toBe('expired')
+    expect(state.events.filter((event) => event.task_id === old?.id && event.event_kind === 'expired')).toHaveLength(1)
+    expect(result.dailyQuest?.startsOn).toBe('2026-09-29')
+  })
+
   it('requires the journal duration and records explicit owner self-report evidence', async () => {
     seedSelfReportTask()
     const id = state.tasks[0]!.id
