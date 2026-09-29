@@ -5,7 +5,6 @@ import type { HealthOwnerConfig } from '../server/auth/config.ts'
 import { withOwnerAuth } from '../server/auth/with-owner.ts'
 import { matchHealthApiRoute } from '../server/dispatch.ts'
 import { matchCoachRoute } from '../server/handlers/coach.ts'
-import coachHandler from '../server/handlers/coach.ts'
 import { wrapNodeResponse, type ApiRequest, type ApiResponse } from '../server/http.ts'
 
 const service = vi.hoisted(() => ({
@@ -48,24 +47,6 @@ function response() {
   }
   res.json = () => res
   return { res, status: () => statusCode, allow: () => headers.get('allow') }
-}
-
-function call(method: string, url: string, identity: { id: string; email: string } | null, body?: unknown) {
-  const captured = response()
-  return withOwnerAuth(async (req, res) => {
-    const route = matchCoachRoute(req.url ?? '')
-    if (!route) {
-      res.status(404).json({ error: 'Not found' })
-      return
-    }
-    // Invoke the same wrapped handler through a request whose auth has already been established.
-    // The service module is mocked, so only route/method behavior is under test here.
-    const unwrapped = (coachHandler as unknown as (req: ApiRequest, res: ApiResponse) => Promise<void>)
-    await unwrapped(req, res)
-  }, {
-    config: ownerConfig,
-    readSession: async () => identity,
-  })(request(method, url, body), captured.res).then(() => captured)
 }
 
 describe('Coach API routing', () => {
