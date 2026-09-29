@@ -13,7 +13,7 @@ import {
 } from 'recharts'
 import { kilogramsToPounds } from '@/domain/units'
 import { usePrefersReducedMotion } from '@/lib'
-import { finiteChartDomain } from './chart-domain'
+import { finiteChartDomain, niceIntegerAxis } from './chart-domain'
 import { formatCalendarDate, formatDurationSec, formatReps } from './format'
 
 function asLb(kg: number): number {
@@ -190,8 +190,8 @@ export function LoggedCaloriesChart({
   if (points.length < 2) {
     return null
   }
-  const domain = finiteChartDomain(points.map((item) => item.calories))
-  if (!domain) {
+  const axis = niceIntegerAxis(points.map((item) => item.calories))
+  if (!axis) {
     return null
   }
   const targetValues = [...new Set(points.map((item) => item.targetCalories).filter((value): value is number => value != null))]
@@ -220,7 +220,10 @@ export function LoggedCaloriesChart({
             <YAxis
               dataKey="calories"
               unit=" kcal"
-              domain={domain}
+              domain={axis.domain}
+              ticks={axis.ticks}
+              allowDecimals={false}
+              tickFormatter={(value) => Number(value).toLocaleString('en-US', { maximumFractionDigits: 0 })}
               tick={{ fill: 'var(--chart-muted)', fontSize: 11 }}
               width={64}
             />
