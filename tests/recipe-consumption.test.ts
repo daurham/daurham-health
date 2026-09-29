@@ -36,14 +36,15 @@ vi.mock('../server/db.ts', () => ({
             protein: params[11],
             carbs: params[12],
             fat: params[13],
-            fiber: null,
-            source_kind: 'manual',
+            fiber: params[14],
+            sodium: params[15],
+            source_kind: params[16],
             notes: null,
             meal_group_id: null,
-            recipe_version_id: params[17],
-            recipe_portion_kind: params[18],
-            recipe_portion_amount: params[19],
-            recipe_fraction: params[20],
+            recipe_version_id: params[18],
+            recipe_portion_kind: params[19],
+            recipe_portion_amount: params[20],
+            recipe_fraction: params[21],
             created_at: '2026-09-27T15:00:00.000Z',
             updated_at: '2026-09-27T15:00:00.000Z',
           },
@@ -73,6 +74,8 @@ function basis(overrides: Partial<RecipePortionBasis> = {}): RecipePortionBasis 
     proteinG: 120,
     carbsG: 80,
     fatG: 40,
+    fiberG: null,
+    sodiumMg: null,
     yieldServings: 6,
     finishedWeightG: 2850,
     ...overrides,
@@ -89,6 +92,8 @@ function versionRow(id: string, version: number, calories: number, name: string)
     protein_g: null,
     carbs_g: 100,
     fat_g: 50,
+    fiber_g: null,
+    sodium_mg: null,
     yield_servings: 6,
     finished_weight_g: 2850,
   }
@@ -131,8 +136,8 @@ describe('recipe portion resolver', () => {
     const current = [{ name: 'Sundubu-jjigae', recipeVersionId: 'v3' }]
     expect(matchCurrentRecipes(current, 'sundubu')).toEqual(current)
     expect(matchCurrentRecipes(current, 'rice')).toEqual([])
-    const food = { calories: 100, protein: 10, carbs: 5, fat: 2, fiber: null }
-    const recipe = { calories: 236.75, protein: 20, carbs: null, fat: 6, fiber: null }
+    const food = { calories: 100, protein: 10, carbs: 5, fat: 2, fiber: null, sodium: null }
+    const recipe = { calories: 236.75, protein: 20, carbs: null, fat: 6, fiber: null, sodium: null }
     const totals = nutritionDayTotals([food, recipe])
     expect(totals.calories.value).toBe(336.75)
     expect(totals.protein.value).toBe(30)
