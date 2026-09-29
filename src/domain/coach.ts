@@ -226,7 +226,7 @@ export const GENERAL_DAILY_COACH_RULES: readonly GeneralCoachRule[] = [
   {
     ruleKey: 'manual:run:15m',
     title: 'Run for 15 minutes',
-    detail: 'Log duration in Training. You may also record distance as Coach evidence.',
+    detail: 'Log duration in Training. Add distance when you know it so pace and distance progress can be derived.',
     domain: 'training',
     verificationMode: 'training_log',
     actionKind: 'log_training',
@@ -237,7 +237,7 @@ export const GENERAL_DAILY_COACH_RULES: readonly GeneralCoachRule[] = [
     intensity: 'moderate',
     training: {
       exerciseName: 'Running',
-      measurementKind: 'duration',
+      measurementKind: 'distance_duration',
       loadType: 'none',
       sessionName: 'Coach · Run',
       valueKind: 'duration_min',
@@ -249,7 +249,7 @@ export const GENERAL_DAILY_COACH_RULES: readonly GeneralCoachRule[] = [
   {
     ruleKey: 'manual:hike:20m',
     title: 'Hike for 20 minutes',
-    detail: 'Log duration in Training. You may also record distance as Coach evidence.',
+    detail: 'Log duration in Training. Add distance when you know it so pace and distance progress can be derived.',
     domain: 'training',
     verificationMode: 'training_log',
     actionKind: 'log_training',
@@ -260,7 +260,7 @@ export const GENERAL_DAILY_COACH_RULES: readonly GeneralCoachRule[] = [
     intensity: 'low',
     training: {
       exerciseName: 'Hiking',
-      measurementKind: 'duration',
+      measurementKind: 'distance_duration',
       loadType: 'none',
       sessionName: 'Coach · Hike',
       valueKind: 'duration_min',
