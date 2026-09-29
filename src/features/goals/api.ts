@@ -22,6 +22,7 @@ export type GoalView = {
   startedOn: string
   pausedAt: string | null
   completedAt: string | null
+  archivedAt: string | null
   displayName: string
   selectorContext: { archived: boolean; message: string | null }
   currentVersion: GoalVersionView
@@ -33,6 +34,7 @@ export type GoalView = {
     difference: number | null
     relation: 'above_range' | 'below_range' | 'inside_range' | null
     provisional: { value: number; unit: string; label: 'so far' } | null
+    strengthBasis: { sessionId: string; setId: string; weightKg: number; reps: number; formula: 'epley' } | null
     label: string | null
     coverage: {
       observedDays: number
@@ -104,4 +106,9 @@ export function changeGoalStatus(id: string, action: 'pause' | 'resume' | 'compl
 
 export function fetchGoalProjection(id: string): Promise<GoalProjection> {
   return send(`/api/goals/${id}/projection`, 'GET')
+}
+
+
+export function removeGoal(id: string): Promise<{ disposition: 'deleted' | 'archived' }> {
+  return send(`/api/goals/${id}`, 'DELETE')
 }
