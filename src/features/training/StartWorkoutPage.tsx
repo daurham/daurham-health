@@ -141,24 +141,48 @@ export function StartWorkoutPage() {
           </p>
         ) : null}
         {loading ? (
-          <p className="text-sm text-zinc-600">Loading templates…</p>
+          <p className="text-sm text-zinc-600">Loading routines…</p>
         ) : (
-          <ul className="space-y-3">
-            {templates.map((template) => (
-              <li key={template.id}>
-                <button
-                  type="button"
-                  className={`w-full px-4 py-4 text-left ${interactiveCardClass}`}
-                  onClick={() => setDraft(draftFromTemplate(template))}
-                >
-                  <p className="font-semibold">{template.name}</p>
-                  <p className="mt-1 text-sm text-zinc-500">
-                    Routine {template.routineCode} · v{template.version}
-                  </p>
-                </button>
-              </li>
-            ))}
-          </ul>
+          <div className="space-y-6">
+            <section>
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">Built-in routines</h2>
+              <ul className="mt-3 space-y-3">
+                {templates.filter((template) => template.originKind === 'seeded').map((template) => (
+                  <li key={template.id}>
+                    <button type="button" className={`w-full px-4 py-4 text-left ${interactiveCardClass}`} onClick={() => setDraft(draftFromTemplate(template))}>
+                      <p className="font-semibold">{template.name}</p>
+                      <p className="mt-1 text-sm text-zinc-500">Routine {template.routineCode} · v{template.version}</p>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+            <section>
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">Saved routines</h2>
+                <Link to="/training/routines" className="inline-flex min-h-11 items-center text-sm text-zinc-600 hover:underline">Manage</Link>
+              </div>
+              {templates.some((template) => template.originKind === 'owner') ? (
+                <ul className="mt-3 space-y-3">
+                  {templates.filter((template) => template.originKind === 'owner').map((template) => (
+                    <li key={template.id}>
+                      <button type="button" className={`w-full px-4 py-4 text-left ${interactiveCardClass}`} onClick={() => setDraft(draftFromTemplate(template))}>
+                        <p className="font-semibold">{template.name}</p>
+                        <p className="mt-1 text-sm text-zinc-500">{template.exercises.length} exercises · v{template.version}</p>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : <p className="mt-2 text-sm text-zinc-500">No saved routines yet.</p>}
+            </section>
+            <section>
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">Empty workout</h2>
+              <Link to="/training/new?type=ad_hoc" className={`mt-3 block w-full px-4 py-4 text-left ${interactiveCardClass}`}>
+                <p className="font-semibold">Start empty workout</p>
+                <p className="mt-1 text-sm text-zinc-500">Add exercises as you go.</p>
+              </Link>
+            </section>
+          </div>
         )}
       </section>
     )
