@@ -440,7 +440,8 @@ describe('owner exercises', () => {
       expect(renamed.nameOnly).toBe(true)
     }
     const sql = readFileSync('server/training/owner-exercises.ts', 'utf8')
-    expect(sql).toContain("'other'")
+    expect(sql).toContain('analytics.performanceType')
+    expect(sql).toContain('analytics.analyticsLoadType')
     expect(sql).toContain("'none'")
     expect(sql).toContain('is_active = false')
     expect(sql).not.toContain('DELETE FROM exercise_definitions')
