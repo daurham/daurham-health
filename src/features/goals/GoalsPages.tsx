@@ -525,6 +525,12 @@ export function GoalDetailPage() {
         {goal.currentVersion.evaluationWindowDays ? <p className="text-sm text-zinc-600">{goal.currentVersion.evaluationWindowDays}-day window</p> : null}
         {goal.currentVersion.notes ? <p className="mt-2 text-sm text-zinc-700">{goal.currentVersion.notes}</p> : null}
         <p className="mt-3 text-sm">Current {evidenceText(goal)}</p>
+        {goal.evidence.strengthSource ? (
+          <p className="mt-1 text-sm text-zinc-600">
+            e1RM is derived from {formatGoalQuantity(goal.evidence.strengthSource.loadLb, 'lb')} × {goal.evidence.strengthSource.reps} reps
+            {' '}using the Epley formula; it is not a literal set at the displayed e1RM.
+          </p>
+        ) : null}
         {relation ? <p className="text-sm text-zinc-600">{relation}</p> : null}
         {goal.evidence.provisional ? (
           <p className="text-sm text-zinc-500">Today so far {formatGoalQuantity(goal.evidence.provisional.value, goal.evidence.provisional.unit)}. This is not the closed window.</p>
