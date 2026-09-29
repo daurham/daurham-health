@@ -36,6 +36,8 @@ export type RecipeVersionView = {
   proteinG: number | null
   carbsG: number | null
   fatG: number | null
+  fiberG: number | null
+  sodiumMg: number | null
   calculationVersion: string
   createdAt: string
   ingredients: RecipeIngredientView[]
@@ -69,7 +71,7 @@ export type RecipeListItem = {
 }
 
 const FOOD_BASIS_SQL = `SELECT id::text AS id, name, barcode, serving_quantity, serving_unit, serving_grams,
-  calories, protein, carbs, fat, source_kind, archived
+  calories, protein, carbs, fat, fiber, sodium, source_kind, archived
   FROM nutrition_foods
   WHERE id = ANY($1::uuid[])`
 
@@ -142,10 +144,14 @@ export async function commitRecipeVersion(id: string, body: unknown): Promise<Re
     base_protein_g_snapshot: line.baseProteinGSnapshot,
     base_carbs_g_snapshot: line.baseCarbsGSnapshot,
     base_fat_g_snapshot: line.baseFatGSnapshot,
+    base_fiber_g_snapshot: line.baseFiberGSnapshot,
+    base_sodium_mg_snapshot: line.baseSodiumMgSnapshot,
     line_calories_kcal: line.lineCaloriesKcal,
     line_protein_g: line.lineProteinG,
     line_carbs_g: line.lineCarbsG,
     line_fat_g: line.lineFatG,
+    line_fiber_g: line.lineFiberG,
+    line_sodium_mg: line.lineSodiumMg,
   }))
   let results: [
     unknown,
@@ -180,10 +186,10 @@ export async function commitRecipeVersion(id: string, body: unknown): Promise<Re
     sql.query(
       `INSERT INTO recipe_versions (
          id, recipe_id, version, is_current, name, notes, yield_servings, finished_weight_g,
-         calories_kcal, protein_g, carbs_g, fat_g, calculation_version, source_id, created_at
+         calories_kcal, protein_g, carbs_g, fat_g, fiber_g, sodium_mg, calculation_version, source_id, created_at
        )
        SELECT $2::uuid, $1::uuid, version + 1, true, $4, $5, $6::numeric, $7::numeric,
-              $8::numeric, $9::numeric, $10::numeric, $11::numeric, $12, $13::uuid, $14::timestamptz
+              $8::numeric, $9::numeric, $10::numeric, $11::numeric, $12::numeric, $13::numeric, $14, $15::uuid, $16::timestamptz
        FROM recipe_versions
        WHERE id = $3::uuid
          AND recipe_id = $1::uuid
@@ -202,6 +208,8 @@ export async function commitRecipeVersion(id: string, body: unknown): Promise<Re
         preview.candidate.proteinG,
         preview.candidate.carbsG,
         preview.candidate.fatG,
+        preview.candidate.fiberG,
+        preview.candidate.sodiumMg,
         preview.candidate.calculationVersion,
         sourceId,
         now,
@@ -212,20 +220,20 @@ export async function commitRecipeVersion(id: string, body: unknown): Promise<Re
          id, recipe_version_id, position, food_id, amount, unit, scale_factor,
          food_name_snapshot, food_source_type_snapshot, food_source_external_id_snapshot,
          base_serving_amount_snapshot, base_serving_unit_snapshot, base_weight_grams_snapshot,
-         base_calories_kcal_snapshot, base_protein_g_snapshot, base_carbs_g_snapshot, base_fat_g_snapshot,
-         line_calories_kcal, line_protein_g, line_carbs_g, line_fat_g, created_at
+         base_calories_kcal_snapshot, base_protein_g_snapshot, base_carbs_g_snapshot, base_fat_g_snapshot, base_fiber_g_snapshot, base_sodium_mg_snapshot,
+         line_calories_kcal, line_protein_g, line_carbs_g, line_fat_g, line_fiber_g, line_sodium_mg, created_at
        )
        SELECT line.id::uuid, $2::uuid, line.position, line.food_id::uuid, line.amount, line.unit, line.scale_factor,
               line.food_name_snapshot, line.food_source_type_snapshot, line.food_source_external_id_snapshot,
               line.base_serving_amount_snapshot, line.base_serving_unit_snapshot, line.base_weight_grams_snapshot,
-              line.base_calories_kcal_snapshot, line.base_protein_g_snapshot, line.base_carbs_g_snapshot, line.base_fat_g_snapshot,
-              line.line_calories_kcal, line.line_protein_g, line.line_carbs_g, line.line_fat_g, $3::timestamptz
+              line.base_calories_kcal_snapshot, line.base_protein_g_snapshot, line.base_carbs_g_snapshot, line.base_fat_g_snapshot, line.base_fiber_g_snapshot, line.base_sodium_mg_snapshot,
+              line.line_calories_kcal, line.line_protein_g, line.line_carbs_g, line.line_fat_g, line.line_fiber_g, line.line_sodium_mg, $3::timestamptz
        FROM jsonb_to_recordset($1::jsonb) AS line(
          id text, position integer, food_id text, amount numeric, unit text, scale_factor numeric,
          food_name_snapshot text, food_source_type_snapshot text, food_source_external_id_snapshot text,
          base_serving_amount_snapshot numeric, base_serving_unit_snapshot text, base_weight_grams_snapshot numeric,
-         base_calories_kcal_snapshot numeric, base_protein_g_snapshot numeric, base_carbs_g_snapshot numeric, base_fat_g_snapshot numeric,
-         line_calories_kcal numeric, line_protein_g numeric, line_carbs_g numeric, line_fat_g numeric
+         base_calories_kcal_snapshot numeric, base_protein_g_snapshot numeric, base_carbs_g_snapshot numeric, base_fat_g_snapshot numeric, base_fiber_g_snapshot numeric, base_sodium_mg_snapshot numeric,
+         line_calories_kcal numeric, line_protein_g numeric, line_carbs_g numeric, line_fat_g numeric, line_fiber_g numeric, line_sodium_mg numeric
        )
        WHERE EXISTS (SELECT 1 FROM recipe_versions WHERE id = $2::uuid)`,
       [JSON.stringify(lines), versionId, now],
@@ -320,6 +328,8 @@ function snapshotFromView(version: RecipeVersionView): RecipeVersionSnapshot {
     proteinG: version.proteinG,
     carbsG: version.carbsG,
     fatG: version.fatG,
+    fiberG: version.fiberG,
+    sodiumMg: version.sodiumMg,
     calculationVersion: version.calculationVersion,
     ingredients: version.ingredients,
   }
@@ -333,7 +343,7 @@ function recipeInputError(result: { error: string; code?: string }): HttpError {
 const FOOD_MISMATCH_SQL = `SELECT 1
   FROM jsonb_to_recordset($3::jsonb) AS expected(
     id uuid, name text, serving_quantity text, serving_unit text, serving_grams text,
-    calories text, protein text, carbs text, fat text, archived boolean
+    calories text, protein text, carbs text, fat text, fiber text, sodium text, archived boolean
   )
   LEFT JOIN nutrition_foods foods ON foods.id = expected.id
   WHERE foods.id IS NULL
@@ -345,7 +355,9 @@ const FOOD_MISMATCH_SQL = `SELECT 1
      OR foods.calories IS DISTINCT FROM NULLIF(expected.calories, '')::numeric
      OR foods.protein IS DISTINCT FROM NULLIF(expected.protein, '')::numeric
      OR foods.carbs IS DISTINCT FROM NULLIF(expected.carbs, '')::numeric
-     OR foods.fat IS DISTINCT FROM NULLIF(expected.fat, '')::numeric`
+     OR foods.fat IS DISTINCT FROM NULLIF(expected.fat, '')::numeric
+     OR foods.fiber IS DISTINCT FROM NULLIF(expected.fiber, '')::numeric
+     OR foods.sodium IS DISTINCT FROM NULLIF(expected.sodium, '')::numeric`
 
 export async function createRecipe(body: unknown): Promise<RecipeDetail> {
   const ids = recipeFoodIds(body)
@@ -369,10 +381,10 @@ export async function createRecipe(body: unknown): Promise<RecipeDetail> {
     sql.query(
       `INSERT INTO recipe_versions (
          id, recipe_id, version, is_current, name, notes, yield_servings, finished_weight_g,
-         calories_kcal, protein_g, carbs_g, fat_g, calculation_version, source_id, created_at
+         calories_kcal, protein_g, carbs_g, fat_g, fiber_g, sodium_mg, calculation_version, source_id, created_at
        ) VALUES (
          $1::uuid, $2::uuid, 1, true, $3, $4, $5::numeric, $6::numeric,
-         $7::numeric, $8::numeric, $9::numeric, $10::numeric, $11, $12::uuid, $13::timestamptz
+         $7::numeric, $8::numeric, $9::numeric, $10::numeric, $11::numeric, $12::numeric, $13, $14::uuid, $15::timestamptz
        )
        RETURNING id::text AS id, created_at`,
       [
@@ -386,6 +398,8 @@ export async function createRecipe(body: unknown): Promise<RecipeDetail> {
         composed.proteinG,
         composed.carbsG,
         composed.fatG,
+        composed.fiberG,
+        composed.sodiumMg,
         composed.calculationVersion,
         sourceId,
         now,
@@ -397,14 +411,14 @@ export async function createRecipe(body: unknown): Promise<RecipeDetail> {
            id, recipe_version_id, position, food_id, amount, unit, scale_factor,
            food_name_snapshot, food_source_type_snapshot, food_source_external_id_snapshot,
            base_serving_amount_snapshot, base_serving_unit_snapshot, base_weight_grams_snapshot,
-           base_calories_kcal_snapshot, base_protein_g_snapshot, base_carbs_g_snapshot, base_fat_g_snapshot,
-           line_calories_kcal, line_protein_g, line_carbs_g, line_fat_g, created_at
+           base_calories_kcal_snapshot, base_protein_g_snapshot, base_carbs_g_snapshot, base_fat_g_snapshot, base_fiber_g_snapshot, base_sodium_mg_snapshot,
+           line_calories_kcal, line_protein_g, line_carbs_g, line_fat_g, line_fiber_g, line_sodium_mg, created_at
          ) VALUES (
            $1::uuid, $2::uuid, $3::integer, $4::uuid, $5::numeric, $6, $7::numeric,
            $8, $9, $10,
            $11::numeric, $12, $13::numeric,
-           $14::numeric, $15::numeric, $16::numeric, $17::numeric,
-           $18::numeric, $19::numeric, $20::numeric, $21::numeric, $22::timestamptz
+           $14::numeric, $15::numeric, $16::numeric, $17::numeric, $18::numeric, $19::numeric,
+           $20::numeric, $21::numeric, $22::numeric, $23::numeric, $24::numeric, $25::numeric, $26::timestamptz
          )`,
         [
           ingredientIds[index],
@@ -424,10 +438,14 @@ export async function createRecipe(body: unknown): Promise<RecipeDetail> {
           line.baseProteinGSnapshot,
           line.baseCarbsGSnapshot,
           line.baseFatGSnapshot,
+          line.baseFiberGSnapshot,
+          line.baseSodiumMgSnapshot,
           line.lineCaloriesKcal,
           line.lineProteinG,
           line.lineCarbsG,
           line.lineFatG,
+          line.lineFiberG,
+          line.lineSodiumMg,
           now,
         ],
       ),
@@ -507,6 +525,8 @@ async function loadFoodBasis(sql: Sql, ids: string[]): Promise<{ foods: Map<stri
       protein: optionalNumber(row.protein),
       carbs: optionalNumber(row.carbs),
       fat: optionalNumber(row.fat),
+      fiber: optionalNumber(row.fiber),
+      sodium: optionalNumber(row.sodium),
       sourceKind: row.source_kind,
       barcode: row.barcode,
       archived: row.archived,
@@ -521,6 +541,8 @@ async function loadFoodBasis(sql: Sql, ids: string[]): Promise<{ foods: Map<stri
       protein: rawText(row.protein),
       carbs: rawText(row.carbs),
       fat: rawText(row.fat),
+      fiber: rawText(row.fiber),
+      sodium: rawText(row.sodium),
       archived: row.archived,
     })
   }
@@ -544,7 +566,7 @@ async function readRecipe(sql: Sql, id: string, versionNumber?: number): Promise
   )) as HistoryRow[]
   const versions = (await sql.query(
     `SELECT id::text AS id, version, is_current, name, notes, yield_servings, finished_weight_g,
-            calories_kcal, protein_g, carbs_g, fat_g, calculation_version, created_at
+            calories_kcal, protein_g, carbs_g, fat_g, fiber_g, sodium_mg, calculation_version, created_at
      FROM recipe_versions
      WHERE recipe_id = $1::uuid AND ${versionNumber == null ? 'is_current' : 'version = $2::integer'}
      LIMIT 1`,
@@ -556,8 +578,8 @@ async function readRecipe(sql: Sql, id: string, versionNumber?: number): Promise
     `SELECT id::text AS id, position, food_id::text AS food_id, amount, unit, scale_factor,
             food_name_snapshot, food_source_type_snapshot, food_source_external_id_snapshot,
             base_serving_amount_snapshot, base_serving_unit_snapshot, base_weight_grams_snapshot,
-            base_calories_kcal_snapshot, base_protein_g_snapshot, base_carbs_g_snapshot, base_fat_g_snapshot,
-            line_calories_kcal, line_protein_g, line_carbs_g, line_fat_g
+            base_calories_kcal_snapshot, base_protein_g_snapshot, base_carbs_g_snapshot, base_fat_g_snapshot, base_fiber_g_snapshot, base_sodium_mg_snapshot,
+            line_calories_kcal, line_protein_g, line_carbs_g, line_fat_g, line_fiber_g, line_sodium_mg
      FROM recipe_version_ingredients
      WHERE recipe_version_id = $1::uuid
      ORDER BY position ASC`,
@@ -580,6 +602,8 @@ async function readRecipe(sql: Sql, id: string, versionNumber?: number): Promise
       proteinG: optionalNumber(version.protein_g),
       carbsG: optionalNumber(version.carbs_g),
       fatG: optionalNumber(version.fat_g),
+      fiberG: optionalNumber(version.fiber_g),
+      sodiumMg: optionalNumber(version.sodium_mg),
       calculationVersion: version.calculation_version,
       createdAt: instant(version.created_at) ?? '',
       ingredients: ingredients.map(mapIngredient),
@@ -632,10 +656,14 @@ function mapIngredient(row: IngredientRow): RecipeIngredientView {
     baseProteinGSnapshot: optionalNumber(row.base_protein_g_snapshot),
     baseCarbsGSnapshot: optionalNumber(row.base_carbs_g_snapshot),
     baseFatGSnapshot: optionalNumber(row.base_fat_g_snapshot),
+    baseFiberGSnapshot: optionalNumber(row.base_fiber_g_snapshot),
+    baseSodiumMgSnapshot: optionalNumber(row.base_sodium_mg_snapshot),
     lineCaloriesKcal: numberValue(row.line_calories_kcal),
     lineProteinG: optionalNumber(row.line_protein_g),
     lineCarbsG: optionalNumber(row.line_carbs_g),
     lineFatG: optionalNumber(row.line_fat_g),
+    lineFiberG: optionalNumber(row.line_fiber_g),
+    lineSodiumMg: optionalNumber(row.line_sodium_mg),
   }
   return { ...line, id: row.id, supportedUnits: supportedDisplayUnits(line) }
 }
@@ -672,6 +700,8 @@ type ExpectedFood = {
   protein: string | null
   carbs: string | null
   fat: string | null
+  fiber: string | null
+  sodium: string | null
   archived: boolean
 }
 type FoodBasisRow = {
@@ -685,6 +715,8 @@ type FoodBasisRow = {
   protein: unknown
   carbs: unknown
   fat: unknown
+  fiber: unknown
+  sodium: unknown
   source_kind: string | null
   archived: boolean
 }
@@ -712,6 +744,8 @@ type VersionRow = {
   protein_g: unknown
   carbs_g: unknown
   fat_g: unknown
+  fiber_g: unknown
+  sodium_mg: unknown
   calculation_version: string
   created_at: unknown
 }
@@ -732,8 +766,12 @@ type IngredientRow = {
   base_protein_g_snapshot: unknown
   base_carbs_g_snapshot: unknown
   base_fat_g_snapshot: unknown
+  base_fiber_g_snapshot: unknown
+  base_sodium_mg_snapshot: unknown
   line_calories_kcal: unknown
   line_protein_g: unknown
   line_carbs_g: unknown
   line_fat_g: unknown
+  line_fiber_g: unknown
+  line_sodium_mg: unknown
 }
