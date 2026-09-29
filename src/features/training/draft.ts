@@ -13,7 +13,7 @@ import {
   type WorkoutSession,
   type WorkoutTemplate,
 } from '@/domain/training'
-import { kilogramsToPounds } from '@/domain/units'
+import { kilogramsToPounds, metersToMiles } from '@/domain/units'
 import {
   fieldErrorCountSummary,
   interpretPaperSets,
@@ -66,11 +66,11 @@ export type WorkoutDraft = {
   benchmarkProtocolVersionId?: string | null
 }
 
-export function emptyDraftSet(setNumber: number): DraftSet {
+export function emptyDraftSet(setNumber: number, loadState: LoadState = 'external'): DraftSet {
   return {
     setNumber,
     setType: 'working',
-    loadState: 'external',
+    loadState,
     weightLb: '',
     reps: '',
     durationSec: '',
@@ -78,10 +78,17 @@ export function emptyDraftSet(setNumber: number): DraftSet {
     rightReps: '',
     leftDurationSec: '',
     rightDurationSec: '',
+    distance: '',
+    distanceUnit: 'mi',
+    completed: null,
     notes: '',
-    transcribedLoadState: 'external',
+    transcribedLoadState: loadState,
     transcribedWeightLb: '',
   }
+}
+
+function defaultExerciseLoadState(loadType: string | null | undefined): LoadState {
+  return loadType === 'none' || loadType === 'bodyweight' ? 'bodyweight' : 'external'
 }
 
 export function draftFromTranscription(
@@ -129,14 +136,20 @@ export function draftFromTemplate(template: WorkoutTemplate, now = new Date()): 
       plannedSets: slot.plannedSets,
       prescription: slot.prescription,
       notes: '',
-      sets: Array.from({ length: slot.plannedSets ?? 1 }, (_, index) => emptyDraftSet(index + 1)),
+      sets: Array.from(
+        { length: slot.plannedSets ?? 1 },
+        (_, index) => emptyDraftSet(index + 1, defaultExerciseLoadState(slot.exercise.loadType)),
+      ),
     })),
   }
 }
 
 export function addDraftSet(exercise: DraftExercise): DraftExercise {
   const nextNumber = exercise.sets.reduce((max, set) => Math.max(max, set.setNumber), 0) + 1
-  return { ...exercise, sets: [...exercise.sets, emptyDraftSet(nextNumber)] }
+  return {
+    ...exercise,
+    sets: [...exercise.sets, emptyDraftSet(nextNumber, exercise.sets[0]?.loadState ?? 'external')],
+  }
 }
 
 function parseOptionalPositive(value: string): number | null {
@@ -249,6 +262,7 @@ export function draftExerciseFromDefinition(exercise: {
   id: string
   name: string
   measurementKind: MeasurementKind
+  loadType?: string | null
 }): DraftExercise {
   return {
     exerciseDefinitionId: exercise.id,
@@ -258,7 +272,7 @@ export function draftExerciseFromDefinition(exercise: {
     plannedSets: null,
     prescription: { measurement: exercise.measurementKind },
     notes: '',
-    sets: [emptyDraftSet(1)],
+    sets: [emptyDraftSet(1, defaultExerciseLoadState(exercise.loadType))],
   }
 }
 
@@ -279,13 +293,20 @@ export function draftFromSession(session: WorkoutSession, template: WorkoutTempl
       slotId: exercise.slotId,
       name: exercise.exerciseName,
       measurementKind: template?.exercises.find((slot) => slot.slotId === exercise.slotId)?.exercise.measurementKind
-        ?? (exercise.sets.some((set) => set.leftDurationSec != null || set.rightDurationSec != null)
-          ? 'duration_per_side'
-          : exercise.sets.some((set) => set.leftReps != null || set.rightReps != null)
-            ? 'reps_per_side'
-            : exercise.sets.some((set) => set.durationSec != null)
-              ? 'duration'
-              : 'reps'),
+        ?? exercise.measurementKind
+        ?? (exercise.sets.some((set) => set.completed != null)
+          ? 'completion'
+          : exercise.sets.some((set) => set.distanceM != null && set.durationSec != null)
+            ? 'distance_duration'
+            : exercise.sets.some((set) => set.distanceM != null)
+              ? 'distance'
+              : exercise.sets.some((set) => set.leftDurationSec != null || set.rightDurationSec != null)
+                ? 'duration_per_side'
+                : exercise.sets.some((set) => set.leftReps != null || set.rightReps != null)
+                  ? 'reps_per_side'
+                  : exercise.sets.some((set) => set.durationSec != null)
+                    ? 'duration'
+                    : 'reps'),
       plannedSets: template?.exercises.find((slot) => slot.slotId === exercise.slotId)?.plannedSets ?? exercise.sets.length,
       prescription: template?.exercises.find((slot) => slot.slotId === exercise.slotId)?.prescription ?? { measurement: 'reps' },
       notes: exercise.notes ?? '',
@@ -300,6 +321,9 @@ export function draftFromSession(session: WorkoutSession, template: WorkoutTempl
         rightReps: numberField(set.rightReps),
         leftDurationSec: numberField(set.leftDurationSec),
         rightDurationSec: numberField(set.rightDurationSec),
+        distance: set.distanceM == null ? '' : String(Math.round(metersToMiles(set.distanceM) * 1000) / 1000),
+        distanceUnit: 'mi',
+        completed: set.completed ?? null,
         notes: set.notes ?? '',
         transcribedLoadState: set.loadState,
         transcribedWeightLb: set.weightKg == null ? '' : String(Math.round(kilogramsToPounds(set.weightKg) * 10) / 10),
