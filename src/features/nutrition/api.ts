@@ -197,6 +197,7 @@ export async function savePackagedFoodAndLog(input: {
   carbs?: number | null
   fat?: number | null
   fiber?: number | null
+  sodium?: number | null
   logDate: string
   timezone: string
   logQuantity?: number
@@ -256,6 +257,7 @@ export async function commitNutritionLabelReview(input: {
   carbsGrams?: number | null
   fatGrams?: number | null
   fiberGrams?: number | null
+  sodiumMg?: number | null
   basis: 'per_serving' | 'per_100g' | 'per_container' | 'unknown'
   barcode?: string | null
   logQuantity?: number
@@ -399,6 +401,7 @@ export type UsdaFoodChoice = {
   carbs: number | null
   fat: number | null
   fiber: number | null
+  sodium: number | null
   portions: UsdaPortionChoice[]
 }
 
@@ -439,6 +442,7 @@ export async function saveAiReusableFood(input: {
   carbs?: number | null
   fat?: number | null
   fiber?: number | null
+  sodium?: number | null
   provider: 'gemini' | 'home_ai'
   model?: string | null
   originalCalories: number
