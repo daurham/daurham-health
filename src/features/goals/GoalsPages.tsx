@@ -5,7 +5,7 @@ import { formatGoalQuantity, formatGoalTarget, goalKindDefinition, GOAL_KINDS, t
 import type { GoalProjection } from '@/domain/goal-projection'
 import { healthCalendarDateFromNow } from '@/domain/time'
 import { LoadErrorNotice, primaryButtonClass, quietButtonClass, secondaryButtonClass } from '@/lib'
-import { changeGoalStatus, createGoal, fetchGoal, fetchGoals, reviseGoal, type GoalCatalog, type GoalView } from './api'
+import { changeGoalStatus, createGoal, fetchGoal, fetchGoals, removeGoal, reviseGoal, type GoalCatalog, type GoalView } from './api'
 
 const fieldClass = 'w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm'
 
@@ -506,6 +506,21 @@ export function GoalDetailPage() {
     }
   }
 
+  async function onRemove() {
+    if (!window.confirm('Remove this goal? Goals used by experiment history will be retired instead of deleting that history.')) {
+      return
+    }
+    setBusy(true)
+    setError(null)
+    try {
+      await removeGoal(goalId)
+      navigate('/goals')
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Could not remove this goal')
+      setBusy(false)
+    }
+  }
+
   return (
     <section className="space-y-6">
       <Link to="/goals" className="text-sm underline">
@@ -531,6 +546,12 @@ export function GoalDetailPage() {
         ) : null}
       </section>
       <GoalStatusSection goal={goal} />
+      {goal.evidence.strengthBasis ? (
+        <p className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-700">
+          e1RM source: {formatGoalQuantity(goal.evidence.strengthBasis.weightKg * 2.2046226218, 'lb')} × {goal.evidence.strengthBasis.reps} reps
+          {goal.evidence.observedOn ? ` on ${goal.evidence.observedOn}` : ''} · Epley estimate
+        </p>
+      ) : null}
       {goal.projection ? <ProjectionPanel projection={goal.projection} /> : null}
       <div className="flex flex-wrap gap-2">
         {goal.status === 'active' ? (
@@ -552,6 +573,9 @@ export function GoalDetailPage() {
             Reopen
           </button>
         )}
+        <button type="button" className={quietButtonClass} disabled={busy} onClick={() => void onRemove()}>
+          Remove goal
+        </button>
       </div>
       <form onSubmit={(event) => void onRevise(event)} className="space-y-3 rounded-lg border border-zinc-200 bg-white p-4">
         <h2 className="text-base font-semibold">Revise target</h2>
