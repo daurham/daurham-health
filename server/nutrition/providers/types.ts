@@ -34,8 +34,8 @@ export function snapshotFromUnknownProduct(product: Record<string, unknown>, bar
       fat100g: nutrient(nutriments, 'fat_100g'),
       fiberServing: nutrient(nutriments, 'fiber_serving'),
       fiber100g: nutrient(nutriments, 'fiber_100g'),
-      sodiumServing: nutrient(nutriments, 'sodium_serving'),
-      sodium100g: nutrient(nutriments, 'sodium_100g'),
+      sodiumServing: nutrientMilligramsFromGrams(nutriments, 'sodium_serving'),
+      sodium100g: nutrientMilligramsFromGrams(nutriments, 'sodium_100g'),
     },
   }
 }
@@ -79,6 +79,11 @@ function nutrient(record: Record<string, unknown> | null, ...keys: string[]): nu
     }
   }
   return null
+}
+
+function nutrientMilligramsFromGrams(record: Record<string, unknown> | null, ...keys: string[]): number | null {
+  const grams = nutrient(record, ...keys)
+  return grams == null ? null : grams * 1000
 }
 
 function finiteNonNegative(value: unknown): number | null {
