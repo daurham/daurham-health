@@ -7,6 +7,7 @@ import {
   exerciseListResponseSchema,
   manualWorkoutRequestSchema,
   manualWorkoutRequestValuesSchema,
+  ownerRoutineInputSchema,
   measurementFamilyOf,
   measurementKindAcceptsFamily,
   sessionDetailResponseSchema,
@@ -28,6 +29,7 @@ import {
   type CanonicalWorkoutSetInsert,
   type ExerciseDefinition,
   type ManualWorkoutRequest,
+  type OwnerRoutineInput,
   type SessionDetailResponse,
   type SessionListResponse,
   type SessionSourceKind,
@@ -197,6 +199,122 @@ export async function listTemplates(): Promise<TemplateListResponse> {
   )
 
   return templateListResponseSchema.parse({ templates })
+}
+
+
+function parseOwnerRoutine(body: unknown): OwnerRoutineInput {
+  const parsed = ownerRoutineInputSchema.safeParse(body)
+  if (!parsed.success) throw new HttpError(400, firstZodMessage(parsed.error))
+  return parsed.data
+}
+
+async function validateOwnerRoutineExercises(sql: Sql, request: OwnerRoutineInput): Promise<Map<string, ExerciseDefinition>> {
+  const exercises = await loadExercisesById(request.exercises.map((item) => item.exerciseDefinitionId))
+  for (const item of request.exercises) {
+    const exercise = exercises.get(item.exerciseDefinitionId)
+    if (!exercise || !exercise.isActive) throw new HttpError(400, 'Routine exercise was not found or is archived')
+    if (item.prescription.measurement !== exercise.measurementKind) {
+      throw new HttpError(400, `${exercise.name} prescription must use ${exercise.measurementKind.replaceAll('_', ' ')}`)
+    }
+  }
+  return exercises
+}
+
+function ownerRoutineQueries(sql: Sql, input: {
+  id: string
+  routineCode: string
+  version: string
+  request: OwnerRoutineInput
+  active?: boolean
+}) {
+  const queries = [
+    sql.query(
+      `INSERT INTO workout_templates (
+         id, routine_code, version, name, metadata, is_active, origin_kind, created_at, updated_at
+       ) VALUES ($1::uuid, $2, $3, $4, '{}'::jsonb, $5, 'owner', now(), now())`,
+      [input.id, input.routineCode, input.version, input.request.name, input.active ?? true],
+    ),
+  ]
+  input.request.exercises.forEach((item, index) => {
+    queries.push(sql.query(
+      `INSERT INTO workout_template_exercises (
+         id, workout_template_id, exercise_definition_id, slot_id, position, planned_sets, prescription, metadata
+       ) VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5::int, $6::int, $7::jsonb, '{}'::jsonb)`,
+      [randomUUID(), input.id, item.exerciseDefinitionId, `owner-${index + 1}`, index + 1, item.plannedSets, JSON.stringify(item.prescription)],
+    ))
+  })
+  return queries
+}
+
+export async function createOwnerRoutine(body: unknown): Promise<{ template: WorkoutTemplate }> {
+  const request = parseOwnerRoutine(body)
+  const sql = await getSql()
+  await validateOwnerRoutineExercises(sql, request)
+  const id = randomUUID()
+  const routineCode = `owner:${randomUUID()}`
+  await sql.transaction(ownerRoutineQueries(sql, { id, routineCode, version: '1', request }))
+  const listed = await listTemplates()
+  const template = listed.templates.find((item) => item.id === id)
+  if (!template) throw new HttpError(500, 'Saved Routine could not be read after save')
+  return { template }
+}
+
+export async function reviseOwnerRoutine(templateId: string, body: unknown): Promise<{ template: WorkoutTemplate }> {
+  const request = parseOwnerRoutine(body)
+  const sql = await getSql()
+  await validateOwnerRoutineExercises(sql, request)
+  const currentRows = (await sql.query(
+    `SELECT id::text AS id, routine_code, version, origin_kind, is_active
+     FROM workout_templates WHERE id = $1::uuid LIMIT 1`,
+    [templateId],
+  )) as Array<{ id: string; routine_code: string; version: string; origin_kind: string; is_active: boolean }>
+  const current = currentRows[0]
+  if (!current) throw new HttpError(404, 'Saved Routine was not found')
+  if (current.origin_kind !== 'owner') throw new HttpError(409, 'Built-in routines cannot be edited')
+  if (!current.is_active) throw new HttpError(409, 'This Saved Routine version is no longer current')
+  const number = Number(current.version)
+  if (!Number.isInteger(number) || number < 1) throw new HttpError(409, 'Saved Routine version is invalid')
+  const nextId = randomUUID()
+  try {
+    const results = await sql.transaction([
+      sql.query(
+        `UPDATE workout_templates SET is_active = false, updated_at = now()
+         WHERE id = $1::uuid AND origin_kind = 'owner' AND is_active
+         RETURNING id::text AS id`,
+        [templateId],
+      ),
+      ...ownerRoutineQueries(sql, { id: nextId, routineCode: current.routine_code, version: String(number + 1), request }),
+    ]) as Array<Array<{ id?: string }>>
+    if (!results[0]?.[0]?.id) throw new HttpError(409, 'Saved Routine changed since editing began')
+  } catch (error) {
+    if (error instanceof HttpError) throw error
+    const message = formatDatabaseError(error)
+    if (message.includes('workout_templates_one_active_owner_version_idx') || message.includes('duplicate')) {
+      throw new HttpError(409, 'Saved Routine changed since editing began')
+    }
+    throw error
+  }
+  const listed = await listTemplates()
+  const template = listed.templates.find((item) => item.id === nextId)
+  if (!template) throw new HttpError(500, 'Saved Routine could not be read after revision')
+  return { template }
+}
+
+export async function archiveOwnerRoutine(templateId: string): Promise<{ ok: true }> {
+  const sql = await getSql()
+  const rows = (await sql.query(
+    `UPDATE workout_templates SET is_active = false, updated_at = now()
+     WHERE id = $1::uuid AND origin_kind = 'owner' AND is_active
+     RETURNING id::text AS id`,
+    [templateId],
+  )) as Array<{ id?: string }>
+  if (!rows[0]?.id) {
+    const existing = (await sql.query(`SELECT origin_kind, is_active FROM workout_templates WHERE id = $1::uuid`, [templateId])) as Array<{ origin_kind: string; is_active: boolean }>
+    if (!existing[0]) throw new HttpError(404, 'Saved Routine was not found')
+    if (existing[0].origin_kind !== 'owner') throw new HttpError(409, 'Built-in routines cannot be archived')
+    throw new HttpError(409, 'This Saved Routine version is no longer current')
+  }
+  return { ok: true }
 }
 
 async function loadTemplateById(templateId: string): Promise<WorkoutTemplate> {
