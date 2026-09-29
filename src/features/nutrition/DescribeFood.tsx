@@ -189,6 +189,7 @@ function DescriptionEstimateSheet({
         carbsGrams: values.carbsGrams,
         fatGrams: values.fatGrams,
         fiberGrams: values.fiberGrams,
+        sodiumMg: values.sodiumMg,
         portionScale: scale,
         items: current.items,
       })
@@ -258,6 +259,12 @@ function DescriptionEstimateSheet({
           suffix="g"
           value={values.fiberGrams}
           onChange={(fiberGrams) => setValues((currentValues) => ({ ...currentValues, fiberGrams }))}
+        />
+        <EstimateField
+          label="Sodium"
+          suffix="mg"
+          value={values.sodiumMg}
+          onChange={(sodiumMg) => setValues((currentValues) => ({ ...currentValues, sodiumMg }))}
         />
       </div>
       <label className="mt-4 block">
@@ -346,7 +353,7 @@ function EstimateField({
           onChange={(event) => {
             const next = event.target.value.trim()
             if (!next) {
-              onChange(label === 'Fiber' ? null : 0)
+              onChange(label === 'Fiber' || label === 'Sodium' ? null : 0)
               return
             }
             const parsed = Number(next)
