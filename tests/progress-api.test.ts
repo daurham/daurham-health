@@ -49,7 +49,12 @@ describe('progress query and classification', () => {
       analyticsRepMode: 'standard',
     })
     for (const seed of TRAINING_EXERCISE_SEEDS) {
-      expect(classificationForExternalId(seed.externalId).analyticsLoadType).toBe('external')
+      const classification = classificationForExternalId(seed.externalId)
+      if (seed.measurementKind === 'distance' || seed.measurementKind === 'distance_duration' || seed.measurementKind === 'completion') {
+        expect(classification.analyticsLoadType).toBe('none')
+      } else {
+        expect(classification.analyticsLoadType).toBe('external')
+      }
     }
   })
 
