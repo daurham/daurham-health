@@ -8,7 +8,7 @@ import type { CanonicalSetRecord, ProgressExerciseDefinition } from './progress/
 import { aggregateOccurrenceStates, resolveScheduleRange } from './supplements/resolve.js'
 import type { AdherenceWindow, ScheduleWindow, StatusEventWindow } from './supplements/types.js'
 import { isCalendarDate } from './training.js'
-import { centimetersToInches, kilogramsToPounds } from './units.js'
+import { centimetersToInches, formatPaceSecondsPerMile, kilogramsToPounds, metersToMiles } from './units.js'
 
 export const GOAL_KINDS = [
   'body_metric',
@@ -19,6 +19,11 @@ export const GOAL_KINDS = [
   'nutrition_protein',
   'sleep_duration',
   'supplement_adherence',
+  'training_reps',
+  'training_duration',
+  'training_distance',
+  'training_pace',
+  'training_skill',
 ] as const
 export type GoalKind = (typeof GOAL_KINDS)[number]
 
@@ -58,6 +63,7 @@ export type GoalSelector = {
   benchmarkProtocolVersionId: string | null
   benchmarkRequirementId: string | null
   supplementId: string | null
+  trainingMinDistanceM: number | null
 }
 
 export type GoalTarget = {
@@ -155,6 +161,51 @@ const KIND_DEFINITIONS: Record<GoalKind, GoalKindDefinition> = {
     unit: '%',
     pointMetric: false,
   },
+  training_reps: {
+    kind: 'training_reps',
+    displayName: 'Training reps',
+    modes: ['at_least'],
+    windows: null,
+    defaultWindow: null,
+    unit: 'reps',
+    pointMetric: true,
+  },
+  training_duration: {
+    kind: 'training_duration',
+    displayName: 'Training duration',
+    modes: ['at_least'],
+    windows: null,
+    defaultWindow: null,
+    unit: 'sec',
+    pointMetric: true,
+  },
+  training_distance: {
+    kind: 'training_distance',
+    displayName: 'Training distance',
+    modes: ['at_least'],
+    windows: null,
+    defaultWindow: null,
+    unit: 'mi',
+    pointMetric: true,
+  },
+  training_pace: {
+    kind: 'training_pace',
+    displayName: 'Training pace',
+    modes: ['at_most'],
+    windows: null,
+    defaultWindow: null,
+    unit: 'sec/mi',
+    pointMetric: true,
+  },
+  training_skill: {
+    kind: 'training_skill',
+    displayName: 'Training skill',
+    modes: ['at_least'],
+    windows: null,
+    defaultWindow: null,
+    unit: 'completion',
+    pointMetric: true,
+  },
 }
 
 export function goalKindDefinition(kind: string): GoalKindDefinition | null {
@@ -250,7 +301,14 @@ export type BenchmarkPin = {
 
 export type GoalValidationContext = {
   today: string
-  exercise: { id: string; name: string; active: boolean } | null
+  exercise: {
+    id: string
+    name: string
+    active: boolean
+    measurementKind?: string
+    performanceType?: string
+    analyticsLoadType?: string
+  } | null
   supplement: { id: string; name: string; active: boolean } | null
   benchmark: BenchmarkPin | null
 }
@@ -334,6 +392,9 @@ function selectorOf(record: Record<string, unknown>, kind: GoalKind): GoalSelect
   if (benchmarkRequirementId && typeof benchmarkRequirementId === 'object') {
     return benchmarkRequirementId
   }
+  const rawMinDistance = finiteNumber(record.trainingMinDistanceM)
+  if (rawMinDistance && typeof rawMinDistance === 'object') return rawMinDistance
+  const trainingMinDistanceM = rawMinDistance == null ? null : rawMinDistance
   const supplementId = optionalUuid(record.supplementId)
   if (supplementId && typeof supplementId === 'object') {
     return supplementId
@@ -346,6 +407,7 @@ function selectorOf(record: Record<string, unknown>, kind: GoalKind): GoalSelect
     benchmarkProtocolVersionId,
     benchmarkRequirementId,
     supplementId,
+    trainingMinDistanceM,
   }
   if (kind === 'body_metric') {
     if (!selector.bodyMetricKey || !GOAL_BODY_METRIC_KEYS.includes(selector.bodyMetricKey)) {
@@ -355,11 +417,20 @@ function selectorOf(record: Record<string, unknown>, kind: GoalKind): GoalSelect
       return fail('A body goal uses only its body metric.')
     }
   } else if (kind === 'strength_e1rm') {
-    if (!selector.exerciseDefinitionId) {
-      return fail('Choose an exercise.')
-    }
+    if (!selector.exerciseDefinitionId) return fail('Choose an exercise.')
+    if (selector.trainingMinDistanceM != null) return fail('A strength goal does not use a minimum distance.')
     if (selector.bodyMetricKey || selector.benchmarkDefinitionId || selector.benchmarkProtocolVersionId || selector.benchmarkRequirementId || selector.supplementId) {
       return fail('A strength goal uses only its exercise.')
+    }
+  } else if (kind === 'training_reps' || kind === 'training_duration' || kind === 'training_distance' || kind === 'training_pace' || kind === 'training_skill') {
+    if (!selector.exerciseDefinitionId) return fail('Choose an exercise.')
+    if (kind === 'training_pace') {
+      if (selector.trainingMinDistanceM == null || selector.trainingMinDistanceM <= 0) return fail('A pace goal needs a positive minimum distance.')
+    } else if (selector.trainingMinDistanceM != null) {
+      return fail('Only a pace goal uses a minimum distance.')
+    }
+    if (selector.bodyMetricKey || selector.benchmarkDefinitionId || selector.benchmarkProtocolVersionId || selector.benchmarkRequirementId || selector.supplementId) {
+      return fail('A Training performance goal uses only its exercise.')
     }
   } else if (kind === 'benchmark_result') {
     if (!selector.benchmarkDefinitionId || !selector.benchmarkProtocolVersionId || !selector.benchmarkRequirementId) {
@@ -375,7 +446,7 @@ function selectorOf(record: Record<string, unknown>, kind: GoalKind): GoalSelect
     if (selector.bodyMetricKey || selector.exerciseDefinitionId || selector.benchmarkDefinitionId || selector.benchmarkProtocolVersionId || selector.benchmarkRequirementId) {
       return fail('An adherence goal uses only its supplement.')
     }
-  } else if (selector.bodyMetricKey || selector.exerciseDefinitionId || selector.benchmarkDefinitionId || selector.benchmarkProtocolVersionId || selector.benchmarkRequirementId || selector.supplementId) {
+  } else if (selector.bodyMetricKey || selector.exerciseDefinitionId || selector.benchmarkDefinitionId || selector.benchmarkProtocolVersionId || selector.benchmarkRequirementId || selector.supplementId || selector.trainingMinDistanceM != null) {
     return fail('This goal kind does not take a selector.')
   }
   return selector
@@ -416,6 +487,12 @@ function targetOf(
   const high = targetMax ?? targetMin ?? 0
   if (low <= 0 || high <= 0) {
     return fail('Target values must be greater than zero.')
+  }
+  if (kind === 'training_skill' && (targetMode !== 'at_least' || targetMin !== 1 || targetMax != null)) {
+    return fail('A skill goal target is one completed milestone.')
+  }
+  if (kind === 'training_reps' && targetMin != null && !Number.isInteger(targetMin)) {
+    return fail('A reps target must be a whole number.')
   }
   if (unit === '%' && high > 100) {
     return fail('Adherence is a percent from above 0 through 100.')
@@ -493,13 +570,37 @@ function unitFor(kind: GoalKind, selector: GoalSelector, context: GoalValidation
     return unit
   }
   if (kind === 'strength_e1rm') {
-    if (!context.exercise || context.exercise.id !== selector.exerciseDefinitionId) {
-      return fail('Choose an exercise.')
-    }
-    if (!context.exercise.active) {
-      return fail('That exercise is archived.')
-    }
+    if (!context.exercise || context.exercise.id !== selector.exerciseDefinitionId) return fail('Choose an exercise.')
+    if (!context.exercise.active) return fail('That exercise is archived.')
     return 'lb'
+  }
+  if (kind.startsWith('training_')) {
+    const exercise = context.exercise
+    if (!exercise || exercise.id !== selector.exerciseDefinitionId) return fail('Choose an exercise.')
+    if (!exercise.active) return fail('That exercise is archived.')
+    const measurement = exercise.measurementKind ?? ''
+    if (kind === 'training_reps') {
+      if (!['reps','reps_per_side'].includes(measurement) || (exercise.performanceType === 'loaded_reps' && exercise.analyticsLoadType === 'external')) {
+        return fail('Choose an exercise where reps alone are the performance measure.')
+      }
+      return 'reps'
+    }
+    if (kind === 'training_duration') {
+      if (!['duration','duration_per_side','distance_duration'].includes(measurement)) return fail('Choose a duration exercise.')
+      return 'sec'
+    }
+    if (kind === 'training_distance') {
+      if (!['distance','distance_duration'].includes(measurement)) return fail('Choose a distance exercise.')
+      return 'mi'
+    }
+    if (kind === 'training_pace') {
+      if (measurement !== 'distance_duration') return fail('Choose a distance + duration exercise.')
+      return 'sec/mi'
+    }
+    if (kind === 'training_skill') {
+      if (measurement !== 'completion') return fail('Choose a skill/milestone exercise.')
+      return 'completion'
+    }
   }
   if (kind === 'supplement_adherence') {
     if (!context.supplement || context.supplement.id !== selector.supplementId) {
@@ -577,7 +678,8 @@ export function sameGoalSelector(left: GoalSelector, right: GoalSelector): boole
     left.benchmarkDefinitionId === right.benchmarkDefinitionId &&
     left.benchmarkProtocolVersionId === right.benchmarkProtocolVersionId &&
     left.benchmarkRequirementId === right.benchmarkRequirementId &&
-    left.supplementId === right.supplementId
+    left.supplementId === right.supplementId &&
+    left.trainingMinDistanceM === right.trainingMinDistanceM
   )
 }
 
@@ -591,9 +693,12 @@ export function goalDisplayName(input: {
   if (input.goalKind === 'body_metric') {
     return bodyGoalDisplayName(input.bodyMetricKey ?? '')
   }
-  if (input.goalKind === 'strength_e1rm') {
-    return `${input.exerciseName ?? 'Exercise'} e1RM`
-  }
+  if (input.goalKind === 'strength_e1rm') return `${input.exerciseName ?? 'Exercise'} e1RM`
+  if (input.goalKind === 'training_reps') return `${input.exerciseName ?? 'Exercise'} reps`
+  if (input.goalKind === 'training_duration') return `${input.exerciseName ?? 'Exercise'} duration`
+  if (input.goalKind === 'training_distance') return `${input.exerciseName ?? 'Exercise'} distance`
+  if (input.goalKind === 'training_pace') return `${input.exerciseName ?? 'Exercise'} pace`
+  if (input.goalKind === 'training_skill') return `Achieve ${input.exerciseName ?? 'skill'}`
   if (input.goalKind === 'benchmark_result') {
     return input.benchmarkLabel ?? 'Benchmark result'
   }
@@ -604,6 +709,15 @@ export function goalDisplayName(input: {
 }
 
 export function formatGoalQuantity(value: number, unit: string): string {
+  if (unit === 'sec/mi') return formatPaceSecondsPerMile(value)
+  if (unit === 'completion') return value >= 1 ? 'achieved' : 'not achieved'
+  if (unit === 'sec') {
+    const whole = Math.round(value)
+    const minutes = Math.floor(whole / 60)
+    const seconds = whole % 60
+    return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds} sec`
+  }
+  if (unit === 'mi') return `${value.toFixed(value < 10 ? 2 : 1)} mi`
   if (unit === 'min/night' || unit === 'minutes') {
     const whole = Math.round(value)
     const hours = Math.floor(whole / 60)
@@ -673,6 +787,17 @@ export type GoalEvidence = {
     formula: 'epley'
     sessionId: string
     setId: string
+  } | null
+  trainingSource: {
+    sessionId: string
+    sessionExerciseId: string
+    setId: string
+    exerciseId: string
+    reps: number | null
+    durationSec: number | null
+    distanceM: number | null
+    completed: boolean | null
+    secondsPerMile: number | null
   } | null
   coverage: {
     observedDays: number
@@ -749,6 +874,19 @@ export function goalEvidence(input: {
   activityRows: readonly ActivityDailyRow[]
   proteinDays: readonly { date: string; protein: number | null; logged: boolean }[]
   sleepNights: readonly { date: string; minutes: number | null; analysisEligible: boolean; partial: boolean }[]
+  training: {
+    value: number
+    observedOn: string
+    sessionId: string
+    sessionExerciseId: string
+    setId: string
+    exerciseId: string
+    reps: number | null
+    durationSec: number | null
+    distanceM: number | null
+    completed: boolean | null
+    secondsPerMile: number | null
+  } | null
   adherence: {
     schedules: readonly ScheduleWindow[]
     events: readonly StatusEventWindow[]
@@ -762,6 +900,7 @@ export function goalEvidence(input: {
     observedOn: null as string | null,
     provisional: null as GoalEvidence['provisional'],
     strengthSource: null as GoalEvidence['strengthSource'],
+    trainingSource: null as GoalEvidence['trainingSource'],
     coverage: null as GoalEvidence['coverage'],
   }
   if (input.goalKind === 'body_metric') {
@@ -779,6 +918,22 @@ export function goalEvidence(input: {
         formula: 'epley',
         sessionId: input.strength.sourceSessionId,
         setId: input.strength.sourceSetId,
+      }
+    }
+  } else if (input.goalKind === 'training_reps' || input.goalKind === 'training_duration' || input.goalKind === 'training_distance' || input.goalKind === 'training_pace' || input.goalKind === 'training_skill') {
+    if (input.training) {
+      base.current = input.goalKind === 'training_distance' ? metersToMiles(input.training.value) : input.training.value
+      base.observedOn = input.training.observedOn
+      base.trainingSource = {
+        sessionId: input.training.sessionId,
+        sessionExerciseId: input.training.sessionExerciseId,
+        setId: input.training.setId,
+        exerciseId: input.training.exerciseId,
+        reps: input.training.reps,
+        durationSec: input.training.durationSec,
+        distanceM: input.training.distanceM,
+        completed: input.training.completed,
+        secondsPerMile: input.training.secondsPerMile,
       }
     }
   } else if (input.goalKind === 'benchmark_result') {
