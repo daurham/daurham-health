@@ -304,6 +304,8 @@ export function evidenceFromSet(set: CanonicalSetRecord, extra?: Partial<Canonic
     durationSec: set.durationSec,
     leftDurationSec: set.leftDurationSec,
     rightDurationSec: set.rightDurationSec,
+    distanceM: set.distanceM ?? null,
+    completed: set.completed ?? null,
     ...extra,
   }
 }
