@@ -249,6 +249,7 @@ async function comparisonForCandidate(candidate: NutritionLabelCandidate) {
         carbs: nutrition.carbs,
         fat: nutrition.fat,
         fiber: nutrition.fiber,
+        sodium: nutrition.sodium,
         source: 'Open Food Facts',
       },
     }
@@ -488,6 +489,7 @@ export async function commitNutritionLabel(body: unknown): Promise<{
     carbsGrams: input.carbsGrams ?? null,
     fatGrams: input.fatGrams ?? null,
     fiberGrams: input.fiberGrams ?? null,
+    sodiumMg: input.sodiumMg ?? null,
     basis: input.basis,
     barcode: input.barcode ?? '',
     logQuantity: input.logQuantity ?? 1,
@@ -563,6 +565,7 @@ export async function commitNutritionLabel(body: unknown): Promise<{
       input.fatGrams ?? null,
       true,
       input.fiberGrams ?? null,
+      input.sodiumMg ?? null,
       null,
       null,
       false,
@@ -586,6 +589,7 @@ export async function commitNutritionLabel(body: unknown): Promise<{
         input.carbsGrams ?? null,
         input.fatGrams ?? null,
         input.fiberGrams ?? null,
+        input.sodiumMg ?? null,
         'photo_ai',
         false,
         null,
@@ -623,6 +627,7 @@ export async function commitNutritionLabel(body: unknown): Promise<{
             carbs: food.carbs,
             fat: food.fat,
             fiber: food.fiber,
+            sodium: food.sodium,
             servingGrams: food.servingGrams,
           }
         : undefined,
@@ -639,6 +644,7 @@ async function createLabelEntry(input: {
     carbs: number | null
     fat: number | null
     fiber: number | null
+    sodium: number | null
     servingGrams: number | null
   }
 }): Promise<{ food: NutritionFood; entry: NutritionEntry }> {
@@ -655,6 +661,7 @@ async function createLabelEntry(input: {
     carbs: request.carbsGrams ?? null,
     fat: request.fatGrams ?? null,
     fiber: request.fiberGrams ?? null,
+    sodium: request.sodiumMg ?? null,
     servingGrams: request.servingGrams ?? null,
   }
   const snapshot = snapshotFromDefinition(snapshotSource, { quantity: logQuantity })
@@ -709,6 +716,7 @@ async function createLabelEntry(input: {
     snapshot.carbs,
     snapshot.fat,
     snapshot.fiber,
+    snapshot.sodium,
     'photo_ai',
     null,
     null,
