@@ -381,10 +381,10 @@ export async function createRecipe(body: unknown): Promise<RecipeDetail> {
     sql.query(
       `INSERT INTO recipe_versions (
          id, recipe_id, version, is_current, name, notes, yield_servings, finished_weight_g,
-         calories_kcal, protein_g, carbs_g, fat_g, calculation_version, source_id, created_at
+         calories_kcal, protein_g, carbs_g, fat_g, fiber_g, sodium_mg, calculation_version, source_id, created_at
        ) VALUES (
          $1::uuid, $2::uuid, 1, true, $3, $4, $5::numeric, $6::numeric,
-         $7::numeric, $8::numeric, $9::numeric, $10::numeric, $11, $12::uuid, $13::timestamptz
+         $7::numeric, $8::numeric, $9::numeric, $10::numeric, $11::numeric, $12::numeric, $13, $14::uuid, $15::timestamptz
        )
        RETURNING id::text AS id, created_at`,
       [
