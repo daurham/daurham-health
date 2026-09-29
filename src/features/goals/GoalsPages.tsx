@@ -4,6 +4,7 @@ import { coverageLabel } from '@/domain/goal-status'
 import { formatGoalQuantity, formatGoalTarget, goalKindDefinition, GOAL_KINDS, type GoalKind } from '@/domain/goals'
 import type { GoalProjection } from '@/domain/goal-projection'
 import { healthCalendarDateFromNow } from '@/domain/time'
+import { milesToMeters, metersToMiles } from '@/domain/units'
 import { dangerButtonClass, LoadErrorNotice, primaryButtonClass, quietButtonClass, secondaryButtonClass } from '@/lib'
 import { changeGoalStatus, createGoal, fetchGoal, fetchGoals, removeGoal, reviseGoal, type GoalCatalog, type GoalView } from './api'
 
@@ -18,6 +19,11 @@ const KIND_LABELS: Record<GoalKind, string> = {
   nutrition_protein: 'Protein',
   sleep_duration: 'Sleep duration',
   supplement_adherence: 'Supplement adherence',
+  training_reps: 'Exercise reps',
+  training_duration: 'Exercise duration',
+  training_distance: 'Distance',
+  training_pace: 'Pace',
+  training_skill: 'Skill / milestone',
 }
 
 function projectionDateLabel(iso: string): string {
@@ -138,6 +144,18 @@ function GoalStatusSection({ goal }: { goal: GoalView }) {
             <dd>{coverage}</dd>
           </div>
         ) : null}
+        {goal.selector.trainingMinDistanceM != null ? (
+          <div>
+            <dt className="text-zinc-500">Minimum continuous distance</dt>
+            <dd>{metersToMiles(goal.selector.trainingMinDistanceM).toLocaleString('en-US', { maximumFractionDigits: 2 })} mi</dd>
+          </div>
+        ) : null}
+        {goal.evidence.trainingSource ? (
+          <div>
+            <dt className="text-zinc-500">Evidence</dt>
+            <dd><Link to={`/training/${goal.evidence.trainingSource.sessionId}`} className="underline">Open source workout</Link></dd>
+          </div>
+        ) : null}
       </dl>
       {status.targetState === 'satisfied' ? (
         <p className="mt-3 text-sm text-zinc-600">This goal stays active until you mark it complete.</p>
@@ -242,6 +260,38 @@ export function GoalsPage() {
   )
 }
 
+function compatibleExercise(kind: GoalKind, exercise: GoalCatalog['exercises'][number]): boolean {
+  if (kind === 'strength_e1rm') {
+    return exercise.performance_type === 'loaded_reps' && exercise.analytics_load_type === 'external'
+  }
+  if (kind === 'training_reps') {
+    return (exercise.measurement_kind === 'reps' || exercise.measurement_kind === 'reps_per_side') &&
+      !(exercise.performance_type === 'loaded_reps' && exercise.analytics_load_type === 'external')
+  }
+  if (kind === 'training_duration') {
+    return ['duration', 'duration_per_side', 'distance_duration'].includes(exercise.measurement_kind)
+  }
+  if (kind === 'training_distance') {
+    return ['distance', 'distance_duration'].includes(exercise.measurement_kind)
+  }
+  if (kind === 'training_pace') {
+    return exercise.measurement_kind === 'distance_duration'
+  }
+  if (kind === 'training_skill') {
+    return exercise.measurement_kind === 'completion'
+  }
+  return true
+}
+
+function trainingGoalKind(kind: GoalKind): boolean {
+  return kind === 'strength_e1rm' ||
+    kind === 'training_reps' ||
+    kind === 'training_duration' ||
+    kind === 'training_distance' ||
+    kind === 'training_pace' ||
+    kind === 'training_skill'
+}
+
 function CreateGoalForm({ catalog, asOf, onCreated }: { catalog: GoalCatalog; asOf: string; onCreated: () => void }) {
   const [kind, setKind] = useState<GoalKind>('body_metric')
   const definition = goalKindDefinition(kind)
@@ -256,15 +306,31 @@ function CreateGoalForm({ catalog, asOf, onCreated }: { catalog: GoalCatalog; as
   const [targetDate, setTargetDate] = useState('')
   const [windowDays, setWindowDays] = useState(String(definition?.defaultWindow ?? ''))
   const [notes, setNotes] = useState('')
+  const [durationMinutes, setDurationMinutes] = useState('')
+  const [durationSeconds, setDurationSeconds] = useState('')
+  const [paceDistanceMi, setPaceDistanceMi] = useState('')
+  const [paceMinutes, setPaceMinutes] = useState('')
+  const [paceSeconds, setPaceSeconds] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [warning, setWarning] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+
+  const compatible = catalog.exercises.filter((exercise) => compatibleExercise(kind, exercise))
 
   function onKind(next: GoalKind) {
     const nextDefinition = goalKindDefinition(next)
     setKind(next)
     setTargetMode(nextDefinition?.modes[0] ?? 'at_least')
     setWindowDays(nextDefinition?.defaultWindow == null ? '' : String(nextDefinition.defaultWindow))
+    const first = catalog.exercises.find((exercise) => compatibleExercise(next, exercise))
+    if (first) setExerciseId(first.id)
+    if (next === 'training_skill') {
+      setTargetMin('1')
+      setTargetMax('')
+    } else {
+      setTargetMin('')
+      setTargetMax('')
+    }
   }
 
   async function onSubmit(event: FormEvent) {
@@ -275,18 +341,36 @@ function CreateGoalForm({ catalog, asOf, onCreated }: { catalog: GoalCatalog; as
     const benchmark = catalog.benchmarkOutcomes.find(
       (item) => `${item.definition_id}|${item.version_id}|${item.requirement_id}` === benchmarkKey,
     )
+    const selectedExercise = trainingGoalKind(kind) ? exerciseId : null
+    const durationTarget = Number(durationMinutes || 0) * 60 + Number(durationSeconds || 0)
+    const paceTarget = Number(paceMinutes || 0) * 60 + Number(paceSeconds || 0)
+    const minValue =
+      kind === 'training_skill'
+        ? 1
+        : kind === 'training_duration'
+          ? durationTarget
+          : targetMode === 'at_most'
+            ? null
+            : Number(targetMin)
+    const maxValue =
+      kind === 'training_pace'
+        ? paceTarget
+        : targetMode === 'at_least'
+          ? null
+          : Number(targetMax)
     const body = {
       goalKind: kind,
       startedOn,
       bodyMetricKey: kind === 'body_metric' ? bodyMetricKey : null,
-      exerciseDefinitionId: kind === 'strength_e1rm' ? exerciseId : null,
+      exerciseDefinitionId: selectedExercise,
       supplementId: kind === 'supplement_adherence' ? supplementId : null,
       benchmarkDefinitionId: benchmark?.definition_id ?? null,
       benchmarkProtocolVersionId: benchmark?.version_id ?? null,
       benchmarkRequirementId: benchmark?.requirement_id ?? null,
-      targetMode,
-      targetMin: targetMode === 'at_most' ? null : Number(targetMin),
-      targetMax: targetMode === 'at_least' ? null : Number(targetMax),
+      trainingMinDistanceM: kind === 'training_pace' ? milesToMeters(Number(paceDistanceMi)) : null,
+      targetMode: kind === 'training_skill' ? 'at_least' : targetMode,
+      targetMin: minValue,
+      targetMax: maxValue,
       targetDate: targetDate || null,
       evaluationWindowDays: definition?.pointMetric ? null : Number(windowDays),
       notes: notes || null,
@@ -303,120 +387,115 @@ function CreateGoalForm({ catalog, asOf, onCreated }: { catalog: GoalCatalog; as
     }
   }
 
+  const ordinaryTarget = kind !== 'training_duration' && kind !== 'training_pace' && kind !== 'training_skill'
   return (
     <form onSubmit={(event) => void onSubmit(event)} className="space-y-3 rounded-lg border border-zinc-200 bg-white p-4">
       <h2 className="text-base font-semibold">New goal</h2>
       <label className="block text-sm">
         Kind
         <select className={fieldClass} value={kind} onChange={(event) => onKind(event.target.value as GoalKind)}>
-          {GOAL_KINDS.map((item) => (
-            <option key={item} value={item}>
-              {KIND_LABELS[item]}
-            </option>
-          ))}
+          {GOAL_KINDS.map((item) => <option key={item} value={item}>{KIND_LABELS[item]}</option>)}
         </select>
       </label>
       {kind === 'body_metric' ? (
-        <label className="block text-sm">
-          Metric
+        <label className="block text-sm">Metric
           <select className={fieldClass} value={bodyMetricKey} onChange={(event) => setBodyMetricKey(event.target.value)}>
-            {catalog.bodyMetrics.map((item) => (
-              <option key={item.key} value={item.key}>
-                {item.label} ({item.unit})
-              </option>
-            ))}
+            {catalog.bodyMetrics.map((item) => <option key={item.key} value={item.key}>{item.label} ({item.unit})</option>)}
           </select>
         </label>
       ) : null}
-      {kind === 'strength_e1rm' ? (
-        <label className="block text-sm">
-          Exercise
-          <select className={fieldClass} value={exerciseId} onChange={(event) => setExerciseId(event.target.value)}>
-            {catalog.exercises.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name}
-              </option>
-            ))}
+      {trainingGoalKind(kind) ? (
+        <label className="block text-sm">Exercise
+          <select className={fieldClass} value={exerciseId} onChange={(event) => setExerciseId(event.target.value)} required>
+            {compatible.length === 0 ? <option value="">No compatible exercises</option> : compatible.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
           </select>
         </label>
       ) : null}
       {kind === 'benchmark_result' ? (
-        <label className="block text-sm">
-          Outcome
+        <label className="block text-sm">Outcome
           <select className={fieldClass} value={benchmarkKey} onChange={(event) => setBenchmarkKey(event.target.value)}>
             <option value="">Choose an outcome</option>
             {catalog.benchmarkOutcomes.map((item) => {
               const value = `${item.definition_id}|${item.version_id}|${item.requirement_id}`
-              return (
-                <option key={value} value={value}>
-                  {item.title} v{item.version} · {item.label}
-                </option>
-              )
+              return <option key={value} value={value}>{item.title} v{item.version} · {item.label}</option>
             })}
           </select>
         </label>
       ) : null}
       {kind === 'supplement_adherence' ? (
-        <label className="block text-sm">
-          Supplement
+        <label className="block text-sm">Supplement
           <select className={fieldClass} value={supplementId} onChange={(event) => setSupplementId(event.target.value)}>
-            {catalog.supplements.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name}
-              </option>
-            ))}
+            {catalog.supplements.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
           </select>
         </label>
       ) : null}
-      <label className="block text-sm">
-        Started
+      <label className="block text-sm">Started
         <input className={fieldClass} type="date" value={startedOn} onChange={(event) => setStartedOn(event.target.value)} required />
       </label>
-      <label className="block text-sm">
-        Target
-        <select className={fieldClass} value={targetMode} onChange={(event) => setTargetMode(event.target.value as 'at_least' | 'at_most' | 'range')}>
-          {definition?.modes.map((mode) => (
-            <option key={mode} value={mode}>
-              {mode === 'at_least' ? 'At least' : mode === 'at_most' ? 'At most' : 'Range'}
-            </option>
-          ))}
-        </select>
-      </label>
-      {targetMode !== 'at_most' ? (
-        <label className="block text-sm">
-          Minimum
-          <input className={fieldClass} inputMode="decimal" value={targetMin} onChange={(event) => setTargetMin(event.target.value)} required />
-        </label>
+
+      {kind === 'training_duration' ? (
+        <fieldset className="space-y-1">
+          <legend className="text-sm">Target duration</legend>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="text-sm">Minutes<input className={fieldClass} type="number" min="0" value={durationMinutes} onChange={e => setDurationMinutes(e.target.value)} /></label>
+            <label className="text-sm">Seconds<input className={fieldClass} type="number" min="0" max="59" value={durationSeconds} onChange={e => setDurationSeconds(e.target.value)} /></label>
+          </div>
+        </fieldset>
       ) : null}
-      {targetMode !== 'at_least' ? (
-        <label className="block text-sm">
-          Maximum
-          <input className={fieldClass} inputMode="decimal" value={targetMax} onChange={(event) => setTargetMax(event.target.value)} required />
-        </label>
+
+      {kind === 'training_pace' ? (
+        <div className="space-y-3">
+          <label className="block text-sm">Minimum continuous distance (mi)
+            <input className={fieldClass} type="number" min="0.01" step="0.01" value={paceDistanceMi} onChange={e => setPaceDistanceMi(e.target.value)} required />
+          </label>
+          <fieldset>
+            <legend className="text-sm">Target pace per mile</legend>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="text-sm">Minutes<input className={fieldClass} type="number" min="0" value={paceMinutes} onChange={e => setPaceMinutes(e.target.value)} required /></label>
+              <label className="text-sm">Seconds<input className={fieldClass} type="number" min="0" max="59" value={paceSeconds} onChange={e => setPaceSeconds(e.target.value)} required /></label>
+            </div>
+          </fieldset>
+        </div>
       ) : null}
+
+      {kind === 'training_skill' ? <p className="text-sm text-zinc-600">Target: achieve this skill at least once in canonical Training.</p> : null}
+
+      {ordinaryTarget ? (
+        <>
+          <label className="block text-sm">Target
+            <select className={fieldClass} value={targetMode} onChange={(event) => setTargetMode(event.target.value as 'at_least' | 'at_most' | 'range')}>
+              {definition?.modes.map((mode) => <option key={mode} value={mode}>{mode === 'at_least' ? 'At least' : mode === 'at_most' ? 'At most' : 'Range'}</option>)}
+            </select>
+          </label>
+          {targetMode !== 'at_most' ? (
+            <label className="block text-sm">{kind === 'training_distance' ? 'Minimum miles' : kind === 'training_reps' ? 'Minimum reps' : 'Minimum'}
+              <input className={fieldClass} type="number" min="0" step={kind === 'training_reps' ? '1' : 'any'} inputMode="decimal" value={targetMin} onChange={(event) => setTargetMin(event.target.value)} required />
+            </label>
+          ) : null}
+          {targetMode !== 'at_least' ? (
+            <label className="block text-sm">Maximum
+              <input className={fieldClass} type="number" min="0" inputMode="decimal" value={targetMax} onChange={(event) => setTargetMax(event.target.value)} required />
+            </label>
+          ) : null}
+        </>
+      ) : null}
+
       {definition && !definition.pointMetric ? (
-        <label className="block text-sm">
-          Window (days)
+        <label className="block text-sm">Window (days)
           <select className={fieldClass} value={windowDays} onChange={(event) => setWindowDays(event.target.value)}>
-            {definition.windows?.map((days) => (
-              <option key={days} value={days}>
-                {days}
-              </option>
-            ))}
+            {definition.windows?.map((days) => <option key={days} value={days}>{days}</option>)}
           </select>
         </label>
       ) : null}
-      <label className="block text-sm">
-        Target date (optional)
+      <label className="block text-sm">Target date (optional)
         <input className={fieldClass} type="date" value={targetDate} onChange={(event) => setTargetDate(event.target.value)} />
       </label>
-      <label className="block text-sm">
-        Notes
+      <label className="block text-sm">Notes
         <textarea className={fieldClass} value={notes} onChange={(event) => setNotes(event.target.value)} rows={2} />
       </label>
       {error ? <p className="text-sm text-red-700">{error}</p> : null}
       {warning ? <p className="text-sm text-zinc-700">{warning}</p> : null}
-      <button type="submit" className={primaryButtonClass} disabled={busy}>
+      <button type="submit" className={primaryButtonClass} disabled={busy || (trainingGoalKind(kind) && !exerciseId)}>
         {busy ? 'Saving…' : 'Save goal'}
       </button>
     </form>
