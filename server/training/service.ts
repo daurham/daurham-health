@@ -8,6 +8,7 @@ import {
   manualWorkoutRequestSchema,
   manualWorkoutRequestValuesSchema,
   measurementFamilyOf,
+  measurementKindAcceptsFamily,
   sessionDetailResponseSchema,
   sessionListResponseSchema,
   sessionSummaryFromRow,
@@ -140,7 +141,7 @@ export async function listTemplates(): Promise<TemplateListResponse> {
   const sql = await getSql()
   const templateRows = await queryOrUnavailable(() =>
     sql.query(
-      `SELECT id, routine_code, version, name, metadata, is_active, created_at
+      `SELECT id, routine_code, version, name, metadata, is_active, origin_kind, created_at, updated_at
        FROM workout_templates
        WHERE is_active = true
        ORDER BY routine_code, version`,
@@ -182,6 +183,7 @@ export async function listTemplates(): Promise<TemplateListResponse> {
       name: template.name,
       metadata: template.metadata,
       isActive: template.is_active,
+      originKind: template.origin_kind,
       exercises: parsedSlots
         .filter((slot) => slot.workout_template_id === template.id)
         .map((slot) => {
@@ -313,7 +315,7 @@ export function prepareManualSession(input: {
     const sets = exerciseInput.sets.map((setInput) => {
       const canonical = toCanonicalSetInsert(setInput)
       const family = measurementFamilyOf(canonical)
-      if (family !== definition.measurementKind) {
+      if (!measurementKindAcceptsFamily(definition.measurementKind, family)) {
         throw new HttpError(
           400,
           `${definition.name} expects ${definition.measurementKind.replaceAll('_', ' ')}`,
@@ -427,10 +429,12 @@ export function buildSessionInsertQueries(
         sql.query(
           `INSERT INTO workout_sets (
              workout_session_exercise_id, set_number, set_type, load_state, weight_kg,
-             reps, duration_sec, left_reps, right_reps, left_duration_sec, right_duration_sec, notes
+             reps, duration_sec, left_reps, right_reps, left_duration_sec, right_duration_sec,
+             distance_m, completed, notes
            ) VALUES (
              $1::uuid, $2::int, $3, $4, $5::numeric,
-             $6::int, $7::int, $8::int, $9::int, $10::int, $11::int, $12
+             $6::int, $7::int, $8::int, $9::int, $10::int, $11::int,
+             $12::numeric, $13::boolean, $14
            )`,
           [
             exercise.id,
@@ -444,6 +448,8 @@ export function buildSessionInsertQueries(
             set.rightReps,
             set.leftDurationSec,
             set.rightDurationSec,
+            set.distanceM == null ? null : decimalString(set.distanceM),
+            set.completed,
             set.notes,
           ],
         ),
@@ -737,7 +743,7 @@ export async function getSession(sessionId: string): Promise<SessionDetailRespon
       : await sql.query(
           `SELECT id, workout_session_exercise_id, set_number, set_type, load_state, weight_kg,
                   reps, duration_sec, left_reps, right_reps, left_duration_sec, right_duration_sec,
-                  notes, metadata, created_at
+                  distance_m, completed, notes, metadata, created_at
            FROM workout_sets
            WHERE workout_session_exercise_id = ANY($1::uuid[])
            ORDER BY set_number`,
@@ -788,7 +794,7 @@ async function loadTemplateForEdit(templateId: string): Promise<WorkoutTemplate>
   const sql = await getSql()
   const templateRows = await queryOrUnavailable(() =>
     sql.query(
-      `SELECT id, routine_code, version, name, metadata, is_active, created_at
+      `SELECT id, routine_code, version, name, metadata, is_active, origin_kind, created_at, updated_at
        FROM workout_templates
        WHERE id = $1
        LIMIT 1`,
@@ -816,6 +822,7 @@ async function loadTemplateForEdit(templateId: string): Promise<WorkoutTemplate>
     name: template.name,
     metadata: template.metadata,
     isActive: template.is_active,
+    originKind: template.origin_kind,
     exercises: parsedSlots.map((slot) => {
       const exercise = exercisesById.get(slot.exercise_definition_id)
       if (!exercise) {
