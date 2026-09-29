@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process'
+import { randomUUID } from 'node:crypto'
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -145,5 +146,5 @@ describe.skipIf(!existsSync(`${BIN}/initdb`))('H2D migration on disposable Postg
 })
 
 function genUuid(): string {
-  return crypto.randomUUID()
+  return randomUUID()
 }
