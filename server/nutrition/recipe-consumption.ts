@@ -6,7 +6,7 @@ import { insertRecipeEntry } from './queries.js'
 
 const CURRENT_RECIPE_SQL = `SELECT recipes.id::text AS recipe_id, versions.id::text AS recipe_version_id,
   versions.version, versions.name, versions.calories_kcal, versions.protein_g, versions.carbs_g, versions.fat_g,
-  versions.yield_servings, versions.finished_weight_g
+  versions.fiber_g, versions.sodium_mg, versions.yield_servings, versions.finished_weight_g
   FROM recipes
   JOIN recipe_versions versions ON versions.recipe_id = recipes.id AND versions.is_current
   WHERE recipes.is_active
@@ -28,6 +28,8 @@ type VersionRow = {
   protein_g: unknown
   carbs_g: unknown
   fat_g: unknown
+  fiber_g: unknown
+  sodium_mg: unknown
   yield_servings: unknown
   finished_weight_g: unknown
 }
@@ -70,7 +72,8 @@ export async function logRecipeConsumption(body: unknown) {
     portion.protein,
     portion.carbs,
     portion.fat,
-    null,
+    portion.fiber,
+    portion.sodiumMg,
     'manual',
     null,
     version.recipeVersionId,
@@ -110,6 +113,8 @@ function mapVersion(row: VersionRow) {
     proteinG: optionalNumber(row.protein_g),
     carbsG: optionalNumber(row.carbs_g),
     fatG: optionalNumber(row.fat_g),
+    fiberG: optionalNumber(row.fiber_g),
+    sodiumMg: optionalNumber(row.sodium_mg),
     yieldServings: optionalNumber(row.yield_servings),
     finishedWeightG: optionalNumber(row.finished_weight_g),
   }
