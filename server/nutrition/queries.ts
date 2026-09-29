@@ -76,6 +76,7 @@ export function mapFoodRow(row: FoodRow): NutritionFood {
     carbs: asNumber(row.carbs),
     fat: asNumber(row.fat),
     fiber: asNumber(row.fiber),
+    sodium: asNumber(row.sodium),
     sourceKind: row.source_kind as NutritionFood['sourceKind'],
     isStaple: Boolean(row.is_staple),
     archived: Boolean(row.archived),
@@ -129,16 +130,17 @@ export function mapTargetRow(row: TargetRow): NutritionTarget {
     carbsTarget: asNumber(row.carbs_target),
     fatTarget: asNumber(row.fat_target),
     fiberTarget: asNumber(row.fiber_target),
+    sodiumTarget: asNumber(row.sodium_target),
     createdAt: asIso(row.created_at),
     updatedAt: asIso(row.updated_at),
   }
 }
 
 const FOOD_COLUMNS = `id, name, brand, barcode, catalog_kind, serving_quantity, serving_unit, serving_grams,
-         calories, protein, carbs, fat, fiber, source_kind, is_staple, archived, notes, created_at, updated_at`
+         calories, protein, carbs, fat, fiber, sodium, source_kind, is_staple, archived, notes, created_at, updated_at`
 
 const ENTRY_COLUMNS = `id, log_date, consumed_at, timezone, meal, food_id, food_name, brand, serving_quantity,
-         serving_unit, grams, calories, protein, carbs, fat, fiber, source_kind, notes, meal_group_id,
+         serving_unit, grams, calories, protein, carbs, fat, fiber, sodium, source_kind, notes, meal_group_id,
          recipe_version_id, recipe_portion_kind, recipe_portion_amount, recipe_fraction, created_at, updated_at`
 
 const ENTRY_READ_COLUMNS = ENTRY_COLUMNS.split(',')
@@ -185,7 +187,7 @@ export const GET_FOOD_BY_BARCODES_SQL = `SELECT ${FOOD_COLUMNS}
 export const INSERT_FOOD_SQL = `INSERT INTO nutrition_foods (
            name, brand, barcode, catalog_kind, serving_quantity, serving_unit, serving_grams,
            calories, protein, carbs, fat, fiber, source_kind, is_staple, notes
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
          RETURNING ${FOOD_COLUMNS}`
 
 export const UPDATE_FOOD_SQL = `UPDATE nutrition_foods SET
@@ -200,9 +202,10 @@ export const UPDATE_FOOD_SQL = `UPDATE nutrition_foods SET
            carbs = CASE WHEN $14::boolean THEN $15 ELSE carbs END,
            fat = CASE WHEN $16::boolean THEN $17 ELSE fat END,
            fiber = CASE WHEN $18::boolean THEN $19 ELSE fiber END,
-           is_staple = COALESCE($20, is_staple),
-           archived = COALESCE($21, archived),
-           notes = CASE WHEN $22::boolean THEN $23 ELSE notes END,
+           sodium = CASE WHEN $20::boolean THEN $21 ELSE sodium END,
+           is_staple = COALESCE($22, is_staple),
+           archived = COALESCE($23, archived),
+           notes = CASE WHEN $24::boolean THEN $25 ELSE notes END,
            updated_at = now()
          WHERE id = $1
          RETURNING ${FOOD_COLUMNS}`
@@ -224,16 +227,16 @@ export const GET_ENTRY_SQL = `SELECT ${ENTRY_READ_COLUMNS} FROM ${ENTRY_READ_FRO
 
 export const INSERT_ENTRY_SQL = `INSERT INTO nutrition_entries (
            log_date, consumed_at, timezone, meal, food_id, food_name, brand,
-           serving_quantity, serving_unit, grams, calories, protein, carbs, fat, fiber,
+           serving_quantity, serving_unit, grams, calories, protein, carbs, fat, fiber, sodium,
            source_kind, notes
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
          RETURNING ${ENTRY_COLUMNS}`
 
 export const INSERT_ENTRY_WITH_ID_SQL = `INSERT INTO nutrition_entries (
            id, log_date, consumed_at, timezone, meal, food_id, food_name, brand,
-           serving_quantity, serving_unit, grams, calories, protein, carbs, fat, fiber,
+           serving_quantity, serving_unit, grams, calories, protein, carbs, fat, fiber, sodium,
            source_kind, notes, meal_group_id
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
          RETURNING ${ENTRY_COLUMNS}`
 
 export const UPDATE_ENTRY_SQL = `UPDATE nutrition_entries SET
@@ -250,34 +253,36 @@ export const UPDATE_ENTRY_SQL = `UPDATE nutrition_entries SET
            carbs = CASE WHEN $17::boolean THEN $18 ELSE carbs END,
            fat = CASE WHEN $19::boolean THEN $20 ELSE fat END,
            fiber = CASE WHEN $21::boolean THEN $22 ELSE fiber END,
-           notes = CASE WHEN $23::boolean THEN $24 ELSE notes END,
+           sodium = CASE WHEN $23::boolean THEN $24 ELSE sodium END,
+           notes = CASE WHEN $25::boolean THEN $26 ELSE notes END,
            updated_at = now()
          WHERE id = $1
          RETURNING ${ENTRY_COLUMNS}`
 
 export const DELETE_ENTRY_SQL = `DELETE FROM nutrition_entries WHERE id = $1 RETURNING id`
 
-export const TARGET_FOR_DATE_SQL = `SELECT id, effective_from, calories_target, protein_target, carbs_target, fat_target, fiber_target, created_at, updated_at
+export const TARGET_FOR_DATE_SQL = `SELECT id, effective_from, calories_target, protein_target, carbs_target, fat_target, fiber_target, sodium_target, created_at, updated_at
          FROM nutrition_targets
          WHERE effective_from <= $1
          ORDER BY effective_from DESC
          LIMIT 1`
 
-export const LIST_ALL_TARGETS_SQL = `SELECT id, effective_from, calories_target, protein_target, carbs_target, fat_target, fiber_target, created_at, updated_at
+export const LIST_ALL_TARGETS_SQL = `SELECT id, effective_from, calories_target, protein_target, carbs_target, fat_target, fiber_target, sodium_target, created_at, updated_at
          FROM nutrition_targets
          ORDER BY effective_from ASC, created_at ASC`
 
 export const UPSERT_TARGET_SQL = `INSERT INTO nutrition_targets (
-           effective_from, calories_target, protein_target, carbs_target, fat_target, fiber_target
-         ) VALUES ($1,$2,$3,$4,$5,$6)
+           effective_from, calories_target, protein_target, carbs_target, fat_target, fiber_target, sodium_target
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7)
          ON CONFLICT (effective_from) DO UPDATE SET
            calories_target = EXCLUDED.calories_target,
            protein_target = EXCLUDED.protein_target,
            carbs_target = EXCLUDED.carbs_target,
            fat_target = EXCLUDED.fat_target,
            fiber_target = EXCLUDED.fiber_target,
+           sodium_target = EXCLUDED.sodium_target,
            updated_at = now()
-         RETURNING id, effective_from, calories_target, protein_target, carbs_target, fat_target, fiber_target, created_at, updated_at`
+         RETURNING id, effective_from, calories_target, protein_target, carbs_target, fat_target, fiber_target, sodium_target, created_at, updated_at`
 
 export const LIST_STAPLES_SQL = `SELECT ${FOOD_COLUMNS}
          FROM nutrition_foods
@@ -377,9 +382,9 @@ export const LIST_ENTRIES_BETWEEN_SQL = `SELECT ${ENTRY_READ_COLUMNS}
 
 export const INSERT_RECIPE_ENTRY_SQL = `INSERT INTO nutrition_entries (
            log_date, consumed_at, timezone, meal, food_id, food_name, brand,
-           serving_quantity, serving_unit, grams, calories, protein, carbs, fat, fiber,
+           serving_quantity, serving_unit, grams, calories, protein, carbs, fat, fiber, sodium,
            source_kind, notes, recipe_version_id, recipe_portion_kind, recipe_portion_amount, recipe_fraction
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
          RETURNING ${ENTRY_COLUMNS}`
 
 export async function listEntriesForDate(date: string): Promise<NutritionEntry[]> {
@@ -559,6 +564,7 @@ export async function insertPlannedFood(food: PlannedFood): Promise<NutritionFoo
     food.carbs,
     food.fat,
     food.fiber,
+    null,
     food.sourceKind,
     food.isStaple,
     food.notes,
@@ -582,6 +588,7 @@ export async function insertPlannedEntry(entry: PlannedEntry, foodId: string | n
     entry.carbs,
     entry.fat,
     entry.fiber,
+    null,
     entry.sourceKind,
     entry.notes,
   ])
