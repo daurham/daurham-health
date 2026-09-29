@@ -26,6 +26,7 @@ import type { CadenceConfig, CadenceObservation } from '../../src/domain/body-ca
 import type { BenchmarkRetestView } from '../../src/domain/lab-retests.js'
 import { calendarDateFromInstant } from '../../src/domain/progress/dates.js'
 import type { BodyObservation, CanonicalSetRecord, ProgressExerciseDefinition } from '../../src/domain/progress/types.js'
+import { bestTrainingPerformance, trainingPerformanceObservations } from '../../src/domain/progress/training-performance.js'
 import type { AdherenceWindow, ScheduleWindow, StatusEventWindow } from '../../src/domain/supplements/types.js'
 import { healthCalendarDateFromNow } from '../../src/domain/time.js'
 import { getSql, type Sql } from '../db.js'
@@ -44,6 +45,7 @@ type GoalRow = {
   benchmark_protocol_version_id: string | null
   benchmark_requirement_id: string | null
   supplement_id: string | null
+  training_min_distance_m: string | null
   paused_at: string | null
   completed_at: string | null
   archived_at: string | null
@@ -90,6 +92,7 @@ function selectorFrom(row: GoalRow): GoalSelector {
     benchmarkProtocolVersionId: row.benchmark_protocol_version_id,
     benchmarkRequirementId: row.benchmark_requirement_id,
     supplementId: row.supplement_id,
+    trainingMinDistanceM: numberOrNull(row.training_min_distance_m),
   }
 }
 
@@ -126,6 +129,7 @@ const GOAL_SELECT = `
          goals.benchmark_protocol_version_id::text AS benchmark_protocol_version_id,
          goals.benchmark_requirement_id::text AS benchmark_requirement_id,
          goals.supplement_id::text AS supplement_id,
+         goals.training_min_distance_m::text AS training_min_distance_m,
          goals.paused_at::text AS paused_at,
          goals.completed_at::text AS completed_at,
          goals.archived_at::text AS archived_at,
@@ -168,9 +172,10 @@ async function loadContext(sql: Sql, draft: Record<string, unknown>, today: stri
   const requirementId = typeof draft.benchmarkRequirementId === 'string' ? draft.benchmarkRequirementId : null
   const exerciseRows = exerciseId
     ? ((await sql.query(
-        `SELECT id::text AS id, name, is_active FROM exercise_definitions WHERE id = $1::uuid`,
+        `SELECT id::text AS id, name, is_active, measurement_kind, performance_type, analytics_load_type
+         FROM exercise_definitions WHERE id = $1::uuid`,
         [exerciseId],
-      )) as Array<{ id: string; name: string; is_active: boolean }>)
+      )) as Array<{ id: string; name: string; is_active: boolean; measurement_kind: string; performance_type: string; analytics_load_type: string }>)
     : []
   const supplementRows = supplementId
     ? ((await sql.query(
@@ -236,7 +241,14 @@ async function loadContext(sql: Sql, draft: Record<string, unknown>, today: stri
   }
   return {
     today,
-    exercise: exercise ? { id: exercise.id, name: exercise.name, active: exercise.is_active !== false } : null,
+    exercise: exercise ? {
+      id: exercise.id,
+      name: exercise.name,
+      active: exercise.is_active !== false,
+      measurementKind: exercise.measurement_kind,
+      performanceType: exercise.performance_type,
+      analyticsLoadType: exercise.analytics_load_type,
+    } : null,
     supplement: supplement ? { id: supplement.id, name: supplement.name, active: supplement.status !== 'discontinued' } : null,
     benchmark,
   }
@@ -250,10 +262,10 @@ async function insertGoal(sql: Sql, draft: GoalDraft, sourceId: string, now: str
       `INSERT INTO goals (
          id, goal_kind, status, started_on, body_metric_key, exercise_definition_id,
          benchmark_definition_id, benchmark_protocol_version_id, benchmark_requirement_id,
-         supplement_id, source_id, paused_at, completed_at, created_at, updated_at
+         supplement_id, training_min_distance_m, source_id, paused_at, completed_at, created_at, updated_at
        ) VALUES (
          $1::uuid, $2, 'active', $3::date, $4, $5::uuid, $6::uuid, $7::uuid, $8::uuid, $9::uuid,
-         $10::uuid, NULL, NULL, $11::timestamptz, $11::timestamptz
+         $10::numeric, $11::uuid, NULL, NULL, $12::timestamptz, $12::timestamptz
        )`,
       [
         goalId,
@@ -265,6 +277,7 @@ async function insertGoal(sql: Sql, draft: GoalDraft, sourceId: string, now: str
         draft.benchmarkProtocolVersionId,
         draft.benchmarkRequirementId,
         draft.supplementId,
+        draft.trainingMinDistanceM,
         sourceId,
         now,
       ],
@@ -312,7 +325,7 @@ async function readVersions(sql: Sql, goalId: string): Promise<VersionRow[]> {
 }
 
 function selectorContext(row: GoalRow): { archived: boolean; message: string | null } {
-  if (row.goal_kind === 'strength_e1rm' && row.exercise_active === false) {
+  if ((row.goal_kind === 'strength_e1rm' || row.goal_kind.startsWith('training_')) && row.exercise_active === false) {
     return { archived: true, message: 'Underlying exercise is archived.' }
   }
   if (row.goal_kind === 'supplement_adherence' && row.supplement_status === 'discontinued') {
@@ -334,6 +347,7 @@ async function loadEvidence(sql: Sql, row: GoalRow, target: GoalTarget, asOf: st
     proteinDays: [] as { date: string; protein: number | null; logged: boolean }[],
     sleepNights: [] as { date: string; minutes: number | null; analysisEligible: boolean; partial: boolean }[],
     adherence: null,
+    training: null,
   }
   if (row.goal_kind === 'body_metric' && row.body_metric_key) {
     const metrics = (await sql.query(
@@ -412,6 +426,66 @@ async function loadEvidence(sql: Sql, row: GoalRow, target: GoalTarget, asOf: st
         grouped.set(record.sessionId, bucket)
       }
       empty.strength = latestSessionE1rm([...grouped.values()], exercise)
+    }
+  }
+  if (['training_reps', 'training_duration', 'training_distance', 'training_pace', 'training_skill'].includes(row.goal_kind) && row.exercise_definition_id) {
+    const exercises = (await sql.query(
+      `SELECT id::text AS id, name, external_id, performance_type, analytics_load_type, analytics_rep_mode, measurement_kind, unilateral
+       FROM exercise_definitions WHERE id = $1::uuid`,
+      [row.exercise_definition_id],
+    )) as Array<Record<string, unknown>>
+    const exerciseRow = exercises[0]
+    const sets = (await sql.query(
+      `SELECT sets.id::text AS set_id, sessions.id::text AS session_id, session_exercises.id::text AS session_exercise_id,
+              session_exercises.exercise_definition_id::text AS exercise_id, sessions.workout_date::text AS session_date,
+              sessions.created_at::text AS session_created_at, session_exercises.position AS session_exercise_position,
+              sets.set_number, sets.set_type, sets.load_state, sets.weight_kg::text AS weight_kg, sets.reps,
+              sets.duration_sec, sets.left_reps, sets.right_reps, sets.left_duration_sec, sets.right_duration_sec,
+              sets.distance_m::text AS distance_m, sets.completed
+       FROM workout_sets sets
+       JOIN workout_session_exercises session_exercises ON session_exercises.id = sets.workout_session_exercise_id
+       JOIN workout_sessions sessions ON sessions.id = session_exercises.workout_session_id
+       WHERE session_exercises.exercise_definition_id = $1::uuid
+         AND sessions.session_type IN ('programmed', 'ad_hoc', 'experiment')
+         AND sessions.workout_date <= $2::date
+       ORDER BY sessions.workout_date, sessions.created_at, session_exercises.position, sets.set_number`,
+      [row.exercise_definition_id, asOf],
+    )) as Array<Record<string, unknown>>
+    if (exerciseRow) {
+      const exercise: ProgressExerciseDefinition = {
+        id: String(exerciseRow.id),
+        name: String(exerciseRow.name),
+        externalId: exerciseRow.external_id == null ? null : String(exerciseRow.external_id),
+        performanceType: exerciseRow.performance_type as ProgressExerciseDefinition['performanceType'],
+        analyticsLoadType: exerciseRow.analytics_load_type as ProgressExerciseDefinition['analyticsLoadType'],
+        analyticsRepMode: exerciseRow.analytics_rep_mode as ProgressExerciseDefinition['analyticsRepMode'],
+        measurementKind: String(exerciseRow.measurement_kind),
+        unilateral: exerciseRow.unilateral === true,
+      }
+      const records: CanonicalSetRecord[] = sets.map((set) => ({
+        setId: String(set.set_id), sessionId: String(set.session_id), sessionExerciseId: String(set.session_exercise_id),
+        exerciseId: String(set.exercise_id), sessionDate: String(set.session_date), sessionCreatedAt: String(set.session_created_at),
+        sessionExercisePosition: Number(set.session_exercise_position), setNumber: Number(set.set_number), setType: String(set.set_type),
+        loadState: String(set.load_state), weightKg: numberOrNull(set.weight_kg), reps: numberOrNull(set.reps),
+        durationSec: numberOrNull(set.duration_sec), leftReps: numberOrNull(set.left_reps), rightReps: numberOrNull(set.right_reps),
+        leftDurationSec: numberOrNull(set.left_duration_sec), rightDurationSec: numberOrNull(set.right_duration_sec),
+        distanceM: numberOrNull(set.distance_m), completed: set.completed == null ? null : set.completed === true,
+      }))
+      const kind = row.goal_kind === 'training_reps' ? 'reps'
+        : row.goal_kind === 'training_duration' ? 'duration'
+          : row.goal_kind === 'training_distance' ? 'distance'
+            : row.goal_kind === 'training_pace' ? 'pace' : 'skill'
+      const observations = trainingPerformanceObservations(records, exercise)
+      const best = bestTrainingPerformance(observations, kind, { minDistanceM: numberOrNull(row.training_min_distance_m) })
+      if (best) {
+        empty.training = {
+          value: best.value, observedOn: best.date, sessionId: best.sourceSet.sessionId,
+          sessionExerciseId: best.sourceSet.sessionExerciseId, setId: best.sourceSet.setId, exerciseId: best.sourceSet.exerciseId,
+          reps: best.sourceSet.reps, durationSec: best.sourceSet.durationSec, distanceM: best.sourceSet.distanceM ?? null,
+          completed: best.sourceSet.completed ?? null,
+          secondsPerMile: kind === 'pace' ? best.value : null,
+        }
+      }
     }
   }
   if (row.goal_kind === 'benchmark_result' && row.benchmark_definition_id && row.benchmark_requirement_id && row.benchmark_protocol_version_id) {
@@ -664,9 +738,10 @@ async function loadCatalog(sql: Sql) {
     unit: item.family === 'mass' ? 'lb' : item.family === 'circumference' ? 'in' : '%',
   }))
   const exercises = (await sql.query(
-    `SELECT id::text AS id, name, is_active FROM exercise_definitions WHERE is_active ORDER BY name`,
+    `SELECT id::text AS id, name, is_active, measurement_kind, performance_type, analytics_load_type
+     FROM exercise_definitions WHERE is_active ORDER BY name`,
     [],
-  )) as Array<{ id: string; name: string; is_active: boolean }>
+  )) as Array<{ id: string; name: string; is_active: boolean; measurement_kind: string; performance_type: string; analytics_load_type: string }>
   const supplements = (await sql.query(
     `SELECT id::text AS id, name FROM supplements ORDER BY sort_order, name`,
     [],
