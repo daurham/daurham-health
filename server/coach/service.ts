@@ -950,6 +950,12 @@ export async function logCoachTraining(id: string, body: unknown, now = new Date
   }
   const rule = manualRuleByKey(row.rule_key)
   if (!rule?.training) throw new HttpError(409, 'Training preset is unavailable for this task')
+  if (rule.training.valueKind === 'reps' && !Number.isInteger(parsed.data.actualValue)) {
+    throw new HttpError(400, 'Reps must be a whole number')
+  }
+  if (rule.training.valueKind === 'duration_min' && parsed.data.actualValue > 1440) {
+    throw new HttpError(400, 'Duration must be 24 hours or less')
+  }
 
   const existing = (await sql.query(
     `SELECT id::text AS id FROM workout_sessions WHERE id = $1::uuid LIMIT 1`,
