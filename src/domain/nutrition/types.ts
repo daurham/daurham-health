@@ -28,7 +28,7 @@ export type NutritionFood = {
   carbs: number | null
   fat: number | null
   fiber: number | null
-  sodium: number | null
+  sodium?: number | null
   sourceKind: NutritionFoodSourceKind
   isStaple: boolean
   archived: boolean
@@ -54,7 +54,7 @@ export type NutritionEntry = {
   carbs: number | null
   fat: number | null
   fiber: number | null
-  sodium: number | null
+  sodium?: number | null
   sourceKind: NutritionSourceKind
   notes: string | null
   mealGroupId: string | null
@@ -76,7 +76,7 @@ export type NutritionTarget = {
   carbsTarget: number | null
   fatTarget: number | null
   fiberTarget: number | null
-  sodiumTarget: number | null
+  sodiumTarget?: number | null
   createdAt: string
   updatedAt: string
 }
