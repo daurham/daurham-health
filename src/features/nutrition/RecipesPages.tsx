@@ -96,6 +96,8 @@ function foodBasis(food: NutritionFood): RecipeFoodBasis {
     protein: food.protein,
     carbs: food.carbs,
     fat: food.fat,
+    fiber: food.fiber,
+    sodium: food.sodium,
     sourceKind: food.sourceKind,
     barcode: food.barcode,
     archived: food.archived,
@@ -511,6 +513,8 @@ export function RecipeDetailPage() {
         <p>{macroText(version.proteinG, 'Protein')}</p>
         <p>{macroText(version.carbsG, 'Carbs')}</p>
         <p>{macroText(version.fatG, 'Fat')}</p>
+        <p>{macroText(version.fiberG, 'Fiber')}</p>
+        <p>{version.sodiumMg == null ? 'Sodium not fully known' : `${formatNumber(version.sodiumMg, 0)} mg sodium`}</p>
         {version.yieldServings != null ? <p className="mt-2 text-sm text-zinc-700">{formatNumber(version.yieldServings, 1)} servings</p> : null}
         {version.finishedWeightG != null ? <p className="text-sm text-zinc-700">{formatNumber(version.finishedWeightG, 1)} g finished weight</p> : null}
       </div>
@@ -525,6 +529,7 @@ export function RecipeDetailPage() {
             <p className="text-sm text-zinc-700">{macroText(line.lineProteinG, 'Protein')}</p>
             <p className="text-sm text-zinc-700">{macroText(line.lineCarbsG, 'Carbs')}</p>
             <p className="text-sm text-zinc-700">{macroText(line.lineFatG, 'Fat')}</p>
+             <p className="text-sm text-zinc-700">{macroText(line.lineFiberG, 'Fiber')}</p>
           </li>
         ))}
       </ol>
@@ -620,6 +625,8 @@ export function RecipeVersionPage() {
         <p>{macroText(version.proteinG, 'Protein')}</p>
         <p>{macroText(version.carbsG, 'Carbs')}</p>
         <p>{macroText(version.fatG, 'Fat')}</p>
+        <p>{macroText(version.fiberG, 'Fiber')}</p>
+        <p>{version.sodiumMg == null ? 'Sodium not fully known' : `${formatNumber(version.sodiumMg, 0)} mg sodium`}</p>
       </div>
       <ol className="space-y-2">
         {version.ingredients.map((line) => (
