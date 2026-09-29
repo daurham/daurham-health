@@ -42,6 +42,7 @@ const aiFoodSchema = z.object({
   carbs: z.number().min(0).nullable().optional(),
   fat: z.number().min(0).nullable().optional(),
   fiber: z.number().min(0).nullable().optional(),
+  sodium: z.number().min(0).nullable().optional(),
   provider: z.enum(['gemini', 'home_ai']),
   model: z.string().max(80).nullable().optional(),
   originalCalories: z.number().min(0),
@@ -56,8 +57,8 @@ RETURNING entity_id`
 
 const INSERT_FOOD_WITH_ID_SQL = `INSERT INTO nutrition_foods (
   id, name, brand, barcode, catalog_kind, serving_quantity, serving_unit, serving_grams,
-  calories, protein, carbs, fat, fiber, source_kind, is_staple, notes
-) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+  calories, protein, carbs, fat, fiber, sodium, source_kind, is_staple, notes
+) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
 RETURNING *`
 
 function parseOr400<T>(schema: z.ZodType<T>, body: unknown, fallback: string): T {
@@ -177,6 +178,7 @@ export async function saveUsdaReusableFood(body: unknown, provider: UsdaFoodLook
       carbs: scaled.carbs,
       fat: scaled.fat,
       fiber: scaled.fiber,
+      sodium: scaled.sodium,
       sourceKind: 'usda',
     },
     'Invalid USDA food',
@@ -218,6 +220,7 @@ export async function saveUsdaReusableFood(body: unknown, provider: UsdaFoodLook
     input.carbs ?? null,
     input.fat ?? null,
     input.fiber ?? null,
+    input.sodium ?? null,
     'usda',
     false,
     null,
@@ -244,6 +247,7 @@ export async function saveAiReusableFood(body: unknown) {
       carbs: requested.carbs ?? null,
       fat: requested.fat ?? null,
       fiber: requested.fiber ?? null,
+      sodium: requested.sodium ?? null,
       sourceKind: 'description_ai',
     },
     'Invalid reusable food',
@@ -307,6 +311,7 @@ export async function saveAiReusableFood(body: unknown) {
       input.carbs ?? null,
       input.fat ?? null,
       input.fiber ?? null,
+      input.sodium ?? null,
       'description_ai',
       false,
       null,
