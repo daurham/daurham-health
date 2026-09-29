@@ -52,6 +52,7 @@ export const nutritionLabelFieldsSchema = z.object({
   carbsGrams: extractedNumber,
   fatGrams: extractedNumber,
   fiberGrams: extractedNumber,
+  sodiumMg: extractedNumber,
   basis: extractedBasis,
   barcode: extractedString,
 })
@@ -138,6 +139,7 @@ export function emptyLabelCandidate(partial?: Partial<NutritionLabelCandidate>):
       carbsGrams: missingField(),
       fatGrams: missingField(),
       fiberGrams: missingField(),
+      sodiumMg: missingField(),
       basis: missingField(),
       barcode: missingField(),
     },
@@ -149,6 +151,7 @@ export function emptyLabelCandidate(partial?: Partial<NutritionLabelCandidate>):
 
 const CALORIES_MAX = 5000
 const MACRO_MAX = 500
+const SODIUM_MAX_MG = 50000
 const SERVING_GRAMS_MAX = 5000
 const SERVING_QTY_MAX = 100
 const SERVINGS_CONTAINER_MAX = 200
@@ -187,6 +190,7 @@ export function validateAndFlagCandidate(candidate: NutritionLabelCandidate): Nu
   fields.carbsGrams = clampNumericField(fields.carbsGrams, 0, MACRO_MAX, 'carbs', warnings, ambiguities)
   fields.fatGrams = clampNumericField(fields.fatGrams, 0, MACRO_MAX, 'fat', warnings, ambiguities)
   fields.fiberGrams = clampNumericField(fields.fiberGrams, 0, MACRO_MAX, 'fiber', warnings, ambiguities)
+  fields.sodiumMg = clampNumericField(fields.sodiumMg, 0, SODIUM_MAX_MG, 'sodium', warnings, ambiguities)
   fields.servingGrams = clampNumericField(fields.servingGrams, 0, SERVING_GRAMS_MAX, 'serving grams', warnings, ambiguities, true)
   fields.servingQuantity = clampNumericField(fields.servingQuantity, 0, SERVING_QTY_MAX, 'serving quantity', warnings, ambiguities, true)
   fields.servingsPerContainer = clampNumericField(
@@ -316,6 +320,7 @@ export type LabelReviewDraft = {
   carbsGrams: number | null
   fatGrams: number | null
   fiberGrams: number | null
+  sodiumMg: number | null
   basis: LabelBasis | ''
   barcode: string
   logQuantity: number
@@ -335,6 +340,7 @@ export function draftFromCandidate(candidate: NutritionLabelCandidate): LabelRev
     carbsGrams: fields.carbsGrams.value,
     fatGrams: fields.fatGrams.value,
     fiberGrams: fields.fiberGrams.value,
+    sodiumMg: fields.sodiumMg.value,
     basis: fields.basis.value ?? 'unknown',
     barcode: fields.barcode.value ?? '',
     logQuantity: 1,
@@ -479,6 +485,7 @@ export const nutritionLabelComparisonSchema = z.object({
       carbs: z.number().nullable(),
       fat: z.number().nullable(),
       fiber: z.number().nullable(),
+      sodium: z.number().nullable(),
       source: z.string(),
     })
     .nullable(),
@@ -519,6 +526,7 @@ export const commitNutritionLabelRequestSchema = z.object({
   carbsGrams: z.number().nullable().optional(),
   fatGrams: z.number().nullable().optional(),
   fiberGrams: z.number().nullable().optional(),
+  sodiumMg: z.number().nullable().optional(),
   basis: z.enum(LABEL_BASES),
   barcode: z.string().nullable().optional(),
   logQuantity: z.number().optional().default(1),
