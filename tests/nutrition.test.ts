@@ -137,7 +137,7 @@ describe('nutrition foods', () => {
 })
 
 describe('nutrition servings', () => {
-  const base = { calories: 200, protein: 20, carbs: 10, fat: 8, fiber: 2 }
+  const base = { calories: 200, protein: 20, carbs: 10, fat: 8, fiber: 2, sodium: null }
 
   it('scales 1 serving and fractional servings deterministically', () => {
     expect(scaleNutrients(base, 1)).toEqual(base)
@@ -147,6 +147,7 @@ describe('nutrition servings', () => {
       carbs: 15,
       fat: 12,
       fiber: 3,
+      sodium: null,
     })
   })
 
