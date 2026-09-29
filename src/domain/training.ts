@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { poundsToKilograms } from './units.js'
+import { distanceToMeters, poundsToKilograms } from './units.js'
 
 const uuidSchema = z.uuid()
 const timestamptzSchema = z.coerce.date()
@@ -81,6 +81,9 @@ export const MEASUREMENT_KINDS = [
   'duration',
   'reps_per_side',
   'duration_per_side',
+  'distance',
+  'distance_duration',
+  'completion',
 ] as const
 
 export const measurementKindSchema = z.enum(MEASUREMENT_KINDS)
@@ -157,6 +160,9 @@ export const templatePrescriptionSchema = z
     max: z.number().optional(),
     min_sec: z.number().optional(),
     max_sec: z.number().optional(),
+    min_distance_m: z.number().positive().optional(),
+    max_distance_m: z.number().positive().optional(),
+    completion: z.boolean().optional(),
   })
   .passthrough()
 
@@ -203,6 +209,10 @@ export function exerciseDefinitionFromRow(row: ExerciseDefinitionRow): ExerciseD
   })
 }
 
+export const TEMPLATE_ORIGINS = ['seeded', 'owner'] as const
+export const templateOriginSchema = z.enum(TEMPLATE_ORIGINS)
+export type TemplateOrigin = z.infer<typeof templateOriginSchema>
+
 export const workoutTemplateRowSchema = z.object({
   id: uuidSchema,
   routine_code: nonemptyText('Routine'),
@@ -210,7 +220,9 @@ export const workoutTemplateRowSchema = z.object({
   name: nonemptyText('Template name'),
   metadata: jsonRecordSchema,
   is_active: z.boolean(),
+  origin_kind: templateOriginSchema,
   created_at: timestamptzSchema,
+  updated_at: timestamptzSchema,
 })
 
 export type WorkoutTemplateRow = z.infer<typeof workoutTemplateRowSchema>
@@ -247,6 +259,7 @@ export const workoutTemplateSchema = z.object({
   name: nonemptyText('Template name'),
   metadata: jsonRecordSchema,
   isActive: z.boolean(),
+  originKind: templateOriginSchema,
   exercises: z.array(workoutTemplateExerciseSchema),
 })
 
@@ -265,6 +278,8 @@ export const workoutSetRowSchema = z.object({
   right_reps: nullableInt(),
   left_duration_sec: nullableInt(),
   right_duration_sec: nullableInt(),
+  distance_m: nullableNumber(),
+  completed: z.boolean().nullable(),
   notes: z.string().nullable(),
   metadata: jsonRecordSchema,
   created_at: timestamptzSchema,
@@ -287,6 +302,8 @@ export const workoutSetSchema = z
     rightReps: nonnegativeInt.nullable(),
     leftDurationSec: nonnegativeInt.nullable(),
     rightDurationSec: nonnegativeInt.nullable(),
+    distanceM: z.number().positive().nullable(),
+    completed: z.boolean().nullable(),
     notes: z.string().nullable(),
   })
   .superRefine((set, ctx) => addSetInvariantIssues(set, ctx))
@@ -416,9 +433,21 @@ type SetMeasurementFields = {
   rightReps: number | null
   leftDurationSec: number | null
   rightDurationSec: number | null
+  distanceM?: number | null
+  distance?: number | null
+  completed?: boolean | null
 }
 
-export type MeasurementFamily = 'reps' | 'duration' | 'reps_per_side' | 'duration_per_side' | 'mixed' | 'empty'
+export type MeasurementFamily =
+  | 'reps'
+  | 'duration'
+  | 'reps_per_side'
+  | 'duration_per_side'
+  | 'distance'
+  | 'distance_duration'
+  | 'completion'
+  | 'mixed'
+  | 'empty'
 
 export function measurementFamilyOf(set: {
   reps: number | null
@@ -427,28 +456,35 @@ export function measurementFamilyOf(set: {
   rightReps: number | null
   leftDurationSec: number | null
   rightDurationSec: number | null
+  distanceM?: number | null
+  distance?: number | null
+  completed?: boolean | null
 }): MeasurementFamily {
   const hasReps = set.reps != null
   const hasDuration = set.durationSec != null
   const hasUnilateralReps = set.leftReps != null || set.rightReps != null
   const hasUnilateralDuration = set.leftDurationSec != null || set.rightDurationSec != null
-  const present = [hasReps, hasDuration, hasUnilateralReps, hasUnilateralDuration].filter(Boolean).length
-  if (present === 0) {
-    return 'empty'
+  const hasDistance = (set.distanceM ?? set.distance) != null
+  const hasCompletion = set.completed != null
+  if (hasCompletion) {
+    return hasReps || hasDuration || hasUnilateralReps || hasUnilateralDuration || hasDistance ? 'mixed' : 'completion'
   }
-  if (present > 1) {
-    return 'mixed'
+  if (hasReps || hasUnilateralReps || hasUnilateralDuration) {
+    const present = [hasReps, hasDuration, hasUnilateralReps, hasUnilateralDuration, hasDistance].filter(Boolean).length
+    if (present > 1) return 'mixed'
+    if (hasReps) return 'reps'
+    if (hasUnilateralReps) return 'reps_per_side'
+    return 'duration_per_side'
   }
-  if (hasReps) {
-    return 'reps'
-  }
-  if (hasDuration) {
-    return 'duration'
-  }
-  if (hasUnilateralReps) {
-    return 'reps_per_side'
-  }
-  return 'duration_per_side'
+  if (hasDuration && hasDistance) return 'distance_duration'
+  if (hasDistance) return 'distance'
+  if (hasDuration) return 'duration'
+  return 'empty'
+}
+
+export function measurementFamilyMatches(kind: MeasurementKind, family: MeasurementFamily): boolean {
+  if (kind === 'distance_duration') return family === 'duration' || family === 'distance_duration'
+  return kind === family
 }
 
 function addLoadIssues(
@@ -481,7 +517,7 @@ function addMeasurementFamilyIssues(set: SetMeasurementFields, ctx: z.Refinement
   if (family === 'empty') {
     ctx.addIssue({
       code: 'custom',
-      message: 'Each set needs reps or duration',
+      message: 'Each set needs a measurement',
     })
     return
   }
@@ -501,6 +537,9 @@ function addSetInvariantIssues(set: SetMeasurementFields, ctx: z.RefinementCtx, 
 const nullableNonnegativeNumber = z.number().nonnegative().nullable()
 const nullableNonnegativeInt = z.int().nonnegative().nullable()
 
+export const distanceUnitSchema = z.enum(['mi', 'km'])
+export type DistanceUnit = z.infer<typeof distanceUnitSchema>
+
 export const manualWorkoutSetValuesSchema = z.object({
   setNumber: z.int().positive(),
   setType: setTypeSchema.default('working'),
@@ -512,6 +551,9 @@ export const manualWorkoutSetValuesSchema = z.object({
   rightReps: nullableNonnegativeInt,
   leftDurationSec: nullableNonnegativeInt,
   rightDurationSec: nullableNonnegativeInt,
+  distance: z.number().positive().nullable(),
+  distanceUnit: distanceUnitSchema.nullable(),
+  completed: z.boolean().nullable(),
   notes: optionalNotesSchema,
 })
 
@@ -526,6 +568,8 @@ export const manualWorkoutSetInputSchema = manualWorkoutSetValuesSchema.superRef
       rightReps: set.rightReps,
       leftDurationSec: set.leftDurationSec,
       rightDurationSec: set.rightDurationSec,
+      distance: set.distance,
+      completed: set.completed,
     },
     ctx,
     'weightLb',
@@ -597,6 +641,8 @@ export type CanonicalWorkoutSetInsert = {
   rightReps: number | null
   leftDurationSec: number | null
   rightDurationSec: number | null
+  distanceM: number | null
+  completed: boolean | null
   notes: string | null
 }
 
@@ -612,6 +658,8 @@ export function toCanonicalSetInsert(set: ManualWorkoutSetInput): CanonicalWorko
     rightReps: set.rightReps,
     leftDurationSec: set.leftDurationSec,
     rightDurationSec: set.rightDurationSec,
+    distanceM: set.distance == null ? null : distanceToMeters(set.distance, set.distanceUnit ?? 'mi'),
+    completed: set.completed,
     notes: set.notes ?? null,
   }
 }
@@ -625,6 +673,9 @@ export type DraftSetFields = {
   rightReps: string
   leftDurationSec: string
   rightDurationSec: string
+  distance: string
+  distanceUnit: DistanceUnit
+  completed: boolean | null
   notes: string
   transcribedLoadState?: LoadState
   transcribedWeightLb?: string
@@ -660,6 +711,8 @@ export function isDraftSetUntouched(set: DraftSetFields): boolean {
     set.rightReps.trim() === '' &&
     set.leftDurationSec.trim() === '' &&
     set.rightDurationSec.trim() === '' &&
+    set.distance.trim() === '' &&
+    set.completed == null &&
     set.notes.trim() === ''
   )
 }
@@ -679,6 +732,9 @@ export function draftSetToManualInput(
     rightReps: parseOptionalInt(set.rightReps),
     leftDurationSec: parseOptionalInt(set.leftDurationSec),
     rightDurationSec: parseOptionalInt(set.rightDurationSec),
+    distance: parseOptionalNumber(set.distance),
+    distanceUnit: set.distanceUnit,
+    completed: set.completed,
     notes: set.notes.trim() === '' ? null : set.notes.trim(),
   }
 }
@@ -719,6 +775,8 @@ export function workoutSetFromRow(row: WorkoutSetRow): WorkoutSet {
     rightReps: row.right_reps,
     leftDurationSec: row.left_duration_sec,
     rightDurationSec: row.right_duration_sec,
+    distanceM: row.distance_m,
+    completed: row.completed,
     notes: row.notes,
   })
 }
@@ -837,14 +895,18 @@ export function ownerExerciseAnalyticsDefaults(
   measurementKind: MeasurementKind,
   unilateral: boolean,
 ): {
-  performanceType: 'other'
+  performanceType: 'other' | 'distance' | 'skill'
   analyticsLoadType: 'none'
   analyticsRepMode: 'standard' | 'per_side'
 } {
   const perSide =
     unilateral || measurementKind === 'reps_per_side' || measurementKind === 'duration_per_side'
   return {
-    performanceType: 'other',
+    performanceType: measurementKind === 'distance' || measurementKind === 'distance_duration'
+      ? 'distance'
+      : measurementKind === 'completion'
+        ? 'skill'
+        : 'other',
     analyticsLoadType: 'none',
     analyticsRepMode: perSide ? 'per_side' : 'standard',
   }
@@ -876,6 +938,19 @@ export const ownerExerciseRequestSchema = z.object({
 })
 
 export type OwnerExerciseRequest = z.infer<typeof ownerExerciseRequestSchema>
+
+export const ownerRoutineSlotSchema = z.object({
+  exerciseDefinitionId: uuidSchema,
+  plannedSets: z.int().min(1).max(20),
+  prescription: templatePrescriptionSchema,
+})
+
+export const ownerRoutineRequestSchema = z.object({
+  name: z.string().trim().min(1, 'Routine name is required').max(120),
+  slots: z.array(ownerRoutineSlotSchema).min(1, 'Add at least one exercise').max(30),
+}).strict()
+
+export type OwnerRoutineRequest = z.infer<typeof ownerRoutineRequestSchema>
 
 export function planOwnerExercisePatch(input: {
   existing: {
@@ -936,6 +1011,20 @@ export function formatPrescription(plannedSets: number | null, prescription: Tem
     const range = min != null && max != null ? `${min}–${max} sec` : 'duration'
     const side = prescription.measurement === 'duration_per_side' ? ' per side' : ''
     return `${setsLabel}${range}${side}`.trim()
+  }
+  if (prescription.measurement === 'distance' || prescription.measurement === 'distance_duration') {
+    const distance = prescription.min_distance_m != null && prescription.max_distance_m != null
+      ? `${Math.round(prescription.min_distance_m)}–${Math.round(prescription.max_distance_m)} m`
+      : prescription.min_distance_m != null
+        ? `≥ ${Math.round(prescription.min_distance_m)} m`
+        : 'distance'
+    const duration = prescription.measurement === 'distance_duration' && prescription.min_sec != null && prescription.max_sec != null
+      ? ` · ${prescription.min_sec}–${prescription.max_sec} sec`
+      : ''
+    return `${setsLabel}${distance}${duration}`.trim()
+  }
+  if (prescription.measurement === 'completion') {
+    return `${setsLabel}skill attempt`.trim()
   }
   const min = prescription.min
   const max = prescription.max
