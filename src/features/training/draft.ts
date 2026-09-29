@@ -293,20 +293,7 @@ export function draftFromSession(session: WorkoutSession, template: WorkoutTempl
       exerciseDefinitionId: exercise.exerciseDefinitionId,
       slotId: exercise.slotId,
       name: exercise.exerciseName,
-      measurementKind: template?.exercises.find((slot) => slot.slotId === exercise.slotId)?.exercise.measurementKind
-        ?? (exercise.sets.some((set) => set.leftDurationSec != null || set.rightDurationSec != null)
-          ? 'duration_per_side'
-          : exercise.sets.some((set) => set.leftReps != null || set.rightReps != null)
-            ? 'reps_per_side'
-            : exercise.sets.some((set) => set.completed != null)
-              ? 'completion'
-              : exercise.sets.some((set) => set.distanceM != null && set.durationSec != null)
-                ? 'distance_duration'
-                : exercise.sets.some((set) => set.distanceM != null)
-                  ? 'distance'
-                  : exercise.sets.some((set) => set.durationSec != null)
-                    ? 'duration'
-                    : 'reps'),
+      measurementKind: template?.exercises.find((slot) => slot.slotId === exercise.slotId)?.exercise.measurementKind ?? exercise.measurementKind,
       plannedSets: template?.exercises.find((slot) => slot.slotId === exercise.slotId)?.plannedSets ?? exercise.sets.length,
       prescription: template?.exercises.find((slot) => slot.slotId === exercise.slotId)?.prescription ?? { measurement: 'reps' },
       notes: exercise.notes ?? '',
