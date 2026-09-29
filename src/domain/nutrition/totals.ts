@@ -15,6 +15,7 @@ export type NutritionDayTotals = {
   carbs: NutrientTotal
   fat: NutrientTotal
   fiber: NutrientTotal
+  sodiumMg: NutrientTotal
 }
 
 export type NutritionTotable = {
@@ -23,6 +24,7 @@ export type NutritionTotable = {
   carbs: number | null
   fat: number | null
   fiber: number | null
+  sodiumMg: number | null
 }
 
 /**
