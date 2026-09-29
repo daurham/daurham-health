@@ -44,6 +44,8 @@ function loggableFrom(recipe: RecipeDetail) {
     proteinG: recipe.version.proteinG,
     carbsG: recipe.version.carbsG,
     fatG: recipe.version.fatG,
+    fiberG: recipe.version.fiberG,
+    sodiumMg: recipe.version.sodiumMg,
     yieldServings: recipe.version.yieldServings,
     finishedWeightG: recipe.version.finishedWeightG,
   }
@@ -97,7 +99,7 @@ function foodBasis(food: NutritionFood): RecipeFoodBasis {
     carbs: food.carbs,
     fat: food.fat,
     fiber: food.fiber,
-    sodium: food.sodium,
+    sodium: food.sodium ?? null,
     sourceKind: food.sourceKind,
     barcode: food.barcode,
     archived: food.archived,
