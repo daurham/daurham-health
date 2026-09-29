@@ -244,7 +244,13 @@ function StretchContent({ task, actions }: { task: CoachTaskView; actions: Coach
           <p className="mt-2 text-xs text-zinc-500">{task.status === 'offered' ? 'Offer expires' : 'Challenge ends'} {coachDateLabel(task.expiresOn)} · {task.status === 'offered' ? '7 days to attempt after acceptance' : 'Verified by Training'}</p>
           {task.status === 'offered' ? (
             <p className="mt-2 text-xs leading-relaxed text-zinc-600">
-              {isStrength ? 'e1RM is estimated performance, not the literal load to put on the bar. Any valid high-confidence weight × rep combination can count.' : 'Measured from one qualifying working set saved in Training.'}
+              {isStrength
+                ? 'e1RM is estimated performance, not the literal load to put on the bar. Any valid high-confidence weight × rep combination can count.'
+                : metadata?.strategy === 'pace'
+                  ? 'Pace comes from one continuous Training set. You must cover at least the baseline distance while meeting or beating the pace target.'
+                  : metadata?.strategy === 'distance'
+                    ? 'Distance is verified from one continuous Training working set.'
+                    : 'Measured from one qualifying working set saved in Training.'}
               {metadata?.perSide === true ? ' Both sides must be completed; the lower side counts.' : null}
             </p>
           ) : isStrength ? <p className="mt-2 text-xs leading-relaxed text-zinc-600">The e1RM target is an estimate, not a prescribed bar load. Any valid high-confidence weight × rep combination can count.</p> : null}
