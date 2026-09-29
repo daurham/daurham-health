@@ -325,7 +325,7 @@ async function readVersions(sql: Sql, goalId: string): Promise<VersionRow[]> {
 }
 
 function selectorContext(row: GoalRow): { archived: boolean; message: string | null } {
-  if ((row.goal_kind === 'strength_e1rm' || row.goal_kind.startsWith('training_')) && row.exercise_active === false) {
+  if ((row.goal_kind === 'strength_e1rm' || ['training_reps','training_duration','training_distance','training_pace','training_skill'].includes(row.goal_kind)) && row.exercise_active === false) {
     return { archived: true, message: 'Underlying exercise is archived.' }
   }
   if (row.goal_kind === 'supplement_adherence' && row.supplement_status === 'discontinued') {
