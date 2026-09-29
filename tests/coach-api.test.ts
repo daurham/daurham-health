@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { HealthOwnerConfig } from '../server/auth/config.ts'
 import { withOwnerAuth } from '../server/auth/with-owner.ts'
 import { matchHealthApiRoute } from '../server/dispatch.ts'
-import { matchCoachRoute } from '../server/handlers/coach.ts'
+import { handleCoach, matchCoachRoute } from '../server/handlers/coach.ts'
 import { wrapNodeResponse, type ApiRequest, type ApiResponse } from '../server/http.ts'
 
 const service = vi.hoisted(() => ({
@@ -49,6 +49,16 @@ function response() {
   return { res, status: () => statusCode, allow: () => headers.get('allow') }
 }
 
+
+
+function call(method: string, url: string, identity: { id: string; email: string } | null, body?: unknown) {
+  const captured = response()
+  return withOwnerAuth(handleCoach, {
+    config: ownerConfig,
+    readSession: async () => identity,
+  })(request(method, url, body), captured.res).then(() => captured)
+}
+
 describe('Coach API routing', () => {
   beforeEach(() => {
     for (const fn of Object.values(service)) fn.mockReset()
@@ -70,19 +80,25 @@ describe('Coach API routing', () => {
     expect(matchHealthApiRoute(`/api/coach/tasks/${TASK}/log-training`)).toBe('coach')
   })
 
-  it('keeps Coach owner-only', async () => {
-    const captured = response()
-    await withOwnerAuth(async () => {}, {
-      config: ownerConfig,
-      readSession: async () => null,
-    })(request('GET', '/api/coach'), captured.res)
-    expect(captured.status()).toBe(401)
+  it('keeps Coach owner-only and enforces methods', async () => {
+    expect((await call('GET', '/api/coach', null)).status()).toBe(401)
+    expect((await call('POST', '/api/coach/ensure', { id: 'someone', email: 'other@example.com' })).status()).toBe(403)
+    const wrong = await call('GET', '/api/coach/ensure', { id: 'owner-1', email: 'owner@example.com' })
+    expect(wrong.status()).toBe(405)
+    expect(wrong.allow()).toBe('POST')
+  })
 
-    const other = response()
-    await withOwnerAuth(async () => {}, {
-      config: ownerConfig,
-      readSession: async () => ({ id: 'someone', email: 'other@example.com' }),
-    })(request('GET', '/api/coach'), other.res)
-    expect(other.status()).toBe(403)
+  it('lets the owner ensure, pass, and log both completion modes', async () => {
+    const owner = { id: 'owner-1', email: 'owner@example.com' }
+    expect((await call('GET', '/api/coach', owner)).status()).toBe(200)
+    expect((await call('POST', '/api/coach/ensure', owner)).status()).toBe(200)
+    expect((await call('POST', `/api/coach/tasks/${TASK}/pass`, owner, {})).status()).toBe(200)
+    expect((await call('POST', `/api/coach/tasks/${TASK}/log-training`, owner, { submissionId: TASK, actualValue: 10 })).status()).toBe(200)
+    expect((await call('POST', `/api/coach/tasks/${TASK}/log-self-report`, owner, { submissionId: TASK, durationMin: 10 })).status()).toBe(200)
+    expect(service.readCoach).toHaveBeenCalledTimes(1)
+    expect(service.ensureCoach).toHaveBeenCalledTimes(1)
+    expect(service.passCoachTask).toHaveBeenCalledWith(TASK)
+    expect(service.logCoachTraining).toHaveBeenCalledWith(TASK, { submissionId: TASK, actualValue: 10 })
+    expect(service.logCoachSelfReport).toHaveBeenCalledWith(TASK, { submissionId: TASK, durationMin: 10 })
   })
 })
