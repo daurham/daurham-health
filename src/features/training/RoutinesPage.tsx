@@ -3,6 +3,7 @@ import type { ExerciseDefinition, MeasurementKind, TemplatePrescription, Workout
 import { milesToMeters, metersToMiles } from '@/domain/units'
 import { dangerButtonClass, primaryButtonClass, quietButtonClass, secondaryButtonClass } from '@/lib'
 import { archiveRoutine, createRoutine, fetchExercises, fetchTemplates, reviseRoutine } from './api'
+import { ExerciseGuideButton, ExerciseGuideSheet } from './ExerciseGuideSheet'
 
 type SlotDraft = {
   exerciseDefinitionId: string
@@ -99,6 +100,7 @@ export function RoutinesPage() {
   const [slots, setSlots] = useState<SlotDraft[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [guide, setGuide] = useState<ExerciseDefinition | null>(null)
 
   async function reload() {
     try {
@@ -172,7 +174,7 @@ export function RoutinesPage() {
       {slots.map((slot, index) => {
         const exercise = exercises.find(item => item.id === slot.exerciseDefinitionId) ?? exercises[0]
         return <article key={index} className="space-y-3 rounded-md border border-zinc-200 p-3">
-          <div className="flex items-center justify-between gap-2"><p className="text-sm font-semibold">Exercise {index + 1}</p><div className="flex gap-1">
+          <div className="flex items-center justify-between gap-2"><div className="flex items-center gap-2"><p className="text-sm font-semibold">Exercise {index + 1}</p>{exercise ? <ExerciseGuideButton exercise={exercise} onOpen={() => setGuide(exercise)} /> : null}</div><div className="flex gap-1">
             <button type="button" className={quietButtonClass} disabled={index === 0} onClick={() => setSlots(current => { const next=[...current]; const [item]=next.splice(index,1); if(item) next.splice(index-1,0,item); return next })}>↑</button>
             <button type="button" className={quietButtonClass} disabled={index === slots.length-1} onClick={() => setSlots(current => { const next=[...current]; const [item]=next.splice(index,1); if(item) next.splice(index+1,0,item); return next })}>↓</button>
             <button type="button" className={quietButtonClass} disabled={slots.length === 1} onClick={() => setSlots(current => current.filter((_,i)=>i!==index))}>Remove</button>
@@ -185,5 +187,6 @@ export function RoutinesPage() {
       <button type="button" className={secondaryButtonClass} onClick={() => setSlots(current=>[...current,emptySlot(exercises[0]?.id ?? '')])}>Add exercise</button>
       <div className="flex flex-wrap gap-2"><button type="button" className={primaryButtonClass} disabled={busy || name.trim()==='' || slots.length===0} onClick={()=>void save()}>{busy?'Saving…':editing?'Save new version':'Save routine'}</button><button type="button" className={quietButtonClass} disabled={busy} onClick={()=>{setEditing(null);setSlots([]);setName('');setError(null)}}>Cancel</button></div>
     </div>}
+    {guide ? <ExerciseGuideSheet exercise={guide} onClose={() => setGuide(null)} /> : null}
   </section>
 }
