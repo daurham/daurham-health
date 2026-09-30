@@ -19,6 +19,7 @@ Other owner surfaces, reached from pages rather than the primary tabs:
 - Settings, including backup export
 - Ask Health
 - Checkpoints
+- Rewards / XP wallet
 
 Canonical Training sessions are `programmed`, `ad_hoc`, and `experiment`. Apple Activity workouts stay in Activity. They are not Training sets, volume, or performance bests.
 
@@ -45,6 +46,8 @@ Migrations are ordered SQL files in `migrations/`, applied with `npm run migrate
 The database is the owner's system of record. Full backup, verify, and restore are described in `docs/BACKUP.md`. Portable export is a smaller owner-data archive. Operational rows such as `ai_usage` belong in the full backup and not in the portable export.
 
 Derived products are not stored as tables. That includes goal status, projections, insight cards, weekly coach prose, sleep baselines, and Ask Health transcripts. Correcting a canonical row changes the next read.
+
+The H3 reward wallet is durable owner state rather than a derived Health score. `xp_ledger` is append-only; Lifetime and Spendable XP are derived from it. Coach completion is the only XP issuance boundary. Reward catalog entries and immutable purchase snapshots are owner data.
 
 ## Important flows
 
