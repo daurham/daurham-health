@@ -1,6 +1,7 @@
 import { Suspense, useEffect, useRef } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { LockedScreen, useAuth } from '@/auth'
+import { useRewardSummary } from '@/features/rewards/useRewardSummary'
 import { AppSurfaceProvider } from '@/lib/app-prefix'
 import { cn, quietButtonClass, RouteFallback, selectedTabClass, SHELL_MAX_WIDTH_CLASS, tabClass } from '@/lib'
 import type { NavItem } from '@/types'
@@ -46,6 +47,7 @@ export function Layout() {
   const showOwnerChrome = !demoRoute && (status === 'owner' || status === 'unauthorized')
   const items = demoRoute ? demoNavItems : navItems
   const mobileMenuRef = useRef<HTMLDetailsElement>(null)
+  const wallet = useRewardSummary(showOwnerChrome && status === 'owner' && !demoRoute)
 
   useEffect(() => {
     if (mobileMenuRef.current) mobileMenuRef.current.open = false
@@ -64,6 +66,14 @@ export function Layout() {
           {showOwnerChrome ? (
             <>
               <div className="hidden items-center gap-3 md:flex">
+                <Link
+                  to="/rewards"
+                  className="motion-pressable xp-badge inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                  aria-label={wallet.summary ? `${wallet.summary.spendableXp.toLocaleString('en-US')} spendable XP. Open Rewards.` : 'Open Rewards'}
+                >
+                  <span aria-hidden="true">✦</span>
+                  <span>{wallet.summary ? `${wallet.summary.spendableXp.toLocaleString('en-US')} XP` : 'XP'}</span>
+                </Link>
                 <NavLink
                   to="/settings"
                   className={({ isActive }) =>
@@ -82,7 +92,16 @@ export function Layout() {
                   Sign out
                 </button>
               </div>
-              <details ref={mobileMenuRef} className="relative md:hidden">
+              <div className="ml-auto flex items-center gap-2 md:hidden">
+                <Link
+                  to="/rewards"
+                  className="motion-pressable xp-badge inline-flex min-h-9 items-center gap-1 rounded-full px-2.5 text-xs font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                  aria-label={wallet.summary ? `${wallet.summary.spendableXp.toLocaleString('en-US')} spendable XP. Open Rewards.` : 'Open Rewards'}
+                >
+                  <span aria-hidden="true">✦</span>
+                  <span>{wallet.summary ? wallet.summary.spendableXp.toLocaleString('en-US') : 'XP'}</span>
+                </Link>
+                <details ref={mobileMenuRef} className="relative">
                 <summary className="cursor-pointer list-none rounded-md px-2 py-1 text-sm text-zinc-600 marker:content-none hover:bg-zinc-100 hover:text-zinc-900 [&::-webkit-details-marker]:hidden">
                   Menu
                 </summary>
@@ -103,7 +122,8 @@ export function Layout() {
                     Sign out
                   </button>
                 </div>
-              </details>
+                </details>
+              </div>
             </>
           ) : null}
         </div>
