@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 describe('H2D Goal UI contract', () => {
   it('exposes all new Training Goal kinds with friendly controls', () => {
     const source = readFileSync('src/features/goals/GoalsPages.tsx', 'utf8')
-    for (const label of ['Training reps', 'Training duration', 'Training distance', 'Training pace', 'Training skill']) {
+    for (const label of ['Exercise reps', 'Exercise duration', 'Distance', 'Pace', 'Skill / milestone']) {
       expect(source).toContain(label)
     }
     expect(source).toContain('Target duration')
