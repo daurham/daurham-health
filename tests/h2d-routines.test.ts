@@ -51,7 +51,8 @@ describe('H2D Saved Routines', () => {
     expect(start).toContain('Empty workout')
     expect(start).toContain("const draftIsAdHoc = draft.sessionType === 'ad_hoc'")
     expect(start).toContain('allowExerciseManagement={draftIsAdHoc || experimentWorkout}')
-    expect(start).toContain('Promise.all([fetchTemplates(), fetchExercises()])')
+    expect(start).toContain('Promise.all([fetchTemplates(), fetchExerciseLibrary()])')
+    expect(start).toContain("allowExerciseAddition={draft.sessionType === 'programmed'}")
   })
 
   it('keeps the routine builder lightweight and measurement-aware', () => {
