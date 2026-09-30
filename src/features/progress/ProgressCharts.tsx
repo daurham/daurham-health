@@ -238,10 +238,10 @@ export function LoggedCaloriesChart({
               }}
             />
             {constantTarget != null ? (
-              <ReferenceLine y={constantTarget} stroke="var(--chart-soft)" strokeDasharray="4 4" />
+              <ReferenceLine y={constantTarget} stroke="var(--chart-secondary)" strokeDasharray="4 4" />
             ) : null}
             <Scatter data={points} fill="var(--chart-ink)" name="Calories" isAnimationActive={chartMotion} />
-            {varyingTargets.length > 0 ? <Scatter data={varyingTargets} fill="var(--chart-soft)" name="Target" isAnimationActive={chartMotion} /> : null}
+            {varyingTargets.length > 0 ? <Scatter data={varyingTargets} fill="var(--chart-secondary)" name="Target" isAnimationActive={chartMotion} /> : null}
           </ScatterChart>
         </ResponsiveContainer>
       </div>
