@@ -141,6 +141,27 @@ function findingTrend(finding: ProgressFinding): { metric: TrendMetric; directio
   return null
 }
 
+function findingSignal(
+  finding: ProgressFinding,
+  goals: readonly TrendGoalIntent[],
+  preferences: TrendPreferences,
+): { direction: TrendDirection; meaning: 'toward' | 'away' | 'neutral' | 'within'; source: 'goal' | 'preference' | 'default' | 'neutral' } | null {
+  if (finding.kind === 'performance_best') {
+    return { direction: 'higher', meaning: 'toward', source: 'default' }
+  }
+  const trend = findingTrend(finding)
+  if (!trend) return null
+  return {
+    direction: trend.direction,
+    ...resolveTrendMeaning({
+      metric: trend.metric,
+      direction: trend.direction,
+      goals,
+      preferences,
+    }),
+  }
+}
+
 export function OverviewSection({
   overview,
   onEvidence,
@@ -309,18 +330,9 @@ function FindingFeed({
                 {findingTitle(finding.kind)}
               </p>
               <p className="mt-1 font-medium">{findingHeadline(finding, overview)}</p>
-              {findingTrend(finding) ? (
+              {findingSignal(finding, trendGoals, trendPreferences) ? (
                 <div className="mt-1">
-                  <TrendSignal
-                    compact
-                    direction={findingTrend(finding)!.direction}
-                    meaning={resolveTrendMeaning({
-                      metric: findingTrend(finding)!.metric,
-                      direction: findingTrend(finding)!.direction,
-                      goals: trendGoals,
-                      preferences: trendPreferences,
-                    }).meaning}
-                  />
+                  <TrendSignal compact {...findingSignal(finding, trendGoals, trendPreferences)!} />
                 </div>
               ) : null}
               <p className="mt-1 text-sm text-zinc-600">
@@ -355,17 +367,8 @@ function FindingFeed({
                 <span className="truncate font-medium">{findingEventName(finding, overview)}</span>
                 <span className="text-sm text-zinc-800">{findingResult(finding, overview) ?? '—'}</span>
                 <span className="truncate text-sm text-zinc-600">
-                  {findingTrend(finding) ? (
-                    <TrendSignal
-                      compact
-                      direction={findingTrend(finding)!.direction}
-                      meaning={resolveTrendMeaning({
-                        metric: findingTrend(finding)!.metric,
-                        direction: findingTrend(finding)!.direction,
-                        goals: trendGoals,
-                        preferences: trendPreferences,
-                      }).meaning}
-                    />
+                  {findingSignal(finding, trendGoals, trendPreferences) ? (
+                    <TrendSignal compact {...findingSignal(finding, trendGoals, trendPreferences)!} />
                   ) : achievementList(finding)[0] ?? '—'}
                 </span>
                 <span className="text-right text-zinc-400" aria-hidden="true">
