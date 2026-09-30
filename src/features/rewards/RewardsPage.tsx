@@ -1,5 +1,9 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import type { RewardItem, RewardItemInput, RewardsState } from '@/domain/rewards'
+import { progressionState } from '@/domain/progression'
+import { themePack } from '@/theme'
+import { XpAmount } from '@/components/XpAmount'
 import {
   primaryButtonClass,
   quietButtonClass,
@@ -146,6 +150,8 @@ export function RewardsPage() {
   }
 
   const { spendableXp, lifetimeXp } = state.balances
+  const progression = progressionState(lifetimeXp)
+  const nextTheme = progression.nextThemeUnlock ? themePack(progression.nextThemeUnlock.id) : null
 
   return (
     <section className="space-y-6">
@@ -162,16 +168,37 @@ export function RewardsPage() {
         </p>
       ) : null}
 
-      <div className="grid gap-3 sm:grid-cols-2" aria-label="XP wallet">
-        <div className="rounded-xl border border-zinc-200 bg-white p-5">
-          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Available</p>
-          <p className="mt-1 text-3xl font-semibold tracking-tight">{spendableXp.toLocaleString('en-US')} XP</p>
-          <p className="mt-1 text-sm text-zinc-500">Spendable now</p>
+      <div className="grid gap-3 sm:grid-cols-[0.9fr_1.1fr]" aria-label="XP wallet">
+        <div className="health-hero-surface health-raised-surface rounded-xl border border-zinc-200 p-5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Spendable</p>
+          <div className="mt-1">
+            <XpAmount amount={spendableXp} badge={false} className="text-3xl tracking-tight" label={spendableXp + ' spendable XP'} />
+          </div>
+          <p className="mt-1 text-sm text-zinc-500">Use this on rewards. Redemptions never reduce your level.</p>
         </div>
         <div className="rounded-xl border border-zinc-200 bg-white p-5">
-          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Lifetime</p>
-          <p className="mt-1 text-3xl font-semibold tracking-tight">{lifetimeXp.toLocaleString('en-US')} XP</p>
-          <p className="mt-1 text-sm text-zinc-500">All Coach XP earned</p>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Lifetime progression</p>
+              <p className="mt-1 text-2xl font-semibold tracking-tight text-zinc-900">Level {progression.level}</p>
+            </div>
+            <XpAmount amount={lifetimeXp} label={lifetimeXp + ' lifetime XP'} />
+          </div>
+          <div
+            className="mt-4 h-2 overflow-hidden rounded-full bg-zinc-100"
+            role="progressbar"
+            aria-label={'Level ' + progression.level + ' progress'}
+            aria-valuemin={progression.levelFloorXp}
+            aria-valuemax={progression.nextLevelXp}
+            aria-valuenow={lifetimeXp}
+          >
+            <div className="progression-meter h-full rounded-full bg-accent" style={{ width: progression.progressPct + '%' }} />
+          </div>
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-zinc-500">
+            <span>{progression.xpNeededForNextLevel.toLocaleString('en-US')} XP to Level {progression.level + 1}</span>
+            {nextTheme ? <span>Next theme · {nextTheme.label}</span> : <span>All current themes unlocked</span>}
+          </div>
+          <Link to="/settings#theme-studio" className={quietButtonClass}>Open Theme Studio</Link>
         </div>
       </div>
 
@@ -230,7 +257,7 @@ export function RewardsPage() {
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                         <h3 className="font-semibold text-zinc-900">{item.name}</h3>
-                        <span className="text-sm font-semibold text-zinc-700">{item.costXp.toLocaleString('en-US')} XP</span>
+                        <XpAmount amount={item.costXp} />
                       </div>
                       {item.note ? <p className="mt-1 text-sm text-zinc-600">{item.note}</p> : null}
                       {!affordable ? <p className="mt-1 text-xs text-zinc-500">Need {shortBy.toLocaleString('en-US')} more XP</p> : null}
@@ -315,9 +342,7 @@ export function RewardsPage() {
                   <p className="text-sm font-medium text-zinc-900">{entry.label}</p>
                   <p className="mt-0.5 text-xs text-zinc-500">{formatInstant(entry.occurredAt)}</p>
                 </div>
-                <span className="shrink-0 text-sm font-semibold text-zinc-800">
-                  {entry.signedAmountXp > 0 ? '+' : '−'}{Math.abs(entry.signedAmountXp).toLocaleString('en-US')} XP
-                </span>
+                <XpAmount amount={entry.signedAmountXp} sign badge={false} className="shrink-0 text-sm" />
               </li>
             ))}
           </ul>
