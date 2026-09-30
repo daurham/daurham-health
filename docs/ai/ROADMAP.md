@@ -28,18 +28,18 @@ Frozen v1.0.0, then the v2 slices the blueprint marks implemented:
 - V2-H2A/H2B/H2C Coach: persistent deterministic Weekly/Daily assignments, accepted Stretch Quests, Personal Lab attention, snoozes, priority/inbox polish, and canonical-change refresh.
 - V2-H2D Goals + Training Measurement Expansion + Lightweight Routines: distance, pace, skills, Training Goals/bests, Running/Hiking, distance/pace Stretch, and versioned owner Saved Routines.
 - V2-H3 XP / Reward Wallet: Coach-completion XP, Lifetime/Spendable balances, append-only accounting, owner reward catalog, concurrency-safe redemption, refunds, and backup/export support.
+- V2-H4 Experience System: Nutrition-first Today hierarchy, compact progressive-disclosure Coach, XP/Level progression, full Theme Studio, goal-aware/motivating trend semantics, readable dates, and bounded reduced-motion-safe celebration.
 
 Also present from v1 and the import work: Nutrition, Training, Body, Progress, Activity, Sleep, Timeline, Compare, checkpoints, Apple Health archive import, Health Auto Export ingest, Gemini nutrition capture, Home-AI transcription, backup and portable export, and the public demo.
 
 ## Current work
 
-No active implementation task after V2-H3 completion. See `CURRENT_TASK.md`.
+V2-H5 Pantry + Exercise Library + Flexible Programmed Workouts is the next accepted slice. See `CURRENT_TASK.md` once promoted from `docs/ai/H5_DRAFT.md`.
 
 ## Known planned work
 
 - V2-H5 Pantry + Exercise Library + Flexible Programmed Workouts: manage existing saved foods, manage/annotate/archive exercises, exercise GIF/video/form guidance, one-session programmed extras with `+` session labels, and a beginner calisthenics built-in routine. Contract is staged in `docs/ai/H5_DRAFT.md` until H4 closes.
 
-- V2-H4 Themes + progression polish may build levels/unlocks from H3 Lifetime XP; no H4 implementation contract is active yet.
 
 Named by the current manual or blueprint, and not marked implemented:
 
