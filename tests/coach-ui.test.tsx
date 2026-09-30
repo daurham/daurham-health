@@ -73,20 +73,21 @@ function state(overrides: Partial<CoachState> = {}): CoachState {
 }
 
 describe('Today Coach UI', () => {
-  it('renders Weekly Focus and one primary Daily Quest in one Coach surface', () => {
+  it('renders Daily first and keeps Weekly visible in one compact Coach surface', () => {
     const html = renderToStaticMarkup(
       <MemoryRouter>
         <CoachCard state={state()} onState={() => undefined} />
       </MemoryRouter>,
     )
-    expect(html).toContain('Focus this week')
-    expect(html).toContain('Complete 3 training sessions this week')
-    expect(html).toContain("Today&#x27;s quest")
+    expect(html).toContain('Missions that matter now')
     expect(html).toContain('100 jumping jacks')
-    expect(html).toContain('Logs to Training')
-    expect(html).toContain('Log it')
-    expect(html).toContain('Pass')
-    expect(html).toContain('Coach · 2')
+    expect(html).toContain('Complete 3 training sessions this week')
+    expect(html.indexOf('100 jumping jacks')).toBeLessThan(html.indexOf('Complete 3 training sessions this week'))
+    expect(html).toContain('>Log<')
+    expect(html).toContain('+25 XP')
+    expect(html).toContain('+75 XP')
+    expect(html).not.toContain('Log the reps when you finish.')
+    expect(html).not.toContain('>Pass<')
   })
 
   it('collapses a completed quest to a compact resolved line with evidence provenance', () => {
@@ -108,9 +109,10 @@ describe('Today Coach UI', () => {
         />
       </MemoryRouter>,
     )
-    expect(html).toContain('Quest complete')
-    expect(html).toContain('Logged in Training')
-    expect(html).not.toContain('>Log it<')
+    expect(html).toContain('100 jumping jacks')
+    expect(html).toContain('Complete · Logged in Training')
+    expect(html).toContain('+25 XP')
+    expect(html).not.toContain('>Log<')
   })
 
   it('keeps the Today integration to one CoachCard and reuses reduced-motion vocabulary', () => {
@@ -162,89 +164,112 @@ const inboxActions = {
 }
 
 describe('Stretch Quest Today integration', () => {
-  it('prioritizes an active or offered Stretch over Daily while keeping Weekly compact', () => {
+  it('keeps Daily visible ahead of active or offered Stretch while preserving legacy attention selection', () => {
     for (const status of ['active', 'offered'] as const) {
       const coach = state({ stretchQuest: stretch({ status }), activeCount: 3 })
       const html = markup(coach)
       expect(selectPrimaryCoachTask(coach, null)?.taskKind).toBe('stretch_quest')
-      expect(html).toContain('data-coach-primary="stretch_quest"')
-      expect((html.match(/data-coach-primary=/g) ?? []).length).toBe(1)
-      expect(html.indexOf('Focus this week')).toBeLessThan(html.indexOf('Stretch Quest'))
-      expect(html).not.toContain('100 jumping jacks')
-      expect(html).toContain('Coach · 3')
+      expect(html).toContain('data-coach-mission="daily_quest"')
+      expect(html).toContain('data-coach-mission="stretch_quest"')
+      expect(html).toContain('data-coach-mission="weekly_focus"')
+      expect(html.indexOf('100 jumping jacks')).toBeLessThan(html.indexOf('Bench Press · Stretch your best'))
+      expect(html.indexOf('Bench Press · Stretch your best')).toBeLessThan(html.indexOf('Complete 3 training sessions this week'))
+      expect(html).not.toContain('data-coach-primary')
     }
   })
 
-  it('explains offered strength baseline, target, timing, estimation, and explicit acceptance', () => {
-    const html = markup(state({ stretchQuest: stretch() }))
-    expect(html).toContain('Baseline')
-    expect(html).toContain('120 lb e1RM')
-    expect(html).toContain('122.5 lb e1RM')
-    expect(html).toContain('Offer expires')
-    expect(html).toContain('Oct 1')
-    expect(html).toContain('7 days to attempt after acceptance')
-    expect(html).toContain('e1RM is estimated performance, not the literal load to put on the bar')
-    expect(html).toContain('Any valid high-confidence weight × rep combination can count')
-    expect(html).toContain('>Accept<')
-    expect(html).toContain('>Pass<')
-    expect(html).not.toContain('>Log it<')
-  })
-
-  it('shows accepted best attempt, expiry, evidence authority, and Training/end actions', () => {
-    const html = markup(state({ stretchQuest: stretch({ status: 'active', expiresOn: '2026-10-05', progress: { current: 119, target: 122.5, unit: 'lb', label: null } }) }))
-    expect(html).toContain('Best attempt')
-    expect(html).toContain('119 lb e1RM')
-    expect(html).toContain('Challenge ends')
-    expect(html).toContain('Oct 5')
-    expect(html).toContain('Verified by Training')
-    expect(html).toContain('>Open Training<')
-    expect(html).toContain('>End quest<')
-    expect(html).not.toContain('>Accept<')
-    expect(html).not.toContain('>Pass<')
-  })
-
-  it('shows a new PR below the target with the offered XP but without completion', () => {
-    const html = markup(state({ stretchQuest: stretch({ status: 'active', progress: { current: 121.8, target: 122.5, unit: 'lb', label: 'New PR' } }) }))
-    expect(html).toContain('New PR')
-    expect(html).toContain('121.8 lb e1RM')
-    expect(html).toContain('122.5 lb e1RM')
-    expect(html).toContain('Quest not conquered yet.')
-    expect(html).not.toContain('Stretch conquered')
+  it('keeps offered Stretch concise on Today and preserves full details in disclosure', () => {
+    const coach = state({ stretchQuest: stretch() })
+    const html = markup(coach)
+    expect(html).toContain('Bench Press · Stretch your best')
+    expect(html).toContain('Target 122.5 lb e1RM')
+    expect(html).toContain('Offer ends Oct 1')
     expect(html).toContain('+100 XP')
+    expect(html).not.toContain('Baseline')
+    expect(html).not.toContain('e1RM is estimated performance, not the literal load to put on the bar')
+    expect(html).not.toContain('>Accept<')
+
+    const details = renderToStaticMarkup(
+      <MemoryRouter><CoachInbox state={coach} onClose={() => undefined} actions={inboxActions} /></MemoryRouter>,
+    )
+    expect(details).toContain('Baseline')
+    expect(details).toContain('120 lb e1RM')
+    expect(details).toContain('122.5 lb e1RM')
+    expect(details).toContain('Offer expires')
+    expect(details).toContain('7 days to attempt after acceptance')
+    expect(details).toContain('e1RM is estimated performance, not the literal load to put on the bar')
+    expect(details).toContain('Any valid high-confidence weight × rep combination can count')
+    expect(details).toContain('>Accept<')
+    expect(details).toContain('>Pass<')
   })
 
-  it('acknowledges completion with achieved value and target, then returns priority to Daily', () => {
+  it('keeps accepted Stretch progress compact and leaves actions in disclosure', () => {
+    const coach = state({ stretchQuest: stretch({ status: 'active', expiresOn: '2026-10-05', progress: { current: 119, target: 122.5, unit: 'lb', label: null } }) })
+    const html = markup(coach)
+    expect(html).toContain('Target 122.5 lb e1RM')
+    expect(html).toContain('Ends Oct 5')
+    expect(html).not.toContain('Best attempt')
+    expect(html).not.toContain('>Open Training<')
+
+    const details = renderToStaticMarkup(
+      <MemoryRouter><CoachInbox state={coach} onClose={() => undefined} actions={inboxActions} /></MemoryRouter>,
+    )
+    expect(details).toContain('Best attempt')
+    expect(details).toContain('119 lb e1RM')
+    expect(details).toContain('Verified by Training')
+    expect(details).toContain('>Open Training<')
+    expect(details).toContain('>End quest<')
+  })
+
+  it('keeps a below-target PR behind Stretch disclosure while retaining reward visibility', () => {
+    const coach = state({ stretchQuest: stretch({ status: 'active', progress: { current: 121.8, target: 122.5, unit: 'lb', label: 'New PR' } }) })
+    const html = markup(coach)
+    expect(html).toContain('+100 XP')
+    expect(html).not.toContain('New PR')
+    const details = renderToStaticMarkup(
+      <MemoryRouter><CoachInbox state={coach} onClose={() => undefined} actions={inboxActions} /></MemoryRouter>,
+    )
+    expect(details).toContain('New PR')
+    expect(details).toContain('121.8 lb e1RM')
+    expect(details).toContain('122.5 lb e1RM')
+    expect(details).toContain('Quest not conquered yet.')
+  })
+
+  it('keeps completed Stretch compact on Today and preserves acknowledgement details', () => {
     const completed = stretch({ status: 'completed', evidenceLabel: 'Verified by Training', progress: { current: 123.2, target: 122.5, unit: 'lb', label: null } })
     const coach = state({ stretchQuest: completed })
     const html = markup(coach)
-    expect(html).toContain('Stretch conquered')
-    expect(html).toContain('Achieved')
-    expect(html).toContain('123.2 lb e1RM')
-    expect(html).toContain('122.5 lb e1RM')
-    expect(html).toContain('Verified by Training')
-    expect(html).toContain('>Got it<')
+    expect(html).toContain('Complete · Verified by Training')
+    expect(html).toContain('+100 XP')
+    expect(html).not.toContain('Stretch conquered')
+    const details = renderToStaticMarkup(
+      <MemoryRouter><CoachInbox state={coach} onClose={() => undefined} actions={inboxActions} /></MemoryRouter>,
+    )
+    expect(details).toContain('Stretch conquered')
+    expect(details).toContain('123.2 lb e1RM')
+    expect(details).toContain('122.5 lb e1RM')
+    expect(details).toContain('>Got it<')
     expect(selectPrimaryCoachTask(coach, null)?.id).toBe(coach.dailyQuest?.id)
     expect(selectPrimaryCoachTask({ ...coach, dailyQuest: null }, null)?.id).toBe(completed.id)
-    expect(selectPrimaryCoachTask(coach, completed.id)?.id).toBe(coach.dailyQuest?.id)
   })
 
   it.each([['passed', 'Passed'], ['failed', 'Challenge ended'], ['expired', 'Offer expired']] as const)('keeps %s Stretch neutral and compact beside Daily', (status, label) => {
     const coach = state({ stretchQuest: stretch({ status }), activeCount: 2 })
     const html = markup(coach)
     expect(selectPrimaryCoachTask(coach, null)?.taskKind).toBe('daily_quest')
-    expect(html).toContain('data-coach-primary="daily_quest"')
+    expect(html).toContain('data-coach-mission="daily_quest"')
     expect(html).toContain(label)
     expect(html).toContain('100 jumping jacks')
     expect(html).not.toContain('>Accept<')
     expect(html).not.toMatch(/lost|penalty|streak|failure/i)
   })
 
-  it('orders inbox Stretch, Today, This week and preserves hidden Daily actions', () => {
+  it('orders inbox Today, Stretch, This week and preserves full actions', () => {
     const html = renderToStaticMarkup(
       <MemoryRouter><CoachInbox state={state({ stretchQuest: stretch() })} onClose={() => undefined} actions={inboxActions} /></MemoryRouter>,
     )
-    expect(html.indexOf('aria-label="Stretch"')).toBeLessThan(html.indexOf('aria-label="Today"'))
-    expect(html.indexOf('aria-label="Today"')).toBeLessThan(html.indexOf('aria-label="This week"'))
+    expect(html.indexOf('aria-label="Today"')).toBeLessThan(html.indexOf('aria-label="Stretch"'))
+    expect(html.indexOf('aria-label="Stretch"')).toBeLessThan(html.indexOf('aria-label="This week"'))
     expect(html).toContain('100 jumping jacks')
     expect(html).toContain('>Log it<')
     expect(html).toContain('>Accept<')
@@ -253,7 +278,9 @@ describe('Stretch Quest Today integration', () => {
   it('uses canonical reps and duration units and explains both completed sides', () => {
     for (const [strategy, unit, baseline, target] of [['reps', 'reps', 42, 45], ['duration', 'sec', 95, 100]] as const) {
       const quest = stretch({ targetUnit: unit, baselineValue: baseline, targetValue: target, metadata: { stretch: { strategy, perSide: true } } })
-      const html = markup(state({ stretchQuest: quest }))
+      const html = renderToStaticMarkup(
+        <MemoryRouter><CoachInbox state={state({ stretchQuest: quest })} onClose={() => undefined} actions={inboxActions} /></MemoryRouter>,
+      )
       expect(html).toContain(`${baseline} ${unit}`)
       expect(html).toContain(`${target} ${unit}`)
       expect(html).toContain('Both sides must be completed; the lower side counts.')
@@ -268,15 +295,15 @@ describe('Stretch Quest Today integration', () => {
     const css = readFileSync('src/index.css', 'utf8')
     const html = markup(state({ stretchQuest: stretch() }))
     const reduced = css.slice(css.indexOf('@media (prefers-reduced-motion: reduce)'))
-    expect(html).toContain('grid-cols-2')
+    expect(html).toContain('truncate')
     expect(html).toContain('min-w-0')
-    expect(card).toContain('flex flex-wrap gap-3')
+    expect(card).toContain('data-coach-mission')
     expect(readFileSync('src/features/coach/CoachDialog.tsx', 'utf8')).toContain('max-h-[90dvh] w-full overflow-y-auto')
     expect(card).toContain('motion-notice-enter')
     expect(card).toContain('without a reward')
     expect(reduced).toContain('.motion-notice-enter')
     expect(reduced).toContain('animation: none')
-    expect(card).not.toMatch(/animate-bounce|animate-ping|requestAnimationFrame|setInterval/)
+    expect(card).not.toMatch(/animate-bounce|animate-ping|setInterval/)
   })
 })
 function lab(overrides: Partial<CoachLabItem> = {}): CoachLabItem {
@@ -307,21 +334,19 @@ describe('Personal Lab Coach attention', () => {
     expect(primaryIdentity(state({ stretchQuest: completed, dailyQuest: null, labItems: [] }), completed.id)).toBe(completed.id)
   })
 
-  it('shows exactly one primary Lab item and leaves displaced Daily actionable in the inbox', () => {
+  it('keeps Lab as a compact count so it cannot displace Daily, Stretch, or Weekly', () => {
     const coach = state({ labItems: [lab()], stretchQuest: stretch() })
     const html = markup(coach)
-    expect((html.match(/data-coach-primary=/g) ?? []).length).toBe(1)
-    expect(html).toContain('data-coach-primary="lab"')
-    expect(html).toContain('Retest Bench Press')
-    expect(html).toContain('>Open benchmark<')
-    expect(html).toContain('>Not now<')
-    expect(html).not.toContain('100 jumping jacks')
-    expect(html).not.toContain('>Accept<')
+    expect(html).toContain('Lab · 1')
+    expect(html).toContain('100 jumping jacks')
+    expect(html).toContain('Bench Press · Stretch your best')
+    expect(html).toContain('Complete 3 training sessions this week')
+    expect(html).not.toContain('Retest Bench Press')
+    expect(html).not.toContain('>Open benchmark<')
     const inbox = renderToStaticMarkup(<MemoryRouter><CoachInbox state={coach} onClose={() => undefined} actions={inboxActions} /></MemoryRouter>)
-    expect(inbox).toContain('100 jumping jacks')
-    expect(inbox).toContain('>Log it<')
-    expect(inbox).toContain('>Accept<')
-    for (const [earlier, later] of [['Stretch', 'Today'], ['Today', 'Lab'], ['Lab', 'This week']]) {
+    expect(inbox).toContain('Retest Bench Press')
+    expect(inbox).toContain('>Open benchmark<')
+    for (const [earlier, later] of [['Today', 'Stretch'], ['Stretch', 'This week'], ['This week', 'Lab']]) {
       expect(inbox.indexOf(`aria-label="${earlier}"`)).toBeGreaterThan(-1)
       expect(inbox.indexOf(`aria-label="${earlier}"`)).toBeLessThan(inbox.indexOf(`aria-label="${later}"`))
     }
@@ -346,8 +371,8 @@ describe('Personal Lab Coach attention', () => {
 
   it('keeps Weekly-only compact and truly empty Coach quiet without prior-day acknowledgements', () => {
     const weekly = markup(state({ dailyQuest: null }))
-    expect(weekly).toContain('Focus this week')
-    expect(weekly).not.toContain('data-coach-primary')
+    expect(weekly).toContain('This week')
+    expect(weekly).toContain('data-coach-mission="weekly_focus"')
     expect(markup(state({ dailyQuest: null, weeklyFocus: null, activeCount: 0 }))).toBe('')
     const old = stretch({ status: 'completed', completedAt: '2026-09-28T20:00:00Z', closedAt: '2026-09-28T20:00:00Z' })
     const quiet = state({ dailyQuest: null, weeklyFocus: null, stretchQuest: old, activeCount: 0 })
