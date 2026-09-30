@@ -1192,3 +1192,31 @@ Do not close H4 until:
 - progression-theme preview/personality is visibly stronger;
 - full automated validation passes again;
 - the owner gets one more visual QA pass.
+
+
+## J. Motivational signal must decorate, not replace, the finding
+
+Final owner QA caught that the semantic signal label could replace the useful Detail text in Progress “What changed.”
+
+Required behavior:
+
+- keep the actual finding detail visible, e.g. `Heaviest load`, `Most reps at this load`, `Estimated strength improved`, or `3 more workouts than previous`;
+- apply the positive/attention arrow + semantic color to that specific phrase;
+- generic accessibility meaning such as “Positive signal” / “Needs attention” may remain in an aria-label or supplemental copy;
+- do not replace the finding itself with generic “Positive signal.”
+
+The semantic indicator exists to draw attention to the fact, not to erase the fact.
+
+## K. Mobile Nutrition Add Food action must be viewport-bounded
+
+The mobile screen recording showed the fixed Add Food action contributing to unstable/overflowing geometry.
+
+Required behavior:
+
+- the mobile fixed CTA is bounded by explicit left/right safe gutters;
+- it must not inherit a full-width class that extends beyond the viewport;
+- no horizontal page overflow or sideways shift while scrolling;
+- it stays above the bottom navigation/safe-area;
+- the desktop Add Food action remains unchanged.
+
+These two items are part of H4 closeout and must pass before H4 is closed.
