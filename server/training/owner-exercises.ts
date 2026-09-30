@@ -4,6 +4,7 @@ import {
   OWNER_EXERCISE_ORIGIN,
   exerciseDefinitionFromRow,
   exerciseDefinitionRowSchema,
+  exerciseLibraryLastSessionSchema,
   ownerExerciseAnalyticsDefaults,
   ownerExerciseCoherenceError,
   ownerExerciseRequestSchema,
@@ -285,11 +286,45 @@ export async function listExerciseLibrary(): Promise<{ exercises: ExerciseLibrar
                 FROM workout_session_exercises used
                 JOIN workout_sessions sessions ON sessions.id = used.workout_session_id
                 WHERE used.exercise_definition_id = exercise_definitions.id
-              ) AS last_performed_date
+              ) AS last_performed_date,
+              (
+                SELECT jsonb_build_object(
+                  'date', sessions.workout_date::text,
+                  'sets', COALESCE((
+                    SELECT jsonb_agg(
+                      jsonb_build_object(
+                        'setNumber', sets.set_number,
+                        'loadState', sets.load_state,
+                        'weightKg', sets.weight_kg,
+                        'reps', sets.reps,
+                        'durationSec', sets.duration_sec,
+                        'leftReps', sets.left_reps,
+                        'rightReps', sets.right_reps,
+                        'leftDurationSec', sets.left_duration_sec,
+                        'rightDurationSec', sets.right_duration_sec,
+                        'distanceM', sets.distance_m,
+                        'completed', sets.completed
+                      )
+                      ORDER BY sets.set_number
+                    )
+                    FROM workout_sets sets
+                    WHERE sets.workout_session_exercise_id = used.id
+                  ), '[]'::jsonb)
+                )
+                FROM workout_session_exercises used
+                JOIN workout_sessions sessions ON sessions.id = used.workout_session_id
+                WHERE used.exercise_definition_id = exercise_definitions.id
+                ORDER BY sessions.workout_date DESC, sessions.created_at DESC, used.position DESC
+                LIMIT 1
+              ) AS last_session
        FROM exercise_definitions
        ORDER BY external_id NULLS LAST, name, id`,
     ),
-  )) as Array<Record<string, unknown> & { usage_count: number | string; last_performed_date: unknown }>
+  )) as Array<Record<string, unknown> & {
+    usage_count: number | string
+    last_performed_date: unknown
+    last_session: unknown
+  }>
   const exercises = rows.map((row) => mapExercise(row))
   const dependencies = await activeRoutineDependencies(exercises.map((exercise) => exercise.id))
   return {
@@ -299,6 +334,10 @@ export async function listExerciseLibrary(): Promise<{ exercises: ExerciseLibrar
         exercise,
         usageCount,
         lastPerformedDate: calendarDate(rows[index]?.last_performed_date),
+        lastSession:
+          rows[index]?.last_session == null
+            ? null
+            : exerciseLibraryLastSessionSchema.parse(rows[index]?.last_session),
         activeRoutines: dependencies.get(exercise.id) ?? [],
         semanticEditable: exercise.externalId == null && exercise.metadata.origin === 'owner' && usageCount === 0,
         builtIn: exercise.externalId != null,
