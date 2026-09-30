@@ -50,6 +50,9 @@ import {
   provenancePayload,
 } from '../../src/domain/training-transcription.js'
 import { poundsToKilograms } from '../../src/domain/units.js'
+import { bestTrainingPerformance, trainingPerformanceObservations, TRAINING_PERFORMANCE_KINDS } from '../../src/domain/progress/training-performance.js'
+import type { CanonicalSetRecord, ProgressExerciseDefinition } from '../../src/domain/progress/types.js'
+import type { TrainingPerformanceBestView } from '../../src/domain/training.js'
 import {
   applyPaperInheritanceToManualRequest,
   fieldErrorCountSummary,
@@ -712,6 +715,94 @@ export async function listSessions(): Promise<SessionListResponse> {
   })
 }
 
+async function loadTrainingPerformanceBests(
+  exerciseIds: readonly string[],
+): Promise<Map<string, TrainingPerformanceBestView[]>> {
+  const unique = [...new Set(exerciseIds)]
+  if (unique.length === 0) return new Map()
+  const sql = await getSql()
+  const definitionRows = (await sql.query(
+    `SELECT id::text AS id, name, external_id, performance_type, analytics_load_type,
+            analytics_rep_mode, measurement_kind, load_type, unilateral
+       FROM exercise_definitions
+      WHERE id = ANY($1::uuid[])`,
+    [unique],
+  )) as Array<Record<string, unknown>>
+  const exercises = definitionRows.map((row) => ({
+    id: String(row.id),
+    name: String(row.name),
+    externalId: row.external_id == null ? null : String(row.external_id),
+    performanceType: row.performance_type as ProgressExerciseDefinition['performanceType'],
+    analyticsLoadType: row.analytics_load_type as ProgressExerciseDefinition['analyticsLoadType'],
+    analyticsRepMode: row.analytics_rep_mode as ProgressExerciseDefinition['analyticsRepMode'],
+    measurementKind: String(row.measurement_kind),
+    loadType: String(row.load_type),
+    unilateral: row.unilateral === true,
+  }))
+  const setRows = (await sql.query(
+    `SELECT sets.id::text AS set_id, sessions.id::text AS session_id,
+            session_exercises.id::text AS session_exercise_id,
+            session_exercises.exercise_definition_id::text AS exercise_id,
+            sessions.workout_date::text AS session_date,
+            sessions.created_at::text AS session_created_at,
+            session_exercises.position AS session_exercise_position,
+            sets.set_number, sets.set_type, sets.load_state, sets.weight_kg::text AS weight_kg,
+            sets.reps, sets.duration_sec, sets.left_reps, sets.right_reps,
+            sets.left_duration_sec, sets.right_duration_sec,
+            sets.distance_m::text AS distance_m, sets.completed
+       FROM workout_sets sets
+       JOIN workout_session_exercises session_exercises ON session_exercises.id = sets.workout_session_exercise_id
+       JOIN workout_sessions sessions ON sessions.id = session_exercises.workout_session_id
+      WHERE session_exercises.exercise_definition_id = ANY($1::uuid[])
+        AND sessions.session_type IN ('programmed', 'ad_hoc', 'experiment')
+      ORDER BY sessions.workout_date, sessions.created_at, sessions.id,
+               session_exercises.position, sets.set_number, sets.id`,
+    [unique],
+  )) as Array<Record<string, unknown>>
+  const records: CanonicalSetRecord[] = setRows.map((set) => ({
+    setId: String(set.set_id),
+    sessionId: String(set.session_id),
+    sessionExerciseId: String(set.session_exercise_id),
+    exerciseId: String(set.exercise_id),
+    sessionDate: String(set.session_date),
+    sessionCreatedAt: String(set.session_created_at),
+    sessionExercisePosition: Number(set.session_exercise_position),
+    setNumber: Number(set.set_number),
+    setType: String(set.set_type),
+    loadState: String(set.load_state),
+    weightKg: numberOrNull(set.weight_kg),
+    reps: numberOrNull(set.reps),
+    durationSec: numberOrNull(set.duration_sec),
+    leftReps: numberOrNull(set.left_reps),
+    rightReps: numberOrNull(set.right_reps),
+    leftDurationSec: numberOrNull(set.left_duration_sec),
+    rightDurationSec: numberOrNull(set.right_duration_sec),
+    distanceM: numberOrNull(set.distance_m),
+    completed: set.completed == null ? null : set.completed === true,
+  }))
+  const observations = trainingPerformanceObservations(records, exercises)
+  const byExercise = new Map<string, TrainingPerformanceBestView[]>()
+  for (const exercise of exercises) {
+    const bests = TRAINING_PERFORMANCE_KINDS.flatMap((kind) => {
+      const best = bestTrainingPerformance(observations, { exerciseId: exercise.id, kind })
+      if (!best) return []
+      return [{
+        kind: best.kind,
+        value: best.value,
+        unit: best.unit,
+        date: best.date,
+        sessionId: best.sourceSet.sessionId,
+        setId: best.sourceSet.setId,
+        distanceM: best.distanceM,
+        durationSec: best.durationSec,
+        completed: best.completed,
+      } satisfies TrainingPerformanceBestView]
+    })
+    byExercise.set(exercise.id, bests)
+  }
+  return byExercise
+}
+
 export async function getSession(sessionId: string): Promise<SessionDetailResponse> {
   const sql = await getSql()
   const sessionRows = await queryOrUnavailable(() =>
@@ -743,6 +834,9 @@ export async function getSession(sessionId: string): Promise<SessionDetailRespon
   )
   const exercises = z.array(workoutSessionExerciseRowSchema).parse(exerciseRows)
   const exerciseIds = exercises.map((exercise) => exercise.id)
+  const performanceBestsByExercise = await loadTrainingPerformanceBests(
+    exercises.map((exercise) => exercise.exercise_definition_id),
+  )
   const setRows =
     exerciseIds.length === 0
       ? []
@@ -779,6 +873,7 @@ export async function getSession(sessionId: string): Promise<SessionDetailRespon
       measurementKind: exercise.measurement_kind,
       notes: exercise.notes,
       sets: setsByExercise.get(exercise.id) ?? [],
+      performanceBests: performanceBestsByExercise.get(exercise.exercise_definition_id) ?? [],
     })),
   }
 
