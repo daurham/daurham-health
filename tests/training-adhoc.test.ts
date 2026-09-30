@@ -402,7 +402,8 @@ describe('owner exercises', () => {
       next: { name: 'Box Squat', measurementKind: 'reps', loadType: 'barbell', unilateral: false },
       used: false,
     })
-    expect(seeded.ok).toBe(false)
+    expect(seeded.ok).toBe(true)
+    if (seeded.ok) expect(seeded.semanticEditable).toBe(false)
     const archived = planOwnerExercisePatch({
       existing: owner,
       next: { name: 'Push-up', measurementKind: 'reps', loadType: 'bodyweight', unilateral: false },
@@ -437,7 +438,7 @@ describe('owner exercises', () => {
     })
     expect(renamed.ok).toBe(true)
     if (renamed.ok) {
-      expect(renamed.nameOnly).toBe(true)
+      expect(renamed.semanticEditable).toBe(false)
     }
     const sql = readFileSync('server/training/owner-exercises.ts', 'utf8')
     expect(sql).toContain('analytics.performanceType')
