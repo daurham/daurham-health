@@ -261,3 +261,28 @@ Observed from the current code and product docs. Where the original rationale is
 **Status:** Active  
 **Reason:** Coach truth can change after Training, Nutrition, Body, Activity/import, Goal, Context, Supplement, and Lab mutations. Continuous polling is unnecessary.  
 **Implications:** Successful relevant owner mutations emit a coalesced client event. Today and Coach reload from their canonical server authorities. Preview/draft requests, failed mutations, Coach ensure, and Lab snooze itself do not emit the canonical-change event.
+
+
+## Decision: Pace and Training PRs are derived from canonical observations
+
+**Status:** Active  
+**Reason:** H2D adds canonical distance and duration observations, but pace and PR status are interpretations of those facts and must not become a second source of truth.  
+**Implications:** Training stores distance in meters and duration in seconds. Pace is derived only when one qualifying working set contains both. Reps, duration, distance, pace, skill achievement, Goal evidence, and Training bests are recomputed from current canonical Training; no pace or PR flag is stored.
+
+## Decision: Skill achievement is explicit binary Training evidence
+
+**Status:** Active  
+**Reason:** Skills such as a handstand or first unassisted movement cannot be inferred reliably from an exercise name, duration, or rep count.  
+**Implications:** A `completion` exercise stores an explicit working-set `completed` boolean. `true` is achievement; `false` is an attempt. Skill Goals use that evidence. Binary skills do not auto-generate Stretch Quests because there is no deterministic percentage-based next step without a progression hierarchy.
+
+## Decision: Running and Hiking are canonical Training, separate from Activity
+
+**Status:** Active  
+**Reason:** Owner-entered continuous performance needs canonical distance/time evidence for Goals and Stretch, while synced Apple workouts remain Activity by design.  
+**Implications:** Built-in Training definitions EX18 Running and EX19 Hiking use `distance_duration`. Future manual Coach Run/Hike logs write duration and any supplied distance into ordinary `ad_hoc` Training. Health Auto Export workouts are not converted into Training and do not become Training performance evidence.
+
+## Decision: Saved Routines reuse immutable workout-template versions
+
+**Status:** Active  
+**Reason:** Training already has versioned templates and programmed sessions snapshot template identity. A parallel routine model would duplicate that authority.  
+**Implications:** Built-in A/B/C templates are `seeded` and owner-immutable. Owner Saved Routines use stable opaque `owner:<uuid>` routine codes. Editing creates a new active template version and deactivates the prior version; archiving deactivates the current version. Historical sessions remain tied to the exact old template/version and are never rewritten.

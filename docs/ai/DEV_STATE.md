@@ -1,109 +1,113 @@
 # Dev state
 
-Snapshot recorded 2026-09-29 after **V2-H2C — Personal Lab + Coach Polish**, on top of V2-H2A Coach Core + Today and V2-H2B Stretch Quests. This is the current health application.
+Snapshot recorded 2026-09-29 after **V2-H2D — Goals + Training Measurement Expansion + Lightweight Routines**, on top of H2A/H2B/H2C Coach. This is the current health application.
 
 ## Git and runtime
 
-- Branch: `main`; package version remains 1.0.0.
-- H2C extends the deployed H2A/H2B Coach tree and reuses the existing Personal Lab retest and Experiment Suggestion authorities.
+- Branch: `main` after H2D publication; package version remains 1.0.0.
 - No new runtime dependency, provider request type, scheduler, or Vercel function was added.
-- H2B validation/publication details remain in `docs/ai/H2B_REPORT.md`; H2C details are in `docs/ai/H2C_REPORT.md`.
+- H2D remains deterministic/provider-free except the already-existing explicit workout-photo transcription path.
+- Full implementation/validation details are in `docs/ai/H2D_REPORT.md`.
 
 ## Schema and deployment
 
-- Migration head: `0037_coach_lab_snoozes.sql`.
-- H2B adds `stretch_quest`, `offered` / `failed`, nullable `accepted_at`, and the frozen `stretch` difficulty/reward band to the existing Coach ledger.
-- `coach_task_events` supports failed events. State changes and Stretch events are atomic and deduplicated by lifecycle key.
-- A partial unique index enforces one offered/active Stretch for the single owner.
-- Existing one-Daily-per-date and one-Weekly-per-week indexes remain unchanged.
-- The owner applied `0035_coach_tasks.sql`, `0036_stretch_quests.sql`, and `0037_coach_lab_snoozes.sql`. Production schema is now at migration head `0037_coach_lab_snoozes.sql`.
-- `coach_lab_snoozes` stores Coach-only presentation state: Lab item kind, stable source key, exact source fingerprint, Phoenix `snoozed_until`, and timestamps. It does not store Lab suggestion content or canonical evidence.
-- Backup and portable export include Coach task/event history plus `coach_lab_snoozes`; inventory schema head is `0037_coach_lab_snoozes.sql`.
+- Migration head: `0038_training_measurements_goals_routines.sql`.
+- Production is currently applied through `0037_coach_lab_snoozes.sql`; **0038 is pending owner deployment**.
+- `exercise_definitions.measurement_kind` now supports `distance`, `distance_duration`, and `completion` in addition to the existing reps/duration families.
+- `exercise_definitions.performance_type` adds `skill`.
+- `workout_sets` adds canonical `distance_m` and `completed`. Distance is meters; duration remains seconds; pace/PR flags are not stored.
+- `goals` adds `training_min_distance_m` and the Training Goal kinds `training_reps`, `training_duration`, `training_distance`, `training_pace`, and `training_skill`.
+- `workout_templates` adds `origin_kind = seeded|owner` and `updated_at`; a partial unique index permits only one active owner version per routine code.
+- Built-in EX18 Running and EX19 Hiking are canonical no-load `distance_duration` Training definitions.
+- Backup/full and portable inventory head is 0038 and includes new set fields, Goal selector state, and Saved Routine origin/version fields.
 
-## Existing H2A behavior
+## Canonical Training measurements
 
-- One frozen Daily Quest per Phoenix date and one Weekly Focus per Monday–Sunday Coach week; passing consumes its period and never rerolls.
-- Existing Goal, Body cadence, Activity, Nutrition, Training, and explicit self-report rules remain provider-free.
-- Canonical automatic completions reread their domain authority. Missing Nutrition evidence remains missing.
-- Manual physical quests save normal `ad_hoc` Training. Run/hike optional distance remains Coach evidence only.
-- Meal prep and journaling remain explicit self-report; they do not create eaten food or mutate Daily Context.
-- Manual unloaded Training presets now emit the existing valid `bodyweight` load state; the former `none` value was rejected by the real Training parser. Regression coverage uses that real parser.
+- Existing reps, duration, per-side reps/duration, load semantics, programmed/ad-hoc/experiment session types, and imported workout behavior remain intact.
+- Distance-only observations use `distance_m > 0`.
+- `distance_duration` requires duration for its performance observation and may additionally store distance. Duration-only running/hiking remains representable; pace/distance analytics require known positive distance.
+- `completion` records explicit `completed = true|false`; false is an attempt, not achievement.
+- Public/manual UI accepts miles or kilometers and converts once at the Training boundary to meters. A supplied distance requires an explicit unit.
+- The editor shows distance/unit controls, distance+duration with a derived pace preview, and Achieved/Not yet for completion. Irrelevant weight fields are hidden for no-load distance/skill exercises.
+- Workout detail formats distance, duration, pace, and skill state and shows **derived Training bests** for reps, duration, distance, pace, and skill achievement, with links to source workouts.
+- Derived bests are recalculated from current canonical Training on read; deleting/editing source Training changes the next result.
 
-## Stretch lifecycle and timing
+## Shared performance authority
 
-- First independently eligible offer may appear immediately; all subsequent offers wait at least eight Phoenix calendar days from the prior offer date, regardless of its outcome.
-- An offer includes its creation date plus two further dates. Acceptance creates a seven-date inclusive challenge window. Refresh/retry extends neither window.
-- Offer → explicit accept → active → canonical completion or neutral ended/unmet (`failed`). Pass is available only before acceptance; an unaccepted closed window is `expired`.
-- Accept/pass/end and repeated reconciliation are idempotent. There is no reroll endpoint, reward, streak, penalty, or XP amount.
-- Reads/ensure/mutations reconcile; there is no background scheduler.
-- Generation takes a transaction-scoped advisory lock followed by a guarded insertion with a fresh READ COMMITTED snapshot; the current-row index and global cooldown guard cover concurrent and terminal-state races.
+- `src/domain/progress/training-performance.ts` is the shared reps/duration/distance/pace/skill authority.
+- Qualifying performance comes from canonical `programmed`, `ad_hoc`, or `experiment` working sets.
+- Per-side reps/duration use the lower completed side for performance; they are never summed for bests.
+- Generic reps performance is limited to unloaded/bodyweight semantics. Loaded strength remains governed by e1RM.
+- Distance compares canonical meters and displays miles.
+- Pace is seconds per mile derived from one set's distance + duration; lower is better. Values from different sets are never combined.
+- Skill best exists only when a qualifying set has `completed = true`.
+- Exact session/session-exercise/set provenance and raw source fields remain available to Goals, Stretch, and Training best presentation.
 
-## Performance authority
+## Training Goals
 
-- Shared helpers in `src/domain/progress/stretch-performance.ts` support only canonical `programmed`, `ad_hoc`, and `experiment` working sets.
-- Eligible baselines require two qualifying session/exercise appearances, latest age at most 21 Phoenix days, all counted appearances within age 42 days. The baseline is the best eligible single set in that window.
-- Strength uses the existing high-confidence Epley authority. The frozen pounds target is baseline × 1.02 rounded upward to 0.5 lb. Any valid high-confidence load × reps may reach it; the target is an estimate, not a prescribed bar load.
-- Reps/duration use existing unloaded/bodyweight set semantics. Per-side results use the minimum of both completed sides.
-- Reps target is +5%, rounded upward to whole reps, minimum +1. Duration target is +5%, rounded upward to five-second increments, minimum +5 seconds. If rounding/minimum exceeds 110% of baseline, the candidate is suppressed. The conflicting contract example 20→25 sec is not emitted.
-- Canonical workout date and session creation timestamp must both fit the accepted window. The timestamp must be strictly after acceptance and before the next Phoenix midnight after challenge expiry. Work captured after the window with a backdated date cannot qualify.
-- Full PostgreSQL microsecond timestamps are preserved for exact source guards/provenance. No performed instant per set exists; session capture time is the conservative available authority.
-- Source session, session-exercise, set, raw load/reps/duration/sides, formula/confidence, derived value, target, and exercise classification are frozen as provenance.
-- Offered baselines fail closed after deletion or edits, including raw edits that keep e1RM numerically unchanged. Accepted targets never rebase.
-- Completion transitions recheck source identity/raw values/timestamp/classification in SQL to prevent a deleted/edited source between evaluation and transition from winning completion.
-- Completed historical provenance stays intact after later canonical deletion; current Training analytics still recompute from existing canonical data. H3 will decide reward-reconciliation policy.
-- A best post-acceptance attempt above baseline but below target is progress (`New PR`) and remains active without a completion event.
+- New first-class point-performance Goal kinds:
+  - `training_reps` — at least whole reps.
+  - `training_duration` — at least seconds; UI uses minutes/seconds.
+  - `training_distance` — at least miles; canonical evidence converts meters.
+  - `training_pace` — at most whole seconds/mile, with a stable positive `training_min_distance_m` selector.
+  - `training_skill` — fixed one-completion target.
+- Goal creation filters to compatible exercise semantics and fails closed server-side on incompatible selectors.
+- Pace minimum distance is Goal identity and cannot change in a target-version revision.
+- Goal evidence is read from canonical Training at request time and carries source session/set/raw values plus the derived pace when applicable.
+- Training edits/deletes automatically alter current Goal evidence on the next read. Immutable Goal target versions remain unchanged.
+- The existing `goal-projection-v1` remains projectable only for body/e1RM. New Training Goal kinds intentionally return `not_applicable`.
+- Goal UI uses friendly distance/duration/pace/skill controls and links canonical Training evidence back to the source workout.
 
-## Selection and context
+## Stretch Quest expansion
 
-- Candidates are generated and ranked deterministically: independently eligible matching active strength Goal relevance, freshness, appearance count, recently trained adjustment, prior challenge penalty, then stable strategy/exercise IDs.
-- Avoid the same exercise/strategy inside 30 days whenever an eligible non-repeated alternative exists; an only eligible candidate can repeat after the eight-day cooldown.
-- All new Stretch offers are suppressed for `sick`, `pain`, `rest_day`, `unusual_physical_labor`, `unusual_stress`, `poor_sleep_opportunity`, or `baby_night_interruption`.
-- Existing challenges stay frozen. Absence of a suppression tag does not imply medical readiness.
+- H2B lifecycle, explicit acceptance, one-current invariant, eight-day cooldown, challenge windows, context suppression, pass/fail semantics, and exact provenance are unchanged.
+- Stretch strategies now include `distance` and `pace` in addition to strength e1RM, reps, and duration.
+- Distance baseline uses the existing two-appearance / 21-day latest / 42-day window rule. Target is +5%, rounded upward to 0.05 mi, minimum +0.05 mi, and fails closed above the 110% rounding cap.
+- Pace baseline requires one-set distance+duration and at least 0.50 mi. Target is 2% faster, rounded down to a whole second/mile.
+- Pace completion must cover at least the frozen baseline distance and meet or beat the frozen pace target in one post-acceptance canonical set.
+- Active matching Training Goals may add deterministic Stretch relevance; a pace Goal's minimum distance must be satisfied by the relevant baseline.
+- Binary skill Goals deliberately do not auto-generate Stretch challenges until a progression hierarchy exists.
+- Future H2A Run/Hike manual quest logs now use EX18/EX19 and write supplied distance into canonical Training as well as retaining Coach provenance. Historical rows are not rewritten.
 
-## Personal Lab Coach integration
+## Saved Routines
 
-- Personal Lab eligibility remains derived. Coach calls the existing benchmark-retest and Experiment Suggestion authorities; it does not copy suggestions into `coach_tasks`.
-- Coach can surface current `due` and `available` benchmark retests plus existing deterministic `benchmark_missing_baseline` / `benchmark_retest_due` Experiment Suggestions.
-- A direct actionable retest suppresses the equivalent due-retest Experiment Suggestion only inside Coach presentation; the Lab Suggestions page remains unchanged.
-- Experiment Suggestion listing remains provider-free. Today/Coach does not call Gemini, Home-AI, Europe PMC, or reserve `ai_usage`. The existing explicit `Draft proposal` action remains the only suggestion-AI path.
-- Derived Lab attention carries stable source identity/fingerprint, title/detail, urgency, attention reason, href, and benchmark/suggestion ids as appropriate.
-- `Not now` persists only the exact current fingerprint for seven Phoenix calendar days. It hides while current date is earlier than `snoozed_until` and may resurface on that date if still eligible.
-- A changed canonical result, protocol, retest state, or Experiment Suggestion fingerprint is not hidden by an older snooze.
-- Snooze mutations rederive the current item and return a stale conflict when the supplied fingerprint is no longer current. Identical retries are idempotent and do not extend the original snooze.
-- Lab surfacing, opening, snoozing, and accepting a suggestion are not rewardable Coach completions and issue no XP.
+- Saved Routines reuse `workout_templates`; there is no parallel routine authority.
+- Existing A/B/C rows are `seeded` and cannot be changed or archived through owner CRUD.
+- Owner routines use stable opaque `owner:<uuid>` routine codes. Initial version is 1.
+- Editing the current owner routine atomically deactivates it and creates a new immutable numeric version. Stale/inactive revisions fail. The database enforces one active owner version.
+- Archiving deactivates the current owner version; no historical template row is deleted.
+- Historical programmed sessions remain pinned to their original template id/version/name and can still be read/edited without switching template identity.
+- Routine prescriptions are validated against exercise measurement families and reject invalid/mixed/range semantics.
+- Training exposes a lightweight Saved Routines manager: name, ordered exercises, planned sets, compatible prescription, create/revise/archive.
+- Start Workout is organized as **Built-in routines / Saved routines / Empty workout**. Empty Workout is the existing fully editable `ad_hoc` path.
+- Training landing actions are Start workout / Manage routines / Import workout photo.
 
-## Coach priority and polish
+## Coach, Today, demo, and provider boundaries
 
-- Primary action order is: accepted active Stretch → due Lab retest → offered Stretch → active Daily Quest → available Lab retest → Experiment Suggestion → bounded current-period completion acknowledgement.
-- Weekly Focus remains a compact strip outside primary competition. Displaced Daily Quest remains actionable in the Coach inbox.
-- Inbox hierarchy is Stretch / Today / Lab / This week. Lab presentation is bounded to three visible items total; overflow links to Personal Lab.
-- The former standalone Today retest card is removed to avoid duplicate retest attention. Scheduled/active/review-ready Experiment status remains as a lower Today surface.
-- Coach dialogs share keyboard/focus behavior: Escape closes, Tab is contained, focus is restored when feasible, and route changes close overlays. Existing app-prefix routing is preserved.
-- Shared reduced-motion classes remain authoritative; Coach does not animate health/performance numbers.
-- Canonical owner mutations publish one coalesced in-app change signal so Today and Coach refresh after relevant Training, Nutrition, Body, Activity/import, Goal, Context, Supplement, and Lab changes without polling.
+- H2C's primary Coach hierarchy, Lab derivation/snooze rules, in-app canonical-change invalidation, and no-polling behavior remain intact.
+- New Training and Goal mutations participate in existing Today/Coach refresh signaling where relevant.
+- Routine definition changes do not manufacture Coach completion.
+- Apple/Health Auto Export workouts remain Activity and are never Training performance evidence.
+- Public demo remains anonymous, synthetic, read-only, and provider-free.
+- H2D adds no Gemini, Home-AI, Europe PMC, or AI-ledger call. Existing explicit workout-photo Home-AI behavior is unchanged.
+- H2D adds no XP or reward issuance.
 
-## Today and Coach inbox
+## Validation and QA
 
-- One combined Coach surface; Weekly Focus remains the compact top strip.
-- The finalized primary ordering includes derived Personal Lab attention as documented above; a due retest can outrank an offered Stretch, while an accepted Stretch remains highest priority.
-- The inbox orders Stretch / Today / Lab / This week and keeps Daily Quest actionable when Stretch or Lab owns the primary slot.
-- Offer displays baseline, target, timing, measurement explanation, Accept / Pass. Active displays best attempt, target, expiry, Open Training / End quest.
-- Ending confirms that the quest closes without a reward and Training PRs remain. Terminal labels are neutral.
-- Accomplishment motion uses existing CSS; reduced motion stays globally controlled and numbers do not animate.
-- Public demo remains synthetic, read-only, anonymous, and isolated from owner APIs/providers.
-
-## Validation and manual QA
-
-- H2C validation at `af009ad9d5580e535d6542041967c0ee313d5e94` passed on Linux/Node 22/PostgreSQL 14: **1,241 passed, 1 skipped across 128 test files**, plus typecheck, ESLint, and production build. The same production/test code was fast-forwarded to `main`; the temporary validation workflow was removed afterward.
-- Local Windows typecheck, ESLint, build, domain/service/API/UI/backup checks passed. Vite runner mode avoids the sandbox's native config-bundler ancestor traversal restriction.
-- Real PostgreSQL tests exercise H2B lifecycle constraints plus H2C `coach_lab_snoozes` constraints, concurrent snooze upserts, idempotency, seven-day resurfacing, and changed-fingerprint behavior in disposable databases.
-- H2C source/UI regression covers primary/inbox hierarchy, mobile-safe markup, overlay navigation cleanup, focus containment/restoration, Escape behavior, and reduced motion. No authenticated production browser click-through was performed during this completion pass.
-- Tests and synthetic rendering call no owner production database or provider; authenticated production click-through and real owner data remain a manual QA limitation.
+- Final validated production/test code commit: `062ba51a2043d18f884e48f2374dbbe463f5a7f8`.
+- GitHub Actions run `36650042103`, Ubuntu / Node 22 / PostgreSQL 14 / America/Phoenix:
+  - `npx tsc -b`: passed
+  - `npx eslint .`: passed
+  - `npm run build`: passed
+  - `npm test`: **135 test files passed; 1,270 tests passed, 1 skipped (1,271 total)**
+- Real PostgreSQL coverage applies migration 0038 in disposable PostgreSQL and verifies new set constraints, Goal selector constraints, Running/Hiking seeds, and active owner-routine version invariants.
+- H2D-focused regression covers units, measurement families, performance evidence, all new Goal kinds, Goal UI semantics, distance/pace Stretch, skill Stretch deferral, Saved Routine contracts, Start Workout paths, backup round-trip, and Training-best presentation.
+- No authenticated production browser click-through was performed. Mobile/touch/reduced-motion behavior is covered by markup/component/static regression and existing shared UI tests; production owner data/database were not used for implementation validation.
 
 ## Retained invariants and next phases
 
-One-owner auth, Phoenix calendar, single Vercel function, canonical Goal/version semantics, Apple workouts as Activity only, Personal Lab, Body, Sleep, Nutrition, Supplements, backup/export integrity, Appearance and shared motion remain intact.
+One-owner auth, Phoenix calendar, single Vercel function, Health-as-canonical-facts, immutable Goal versions, Lab authority, Apple Activity separation, Nutrition unknown-evidence semantics, backup/export integrity, Appearance, and shared motion remain active.
 
-- H2D: Goals + Training measurement expansion (distance/pace/skills and richer reps/duration Goal kinds) + lightweight routines. The Stretch strategy interface is reusable for these later additions.
-- H3: XP / reward wallet, lifetime and spendable XP, purchases.
-- H4: themes and progression polish.
+- **H3:** XP / Reward Wallet — lifetime + spendable XP, append-only reward ledger, calibration, and purchases.
+- **H4:** Themes + progression polish.
+- A future skill-progression model may add automatic skill Stretch strategies; H2D intentionally does not invent one.
