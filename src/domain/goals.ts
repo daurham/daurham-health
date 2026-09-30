@@ -608,8 +608,9 @@ function unitFor(kind: GoalKind, selector: GoalSelector, context: GoalValidation
     if (kind === 'strength_e1rm') return 'lb'
     if (kind === 'training_reps') {
       const repsKind = exercise.measurementKind === 'reps' || exercise.measurementKind === 'reps_per_side'
-      const strengthAuthority = exercise.performanceType === 'loaded_reps' && exercise.analyticsLoadType === 'external'
-      if (!repsKind || strengthAuthority) return fail('Choose an unloaded/bodyweight reps exercise.')
+      const unloaded = (exercise.loadType === 'bodyweight' || exercise.loadType === 'none') &&
+        (exercise.analyticsLoadType === 'bodyweight' || exercise.analyticsLoadType === 'none')
+      if (!repsKind || !unloaded) return fail('Choose an unloaded/bodyweight reps exercise.')
       return 'reps'
     }
     if (kind === 'training_duration') {
