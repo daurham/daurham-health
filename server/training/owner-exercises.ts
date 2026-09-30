@@ -9,6 +9,7 @@ import {
   ownerExerciseRequestSchema,
   planOwnerExercisePatch,
   type ExerciseDefinition,
+  type ExerciseLibraryItem,
   type OwnerExerciseRequest,
 } from '../../src/domain/training.js'
 import { formatDatabaseError, getSql } from '../db.js'
@@ -16,7 +17,7 @@ import { HttpError } from '../http.js'
 
 const TABLES_UNAVAILABLE = 'Training tables are not available. Apply pending migrations.'
 
-const EXERCISE_COLUMNS = `id, external_id, name, measurement_kind, load_type, unilateral, metadata, is_active, created_at, updated_at`
+const EXERCISE_COLUMNS = `id, external_id, name, measurement_kind, load_type, unilateral, metadata, gif_url, youtube_url, form_instructions, notes, is_active, created_at, updated_at`
 
 function asMissingRelation(error: unknown): boolean {
   return formatDatabaseError(error).includes('does not exist')
@@ -35,6 +36,30 @@ async function queryOrUnavailable<T>(run: () => Promise<T>): Promise<T> {
 
 function mapExercise(row: unknown): ExerciseDefinition {
   return exerciseDefinitionFromRow(exerciseDefinitionRowSchema.parse(row))
+}
+
+function mergePresentationMetadata(
+  metadata: Record<string, unknown>,
+  request: OwnerExerciseRequest,
+): Record<string, unknown> {
+  const next = { ...metadata }
+  const apply = (key: string, value: unknown) => {
+    if (value === undefined) return
+    if (value === null || (Array.isArray(value) && value.length === 0)) delete next[key]
+    else next[key] = value
+  }
+  apply('primary_muscle_group', request.primaryMuscleGroup)
+  apply('secondary_muscle_groups', request.secondaryMuscleGroups)
+  apply('movement_pattern', request.movementPattern)
+  apply('aliases', request.aliases)
+  return next
+}
+
+function calendarDate(value: unknown): string | null {
+  if (value == null) return null
+  if (value instanceof Date) return value.toISOString().slice(0, 10)
+  const text = String(value)
+  return text.includes('T') ? text.slice(0, 10) : text
 }
 
 function parseOwnerExerciseRequest(body: unknown): OwnerExerciseRequest {
@@ -91,10 +116,11 @@ export async function createOwnerExercise(body: unknown): Promise<{ exercise: Ex
     sql.query(
       `INSERT INTO exercise_definitions (
          id, external_id, name, measurement_kind, load_type, unilateral, metadata,
-         performance_type, analytics_load_type, analytics_rep_mode
+         performance_type, analytics_load_type, analytics_rep_mode,
+         gif_url, youtube_url, form_instructions, notes
        ) VALUES (
          $1::uuid, NULL, $2, $3, $4, $5, $6::jsonb,
-         $7, $8, $9
+         $7, $8, $9, $10, $11, $12, $13
        )
        RETURNING ${EXERCISE_COLUMNS}`,
       [
@@ -103,10 +129,14 @@ export async function createOwnerExercise(body: unknown): Promise<{ exercise: Ex
         request.measurementKind,
         request.loadType,
         request.unilateral,
-        JSON.stringify(OWNER_EXERCISE_ORIGIN),
+        JSON.stringify(mergePresentationMetadata(OWNER_EXERCISE_ORIGIN, request)),
         analytics.performanceType,
         analytics.analyticsLoadType,
         analytics.analyticsRepMode,
+        request.gifUrl ?? null,
+        request.youtubeUrl ?? null,
+        request.formInstructions ?? null,
+        request.notes ?? null,
       ],
     ),
   )
@@ -154,85 +184,165 @@ export async function updateOwnerExercise(
 ): Promise<{ exercise: ExerciseDefinition }> {
   const existing = await getExerciseDefinition(id)
   const request = parseOwnerExerciseRequest(body)
-  const plan = planOwnerExercisePatch({
-    existing,
-    next: request,
-    used: await exerciseIsUsed(id),
-  })
+  const used = await exerciseIsUsed(id)
+  const plan = planOwnerExercisePatch({ existing, next: request, used })
   if (!plan.ok) {
     throw new HttpError(plan.status, plan.message)
   }
+  const metadata = mergePresentationMetadata(existing.metadata, request)
   const sql = await getSql()
   const rows = await queryOrUnavailable(() =>
-    plan.nameOnly
-      ? sql.query(
-          `UPDATE exercise_definitions
-           SET name = $2,
-               updated_at = now()
-           WHERE id = $1::uuid
-           RETURNING ${EXERCISE_COLUMNS}`,
-          [id, plan.name],
-        )
-      : sql.query(
-          `UPDATE exercise_definitions
-           SET name = $2,
-               measurement_kind = $3,
-               load_type = $4,
-               unilateral = $5,
-               performance_type = $6,
-               analytics_load_type = $7,
-               analytics_rep_mode = $8,
-               updated_at = now()
-           WHERE id = $1::uuid
-           RETURNING ${EXERCISE_COLUMNS}`,
-          [
-            id,
-            plan.name,
-            plan.measurementKind,
-            plan.loadType,
-            plan.unilateral,
-            plan.analytics.performanceType,
-            plan.analytics.analyticsLoadType,
-            plan.analytics.analyticsRepMode,
-          ],
-        ),
+    sql.query(
+      `UPDATE exercise_definitions
+       SET name = $2,
+           measurement_kind = $3,
+           load_type = $4,
+           unilateral = $5,
+           performance_type = $6,
+           analytics_load_type = $7,
+           analytics_rep_mode = $8,
+           gif_url = CASE WHEN $9::boolean THEN $10 ELSE gif_url END,
+           youtube_url = CASE WHEN $11::boolean THEN $12 ELSE youtube_url END,
+           form_instructions = CASE WHEN $13::boolean THEN $14 ELSE form_instructions END,
+           notes = CASE WHEN $15::boolean THEN $16 ELSE notes END,
+           metadata = $17::jsonb,
+           updated_at = now()
+       WHERE id = $1::uuid
+       RETURNING ${EXERCISE_COLUMNS}`,
+      [
+        id,
+        plan.name,
+        plan.measurementKind,
+        plan.loadType,
+        plan.unilateral,
+        plan.analytics.performanceType,
+        plan.analytics.analyticsLoadType,
+        plan.analytics.analyticsRepMode,
+        request.gifUrl !== undefined,
+        request.gifUrl ?? null,
+        request.youtubeUrl !== undefined,
+        request.youtubeUrl ?? null,
+        request.formInstructions !== undefined,
+        request.formInstructions ?? null,
+        request.notes !== undefined,
+        request.notes ?? null,
+        JSON.stringify(metadata),
+      ],
+    ),
   )
   const row = rows[0]
-  if (!row) {
-    throw new HttpError(404, 'Exercise was not found')
-  }
+  if (!row) throw new HttpError(404, 'Exercise was not found')
   return { exercise: mapExercise(row) }
 }
 
+async function activeRoutineDependencies(ids: string[]) {
+  if (ids.length === 0) return new Map<string, ExerciseLibraryItem['activeRoutines']>()
+  const sql = await getSql()
+  const rows = (await queryOrUnavailable(() =>
+    sql.query(
+      `SELECT slots.exercise_definition_id::text AS exercise_definition_id,
+              templates.id::text AS id,
+              templates.name,
+              templates.routine_code,
+              templates.origin_kind
+       FROM workout_template_exercises slots
+       JOIN workout_templates templates ON templates.id = slots.workout_template_id
+       WHERE templates.is_active = true
+         AND slots.exercise_definition_id = ANY($1::uuid[])
+       ORDER BY templates.routine_code, templates.version`,
+      [ids],
+    ),
+  )) as Array<{
+    exercise_definition_id: string
+    id: string
+    name: string
+    routine_code: string
+    origin_kind: 'seeded' | 'owner'
+  }>
+  const grouped = new Map<string, ExerciseLibraryItem['activeRoutines']>()
+  for (const row of rows) {
+    const current = grouped.get(row.exercise_definition_id) ?? []
+    if (!current.some((routine) => routine.id === row.id)) {
+      current.push({ id: row.id, name: row.name, routineCode: row.routine_code, originKind: row.origin_kind })
+    }
+    grouped.set(row.exercise_definition_id, current)
+  }
+  return grouped
+}
+
+export async function listExerciseLibrary(): Promise<{ exercises: ExerciseLibraryItem[] }> {
+  const sql = await getSql()
+  const rows = (await queryOrUnavailable(() =>
+    sql.query(
+      `SELECT ${EXERCISE_COLUMNS},
+              COALESCE((
+                SELECT count(DISTINCT used.workout_session_id)
+                FROM workout_session_exercises used
+                WHERE used.exercise_definition_id = exercise_definitions.id
+              ), 0)::int AS usage_count,
+              (
+                SELECT max(sessions.workout_date)
+                FROM workout_session_exercises used
+                JOIN workout_sessions sessions ON sessions.id = used.workout_session_id
+                WHERE used.exercise_definition_id = exercise_definitions.id
+              ) AS last_performed_date
+       FROM exercise_definitions
+       ORDER BY external_id NULLS LAST, name, id`,
+    ),
+  )) as Array<Record<string, unknown> & { usage_count: number | string; last_performed_date: unknown }>
+  const exercises = rows.map((row) => mapExercise(row))
+  const dependencies = await activeRoutineDependencies(exercises.map((exercise) => exercise.id))
+  return {
+    exercises: exercises.map((exercise, index) => {
+      const usageCount = Number(rows[index]?.usage_count ?? 0)
+      return {
+        exercise,
+        usageCount,
+        lastPerformedDate: calendarDate(rows[index]?.last_performed_date),
+        activeRoutines: dependencies.get(exercise.id) ?? [],
+        semanticEditable: exercise.externalId == null && exercise.metadata.origin === 'owner' && usageCount === 0,
+        builtIn: exercise.externalId != null,
+      }
+    }),
+  }
+}
+
 export async function archiveOwnerExercise(id: string): Promise<{ exercise: ExerciseDefinition }> {
-  const existing = await getExerciseDefinition(id)
-  const plan = planOwnerExercisePatch({
-    existing,
-    next: {
-      name: existing.name,
-      measurementKind: existing.measurementKind,
-      loadType: existing.loadType as OwnerExerciseRequest['loadType'],
-      unilateral: existing.unilateral,
-    },
-    used: false,
-  })
-  if (!plan.ok) {
-    throw new HttpError(plan.status, plan.message)
+  await getExerciseDefinition(id)
+  const dependencies = (await activeRoutineDependencies([id])).get(id) ?? []
+  if (dependencies.length > 0) {
+    throw new HttpError(
+      409,
+      `Remove this exercise from active routines first: ${dependencies.map((routine) => routine.name).join(', ')}`,
+    )
   }
   const sql = await getSql()
   const rows = await queryOrUnavailable(() =>
     sql.query(
       `UPDATE exercise_definitions
-       SET is_active = false,
-           updated_at = now()
+       SET is_active = false, updated_at = now()
        WHERE id = $1::uuid
        RETURNING ${EXERCISE_COLUMNS}`,
       [id],
     ),
   )
   const row = rows[0]
-  if (!row) {
-    throw new HttpError(404, 'Exercise was not found')
-  }
+  if (!row) throw new HttpError(404, 'Exercise was not found')
+  return { exercise: mapExercise(row) }
+}
+
+export async function restoreExercise(id: string): Promise<{ exercise: ExerciseDefinition }> {
+  const sql = await getSql()
+  const rows = await queryOrUnavailable(() =>
+    sql.query(
+      `UPDATE exercise_definitions
+       SET is_active = true, updated_at = now()
+       WHERE id = $1::uuid
+       RETURNING ${EXERCISE_COLUMNS}`,
+      [id],
+    ),
+  )
+  const row = rows[0]
+  if (!row) throw new HttpError(404, 'Exercise was not found')
   return { exercise: mapExercise(row) }
 }

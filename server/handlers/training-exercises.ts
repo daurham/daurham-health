@@ -3,28 +3,24 @@ import {
   archiveOwnerExercise,
   createOwnerExercise,
   getExerciseDefinition,
+  listExerciseLibrary,
+  restoreExercise,
   updateOwnerExercise,
 } from '../training/owner-exercises.js'
 import { withOwnerAuth } from '../auth/with-owner.js'
-import { handleApiError, readJsonBody, requestApiPathname, sendJson, type ApiRequest, type ApiResponse } from '../http.js'
+import { handleApiError, queryStringParam, readJsonBody, requestApiPathname, sendJson, type ApiRequest, type ApiResponse } from '../http.js'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export function matchTrainingExerciseRoute(
   pathname: string,
-): { kind: 'collection' } | { kind: 'detail'; id: string } | null {
-  if (pathname === '/api/training/exercises') {
-    return { kind: 'collection' }
-  }
-  const prefix = '/api/training/exercises/'
-  if (!pathname.startsWith(prefix)) {
-    return null
-  }
-  const id = pathname.slice(prefix.length)
-  if (!UUID.test(id)) {
-    return null
-  }
-  return { kind: 'detail', id }
+): { kind: 'collection' } | { kind: 'detail'; id: string } | { kind: 'restore'; id: string } | null {
+  if (pathname === '/api/training/exercises') return { kind: 'collection' }
+  const restore = /^\/api\/training\/exercises\/([^/]+)\/restore$/.exec(pathname)
+  if (restore && UUID.test(restore[1] ?? '')) return { kind: 'restore', id: restore[1]! }
+  const detail = /^\/api\/training\/exercises\/([^/]+)$/.exec(pathname)
+  if (detail && UUID.test(detail[1] ?? '')) return { kind: 'detail', id: detail[1]! }
+  return null
 }
 
 export async function handleTrainingExercises(req: ApiRequest, res: ApiResponse) {
@@ -35,8 +31,17 @@ export async function handleTrainingExercises(req: ApiRequest, res: ApiResponse)
   }
   try {
     if (route.kind === 'collection') {
-      if (req.method === 'GET') {
-        sendJson(res, 200, await listExercises())
+      if (route.kind === 'restore') {
+      if (req.method !== 'POST') {
+        res.setHeader('Allow', 'POST')
+        sendJson(res, 405, { error: 'Method not allowed' })
+        return
+      }
+      sendJson(res, 200, await restoreExercise(route.id))
+      return
+    }
+    if (req.method === 'GET') {
+        sendJson(res, 200, queryStringParam(req, 'management') === 'true' ? await listExerciseLibrary() : await listExercises())
         return
       }
       if (req.method === 'POST') {

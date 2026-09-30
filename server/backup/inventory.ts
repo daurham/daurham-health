@@ -1,6 +1,6 @@
 export const BACKUP_FORMAT = 'daurham-health-backup'
 export const BACKUP_FORMAT_VERSION = 1
-export const LATEST_SCHEMA_MIGRATION = '0040_goal_training_units_fix.sql'
+export const LATEST_SCHEMA_MIGRATION = '0041_exercise_library_calisthenics.sql'
 export const PORTABLE_EXPORT_BYTE_LIMIT = 3_500_000
 
 export type ColumnKind = 'uuid' | 'text' | 'date' | 'timestamptz' | 'numeric' | 'int' | 'bool' | 'json' | 'bytea'
@@ -113,6 +113,10 @@ export const BACKUP_TABLES: readonly BackupTable[] = [
       col('performance_type', 'text'),
       col('analytics_load_type', 'text'),
       col('analytics_rep_mode', 'text'),
+      col('gif_url', 'text'),
+      col('youtube_url', 'text'),
+      col('form_instructions', 'text'),
+      col('notes', 'text'),
     ],
   }),
   table({

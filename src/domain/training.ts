@@ -176,6 +176,10 @@ export const exerciseDefinitionRowSchema = z.object({
   load_type: nonemptyText('Load type'),
   unilateral: z.boolean(),
   metadata: jsonRecordSchema,
+  gif_url: z.string().nullable(),
+  youtube_url: z.string().nullable(),
+  form_instructions: z.string().nullable(),
+  notes: z.string().nullable(),
   is_active: z.boolean(),
   created_at: timestamptzSchema,
   updated_at: timestamptzSchema,
@@ -191,6 +195,10 @@ export const exerciseDefinitionSchema = z.object({
   loadType: nonemptyText('Load type'),
   unilateral: z.boolean(),
   metadata: jsonRecordSchema,
+  gifUrl: z.string().nullable(),
+  youtubeUrl: z.string().nullable(),
+  formInstructions: z.string().nullable(),
+  notes: z.string().nullable(),
   isActive: z.boolean(),
 })
 
@@ -205,6 +213,10 @@ export function exerciseDefinitionFromRow(row: ExerciseDefinitionRow): ExerciseD
     loadType: row.load_type,
     unilateral: row.unilateral,
     metadata: row.metadata,
+    gifUrl: row.gif_url,
+    youtubeUrl: row.youtube_url,
+    formInstructions: row.form_instructions,
+    notes: row.notes,
     isActive: row.is_active,
   })
 }
@@ -212,6 +224,29 @@ export function exerciseDefinitionFromRow(row: ExerciseDefinitionRow): ExerciseD
 export const TEMPLATE_ORIGINS = ['seeded', 'owner'] as const
 export const templateOriginSchema = z.enum(TEMPLATE_ORIGINS)
 export type TemplateOrigin = z.infer<typeof templateOriginSchema>
+
+export const exerciseLibraryRoutineSchema = z.object({
+  id: uuidSchema,
+  name: nonemptyText('Routine name'),
+  routineCode: nonemptyText('Routine'),
+  originKind: templateOriginSchema,
+})
+export type ExerciseLibraryRoutine = z.infer<typeof exerciseLibraryRoutineSchema>
+
+export const exerciseLibraryItemSchema = z.object({
+  exercise: exerciseDefinitionSchema,
+  usageCount: z.number().int().nonnegative(),
+  lastPerformedDate: isoDateSchema.nullable(),
+  activeRoutines: z.array(exerciseLibraryRoutineSchema),
+  semanticEditable: z.boolean(),
+  builtIn: z.boolean(),
+})
+export type ExerciseLibraryItem = z.infer<typeof exerciseLibraryItemSchema>
+
+export const exerciseLibraryResponseSchema = z.object({
+  exercises: z.array(exerciseLibraryItemSchema),
+})
+export type ExerciseLibraryResponse = z.infer<typeof exerciseLibraryResponseSchema>
 
 export const workoutTemplateRowSchema = z.object({
   id: uuidSchema,
@@ -953,11 +988,41 @@ export function isOwnerCreatedExercise(exercise: {
   return exercise.externalId == null && exercise.metadata.origin === 'owner'
 }
 
+function optionalExerciseText(max: number) {
+  return z
+    .union([z.string(), z.null()])
+    .optional()
+    .transform((value, ctx) => {
+      if (value === undefined) return undefined
+      if (value === null) return null
+      const next = value.trim()
+      if (next.length === 0) return null
+      if (next.length > max) {
+        ctx.addIssue({ code: 'custom', message: `Must be ${max} characters or fewer` })
+        return z.NEVER
+      }
+      return next
+    })
+}
+
+const optionalExerciseUrlSchema = optionalExerciseText(1000).refine(
+  (value) => value == null || /^https?:\/\/[^\s]+$/i.test(value),
+  'Use an http(s) URL',
+)
+
 export const ownerExerciseRequestSchema = z.object({
   name: z.string().trim().min(1, 'Exercise name is required').max(120),
   measurementKind: measurementKindSchema,
   loadType: ownerExerciseLoadTypeSchema,
   unilateral: z.boolean(),
+  gifUrl: optionalExerciseUrlSchema,
+  youtubeUrl: optionalExerciseUrlSchema,
+  formInstructions: optionalExerciseText(3000),
+  notes: optionalExerciseText(2000),
+  primaryMuscleGroup: optionalExerciseText(80),
+  secondaryMuscleGroups: z.array(z.string().trim().min(1).max(80)).max(12).nullable().optional(),
+  movementPattern: optionalExerciseText(80),
+  aliases: z.array(z.string().trim().min(1).max(80)).max(20).nullable().optional(),
 })
 
 export type OwnerExerciseRequest = z.infer<typeof ownerExerciseRequestSchema>
@@ -1035,26 +1100,31 @@ export function planOwnerExercisePatch(input: {
       measurementKind: MeasurementKind
       loadType: OwnerExerciseLoadType
       unilateral: boolean
-      nameOnly: boolean
+      semanticEditable: boolean
       analytics: ReturnType<typeof ownerExerciseAnalyticsDefaults>
     }
   | { ok: false; status: 400 | 409; message: string } {
-  if (!isOwnerCreatedExercise(input.existing)) {
-    return { ok: false, status: 409, message: 'Seeded exercises stay in the built-in catalog.' }
-  }
   const coherence = ownerExerciseCoherenceError(input.next)
   if (coherence) {
     return { ok: false, status: 400, message: coherence }
   }
+  const ownerCreated = isOwnerCreatedExercise(input.existing)
   const semanticChange =
     input.next.measurementKind !== input.existing.measurementKind ||
     input.next.unilateral !== input.existing.unilateral ||
     input.next.loadType !== input.existing.loadType
+  if (!ownerCreated && semanticChange) {
+    return {
+      ok: false,
+      status: 409,
+      message: 'Built-in exercise measurement settings are locked.',
+    }
+  }
   if (input.used && semanticChange) {
     return {
       ok: false,
       status: 409,
-      message: 'This exercise is already used. Create a new exercise instead.',
+      message: 'This exercise already has workout history. Create a new exercise to change its measurement settings.',
     }
   }
   return {
@@ -1063,7 +1133,7 @@ export function planOwnerExercisePatch(input: {
     measurementKind: input.next.measurementKind,
     loadType: input.next.loadType,
     unilateral: input.next.unilateral,
-    nameOnly: input.used,
+    semanticEditable: ownerCreated && !input.used,
     analytics: ownerExerciseAnalyticsDefaults(input.next.measurementKind, input.next.unilateral),
   }
 }

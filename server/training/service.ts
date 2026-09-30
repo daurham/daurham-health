@@ -138,7 +138,7 @@ export async function listExercises(): Promise<{ exercises: ExerciseDefinition[]
   const sql = await getSql()
   const rows = await queryOrUnavailable(() =>
     sql.query(
-      `SELECT id, external_id, name, measurement_kind, load_type, unilateral, metadata, is_active, created_at, updated_at
+      `SELECT id, external_id, name, measurement_kind, load_type, unilateral, metadata, gif_url, youtube_url, form_instructions, notes, is_active, created_at, updated_at
        FROM exercise_definitions
        WHERE is_active = true
        ORDER BY external_id NULLS LAST, name`,
@@ -177,7 +177,7 @@ export async function listTemplates(): Promise<TemplateListResponse> {
     exerciseIds.length === 0
       ? []
       : await sql.query(
-          `SELECT id, external_id, name, measurement_kind, load_type, unilateral, metadata, is_active, created_at, updated_at
+          `SELECT id, external_id, name, measurement_kind, load_type, unilateral, metadata, gif_url, youtube_url, form_instructions, notes, is_active, created_at, updated_at
            FROM exercise_definitions
            WHERE id = ANY($1::uuid[])`,
           [exerciseIds],
@@ -235,7 +235,7 @@ async function loadExercisesById(ids: string[]): Promise<Map<string, ExerciseDef
   const sql = await getSql()
   const rows = await queryOrUnavailable(() =>
     sql.query(
-      `SELECT id, external_id, name, measurement_kind, load_type, unilateral, metadata, is_active, created_at, updated_at
+      `SELECT id, external_id, name, measurement_kind, load_type, unilateral, metadata, gif_url, youtube_url, form_instructions, notes, is_active, created_at, updated_at
        FROM exercise_definitions
        WHERE id = ANY($1::uuid[])`,
       [unique],
