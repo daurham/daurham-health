@@ -265,7 +265,7 @@ function TrendPreferenceRow<T extends string>({
             key={option.value}
             type="button"
             aria-pressed={value === option.value}
-            className={value === option.value ? themeChoiceSelectedClass : themeChoiceClass}
+            className={`${value === option.value ? themeChoiceSelectedClass : themeChoiceClass} !w-auto px-3`}
             onClick={() => onChange(option.value)}
           >
             {option.label}
