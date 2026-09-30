@@ -263,7 +263,7 @@ export function CoachCard({ state, pending, error, onState }: {
         {xpNotice != null ? (
           <div className="xp-celebration mx-3 mb-3 flex items-center justify-between gap-3 rounded-lg bg-reward-muted px-3 py-2" role="status" aria-live="polite">
             <span className="text-sm font-semibold text-zinc-900">Mission complete</span>
-            <XpAmount amount={xpNotice} />
+            <XpAmount amount={xpNotice} sign />
           </div>
         ) : null}
         {actionError ? <p className="px-3 py-2 text-sm text-red-700" role="alert">{actionError}</p> : null}
@@ -309,7 +309,7 @@ function MissionRow({
           <span className={`shrink-0 text-[11px] font-semibold uppercase tracking-wide ${task.taskKind === 'daily_quest' ? 'text-accent' : 'text-zinc-500'}`}>
             {missionType(task)}
           </span>
-          <XpAmount amount={xpForRewardBand(task.rewardBand)} />
+          <XpAmount amount={xpForRewardBand(task.rewardBand)} sign />
           {complete ? <span className="shrink-0 text-xs font-semibold text-toward">✓</span> : null}
         </div>
         <p className="mt-1 truncate text-sm font-semibold text-zinc-900">{task.title}</p>
@@ -351,7 +351,7 @@ function CoachTaskContent({ task, actions }: { task: CoachTaskView; actions: Coa
           <p className="mt-1 text-lg font-semibold tracking-tight text-zinc-900">{task.title}</p>
           <p className="mt-1 text-sm text-zinc-600">{task.detail}</p>
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-500">
-            <XpAmount amount={xpForRewardBand(task.rewardBand)} />
+            <XpAmount amount={xpForRewardBand(task.rewardBand)} sign />
             <span>{verificationCopy(task)}</span>
             {progressText(task) ? <span>{progressText(task)}</span> : null}
           </div>
@@ -368,7 +368,7 @@ function CoachTaskContent({ task, actions }: { task: CoachTaskView; actions: Coa
             <p className="text-sm font-medium text-zinc-900">{task.status === 'completed' ? '✓ Quest complete' : resolvedCopy(task)}</p>
             <p className="mt-0.5 text-xs text-zinc-500">{task.title}</p>
           </div>
-          {task.status === 'completed' ? <span className="flex flex-wrap items-center gap-2"><XpAmount amount={xpForRewardBand(task.rewardBand)} />{task.evidenceLabel ? <span className="text-xs text-zinc-500">{task.evidenceLabel}</span> : null}</span> : null}
+          {task.status === 'completed' ? <span className="flex flex-wrap items-center gap-2"><XpAmount amount={xpForRewardBand(task.rewardBand)} sign />{task.evidenceLabel ? <span className="text-xs text-zinc-500">{task.evidenceLabel}</span> : null}</span> : null}
         </div>
       )}
     </>
@@ -392,7 +392,7 @@ function StretchContent({ task, actions }: { task: CoachTaskView; actions: Coach
   if (task.status !== 'active' && task.status !== 'offered' && !completed) return <StretchSummary task={task} />
   return (
     <div className={completed ? 'motion-notice-enter' : undefined}>
-      <div className="flex flex-wrap items-center gap-2"><p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Stretch Quest</p><XpAmount amount={xpForRewardBand(task.rewardBand)} /></div>
+      <div className="flex flex-wrap items-center gap-2"><p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Stretch Quest</p><XpAmount amount={xpForRewardBand(task.rewardBand)} sign /></div>
       <p className="mt-1 text-lg font-semibold tracking-tight text-zinc-900">{completed ? '✓ Stretch conquered' : task.title}</p>
       {completed ? <p className="mt-1 text-sm text-zinc-600">{task.title}</p> : <p className="mt-1 text-sm text-zinc-600">{task.detail}</p>}
       <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
@@ -440,7 +440,7 @@ function StretchContent({ task, actions }: { task: CoachTaskView; actions: Coach
 function StretchSummary({ task, onAcknowledge }: { task: CoachTaskView; onAcknowledge?: () => void }) {
   return (
     <div className="min-w-0">
-      <div className="flex flex-wrap items-center gap-2"><p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Stretch Quest</p><XpAmount amount={xpForRewardBand(task.rewardBand)} /></div>
+      <div className="flex flex-wrap items-center gap-2"><p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Stretch Quest</p><XpAmount amount={xpForRewardBand(task.rewardBand)} sign /></div>
       <p className="mt-1 text-sm font-medium text-zinc-900">{task.status === 'completed' ? '✓ Stretch conquered' : task.status === 'offered' ? 'Offer available' : task.status === 'active' ? 'In progress' : resolvedCopy(task)}</p>
       <p className="mt-0.5 text-xs text-zinc-500">{task.title}</p>
       {task.status === 'completed' ? <p className="mt-1 text-xs text-zinc-500">Achieved {formatStretchValue(task, task.progress?.current ?? null)} · Target {formatStretchValue(task, task.targetValue)} · Verified by Training</p> : null}
