@@ -5,6 +5,7 @@ import {
   createRewardItem,
   purchaseReward,
   readRewards,
+  readRewardSummary,
   refundRewardPurchase,
   updateRewardItem,
 } from '../rewards/service.js'
@@ -13,6 +14,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 
 type RewardsRoute =
   | { kind: 'root' }
+  | { kind: 'summary' }
   | { kind: 'items' }
   | { kind: 'item'; id: string }
   | { kind: 'purchases' }
@@ -20,6 +22,7 @@ type RewardsRoute =
 
 export function matchRewardsRoute(pathname: string): RewardsRoute | null {
   if (pathname === '/api/rewards') return { kind: 'root' }
+  if (pathname === '/api/rewards/summary') return { kind: 'summary' }
   if (pathname === '/api/rewards/items') return { kind: 'items' }
   if (pathname === '/api/rewards/purchases') return { kind: 'purchases' }
 
@@ -46,6 +49,16 @@ export async function handleRewards(req: ApiRequest, res: ApiResponse) {
       return
     }
     sendJson(res, 200, await readRewards())
+    return
+  }
+
+  if (route.kind === 'summary') {
+    if (req.method !== 'GET') {
+      res.setHeader('Allow', 'GET')
+      sendJson(res, 405, { error: 'Method not allowed' })
+      return
+    }
+    sendJson(res, 200, await readRewardSummary())
     return
   }
 
