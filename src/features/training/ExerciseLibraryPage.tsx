@@ -156,7 +156,7 @@ export function ExerciseLibraryPage() {
         <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search name, alias, muscle…" className="min-h-11 rounded-md border border-zinc-300 bg-white px-3 text-base lg:text-sm" />
         <select value={stateFilter} onChange={(event) => setStateFilter(event.target.value as StateFilter)} className="min-h-11 rounded-md border border-zinc-300 bg-white px-3 text-sm"><option value="active">Active</option><option value="archived">Archived</option><option value="all">All states</option></select>
         <select value={familyFilter} onChange={(event) => setFamilyFilter(event.target.value as FamilyFilter)} className="min-h-11 rounded-md border border-zinc-300 bg-white px-3 text-sm"><option value="all">All measurements</option><option value="reps">Reps</option><option value="duration">Duration</option><option value="distance">Distance</option><option value="skill">Skill</option></select>
-        <select value={muscleFilter} onChange={(event) => setMuscleFilter(event.target.value)} className="min-h-11 rounded-md border border-zinc-300 bg-white px-3 text-sm"><option value="all">All muscles</option>{muscles.map((muscle) => <option key={muscle} value={muscle}>{muscle.replaceAll('_', ' ')}</option>)}</select>
+        <select value={muscleFilter} onChange={(event) => setMuscleFilter(event.target.value)} className="min-h-11 rounded-md border border-zinc-300 bg-white px-3 text-sm"><option value="all">All muscles</option>{muscles.map((muscle) => <option key={muscle} value={muscle}>{muscle.replace(/_/g, ' ')}</option>)}</select>
         <select value={sort} onChange={(event) => setSort(event.target.value as SortKind)} className="min-h-11 rounded-md border border-zinc-300 bg-white px-3 text-sm"><option value="recent">Recently used</option><option value="used">Most used</option><option value="alpha">A–Z</option></select>
       </div>
 
@@ -179,11 +179,11 @@ export function ExerciseLibraryPage() {
                       {!item.exercise.isActive ? <span className="rounded-full border border-zinc-300 px-2 py-0.5 text-xs text-zinc-600">Archived</span> : null}
                       <ExerciseGuideButton exercise={item.exercise} onOpen={() => setGuide(item.exercise)} />
                     </div>
-                    <p className="mt-1 text-sm text-zinc-700">{item.exercise.measurementKind.replaceAll('_', ' ')} · {item.exercise.loadType.replaceAll('_', ' ')}</p>
+                    <p className="mt-1 text-sm text-zinc-700">{item.exercise.measurementKind.replace(/_/g, ' ')} · {item.exercise.loadType.replace(/_/g, ' ')}</p>
                     <p className="mt-1 text-xs text-zinc-500">
                       {item.usageCount === 0 ? 'Never performed' : `Used in ${item.usageCount} workout${item.usageCount === 1 ? '' : 's'}`}
                       {item.lastPerformedDate ? ` · Last ${dateLabel(item.lastPerformedDate)}` : ''}
-                      {info.primaryMuscleGroup ? ` · ${info.primaryMuscleGroup.replaceAll('_', ' ')}` : ''}
+                      {info.primaryMuscleGroup ? ` · ${info.primaryMuscleGroup.replace(/_/g, ' ')}` : ''}
                     </p>
                     {item.activeRoutines.length > 0 ? <p className="mt-1 text-xs text-zinc-500">Routines · {item.activeRoutines.map((routine) => routine.name).join(', ')}</p> : null}
                   </div>
@@ -309,8 +309,8 @@ function ExerciseEditorSheet({
           <label className="block text-sm font-medium">Name<input autoFocus className={inputClass} value={name} onChange={(event) => setName(event.target.value)} /></label>
           {duplicate ? <p className="rounded-md border border-amber-300 bg-amber-50 p-2 text-sm text-amber-900">An exercise named “{duplicate.exercise.name}” already exists.</p> : null}
           <div className="grid gap-3 sm:grid-cols-2">
-            <label className="block text-sm font-medium">Measurement<select className={inputClass} value={measurementKind} disabled={!semanticEditable} onChange={(event) => setMeasurementKind(event.target.value as MeasurementKind)}>{MEASUREMENT_KINDS.map((kind) => <option key={kind} value={kind}>{kind.replaceAll('_', ' ')}</option>)}</select></label>
-            <label className="block text-sm font-medium">Load / equipment<select className={inputClass} value={loadType} disabled={!semanticEditable} onChange={(event) => setLoadType(event.target.value as OwnerExerciseLoadType)}>{OWNER_EXERCISE_LOAD_TYPES.map((kind) => <option key={kind} value={kind}>{kind.replaceAll('_', ' ')}</option>)}</select></label>
+            <label className="block text-sm font-medium">Measurement<select className={inputClass} value={measurementKind} disabled={!semanticEditable} onChange={(event) => setMeasurementKind(event.target.value as MeasurementKind)}>{MEASUREMENT_KINDS.map((kind) => <option key={kind} value={kind}>{kind.replace(/_/g, ' ')}</option>)}</select></label>
+            <label className="block text-sm font-medium">Load / equipment<select className={inputClass} value={loadType} disabled={!semanticEditable} onChange={(event) => setLoadType(event.target.value as OwnerExerciseLoadType)}>{OWNER_EXERCISE_LOAD_TYPES.map((kind) => <option key={kind} value={kind}>{kind.replace(/_/g, ' ')}</option>)}</select></label>
           </div>
           {!semanticEditable ? <p className="text-xs text-zinc-500">Measurement semantics are locked because this is built-in or already has workout history. Presentation fields can still be edited.</p> : null}
           <div className="grid gap-3 sm:grid-cols-2">
