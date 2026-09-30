@@ -47,6 +47,7 @@ const WeeklyCoachPage = lazy(() => import('@/features/weekly-coach/WeeklyCoachPa
 const GoalsPage = lazy(() => import('@/features/goals/GoalsPages').then((module) => ({ default: module.GoalsPage })))
 const GoalDetailPage = lazy(() => import('@/features/goals/GoalsPages').then((module) => ({ default: module.GoalDetailPage })))
 const AskHealthPage = lazy(() => import('@/features/ask-health/AskHealthPage').then((module) => ({ default: module.AskHealthPage })))
+const RewardsPage = lazy(() => import('@/features/rewards').then((module) => ({ default: module.RewardsPage })))
 const DemoTodayPage = lazy(() => import('@/features/demo/DemoTodayPage').then((module) => ({ default: module.DemoTodayPage })))
 const DemoNutritionPage = lazy(() => import('@/features/demo/DemoNutritionPage').then((module) => ({ default: module.DemoNutritionPage })))
 const DemoTrainingPage = lazy(() => import('@/features/demo/DemoTrainingPage').then((module) => ({ default: module.DemoTrainingPage })))
@@ -92,6 +93,7 @@ const router = createBrowserRouter([
       { path: 'goals', element: <GoalsPage /> },
       { path: 'goals/:goalId', element: <GoalDetailPage /> },
       { path: 'ask-health', element: <AskHealthPage /> },
+      { path: 'rewards', element: <RewardsPage /> },
       { path: 'lab/experiments/new', element: <NewExperimentPage /> },
       { path: 'lab/experiments/:experimentId/result', element: <ReviewExperimentResultPage /> },
       { path: 'lab/experiments/:experimentId', element: <ExperimentDetailPage /> },
