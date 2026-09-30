@@ -2,6 +2,40 @@
 
 ## V2-H5 — Pantry + Exercise Library + Flexible Programmed Workouts
 
+### Implementation status — owner visual QA pending
+
+Implementation is complete on branch `h5-pantry-exercise-library`.
+
+Validated implementation head before this documentation update:
+
+`6d7abaa204633e72335024fcb2c7a65eca2fe4d5`
+
+GitHub Actions run `36792957893` passed:
+
+- TypeScript;
+- ESLint;
+- 151 test files;
+- 1,338 tests passed;
+- 1 skipped;
+- production build.
+
+Important closeout notes:
+
+- repository schema head is `0041_exercise_library_calisthenics.sql`;
+- migration 0041 has **not** been applied to production by this implementation workflow;
+- H5 is not merged to `main` yet;
+- final closeout requires owner visual QA on desktop/mobile after applying 0041 to the QA database/environment.
+
+Focused owner QA:
+
+1. Nutrition → Pantry loads without overflow; search/filter/sort and an existing food editor are usable.
+2. Training → Exercises loads; filters wrap sensibly; a built-in exercise opens its Form guide.
+3. Start Workout shows **Beginner Calisthenics — Full Body** and the seven exercises/prescriptions.
+4. Start a programmed routine, add one extra exercise, and confirm **This workout only**, **Last time** when history exists, and the routine-name `+` behavior.
+5. On mobile, check Pantry, Exercise Library, and a programmed workout with one added exercise for clipping/overflow.
+
+Do not close H5 or merge the branch until this visual QA is accepted.
+
 Implementation contract. H4 is complete; H5 is the active implementation slice.
 
 ## Product intent
