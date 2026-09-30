@@ -83,7 +83,7 @@ function AppearanceSection() {
   }
 
   return (
-    <section className="min-w-0 space-y-5 rounded-xl border border-zinc-200 bg-white p-4 sm:p-5">
+    <section id="theme-studio" className="min-w-0 scroll-mt-6 space-y-5 rounded-xl border border-zinc-200 bg-white p-4 sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold tracking-tight">Theme Studio</h2>
