@@ -509,7 +509,7 @@ describe('Progress UI states', () => {
     expect(html).toContain('Performance best')
     expect(html).toContain('Cable Row')
     expect(html).toContain('Farmer Carry')
-    expect(html).toContain('Sep 20 ×2')
+    expect(html).toContain('Sep 20, 2026 ×2')
     expect(html).toContain('Sep 21')
     expect(html).toContain('3 workouts')
     expect(html).toContain('2 performance bests')
