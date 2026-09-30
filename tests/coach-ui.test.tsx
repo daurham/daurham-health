@@ -203,14 +203,14 @@ describe('Stretch Quest Today integration', () => {
     expect(html).not.toContain('>Pass<')
   })
 
-  it('shows a new PR below the target without a completion or reward', () => {
+  it('shows a new PR below the target with the offered XP but without completion', () => {
     const html = markup(state({ stretchQuest: stretch({ status: 'active', progress: { current: 121.8, target: 122.5, unit: 'lb', label: 'New PR' } }) }))
     expect(html).toContain('New PR')
     expect(html).toContain('121.8 lb e1RM')
     expect(html).toContain('122.5 lb e1RM')
     expect(html).toContain('Quest not conquered yet.')
     expect(html).not.toContain('Stretch conquered')
-    expect(html).not.toContain('XP')
+    expect(html).toContain('+100 XP')
   })
 
   it('acknowledges completion with achieved value and target, then returns priority to Daily', () => {
