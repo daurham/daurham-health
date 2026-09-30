@@ -197,7 +197,7 @@ async function walletState(sql: Sql): Promise<RewardsState> {
          FROM reward_items
         WHERE is_active = true
         ORDER BY created_at, id`,
-    ) as Promise<RewardItemRow[]>,
+    ) as unknown as Promise<RewardItemRow[]>,
     sql.query(
       `SELECT purchase.id::text AS id,
               purchase.reward_item_id::text AS reward_item_id,
@@ -213,12 +213,12 @@ async function walletState(sql: Sql): Promise<RewardsState> {
           AND refund.source_id = purchase.id
         ORDER BY purchase.purchased_at DESC, purchase.id DESC
         LIMIT 30`,
-    ) as Promise<PurchaseRow[]>,
+    ) as unknown as Promise<PurchaseRow[]>,
     sql.query(
       `SELECT entry_kind, amount_xp
          FROM xp_ledger
         ORDER BY occurred_at, id`,
-    ) as Promise<Array<{ entry_kind: XpLedgerEntryKind; amount_xp: number | string }>>,
+    ) as unknown as Promise<Array<{ entry_kind: XpLedgerEntryKind; amount_xp: number | string }>>,
     sql.query(
       `SELECT id::text AS id, entry_kind, amount_xp, source_kind,
               source_id::text AS source_id, idempotency_key, rule_version,
@@ -226,7 +226,7 @@ async function walletState(sql: Sql): Promise<RewardsState> {
          FROM xp_ledger
         ORDER BY occurred_at DESC, id DESC
         LIMIT 40`,
-    ) as Promise<LedgerRow[]>,
+    ) as unknown as Promise<LedgerRow[]>,
   ])
 
   const balances = deriveWalletBalances(
