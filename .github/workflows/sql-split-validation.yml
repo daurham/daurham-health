@@ -1,0 +1,24 @@
+name: SQL splitter validation
+
+on:
+  push:
+    branches:
+      - verify-sql-dollar-quote
+
+env:
+  TZ: America/Phoenix
+
+jobs:
+  validate:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx vitest run tests/sql-split.test.ts
+      - run: npx tsc -b
+      - run: npx eslint .
