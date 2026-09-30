@@ -5,6 +5,7 @@ import type { CoachLabItem } from '@/domain/coach-lab'
 import { primaryButtonClass, quietButtonClass } from '@/lib'
 import { prefixedPath, useAppPathPrefix } from '@/lib/app-prefix'
 import { metersToMiles } from '@/domain/units'
+import { xpForRewardBand } from '@/domain/rewards'
 import { CoachDialog } from './CoachDialog'
 import { acceptCoachTask, CoachApiError, endCoachTask, fetchCoach, logCoachSelfReport, logCoachTraining, passCoachTask, snoozeCoachLabItem } from './api'
 import { coachDateLabel, formatStretchValue, isCurrentResolvedCoachTask, pendingStretchAcknowledgement, selectPrimaryCoachItem } from './presentation'
@@ -136,11 +137,14 @@ export function CoachCard({ state, pending, error, onState }: {
       <section className="overflow-hidden rounded-lg border border-zinc-200 bg-white" aria-label="Coach">
         <div className="flex items-center justify-between gap-3 px-4 pt-4">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Coach</h2>
-          {visibleCount > 1 || labOverflow > 0 ? (
-            <button type="button" className={quietButtonClass} onClick={event => { returnFocusRef.current = event.currentTarget; setInboxOpen(true) }}>
-              {state.activeCount + labItems.length + labOverflow > 0 ? `Coach · ${state.activeCount + labItems.length + labOverflow}` : 'Coach inbox'}
-            </button>
-          ) : null}
+          <div className="flex items-center gap-2">
+            {prefix === '' ? <Link to="/rewards" className={quietButtonClass}>Rewards</Link> : null}
+            {visibleCount > 1 || labOverflow > 0 ? (
+              <button type="button" className={quietButtonClass} onClick={event => { returnFocusRef.current = event.currentTarget; setInboxOpen(true) }}>
+                {state.activeCount + labItems.length + labOverflow > 0 ? `Coach · ${state.activeCount + labItems.length + labOverflow}` : 'Coach inbox'}
+              </button>
+            ) : null}
+          </div>
         </div>
         {weekly ? (
           <div className={`mx-4 mt-3 rounded-md bg-zinc-50 px-3 py-3${!primary && !compactDaily && !compactStretch ? ' mb-4' : ''}`}>
@@ -148,6 +152,7 @@ export function CoachCard({ state, pending, error, onState }: {
               <div className="min-w-0">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Focus this week</p>
                 <p className="mt-1 text-sm font-semibold text-zinc-900">{weekly.title}</p>
+                <p className="mt-1 text-xs font-medium text-zinc-500">+{xpForRewardBand(weekly.rewardBand)} XP</p>
                 {weekly.status === 'active' ? <><p className="mt-0.5 text-sm text-zinc-600">{weekly.detail}</p>{progressText(weekly) ? <p className="mt-1 text-xs font-medium text-zinc-600">{progressText(weekly)}</p> : null}</> : <p className="mt-1 text-xs font-medium text-zinc-500">{resolvedCopy(weekly)}</p>}
               </div>
               {weekly.status === 'active' ? (
@@ -192,6 +197,7 @@ function CoachTaskContent({ task, actions }: { task: CoachTaskView; actions: Coa
           <p className="mt-1 text-lg font-semibold tracking-tight text-zinc-900">{task.title}</p>
           <p className="mt-1 text-sm text-zinc-600">{task.detail}</p>
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-500">
+            <span>+{xpForRewardBand(task.rewardBand)} XP</span>
             <span>{verificationCopy(task)}</span>
             {progressText(task) ? <span>{progressText(task)}</span> : null}
           </div>
@@ -208,7 +214,7 @@ function CoachTaskContent({ task, actions }: { task: CoachTaskView; actions: Coa
             <p className="text-sm font-medium text-zinc-900">{task.status === 'completed' ? '✓ Quest complete' : resolvedCopy(task)}</p>
             <p className="mt-0.5 text-xs text-zinc-500">{task.title}</p>
           </div>
-          {task.status === 'completed' && task.evidenceLabel ? <span className="text-xs text-zinc-500">{task.evidenceLabel}</span> : null}
+          {task.status === 'completed' ? <span className="text-xs text-zinc-500">+{xpForRewardBand(task.rewardBand)} XP{task.evidenceLabel ? ` · ${task.evidenceLabel}` : ''}</span> : null}
         </div>
       )}
     </>
@@ -232,7 +238,7 @@ function StretchContent({ task, actions }: { task: CoachTaskView; actions: Coach
   if (task.status !== 'active' && task.status !== 'offered' && !completed) return <StretchSummary task={task} />
   return (
     <div className={completed ? 'motion-notice-enter' : undefined}>
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Stretch Quest</p>
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Stretch Quest · +{xpForRewardBand(task.rewardBand)} XP</p>
       <p className="mt-1 text-lg font-semibold tracking-tight text-zinc-900">{completed ? '✓ Stretch conquered' : task.title}</p>
       {completed ? <p className="mt-1 text-sm text-zinc-600">{task.title}</p> : <p className="mt-1 text-sm text-zinc-600">{task.detail}</p>}
       <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
@@ -280,7 +286,7 @@ function StretchContent({ task, actions }: { task: CoachTaskView; actions: Coach
 function StretchSummary({ task, onAcknowledge }: { task: CoachTaskView; onAcknowledge?: () => void }) {
   return (
     <div className="min-w-0">
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Stretch Quest</p>
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Stretch Quest · +{xpForRewardBand(task.rewardBand)} XP</p>
       <p className="mt-1 text-sm font-medium text-zinc-900">{task.status === 'completed' ? '✓ Stretch conquered' : task.status === 'offered' ? 'Offer available' : task.status === 'active' ? 'In progress' : resolvedCopy(task)}</p>
       <p className="mt-0.5 text-xs text-zinc-500">{task.title}</p>
       {task.status === 'completed' ? <p className="mt-1 text-xs text-zinc-500">Achieved {formatStretchValue(task, task.progress?.current ?? null)} · Target {formatStretchValue(task, task.targetValue)} · Verified by Training</p> : null}
