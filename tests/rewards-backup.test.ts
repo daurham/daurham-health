@@ -67,7 +67,7 @@ const rowsByTable: Record<string, BackupRow[]> = {
 
 describe('Reward wallet backup inventory', () => {
   it('advances schema head and keeps wallet owner data portable', () => {
-    expect(LATEST_SCHEMA_MIGRATION).toBe('0040_goal_training_units_fix.sql')
+    expect(LATEST_SCHEMA_MIGRATION).toBe('0041_exercise_library_calisthenics.sql')
     for (const name of ['reward_items', 'reward_purchases', 'xp_ledger']) {
       expect(backupTable(name)).toMatchObject({ backupClass: 'canonical', portable: true, seeded: false })
       expect(tablesForProfile('portable').map((table) => table.name)).toContain(name)
