@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import type { ProgressOverview, ProgressRange } from '@/domain/progress'
-import { resolveTrendMeaning, type TrendGoalIntent, type TrendPreferences } from '@/domain/trend-intent'
+import { DEFAULT_TREND_PREFERENCES, resolveTrendMeaning, type TrendGoalIntent, type TrendPreferences } from '@/domain/trend-intent'
 import { TrendSignal } from '@/components/TrendSignal'
 import { interactiveCardClass } from '@/lib'
 import { prefixedPath, useAppPathPrefix } from '@/lib/app-prefix'
@@ -44,14 +44,14 @@ export function StrengthSection({
   overview,
   range,
   onEvidence,
-  trendGoals,
-  trendPreferences,
+  trendGoals = [],
+  trendPreferences = DEFAULT_TREND_PREFERENCES,
 }: {
   overview: ProgressOverview
   range: ProgressRange
   onEvidence: (topic: EvidenceTopic) => void
-  trendGoals: TrendGoalIntent[]
-  trendPreferences: TrendPreferences
+  trendGoals?: TrendGoalIntent[]
+  trendPreferences?: TrendPreferences
 }) {
   const prefix = useAppPathPrefix()
   const exercises = overview.exercises.filter(
@@ -176,13 +176,13 @@ function StatusCell({
 function ExerciseCard({
   exercise,
   range,
-  trendGoals,
-  trendPreferences,
+  trendGoals = [],
+  trendPreferences = DEFAULT_TREND_PREFERENCES,
 }: {
   exercise: ProgressOverview['exercises'][number]
   range: ProgressRange
-  trendGoals: TrendGoalIntent[]
-  trendPreferences: TrendPreferences
+  trendGoals?: TrendGoalIntent[]
+  trendPreferences?: TrendPreferences
 }) {
   const prefix = useAppPathPrefix()
   return (
