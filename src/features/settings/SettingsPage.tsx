@@ -3,10 +3,12 @@ import { Link } from 'react-router-dom'
 import { parseAppleHealthFile, previewAppleHealth } from '@/domain/apple-health'
 import { formatCalendarRange } from '@/domain/calendar-format'
 import { healthCalendarDateFromNow } from '@/domain/time'
+import { progressionState } from '@/domain/progression'
+import { XpAmount } from '@/components/XpAmount'
+import { useRewardSummary } from '@/features/rewards/useRewardSummary'
 import {
-  HEALTH_PALETTES,
   MODE_LABELS,
-  PALETTE_LABELS,
+  THEME_PACKS,
   PALETTE_STORAGE_KEY,
   THEME_MODE_PREFERENCES,
   THEME_STORAGE_KEY,
@@ -15,6 +17,7 @@ import {
   readThemePreference,
   writePalettePreference,
   writeThemePreference,
+  themePackUnlocked,
   type HealthPalette,
   type ThemeModePreference,
 } from '@/theme'
@@ -54,6 +57,8 @@ function prefersDark(): boolean {
 function AppearanceSection() {
   const [mode, setMode] = useState<ThemeModePreference>(storedMode)
   const [palette, setPalette] = useState<HealthPalette>(storedPalette)
+  const { summary } = useRewardSummary(true)
+  const progression = progressionState(summary?.lifetimeXp ?? 0)
 
   useEffect(() => {
     function onStorage(event: StorageEvent) {
@@ -71,11 +76,31 @@ function AppearanceSection() {
     applyStoredAppearance(localStorage, prefersDark(), document.documentElement)
   }
 
+  function animateThemeChange() {
+    const root = document.documentElement
+    root.classList.add('theme-changing')
+    window.setTimeout(() => root.classList.remove('theme-changing'), 260)
+  }
+
   return (
-    <section className="min-w-0 space-y-4 rounded-lg border border-zinc-200 bg-white p-4">
-      <h2 className="text-base font-semibold">Appearance</h2>
+    <section className="min-w-0 space-y-5 rounded-xl border border-zinc-200 bg-white p-4 sm:p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold tracking-tight">Theme Studio</h2>
+          <p className="mt-1 max-w-2xl text-sm text-zinc-600">
+            Mode controls light and dark. Theme packs change the app's surfaces, charts, reward energy, and overall personality.
+          </p>
+        </div>
+        {summary ? (
+          <div className="text-right">
+            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Level {progression.level}</p>
+            <XpAmount amount={summary.lifetimeXp} badge={false} className="mt-1 text-sm" label={String(summary.lifetimeXp) + ' lifetime XP'} />
+          </div>
+        ) : null}
+      </div>
+
       <div className="space-y-2">
-        <p className="text-sm text-zinc-600">Mode</p>
+        <p className="text-sm font-medium text-zinc-700">Color mode</p>
         <div className="grid grid-cols-3 gap-2">
           {THEME_MODE_PREFERENCES.map((choice) => (
             <button
@@ -85,6 +110,7 @@ function AppearanceSection() {
               aria-label={choice === 'light' ? 'Switch to light mode' : choice === 'dark' ? 'Switch to dark mode' : 'Use system appearance'}
               onClick={() => {
                 writeThemePreference(localStorage, choice)
+                animateThemeChange()
                 paint()
                 setMode(choice)
               }}
@@ -95,25 +121,65 @@ function AppearanceSection() {
           ))}
         </div>
       </div>
-      <div className="space-y-2">
-        <p className="text-sm text-zinc-600">Palette</p>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          {HEALTH_PALETTES.map((choice) => (
-            <button
-              key={choice}
-              type="button"
-              aria-pressed={palette === choice}
-              aria-label={`Use ${PALETTE_LABELS[choice]} palette`}
-              onClick={() => {
-                writePalettePreference(localStorage, choice)
-                paint()
-                setPalette(choice)
-              }}
-              className={palette === choice ? themeChoiceSelectedClass : themeChoiceClass}
-            >
-              {PALETTE_LABELS[choice]}
-            </button>
-          ))}
+
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <p className="text-sm font-medium text-zinc-700">Theme packs</p>
+            <p className="mt-0.5 text-xs text-zinc-500">Lifetime XP unlocks new packs. Unlocking never spends XP.</p>
+          </div>
+          {progression.nextThemeUnlock ? (
+            <p className="text-xs text-zinc-500">
+              Next pack at Level {progression.nextThemeUnlock.level} · {progression.nextThemeUnlock.thresholdXp.toLocaleString('en-US')} lifetime XP
+            </p>
+          ) : null}
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {THEME_PACKS.map((pack) => {
+            const unlocked = pack.unlockLevel == null || pack.id === palette || (summary != null && themePackUnlocked(pack.id, summary.lifetimeXp))
+            const selected = palette === pack.id
+            return (
+              <button
+                key={pack.id}
+                type="button"
+                aria-pressed={selected}
+                aria-label={unlocked ? 'Use ' + pack.label + ' theme' : pack.label + ' theme unlocks at level ' + pack.unlockLevel}
+                disabled={!unlocked}
+                onClick={() => {
+                  writePalettePreference(localStorage, pack.id)
+                  animateThemeChange()
+                  paint()
+                  setPalette(pack.id)
+                }}
+                className={[
+                  'motion-pressable min-w-0 overflow-hidden rounded-xl border p-0 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
+                  selected ? 'border-accent ring-1 ring-accent' : unlocked ? 'border-zinc-200 hover:border-zinc-400' : 'border-zinc-200 opacity-70',
+                ].join(' ')}
+              >
+                <div
+                  className="h-20 border-b border-black/5 p-3"
+                  style={{ background: 'linear-gradient(135deg, ' + pack.preview.canvas + ', ' + pack.preview.surface + ')' }}
+                  aria-hidden="true"
+                >
+                  <div className="flex h-full items-end gap-2">
+                    <span className="h-9 w-9 rounded-lg shadow-sm" style={{ background: pack.preview.accent }} />
+                    <span className="h-7 w-7 rounded-full" style={{ background: pack.preview.secondary }} />
+                    <span className="ml-auto h-5 w-12 rounded-full" style={{ background: pack.preview.reward }} />
+                  </div>
+                </div>
+                <div className="bg-white p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-semibold text-zinc-900">{pack.label}</span>
+                    <span className={selected ? 'text-xs font-semibold text-accent' : unlocked ? 'text-xs text-zinc-500' : 'text-xs font-semibold text-zinc-500'}>
+                      {selected ? 'Selected' : unlocked ? 'Unlocked' : 'Level ' + pack.unlockLevel}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs leading-5 text-zinc-600">{pack.flavor}</p>
+                </div>
+              </button>
+            )
+          })}
         </div>
       </div>
     </section>
