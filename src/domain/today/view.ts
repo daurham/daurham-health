@@ -338,7 +338,7 @@ export function buildTodayView(sources: TodaySources): TodayViewModel {
     const detail = `Across ${trendFinding.observationCount} measurements`
     changedItems.push({
       id: 'body:weight_trend',
-      direction: null,
+      direction: trendFinding.slopePerWeek > 0 ? 'higher' : trendFinding.slopePerWeek < 0 ? 'lower' : null,
       headline,
       detail,
       text: `${headline} across ${trendFinding.observationCount} measurements.`,
