@@ -1,7 +1,14 @@
 import { useMemo, useState, useEffect } from 'react'
-import { distanceToMeters, secondsPerMile } from '@/domain/units'
+import { distanceToMeters, kilogramsToPounds, metersToMiles, secondsPerMile } from '@/domain/units'
 import { formatPrescription } from '@/domain/training'
-import type { ExerciseDefinition, LoadState, MeasurementKind, OwnerExerciseRequest } from '@/domain/training'
+import type {
+  ExerciseDefinition,
+  ExerciseLibraryLastSession,
+  ExerciseLibraryLastSet,
+  LoadState,
+  MeasurementKind,
+  OwnerExerciseRequest,
+} from '@/domain/training'
 import { OWNER_EXERCISE_LOAD_TYPES, MEASUREMENT_KINDS } from '@/domain/training'
 import type { TranscriptionGuidance } from '@/domain/training-transcription'
 import {
@@ -40,7 +47,7 @@ export function WorkoutEditor({
   allowExerciseAddition = false,
   allowSessionName = false,
   exerciseCatalog = [],
-  lastPerformedDates = {},
+  lastSessions = {},
   onCreateExercise,
 }: {
   title: string
@@ -62,7 +69,7 @@ export function WorkoutEditor({
   allowExerciseAddition?: boolean
   allowSessionName?: boolean
   exerciseCatalog?: ExerciseDefinition[]
-  lastPerformedDates?: Record<string, string | null>
+  lastSessions?: Record<string, ExerciseLibraryLastSession | null>
   onCreateExercise?: (input: OwnerExerciseRequest) => Promise<ExerciseDefinition>
 }) {
   const [guideExercise, setGuideExercise] = useState<ExerciseDefinition | null>(null)
@@ -156,7 +163,7 @@ export function WorkoutEditor({
             fieldErrors={fieldErrors}
             definition={catalogById.get(exercise.exerciseDefinitionId) ?? null}
             sessionOnly={draft.sessionType === 'programmed' && exercise.slotId == null}
-            lastPerformedDate={lastPerformedDates[exercise.exerciseDefinitionId] ?? null}
+            lastSession={lastSessions[exercise.exerciseDefinitionId] ?? null}
             onOpenGuide={(definition) => setGuideExercise(definition)}
             showPrescription={!allowExerciseManagement && exercise.slotId != null}
             allowSetRemoval={allowExerciseManagement || (draft.sessionType === 'programmed' && exercise.slotId == null)}
@@ -378,13 +385,42 @@ function ScoreRow({
   )
 }
 
-function displayLastPerformedDate(date: string): string {
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    timeZone: 'UTC',
-  }).format(new Date(`${date}T12:00:00Z`))
+function compactPounds(valueKg: number): string {
+  const pounds = kilogramsToPounds(valueKg)
+  const rounded = Math.round(pounds * 10) / 10
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1)
+}
+
+function lastSetSummary(set: ExerciseLibraryLastSet): string {
+  const load = set.loadState === 'external' && set.weightKg != null
+    ? `${compactPounds(set.weightKg)} lb`
+    : set.loadState === 'bodyweight'
+      ? 'BW'
+      : null
+  if (set.reps != null) return load ? `${load} × ${set.reps}` : `${set.reps} reps`
+  if (set.leftReps != null || set.rightReps != null) {
+    const sides = `L ${set.leftReps ?? '—'} / R ${set.rightReps ?? '—'}`
+    return load ? `${load} · ${sides}` : sides
+  }
+  if (set.durationSec != null && set.distanceM != null) {
+    const miles = Math.round(metersToMiles(set.distanceM) * 100) / 100
+    return `${miles} mi · ${set.durationSec}s`
+  }
+  if (set.distanceM != null) {
+    const miles = Math.round(metersToMiles(set.distanceM) * 100) / 100
+    return `${miles} mi`
+  }
+  if (set.durationSec != null) return load ? `${load} · ${set.durationSec}s` : `${set.durationSec}s`
+  if (set.leftDurationSec != null || set.rightDurationSec != null) {
+    return `L ${set.leftDurationSec ?? '—'}s / R ${set.rightDurationSec ?? '—'}s`
+  }
+  if (set.completed != null) return set.completed ? 'Achieved' : 'Not yet'
+  return 'Recorded'
+}
+
+function lastSessionSummary(session: ExerciseLibraryLastSession): string {
+  const sets = session.sets.slice(0, 3).map(lastSetSummary)
+  return sets.length > 0 ? sets.join(' · ') : session.date
 }
 
 function ExerciseCard({
@@ -394,7 +430,7 @@ function ExerciseCard({
   fieldErrors,
   definition,
   sessionOnly,
-  lastPerformedDate,
+  lastSession,
   onOpenGuide,
   showPrescription,
   allowSetRemoval,
@@ -408,7 +444,7 @@ function ExerciseCard({
   fieldErrors: ReviewFieldError[]
   definition: ExerciseDefinition | null
   sessionOnly: boolean
-  lastPerformedDate: string | null
+  lastSession: ExerciseLibraryLastSession | null
   onOpenGuide: (exercise: ExerciseDefinition) => void
   showPrescription: boolean
   allowSetRemoval: boolean
@@ -435,8 +471,8 @@ function ExerciseCard({
             ) : null}
             {definition ? <ExerciseGuideButton exercise={definition} onOpen={() => onOpenGuide(definition)} /> : null}
           </div>
-          {lastPerformedDate ? (
-            <p className="mt-1 text-xs text-zinc-500">Last time · {displayLastPerformedDate(lastPerformedDate)}</p>
+          {lastSession ? (
+            <p className="mt-1 text-xs text-zinc-500">Last time · {lastSessionSummary(lastSession)}</p>
           ) : null}
         </div>
         {onRemove ? (
