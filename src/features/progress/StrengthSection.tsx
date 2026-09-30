@@ -1,5 +1,7 @@
 import { Link } from 'react-router-dom'
 import type { ProgressOverview, ProgressRange } from '@/domain/progress'
+import { resolveTrendMeaning, type TrendGoalIntent, type TrendPreferences } from '@/domain/trend-intent'
+import { TrendSignal } from '@/components/TrendSignal'
 import { interactiveCardClass } from '@/lib'
 import { prefixedPath, useAppPathPrefix } from '@/lib/app-prefix'
 import { compactTrendCopy } from './copy'
@@ -18,14 +20,38 @@ import {
 } from './format'
 import { progressSearch } from './range'
 
+function StrengthTrendSignal({
+  exercise,
+  goals,
+  preferences,
+}: {
+  exercise: ProgressOverview['exercises'][number]
+  goals: TrendGoalIntent[]
+  preferences: TrendPreferences
+}) {
+  if (exercise.trend.status !== 'available' || exercise.trend.value.direction === 'stable') return null
+  const direction = exercise.trend.value.direction === 'improving' ? 'higher' : 'lower'
+  const meaning = resolveTrendMeaning({
+    metric: { kind: 'strength', exerciseDefinitionId: exercise.exerciseId },
+    direction,
+    goals,
+    preferences,
+  }).meaning
+  return <TrendSignal compact direction={direction} meaning={meaning} />
+}
+
 export function StrengthSection({
   overview,
   range,
   onEvidence,
+  trendGoals,
+  trendPreferences,
 }: {
   overview: ProgressOverview
   range: ProgressRange
   onEvidence: (topic: EvidenceTopic) => void
+  trendGoals: TrendGoalIntent[]
+  trendPreferences: TrendPreferences
 }) {
   const prefix = useAppPathPrefix()
   const exercises = overview.exercises.filter(
@@ -50,7 +76,7 @@ export function StrengthSection({
           <ul className="space-y-2 md:hidden">
             {exercises.map((exercise) => (
               <li key={exercise.exerciseId}>
-                <ExerciseCard exercise={exercise} range={range} />
+                <ExerciseCard exercise={exercise} range={range} trendGoals={trendGoals} trendPreferences={trendPreferences} />
               </li>
             ))}
           </ul>
@@ -78,7 +104,10 @@ export function StrengthSection({
                       <p className="relative z-10 text-xs text-zinc-500">{performanceTypeLabel(exercise.performanceType)}</p>
                     </td>
                     <td className="py-2.5 pr-3">{formatLatestPerformance(exercise.latestPerformance)}</td>
-                    <td className="py-2.5 pr-3 text-zinc-700">{compactTrendCopy(exercise)}</td>
+                    <td className="py-2.5 pr-3 text-zinc-700">
+                      <p>{compactTrendCopy(exercise)}</p>
+                      <StrengthTrendSignal exercise={exercise} goals={trendGoals} preferences={trendPreferences} />
+                    </td>
                     <td className="py-2.5 pr-3 text-zinc-600">
                       {exercise.latestPerformance ? formatCalendarDate(exercise.latestPerformance.date) : '—'}
                     </td>
@@ -147,9 +176,13 @@ function StatusCell({
 function ExerciseCard({
   exercise,
   range,
+  trendGoals,
+  trendPreferences,
 }: {
   exercise: ProgressOverview['exercises'][number]
   range: ProgressRange
+  trendGoals: TrendGoalIntent[]
+  trendPreferences: TrendPreferences
 }) {
   const prefix = useAppPathPrefix()
   return (
@@ -163,6 +196,7 @@ function ExerciseCard({
       </div>
       <div className="shrink-0 text-right text-xs text-zinc-500">
         <p>{compactTrendCopy(exercise)}</p>
+        <div className="mt-0.5"><StrengthTrendSignal exercise={exercise} goals={trendGoals} preferences={trendPreferences} /></div>
         {exercise.recentPrs.length > 0 ? <p className="mt-0.5 font-medium text-zinc-700">Best</p> : null}
       </div>
     </Link>
@@ -174,11 +208,15 @@ export function StrengthLab({
   range,
   exerciseId,
   onEvidence,
+  trendGoals,
+  trendPreferences,
 }: {
   overview: ProgressOverview
   range: ProgressRange
   exerciseId: string
   onEvidence: (topic: EvidenceTopic) => void
+  trendGoals: TrendGoalIntent[]
+  trendPreferences: TrendPreferences
 }) {
   const prefix = useAppPathPrefix()
   const exercise = overview.exercises.find((item) => item.exerciseId === exerciseId)
@@ -238,6 +276,7 @@ export function StrengthLab({
                 <p className="mt-1 text-sm text-zinc-600">
                   From {formatKgAsLb(exercise.estimatedStrength.value.sourceSet.loadKg)} × {exercise.estimatedStrength.value.sourceSet.reps}
                 </p>
+                <div className="mt-2"><StrengthTrendSignal exercise={exercise} goals={trendGoals} preferences={trendPreferences} /></div>
               </>
             ) : (
               <>
