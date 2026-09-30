@@ -24,14 +24,20 @@ Frozen v1.0.0, then the v2 slices the blueprint marks implemented:
 - V2-G6 Multi-Angle Meal Photo Estimation: one to three photos of the same meal go to Gemini as one request and one `ai_usage` reservation. Home-AI stays one photo. The saved Nutrition entry is still the reviewed value.
 - V2-G7 Recipe Text Draft Assistant: pasted recipe text can become a transient Gemini ingredient draft. The owner resolves each food. Recipe nutrition stays deterministic. Health does not fetch recipe pages.
 - V2-G8 Meal Clarification Refinement: a Gemini meal estimate may include up to three optional questions. Refine estimate reuses the same job and stored photos for one new `nutrition_meal_photo` attempt. Home-AI does not accept those answers. The saved meal is still the reviewed value.
+- V2-H1 Nutrition Micronutrients + Goal/Progress hardening: fiber and sodium preserve unknown evidence, strength Goals use canonical Training e1RM evidence, and mistaken Goals have explicit correction semantics.
+- V2-H2A/H2B/H2C Coach: persistent deterministic Weekly/Daily assignments, accepted Stretch Quests, Personal Lab attention, snoozes, priority/inbox polish, and canonical-change refresh.
+- V2-H2D Goals + Training Measurement Expansion + Lightweight Routines: distance, pace, skills, Training Goals/bests, Running/Hiking, distance/pace Stretch, and versioned owner Saved Routines.
+- V2-H3 XP / Reward Wallet: Coach-completion XP, Lifetime/Spendable balances, append-only accounting, owner reward catalog, concurrency-safe redemption, refunds, and backup/export support.
 
 Also present from v1 and the import work: Nutrition, Training, Body, Progress, Activity, Sleep, Timeline, Compare, checkpoints, Apple Health archive import, Health Auto Export ingest, Gemini nutrition capture, Home-AI transcription, backup and portable export, and the public demo.
 
 ## Current work
 
-No active implementation task. See `CURRENT_TASK.md`.
+No active implementation task after V2-H3 completion. See `CURRENT_TASK.md`.
 
 ## Known planned work
+
+- V2-H4 Themes + progression polish may build levels/unlocks from H3 Lifetime XP; no H4 implementation contract is active yet.
 
 Named by the current manual or blueprint, and not marked implemented:
 
