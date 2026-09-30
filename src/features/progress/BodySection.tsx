@@ -1,5 +1,5 @@
 import type { ProgressOverview } from '@/domain/progress'
-import { resolveTrendMeaning, type TrendGoalIntent, type TrendMetric, type TrendPreferences } from '@/domain/trend-intent'
+import { DEFAULT_TREND_PREFERENCES, resolveTrendMeaning, type TrendGoalIntent, type TrendMetric, type TrendPreferences } from '@/domain/trend-intent'
 import { TrendSignal } from '@/components/TrendSignal'
 import { kilogramsToPounds } from '@/domain/units'
 import { remainingCount } from './copy'
@@ -17,13 +17,13 @@ function bodyIntentMetric(metricKey: string): TrendMetric | null {
 export function BodySection({
   overview,
   onEvidence,
-  trendGoals,
-  trendPreferences,
+  trendGoals = [],
+  trendPreferences = DEFAULT_TREND_PREFERENCES,
 }: {
   overview: ProgressOverview
   onEvidence: (topic: EvidenceTopic) => void
-  trendGoals: TrendGoalIntent[]
-  trendPreferences: TrendPreferences
+  trendGoals?: TrendGoalIntent[]
+  trendPreferences?: TrendPreferences
 }) {
   const weight = overview.body.weight
   const trend = weight.trend
