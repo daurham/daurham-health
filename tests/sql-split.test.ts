@@ -19,7 +19,47 @@ describe('splitSqlStatements', () => {
     expect(statements).toEqual(['CREATE TABLE t (id UUID)'])
   })
 
-  it('splits the current Health migrations without dollar-quoted bodies', () => {
+  it('keeps dollar-quoted function bodies in one statement', () => {
+    const statements = splitSqlStatements(`
+      CREATE OR REPLACE FUNCTION demo_trigger()
+      RETURNS trigger
+      LANGUAGE plpgsql
+      AS $
+      BEGIN
+        RAISE EXCEPTION 'keep; this together';
+      END;
+      $;
+
+      CREATE TRIGGER demo
+      BEFORE UPDATE ON demo_table
+      FOR EACH ROW EXECUTE FUNCTION demo_trigger();
+    `)
+
+    expect(statements).toHaveLength(2)
+    expect(statements[0]).toContain("RAISE EXCEPTION 'keep; this together';")
+    expect(statements[0]).toContain('END;')
+    expect(statements[0]).toMatch(/^CREATE OR REPLACE FUNCTION demo_trigger/)
+    expect(statements[1]).toMatch(/^CREATE TRIGGER demo/)
+  })
+
+  it('supports tagged dollar quotes', () => {
+    const statements = splitSqlStatements(`
+      DO $migration$
+      BEGIN
+        PERFORM 1;
+        PERFORM 2;
+      END;
+      $migration$;
+      SELECT 3;
+    `)
+
+    expect(statements).toHaveLength(2)
+    expect(statements[0]).toContain('PERFORM 1;')
+    expect(statements[0]).toContain('PERFORM 2;')
+    expect(statements[1]).toBe('SELECT 3')
+  })
+
+  it('splits the current Health migrations including H3 PL/pgSQL', () => {
     const foundation = splitSqlStatements(
       readFileSync(path.join('migrations', '0001_health_foundation.sql'), 'utf8'),
     )
@@ -128,5 +168,14 @@ describe('splitSqlStatements', () => {
     expect(training[9]).toContain('A01')
     expect(training[9]).toContain('B07')
     expect(training[9]).toContain('C07')
+
+    const rewards = splitSqlStatements(
+      readFileSync(path.join('migrations', '0039_xp_reward_wallet.sql'), 'utf8'),
+    )
+    expect(rewards).toHaveLength(13)
+    expect(rewards[9]).toMatch(/^CREATE OR REPLACE FUNCTION prevent_reward_history_mutation/)
+    expect(rewards[9]).toContain("RAISE EXCEPTION '% is append-only', TG_TABLE_NAME;")
+    expect(rewards[10]).toMatch(/^CREATE TRIGGER xp_ledger_append_only/)
+    expect(rewards[11]).toMatch(/^CREATE TRIGGER reward_purchases_immutable/)
   })
 })
