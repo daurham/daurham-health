@@ -37,6 +37,12 @@ export type NutritionFood = {
   updatedAt: string
 }
 
+export type NutritionFoodManagement = NutritionFood & {
+  usageCount: number
+  lastUsedDate: string | null
+  recipeUseCount: number
+}
+
 export type NutritionEntry = {
   id: string
   logDate: string

@@ -4,6 +4,7 @@ import type {
   LoggableRecipeVersion,
   NutritionEntryPatch,
   NutritionFood,
+  NutritionFoodManagement,
   NutritionFoodCreate,
   NutritionFoodPatch,
   NutritionTarget,
@@ -52,6 +53,13 @@ export async function searchNutritionFoods(query: string, signal?: AbortSignal):
   const suffix = params.size > 0 ? `?${params.toString()}` : ''
   const body = await parseOk<{ foods: NutritionFood[] }>(
     await healthFetch(`/api/nutrition/foods${suffix}`, { signal }),
+  )
+  return body.foods
+}
+
+export async function fetchPantryFoods(signal?: AbortSignal): Promise<NutritionFoodManagement[]> {
+  const body = await parseOk<{ foods: NutritionFoodManagement[] }>(
+    await healthFetch('/api/nutrition/foods?management=true', { signal }),
   )
   return body.foods
 }

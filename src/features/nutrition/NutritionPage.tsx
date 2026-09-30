@@ -311,7 +311,10 @@ export function NutritionPage() {
           <h1 className="text-xl font-semibold tracking-tight md:text-2xl">Nutrition</h1>
           <p className="mt-1 text-sm text-zinc-600 md:text-base">{formatNutritionDayLabel(date, today)}</p>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+          <Link to="/nutrition/pantry" className={secondaryButtonClass}>
+            Pantry
+          </Link>
           <Link to="/nutrition/recipes" className={secondaryButtonClass}>
             Recipes
           </Link>

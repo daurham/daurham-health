@@ -7,6 +7,7 @@ import { TodayPage } from '@/features/today'
 
 const NutritionPage = lazy(() => import('@/features/nutrition').then((module) => ({ default: module.NutritionPage })))
 const RecipesPage = lazy(() => import('@/features/nutrition').then((module) => ({ default: module.RecipesPage })))
+const PantryPage = lazy(() => import('@/features/nutrition').then((module) => ({ default: module.PantryPage })))
 const NewRecipePage = lazy(() => import('@/features/nutrition').then((module) => ({ default: module.NewRecipePage })))
 const RecipeDetailPage = lazy(() => import('@/features/nutrition').then((module) => ({ default: module.RecipeDetailPage })))
 const RecipeEditPage = lazy(() => import('@/features/nutrition').then((module) => ({ default: module.RecipeEditPage })))
@@ -73,6 +74,7 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: <TodayPage /> },
       { path: 'nutrition', element: <NutritionPage /> },
+      { path: 'nutrition/pantry', element: <PantryPage /> },
       { path: 'nutrition/recipes', element: <RecipesPage /> },
       { path: 'nutrition/recipes/new', element: <NewRecipePage /> },
       { path: 'nutrition/recipes/:recipeId/edit', element: <RecipeEditPage /> },

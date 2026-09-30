@@ -1,7 +1,7 @@
 import { formatDatabaseError, getSql } from '../db.js'
 import { HttpError } from '../http.js'
 import { NUTRITION_ENTRY_ENTITY, NUTRITION_FOOD_ENTITY } from '../../src/domain/nutrition/config.js'
-import type { NutritionEntry, NutritionFood, NutritionTarget } from '../../src/domain/nutrition/types.js'
+import type { NutritionEntry, NutritionFood, NutritionFoodManagement, NutritionTarget } from '../../src/domain/nutrition/types.js'
 import type { PlannedEntry, PlannedFood } from '../../src/domain/nutrition/legacy.js'
 
 const TABLES_UNAVAILABLE = 'Nutrition tables are not available. Apply pending migrations.'
@@ -166,6 +166,19 @@ export const LIST_FOODS_SQL = `SELECT ${FOOD_COLUMNS}
            END,
            name ASC, catalog_kind ASC, id ASC
          LIMIT $2`
+
+export const LIST_PANTRY_FOODS_SQL = `SELECT ${FOOD_COLUMNS},
+         COALESCE((SELECT count(*) FROM nutrition_entries entries WHERE entries.food_id = nutrition_foods.id), 0)::int AS usage_count,
+         (SELECT max(entries.log_date) FROM nutrition_entries entries WHERE entries.food_id = nutrition_foods.id) AS last_used_date,
+         COALESCE((
+           SELECT count(DISTINCT versions.recipe_id)
+           FROM recipe_version_ingredients ingredients
+           JOIN recipe_versions versions ON versions.id = ingredients.recipe_version_id
+           WHERE ingredients.food_id = nutrition_foods.id
+         ), 0)::int AS recipe_use_count
+         FROM nutrition_foods
+         WHERE catalog_kind <> 'recipe'
+         ORDER BY name ASC, brand ASC NULLS LAST, id ASC`
 
 export const GET_FOOD_SQL = `SELECT ${FOOD_COLUMNS} FROM nutrition_foods WHERE id = $1`
 
@@ -335,6 +348,23 @@ export async function listFoods(query: string | null, limit: number): Promise<Nu
     const sql = await getSql()
     const rows = (await sql.query(LIST_FOODS_SQL, [query, limit])) as FoodRow[]
     return rows.map(mapFoodRow)
+  })
+}
+
+export async function listPantryFoods(): Promise<NutritionFoodManagement[]> {
+  return queryOrUnavailable(async () => {
+    const sql = await getSql()
+    const rows = (await sql.query(LIST_PANTRY_FOODS_SQL)) as Array<FoodRow & {
+      usage_count: number | string
+      last_used_date: unknown
+      recipe_use_count: number | string
+    }>
+    return rows.map((row) => ({
+      ...mapFoodRow(row),
+      usageCount: Number(row.usage_count ?? 0),
+      lastUsedDate: row.last_used_date == null ? null : asCalendarDate(row.last_used_date),
+      recipeUseCount: Number(row.recipe_use_count ?? 0),
+    }))
   })
 }
 

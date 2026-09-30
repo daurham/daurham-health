@@ -30,6 +30,7 @@ import {
   insertFood,
   listEntriesForDate,
   listFoods,
+  listPantryFoods,
   listRecentFoods,
   listRecipeFoods,
   listStapleFoods,
@@ -108,6 +109,10 @@ export async function searchNutritionFoods(query: string | null): Promise<Nutrit
   const trimmed = query?.trim() || null
   const foods = await listFoods(trimmed, NUTRITION_CONFIG.foodQueryLimit)
   return trimmed ? rankFoodsForQuery(foods, trimmed) : foods
+}
+
+export async function listNutritionPantry() {
+  return listPantryFoods()
 }
 
 export async function getNutritionFood(id: string): Promise<NutritionFood> {

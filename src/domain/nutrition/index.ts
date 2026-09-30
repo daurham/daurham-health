@@ -67,6 +67,7 @@ export {
 } from './types.js'
 export type {
   NutritionFood,
+  NutritionFoodManagement,
   NutritionEntry,
   NutritionTarget,
   NutritionFoodCreate,
