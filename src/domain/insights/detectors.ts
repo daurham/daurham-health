@@ -3,6 +3,7 @@ import type { AskLens } from '../ask-health/index.js'
 import { ACTIVITY_TIMEZONE } from '../activity/config.js'
 import { findingCopy } from '../intelligence/copy.js'
 import type { AssociationStrength, CrossDomainFinding } from '../intelligence/types.js'
+import { formatCalendarRange, formatFullCalendarDate } from '../calendar-format.js'
 import { addCalendarDays } from '../progress/dates.js'
 import { bodyWeightTrend } from '../progress/body-trend.js'
 import { percentChange } from '../progress/statistics.js'
@@ -500,7 +501,7 @@ export function detectStrengthTrend(input: InsightDetectorInput): InsightDetecto
         value: `${formatQuantity(trend.recentMedian, 1)} kg vs ${formatQuantity(trend.previousMedian, 1)} kg`,
       },
       { label: 'Appearances', value: `${trend.observationCount} in the accepted comparison` },
-      { label: 'Latest appearance', value: chosen.exercise.latestDate! },
+      { label: 'Latest appearance', value: formatFullCalendarDate(chosen.exercise.latestDate!) },
     ],
     detailPath: `/progress/strength/${chosen.exercise.exerciseId}`,
     signal: chosen.direction === 'improving' ? 'positive' : 'negative',
@@ -542,7 +543,7 @@ function patternInsight(input: InsightDetectorInput, finding: CrossDomainFinding
     title: 'Pattern',
     summary: text,
     period: { start: finding.period.start, end: finding.period.end },
-    periodLabel: `${finding.period.start} to ${finding.period.end}`,
+    periodLabel: formatCalendarRange(finding.period.start, finding.period.end),
     evidence,
     detailPath: '/progress/compare',
     signal: patternSignal(finding),
@@ -685,7 +686,7 @@ function average(values: readonly number[]): number {
 function periodEvidence(windows: { current: Window; previous: Window }): InsightEvidence {
   return {
     label: 'Period',
-    value: `${windows.current.start} to ${windows.current.end} vs ${windows.previous.start} to ${windows.previous.end}`,
+    value: `${formatCalendarRange(windows.current.start, windows.current.end)} vs ${formatCalendarRange(windows.previous.start, windows.previous.end)}`,
   }
 }
 
