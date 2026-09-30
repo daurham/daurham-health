@@ -35,6 +35,8 @@ export type ProactiveInsight = {
   detailPath: string
   goalPath?: string
   askHealth?: InsightAskHealth
+  /** Conservative presentation emphasis; not a medical or causal judgment. */
+  signal?: 'positive' | 'negative' | 'neutral'
   ranking: {
     tier: number
     stableKey: string
