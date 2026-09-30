@@ -133,9 +133,9 @@ Purchase snapshots, archive state, ledger amount/kind, source identity, rule ver
 
 ## Validation
 
-Production/test code at commit `6ab695e0e1ac6fb9773562194eb462cd28d521fc` passed GitHub Actions run `36661033409` on Ubuntu 22.04 / Node 22 / PostgreSQL 14 with America/Phoenix timezone:
+Final implementation/documentation code at commit `ece1200a459ab36407bf212b6ea04d2a11167a9f` passed GitHub Actions run `36661368896` on Ubuntu 22.04 / Node 22 / PostgreSQL 14 with America/Phoenix timezone:
 
-- `npm test`: **139 test files passed; 1,286 tests passed, 1 skipped**
+- `npm test`: **140 test files passed; 1,290 tests passed, 1 skipped**
 - `npx tsc -b`: passed
 - `npx eslint .`: passed
 - `npm run build`: passed
@@ -156,7 +156,7 @@ Coverage includes:
 - backup/full/portable wallet round-trip
 - Coach XP presentation and owner-only Rewards routing
 
-A later documentation/UI-contract-only closeout commit may have a subsequent validation run; this report should be updated if that changes validation totals.
+The temporary H3 validation workflow was removed after this successful closeout validation.
 
 ## Deployment
 

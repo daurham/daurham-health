@@ -69,14 +69,12 @@ Owner API routes:
 
 ## Validation
 
-H3 production/test code passed GitHub Actions validation on Ubuntu 22.04 / Node 22 / PostgreSQL 14 / America/Phoenix before documentation closeout:
+Final H3 implementation/documentation code at commit `ece1200a459ab36407bf212b6ea04d2a11167a9f` passed GitHub Actions run `36661368896` on Ubuntu 22.04 / Node 22 / PostgreSQL 14 / America/Phoenix:
 
-- `npm test`: 139 test files passed; 1,286 tests passed, 1 skipped
+- `npm test`: 140 test files passed; 1,290 tests passed, 1 skipped
 - `npx tsc -b`: passed
 - `npx eslint .`: passed
-- `npm run build`: passed
-
-A final closeout validation will include the H3 documentation/UI-contract additions. Production owner data was not used for implementation tests; PostgreSQL wallet/migration/concurrency coverage uses a disposable local cluster.
+- `npm run build`: passed Production owner data was not used for implementation tests; PostgreSQL wallet/migration/concurrency coverage uses a disposable local cluster.
 
 ## Retained invariants and next phase
 
