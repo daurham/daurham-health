@@ -9,6 +9,10 @@ on:
 env:
   TZ: America/Phoenix
 
+concurrency:
+  group: h4-validation
+  cancel-in-progress: true
+
 jobs:
   validate:
     runs-on: ubuntu-22.04
