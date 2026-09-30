@@ -38,6 +38,8 @@ export type WalletBalances = {
   spendableXp: number
 }
 
+export type RewardSummary = WalletBalances
+
 export function deriveWalletBalances(
   entries: readonly Pick<WalletLedgerEntry, 'entryKind' | 'amountXp'>[],
 ): WalletBalances {
