@@ -110,6 +110,7 @@ function baseInsight(
     detailPath: fields.detailPath,
     goalPath: fields.goalPath,
     askHealth: fields.askHealth,
+    signal: fields.signal,
     ranking: { tier: fields.tier, stableKey: fields.id },
   }
   return {
@@ -210,6 +211,10 @@ export function detectActivityChange(input: InsightDetectorInput): InsightDetect
       periodEvidence(windows),
     ],
     detailPath: '/progress/activity',
+    signal:
+      chosen.key === 'steps' || chosen.key === 'exercise_minutes'
+        ? chosen.change > 0 ? 'positive' : 'negative'
+        : 'neutral',
     tier: INSIGHT_TIERS.activity_change,
     magnitude: Math.abs(chosen.change),
     associationRank: 0,
@@ -312,6 +317,7 @@ export function detectNutritionChange(input: InsightDetectorInput): InsightDetec
       periodEvidence(windows),
     ],
     detailPath: '/nutrition',
+    signal: chosen.key === 'protein' ? (chosen.change > 0 ? 'positive' : 'negative') : 'neutral',
     tier: INSIGHT_TIERS.nutrition_change,
     magnitude: Math.abs(chosen.change),
     associationRank: 0,
@@ -395,6 +401,7 @@ export function detectTrainingFrequencyChange(input: InsightDetectorInput): Insi
       periodEvidence(windows),
     ],
     detailPath: '/training',
+    signal: delta > 0 ? 'positive' : 'negative',
     tier: INSIGHT_TIERS.training_frequency,
     magnitude: Math.abs(delta),
     associationRank: 0,
@@ -496,6 +503,7 @@ export function detectStrengthTrend(input: InsightDetectorInput): InsightDetecto
       { label: 'Latest appearance', value: chosen.exercise.latestDate! },
     ],
     detailPath: `/progress/strength/${chosen.exercise.exerciseId}`,
+    signal: chosen.direction === 'improving' ? 'positive' : 'negative',
     tier: INSIGHT_TIERS.domain_trend,
     magnitude: Math.abs(trend.changePercent),
     associationRank: 0,
@@ -537,6 +545,7 @@ function patternInsight(input: InsightDetectorInput, finding: CrossDomainFinding
     periodLabel: `${finding.period.start} to ${finding.period.end}`,
     evidence,
     detailPath: '/progress/compare',
+    signal: patternSignal(finding),
     tier: INSIGHT_TIERS.cross_domain_pattern,
     magnitude: patternMagnitude(finding),
     associationRank: finding.strength ? ASSOCIATION_RANK[finding.strength] : 0,
@@ -591,6 +600,15 @@ function patternEvidence(finding: CrossDomainFinding): InsightEvidence[] {
   }
   items.push({ label: 'Sample size', value: String(finding.sampleSize) })
   return items
+}
+
+function patternSignal(finding: CrossDomainFinding): 'positive' | 'negative' | 'neutral' {
+  if (finding.id !== 'activity_training:steps' || finding.kind !== 'group_comparison') {
+    return 'neutral'
+  }
+  const steps = finding.metrics.metrics.find((metric) => metric.metric === 'steps')
+  if (steps?.delta == null || steps.delta === 0) return 'neutral'
+  return steps.delta > 0 ? 'positive' : 'negative'
 }
 
 function patternMagnitude(finding: CrossDomainFinding): number {
