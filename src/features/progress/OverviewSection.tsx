@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import type { NutritionPeriodSummary, ProgressFinding, ProgressOverview } from '@/domain/progress'
-import { resolveTrendMeaning, type TrendDirection, type TrendGoalIntent, type TrendMetric, type TrendPreferences } from '@/domain/trend-intent'
+import { DEFAULT_TREND_PREFERENCES, resolveTrendMeaning, type TrendDirection, type TrendGoalIntent, type TrendMetric, type TrendPreferences } from '@/domain/trend-intent'
 import { TrendSignal } from '@/components/TrendSignal'
 import { kilogramsToPounds } from '@/domain/units'
 import { cn } from '@/lib'
@@ -144,13 +144,13 @@ function findingTrend(finding: ProgressFinding): { metric: TrendMetric; directio
 export function OverviewSection({
   overview,
   onEvidence,
-  trendGoals,
-  trendPreferences,
+  trendGoals = [],
+  trendPreferences = DEFAULT_TREND_PREFERENCES,
 }: {
   overview: ProgressOverview
   onEvidence: (topic: EvidenceTopic) => void
-  trendGoals: TrendGoalIntent[]
-  trendPreferences: TrendPreferences
+  trendGoals?: TrendGoalIntent[]
+  trendPreferences?: TrendPreferences
 }) {
   const strength = strengthOverviewCopy(overview)
   const workouts = overview.training.workouts.status === 'available' ? overview.training.workouts.value.count : null
