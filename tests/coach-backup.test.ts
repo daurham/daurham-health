@@ -4,7 +4,7 @@ import { buildBackupArchive, restoreStatements, verifyBackupArchive, type Backup
 
 describe('Coach backup inventory', () => {
   it('advances the schema head and keeps Coach history portable', () => {
-    expect(LATEST_SCHEMA_MIGRATION).toBe('0040_goal_training_units_fix.sql')
+    expect(LATEST_SCHEMA_MIGRATION).toBe('0041_exercise_library_calisthenics.sql')
     const tasks = backupTable('coach_tasks')
     const events = backupTable('coach_task_events')
     expect(tasks?.portable).toBe(true)
