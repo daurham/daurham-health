@@ -121,6 +121,7 @@ describe.skipIf(!existsSync(`${BIN}/initdb`))('Stretch production service on dis
     await pool.query(readFileSync('migrations/0035_coach_tasks.sql', 'utf8'))
     await pool.query(readFileSync('migrations/0036_stretch_quests.sql', 'utf8'))
     await pool.query(readFileSync('migrations/0037_coach_lab_snoozes.sql', 'utf8'))
+    await pool.query(readFileSync('migrations/0039_xp_reward_wallet.sql', 'utf8'))
   }, 60_000)
 
   afterAll(async () => {
@@ -131,7 +132,7 @@ describe.skipIf(!existsSync(`${BIN}/initdb`))('Stretch production service on dis
 
   beforeEach(async () => {
     database.retests = []
-    await pool.query('TRUNCATE coach_lab_snoozes, coach_task_events, coach_tasks, workout_sets, workout_session_exercises, workout_sessions, exercise_definitions')
+    await pool.query('TRUNCATE xp_ledger, reward_purchases, reward_items, coach_lab_snoozes, coach_task_events, coach_tasks, workout_sets, workout_session_exercises, workout_sessions, exercise_definitions')
     await pool.query(`INSERT INTO exercise_definitions
       (id, name, external_id, performance_type, analytics_load_type, analytics_rep_mode, measurement_kind, load_type, unilateral)
       VALUES ($1, 'Bench Press', NULL, 'loaded_reps', 'external', 'standard', 'reps', 'barbell', false)`, [EXERCISE])
