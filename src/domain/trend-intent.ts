@@ -7,7 +7,11 @@ export type TrendMetric =
   | { kind: 'body'; metricKey: 'weight' | 'body_fat_percentage' | 'waist_circumference' }
   | { kind: 'strength'; exerciseDefinitionId: string }
   | { kind: 'activity_steps' }
+  | { kind: 'activity_exercise_minutes' }
   | { kind: 'training_frequency' }
+  | { kind: 'nutrition_protein' }
+
+export type TrendMeaningSource = 'goal' | 'preference' | 'default' | 'neutral'
 
 export type TrendPreferenceDirection = 'lower' | 'maintain' | 'higher' | 'none'
 
@@ -48,7 +52,9 @@ function matchingGoal(metric: TrendMetric, goal: TrendGoalIntent): boolean {
     return goal.goalKind === 'strength_e1rm' && goal.exerciseDefinitionId === metric.exerciseDefinitionId
   }
   if (metric.kind === 'activity_steps') return goal.goalKind === 'activity_steps'
-  return goal.goalKind === 'training_frequency'
+  if (metric.kind === 'training_frequency') return goal.goalKind === 'training_frequency'
+  if (metric.kind === 'nutrition_protein') return goal.goalKind === 'nutrition_protein'
+  return false
 }
 
 function meaningForGoal(goal: TrendGoalIntent, direction: TrendDirection): TrendMeaning {
@@ -80,6 +86,20 @@ function preferenceForMetric(metric: TrendMetric, preferences: TrendPreferences)
   return 'none'
 }
 
+function defaultMeaningForMetric(metric: TrendMetric, direction: TrendDirection): TrendMeaning | null {
+  if (direction === 'stable') return null
+  if (
+    metric.kind === 'strength' ||
+    metric.kind === 'activity_steps' ||
+    metric.kind === 'activity_exercise_minutes' ||
+    metric.kind === 'training_frequency' ||
+    metric.kind === 'nutrition_protein'
+  ) {
+    return direction === 'higher' ? 'toward' : 'away'
+  }
+  return null
+}
+
 function meaningForPreference(preference: TrendPreferenceDirection, direction: TrendDirection): TrendMeaning {
   if (direction === 'stable' || preference === 'none' || preference === 'maintain') return 'neutral'
   return preference === direction ? 'toward' : 'away'
@@ -90,7 +110,7 @@ export function resolveTrendMeaning(input: {
   direction: TrendDirection
   goals: readonly TrendGoalIntent[]
   preferences: TrendPreferences
-}): { meaning: TrendMeaning; source: 'goal' | 'preference' | 'neutral' } {
+}): { meaning: TrendMeaning; source: TrendMeaningSource } {
   const matches = input.goals.filter((goal) => matchingGoal(input.metric, goal))
   if (matches.length > 0) {
     const meanings = [...new Set(matches.map((goal) => meaningForGoal(goal, input.direction)))]
@@ -105,12 +125,17 @@ export function resolveTrendMeaning(input: {
       source: 'preference',
     }
   }
+  const defaultMeaning = defaultMeaningForMetric(input.metric, input.direction)
+  if (defaultMeaning) {
+    return { meaning: defaultMeaning, source: 'default' }
+  }
   return { meaning: 'neutral', source: 'neutral' }
 }
 
-export function trendMeaningLabel(meaning: TrendMeaning): string {
-  if (meaning === 'toward') return 'Toward goal'
-  if (meaning === 'away') return 'Away from goal'
+export function trendMeaningLabel(meaning: TrendMeaning, source: TrendMeaningSource = 'goal'): string {
   if (meaning === 'within') return 'Within target'
-  return 'Neutral'
+  if (meaning === 'neutral') return 'Neutral'
+  if (source === 'default') return meaning === 'toward' ? 'Positive signal' : 'Needs attention'
+  if (source === 'preference') return meaning === 'toward' ? 'Preferred direction' : 'Away from preference'
+  return meaning === 'toward' ? 'Toward goal' : 'Away from goal'
 }
