@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useOutletContext, useParams, useSearchParams } from 'react-router-dom'
 import type { ProactiveInsight } from '@/domain/insights'
 import type { ProgressOverview, ProgressRange, ProgressTimeline } from '@/domain/progress'
-import type { TrendGoalIntent, TrendPreferences } from '@/domain/trend-intent'
+import { DEFAULT_TREND_PREFERENCES, type TrendGoalIntent, type TrendPreferences } from '@/domain/trend-intent'
 import { cn, LoadErrorNotice, quietButtonClass, selectedTabClass, tabClass } from '@/lib'
 import { useTrendPreferences } from '@/lib/use-trend-preferences'
 import { useActiveTrendGoals } from '@/features/goals/useActiveTrendGoals'
@@ -58,8 +58,9 @@ export function ProgressPage() {
   const [evidence, setEvidence] = useState<EvidenceTopic | null>(null)
   const overviewRef = useRef<ProgressOverview | null>(null)
   const readOnly = useDemoReadOnly()
-  const { goals: trendGoals } = useActiveTrendGoals(!readOnly)
-  const trendPreferences = useTrendPreferences()
+  const { goals: trendGoals, pending: trendGoalsPending } = useActiveTrendGoals(!readOnly)
+  const storedTrendPreferences = useTrendPreferences()
+  const trendPreferences = readOnly || trendGoalsPending ? DEFAULT_TREND_PREFERENCES : storedTrendPreferences
 
   useEffect(() => {
     const controller = new AbortController()
