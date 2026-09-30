@@ -1,6 +1,7 @@
 import type { CoachState } from '@/domain/coach'
 import type { CoachLabItem } from '@/domain/coach-lab'
 import { healthFetch, readApiError } from '@/lib'
+import { notifyRewardStateChanged } from '@/lib/reward-events'
 
 export class CoachApiError extends Error {
   readonly status: number
@@ -21,7 +22,9 @@ async function send<T extends CoachState = CoachState>(path: string, method: 'GE
   if (!response.ok) {
     throw new CoachApiError(await readApiError(response), response.status)
   }
-  return (await response.json()) as T
+  const payload = (await response.json()) as T
+  if (method === 'POST') notifyRewardStateChanged({ kind: 'award' })
+  return payload
 }
 
 export function fetchCoach(): Promise<CoachState> {
