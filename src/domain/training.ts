@@ -310,6 +310,20 @@ export const workoutSetSchema = z
 
 export type WorkoutSet = z.infer<typeof workoutSetSchema>
 
+export const trainingPerformanceBestViewSchema = z.object({
+  kind: z.enum(['reps', 'duration', 'distance', 'pace', 'skill']),
+  value: z.number(),
+  unit: z.enum(['reps', 'sec', 'mi', 'sec/mi', 'completion']),
+  date: isoDateSchema,
+  sessionId: uuidSchema,
+  setId: uuidSchema,
+  distanceM: z.number().positive().nullable(),
+  durationSec: z.number().int().positive().nullable(),
+  completed: z.boolean().nullable(),
+})
+
+export type TrainingPerformanceBestView = z.infer<typeof trainingPerformanceBestViewSchema>
+
 export const workoutSessionExerciseRowSchema = z.object({
   id: uuidSchema,
   workout_session_id: uuidSchema,
@@ -336,6 +350,7 @@ export const workoutSessionExerciseSchema = z.object({
   measurementKind: measurementKindSchema.optional(),
   notes: z.string().nullable(),
   sets: z.array(workoutSetSchema).min(1),
+  performanceBests: z.array(trainingPerformanceBestViewSchema).default([]),
 })
 
 export type WorkoutSessionExercise = z.infer<typeof workoutSessionExerciseSchema>
