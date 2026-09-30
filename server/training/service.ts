@@ -9,6 +9,7 @@ import {
   manualWorkoutRequestValuesSchema,
   measurementFamilyMatches,
   measurementFamilyOf,
+  ownerRoutinePrescriptionError,
   ownerRoutineRequestSchema,
   sessionDetailResponseSchema,
   sessionListResponseSchema,
@@ -857,11 +858,9 @@ async function validateOwnerRoutineExercises(
     if (!exercise || !exercise.isActive) {
       throw new HttpError(400, 'Saved Routines can use only active exercises.')
     }
-    if (slot.prescription.measurement !== exercise.measurementKind) {
-      throw new HttpError(
-        400,
-        `${exercise.name} prescription must use ${exercise.measurementKind.replaceAll('_', ' ')}.`,
-      )
+    const prescriptionError = ownerRoutinePrescriptionError(exercise.measurementKind, slot.prescription)
+    if (prescriptionError) {
+      throw new HttpError(400, `${exercise.name}: ${prescriptionError}`)
     }
   }
   return byId
