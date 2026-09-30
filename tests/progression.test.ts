@@ -16,7 +16,7 @@ describe('H4 Lifetime XP progression', () => {
     expect(xpThresholdForLevel(5)).toBe(700)
     expect(xpThresholdForLevel(6)).toBe(1000)
     expect(xpThresholdForLevel(12)).toBe(3850)
-    expect(xpThresholdForLevel(13)).toBe(4550)
+    expect(xpThresholdForLevel(13)).toBe(4500)
   })
 
   it('derives level and progress only from Lifetime XP', () => {
