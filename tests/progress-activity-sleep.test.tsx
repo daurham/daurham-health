@@ -352,7 +352,7 @@ describe('activity and sleep progress UI', () => {
       </MemoryRouter>,
     )
     expect(html).toContain('No complete sleep observations in the last 30 days.')
-    expect(html).toContain('Latest complete night: Jun 14 · 9h 52m')
+    expect(html).toContain('Latest complete night: Jun 14, 2026 · 9h 52m')
     expect(html).not.toContain('1h 22m')
     expect(html).not.toContain('sleep score')
   })
