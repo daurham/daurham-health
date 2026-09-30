@@ -24,11 +24,11 @@ describe('splitSqlStatements', () => {
       CREATE OR REPLACE FUNCTION demo_trigger()
       RETURNS trigger
       LANGUAGE plpgsql
-      AS $
+      AS $$
       BEGIN
         RAISE EXCEPTION 'keep; this together';
       END;
-      $;
+      $$;
 
       CREATE TRIGGER demo
       BEFORE UPDATE ON demo_table
