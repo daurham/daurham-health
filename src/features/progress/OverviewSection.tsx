@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react'
 import type { NutritionPeriodSummary, ProgressFinding, ProgressOverview } from '@/domain/progress'
+import { resolveTrendMeaning, type TrendDirection, type TrendGoalIntent, type TrendMetric, type TrendPreferences } from '@/domain/trend-intent'
+import { TrendSignal } from '@/components/TrendSignal'
 import { kilogramsToPounds } from '@/domain/units'
 import { cn } from '@/lib'
 import { formatGrams, formatKcal } from '@/features/nutrition/format'
@@ -114,12 +116,41 @@ function findingTopic(finding: ProgressFinding, overview: ProgressOverview): Evi
   }
 }
 
+function findingTrend(finding: ProgressFinding): { metric: TrendMetric; direction: TrendDirection } | null {
+  if (finding.kind === 'body_weight_trend') {
+    if (finding.direction === 'increasing') return { metric: { kind: 'body', metricKey: 'weight' }, direction: 'higher' }
+    if (finding.direction === 'decreasing') return { metric: { kind: 'body', metricKey: 'weight' }, direction: 'lower' }
+  }
+  if (finding.kind === 'exercise_improved' && finding.exerciseId) {
+    return { metric: { kind: 'strength', exerciseDefinitionId: finding.exerciseId }, direction: 'higher' }
+  }
+  if (finding.kind === 'exercise_decreased' && finding.exerciseId) {
+    return { metric: { kind: 'strength', exerciseDefinitionId: finding.exerciseId }, direction: 'lower' }
+  }
+  if (
+    finding.kind === 'training_frequency_change' &&
+    finding.currentWorkouts != null &&
+    finding.previousWorkouts != null &&
+    finding.currentWorkouts !== finding.previousWorkouts
+  ) {
+    return {
+      metric: { kind: 'training_frequency' },
+      direction: finding.currentWorkouts > finding.previousWorkouts ? 'higher' : 'lower',
+    }
+  }
+  return null
+}
+
 export function OverviewSection({
   overview,
   onEvidence,
+  trendGoals,
+  trendPreferences,
 }: {
   overview: ProgressOverview
   onEvidence: (topic: EvidenceTopic) => void
+  trendGoals: TrendGoalIntent[]
+  trendPreferences: TrendPreferences
 }) {
   const strength = strengthOverviewCopy(overview)
   const workouts = overview.training.workouts.status === 'available' ? overview.training.workouts.value.count : null
@@ -173,6 +204,20 @@ export function OverviewSection({
                   ? 'Building history'
                   : 'No measurements yet'}
             </p>
+            {weight.trend.status === 'available' && weight.trend.value.slopePerWeek !== 0 ? (
+              <div className="mt-2">
+                <TrendSignal
+                  compact
+                  direction={weight.trend.value.slopePerWeek > 0 ? 'higher' : 'lower'}
+                  meaning={resolveTrendMeaning({
+                    metric: { kind: 'body', metricKey: 'weight' },
+                    direction: weight.trend.value.slopePerWeek > 0 ? 'higher' : 'lower',
+                    goals: trendGoals,
+                    preferences: trendPreferences,
+                  }).meaning}
+                />
+              </div>
+            ) : null}
           </Card>
           <Card title="Strength">
             {strength.improving + strength.stable + strength.decreasing === 0 ? (
@@ -226,7 +271,7 @@ export function OverviewSection({
             No new performance bests or trend changes in this period. First performances establish a baseline rather than a PR.
           </p>
         ) : (
-          <FindingFeed findings={findings} overview={overview} onEvidence={onEvidence} />
+          <FindingFeed findings={findings} overview={overview} onEvidence={onEvidence} trendGoals={trendGoals} trendPreferences={trendPreferences} />
         )}
       </section>
 
@@ -241,10 +286,14 @@ function FindingFeed({
   findings,
   overview,
   onEvidence,
+  trendGoals,
+  trendPreferences,
 }: {
   findings: ProgressFinding[]
   overview: ProgressOverview
   onEvidence: (topic: EvidenceTopic) => void
+  trendGoals: TrendGoalIntent[]
+  trendPreferences: TrendPreferences
 }) {
   return (
     <>
@@ -260,6 +309,20 @@ function FindingFeed({
                 {findingTitle(finding.kind)}
               </p>
               <p className="mt-1 font-medium">{findingHeadline(finding, overview)}</p>
+              {findingTrend(finding) ? (
+                <div className="mt-1">
+                  <TrendSignal
+                    compact
+                    direction={findingTrend(finding)!.direction}
+                    meaning={resolveTrendMeaning({
+                      metric: findingTrend(finding)!.metric,
+                      direction: findingTrend(finding)!.direction,
+                      goals: trendGoals,
+                      preferences: trendPreferences,
+                    }).meaning}
+                  />
+                </div>
+              ) : null}
               <p className="mt-1 text-sm text-zinc-600">
                 {[achievementList(finding)[0], findingDate(finding)].filter(Boolean).join(' · ')}
               </p>
@@ -291,7 +354,20 @@ function FindingFeed({
                 <span className="text-xs text-zinc-500">{findingTitle(finding.kind)}</span>
                 <span className="truncate font-medium">{findingEventName(finding, overview)}</span>
                 <span className="text-sm text-zinc-800">{findingResult(finding, overview) ?? '—'}</span>
-                <span className="truncate text-sm text-zinc-600">{achievementList(finding)[0] ?? '—'}</span>
+                <span className="truncate text-sm text-zinc-600">
+                  {findingTrend(finding) ? (
+                    <TrendSignal
+                      compact
+                      direction={findingTrend(finding)!.direction}
+                      meaning={resolveTrendMeaning({
+                        metric: findingTrend(finding)!.metric,
+                        direction: findingTrend(finding)!.direction,
+                        goals: trendGoals,
+                        preferences: trendPreferences,
+                      }).meaning}
+                    />
+                  ) : achievementList(finding)[0] ?? '—'}
+                </span>
                 <span className="text-right text-zinc-400" aria-hidden="true">
                   →
                 </span>
