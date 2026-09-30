@@ -26,6 +26,8 @@ describe('H4 experience-system source contract', () => {
     expect(coach).toContain('truncate text-sm font-semibold')
     expect(coach).toContain('setDetailTask(task)')
     expect(coach).not.toContain('data-coach-primary')
+    expect(coach).toContain('min-h-56')
+    expect(coach).toContain('aria-label="Loading Coach"')
     const inbox = coach.slice(coach.indexOf('export function CoachInbox'))
     expect(inbox.indexOf('aria-label="Today"')).toBeLessThan(inbox.indexOf('aria-label="Stretch"'))
     expect(inbox.indexOf('aria-label="Stretch"')).toBeLessThan(inbox.indexOf('aria-label="This week"'))
@@ -52,10 +54,13 @@ describe('H4 experience-system source contract', () => {
     expect(css).toContain('--health-reward:')
     expect(css).toContain('--health-hero-gradient:')
     expect(css).toContain("data-health-palette='silver-instinct'")
+    expect(css).toContain('.app-shell')
+    expect(css).toContain('.signal-positive-surface')
+    expect(css).toContain('.signal-negative-surface')
   })
 
   it('keeps H4 presentation-only and event-driven', () => {
-    expect(inventory).toContain("LATEST_SCHEMA_MIGRATION = '0039_xp_reward_wallet.sql'")
+    expect(inventory).toContain("LATEST_SCHEMA_MIGRATION = '0040_goal_training_units_fix.sql'")
     expect(layout).not.toContain('setInterval')
     expect(coach).not.toContain('setInterval')
     expect(rewards).not.toContain('setInterval')
