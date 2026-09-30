@@ -842,6 +842,59 @@ html.dark[data-health-palette='silver-instinct'] {
   }
 }
 
+
+.theme-changing body,
+.theme-changing header,
+.theme-changing nav,
+.theme-changing main,
+.theme-changing section,
+.theme-changing button,
+.theme-changing a,
+.theme-changing .health-hero-surface,
+.theme-changing .xp-badge {
+  transition:
+    background-color 240ms ease,
+    border-color 240ms ease,
+    color 240ms ease,
+    box-shadow 240ms ease;
+}
+
+.progression-meter {
+  transition: width 420ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.wallet-xp-pulse {
+  animation: wallet-xp-pulse 520ms ease-out;
+}
+
+.xp-celebration {
+  animation: xp-celebration 520ms ease-out;
+}
+
+.level-celebration {
+  animation: level-celebration 420ms cubic-bezier(0.2, 0.9, 0.25, 1);
+}
+
+.reward-celebration {
+  animation: reward-celebration 360ms ease-out;
+}
+
+.theme-unlock-glow {
+  position: relative;
+  isolation: isolate;
+}
+
+.theme-unlock-glow::before {
+  position: absolute;
+  z-index: -1;
+  inset: -0.35rem;
+  border-radius: inherit;
+  background: radial-gradient(circle, var(--health-glow), transparent 70%);
+  content: '';
+  animation: theme-unlock-glow 700ms ease-out both;
+  pointer-events: none;
+}
+
 :root {
   --motion-press: 120ms;
   --motion-state: 160ms;
@@ -922,6 +975,27 @@ html.dark[data-health-palette='silver-instinct'] {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .wallet-xp-pulse,
+  .xp-celebration,
+  .level-celebration,
+  .reward-celebration,
+  .theme-unlock-glow::before {
+    animation: none;
+  }
+
+  .progression-meter,
+  .theme-changing body,
+  .theme-changing header,
+  .theme-changing nav,
+  .theme-changing main,
+  .theme-changing section,
+  .theme-changing button,
+  .theme-changing a,
+  .theme-changing .health-hero-surface,
+  .theme-changing .xp-badge {
+    transition: none;
+  }
+
   .page-enter,
   .motion-page-enter,
   .motion-panel-enter,
@@ -946,6 +1020,34 @@ html.dark[data-health-palette='silver-instinct'] {
   .motion-card:hover:active {
     transform: none;
   }
+}
+
+@keyframes wallet-xp-pulse {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 transparent; }
+  45% { transform: scale(1.055); box-shadow: 0 0 0 0.35rem var(--health-glow); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 transparent; }
+}
+
+@keyframes xp-celebration {
+  0% { opacity: 0; transform: translateY(4px) scale(0.96); }
+  45% { opacity: 1; transform: translateY(-1px) scale(1.035); }
+  100% { opacity: 1; transform: none; }
+}
+
+@keyframes level-celebration {
+  0% { opacity: 0; transform: translateY(-8px) scale(0.98); }
+  100% { opacity: 1; transform: none; }
+}
+
+@keyframes reward-celebration {
+  0% { opacity: 0.25; transform: scale(0.985); }
+  100% { opacity: 1; transform: none; }
+}
+
+@keyframes theme-unlock-glow {
+  0% { opacity: 0; transform: scale(0.84); }
+  45% { opacity: 0.9; }
+  100% { opacity: 0; transform: scale(1.12); }
 }
 
 @keyframes page-enter {
