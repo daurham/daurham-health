@@ -29,19 +29,17 @@ export async function handleTrainingExercises(req: ApiRequest, res: ApiResponse)
     sendJson(res, 404, { error: 'Not found' })
     return
   }
+
   try {
     if (route.kind === 'collection') {
-      if (route.kind === 'restore') {
-      if (req.method !== 'POST') {
-        res.setHeader('Allow', 'POST')
-        sendJson(res, 405, { error: 'Method not allowed' })
-        return
-      }
-      sendJson(res, 200, await restoreExercise(route.id))
-      return
-    }
-    if (req.method === 'GET') {
-        sendJson(res, 200, queryStringParam(req, 'management') === 'true' ? await listExerciseLibrary() : await listExercises())
+      if (req.method === 'GET') {
+        sendJson(
+          res,
+          200,
+          queryStringParam(req, 'management') === 'true'
+            ? await listExerciseLibrary()
+            : await listExercises(),
+        )
         return
       }
       if (req.method === 'POST') {
@@ -52,6 +50,17 @@ export async function handleTrainingExercises(req: ApiRequest, res: ApiResponse)
       sendJson(res, 405, { error: 'Method not allowed' })
       return
     }
+
+    if (route.kind === 'restore') {
+      if (req.method !== 'POST') {
+        res.setHeader('Allow', 'POST')
+        sendJson(res, 405, { error: 'Method not allowed' })
+        return
+      }
+      sendJson(res, 200, await restoreExercise(route.id))
+      return
+    }
+
     if (req.method === 'GET') {
       sendJson(res, 200, { exercise: await getExerciseDefinition(route.id) })
       return
