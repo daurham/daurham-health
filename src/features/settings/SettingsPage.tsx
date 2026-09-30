@@ -5,6 +5,8 @@ import { formatCalendarRange } from '@/domain/calendar-format'
 import { healthCalendarDateFromNow } from '@/domain/time'
 import { progressionState } from '@/domain/progression'
 import { XpAmount } from '@/components/XpAmount'
+import { DEFAULT_TREND_PREFERENCES, type TrendPreferenceDirection, type TrendPreferences } from '@/domain/trend-intent'
+import { clearTrendPreferences, readTrendPreferences, writeTrendPreferences } from '@/trend-intent'
 import { useRewardSummary } from '@/features/rewards/useRewardSummary'
 import {
   MODE_LABELS,
@@ -186,6 +188,93 @@ function AppearanceSection() {
   )
 }
 
+function storedTrendPreferences(): TrendPreferences {
+  return typeof localStorage === 'undefined' ? { ...DEFAULT_TREND_PREFERENCES } : readTrendPreferences(localStorage)
+}
+
+const BODY_TREND_OPTIONS: Array<{ value: TrendPreferenceDirection; label: string }> = [
+  { value: 'lower', label: 'Lower' },
+  { value: 'maintain', label: 'Maintain / neutral' },
+  { value: 'higher', label: 'Higher' },
+  { value: 'none', label: 'No preference' },
+]
+
+const UP_TREND_OPTIONS: Array<{ value: 'higher' | 'none'; label: string }> = [
+  { value: 'higher', label: 'Higher' },
+  { value: 'none', label: 'No preference' },
+]
+
+function TrendColorsSection() {
+  const [preferences, setPreferences] = useState<TrendPreferences>(storedTrendPreferences)
+
+  function update<K extends keyof Omit<TrendPreferences, 'version'>>(key: K, value: TrendPreferences[K]) {
+    const next = { ...preferences, [key]: value }
+    setPreferences(next)
+    writeTrendPreferences(localStorage, next)
+  }
+
+  function reset() {
+    clearTrendPreferences(localStorage)
+    setPreferences({ ...DEFAULT_TREND_PREFERENCES })
+  }
+
+  return (
+    <section id="trend-colors" className="min-w-0 scroll-mt-6 space-y-4 rounded-xl border border-zinc-200 bg-white p-4 sm:p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold tracking-tight">Personalize trend colors</h2>
+          <p className="mt-1 max-w-2xl text-sm text-zinc-600">
+            Tell Progress what direction you generally want when there is no active Goal. An active formal Goal always takes priority over these visual preferences.
+          </p>
+        </div>
+        <button type="button" className={quietButtonClass} onClick={reset}>Reset</button>
+      </div>
+
+      <TrendPreferenceRow label="Bodyweight" value={preferences.bodyweight} options={BODY_TREND_OPTIONS} onChange={(value) => update('bodyweight', value)} />
+      <TrendPreferenceRow label="Body fat" value={preferences.bodyFat} options={BODY_TREND_OPTIONS} onChange={(value) => update('bodyFat', value)} />
+      <TrendPreferenceRow label="Waist" value={preferences.waist} options={BODY_TREND_OPTIONS} onChange={(value) => update('waist', value)} />
+      <TrendPreferenceRow label="Strength" value={preferences.strength} options={UP_TREND_OPTIONS} onChange={(value) => update('strength', value)} />
+      <TrendPreferenceRow label="Activity steps" value={preferences.activitySteps} options={UP_TREND_OPTIONS} onChange={(value) => update('activitySteps', value)} />
+
+      <p className="text-xs leading-5 text-zinc-500">
+        These choices only color trend direction. They do not create Health Goals, change Coach, or alter any stored Health measurement.
+      </p>
+    </section>
+  )
+}
+
+function TrendPreferenceRow<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string
+  value: T
+  options: Array<{ value: T; label: string }>
+  onChange: (value: T) => void
+}) {
+  return (
+    <fieldset className="grid gap-2 border-t border-zinc-100 pt-3 sm:grid-cols-[10rem_1fr] sm:items-center">
+      <legend className="sr-only">{label}</legend>
+      <p className="text-sm font-medium text-zinc-800">{label}</p>
+      <div className="flex flex-wrap gap-2">
+        {options.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            aria-pressed={value === option.value}
+            className={value === option.value ? themeChoiceSelectedClass : themeChoiceClass}
+            onClick={() => onChange(option.value)}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+    </fieldset>
+  )
+}
+
 function PreviewReport({ preview }: { preview: AppleHealthPreview }) {
   const counts = preview.counts
   return (
@@ -338,6 +427,7 @@ export function SettingsPage() {
       </div>
 
       <AppearanceSection />
+      <TrendColorsSection />
 
       <section className="space-y-3 rounded-lg border border-zinc-200 bg-white p-4">
         <h2 className="text-base font-semibold">Supplements</h2>
