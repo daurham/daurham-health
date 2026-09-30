@@ -2,6 +2,7 @@ import {
   trendMeaningLabel,
   type TrendDirection,
   type TrendMeaning,
+  type TrendMeaningSource,
 } from '@/domain/trend-intent'
 import { cn } from '@/lib'
 
@@ -23,13 +24,15 @@ export function TrendSignal({
   meaning,
   compact = false,
   className,
+  source = 'goal',
 }: {
   direction: TrendDirection
   meaning: TrendMeaning
+  source?: TrendMeaningSource
   compact?: boolean
   className?: string
 }) {
-  const label = trendMeaningLabel(meaning)
+  const label = trendMeaningLabel(meaning, source)
   return (
     <span
       className={cn(
