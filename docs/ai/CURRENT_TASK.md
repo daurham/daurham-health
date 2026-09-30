@@ -1033,3 +1033,162 @@ H4 is complete only when all of the following are true:
 18. full automated regression passes.
 19. desktop + mobile visual acceptance passes across representative themes.
 20. the owner can describe the app as feeling more alive and having a recognizable personality without sacrificing the seriousness/readability of a personal Health tool.
+
+
+---
+
+# Visual QA addendum — 2026-09-29
+
+The owner's first desktop/mobile visual pass accepted the overall H4 direction and identified the following required closeout refinements. These requirements supersede any conflicting wording above.
+
+## A. Stable Coach loading geometry
+
+The Today Coach loading state must reserve approximately the same vertical footprint as the normal compact mission card so Nutrition/Training do not visibly jump when Coach finishes loading.
+
+- Use a structured mission-card skeleton rather than an unrelated short rectangle.
+- Skeleton and loaded card must share a stable minimum height at the Today breakpoint.
+- Do not add a fake delay.
+- Do not add polling merely to make the skeleton disappear sooner.
+- Local Coach generation may be slower than production; layout stability is the required fix.
+
+## B. Theme Studio previews follow resolved light/dark mode
+
+Theme preview cards must visually match the currently resolved color mode.
+
+- Dark mode shows dark theme previews.
+- Light mode shows light theme previews.
+- System follows the actual system-resolved mode.
+- Preview remains a miniature theme sample and may show its gradient/glow/reward identity even when the theme is locked.
+- The preview must not temporarily activate the locked theme.
+
+## C. Conservative motivating defaults supplement Goal semantics
+
+The earlier rule “no goal/preference => always neutral” is too restrictive.
+
+Formal Goals still have highest precedence. Presentation preferences still apply next where configured. After those, H4 may use a **small explicit motivational-default allowlist** for metrics whose product meaning is intentionally unambiguous for this personal app.
+
+Initial defaults:
+
+- activity steps higher => positive/toward-like motivating signal
+- activity steps lower => negative/attention signal
+- exercise minutes higher => positive; lower => negative when surfaced as a comparison
+- estimated strength improving/higher => positive
+- estimated strength decreasing/lower => negative
+- Training frequency higher => positive
+- Training frequency lower => negative
+- a new canonical performance best / PR => positive
+- logged-day protein average higher => positive
+- logged-day protein average lower => negative
+- calories higher/lower => neutral unless an explicit Goal applies
+- sleep duration higher/lower => neutral unless an explicit Goal applies
+- bodyweight/body composition remains Goal/preference driven unless a future explicit product rule is added
+
+These are presentation signals, not medical judgments and not new Health analytics.
+
+Precedence becomes:
+
+**active formal Goal > explicit trend-color preference > conservative motivational default > neutral**
+
+Do not expand the default allowlist by guessing.
+
+UI copy for these defaults should not falsely say “Toward goal” when no Goal exists. Use accessible wording such as “Positive signal” / “Needs attention” while retaining the arrow and semantic color.
+
+## D. Cross-domain pattern tone
+
+Where an existing deterministic pattern directly compares a motivational-default metric, the pattern can inherit a conservative presentation tone.
+
+Required example:
+
+- `activity_training:steps`: if Training-day steps are lower than other completed Activity days, show an attention/negative treatment; if higher, show a positive treatment.
+
+Other associations stay neutral unless their meaning is explicitly defined. Color must not imply causation.
+
+## E. Human-readable date-only presentation
+
+Date-only values shown to the owner should not expose raw `YYYY-MM-DD` unless they are inside a native date input.
+
+Preferred standalone format:
+
+- `Sep 29, 2026`
+
+Preferred ranges:
+
+- same month/year: `Sep 22–28`
+- cross month/same year: `Sep 22–Oct 28`
+- cross year: include years where required for clarity
+
+Use the shared calendar-date formatting module. Do not construct date-only values through local-time `new Date('YYYY-MM-DD')` parsing that can shift calendar days.
+
+Audit high-visibility Goal, Progress, Insights, Today, Coach, Lab, and comparison copy for raw date-only output.
+
+## F. Training Goal persistence bug is a schema-repair exception
+
+Visual QA exposed an older H2D schema defect: Training Goal kinds can validate in application code but fail when inserting `goal_versions` because the 0028 `goal_versions_unit_known` database constraint was never expanded for H2D's new canonical Goal units.
+
+The repair requires migration:
+
+`0040_goal_training_units_fix.sql`
+
+It must expand the allowed Goal-version units to include:
+
+- `sec`
+- `mi`
+- `sec/mi`
+- `completion`
+
+This is an H2D persistence bug fix discovered during H4 QA, not a new H4 data model. It is the explicit exception to the earlier “no H4 migration” requirement.
+
+After this repair:
+
+- repository/backup schema head becomes 0040;
+- Distance / Duration / Pace / Skill Goal creation must persist successfully;
+- existing Goal kinds remain valid;
+- production owner must apply migration 0040 before relying on these Goal kinds.
+
+Add a disposable PostgreSQL regression proving the new units satisfy the actual database constraint.
+
+## G. Local Nutrition date-query parity
+
+Local Vite GET `/api/nutrition/day?date=...` currently loses the query parameter because the handler reads only the Vercel `req.query` shape.
+
+Use the shared request-query helper that supports both:
+
+- Vercel `req.query`;
+- query parameters parsed from the local Node/Vite request URL.
+
+Add a regression that exercises the Vite-style URL shape with no `req.query`.
+
+Production behavior must remain unchanged.
+
+## H. Progression themes need stronger personality
+
+The first H4 visual pass accepts the calmer base theme direction but confirms that progression themes should visibly earn their “unlock” status.
+
+Progression theme packs should use their existing theme tokens more aggressively through restrained:
+
+- ambient gradients;
+- surface tint;
+- glow around reward/progression chrome;
+- themed hero/raised surfaces;
+- chart supporting colors;
+- bounded unlock/theme-selection animation.
+
+No infinite ambient animation.
+
+Base themes may remain calmer.
+
+A locked Theme Studio preview should make these personality differences visible so the owner can see what they are working toward.
+
+## I. Closeout gate
+
+Do not close H4 until:
+
+- the Goal POST bug is fixed and migration 0040 validated;
+- local Nutrition date navigation works;
+- Coach skeleton no longer causes a visible geometry jump;
+- dark-mode Theme Studio previews look dark;
+- motivational positive/negative signals are visible in the approved allowlisted cases;
+- raw date-only strings are removed from high-frequency owner-facing presentation;
+- progression-theme preview/personality is visibly stronger;
+- full automated validation passes again;
+- the owner gets one more visual QA pass.
