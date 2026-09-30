@@ -1,6 +1,6 @@
 export const BACKUP_FORMAT = 'daurham-health-backup'
 export const BACKUP_FORMAT_VERSION = 1
-export const LATEST_SCHEMA_MIGRATION = '0038_training_measurements_goals_routines.sql'
+export const LATEST_SCHEMA_MIGRATION = '0039_xp_reward_wallet.sql'
 export const PORTABLE_EXPORT_BYTE_LIMIT = 3_500_000
 
 export type ColumnKind = 'uuid' | 'text' | 'date' | 'timestamptz' | 'numeric' | 'int' | 'bool' | 'json' | 'bytea'
@@ -1058,6 +1058,60 @@ export const BACKUP_TABLES: readonly BackupTable[] = [
       col('snoozed_until', 'date'),
       col('created_at', 'timestamptz'),
       col('updated_at', 'timestamptz'),
+    ],
+  }),
+  table({
+    name: 'reward_items',
+    backupClass: 'canonical',
+    primaryKey: ['id'],
+    seeded: false,
+    portable: true,
+    references: [],
+    columns: [
+      col('id', 'uuid'),
+      col('name', 'text'),
+      col('cost_xp', 'int'),
+      col('note', 'text'),
+      col('is_active', 'bool'),
+      col('created_at', 'timestamptz'),
+      col('updated_at', 'timestamptz'),
+    ],
+  }),
+  table({
+    name: 'reward_purchases',
+    backupClass: 'canonical',
+    primaryKey: ['id'],
+    seeded: false,
+    portable: true,
+    references: [{ column: 'reward_item_id', table: 'reward_items' }],
+    columns: [
+      col('id', 'uuid'),
+      col('reward_item_id', 'uuid'),
+      col('reward_name', 'text'),
+      col('cost_xp', 'int'),
+      col('submission_id', 'uuid'),
+      col('purchased_at', 'timestamptz'),
+      col('created_at', 'timestamptz'),
+    ],
+  }),
+  table({
+    name: 'xp_ledger',
+    backupClass: 'canonical',
+    primaryKey: ['id'],
+    seeded: false,
+    portable: true,
+    references: [],
+    columns: [
+      col('id', 'uuid'),
+      col('entry_kind', 'text'),
+      col('amount_xp', 'int'),
+      col('source_kind', 'text'),
+      col('source_id', 'uuid'),
+      col('idempotency_key', 'text'),
+      col('rule_version', 'text'),
+      col('occurred_at', 'timestamptz'),
+      col('metadata', 'json'),
+      col('created_at', 'timestamptz'),
     ],
   }),
   table({
