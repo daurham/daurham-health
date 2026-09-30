@@ -13,6 +13,7 @@ import {
 } from '@/domain/paper-load'
 import { cn, dangerButtonClass, primaryButtonClass, quietButtonClass, SHELL_MAX_WIDTH_CLASS } from '@/lib'
 import { addDraftSet, draftExerciseFromDefinition, type DraftExercise, type DraftSet, type WorkoutDraft } from './draft'
+import { ExerciseGuideButton, ExerciseGuideSheet } from './ExerciseGuideSheet'
 
 const inputClass =
   'min-h-11 w-full rounded-md border border-zinc-300 bg-white px-2.5 py-2 text-base text-zinc-900 disabled:bg-zinc-100'
@@ -36,8 +37,10 @@ export function WorkoutEditor({
   guidance = [],
   disclaimer,
   allowExerciseManagement = false,
+  allowExerciseAddition = false,
   allowSessionName = false,
   exerciseCatalog = [],
+  lastPerformedDates = {},
   onCreateExercise,
 }: {
   title: string
@@ -56,10 +59,17 @@ export function WorkoutEditor({
   guidance?: TranscriptionGuidance[]
   disclaimer?: string
   allowExerciseManagement?: boolean
+  allowExerciseAddition?: boolean
   allowSessionName?: boolean
   exerciseCatalog?: ExerciseDefinition[]
+  lastPerformedDates?: Record<string, string | null>
   onCreateExercise?: (input: OwnerExerciseRequest) => Promise<ExerciseDefinition>
 }) {
+  const [guideExercise, setGuideExercise] = useState<ExerciseDefinition | null>(null)
+  const catalogById = useMemo(
+    () => new Map(exerciseCatalog.map((exercise) => [exercise.id, exercise] as const)),
+    [exerciseCatalog],
+  )
   const highlightDate = guidance.some((item) => item.path === 'workoutDate')
   const dateError = fieldError(fieldErrors, 'workoutDate')
   const firstErrorPath = fieldErrors[0]?.path
@@ -144,8 +154,12 @@ export function WorkoutEditor({
             exerciseIndex={exerciseIndex}
             highlighted={guidance.some((item) => item.path === `exercises.${exercise.slotId}`)}
             fieldErrors={fieldErrors}
-            showPrescription={!allowExerciseManagement}
-            allowSetRemoval={allowExerciseManagement}
+            definition={catalogById.get(exercise.exerciseDefinitionId) ?? null}
+            sessionOnly={draft.sessionType === 'programmed' && exercise.slotId == null}
+            lastPerformedDate={lastPerformedDates[exercise.exerciseDefinitionId] ?? null}
+            onOpenGuide={(definition) => setGuideExercise(definition)}
+            showPrescription={!allowExerciseManagement && exercise.slotId != null}
+            allowSetRemoval={allowExerciseManagement || (draft.sessionType === 'programmed' && exercise.slotId == null)}
             onMove={
               allowExerciseManagement
                 ? (direction) => {
@@ -164,7 +178,7 @@ export function WorkoutEditor({
                 : undefined
             }
             onRemove={
-              allowExerciseManagement
+              allowExerciseManagement || (draft.sessionType === 'programmed' && exercise.slotId == null)
                 ? () => {
                     onChange({
                       ...draft,
@@ -182,9 +196,11 @@ export function WorkoutEditor({
           />
         ))}
       </div>
-      {allowExerciseManagement ? (
+      {allowExerciseManagement || allowExerciseAddition ? (
         <ExercisePicker
-          catalog={exerciseCatalog}
+          catalog={exerciseCatalog.filter(
+            (candidate) => !draft.exercises.some((exercise) => exercise.exerciseDefinitionId === candidate.id),
+          )}
           disabled={saving}
           onSelect={(exercise) => {
             onChange({ ...draft, exercises: [...draft.exercises, draftExerciseFromDefinition(exercise)] })
@@ -192,6 +208,8 @@ export function WorkoutEditor({
           onCreateExercise={onCreateExercise}
         />
       ) : null}
+
+      {guideExercise ? <ExerciseGuideSheet exercise={guideExercise} onClose={() => setGuideExercise(null)} /> : null}
 
       <div className="shell-action-bar border-t border-zinc-200 bg-white px-4 py-3">
         <div className={cn('mx-auto flex gap-3', SHELL_MAX_WIDTH_CLASS)}>
@@ -360,11 +378,24 @@ function ScoreRow({
   )
 }
 
+function displayLastPerformedDate(date: string): string {
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(`${date}T12:00:00Z`))
+}
+
 function ExerciseCard({
   exercise,
   exerciseIndex,
   highlighted,
   fieldErrors,
+  definition,
+  sessionOnly,
+  lastPerformedDate,
+  onOpenGuide,
   showPrescription,
   allowSetRemoval,
   onMove,
@@ -375,6 +406,10 @@ function ExerciseCard({
   exerciseIndex: number
   highlighted: boolean
   fieldErrors: ReviewFieldError[]
+  definition: ExerciseDefinition | null
+  sessionOnly: boolean
+  lastPerformedDate: string | null
+  onOpenGuide: (exercise: ExerciseDefinition) => void
   showPrescription: boolean
   allowSetRemoval: boolean
   onMove?: (direction: -1 | 1) => void
@@ -390,18 +425,29 @@ function ExerciseCard({
       )}
     >
       <div className="flex items-start justify-between gap-3">
-        <h2 className="font-semibold">{exercise.name}</h2>
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="font-semibold">{exercise.name}</h2>
+            {sessionOnly ? (
+              <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-medium text-zinc-600">
+                This workout only
+              </span>
+            ) : null}
+            {definition ? <ExerciseGuideButton exercise={definition} onOpen={() => onOpenGuide(definition)} /> : null}
+          </div>
+          {lastPerformedDate ? (
+            <p className="mt-1 text-xs text-zinc-500">Last time · {displayLastPerformedDate(lastPerformedDate)}</p>
+          ) : null}
+        </div>
         {onRemove ? (
           <div className="flex shrink-0 gap-2">
-            <button type="button" className="text-sm text-zinc-600" onClick={() => onMove?.(-1)}>
-              Up
-            </button>
-            <button type="button" className="text-sm text-zinc-600" onClick={() => onMove?.(1)}>
-              Down
-            </button>
-            <button type="button" className="text-sm text-red-700" onClick={onRemove}>
-              Remove
-            </button>
+            {onMove ? (
+              <>
+                <button type="button" className="text-sm text-zinc-600" onClick={() => onMove(-1)}>Up</button>
+                <button type="button" className="text-sm text-zinc-600" onClick={() => onMove(1)}>Down</button>
+              </>
+            ) : null}
+            <button type="button" className="text-sm text-red-700" onClick={onRemove}>Remove</button>
           </div>
         ) : null}
       </div>

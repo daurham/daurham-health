@@ -8,7 +8,7 @@ import {
   quietButtonClass,
   secondaryButtonClass,
 } from '@/lib'
-import { createOwnerExercise, deleteSession, fetchExercises, fetchSession, fetchTemplates, updateSession } from './api'
+import { createOwnerExercise, deleteSession, fetchExerciseLibrary, fetchSession, fetchTemplates, updateSession } from './api'
 import {
   DraftValidationError,
   buildManualWorkoutPayload,
@@ -24,6 +24,7 @@ export function WorkoutDetailPage() {
   const navigate = useNavigate()
   const [session, setSession] = useState<WorkoutSession | null>(null)
   const [catalog, setCatalog] = useState<ExerciseDefinition[]>([])
+  const [lastPerformedDates, setLastPerformedDates] = useState<Record<string, string | null>>({})
   const [template, setTemplate] = useState<WorkoutTemplate | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -77,21 +78,21 @@ export function WorkoutDetailPage() {
   }, [sessionId, reloadToken])
 
   useEffect(() => {
-    if (session?.sessionType !== 'ad_hoc' && session?.sessionType !== 'experiment') {
-      return
-    }
+    if (!session) return
     let cancelled = false
-    fetchExercises()
-      .then((next) => {
-        if (!cancelled) {
-          setCatalog(next)
-        }
+    fetchExerciseLibrary()
+      .then((items) => {
+        if (cancelled) return
+        setCatalog(items.filter((item) => item.exercise.isActive).map((item) => item.exercise))
+        setLastPerformedDates(
+          Object.fromEntries(items.map((item) => [item.exercise.id, item.lastPerformedDate])),
+        )
       })
       .catch(() => undefined)
     return () => {
       cancelled = true
     }
-  }, [session?.sessionType])
+  }, [session?.id])
 
   async function onSave() {
     if (!sessionId || !draft) {
@@ -167,17 +168,16 @@ export function WorkoutDetailPage() {
           subtitle="Changes update this workout. They are not saved until you tap Save workout."
           draft={draft}
           allowExerciseManagement={session?.sessionType === 'ad_hoc' || session?.sessionType === 'experiment'}
+          allowExerciseAddition={session?.sessionType === 'programmed'}
           allowSessionName={session?.sessionType === 'ad_hoc' || session?.sessionType === 'experiment'}
           exerciseCatalog={catalog}
-          onCreateExercise={
-            session?.sessionType === 'ad_hoc' || session?.sessionType === 'experiment'
-              ? async (input) => {
-                  const created = await createOwnerExercise(input)
-                  setCatalog((current) => [...current.filter((exercise) => exercise.id !== created.id), created])
-                  return created
-                }
-              : undefined
-          }
+          lastPerformedDates={lastPerformedDates}
+          onCreateExercise={async (input) => {
+            const created = await createOwnerExercise(input)
+            setCatalog((current) => [...current.filter((exercise) => exercise.id !== created.id), created])
+            setLastPerformedDates((current) => ({ ...current, [created.id]: null }))
+            return created
+          }}
           onChange={(next) => {
             setDraft(next)
             setFieldErrors((current) => (current.length > 0 ? validateWorkoutDraft(next) : current))
@@ -251,7 +251,7 @@ function SessionDetail({
           </h1>
           <p className="mt-1 text-sm text-zinc-500">
             {session.sessionType === 'programmed' && session.routineCode
-              ? `Routine ${session.routineCode}${session.templateVersion ? ` · v${session.templateVersion}` : ''} · Programmed`
+              ? `Routine ${session.routineCode}${session.hasProgrammedExtras ? '+' : ''}${session.templateVersion ? ` · v${session.templateVersion}` : ''} · Programmed`
               : sessionIntentLabel(session.sessionType)}
           </p>
         </div>

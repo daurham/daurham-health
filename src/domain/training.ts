@@ -435,6 +435,7 @@ export const workoutSessionSummarySchema = z.object({
   effort: effortSchema.nullable(),
   painLevel: painLevelSchema.nullable(),
   sourceKind: sessionSourceKindSchema,
+  hasProgrammedExtras: z.boolean().optional(),
 })
 
 export type WorkoutSessionSummary = z.infer<typeof workoutSessionSummarySchema>
@@ -817,6 +818,7 @@ export function sessionSummaryFromRow(row: WorkoutSessionRow): WorkoutSessionSum
     effort: row.effort,
     painLevel: row.pain_level,
     sourceKind: row.source_kind,
+    ...(row.metadata.has_programmed_extras === true ? { hasProgrammedExtras: true } : {}),
   })
 }
 
@@ -856,6 +858,7 @@ export function trainingSessionDisplayName(session: {
   sessionName?: string | null
   templateName?: string | null
   routineCode?: string | null
+  hasProgrammedExtras?: boolean
 }): string {
   if (session.sessionType === 'ad_hoc') {
     const name = session.sessionName?.trim()
@@ -865,13 +868,14 @@ export function trainingSessionDisplayName(session: {
     const name = session.sessionName?.trim()
     return name ? name : 'Experiment workout'
   }
+  const suffix = session.hasProgrammedExtras ? '+' : ''
   const templateName = session.templateName?.trim()
   if (templateName) {
-    return templateName
+    return `${templateName}${suffix}`
   }
   const routineCode = session.routineCode?.trim()
   if (routineCode) {
-    return `Routine ${routineCode}`
+    return `Routine ${routineCode}${suffix}`
   }
   return 'Workout'
 }

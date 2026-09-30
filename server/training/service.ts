@@ -372,7 +372,12 @@ export function prepareManualSession(input: {
     experimentId: request.sessionType === 'experiment' ? (request.experimentId ?? null) : null,
     benchmarkProtocolVersionId:
       request.sessionType === 'experiment' ? (request.benchmarkProtocolVersionId ?? null) : null,
-    metadata: { entry_mass_unit: 'lb', ...(input.metadata ?? {}) },
+    metadata: {
+      ...(input.metadata ?? {}),
+      entry_mass_unit: 'lb',
+      has_programmed_extras:
+        request.sessionType === 'programmed' && request.exercises.some((exercise) => exercise.slotId == null),
+    },
     exercises,
   }
 }

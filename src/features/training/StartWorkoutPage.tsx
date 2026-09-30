@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import type { ReviewFieldError } from '@/domain/paper-load'
 import { trainingSessionDisplayName } from '@/domain/training'
-import type { ExerciseDefinition, WorkoutTemplate } from '@/domain/training'
+import type { ExerciseDefinition, ExerciseLibraryItem, WorkoutTemplate } from '@/domain/training'
 import { interactiveCardClass } from '@/lib'
-import { createOwnerExercise, createSession, fetchExercises, fetchTemplates } from './api'
+import { createOwnerExercise, createSession, fetchExerciseLibrary, fetchTemplates } from './api'
 import { WorkoutEditor } from './WorkoutEditor'
 import {
   DraftValidationError,
@@ -25,6 +25,7 @@ export function StartWorkoutPage() {
   const benchmarkProtocolVersionId = params.get('benchmarkProtocolVersionId')
   const [templates, setTemplates] = useState<WorkoutTemplate[]>([])
   const [catalog, setCatalog] = useState<ExerciseDefinition[]>([])
+  const [lastPerformedDates, setLastPerformedDates] = useState<Record<string, string | null>>({})
   const [loading, setLoading] = useState(!adHoc && !experimentWorkout)
   const [error, setError] = useState<string | null>(null)
   const [draft, setDraft] = useState<WorkoutDraft | null>(() => {
@@ -41,13 +42,18 @@ export function StartWorkoutPage() {
   const [errorFocusKey, setErrorFocusKey] = useState(0)
 
   useEffect(() => {
+    function applyLibrary(items: ExerciseLibraryItem[]) {
+      setCatalog(items.filter((item) => item.exercise.isActive).map((item) => item.exercise))
+      setLastPerformedDates(
+        Object.fromEntries(items.map((item) => [item.exercise.id, item.lastPerformedDate])),
+      )
+    }
+
     if (adHoc || experimentWorkout) {
       let cancelled = false
-      fetchExercises()
-        .then((next) => {
-          if (!cancelled) {
-            setCatalog(next)
-          }
+      fetchExerciseLibrary()
+        .then((items) => {
+          if (!cancelled) applyLibrary(items)
         })
         .catch((caught: unknown) => {
           if (!cancelled) {
@@ -59,11 +65,11 @@ export function StartWorkoutPage() {
       }
     }
     let cancelled = false
-    Promise.all([fetchTemplates(), fetchExercises()])
-      .then(([nextTemplates, nextCatalog]) => {
+    Promise.all([fetchTemplates(), fetchExerciseLibrary()])
+      .then(([nextTemplates, items]) => {
         if (!cancelled) {
           setTemplates(nextTemplates)
-          setCatalog(nextCatalog)
+          applyLibrary(items)
         }
       })
       .catch((caught: unknown) => {
@@ -202,6 +208,8 @@ export function StartWorkoutPage() {
   }
 
   const draftIsAdHoc = draft.sessionType === 'ad_hoc'
+  const hasProgrammedExtras =
+    draft.sessionType === 'programmed' && draft.exercises.some((exercise) => exercise.slotId == null)
 
   return (
     <>
@@ -218,7 +226,7 @@ export function StartWorkoutPage() {
             ? trainingSessionDisplayName({ sessionType: 'experiment', sessionName: draft.sessionName })
             : draftIsAdHoc
               ? trainingSessionDisplayName({ sessionType: 'ad_hoc', sessionName: draft.sessionName })
-              : (draft.template?.name ?? 'Workout')
+              : `${draft.template?.name ?? 'Workout'}${hasProgrammedExtras ? '+' : ''}`
         }
         subtitle="Draft — not saved until you tap Save Workout."
         draft={draft}
@@ -232,11 +240,14 @@ export function StartWorkoutPage() {
         onCancel={experimentWorkout ? () => navigate('/lab') : draftIsAdHoc ? () => navigate('/training') : () => setDraft(null)}
         cancelLabel={draftIsAdHoc || experimentWorkout ? 'Cancel' : 'Change template'}
         allowExerciseManagement={draftIsAdHoc || experimentWorkout}
+        allowExerciseAddition={draft.sessionType === 'programmed'}
         allowSessionName={draftIsAdHoc || experimentWorkout}
         exerciseCatalog={catalog}
+        lastPerformedDates={lastPerformedDates}
         onCreateExercise={async (input) => {
           const created = await createOwnerExercise(input)
           setCatalog((current) => [...current.filter((exercise) => exercise.id !== created.id), created])
+          setLastPerformedDates((current) => ({ ...current, [created.id]: null }))
           return created
         }}
         commitLabel="Save Workout"
