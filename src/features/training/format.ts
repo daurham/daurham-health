@@ -1,6 +1,6 @@
 import { formatCompactCalendarDate } from '@/domain/calendar-format'
 import { kilogramsToPounds, metersToMiles, secondsPerMile } from '@/domain/units'
-import type { LoadState, TemplatePrescription } from '@/domain/training'
+import type { LoadState, TemplatePrescription, TrainingPerformanceBestView } from '@/domain/training'
 import { formatPrescription } from '@/domain/training'
 
 import { healthCalendarDateFromNow } from '@/domain/time'
@@ -36,6 +36,27 @@ export function formatLoad(loadState: LoadState, weightKg: number | null): strin
 export function formatPaceSecondsPerMile(value: number): string {
   const rounded = Math.round(value)
   return `${Math.floor(rounded / 60)}:${String(rounded % 60).padStart(2, '0')}/mi`
+}
+
+function formatDurationSeconds(value: number): string {
+  const rounded = Math.round(value)
+  if (rounded < 60) return `${rounded}s`
+  const minutes = Math.floor(rounded / 60)
+  const seconds = rounded % 60
+  return seconds === 0 ? `${minutes} min` : `${minutes}:${String(seconds).padStart(2, '0')}`
+}
+
+export function formatTrainingPerformanceBest(best: TrainingPerformanceBestView): string {
+  if (best.kind === 'reps') return `Best reps · ${Math.round(best.value)}`
+  if (best.kind === 'duration') return `Longest duration · ${formatDurationSeconds(best.value)}`
+  if (best.kind === 'distance') return `Longest distance · ${best.value.toLocaleString('en-US', { maximumFractionDigits: 2 })} mi`
+  if (best.kind === 'pace') {
+    const distance = best.distanceM == null
+      ? ''
+      : ` · over ${metersToMiles(best.distanceM).toLocaleString('en-US', { maximumFractionDigits: 2 })} mi`
+    return `Fastest pace · ${formatPaceSecondsPerMile(best.value)}${distance}`
+  }
+  return 'Skill achieved'
 }
 
 export function formatSetPerformance(input: {
