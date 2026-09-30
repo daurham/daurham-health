@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { parseAppleHealthFile, previewAppleHealth } from '@/domain/apple-health'
 import { formatCalendarRange } from '@/domain/calendar-format'
 import { healthCalendarDateFromNow } from '@/domain/time'
@@ -323,6 +323,15 @@ function PreviewReport({ preview }: { preview: AppleHealthPreview }) {
 }
 
 export function SettingsPage() {
+  const location = useLocation()
+
+  useEffect(() => {
+    if (location.hash !== '#theme-studio' && location.hash !== '#trend-colors') return
+    const id = location.hash.slice(1)
+    window.requestAnimationFrame(() => {
+      document.getElementById(id)?.scrollIntoView({ block: 'start' })
+    })
+  }, [location.hash])
   const [status, setStatus] = useState<AppleHealthStatus | null>(null)
   const [preview, setPreview] = useState<AppleHealthPreview | null>(null)
   const [busy, setBusy] = useState<'preview' | 'commit' | null>(null)
