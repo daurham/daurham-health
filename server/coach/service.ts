@@ -46,6 +46,7 @@ import { loadCoachLabState, snoozeCoachLabPresentation } from './lab.js'
 import { coachTaskAttentionReason } from '../../src/domain/coach-lab.js'
 import { listGoals } from '../goals/service.js'
 import { HttpError } from '../http.js'
+import { reconcileCoachAwards } from '../rewards/service.js'
 import { ensureOwnerExercise, getExerciseDefinition } from '../training/owner-exercises.js'
 import {
   buildSessionInsertQueries,
@@ -1316,6 +1317,7 @@ async function toView(sql: Sql, row: CoachTaskRow, today: string, now: Date): Pr
 }
 
 async function currentState(sql: Sql, date: string, now: Date): Promise<CoachState> {
+  await reconcileCoachAwards(sql)
   const week = coachWeek(date)
   const [weeklyRow, dailyRow, stretchRow] = await Promise.all([
     loadTaskForPeriod(sql, 'weekly_focus', week.start),
