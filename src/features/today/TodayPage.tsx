@@ -239,14 +239,14 @@ export function TodayBoard({
             {view.changedItems.map((item) => {
               const metric = metricForChangedItem(item.id)
               const direction = item.direction ?? 'stable'
-              const meaning = metric
-                ? resolveTrendMeaning({ metric, direction, goals: trendGoals, preferences: trendPreferences }).meaning
-                : 'neutral'
+              const resolution = metric
+                ? resolveTrendMeaning({ metric, direction, goals: trendGoals, preferences: trendPreferences })
+                : { meaning: 'neutral' as const, source: 'neutral' as const }
               return (
                 <li key={item.id}>
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                     <p className="text-sm font-medium text-zinc-900">{item.headline}</p>
-                    {item.direction ? <TrendSignal direction={direction} meaning={meaning} compact /> : null}
+                    {item.direction ? <TrendSignal direction={direction} {...resolution} compact /> : null}
                   </div>
                   <p className="mt-1 whitespace-pre-line text-sm text-zinc-600">{item.detail}</p>
                 </li>
@@ -258,9 +258,27 @@ export function TodayBoard({
       {view.patterns.length > 0 ? (
         <section className="rounded-lg border border-zinc-200 bg-white p-4">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Patterns</h2>
-          <ul className="mt-2 space-y-1 text-sm text-zinc-700">
+          <ul className="mt-2 space-y-2 text-sm text-zinc-700">
             {view.patterns.map((item) => (
-              <li key={item.id}>{item.text}</li>
+              <li
+                key={item.id}
+                className={
+                  item.tone === 'positive'
+                    ? 'signal-positive-surface rounded-md px-3 py-2'
+                    : item.tone === 'negative'
+                      ? 'signal-negative-surface rounded-md px-3 py-2'
+                      : 'px-1 py-1'
+                }
+              >
+                <div className="flex items-start gap-2">
+                  {item.tone !== 'neutral' ? (
+                    <span className={item.tone === 'positive' ? 'trend-toward font-semibold' : 'trend-away font-semibold'}>
+                      {item.tone === 'positive' ? '↑' : '↓'}
+                    </span>
+                  ) : null}
+                  <span>{item.text}</span>
+                </div>
+              </li>
             ))}
           </ul>
         </section>
