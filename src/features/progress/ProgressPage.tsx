@@ -2,7 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useOutletContext, useParams, useSearchParams } from 'react-router-dom'
 import type { ProactiveInsight } from '@/domain/insights'
 import type { ProgressOverview, ProgressRange, ProgressTimeline } from '@/domain/progress'
+import type { TrendGoalIntent, TrendPreferences } from '@/domain/trend-intent'
 import { cn, LoadErrorNotice, quietButtonClass, selectedTabClass, tabClass } from '@/lib'
+import { useTrendPreferences } from '@/lib/use-trend-preferences'
+import { useActiveTrendGoals } from '@/features/goals/useActiveTrendGoals'
+import { useDemoReadOnly } from '@/lib/app-prefix'
 import { AskHealthLink } from '@/features/ask-health/AskHealthLink'
 import { fetchProgressInsights, fetchProgressOverview, fetchProgressTimeline } from './api'
 import { ActivityProgressPage } from './ActivitySection'
@@ -24,6 +28,8 @@ type ProgressOutletContext = {
   overview: ProgressOverview
   range: ProgressRange
   onEvidence: (topic: EvidenceTopic) => void
+  trendGoals: TrendGoalIntent[]
+  trendPreferences: TrendPreferences
 }
 
 const TABS = [
@@ -51,6 +57,9 @@ export function ProgressPage() {
   const [reloadToken, setReloadToken] = useState(0)
   const [evidence, setEvidence] = useState<EvidenceTopic | null>(null)
   const overviewRef = useRef<ProgressOverview | null>(null)
+  const readOnly = useDemoReadOnly()
+  const { goals: trendGoals } = useActiveTrendGoals(!readOnly)
+  const trendPreferences = useTrendPreferences()
 
   useEffect(() => {
     const controller = new AbortController()
@@ -104,16 +113,25 @@ export function ProgressPage() {
           overview,
           range,
           onEvidence: setEvidence,
+          trendGoals,
+          trendPreferences,
         }
       : null
 
   return (
     <section className="space-y-3 md:space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight md:text-2xl">Progress</h1>
-        <p className="mt-1 hidden text-sm text-zinc-600 md:block">
-          What changed in training and body — from recorded work, not guesses.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight md:text-2xl">Progress</h1>
+          <p className="mt-1 hidden text-sm text-zinc-600 md:block">
+            What changed in training and body — from recorded work, not guesses.
+          </p>
+        </div>
+        {readOnly ? null : (
+          <Link to="/settings#trend-colors" className={quietButtonClass}>
+            Personalize trend colors
+          </Link>
+        )}
       </div>
 
       <div className="rounded-lg border border-zinc-200 bg-white px-2 py-2 md:px-3">
@@ -196,12 +214,12 @@ function ProgressInsights({ range }: { range: ProgressRange }) {
 }
 
 export function ProgressOverviewRoute() {
-  const { overview, range, onEvidence } = useOutletContext<ProgressOutletContext>()
+  const { overview, range, onEvidence, trendGoals, trendPreferences } = useOutletContext<ProgressOutletContext>()
   return (
     <div className="space-y-5 md:space-y-6">
       <ProgressInsights range={range} />
       <WeeklyCoachEntry />
-      <OverviewSection overview={overview} onEvidence={onEvidence} />
+      <OverviewSection overview={overview} onEvidence={onEvidence} trendGoals={trendGoals} trendPreferences={trendPreferences} />
       <ActivitySleepOverview range={range} />
       <section className="rounded-lg border border-zinc-200 bg-white p-4">
         <h2 className="text-sm font-semibold text-zinc-900">Ask Health</h2>
@@ -239,26 +257,28 @@ export function ProgressSleepNightRoute() {
 }
 
 export function ProgressStrengthRoute() {
-  const { overview, range, onEvidence } = useOutletContext<ProgressOutletContext>()
-  return <StrengthSection overview={overview} range={range} onEvidence={onEvidence} />
+  const { overview, range, onEvidence, trendGoals, trendPreferences } = useOutletContext<ProgressOutletContext>()
+  return <StrengthSection overview={overview} range={range} onEvidence={onEvidence} trendGoals={trendGoals} trendPreferences={trendPreferences} />
 }
 
 export function ProgressStrengthLabRoute() {
   const { exerciseId } = useParams()
-  const { overview, range, onEvidence } = useOutletContext<ProgressOutletContext>()
+  const { overview, range, onEvidence, trendGoals, trendPreferences } = useOutletContext<ProgressOutletContext>()
   return (
     <StrengthLab
       overview={overview}
       range={range}
       exerciseId={exerciseId ?? ''}
       onEvidence={onEvidence}
+      trendGoals={trendGoals}
+      trendPreferences={trendPreferences}
     />
   )
 }
 
 export function ProgressBodyRoute() {
-  const { overview, onEvidence } = useOutletContext<ProgressOutletContext>()
-  return <BodySection overview={overview} onEvidence={onEvidence} />
+  const { overview, onEvidence, trendGoals, trendPreferences } = useOutletContext<ProgressOutletContext>()
+  return <BodySection overview={overview} onEvidence={onEvidence} trendGoals={trendGoals} trendPreferences={trendPreferences} />
 }
 
 export function ProgressTimelineRoute() {
