@@ -22,6 +22,8 @@ export function useRewardSummary(enabled = true): RewardSummaryResource {
 
   useEffect(() => {
     if (!enabled) {
+      setSummary(null)
+      setError(null)
       setPending(false)
       return
     }
