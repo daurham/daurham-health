@@ -68,12 +68,12 @@ export function BodySection({
                 <div className="mt-2">
                   <TrendSignal
                     direction={trend.value.slopePerWeek > 0 ? 'higher' : 'lower'}
-                    meaning={resolveTrendMeaning({
+                    {...resolveTrendMeaning({
                       metric: { kind: 'body', metricKey: 'weight' },
                       direction: trend.value.slopePerWeek > 0 ? 'higher' : 'lower',
                       goals: trendGoals,
                       preferences: trendPreferences,
-                    }).meaning}
+                    })}
                   />
                 </div>
               ) : null}
@@ -184,12 +184,12 @@ export function BodySection({
                             <TrendSignal
                               compact
                               direction={changeValue > 0 ? 'higher' : 'lower'}
-                              meaning={resolveTrendMeaning({
+                              {...resolveTrendMeaning({
                                 metric: bodyIntentMetric(metric.key)!,
                                 direction: changeValue > 0 ? 'higher' : 'lower',
                                 goals: trendGoals,
                                 preferences: trendPreferences,
-                              }).meaning}
+                              })}
                             />
                           </span>
                         ) : null}
