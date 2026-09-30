@@ -25,7 +25,7 @@ export function StartWorkoutPage() {
   const benchmarkProtocolVersionId = params.get('benchmarkProtocolVersionId')
   const [templates, setTemplates] = useState<WorkoutTemplate[]>([])
   const [catalog, setCatalog] = useState<ExerciseDefinition[]>([])
-  const [lastPerformedDates, setLastPerformedDates] = useState<Record<string, string | null>>({})
+  const [lastSessions, setLastSessions] = useState<Record<string, ExerciseLibraryItem['lastSession']>>({})
   const [loading, setLoading] = useState(!adHoc && !experimentWorkout)
   const [error, setError] = useState<string | null>(null)
   const [draft, setDraft] = useState<WorkoutDraft | null>(() => {
@@ -44,8 +44,8 @@ export function StartWorkoutPage() {
   useEffect(() => {
     function applyLibrary(items: ExerciseLibraryItem[]) {
       setCatalog(items.filter((item) => item.exercise.isActive).map((item) => item.exercise))
-      setLastPerformedDates(
-        Object.fromEntries(items.map((item) => [item.exercise.id, item.lastPerformedDate])),
+      setLastSessions(
+        Object.fromEntries(items.map((item) => [item.exercise.id, item.lastSession])),
       )
     }
 
@@ -243,11 +243,11 @@ export function StartWorkoutPage() {
         allowExerciseAddition={draft.sessionType === 'programmed'}
         allowSessionName={draftIsAdHoc || experimentWorkout}
         exerciseCatalog={catalog}
-        lastPerformedDates={lastPerformedDates}
+        lastSessions={lastSessions}
         onCreateExercise={async (input) => {
           const created = await createOwnerExercise(input)
           setCatalog((current) => [...current.filter((exercise) => exercise.id !== created.id), created])
-          setLastPerformedDates((current) => ({ ...current, [created.id]: null }))
+          setLastSessions((current) => ({ ...current, [created.id]: null }))
           return created
         }}
         commitLabel="Save Workout"
