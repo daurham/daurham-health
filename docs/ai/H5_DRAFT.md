@@ -204,6 +204,92 @@ Update:
 - restore round trip;
 - demo fixtures where needed.
 
+### Seeded form library for existing exercises
+
+H5 should not add empty form fields and make the owner manually populate every built-in exercise.
+
+Migration 0041 must seed concise, practical `form_instructions` for **every existing built-in exercise where technique/form guidance is meaningful**, including the current EX01–EX19 catalog and every new calisthenics exercise added by H5.
+
+Current built-ins to cover:
+
+- Box Squat
+- Barbell Bench Press
+- Cable Row
+- Dumbbell Romanian Deadlift
+- Dumbbell Curl
+- Cable Triceps Pressdown
+- Farmer Carry
+- Goblet Squat to Bench
+- Incline Dumbbell Press
+- Hip Thrust
+- Reverse Lunge
+- Hammer Curl
+- Suitcase Carry
+- Dumbbell Overhead Press
+- Cable Pulldown
+- One-Arm Dumbbell Row
+- Dumbbell Lateral Raise
+- Running
+- Hiking
+
+The new Beginner Calisthenics exercise definitions must ship with form instructions at creation as well.
+
+#### Writing style for seeded form text
+
+Form text should be short enough to use during a workout and structured around action, not anatomy lectures.
+
+Preferred shape:
+
+- **Setup** — starting position / equipment placement.
+- **Move** — the actual movement.
+- **Cues** — 2–4 high-value reminders.
+- **Stop/adjust** only when a very obvious movement-specific warning is useful.
+
+Keep the whole instruction roughly 3–6 concise sentences or short lines.
+
+Examples of the intended level:
+
+- **Barbell Bench Press:** eyes under the bar; feet planted; shoulder blades gently set against the bench; lower the bar under control toward the lower chest/sternum area; keep forearms near vertical; press back up without letting shoulders roll forward.
+- **Dumbbell Romanian Deadlift:** stand tall with dumbbells close to the thighs; unlock the knees slightly; push the hips back while keeping the spine long and weights close to the legs; stop when hamstrings are loaded without losing position; drive the hips forward to stand.
+- **Cable Row:** sit tall and brace; begin with shoulders relaxed rather than shrugged; pull the handle toward the lower ribs while keeping elbows close; pause briefly; return under control without collapsing the torso forward.
+- **Farmer Carry:** stand tall with the load balanced at the sides; keep ribs stacked over pelvis and shoulders level; walk with controlled steps while resisting side-to-side sway; turn deliberately instead of twisting under load.
+
+Running/Hiking may use `form_instructions` as concise movement/technique guidance even though they are not set-based lifts.
+
+Examples:
+
+- **Running:** tall relaxed posture; slight forward lean from the ankles rather than bending at the waist; keep steps underneath the body; arms relaxed and swinging naturally; avoid deliberately overstriding.
+- **Hiking:** stay tall and balanced; shorten stride on steep terrain; place the whole foot securely when possible; keep knees tracking with the feet; use controlled steps on descents rather than braking hard with a long stride.
+
+Do not present seeded copy as medical advice, injury diagnosis, or the only valid technique variation.
+
+#### Seed/update safety
+
+Seeded form copy must not overwrite owner customization.
+
+For existing EX01–EX19 rows:
+
+- populate `form_instructions` only when the field is NULL/blank;
+- preserve any owner-edited form text on future migration/reseed runs;
+- do not overwrite owner `notes`, GIF URLs, or YouTube URLs.
+
+For newly introduced H5 built-ins:
+
+- seed form instructions at insert time;
+- later migrations follow the same “only fill missing default copy” rule.
+
+If useful, record a non-authoritative seed copy version in exercise metadata (for example `form_seed_version: "h5-v1"`) so future migrations can distinguish untouched defaults from owner-edited text without making metadata the instruction authority.
+
+#### Form text vs Notes
+
+Use fields consistently:
+
+- `form_instructions` = reusable technique/setup guidance for the movement;
+- `notes` = owner-specific reminders/preferences, e.g. “bench notch 3,” “use blue band,” “left knee feels better with shorter stance.”
+
+The media/form sheet should visually separate these instead of concatenating them into one paragraph.
+
+
 ### Exercise media affordance during Training
 
 When an exercise has `gifUrl`:
@@ -407,6 +493,10 @@ At minimum prove:
 
 ### Exercise Library
 - lists seeded + owner definitions;
+- every built-in EX01–EX19 row has non-empty seeded form guidance after 0041 where applicable;
+- all H5 calisthenics built-ins have seeded form guidance;
+- seeded form backfill fills missing text but does not overwrite owner-customized form text;
+- form instructions and owner notes remain separate fields/presentation;
 - media/instruction fields round-trip;
 - owner unused semantic edit succeeds;
 - used semantic edit fails;
