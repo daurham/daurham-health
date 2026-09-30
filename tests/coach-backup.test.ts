@@ -70,8 +70,8 @@ describe('Coach backup inventory', () => {
       workout_sets: [{
         id: '22222222-2222-4222-8222-222222222222',
         workout_session_exercise_id: '33333333-3333-4333-8333-333333333333',
-        set_number: 1, set_type: 'working', load_state: 'bodyweight', weight_kg: null,
-        reps: null, duration_sec: 1200, left_reps: null, right_reps: null,
+        set_number: '1', set_type: 'working', load_state: 'bodyweight', weight_kg: null,
+        reps: null, duration_sec: '1200', left_reps: null, right_reps: null,
         left_duration_sec: null, right_duration_sec: null, distance_m: '3218.688',
         completed: null, notes: null, metadata: '{}', created_at: instant,
       }],
