@@ -47,7 +47,7 @@ describe('H2D Training best presentation', () => {
     const detail = readFileSync('src/features/training/WorkoutDetailPage.tsx', 'utf8')
     expect(detail).toContain('Training bests')
     expect(detail).toContain('formatTrainingPerformanceBest(best)')
-    expect(detail).toContain('/training/\\${best.sessionId}')
+    expect(detail).toContain('/training/' + '${best.sessionId}')
     expect(detail).toContain('min-h-11')
   })
 })
