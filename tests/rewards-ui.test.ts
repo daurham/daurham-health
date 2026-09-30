@@ -8,8 +8,10 @@ describe('Rewards owner UI contract', () => {
   const coach = readFileSync('src/features/coach/CoachCard.tsx', 'utf8')
 
   it('shows spendable and lifetime XP without making Rewards a primary navigation tab', () => {
-    expect(page).toContain('Spendable now')
-    expect(page).toContain('All Coach XP earned')
+    expect(page).toContain('Spendable')
+    expect(page).toContain('Lifetime progression')
+    expect(page).toContain('Level {progression.level}')
+    expect(page).toContain('Open Theme Studio')
     expect(routes).toContain("path: 'rewards'")
     expect(layout).not.toContain("{ id: 'rewards'")
   })
@@ -22,15 +24,18 @@ describe('Rewards owner UI contract', () => {
     expect(page).toContain('Refund')
   })
 
-  it('surfaces deterministic XP in Coach and keeps the owner-only wallet link out of demo prefixing', () => {
+  it('surfaces deterministic XP in Coach and makes the owner wallet globally discoverable', () => {
     expect(coach).toContain('xpForRewardBand')
-    expect(coach).toContain('prefix ===')
-    expect(coach).toContain('to="/rewards"')
+    expect(coach).toContain('XpAmount')
+    expect(layout).toContain('to="/rewards"')
+    expect(layout).toContain('spendable XP')
     expect(routes).not.toContain("path: 'demo/rewards'")
   })
 
-  it('does not add count-up animation or a reward polling loop', () => {
-    expect(page).not.toMatch(/requestAnimationFrame|setInterval|setTimeout/)
+  it('keeps reward celebration bounded without count-up animation or polling', () => {
+    expect(page).not.toMatch(/requestAnimationFrame|setInterval/)
+    expect(page).toContain('setTimeout')
     expect(page).not.toMatch(/animate-bounce|animate-ping/)
+    expect(page).not.toMatch(/CountUp|countUp|setInterval/)
   })
 })
