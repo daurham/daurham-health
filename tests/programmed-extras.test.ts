@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
   trainingSessionDisplayName,
@@ -149,5 +150,23 @@ describe('H5 programmed workout extras', () => {
     expect(prepared.metadata.has_programmed_extras).toBe(true)
     expect(prepared.exercises[1]?.slotId).toBeNull()
     expect(template.exercises).toHaveLength(1)
+  })
+})
+
+
+describe('H5 extras and archived definitions remain visible to Progress', () => {
+  it('does not filter canonical Training sets by template slot or active exercise state', () => {
+    const progress = readFileSync('server/progress/queries.ts', 'utf8')
+    const exerciseQuery = progress.slice(
+      progress.indexOf('SELECT id, external_id, name, measurement_kind'),
+      progress.indexOf('sql.query(', progress.indexOf('SELECT id, external_id, name, measurement_kind') + 1),
+    )
+    expect(exerciseQuery).not.toContain('WHERE is_active = true')
+    const setQuery = progress.slice(
+      progress.indexOf('sets.id AS set_id'),
+      progress.indexOf('ORDER BY sessions.workout_date', progress.indexOf('sets.id AS set_id')),
+    )
+    expect(setQuery).toContain('JOIN workout_session_exercises AS exercises')
+    expect(setQuery).not.toContain('slot_id')
   })
 })

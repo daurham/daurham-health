@@ -111,7 +111,6 @@ export async function loadProgressCanonicalRows(): Promise<ProgressCanonicalRows
         sql.query(
           `SELECT id, external_id, name, measurement_kind, unilateral, performance_type, analytics_load_type, analytics_rep_mode
          FROM exercise_definitions
-         WHERE is_active = true
          ORDER BY name, id`,
         ),
         sql.query(
