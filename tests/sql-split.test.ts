@@ -173,9 +173,9 @@ describe('splitSqlStatements', () => {
       readFileSync(path.join('migrations', '0039_xp_reward_wallet.sql'), 'utf8'),
     )
     expect(rewards).toHaveLength(13)
-    expect(rewards[9]).toMatch(/^CREATE OR REPLACE FUNCTION prevent_reward_history_mutation/)
-    expect(rewards[9]).toContain("RAISE EXCEPTION '% is append-only', TG_TABLE_NAME;")
-    expect(rewards[10]).toMatch(/^CREATE TRIGGER xp_ledger_append_only/)
-    expect(rewards[11]).toMatch(/^CREATE TRIGGER reward_purchases_immutable/)
+    expect(rewards[10]).toMatch(/^CREATE OR REPLACE FUNCTION prevent_reward_history_mutation/)
+    expect(rewards[10]).toContain("RAISE EXCEPTION '% is append-only', TG_TABLE_NAME;")
+    expect(rewards[11]).toMatch(/^CREATE TRIGGER xp_ledger_append_only/)
+    expect(rewards[12]).toMatch(/^CREATE TRIGGER reward_purchases_immutable/)
   })
 })
