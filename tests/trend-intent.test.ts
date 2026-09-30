@@ -111,6 +111,36 @@ describe('goal-aware trend meaning', () => {
       direction: 'higher',
       goals: [],
       preferences: DEFAULT_TREND_PREFERENCES,
+    })).toEqual({ meaning: 'toward', source: 'default' })
+  })
+
+  it('uses the conservative motivational allowlist only after Goals and preferences', () => {
+    for (const metric of [
+      { kind: 'activity_steps' as const },
+      { kind: 'activity_exercise_minutes' as const },
+      { kind: 'training_frequency' as const },
+      { kind: 'nutrition_protein' as const },
+      { kind: 'strength' as const, exerciseDefinitionId: 'bench' },
+    ]) {
+      expect(resolveTrendMeaning({
+        metric,
+        direction: 'higher',
+        goals: [],
+        preferences: DEFAULT_TREND_PREFERENCES,
+      })).toEqual({ meaning: 'toward', source: 'default' })
+      expect(resolveTrendMeaning({
+        metric,
+        direction: 'lower',
+        goals: [],
+        preferences: DEFAULT_TREND_PREFERENCES,
+      })).toEqual({ meaning: 'away', source: 'default' })
+    }
+
+    expect(resolveTrendMeaning({
+      metric: { kind: 'body', metricKey: 'weight' },
+      direction: 'higher',
+      goals: [],
+      preferences: DEFAULT_TREND_PREFERENCES,
     })).toEqual({ meaning: 'neutral', source: 'neutral' })
   })
 
