@@ -286,3 +286,28 @@ Observed from the current code and product docs. Where the original rationale is
 **Status:** Active  
 **Reason:** Training already has versioned templates and programmed sessions snapshot template identity. A parallel routine model would duplicate that authority.  
 **Implications:** Built-in A/B/C templates are `seeded` and owner-immutable. Owner Saved Routines use stable opaque `owner:<uuid>` routine codes. Editing creates a new active template version and deactivates the prior version; archiving deactivates the current version. Historical sessions remain tied to the exact old template/version and are never rewritten.
+
+
+## Decision: Coach completion is the XP issuance boundary
+
+**Status:** Active  
+**Reason:** Health measurements should stay canonical observations instead of becoming farmable game events. Coach already owns deterministic commitments and freezes a reward band when each task is created.  
+**Implications:** Only a Coach task with status `completed` mints XP. Routine, standard, weekly, and stretch bands award 10, 25, 75, and 100 XP under `xp-rule-v1`. Offered, active, accepted-only, passed, failed, and expired states award zero. One Health action may complete several distinct Coach commitments and each completed task may award once.
+
+## Decision: XP history is append-only and balances are derived
+
+**Status:** Active  
+**Reason:** A wallet must remain auditable under retries, backfill, purchase concurrency, and later product calibration.  
+**Implications:** `xp_ledger` stores positive immutable award, purchase, and refund entries. Lifetime XP is the sum of awards. Spendable XP is awards minus purchases plus refunds. There is no mutable balance authority and no manual XP adjustment UI. Existing completed Coach tasks are backfilled using their frozen reward band and `xp-rule-v1`.
+
+## Decision: Health corrections do not claw back historical XP
+
+**Status:** Active  
+**Reason:** Correcting an inaccurate Health record must never carry a game-currency penalty that encourages keeping bad health data. Coach completion already preserves the evidence/provenance that existed at completion time.  
+**Implications:** Later editing or deleting canonical Training or other Health evidence does not remove an XP award from a previously completed Coach task. H3 applies no negative penalty for passing, failing, expiry, deletion, or later Health correction.
+
+## Decision: Reward redemptions freeze a snapshot and refunds compensate
+
+**Status:** Active  
+**Reason:** Owner rewards are editable catalog choices, while a historical redemption must retain what was actually bought and what it cost.  
+**Implications:** Reward items can be created, edited, and archived. A redemption freezes reward name and XP cost in `reward_purchases`; later item changes do not rewrite it. Spending appends one purchase ledger entry. Refund appends one compensating refund entry and restores Spendable XP without changing Lifetime XP. Concurrent purchases serialize at the database boundary and cannot overdraft the one-owner wallet.
