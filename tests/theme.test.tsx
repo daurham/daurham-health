@@ -8,6 +8,7 @@ import { SettingsPage } from '../src/features/settings/SettingsPage.tsx'
 import { readFileSync } from 'node:fs'
 import {
   HEALTH_PALETTES,
+  THEME_PACKS,
   PALETTE_STORAGE_KEY,
   THEME_MODE_PREFERENCES,
   THEME_STORAGE_KEY,
@@ -19,6 +20,7 @@ import {
   syncAppearance,
   writePalettePreference,
   writeThemePreference,
+  themePackUnlocked,
   type ThemeChoice,
 } from '../src/theme.ts'
 
@@ -112,7 +114,10 @@ describe('theme preference', () => {
 
   it('keeps mode and palette independent and allowlisted', () => {
     expect(THEME_MODE_PREFERENCES).toEqual(['system', 'light', 'dark'])
-    expect(HEALTH_PALETTES).toEqual(['classic', 'forest', 'ocean', 'sunset', 'plum'])
+    expect(HEALTH_PALETTES.slice(0, 5)).toEqual(['classic', 'forest', 'ocean', 'sunset', 'plum'])
+    expect(HEALTH_PALETTES).toHaveLength(16)
+    expect(HEALTH_PALETTES).toContain('aura')
+    expect(HEALTH_PALETTES).toContain('silver-instinct')
     const storage = memoryStorage({ 'health-theme': 'nope', 'health-palette': 'rainbow' })
     expect(readThemePreference(storage)).toBe('system')
     expect(readPalettePreference(storage)).toBe('classic')
@@ -135,6 +140,17 @@ describe('theme preference', () => {
     expect(root.style.colorScheme).toBe('light')
     expect(root.dataset.healthPalette).toBe('classic')
     expect(HEALTH_PALETTES).not.toContain('<script>')
+  })
+
+  it('derives progression theme locks from Lifetime XP without invalidating legacy themes', () => {
+    expect(THEME_PACKS.map((pack) => pack.id)).toEqual(HEALTH_PALETTES)
+    for (const id of ['classic', 'forest', 'ocean', 'sunset', 'plum'] as const) {
+      expect(themePackUnlocked(id, 0)).toBe(true)
+    }
+    expect(themePackUnlocked('aura', 99)).toBe(false)
+    expect(themePackUnlocked('aura', 100)).toBe(true)
+    expect(themePackUnlocked('silver-instinct', 3849)).toBe(false)
+    expect(themePackUnlocked('silver-instinct', 3850)).toBe(true)
   })
 
   it('follows later system changes only while System is selected', () => {
@@ -179,28 +195,27 @@ describe('theme shells', () => {
     expect(owner).not.toContain('Demo data')
   })
 
-  it('offers mode and palette controls in Settings', () => {
+  it('offers mode, Theme Studio, unlocks, and trend personalization in Settings', () => {
     const html = renderToStaticMarkup(
       <MemoryRouter>
         <SettingsPage />
       </MemoryRouter>,
     )
-    expect(html).toContain('Appearance')
-    expect(html).toContain('Mode')
-    expect(html).toContain('Palette')
+    expect(html).toContain('Theme Studio')
+    expect(html).toContain('Color mode')
+    expect(html).toContain('Theme packs')
+    expect(html).toContain('Personalize trend colors')
     expect(html).toContain('Switch to dark mode')
     expect(html).toContain('Switch to light mode')
     expect(html).toContain('Use system appearance')
     expect(html).toContain('aria-pressed="true"')
     expect(html).toContain('>System<')
     expect(html).toContain('>Classic<')
-    expect(html).toContain('grid-cols-2')
     expect(html).toContain('grid-cols-3')
     expect(html).toContain('min-w-0')
     expect(html).not.toContain('overflow-x-auto')
     expect(html).not.toContain('flex-nowrap')
-    expect(html.match(/w-full/g)?.length).toBeGreaterThanOrEqual(2)
-    expect(html.match(/aria-pressed=/g)?.length).toBe(THEME_MODE_PREFERENCES.length + HEALTH_PALETTES.length)
+    expect(html.match(/aria-pressed=/g)?.length ?? 0).toBeGreaterThan(THEME_MODE_PREFERENCES.length + HEALTH_PALETTES.length)
     expect(html).toContain('Data &amp; Backup')
     expect(readFileSync('src/features/settings/SettingsPage.tsx', 'utf8')).not.toContain("classList.contains('dark')")
     expect(readFileSync('src/features/settings/SettingsPage.tsx', 'utf8')).not.toContain('>Save<')
@@ -220,12 +235,15 @@ describe('theme shells', () => {
       expect(css).toContain(`html[data-health-palette='${palette}']`)
       expect(css).toContain(`html.dark[data-health-palette='${palette}']`)
     }
-    expect(css).toContain('--health-accent: oklch(0.44 0.08 250)')
-    expect(css).toContain('--health-accent: oklch(0.72 0.08 250)')
+    expect(css).toContain('--health-canvas:')
+    expect(css).toContain('--health-surface:')
+    expect(css).toContain('--health-reward:')
+    expect(css).toContain('--health-hero-gradient:')
     expect(css.match(/--health-danger:/g)).toHaveLength(2)
     expect(css.match(/--health-warning:/g)).toHaveLength(2)
     expect(css.match(/--health-success:/g)).toHaveLength(2)
     expect(css).toContain('--chart-ink: var(--health-accent)')
+    expect(css).toContain('--chart-secondary: var(--health-accent-secondary)')
     expect(charts).toContain('var(--chart-ink)')
     expect(charts).not.toContain('health-palette')
     expect(readFileSync('src/theme.ts', 'utf8')).not.toContain('fetch(')
