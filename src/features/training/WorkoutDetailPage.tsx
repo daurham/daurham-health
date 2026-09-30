@@ -176,7 +176,6 @@ export function WorkoutDetailPage() {
           onCreateExercise={async (input) => {
             const created = await createOwnerExercise(input)
             setCatalog((current) => [...current.filter((exercise) => exercise.id !== created.id), created])
-            setLastSessions((current) => ({ ...current, [created.id]: null }))
             return created
           }}
           onChange={(next) => {
