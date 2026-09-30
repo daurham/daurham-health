@@ -37,6 +37,8 @@ No active implementation task after V2-H3 completion. See `CURRENT_TASK.md`.
 
 ## Known planned work
 
+- V2-H5 Pantry + Exercise Library + Flexible Programmed Workouts: manage existing saved foods, manage/annotate/archive exercises, exercise GIF/video/form guidance, one-session programmed extras with `+` session labels, and a beginner calisthenics built-in routine. Contract is staged in `docs/ai/H5_DRAFT.md` until H4 closes.
+
 - V2-H4 Themes + progression polish may build levels/unlocks from H3 Lifetime XP; no H4 implementation contract is active yet.
 
 Named by the current manual or blueprint, and not marked implemented:
