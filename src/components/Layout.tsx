@@ -90,7 +90,7 @@ export function Layout() {
   }, [location.pathname, location.search])
 
   return (
-    <div className="min-h-dvh bg-zinc-50 text-zinc-900">
+    <div className="app-shell min-h-dvh bg-zinc-50 text-zinc-900">
       <header className="border-b border-zinc-200 bg-white pt-[env(safe-area-inset-top)]">
         <div className={cn('mx-auto flex items-center justify-between gap-3 px-4 py-3', SHELL_MAX_WIDTH_CLASS)}>
           <p className="text-sm font-semibold tracking-tight">Daurham Health</p>
