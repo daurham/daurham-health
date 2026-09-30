@@ -233,10 +233,32 @@ export const exerciseLibraryRoutineSchema = z.object({
 })
 export type ExerciseLibraryRoutine = z.infer<typeof exerciseLibraryRoutineSchema>
 
+export const exerciseLibraryLastSetSchema = z.object({
+  setNumber: z.number().int().positive(),
+  loadState: z.enum(['external', 'bodyweight', 'unknown']),
+  weightKg: z.number().nullable(),
+  reps: z.number().int().nonnegative().nullable(),
+  durationSec: z.number().int().nonnegative().nullable(),
+  leftReps: z.number().int().nonnegative().nullable(),
+  rightReps: z.number().int().nonnegative().nullable(),
+  leftDurationSec: z.number().int().nonnegative().nullable(),
+  rightDurationSec: z.number().int().nonnegative().nullable(),
+  distanceM: z.number().positive().nullable(),
+  completed: z.boolean().nullable(),
+})
+export type ExerciseLibraryLastSet = z.infer<typeof exerciseLibraryLastSetSchema>
+
+export const exerciseLibraryLastSessionSchema = z.object({
+  date: isoDateSchema,
+  sets: z.array(exerciseLibraryLastSetSchema),
+})
+export type ExerciseLibraryLastSession = z.infer<typeof exerciseLibraryLastSessionSchema>
+
 export const exerciseLibraryItemSchema = z.object({
   exercise: exerciseDefinitionSchema,
   usageCount: z.number().int().nonnegative(),
   lastPerformedDate: isoDateSchema.nullable(),
+  lastSession: exerciseLibraryLastSessionSchema.nullable(),
   activeRoutines: z.array(exerciseLibraryRoutineSchema),
   semanticEditable: z.boolean(),
   builtIn: z.boolean(),
