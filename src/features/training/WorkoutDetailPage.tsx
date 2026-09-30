@@ -16,7 +16,7 @@ import {
   validateWorkoutDraft,
   type WorkoutDraft,
 } from './draft'
-import { formatLoad, formatPounds, formatSetPerformance, formatWorkoutDate } from './format'
+import { formatLoad, formatPounds, formatSetPerformance, formatTrainingPerformanceBest, formatWorkoutDate } from './format'
 import { WorkoutEditor } from './WorkoutEditor'
 
 export function WorkoutDetailPage() {
@@ -298,6 +298,21 @@ function SessionDetail({
                 </li>
               ))}
             </ul>
+            {exercise.performanceBests.length > 0 ? (
+              <div className="mt-4 border-t border-zinc-100 pt-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Training bests</p>
+                <ul className="mt-2 space-y-1 text-sm text-zinc-700">
+                  {exercise.performanceBests.map((best) => (
+                    <li key={best.kind} className="flex flex-wrap items-baseline justify-between gap-x-3">
+                      <span>{formatTrainingPerformanceBest(best)}</span>
+                      <Link to={`/training/${best.sessionId}`} className="min-h-11 inline-flex items-center text-xs text-zinc-500 hover:underline">
+                        {best.date}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
           </article>
         ))}
       </div>
