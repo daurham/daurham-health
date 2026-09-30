@@ -773,6 +773,65 @@ html.dark[data-health-palette='silver-instinct'] {
   color: var(--health-within);
 }
 
+.signal-positive-surface {
+  border-left: 2px solid var(--health-toward);
+  background: color-mix(in srgb, var(--health-toward) 8%, var(--health-surface));
+}
+
+.signal-negative-surface {
+  border-left: 2px solid var(--health-away);
+  background: color-mix(in srgb, var(--health-away) 8%, var(--health-surface));
+}
+
+/* Progression packs earn more atmosphere than the calmer starter packs.
+   The gradients are static; meaningful events provide the bounded motion. */
+:is(
+  html[data-health-palette='aura'],
+  html[data-health-palette='saiyan-dawn'],
+  html[data-health-palette='grand-line'],
+  html[data-health-palette='hidden-leaf'],
+  html[data-health-palette='super-saiyan-gold'],
+  html[data-health-palette='spartan'],
+  html[data-health-palette='namek-sky'],
+  html[data-health-palette='wasteland'],
+  html[data-health-palette='bonfire'],
+  html[data-health-palette='clone-legion'],
+  html[data-health-palette='silver-instinct']
+) .app-shell {
+  background-image: var(--health-hero-gradient);
+  background-repeat: no-repeat;
+  background-size: 100% min(34rem, 54vh);
+  background-attachment: fixed;
+}
+
+:is(
+  html[data-health-palette='aura'],
+  html[data-health-palette='saiyan-dawn'],
+  html[data-health-palette='grand-line'],
+  html[data-health-palette='hidden-leaf'],
+  html[data-health-palette='super-saiyan-gold'],
+  html[data-health-palette='spartan'],
+  html[data-health-palette='namek-sky'],
+  html[data-health-palette='wasteland'],
+  html[data-health-palette='bonfire'],
+  html[data-health-palette='clone-legion'],
+  html[data-health-palette='silver-instinct']
+) .xp-badge {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--health-reward) 10%, transparent),
+    0 0 24px -8px var(--health-glow);
+}
+
+:is(
+  html[data-health-palette='aura'],
+  html[data-health-palette='saiyan-dawn'],
+  html[data-health-palette='super-saiyan-gold'],
+  html[data-health-palette='bonfire'],
+  html[data-health-palette='silver-instinct']
+) .health-hero-surface {
+  box-shadow: 0 18px 46px -38px var(--health-glow);
+}
+
 .theme-scrim {
   background: rgb(24 24 27 / 0.45);
 }
