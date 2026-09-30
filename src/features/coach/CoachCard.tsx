@@ -466,10 +466,10 @@ export function CoachInbox({ state, onClose, actions, error, returnFocusTo }: {
     <CoachDialog title="Coach inbox" onClose={onClose} returnFocusTo={returnFocusTo}>
       {error ? <p className="mt-3 text-sm text-red-700" role="alert">{error}</p> : null}
       <div className="mt-4 divide-y divide-zinc-200">
+        {state.dailyQuest ? <section className="py-3" aria-label="Today"><h3 className="text-xs font-semibold uppercase tracking-wide text-accent">Today</h3><div className="mt-2"><CoachTaskContent task={state.dailyQuest} actions={inboxActions} /></div></section> : null}
         {visibleStretch ? <section className="py-3" aria-label="Stretch"><h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Stretch</h3><div className="mt-2"><CoachTaskContent task={visibleStretch} actions={inboxActions} /></div></section> : null}
-        {state.dailyQuest ? <section className="py-3" aria-label="Today"><h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Today</h3><div className="mt-2"><CoachTaskContent task={state.dailyQuest} actions={inboxActions} /></div></section> : null}
-        {lab.length || overflow ? <section className="py-3" aria-label="Lab"><h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Lab</h3><ul className="mt-2 divide-y divide-zinc-100">{lab.map(item => <li key={`${item.kind}:${item.sourceKey}`} className="py-3"><LabContent item={item} actions={inboxActions} /></li>)}</ul>{overflow > 0 ? <Link to={prefixedPath(prefix, '/lab')} className={quietButtonClass} onClick={() => { actions.onNavigate?.(); onClose() }}>Open Lab · {overflow} more</Link> : null}</section> : null}
         {state.weeklyFocus ? <section className="py-3" aria-label="This week"><h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">This week</h3><div className="mt-2"><CoachTaskContent task={state.weeklyFocus} actions={inboxActions} /></div></section> : null}
+        {lab.length || overflow ? <section className="py-3" aria-label="Lab"><h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Lab</h3><ul className="mt-2 divide-y divide-zinc-100">{lab.map(item => <li key={`${item.kind}:${item.sourceKey}`} className="py-3"><LabContent item={item} actions={inboxActions} /></li>)}</ul>{overflow > 0 ? <Link to={prefixedPath(prefix, '/lab')} className={quietButtonClass} onClick={() => { actions.onNavigate?.(); onClose() }}>Open Lab · {overflow} more</Link> : null}</section> : null}
       </div>
     </CoachDialog>
   )
