@@ -93,10 +93,10 @@ export function TodayPage() {
   }, [readOnly, loadCoach])
 
   useEffect(() => {
-    if (view?.date && !readOnly) {
+    if (!readOnly) {
       void loadCoach()
     }
-  }, [view?.date, readOnly, loadCoach])
+  }, [readOnly, loadCoach])
 
   return (
     <section className="min-w-0">
