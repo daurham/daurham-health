@@ -266,7 +266,8 @@ function compatibleExercise(kind: GoalKind, exercise: GoalCatalog['exercises'][n
   }
   if (kind === 'training_reps') {
     return (exercise.measurement_kind === 'reps' || exercise.measurement_kind === 'reps_per_side') &&
-      !(exercise.performance_type === 'loaded_reps' && exercise.analytics_load_type === 'external')
+      (exercise.load_type === 'bodyweight' || exercise.load_type === 'none') &&
+      (exercise.analytics_load_type === 'bodyweight' || exercise.analytics_load_type === 'none')
   }
   if (kind === 'training_duration') {
     return ['duration', 'duration_per_side', 'distance_duration'].includes(exercise.measurement_kind)
