@@ -103,16 +103,19 @@ export function TodayPage() {
             {view ? formatWeekdayCalendarDate(view.date) : 'America/Phoenix'}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            resource.retry()
-            void loadCoach()
-          }}
-          className="inline-flex min-h-11 shrink-0 items-center text-sm font-medium text-zinc-600 hover:text-zinc-900"
-        >
-          {resource.isPending && view ? 'Refreshing' : '↻ Refresh'}
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          <AskHealthLink />
+          <button
+            type="button"
+            onClick={() => {
+              resource.retry()
+              void loadCoach()
+            }}
+            className="motion-interactive inline-flex min-h-11 shrink-0 items-center text-sm font-medium text-zinc-600 hover:text-zinc-900"
+          >
+            {resource.isPending && view ? 'Refreshing' : '↻ Refresh'}
+          </button>
+        </div>
       </div>
       <div className="mt-5">
         <PendingLoadRegion pending={resource.isPending} pendingVisible={resource.pendingVisible}>
@@ -169,53 +172,43 @@ export function TodayBoard({
   const prefix = useAppPathPrefix()
   return (
     <div className="space-y-3">
-      {onCoachState ? (
-        <CoachCard
-          state={coach ?? null}
-          pending={coachPending}
-          error={coachError}
-          onState={onCoachState}
-        />
-      ) : null}
-      <div className="flex justify-end">
-        <AskHealthLink />
+      <div className="grid items-start gap-3 md:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)]">
+        <NutritionCard view={view} onNutritionChanged={onNutritionChanged} />
+        <div className="space-y-3">
+          {onCoachState ? (
+            <CoachCard
+              state={coach ?? null}
+              pending={coachPending}
+              error={coachError}
+              onState={onCoachState}
+            />
+          ) : null}
+          <TrainingCard view={view} />
+        </div>
       </div>
+
       {view.pendingItems.length > 0 || view.goalAttention.length > 0 ? (
-        <section className="rounded-lg border border-zinc-200 bg-white p-4">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Needs attention</h2>
-          <ul className="mt-3 space-y-2">
-            {view.pendingItems.map((item) => (
-              <li key={item.id} className="flex items-center justify-between gap-3">
-                <p className="min-w-0 text-sm text-zinc-800">{item.title}</p>
-                <Link
-                  to={prefixedPath(prefix, item.href)}
-                  className="inline-flex min-h-11 shrink-0 items-center rounded-md bg-zinc-900 px-3 text-sm font-medium text-white"
-                >
-                  {item.action}
-                </Link>
-              </li>
-            ))}
-            {view.goalAttention.map((item) => (
-              <li key={item.key} className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-sm text-zinc-800">{item.title}</p>
-                  <p className="text-sm text-zinc-600">{item.detail}</p>
-                </div>
-                <Link
-                  to={prefixedPath(prefix, item.href)}
-                  className="inline-flex min-h-11 shrink-0 items-center rounded-md bg-zinc-900 px-3 text-sm font-medium text-white"
-                >
-                  {item.action}
-                </Link>
-              </li>
-            ))}
-          </ul>
+        <section className="rounded-lg border border-warning/30 bg-amber-50 px-3 py-2.5">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Needs attention</h2>
+            <ul className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-2">
+              {view.pendingItems.map((item) => (
+                <li key={item.id} className="flex min-w-0 items-center gap-2">
+                  <span className="truncate text-sm text-zinc-800">{item.title}</span>
+                  <Link to={prefixedPath(prefix, item.href)} className={quietButtonClass}>{item.action}</Link>
+                </li>
+              ))}
+              {view.goalAttention.map((item) => (
+                <li key={item.key} className="flex min-w-0 items-center gap-2">
+                  <span className="truncate text-sm text-zinc-800">{item.title}</span>
+                  <Link to={prefixedPath(prefix, item.href)} className={quietButtonClass}>{item.action}</Link>
+                </li>
+              ))}
+            </ul>
+          </div>
         </section>
       ) : null}
-      <div className="grid items-start gap-3 md:grid-cols-2">
-        <NutritionCard view={view} onNutritionChanged={onNutritionChanged} />
-        <TrainingCard view={view} />
-      </div>
+
       <SupplementsCard view={view} onChanged={onSupplementsChanged} />
       <div className="grid items-start gap-3 md:grid-cols-3">
         <ActivityCard view={view} />
@@ -250,6 +243,7 @@ export function TodayBoard({
           </ul>
         </section>
       ) : null}
+
     </div>
   )
 }
@@ -475,9 +469,9 @@ function SupplementsCard({ view, onChanged }: { view: TodayViewModel; onChanged?
   )
 }
 
-function Card({ title, children }: { title: string; children: ReactNode }) {
+function Card({ title, children, hero = false }: { title: string; children: ReactNode; hero?: boolean }) {
   return (
-    <section className="min-w-0 rounded-lg border border-zinc-200 bg-white p-4">
+    <section className={hero ? 'health-hero-surface health-raised-surface min-w-0 rounded-xl border border-zinc-200 p-4 sm:p-5' : 'min-w-0 rounded-lg border border-zinc-200 bg-white p-4'}>
       <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{title}</h2>
       <div className="mt-2 text-sm text-zinc-800">{children}</div>
     </section>
@@ -539,7 +533,7 @@ function NutritionCard({
   const readOnly = useDemoReadOnly()
   const dateHref = prefixedPath(useAppPathPrefix(), `/nutrition?date=${view.date}`)
   return (
-    <Card title="Nutrition">
+    <Card title="Nutrition" hero>
       {nutrition.logged && nutrition.totals ? (
         <NutritionTotals totals={nutrition.totals} target={nutrition.target} />
       ) : (
