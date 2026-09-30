@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import type { RewardItem, RewardItemInput, RewardsState } from '@/domain/rewards'
 import { progressionState } from '@/domain/progression'
@@ -56,6 +56,8 @@ export function RewardsPage() {
   const [editing, setEditing] = useState<string | null>(null)
   const [confirmPurchaseId, setConfirmPurchaseId] = useState<string | null>(null)
   const [confirmRefundId, setConfirmRefundId] = useState<string | null>(null)
+  const [celebration, setCelebration] = useState<{ text: string; amount: number } | null>(null)
+  const celebrationTimer = useRef<number | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -73,6 +75,16 @@ export function RewardsPage() {
       cancelled = true
     }
   }, [])
+
+  useEffect(() => () => {
+    if (celebrationTimer.current != null) window.clearTimeout(celebrationTimer.current)
+  }, [])
+
+  function celebrate(text: string, amount: number) {
+    setCelebration({ text, amount })
+    if (celebrationTimer.current != null) window.clearTimeout(celebrationTimer.current)
+    celebrationTimer.current = window.setTimeout(() => setCelebration(null), 2800)
+  }
 
   async function mutate(operation: () => Promise<RewardsState>) {
     setPending(true)
@@ -125,12 +137,15 @@ export function RewardsPage() {
     const submissionId = globalThis.crypto.randomUUID()
     if (await mutate(() => purchaseReward(item.id, submissionId))) {
       setConfirmPurchaseId(null)
+      celebrate('Reward redeemed', -item.costXp)
     }
   }
 
   async function refund(id: string) {
+    const purchase = state?.purchases.find((item) => item.id === id) ?? null
     if (await mutate(() => refundPurchase(id))) {
       setConfirmRefundId(null)
+      if (purchase) celebrate('XP returned', purchase.costXp)
     }
   }
 
@@ -166,6 +181,13 @@ export function RewardsPage() {
         <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
           {error}
         </p>
+      ) : null}
+
+      {celebration ? (
+        <div className="reward-celebration flex items-center justify-between gap-3 rounded-xl border border-reward/30 bg-reward-muted px-4 py-3" role="status" aria-live="polite">
+          <span className="text-sm font-semibold text-zinc-900">{celebration.text}</span>
+          <XpAmount amount={celebration.amount} sign />
+        </div>
       ) : null}
 
       <div className="grid gap-3 sm:grid-cols-[0.9fr_1.1fr]" aria-label="XP wallet">
