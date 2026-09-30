@@ -3,18 +3,18 @@ import { describe, expect, it } from 'vitest'
 import { GENERAL_DAILY_COACH_RULES } from '../src/domain/coach.ts'
 
 describe('Coach H2A domain boundaries', () => {
-  it('keeps run and hike distance as Coach evidence while Training stays duration-native', () => {
+  it('logs future run and hike quest distance into canonical Training without using Activity distance', () => {
     for (const key of ['manual:run:15m', 'manual:hike:20m']) {
       const rule = GENERAL_DAILY_COACH_RULES.find((item) => item.ruleKey === key)
       expect(rule?.training).toMatchObject({
-        measurementKind: 'duration',
+        measurementKind: 'distance_duration',
         valueKind: 'duration_min',
         allowDistance: true,
       })
     }
     const service = readFileSync('server/coach/service.ts', 'utf8')
     expect(service).toContain('distanceUnit')
-    expect(service).not.toContain('distance_m')
+    expect(service).toContain('distance_m')
     expect(service).not.toContain('walking_running_distance_m')
   })
 
