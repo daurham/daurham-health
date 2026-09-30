@@ -85,6 +85,7 @@ export function CoachCard({ state, pending, error, onState }: {
   const [notice, setNotice] = useState<string | null>(null)
   const [xpNotice, setXpNotice] = useState<number | null>(null)
   const celebrationTimerRef = useRef<number | null>(null)
+  const previousTaskStatusesRef = useRef<Map<string, CoachTaskView['status']> | null>(null)
   const returnFocusRef = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
@@ -97,6 +98,27 @@ export function CoachCard({ state, pending, error, onState }: {
   useEffect(() => () => {
     if (celebrationTimerRef.current != null) window.clearTimeout(celebrationTimerRef.current)
   }, [])
+
+  useEffect(() => {
+    if (!state) {
+      previousTaskStatusesRef.current = null
+      return
+    }
+    const tasks = [state.dailyQuest, state.stretchQuest, state.weeklyFocus]
+      .filter((task): task is CoachTaskView => task != null)
+    const previous = previousTaskStatusesRef.current
+    previousTaskStatusesRef.current = new Map(tasks.map((task) => [task.id, task.status]))
+
+    if (!previous) return
+    const newlyCompleted = tasks.find(
+      (task) => task.status === 'completed' && previous.get(task.id) != null && previous.get(task.id) !== 'completed',
+    )
+    if (!newlyCompleted) return
+
+    setXpNotice(xpForRewardBand(newlyCompleted.rewardBand))
+    if (celebrationTimerRef.current != null) window.clearTimeout(celebrationTimerRef.current)
+    celebrationTimerRef.current = window.setTimeout(() => setXpNotice(null), 2600)
+  }, [state])
 
   function closeOverlays() {
     setInboxOpen(false)
