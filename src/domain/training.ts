@@ -559,7 +559,7 @@ export const manualWorkoutSetValuesSchema = z.object({
   notes: optionalNotesSchema,
 })
 
-export const manualWorkoutSetInputSchema = manualWorkoutSetValuesSchema.superRefine((set, ctx) =>
+export const manualWorkoutSetInputSchema = manualWorkoutSetValuesSchema.superRefine((set, ctx) => {
   addSetInvariantIssues(
     {
       loadState: set.loadState,
@@ -575,8 +575,14 @@ export const manualWorkoutSetInputSchema = manualWorkoutSetValuesSchema.superRef
     },
     ctx,
     'weightLb',
-  ),
-)
+  )
+  if (set.distance != null && set.distanceUnit == null) {
+    ctx.addIssue({ code: 'custom', path: ['distanceUnit'], message: 'Distance unit is required when distance is recorded' })
+  }
+  if (set.distance == null && set.distanceUnit != null) {
+    ctx.addIssue({ code: 'custom', path: ['distanceUnit'], message: 'Distance unit requires a distance' })
+  }
+})
 
 export type ManualWorkoutSetInput = z.infer<typeof manualWorkoutSetInputSchema>
 export type ManualWorkoutSetInputDraft = z.input<typeof manualWorkoutSetInputSchema>
@@ -660,7 +666,7 @@ export function toCanonicalSetInsert(set: ManualWorkoutSetInput): CanonicalWorko
     rightReps: set.rightReps,
     leftDurationSec: set.leftDurationSec,
     rightDurationSec: set.rightDurationSec,
-    distanceM: set.distance == null ? null : distanceToMeters(set.distance, set.distanceUnit ?? 'mi'),
+    distanceM: set.distance == null ? null : distanceToMeters(set.distance, set.distanceUnit!),
     completed: set.completed,
     notes: set.notes ?? null,
   }
