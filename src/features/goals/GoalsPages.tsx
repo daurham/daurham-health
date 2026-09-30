@@ -564,6 +564,7 @@ export function GoalDetailPage() {
 
   async function onRevise(event: FormEvent) {
     event.preventDefault()
+    if (!goal) return
     setBusy(true)
     setError(null)
     try {
