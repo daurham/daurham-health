@@ -31,13 +31,13 @@ function StrengthTrendSignal({
 }) {
   if (exercise.trend.status !== 'available' || exercise.trend.value.direction === 'stable') return null
   const direction = exercise.trend.value.direction === 'improving' ? 'higher' : 'lower'
-  const meaning = resolveTrendMeaning({
+  const resolution = resolveTrendMeaning({
     metric: { kind: 'strength', exerciseDefinitionId: exercise.exerciseId },
     direction,
     goals,
     preferences,
-  }).meaning
-  return <TrendSignal compact direction={direction} meaning={meaning} />
+  })
+  return <TrendSignal compact direction={direction} {...resolution} />
 }
 
 export function StrengthSection({
