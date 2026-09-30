@@ -17,6 +17,7 @@ import {
   applyStoredAppearance,
   readPalettePreference,
   readThemePreference,
+  resolveTheme,
   writePalettePreference,
   writeThemePreference,
   themePackUnlocked,
@@ -60,8 +61,19 @@ function prefersDark(): boolean {
 function AppearanceSection() {
   const [mode, setMode] = useState<ThemeModePreference>(storedMode)
   const [palette, setPalette] = useState<HealthPalette>(storedPalette)
+  const [systemDark, setSystemDark] = useState(prefersDark)
   const { summary } = useRewardSummary(true)
   const progression = progressionState(summary?.lifetimeXp ?? 0)
+  const resolvedMode = resolveTheme(mode, systemDark)
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return
+    const media = window.matchMedia('(prefers-color-scheme: dark)')
+    const onChange = () => setSystemDark(media.matches)
+    onChange()
+    media.addEventListener('change', onChange)
+    return () => media.removeEventListener('change', onChange)
+  }, [])
 
   useEffect(() => {
     function onStorage(event: StorageEvent) {
@@ -157,12 +169,18 @@ function AppearanceSection() {
                 }}
                 className={[
                   'motion-pressable min-w-0 overflow-hidden rounded-xl border p-0 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
-                  selected ? 'border-accent ring-1 ring-accent' : unlocked ? 'border-zinc-200 hover:border-zinc-400' : 'border-zinc-200 opacity-70',
+                  selected ? 'border-accent ring-1 ring-accent' : unlocked ? 'border-zinc-200 hover:border-zinc-400' : 'border-zinc-200',
                 ].join(' ')}
               >
                 <div
                   className="h-20 border-b border-black/5 p-3"
-                  style={{ background: 'linear-gradient(135deg, ' + pack.preview.canvas + ', ' + pack.preview.surface + ')' }}
+                  style={{
+                    background:
+                      resolvedMode === 'dark'
+                        ? 'radial-gradient(circle at 82% 12%, ' + pack.preview.secondary + '38, transparent 46%), linear-gradient(135deg, #11151b, ' + pack.preview.accent + '45)'
+                        : 'radial-gradient(circle at 82% 12%, ' + pack.preview.secondary + '22, transparent 46%), linear-gradient(135deg, ' + pack.preview.canvas + ', ' + pack.preview.surface + ')',
+                    boxShadow: pack.unlockLevel == null ? undefined : 'inset 0 0 28px ' + pack.preview.accent + (resolvedMode === 'dark' ? '20' : '12'),
+                  }}
                   aria-hidden="true"
                 >
                   <div className="flex h-full items-end gap-2">
