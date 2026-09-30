@@ -32,7 +32,7 @@ describe('Coach H2A domain boundaries', () => {
     const today = readFileSync('src/features/today/TodayPage.tsx', 'utf8')
     expect(service).not.toMatch(/gemini|home-ai|europe pmc|ai_usage/i)
     expect(today).toContain('if (readOnly) return')
-    expect(today).toContain('if (view?.date && !readOnly)')
+    expect(today).toContain('if (!readOnly)')
   })
 
   it('defines database idempotency for one task per period and one lifecycle event key', () => {
