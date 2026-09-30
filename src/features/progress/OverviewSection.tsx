@@ -141,6 +141,26 @@ function findingTrend(finding: ProgressFinding): { metric: TrendMetric; directio
   return null
 }
 
+function findingDetailLabel(finding: ProgressFinding): string | null {
+  const achievement = achievementList(finding)[0]
+  if (achievement) return achievement
+  if (finding.kind === 'exercise_improved') return 'Estimated strength improved'
+  if (finding.kind === 'exercise_decreased') return 'Estimated strength decreased'
+  if (
+    finding.kind === 'training_frequency_change' &&
+    finding.currentWorkouts != null &&
+    finding.previousWorkouts != null
+  ) {
+    const delta = finding.currentWorkouts - finding.previousWorkouts
+    if (delta > 0) return `${delta} more workout${delta === 1 ? '' : 's'} than previous`
+    if (delta < 0) {
+      const amount = Math.abs(delta)
+      return `${amount} fewer workout${amount === 1 ? '' : 's'} than previous`
+    }
+  }
+  return null
+}
+
 function findingSignal(
   finding: ProgressFinding,
   goals: readonly TrendGoalIntent[],
@@ -335,7 +355,11 @@ function FindingFeed({
                   {[achievementList(finding)[0], findingDate(finding)].filter(Boolean).join(' · ')}
                 </span>
                 {findingSignal(finding, trendGoals, trendPreferences) ? (
-                  <TrendSignal compact {...findingSignal(finding, trendGoals, trendPreferences)!} />
+                  <TrendSignal
+                    compact
+                    label={findingDetailLabel(finding) ?? undefined}
+                    {...findingSignal(finding, trendGoals, trendPreferences)!}
+                  />
                 ) : null}
               </div>
             </button>
@@ -367,14 +391,15 @@ function FindingFeed({
                 <span className="truncate font-medium">{findingEventName(finding, overview)}</span>
                 <span className="text-sm text-zinc-800">{findingResult(finding, overview) ?? '—'}</span>
                 <span className="min-w-0 text-sm text-zinc-600">
-                  <span className="block truncate">{achievementList(finding)[0] ?? '—'}</span>
                   {findingSignal(finding, trendGoals, trendPreferences) ? (
                     <TrendSignal
                       compact
-                      className="mt-0.5"
+                      label={findingDetailLabel(finding) ?? undefined}
                       {...findingSignal(finding, trendGoals, trendPreferences)!}
                     />
-                  ) : null}
+                  ) : (
+                    <span className="block truncate">{findingDetailLabel(finding) ?? '—'}</span>
+                  )}
                 </span>
                 <span className="text-right text-zinc-400" aria-hidden="true">
                   →
