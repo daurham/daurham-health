@@ -2,7 +2,7 @@ import { displayValueForMetric, formatBodyMass } from '@/domain/body-metrics'
 import type { CanonicalUnit } from '@/domain/body-metrics'
 import type { CanonicalEvidence, LatestPerformance, PrAchievement } from '@/domain/progress'
 import { kilogramsToPounds } from '@/domain/units'
-import { formatCalendarRange, formatCompactCalendarDate } from '@/domain/calendar-format'
+import { formatCalendarRange, formatCompactCalendarDate, formatFullCalendarDate } from '@/domain/calendar-format'
 import { formatPounds } from '@/features/training/format'
 
 export function formatKgAsLb(kg: number | null | undefined): string {
@@ -27,13 +27,13 @@ export function formatReps(reps: number | null | undefined): string {
 }
 
 export function formatCalendarDate(isoDate: string): string {
-  return formatCompactCalendarDate(isoDate)
+  return formatFullCalendarDate(isoDate)
 }
 
 export { formatCalendarRange }
 
 export function formatTimelineDayHeading(isoDate: string): string {
-  return formatCalendarDate(isoDate).toUpperCase()
+  return formatCompactCalendarDate(isoDate).toUpperCase()
 }
 
 export function formatClockTime(iso: string, timeZone: string | null): string {
