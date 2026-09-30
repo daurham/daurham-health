@@ -4,7 +4,6 @@ import {
   sessionIntentLabel,
   trainingSessionDisplayName,
   type ExerciseDefinition,
-  type ExerciseLibraryItem,
   type WorkoutSession,
   type WorkoutTemplate,
 } from '@/domain/training'
@@ -31,7 +30,6 @@ export function WorkoutDetailPage() {
   const navigate = useNavigate()
   const [session, setSession] = useState<WorkoutSession | null>(null)
   const [catalog, setCatalog] = useState<ExerciseDefinition[]>([])
-  const [lastSessions, setLastSessions] = useState<Record<string, ExerciseLibraryItem['lastSession']>>({})
   const [template, setTemplate] = useState<WorkoutTemplate | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -91,9 +89,6 @@ export function WorkoutDetailPage() {
       .then((items) => {
         if (cancelled) return
         setCatalog(items.filter((item) => item.exercise.isActive).map((item) => item.exercise))
-        setLastSessions(
-          Object.fromEntries(items.map((item) => [item.exercise.id, item.lastSession])),
-        )
       })
       .catch(() => undefined)
     return () => {
@@ -178,7 +173,6 @@ export function WorkoutDetailPage() {
           allowExerciseAddition={session?.sessionType === 'programmed'}
           allowSessionName={session?.sessionType === 'ad_hoc' || session?.sessionType === 'experiment'}
           exerciseCatalog={catalog}
-          lastSessions={lastSessions}
           onCreateExercise={async (input) => {
             const created = await createOwnerExercise(input)
             setCatalog((current) => [...current.filter((exercise) => exercise.id !== created.id), created])
