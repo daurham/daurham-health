@@ -27,7 +27,7 @@ describe('H5 Pantry contract', () => {
 
   it('archives/restores without hard deleting and warns about possible duplicates', () => {
     expect(page).toContain('{ archived }')
-    expect(page).toContain('{ archived: false }')
+    expect(page).toContain('setArchived(food, false)')
     expect(page).not.toContain("method: 'DELETE'")
     expect(page).toContain('Possible duplicates')
     expect(page).toContain('never auto-merges')
