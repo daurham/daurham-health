@@ -208,15 +208,15 @@ export function StrengthLab({
   range,
   exerciseId,
   onEvidence,
-  trendGoals,
-  trendPreferences,
+  trendGoals = [],
+  trendPreferences = DEFAULT_TREND_PREFERENCES,
 }: {
   overview: ProgressOverview
   range: ProgressRange
   exerciseId: string
   onEvidence: (topic: EvidenceTopic) => void
-  trendGoals: TrendGoalIntent[]
-  trendPreferences: TrendPreferences
+  trendGoals?: TrendGoalIntent[]
+  trendPreferences?: TrendPreferences
 }) {
   const prefix = useAppPathPrefix()
   const exercise = overview.exercises.find((item) => item.exerciseId === exerciseId)
