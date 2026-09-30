@@ -9,7 +9,7 @@ import { nutritionDayTotals, type NutritionDayTotals, type NutritionTotable } fr
 import { resolveNutritionTarget } from '../nutrition/targets.js'
 import type { NutritionTarget } from '../nutrition/types.js'
 import { activityWorkoutLabel, type ProgressActivityWorkout, type ProgressSleepObservation } from '../progress/health-timeline.js'
-import { analyzeCrossDomain, findingCopy, type IntelligenceTrainingSession } from '../intelligence/index.js'
+import { analyzeCrossDomain, findingCopy, type CrossDomainFinding, type IntelligenceTrainingSession } from '../intelligence/index.js'
 import { formatBodyMass } from '../body-metrics.js'
 import { formatCalendarRange } from '../calendar-format.js'
 import { buildTodaySupplementSection, type TodaySupplementInput, type TodaySupplementSection } from '../supplements/index.js'
@@ -183,7 +183,7 @@ export type TodayViewModel = {
     detail: string
     text: string
   }>
-  patterns: Array<{ id: string; text: string }>
+  patterns: Array<{ id: string; text: string; tone: 'positive' | 'negative' | 'neutral' }>
   supplements: TodaySupplementSection | null
   context: TodayContextSnapshot
   lab: {
@@ -196,6 +196,15 @@ export type TodayViewModel = {
 
 function finite(value: number | null | undefined): value is number {
   return typeof value === 'number' && Number.isFinite(value)
+}
+
+function motivationalPatternTone(finding: CrossDomainFinding): 'positive' | 'negative' | 'neutral' {
+  if (finding.id !== 'activity_training:steps' || finding.kind !== 'group_comparison') {
+    return 'neutral'
+  }
+  const steps = finding.metrics.metrics.find((metric) => metric.metric === 'steps')
+  if (steps?.delta == null || steps.delta === 0) return 'neutral'
+  return steps.delta > 0 ? 'positive' : 'negative'
 }
 
 function measuredLabel(ageDays: number): string {
@@ -360,7 +369,7 @@ export function buildTodayView(sources: TodaySources): TodayViewModel {
     }
     const text = findingCopy(finding)
     if (text) {
-      patterns.push({ id: finding.id, text })
+      patterns.push({ id: finding.id, text, tone: motivationalPatternTone(finding) })
     }
   }
 
