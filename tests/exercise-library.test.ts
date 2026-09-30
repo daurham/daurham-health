@@ -37,5 +37,15 @@ describe('H5 Exercise Library source contract', () => {
     expect(guide).toContain('Watch video')
     expect(guide).toContain('target="_blank"')
     expect(guide).not.toContain('autoplay')
+    expect(guide).toContain("hasGif ? 'GIF' : 'Form'")
+  })
+
+  it('supports the full H5 Library filter surface', () => {
+    expect(page).toContain('All equipment')
+    expect(page).toContain('All patterns')
+    expect(page).toContain('All muscles')
+    expect(page).toContain('Recently used')
+    expect(page).toContain('Most used')
+    expect(page).toContain('unilateral')
   })
 })

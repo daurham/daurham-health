@@ -62,15 +62,16 @@ export function ExerciseGuideButton({
 }) {
   const available = Boolean(exercise.gifUrl || exercise.formInstructions || exercise.notes || exercise.youtubeUrl)
   if (!available) return null
+  const hasGif = Boolean(exercise.gifUrl)
   return (
     <button
       type="button"
       onClick={onOpen}
-      className="inline-flex min-h-8 min-w-8 items-center justify-center rounded-md border border-zinc-200 bg-zinc-50 text-sm text-zinc-600 hover:bg-zinc-100"
+      className="inline-flex min-h-8 items-center justify-center rounded-md border border-zinc-200 bg-zinc-50 px-2 text-xs font-medium text-zinc-600 hover:bg-zinc-100"
       aria-label={`Open ${exercise.name} form guide`}
-      title="Form guide"
+      title={hasGif ? 'GIF and form guide' : 'Form guide'}
     >
-      ◇
+      {hasGif ? 'GIF' : 'Form'}
     </button>
   )
 }

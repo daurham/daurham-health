@@ -22,6 +22,7 @@ import { ExerciseGuideButton, ExerciseGuideSheet } from './ExerciseGuideSheet'
 
 type StateFilter = 'active' | 'archived' | 'all'
 type FamilyFilter = 'all' | 'reps' | 'duration' | 'distance' | 'skill'
+type EquipmentFilter = 'all' | 'bodyweight' | 'free_weight' | 'cable_machine' | 'other'
 type SortKind = 'recent' | 'used' | 'alpha'
 
 function normalized(value: string): string {
@@ -47,6 +48,13 @@ function family(kind: MeasurementKind): FamilyFilter {
   return 'skill'
 }
 
+function equipmentFamily(loadType: string): EquipmentFilter {
+  if (loadType === 'bodyweight' || loadType === 'none') return 'bodyweight'
+  if (['barbell', 'dumbbell', 'kettlebell', 'dumbbell_or_kettlebell'].includes(loadType)) return 'free_weight'
+  if (loadType === 'cable' || loadType === 'machine') return 'cable_machine'
+  return 'other'
+}
+
 function dateLabel(date: string): string {
   return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
     .format(new Date(`${date}T12:00:00Z`))
@@ -59,7 +67,9 @@ export function ExerciseLibraryPage() {
   const [query, setQuery] = useState('')
   const [stateFilter, setStateFilter] = useState<StateFilter>('active')
   const [familyFilter, setFamilyFilter] = useState<FamilyFilter>('all')
+  const [equipmentFilter, setEquipmentFilter] = useState<EquipmentFilter>('all')
   const [muscleFilter, setMuscleFilter] = useState('all')
+  const [movementFilter, setMovementFilter] = useState('all')
   const [sort, setSort] = useState<SortKind>('recent')
   const [editing, setEditing] = useState<ExerciseLibraryItem | 'new' | null>(null)
   const [guide, setGuide] = useState<ExerciseDefinition | null>(null)
@@ -87,14 +97,25 @@ export function ExerciseLibraryPage() {
     return [...values].sort()
   }, [items])
 
+  const movements = useMemo(() => {
+    const values = new Set<string>()
+    for (const item of items) {
+      const movement = classification(item.exercise).movementPattern
+      if (movement) values.add(movement)
+    }
+    return [...values].sort()
+  }, [items])
+
   const visible = useMemo(() => {
     const needle = normalized(query)
     const next = items.filter((item) => {
       if (stateFilter === 'active' && !item.exercise.isActive) return false
       if (stateFilter === 'archived' && item.exercise.isActive) return false
       if (familyFilter !== 'all' && family(item.exercise.measurementKind) !== familyFilter) return false
+      if (equipmentFilter !== 'all' && equipmentFamily(item.exercise.loadType) !== equipmentFilter) return false
       const info = classification(item.exercise)
       if (muscleFilter !== 'all' && info.primaryMuscleGroup !== muscleFilter) return false
+      if (movementFilter !== 'all' && info.movementPattern !== movementFilter) return false
       if (!needle) return true
       return normalized([
         item.exercise.name,
@@ -109,7 +130,7 @@ export function ExerciseLibraryPage() {
       if (sort === 'recent') return (right.lastPerformedDate ?? '').localeCompare(left.lastPerformedDate ?? '') || left.exercise.name.localeCompare(right.exercise.name)
       return left.exercise.name.localeCompare(right.exercise.name)
     })
-  }, [familyFilter, items, muscleFilter, query, sort, stateFilter])
+  }, [equipmentFilter, familyFilter, items, movementFilter, muscleFilter, query, sort, stateFilter])
 
   async function archive(item: ExerciseLibraryItem) {
     setBusyId(item.exercise.id)
@@ -152,11 +173,13 @@ export function ExerciseLibraryPage() {
 
       {error ? <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">{error}</p> : null}
 
-      <div className="grid gap-3 rounded-xl border border-zinc-200 bg-white p-3 lg:grid-cols-[minmax(0,1fr)_auto_auto_auto_auto]">
-        <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search name, alias, muscle…" className="min-h-11 rounded-md border border-zinc-300 bg-white px-3 text-base lg:text-sm" />
+      <div className="grid gap-3 rounded-xl border border-zinc-200 bg-white p-3 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_repeat(6,auto)]">
+        <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search name, alias, muscle…" className="min-h-11 rounded-md border border-zinc-300 bg-white px-3 text-base xl:text-sm" />
         <select value={stateFilter} onChange={(event) => setStateFilter(event.target.value as StateFilter)} className="min-h-11 rounded-md border border-zinc-300 bg-white px-3 text-sm"><option value="active">Active</option><option value="archived">Archived</option><option value="all">All states</option></select>
         <select value={familyFilter} onChange={(event) => setFamilyFilter(event.target.value as FamilyFilter)} className="min-h-11 rounded-md border border-zinc-300 bg-white px-3 text-sm"><option value="all">All measurements</option><option value="reps">Reps</option><option value="duration">Duration</option><option value="distance">Distance</option><option value="skill">Skill</option></select>
+        <select value={equipmentFilter} onChange={(event) => setEquipmentFilter(event.target.value as EquipmentFilter)} className="min-h-11 rounded-md border border-zinc-300 bg-white px-3 text-sm"><option value="all">All equipment</option><option value="bodyweight">Bodyweight / none</option><option value="free_weight">Free weights</option><option value="cable_machine">Cable / machine</option><option value="other">Other</option></select>
         <select value={muscleFilter} onChange={(event) => setMuscleFilter(event.target.value)} className="min-h-11 rounded-md border border-zinc-300 bg-white px-3 text-sm"><option value="all">All muscles</option>{muscles.map((muscle) => <option key={muscle} value={muscle}>{muscle.replace(/_/g, ' ')}</option>)}</select>
+        <select value={movementFilter} onChange={(event) => setMovementFilter(event.target.value)} className="min-h-11 rounded-md border border-zinc-300 bg-white px-3 text-sm"><option value="all">All patterns</option>{movements.map((movement) => <option key={movement} value={movement}>{movement.replace(/_/g, ' ')}</option>)}</select>
         <select value={sort} onChange={(event) => setSort(event.target.value as SortKind)} className="min-h-11 rounded-md border border-zinc-300 bg-white px-3 text-sm"><option value="recent">Recently used</option><option value="used">Most used</option><option value="alpha">A–Z</option></select>
       </div>
 
@@ -179,7 +202,11 @@ export function ExerciseLibraryPage() {
                       {!item.exercise.isActive ? <span className="rounded-full border border-zinc-300 px-2 py-0.5 text-xs text-zinc-600">Archived</span> : null}
                       <ExerciseGuideButton exercise={item.exercise} onOpen={() => setGuide(item.exercise)} />
                     </div>
-                    <p className="mt-1 text-sm text-zinc-700">{item.exercise.measurementKind.replace(/_/g, ' ')} · {item.exercise.loadType.replace(/_/g, ' ')}</p>
+                    <p className="mt-1 text-sm text-zinc-700">
+                      {item.exercise.measurementKind.replace(/_/g, ' ')} · {item.exercise.loadType.replace(/_/g, ' ')}
+                      {item.exercise.unilateral ? ' · unilateral' : ''}
+                      {info.movementPattern ? ` · ${info.movementPattern.replace(/_/g, ' ')}` : ''}
+                    </p>
                     <p className="mt-1 text-xs text-zinc-500">
                       {item.usageCount === 0 ? 'Never performed' : `Used in ${item.usageCount} workout${item.usageCount === 1 ? '' : 's'}`}
                       {item.lastPerformedDate ? ` · Last ${dateLabel(item.lastPerformedDate)}` : ''}

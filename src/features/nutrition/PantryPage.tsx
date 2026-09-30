@@ -21,22 +21,42 @@ function normalizeFoodName(value: string): string {
 
 function possibleDuplicates(
   foods: readonly NutritionFoodManagement[],
-  name: string,
-  brand: string,
+  input: {
+    name: string
+    brand: string
+    servingQuantity: string
+    servingUnit: string
+  },
 ): NutritionFoodManagement[] {
-  const normalized = normalizeFoodName(name)
-  const normalizedBrand = normalizeFoodName(brand)
+  const normalized = normalizeFoodName(input.name)
+  const normalizedBrand = normalizeFoodName(input.brand)
+  const normalizedServingUnit = normalizeFoodName(input.servingUnit)
+  const servingQuantity = Number(input.servingQuantity)
   if (normalized.length < 3) return []
   return foods
-    .filter((food) => {
+    .map((food) => {
       const foodName = normalizeFoodName(food.name)
       const foodBrand = normalizeFoodName(food.brand ?? '')
+      const foodServingUnit = normalizeFoodName(food.servingUnit)
       const sameName = foodName === normalized
       const nearName = foodName.includes(normalized) || normalized.includes(foodName)
       const brandCompatible = !normalizedBrand || !foodBrand || foodBrand === normalizedBrand
-      return brandCompatible && (sameName || nearName)
+      const servingUnitCompatible =
+        !normalizedServingUnit || !foodServingUnit || foodServingUnit === normalizedServingUnit
+      const servingQuantityCompatible =
+        !Number.isFinite(servingQuantity) ||
+        Math.abs(food.servingQuantity - servingQuantity) <= Math.max(0.05, Math.abs(servingQuantity) * 0.1)
+      const score =
+        (sameName ? 4 : nearName ? 2 : 0) +
+        (brandCompatible ? 1 : 0) +
+        (servingUnitCompatible ? 1 : 0) +
+        (servingQuantityCompatible ? 1 : 0)
+      return { food, score, sameName, nearName, brandCompatible }
     })
+    .filter((candidate) => candidate.brandCompatible && (candidate.sameName || candidate.nearName) && candidate.score >= 4)
+    .sort((left, right) => right.score - left.score || left.food.name.localeCompare(right.food.name))
     .slice(0, 4)
+    .map((candidate) => candidate.food)
 }
 
 function displayDate(date: string): string {
@@ -242,6 +262,10 @@ export function PantryPage() {
         <NewPantryFoodSheet
           foods={foods}
           onClose={() => setAdding(false)}
+          onOpenExisting={(food) => {
+            setAdding(false)
+            setEditing(food)
+          }}
           onCreated={() => {
             setAdding(false)
             void reload()
@@ -255,10 +279,12 @@ export function PantryPage() {
 function NewPantryFoodSheet({
   foods,
   onClose,
+  onOpenExisting,
   onCreated,
 }: {
   foods: NutritionFoodManagement[]
   onClose: () => void
+  onOpenExisting: (food: NutritionFoodManagement) => void
   onCreated: (food: NutritionFood) => void
 }) {
   const [name, setName] = useState('')
@@ -277,7 +303,10 @@ function NewPantryFoodSheet({
   const [staple, setStaple] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const duplicates = useMemo(() => possibleDuplicates(foods, name, brand), [brand, foods, name])
+  const duplicates = useMemo(
+    () => possibleDuplicates(foods, { name, brand, servingQuantity, servingUnit }),
+    [brand, foods, name, servingQuantity, servingUnit],
+  )
 
   async function submit(event: FormEvent) {
     event.preventDefault()
@@ -323,10 +352,22 @@ function NewPantryFoodSheet({
         {duplicates.length > 0 ? (
           <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
             <p className="font-medium">Possible duplicates</p>
-            <ul className="mt-1 list-disc pl-5">
-              {duplicates.map((food) => <li key={food.id}>{food.name}{food.brand ? ` · ${food.brand}` : ''}{food.archived ? ' · archived' : ''}</li>)}
+            <ul className="mt-2 space-y-2">
+              {duplicates.map((food) => (
+                <li key={food.id} className="flex flex-wrap items-center justify-between gap-2">
+                  <span>
+                    {food.name}
+                    {food.brand ? ` · ${food.brand}` : ''}
+                    {food.archived ? ' · archived' : ''}
+                    {food.servingQuantity ? ` · ${food.servingQuantity} ${food.servingUnit}` : ''}
+                  </span>
+                  <button type="button" className={quietButtonClass} onClick={() => onOpenExisting(food)}>
+                    Edit existing
+                  </button>
+                </li>
+              ))}
             </ul>
-            <p className="mt-1 text-xs">You can still create this food. Pantry never auto-merges definitions.</p>
+            <p className="mt-2 text-xs">You can still create this food. Pantry never auto-merges definitions.</p>
           </div>
         ) : null}
         <div className="grid grid-cols-2 gap-3">

@@ -31,5 +31,8 @@ describe('H5 Pantry contract', () => {
     expect(page).not.toContain("method: 'DELETE'")
     expect(page).toContain('Possible duplicates')
     expect(page).toContain('never auto-merges')
+    expect(page).toContain('servingUnitCompatible')
+    expect(page).toContain('servingQuantityCompatible')
+    expect(page).toContain('Edit existing')
   })
 })
