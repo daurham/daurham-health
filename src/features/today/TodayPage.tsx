@@ -175,9 +175,9 @@ export function TodayBoard({
 }) {
   const prefix = useAppPathPrefix()
   const readOnly = useDemoReadOnly()
-  const { goals: trendGoals } = useActiveTrendGoals(!readOnly)
+  const { goals: trendGoals, pending: trendGoalsPending } = useActiveTrendGoals(!readOnly)
   const storedTrendPreferences = useTrendPreferences()
-  const trendPreferences = readOnly ? DEFAULT_TREND_PREFERENCES : storedTrendPreferences
+  const trendPreferences = readOnly || trendGoalsPending ? DEFAULT_TREND_PREFERENCES : storedTrendPreferences
 
   function metricForChangedItem(id: string): TrendMetric | null {
     if (id === 'activity:steps:recent') return { kind: 'activity_steps' }
