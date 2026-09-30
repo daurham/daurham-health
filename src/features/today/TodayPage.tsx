@@ -33,6 +33,10 @@ import { recordSupplementAdherence } from '@/features/supplements/api'
 import { prefixedPath, useAppPathPrefix, useDemoReadOnly } from '@/lib/app-prefix'
 import { fetchToday } from './api'
 import { CoachCard } from '@/features/coach/CoachCard'
+import { TrendSignal } from '@/components/TrendSignal'
+import { DEFAULT_TREND_PREFERENCES, resolveTrendMeaning, type TrendMetric } from '@/domain/trend-intent'
+import { useActiveTrendGoals } from '@/features/goals/useActiveTrendGoals'
+import { useTrendPreferences } from '@/lib/use-trend-preferences'
 import { ensureCoach } from '@/features/coach/api'
 import type { CoachState } from '@/domain/coach'
 import { todayShouldReloadAfterNutrition, type TodayNutritionOutcome } from './nutrition-refresh'
@@ -170,6 +174,17 @@ export function TodayBoard({
   onCoachState?: (state: CoachState) => void
 }) {
   const prefix = useAppPathPrefix()
+  const readOnly = useDemoReadOnly()
+  const { goals: trendGoals } = useActiveTrendGoals(!readOnly)
+  const storedTrendPreferences = useTrendPreferences()
+  const trendPreferences = readOnly ? DEFAULT_TREND_PREFERENCES : storedTrendPreferences
+
+  function metricForChangedItem(id: string): TrendMetric | null {
+    if (id === 'activity:steps:recent') return { kind: 'activity_steps' }
+    if (id === 'body:weight_trend') return { kind: 'body', metricKey: 'weight' }
+    return null
+  }
+
   return (
     <div className="space-y-3">
       <div className="grid items-start gap-3 md:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)]">
@@ -221,15 +236,22 @@ export function TodayBoard({
         <section className="rounded-lg border border-zinc-200 bg-white p-4">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">What changed</h2>
           <ul className="mt-3 space-y-4">
-            {view.changedItems.map((item) => (
-              <li key={item.id}>
-                <p className="text-sm font-medium text-zinc-900">
-                  {item.direction === 'higher' ? '↑ ' : item.direction === 'lower' ? '↓ ' : ''}
-                  {item.headline}
-                </p>
-                <p className="mt-1 whitespace-pre-line text-sm text-zinc-600">{item.detail}</p>
-              </li>
-            ))}
+            {view.changedItems.map((item) => {
+              const metric = metricForChangedItem(item.id)
+              const direction = item.direction ?? 'stable'
+              const meaning = metric
+                ? resolveTrendMeaning({ metric, direction, goals: trendGoals, preferences: trendPreferences }).meaning
+                : 'neutral'
+              return (
+                <li key={item.id}>
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <p className="text-sm font-medium text-zinc-900">{item.headline}</p>
+                    {item.direction ? <TrendSignal direction={direction} meaning={meaning} compact /> : null}
+                  </div>
+                  <p className="mt-1 whitespace-pre-line text-sm text-zinc-600">{item.detail}</p>
+                </li>
+              )
+            })}
           </ul>
         </section>
       ) : null}
