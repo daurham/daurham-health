@@ -100,7 +100,7 @@ function GoalStatusSection({ goal }: { goal: GoalView }) {
     projection?.state === 'available' && projection.estimatedWindowStart && projection.estimatedWindowEnd
       ? projection.estimatedWindowStart === projection.estimatedWindowEnd
         ? projectionDateLabel(projection.estimatedWindowStart)
-        : `${projectionDateLabel(projection.estimatedWindowStart)} – ${projectionDateLabel(projection.estimatedWindowEnd)}`
+        : formatCalendarRange(projection.estimatedWindowStart, projection.estimatedWindowEnd)
       : null
   const coverage = coverageLabel(goal.goalKind as GoalKind, goal.evidence, goal.currentVersion.targetMin)
   return (
