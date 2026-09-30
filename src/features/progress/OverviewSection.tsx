@@ -344,7 +344,7 @@ function FindingFeed({
       </ul>
       <div className="mt-3 hidden overflow-hidden rounded-lg border border-zinc-200 bg-white md:block">
         <div
-          className="grid grid-cols-[5.5rem_8.75rem_minmax(8rem,1.3fr)_minmax(7rem,1fr)_minmax(7rem,0.9fr)_1rem] gap-3 border-b border-zinc-100 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-zinc-500"
+          className="grid grid-cols-[7.5rem_8.75rem_minmax(8rem,1.3fr)_minmax(7rem,1fr)_minmax(7rem,0.9fr)_1rem] gap-3 border-b border-zinc-100 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-zinc-500"
           aria-hidden="true"
         >
           <span>Date</span>
@@ -360,7 +360,7 @@ function FindingFeed({
               <button
                 type="button"
                 onClick={() => onEvidence(findingTopic(finding, overview))}
-                className="grid w-full grid-cols-[5.5rem_8.75rem_minmax(8rem,1.3fr)_minmax(7rem,1fr)_minmax(7rem,0.9fr)_1rem] items-center gap-3 px-3 py-2.5 text-left hover:bg-zinc-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-zinc-900"
+                className="grid w-full grid-cols-[7.5rem_8.75rem_minmax(8rem,1.3fr)_minmax(7rem,1fr)_minmax(7rem,0.9fr)_1rem] items-center gap-3 px-3 py-2.5 text-left hover:bg-zinc-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-zinc-900"
               >
                 <span className="text-sm text-zinc-600">{findingDate(finding) ?? '—'}</span>
                 <span className="text-xs text-zinc-500">{findingTitle(finding.kind)}</span>
@@ -549,7 +549,7 @@ function ConsistencyBlock({ overview }: { overview: ProgressOverview }) {
                 {activity.map((item) => (
                   <span
                     key={item.date}
-                    title={`${item.count} workout${item.count === 1 ? '' : 's'} on ${item.date}`}
+                    title={`${item.count} workout${item.count === 1 ? '' : 's'} on ${formatCalendarDate(item.date)}`}
                     className="text-sm text-zinc-800"
                   >
                     {formatCalendarDate(item.date)}
