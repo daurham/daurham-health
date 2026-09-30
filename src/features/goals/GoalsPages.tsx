@@ -513,6 +513,10 @@ export function GoalDetailPage() {
   const [targetDate, setTargetDate] = useState('')
   const [windowDays, setWindowDays] = useState('')
   const [notes, setNotes] = useState('')
+  const [reviseDurationMinutes, setReviseDurationMinutes] = useState('')
+  const [reviseDurationSeconds, setReviseDurationSeconds] = useState('')
+  const [revisePaceMinutes, setRevisePaceMinutes] = useState('')
+  const [revisePaceSeconds, setRevisePaceSeconds] = useState('')
   const [busy, setBusy] = useState(false)
 
   function apply(next: GoalView) {
@@ -523,6 +527,12 @@ export function GoalDetailPage() {
     setTargetDate(next.currentVersion.targetDate ?? '')
     setWindowDays(next.currentVersion.evaluationWindowDays == null ? '' : String(next.currentVersion.evaluationWindowDays))
     setNotes(next.currentVersion.notes ?? '')
+    const duration = next.goalKind === 'training_duration' ? (next.currentVersion.targetMin ?? 0) : 0
+    setReviseDurationMinutes(String(Math.floor(duration / 60)))
+    setReviseDurationSeconds(String(Math.round(duration % 60)))
+    const pace = next.goalKind === 'training_pace' ? (next.currentVersion.targetMax ?? 0) : 0
+    setRevisePaceMinutes(String(Math.floor(pace / 60)))
+    setRevisePaceSeconds(String(Math.round(pace % 60)))
   }
 
   useEffect(() => {
@@ -556,11 +566,23 @@ export function GoalDetailPage() {
     setBusy(true)
     setError(null)
     try {
+      const revisedDuration = Number(reviseDurationMinutes || 0) * 60 + Number(reviseDurationSeconds || 0)
+      const revisedPace = Number(revisePaceMinutes || 0) * 60 + Number(revisePaceSeconds || 0)
       const next = await reviseGoal(goalId, {
         sourceVersionId: goal?.currentVersion.id,
-        targetMode,
-        targetMin: targetMode === 'at_most' ? null : Number(targetMin),
-        targetMax: targetMode === 'at_least' ? null : Number(targetMax),
+        targetMode: goal.goalKind === 'training_skill' ? 'at_least' : targetMode,
+        targetMin: goal.goalKind === 'training_skill'
+          ? 1
+          : goal.goalKind === 'training_duration'
+            ? revisedDuration
+            : targetMode === 'at_most'
+              ? null
+              : Number(targetMin),
+        targetMax: goal.goalKind === 'training_pace'
+          ? revisedPace
+          : targetMode === 'at_least'
+            ? null
+            : Number(targetMax),
         targetDate: targetDate || null,
         evaluationWindowDays: windowDays === '' ? null : Number(windowDays),
         notes: notes || null,
@@ -643,27 +665,52 @@ export function GoalDetailPage() {
         <p className="text-sm text-zinc-600">
           Save revised goal. This creates Goal v{goal.currentVersion.version + 1}. v{goal.currentVersion.version} remains in history. The metric stays the same.
         </p>
-        <label className="block text-sm">
-          Target
-          <select className={fieldClass} value={targetMode} onChange={(event) => setTargetMode(event.target.value as 'at_least' | 'at_most' | 'range')}>
-            {definition?.modes.map((mode) => (
-              <option key={mode} value={mode}>
-                {mode === 'at_least' ? 'At least' : mode === 'at_most' ? 'At most' : 'Range'}
-              </option>
-            ))}
-          </select>
-        </label>
-        {targetMode !== 'at_most' ? (
+        {goal.goalKind === 'training_skill' ? (
+          <p className="text-sm text-zinc-600">Skill target stays fixed: achieve {goal.displayName.replace(/^Achieve /, '')}. You can revise the date or notes.</p>
+        ) : (
           <label className="block text-sm">
-            Minimum
-            <input className={fieldClass} inputMode="decimal" value={targetMin} onChange={(event) => setTargetMin(event.target.value)} />
+            Target
+            <select className={fieldClass} value={targetMode} onChange={(event) => setTargetMode(event.target.value as 'at_least' | 'at_most' | 'range')}>
+              {definition?.modes.map((mode) => (
+                <option key={mode} value={mode}>
+                  {mode === 'at_least' ? 'At least' : mode === 'at_most' ? 'At most' : 'Range'}
+                </option>
+              ))}
+            </select>
           </label>
-        ) : null}
-        {targetMode !== 'at_least' ? (
-          <label className="block text-sm">
-            Maximum
-            <input className={fieldClass} inputMode="decimal" value={targetMax} onChange={(event) => setTargetMax(event.target.value)} />
-          </label>
+        )}
+        {goal.goalKind === 'training_duration' ? (
+          <fieldset>
+            <legend className="text-sm">Target duration</legend>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="text-sm">Minutes<input className={fieldClass} type="number" min="0" value={reviseDurationMinutes} onChange={(event) => setReviseDurationMinutes(event.target.value)} /></label>
+              <label className="text-sm">Seconds<input className={fieldClass} type="number" min="0" max="59" value={reviseDurationSeconds} onChange={(event) => setReviseDurationSeconds(event.target.value)} /></label>
+            </div>
+          </fieldset>
+        ) : goal.goalKind === 'training_pace' ? (
+          <fieldset>
+            <legend className="text-sm">Target pace per mile</legend>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="text-sm">Minutes<input className={fieldClass} type="number" min="0" value={revisePaceMinutes} onChange={(event) => setRevisePaceMinutes(event.target.value)} /></label>
+              <label className="text-sm">Seconds<input className={fieldClass} type="number" min="0" max="59" value={revisePaceSeconds} onChange={(event) => setRevisePaceSeconds(event.target.value)} /></label>
+            </div>
+            {goal.selector.trainingMinDistanceM != null ? <p className="mt-1 text-xs text-zinc-500">Minimum continuous distance stays {metersToMiles(goal.selector.trainingMinDistanceM).toLocaleString('en-US', { maximumFractionDigits: 2 })} mi.</p> : null}
+          </fieldset>
+        ) : goal.goalKind !== 'training_skill' ? (
+          <>
+            {targetMode !== 'at_most' ? (
+              <label className="block text-sm">
+                Minimum
+                <input className={fieldClass} inputMode="decimal" value={targetMin} onChange={(event) => setTargetMin(event.target.value)} />
+              </label>
+            ) : null}
+            {targetMode !== 'at_least' ? (
+              <label className="block text-sm">
+                Maximum
+                <input className={fieldClass} inputMode="decimal" value={targetMax} onChange={(event) => setTargetMax(event.target.value)} />
+              </label>
+            ) : null}
+          </>
         ) : null}
         {definition && !definition.pointMetric ? (
           <label className="block text-sm">
