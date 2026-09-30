@@ -9,6 +9,7 @@ import {
   type RewardItem,
   type RewardPurchase,
   type RewardsState,
+  type RewardSummary,
   type WalletLedgerEntry,
   type XpLedgerEntryKind,
 } from '../../src/domain/rewards.js'
@@ -245,6 +246,31 @@ async function walletState(sql: Sql): Promise<RewardsState> {
 export async function readRewards(): Promise<RewardsState> {
   return walletState(await getSql())
 }
+
+async function rewardSummary(sql: Sql): Promise<RewardSummary> {
+  await reconcileCoachAwards(sql)
+  const rows = (await sql.query(
+    `SELECT
+       COALESCE(SUM(CASE WHEN entry_kind = 'award' THEN amount_xp ELSE 0 END), 0)::int AS lifetime_xp,
+       COALESCE(SUM(
+         CASE entry_kind
+           WHEN 'award' THEN amount_xp
+           WHEN 'refund' THEN amount_xp
+           WHEN 'purchase' THEN -amount_xp
+         END
+       ), 0)::int AS spendable_xp
+       FROM xp_ledger`,
+  )) as Array<{ lifetime_xp: number | string; spendable_xp: number | string }>
+  return {
+    lifetimeXp: Number(rows[0]?.lifetime_xp ?? 0),
+    spendableXp: Number(rows[0]?.spendable_xp ?? 0),
+  }
+}
+
+export async function readRewardSummary(): Promise<RewardSummary> {
+  return rewardSummary(await getSql())
+}
+
 
 export async function createRewardItem(body: unknown): Promise<RewardsState> {
   const parsed = rewardItemInputSchema.safeParse(body)
