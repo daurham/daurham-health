@@ -83,6 +83,8 @@ export function CoachCard({ state, pending, error, onState }: {
   const [actionError, setActionError] = useState<string | null>(null)
   const [actionPending, setActionPending] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
+  const [xpNotice, setXpNotice] = useState<number | null>(null)
+  const celebrationTimerRef = useRef<number | null>(null)
   const returnFocusRef = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
@@ -91,6 +93,10 @@ export function CoachCard({ state, pending, error, onState }: {
     setLogTask(null)
     setEndTask(null)
   }, [location.key])
+
+  useEffect(() => () => {
+    if (celebrationTimerRef.current != null) window.clearTimeout(celebrationTimerRef.current)
+  }, [])
 
   function closeOverlays() {
     setInboxOpen(false)
@@ -126,12 +132,24 @@ export function CoachCard({ state, pending, error, onState }: {
   const visibleCount = missions.length + labItems.length + labOverflow
   if (visibleCount === 0 && !notice && !actionError) return null
 
+  function celebrateIfCompleted(task: CoachTaskView, next: CoachState) {
+    const resolved = [next.dailyQuest, next.stretchQuest, next.weeklyFocus].find((item) => item?.id === task.id) ?? null
+    if (task.status !== 'completed' && resolved?.status === 'completed') {
+      const amount = xpForRewardBand(resolved.rewardBand)
+      setXpNotice(amount)
+      if (celebrationTimerRef.current != null) window.clearTimeout(celebrationTimerRef.current)
+      celebrationTimerRef.current = window.setTimeout(() => setXpNotice(null), 2600)
+    }
+  }
+
   async function update(task: CoachTaskView, operation: (id: string) => Promise<CoachState>) {
     setActionPending(true)
     setActionError(null)
     setNotice(null)
     try {
-      onState(await operation(task.id))
+      const next = await operation(task.id)
+      celebrateIfCompleted(task, next)
+      onState(next)
       setDetailTask(null)
       setEndTask(null)
     } catch (caught) {
@@ -242,6 +260,12 @@ export function CoachCard({ state, pending, error, onState }: {
             <button type="button" className={`${quietButtonClass} shrink-0 text-xs`} aria-label="Dismiss Coach notice" onClick={() => setNotice(null)}>Dismiss</button>
           </div>
         ) : null}
+        {xpNotice != null ? (
+          <div className="xp-celebration mx-3 mb-3 flex items-center justify-between gap-3 rounded-lg bg-reward-muted px-3 py-2" role="status" aria-live="polite">
+            <span className="text-sm font-semibold text-zinc-900">Mission complete</span>
+            <XpAmount amount={xpNotice} />
+          </div>
+        ) : null}
         {actionError ? <p className="px-3 py-2 text-sm text-red-700" role="alert">{actionError}</p> : null}
       </section>
 
@@ -255,7 +279,7 @@ export function CoachCard({ state, pending, error, onState }: {
 
       {inboxOpen ? <CoachInbox state={state} onClose={() => setInboxOpen(false)} actions={actions} error={actionError} returnFocusTo={returnFocusRef.current} /> : null}
       {endTask ? <CoachDialog title="End Stretch Quest" onClose={() => setEndTask(null)} returnFocusTo={returnFocusRef.current}><p className="mt-3 text-sm text-zinc-600">This challenge will close without a reward. Any Training PR you achieved stays in your Training history. There is no penalty.</p>{actionError ? <p className="mt-3 text-sm text-red-700" role="alert">{actionError}</p> : null}<div className="mt-4 flex flex-wrap gap-3"><button type="button" className={primaryButtonClass} disabled={actionPending} onClick={() => void update(endTask, endCoachTask)}>{actionPending ? 'Ending…' : 'End quest'}</button><button type="button" data-coach-initial-focus className={quietButtonClass} disabled={actionPending} onClick={() => setEndTask(null)}>Keep going</button></div></CoachDialog> : null}
-      {logTask ? <CoachLogSheet task={logTask} onClose={() => setLogTask(null)} returnFocusTo={returnFocusRef.current} onSaved={next => { setLogTask(null); onState(next) }} /> : null}
+      {logTask ? <CoachLogSheet task={logTask} onClose={() => setLogTask(null)} returnFocusTo={returnFocusRef.current} onSaved={next => { celebrateIfCompleted(logTask, next); setLogTask(null); onState(next) }} /> : null}
     </>
   )
 }
