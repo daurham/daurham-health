@@ -1,7 +1,9 @@
-import { Suspense, useEffect, useRef } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { LockedScreen, useAuth } from '@/auth'
 import { useRewardSummary } from '@/features/rewards/useRewardSummary'
+import { PROGRESSION_THEME_UNLOCKS, progressionState } from '@/domain/progression'
+import { themePack } from '@/theme'
 import { AppSurfaceProvider } from '@/lib/app-prefix'
 import { cn, quietButtonClass, RouteFallback, selectedTabClass, SHELL_MAX_WIDTH_CLASS, tabClass } from '@/lib'
 import type { NavItem } from '@/types'
@@ -48,6 +50,40 @@ export function Layout() {
   const items = demoRoute ? demoNavItems : navItems
   const mobileMenuRef = useRef<HTMLDetailsElement>(null)
   const wallet = useRewardSummary(showOwnerChrome && status === 'owner' && !demoRoute)
+  const previousWallet = useRef<{ spendableXp: number; lifetimeXp: number } | null>(null)
+  const [walletPulse, setWalletPulse] = useState(false)
+  const [levelCelebration, setLevelCelebration] = useState<{ level: number; themes: string[] } | null>(null)
+
+  useEffect(() => {
+    const next = wallet.summary
+    if (!next) {
+      previousWallet.current = null
+      return
+    }
+    const previous = previousWallet.current
+    previousWallet.current = next
+    if (!previous) return
+
+    const timers: number[] = []
+    if (next.spendableXp !== previous.spendableXp) {
+      setWalletPulse(false)
+      window.requestAnimationFrame(() => setWalletPulse(true))
+      timers.push(window.setTimeout(() => setWalletPulse(false), 650))
+    }
+
+    if (next.lifetimeXp > previous.lifetimeXp) {
+      const before = progressionState(previous.lifetimeXp)
+      const after = progressionState(next.lifetimeXp)
+      if (after.level > before.level) {
+        const themes = PROGRESSION_THEME_UNLOCKS
+          .filter((unlock) => unlock.level > before.level && unlock.level <= after.level)
+          .map((unlock) => themePack(unlock.id).label)
+        setLevelCelebration({ level: after.level, themes })
+        timers.push(window.setTimeout(() => setLevelCelebration(null), 4800))
+      }
+    }
+    return () => timers.forEach((timer) => window.clearTimeout(timer))
+  }, [wallet.summary])
 
   useEffect(() => {
     if (mobileMenuRef.current) mobileMenuRef.current.open = false
@@ -68,7 +104,7 @@ export function Layout() {
               <div className="hidden items-center gap-3 md:flex">
                 <Link
                   to="/rewards"
-                  className="motion-pressable xp-badge inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                  className={`motion-pressable xp-badge inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${walletPulse ? 'wallet-xp-pulse' : ''}`}
                   aria-label={wallet.summary ? `${wallet.summary.spendableXp.toLocaleString('en-US')} spendable XP. Open Rewards.` : 'Open Rewards'}
                 >
                   <span aria-hidden="true">✦</span>
@@ -95,7 +131,7 @@ export function Layout() {
               <div className="ml-auto flex items-center gap-2 md:hidden">
                 <Link
                   to="/rewards"
-                  className="motion-pressable xp-badge inline-flex min-h-9 items-center gap-1 rounded-full px-2.5 text-xs font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                  className={`motion-pressable xp-badge inline-flex min-h-9 items-center gap-1 rounded-full px-2.5 text-xs font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${walletPulse ? 'wallet-xp-pulse' : ''}`}
                   aria-label={wallet.summary ? `${wallet.summary.spendableXp.toLocaleString('en-US')} spendable XP. Open Rewards.` : 'Open Rewards'}
                 >
                   <span aria-hidden="true">✦</span>
@@ -148,6 +184,19 @@ export function Layout() {
           </div>
         )}
       </header>
+      {levelCelebration && showOwnerChrome ? (
+        <div className="pointer-events-none fixed inset-x-4 top-4 z-50 flex justify-center pt-[env(safe-area-inset-top)]" role="status" aria-live="polite">
+          <div className="level-celebration theme-unlock-glow pointer-events-auto max-w-md rounded-xl border border-accent/30 bg-white px-4 py-3 shadow-lg">
+            <p className="text-xs font-semibold uppercase tracking-wide text-accent">Level up</p>
+            <p className="mt-0.5 text-lg font-semibold tracking-tight text-zinc-900">Level {levelCelebration.level}</p>
+            {levelCelebration.themes.length > 0 ? (
+              <p className="mt-1 text-sm text-zinc-600">Theme unlocked · {levelCelebration.themes.join(' · ')}</p>
+            ) : (
+              <p className="mt-1 text-sm text-zinc-600">Lifetime XP reached a new level.</p>
+            )}
+          </div>
+        </div>
+      ) : null}
       <main
         className={cn(
           'mx-auto px-4 py-6 pb-[var(--shell-main-pad)] md:py-8',
