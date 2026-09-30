@@ -1,16 +1,29 @@
 import type { ProgressOverview } from '@/domain/progress'
+import { resolveTrendMeaning, type TrendGoalIntent, type TrendMetric, type TrendPreferences } from '@/domain/trend-intent'
+import { TrendSignal } from '@/components/TrendSignal'
 import { kilogramsToPounds } from '@/domain/units'
 import { remainingCount } from './copy'
 import type { EvidenceTopic } from './EvidencePanel'
 import { bodyMetricLabel, formatBodyCanonical, formatBodyMetricChange, formatCalendarDate, formatSigned } from './format'
 import { WeightHistoryChart } from './ProgressCharts'
 
+function bodyIntentMetric(metricKey: string): TrendMetric | null {
+  if (metricKey === 'weight') return { kind: 'body', metricKey: 'weight' }
+  if (metricKey === 'body_fat_percentage') return { kind: 'body', metricKey: 'body_fat_percentage' }
+  if (metricKey === 'waist_circumference') return { kind: 'body', metricKey: 'waist_circumference' }
+  return null
+}
+
 export function BodySection({
   overview,
   onEvidence,
+  trendGoals,
+  trendPreferences,
 }: {
   overview: ProgressOverview
   onEvidence: (topic: EvidenceTopic) => void
+  trendGoals: TrendGoalIntent[]
+  trendPreferences: TrendPreferences
 }) {
   const weight = overview.body.weight
   const trend = weight.trend
@@ -51,6 +64,19 @@ export function BodySection({
               <p className="mt-1 text-sm text-zinc-600">
                 {trend.value.measurementCount} measurements · {trend.value.spanDays} days
               </p>
+              {trend.value.slopePerWeek !== 0 ? (
+                <div className="mt-2">
+                  <TrendSignal
+                    direction={trend.value.slopePerWeek > 0 ? 'higher' : 'lower'}
+                    meaning={resolveTrendMeaning({
+                      metric: { kind: 'body', metricKey: 'weight' },
+                      direction: trend.value.slopePerWeek > 0 ? 'higher' : 'lower',
+                      goals: trendGoals,
+                      preferences: trendPreferences,
+                    }).meaning}
+                  />
+                </div>
+              ) : null}
             </div>
           ) : (
             <HistoryMeter overview={overview} />
@@ -153,6 +179,20 @@ export function BodySection({
                       <span className="col-span-2 text-xs text-zinc-500 md:col-span-1 md:text-sm md:text-zinc-700">
                         <span className="md:hidden">Change </span>
                         {changeLabel}
+                        {changeValue != null && changeValue !== 0 && bodyIntentMetric(metric.key) ? (
+                          <span className="mt-1 block">
+                            <TrendSignal
+                              compact
+                              direction={changeValue > 0 ? 'higher' : 'lower'}
+                              meaning={resolveTrendMeaning({
+                                metric: bodyIntentMetric(metric.key)!,
+                                direction: changeValue > 0 ? 'higher' : 'lower',
+                                goals: trendGoals,
+                                preferences: trendPreferences,
+                              }).meaning}
+                            />
+                          </span>
+                        ) : null}
                       </span>
                     </button>
                   </li>
