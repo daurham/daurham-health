@@ -25,14 +25,17 @@ export function TrendSignal({
   compact = false,
   className,
   source = 'goal',
+  label,
 }: {
   direction: TrendDirection
   meaning: TrendMeaning
   source?: TrendMeaningSource
   compact?: boolean
   className?: string
+  label?: string
 }) {
-  const label = trendMeaningLabel(meaning, source)
+  const semanticLabel = trendMeaningLabel(meaning, source)
+  const visibleLabel = label ?? semanticLabel
   return (
     <span
       className={cn(
@@ -41,10 +44,10 @@ export function TrendSignal({
         MEANING_CLASS[meaning],
         className,
       )}
-      aria-label={`${direction} trend. ${label}.`}
+      aria-label={`${direction} trend. ${semanticLabel}. ${label ? `${label}.` : ``}`.trim()}
     >
       <span aria-hidden="true">{arrow(direction)}</span>
-      <span>{label}</span>
+      <span>{visibleLabel}</span>
     </span>
   )
 }
