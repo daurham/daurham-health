@@ -741,7 +741,7 @@ export function draftSetToManualInput(
     leftDurationSec: parseOptionalInt(set.leftDurationSec),
     rightDurationSec: parseOptionalInt(set.rightDurationSec),
     distance: parseOptionalNumber(set.distance ?? ''),
-    distanceUnit: set.distanceUnit ?? 'mi',
+    distanceUnit: (set.distance?.trim() ?? '') === '' ? null : (set.distanceUnit ?? 'mi'),
     completed: set.completed,
     notes: set.notes.trim() === '' ? null : set.notes.trim(),
   }
