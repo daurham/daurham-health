@@ -16,8 +16,25 @@ export function InsightsSection({ insights }: { insights: ProactiveInsight[] }) 
       ) : (
         <div className="space-y-3">
           {insights.map((insight) => (
-            <article key={insight.id} className="rounded-lg border border-zinc-200 bg-white p-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">{insight.title}</p>
+            <article
+              key={insight.id}
+              className={[
+                'rounded-lg border bg-white p-4',
+                insight.signal === 'positive'
+                  ? 'signal-positive-surface border-zinc-200'
+                  : insight.signal === 'negative'
+                    ? 'signal-negative-surface border-zinc-200'
+                    : 'border-zinc-200',
+              ].join(' ')}
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">{insight.title}</p>
+                {insight.signal === 'positive' ? (
+                  <span className="trend-toward text-xs font-semibold">↑ Positive signal</span>
+                ) : insight.signal === 'negative' ? (
+                  <span className="trend-away text-xs font-semibold">↓ Needs attention</span>
+                ) : null}
+              </div>
               <h3 className="mt-1 text-sm font-semibold text-zinc-900">{insight.summary}</h3>
               <dl className="mt-3 space-y-1 text-sm text-zinc-700">
                 {insight.evidence.map((item) => (
