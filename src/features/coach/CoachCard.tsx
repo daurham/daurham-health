@@ -135,7 +135,26 @@ export function CoachCard({ state, pending, error, onState }: {
     if (document.activeElement instanceof HTMLElement) returnFocusRef.current = document.activeElement
   }
 
-  if (!state && !error) return pending ? <div className="h-24 animate-pulse rounded-lg bg-zinc-200" aria-label="Loading Coach" /> : null
+  if (!state && !error) return pending ? (
+    <section className="min-h-56 overflow-hidden rounded-xl border border-zinc-200 bg-white" aria-label="Loading Coach" aria-busy="true">
+      <div className="px-3 pb-2 pt-3">
+        <div className="h-3 w-14 animate-pulse rounded bg-zinc-200" />
+        <div className="mt-2 h-2.5 w-28 animate-pulse rounded bg-zinc-100" />
+      </div>
+      <div className="border-t border-zinc-100">
+        {[0, 1].map((row) => (
+          <div key={row} className="border-b border-zinc-100 px-3 py-3 last:border-b-0">
+            <div className="flex items-center gap-2">
+              <div className="h-2.5 w-12 animate-pulse rounded bg-zinc-200" />
+              <div className="h-6 w-16 animate-pulse rounded-full bg-zinc-100" />
+            </div>
+            <div className="mt-2 h-3.5 w-3/5 animate-pulse rounded bg-zinc-200" />
+            <div className="mt-2 h-2.5 w-2/5 animate-pulse rounded bg-zinc-100" />
+          </div>
+        ))}
+      </div>
+    </section>
+  ) : null
   if (!state) return (
     <section className="rounded-lg border border-zinc-200 bg-white p-3">
       <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Coach</h2>
@@ -243,7 +262,7 @@ export function CoachCard({ state, pending, error, onState }: {
 
   return (
     <>
-      <section className="overflow-hidden rounded-xl border border-zinc-200 bg-white" aria-label="Coach">
+      <section className="min-h-56 overflow-hidden rounded-xl border border-zinc-200 bg-white" aria-label="Coach">
         <div className="flex items-center justify-between gap-3 px-3 pb-2 pt-3">
           <div>
             <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Coach</h2>
