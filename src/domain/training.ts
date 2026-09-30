@@ -1114,6 +1114,7 @@ export function planOwnerExercisePatch(input: {
       loadType: OwnerExerciseLoadType
       unilateral: boolean
       semanticEditable: boolean
+      semanticChanged: boolean
       analytics: ReturnType<typeof ownerExerciseAnalyticsDefaults>
     }
   | { ok: false; status: 400 | 409; message: string } {
@@ -1147,6 +1148,7 @@ export function planOwnerExercisePatch(input: {
     loadType: input.next.loadType,
     unilateral: input.next.unilateral,
     semanticEditable: ownerCreated && !input.used,
+    semanticChanged: semanticChange,
     analytics: ownerExerciseAnalyticsDefaults(input.next.measurementKind, input.next.unilateral),
   }
 }

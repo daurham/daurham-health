@@ -65,6 +65,7 @@ describe('H5 Exercise Library editing safety', () => {
     expect(planOwnerExercisePatch({ existing: owner, next, used: false })).toMatchObject({
       ok: true,
       semanticEditable: true,
+      semanticChanged: true,
       measurementKind: 'duration',
     })
     expect(planOwnerExercisePatch({ existing: owner, next, used: true })).toMatchObject({
@@ -94,6 +95,7 @@ describe('H5 Exercise Library editing safety', () => {
     })).toMatchObject({
       ok: true,
       semanticEditable: false,
+      semanticChanged: false,
       name: 'Box Squat — My Label',
     })
 
@@ -110,5 +112,17 @@ describe('H5 Exercise Library editing safety', () => {
       ok: false,
       status: 409,
     })
+  })
+})
+
+
+describe('H5 seeded analytics preservation', () => {
+  it('updates semantic/analytics columns only for an allowed semantic change', async () => {
+    const { readFileSync } = await import('node:fs')
+    const source = readFileSync('server/training/owner-exercises.ts', 'utf8')
+    expect(source).toContain('measurement_kind = CASE WHEN $3::boolean THEN $4 ELSE measurement_kind END')
+    expect(source).toContain('performance_type = CASE WHEN $3::boolean THEN $7 ELSE performance_type END')
+    expect(source).toContain('analytics_load_type = CASE WHEN $3::boolean THEN $8 ELSE analytics_load_type END')
+    expect(source).toContain('plan.semanticChanged')
   })
 })
