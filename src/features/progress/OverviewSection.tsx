@@ -330,14 +330,14 @@ function FindingFeed({
                 {findingTitle(finding.kind)}
               </p>
               <p className="mt-1 font-medium">{findingHeadline(finding, overview)}</p>
-              {findingSignal(finding, trendGoals, trendPreferences) ? (
-                <div className="mt-1">
+              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                <span className="text-sm text-zinc-600">
+                  {[achievementList(finding)[0], findingDate(finding)].filter(Boolean).join(' · ')}
+                </span>
+                {findingSignal(finding, trendGoals, trendPreferences) ? (
                   <TrendSignal compact {...findingSignal(finding, trendGoals, trendPreferences)!} />
-                </div>
-              ) : null}
-              <p className="mt-1 text-sm text-zinc-600">
-                {[achievementList(finding)[0], findingDate(finding)].filter(Boolean).join(' · ')}
-              </p>
+                ) : null}
+              </div>
             </button>
           </li>
         ))}
@@ -366,10 +366,15 @@ function FindingFeed({
                 <span className="text-xs text-zinc-500">{findingTitle(finding.kind)}</span>
                 <span className="truncate font-medium">{findingEventName(finding, overview)}</span>
                 <span className="text-sm text-zinc-800">{findingResult(finding, overview) ?? '—'}</span>
-                <span className="truncate text-sm text-zinc-600">
+                <span className="min-w-0 text-sm text-zinc-600">
+                  <span className="block truncate">{achievementList(finding)[0] ?? '—'}</span>
                   {findingSignal(finding, trendGoals, trendPreferences) ? (
-                    <TrendSignal compact {...findingSignal(finding, trendGoals, trendPreferences)!} />
-                  ) : achievementList(finding)[0] ?? '—'}
+                    <TrendSignal
+                      compact
+                      className="mt-0.5"
+                      {...findingSignal(finding, trendGoals, trendPreferences)!}
+                    />
+                  ) : null}
                 </span>
                 <span className="text-right text-zinc-400" aria-hidden="true">
                   →
