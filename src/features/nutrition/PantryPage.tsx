@@ -237,7 +237,7 @@ export function PantryPage() {
                         }
                       }}
                     >
-                      Remove
+                      Remove from Pantry
                     </button>
                   )}
                 </div>
