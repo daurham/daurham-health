@@ -9,6 +9,7 @@ import { wrapNodeResponse, type ApiRequest, type ApiResponse } from '../server/h
 
 const service = vi.hoisted(() => ({
   readRewards: vi.fn(),
+  readRewardSummary: vi.fn(),
   createRewardItem: vi.fn(),
   updateRewardItem: vi.fn(),
   archiveRewardItem: vi.fn(),
@@ -70,6 +71,7 @@ describe('Rewards API routing', () => {
   beforeEach(() => {
     for (const fn of Object.values(service)) fn.mockReset()
     service.readRewards.mockResolvedValue(EMPTY)
+    service.readRewardSummary.mockResolvedValue({ lifetimeXp: 125, spendableXp: 75 })
     service.createRewardItem.mockResolvedValue(EMPTY)
     service.updateRewardItem.mockResolvedValue(EMPTY)
     service.archiveRewardItem.mockResolvedValue(EMPTY)
@@ -79,12 +81,14 @@ describe('Rewards API routing', () => {
 
   it('matches every wallet route through the single API dispatcher', () => {
     expect(matchRewardsRoute('/api/rewards')).toEqual({ kind: 'root' })
+    expect(matchRewardsRoute('/api/rewards/summary')).toEqual({ kind: 'summary' })
     expect(matchRewardsRoute('/api/rewards/items')).toEqual({ kind: 'items' })
     expect(matchRewardsRoute(`/api/rewards/items/${ITEM}`)).toEqual({ kind: 'item', id: ITEM })
     expect(matchRewardsRoute('/api/rewards/purchases')).toEqual({ kind: 'purchases' })
     expect(matchRewardsRoute(`/api/rewards/purchases/${PURCHASE}/refund`)).toEqual({ kind: 'refund', id: PURCHASE })
     expect(matchRewardsRoute('/api/rewards/items/not-a-uuid')).toBeNull()
     expect(matchHealthApiRoute('/api/rewards')).toBe('rewards')
+    expect(matchHealthApiRoute('/api/rewards/summary')).toBe('rewards')
     expect(matchHealthApiRoute(`/api/rewards/items/${ITEM}`)).toBe('rewards')
     expect(matchHealthApiRoute(`/api/rewards/purchases/${PURCHASE}/refund`)).toBe('rewards')
   })
@@ -94,6 +98,8 @@ describe('Rewards API routing', () => {
     expect((await call('GET', '/api/rewards', null)).status()).toBe(401)
     expect((await call('GET', '/api/rewards', { id: 'someone', email: 'other@example.com' })).status()).toBe(403)
     expect((await call('GET', '/api/rewards', owner)).status()).toBe(200)
+    expect((await call('GET', '/api/rewards/summary', owner)).status()).toBe(200)
+    expect(service.readRewardSummary).toHaveBeenCalledTimes(1)
     const wrong = await call('POST', '/api/rewards', owner, {})
     expect(wrong.status()).toBe(405)
     expect(wrong.allow()).toBe('GET')
