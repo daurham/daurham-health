@@ -17,9 +17,11 @@ function toTrendGoal(goal: GoalView): TrendGoalIntent {
 
 export function useActiveTrendGoals(enabled: boolean): {
   goals: TrendGoalIntent[]
+  pending: boolean
   refresh: () => void
 } {
   const [goals, setGoals] = useState<TrendGoalIntent[]>([])
+  const [pending, setPending] = useState(enabled)
   const [generation, setGeneration] = useState(0)
 
   const refresh = useCallback(() => {
@@ -29,15 +31,20 @@ export function useActiveTrendGoals(enabled: boolean): {
   useEffect(() => {
     if (!enabled) {
       setGoals([])
+      setPending(false)
       return
     }
     let active = true
+    setPending(true)
     fetchGoals()
       .then((result) => {
         if (active) setGoals(result.goals.filter((goal) => goal.status === 'active').map(toTrendGoal))
       })
       .catch(() => {
         if (active) setGoals([])
+      })
+      .finally(() => {
+        if (active) setPending(false)
       })
     return () => {
       active = false
@@ -46,5 +53,5 @@ export function useActiveTrendGoals(enabled: boolean): {
 
   useEffect(() => enabled ? subscribeHealthDataChanges(refresh) : () => undefined, [enabled, refresh])
 
-  return { goals, refresh }
+  return { goals, pending, refresh }
 }
