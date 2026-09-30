@@ -2,7 +2,7 @@ import { getNutritionDay, parseNutritionDayQuery } from '../nutrition/service.js
 import { withOwnerAuth } from '../auth/with-owner.js'
 import { handleApiError, requestQueryValue, sendJson, type ApiRequest, type ApiResponse } from '../http.js'
 
-export default withOwnerAuth(async function nutritionDayHandler(req: ApiRequest, res: ApiResponse) {
+export async function handleNutritionDay(req: ApiRequest, res: ApiResponse) {
   try {
     if (req.method !== 'GET') {
       res.setHeader('Allow', 'GET')
@@ -13,4 +13,6 @@ export default withOwnerAuth(async function nutritionDayHandler(req: ApiRequest,
   } catch (error) {
     handleApiError(res, error)
   }
-})
+}
+
+export default withOwnerAuth(handleNutritionDay)
