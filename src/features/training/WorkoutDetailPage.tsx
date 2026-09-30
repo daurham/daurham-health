@@ -91,8 +91,8 @@ export function WorkoutDetailPage() {
       .then((items) => {
         if (cancelled) return
         setCatalog(items.filter((item) => item.exercise.isActive).map((item) => item.exercise))
-        setLastPerformedDates(
-          Object.fromEntries(items.map((item) => [item.exercise.id, item.lastPerformedDate])),
+        setLastSessions(
+          Object.fromEntries(items.map((item) => [item.exercise.id, item.lastSession])),
         )
       })
       .catch(() => undefined)
