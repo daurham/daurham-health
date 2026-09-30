@@ -514,7 +514,7 @@ describe('Progress UI states', () => {
     expect(html).toContain('3 workouts')
     expect(html).toContain('2 performance bests')
     expect(html).toContain('Strength trends building')
-    expect(html).toContain('grid-cols-[5.5rem_8.75rem')
+    expect(html).toContain('grid-cols-[7.5rem_8.75rem')
     expect(html).not.toContain('Strength trend: 0%')
     expect(html).not.toContain('Weight trend: 0')
     expect(html).not.toContain('Box Squat')
