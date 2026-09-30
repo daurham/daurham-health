@@ -39,7 +39,9 @@ function positiveNumber(value: number | null | undefined): number | null {
 function unloadedRepsMeaningful(exercise: TrainingPerformanceExercise): boolean {
   if (supportsLoadedRepStrength(exercise)) return false
   if (exercise.measurementKind !== 'reps' && exercise.measurementKind !== 'reps_per_side') return false
-  return exercise.performanceType === 'bodyweight_reps' || exercise.performanceType === 'other'
+  const unloaded = (exercise.loadType === 'bodyweight' || exercise.loadType === 'none') &&
+    (exercise.analyticsLoadType === 'bodyweight' || exercise.analyticsLoadType === 'none')
+  return unloaded && (exercise.performanceType === 'bodyweight_reps' || exercise.performanceType === 'other')
 }
 
 export function trainingPerformanceObservations(
