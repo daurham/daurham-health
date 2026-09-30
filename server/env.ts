@@ -42,7 +42,9 @@ export async function loadLocalEnv(): Promise<void> {
   if (loaded) {
     return
   }
-  await readEnvFile(path.join(rootDir, '.env'))
+  // Existing process.env values remain highest priority. Load .env.local first
+  // because readEnvFile intentionally never overwrites an already-set key.
   await readEnvFile(path.join(rootDir, '.env.local'))
+  await readEnvFile(path.join(rootDir, '.env'))
   loaded = true
 }
