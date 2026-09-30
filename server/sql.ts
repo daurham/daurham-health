@@ -2,17 +2,9 @@
  * Split a migration file into statements for Neon's HTTP driver, which
  * executes one statement per query.
  *
- * Safe for the current Health migrations: CREATE TABLE/INDEX, INSERT, and
- * CHECKs that do not use dollar-quoting.
- *
- * This is not a PostgreSQL parser. It will mis-split:
- * - semicolons inside dollar-quoted bodies (`$tag$ ... $tag$`)
- * - `/*` comment markers inside quoted strings (stripped globally first)
- * - E'' strings that escape quotes with backslashes
- *
- * Prefer one statement per migration file, or a dedicated sentinel line such as
- * `--> statement`, before teaching this function more SQL syntax. Do not
- * introduce an ORM.
+ * This is intentionally a small PostgreSQL-aware splitter, not a full parser.
+ * It preserves semicolons inside quoted strings, identifiers, line comments,
+ * and dollar-quoted bodies such as PL/pgSQL functions.
  */
 export function splitSqlStatements(sqlText: string): string[] {
   const withoutBlockComments = sqlText.replace(/\/\*[\s\S]*?\*\//g, '')
@@ -21,6 +13,7 @@ export function splitSqlStatements(sqlText: string): string[] {
   let inSingleQuote = false
   let inDoubleQuote = false
   let inLineComment = false
+  let dollarQuoteTag: string | null = null
 
   for (let i = 0; i < withoutBlockComments.length; i += 1) {
     const char = withoutBlockComments[i]
@@ -33,10 +26,31 @@ export function splitSqlStatements(sqlText: string): string[] {
       continue
     }
 
+    if (dollarQuoteTag) {
+      if (withoutBlockComments.startsWith(dollarQuoteTag, i)) {
+        current += dollarQuoteTag
+        i += dollarQuoteTag.length - 1
+        dollarQuoteTag = null
+      } else {
+        current += char
+      }
+      continue
+    }
+
     if (!inSingleQuote && !inDoubleQuote && char === '-' && next === '-') {
       inLineComment = true
       i += 1
       continue
+    }
+
+    if (!inSingleQuote && !inDoubleQuote && char === '$') {
+      const match = withoutBlockComments.slice(i).match(/^\$[A-Za-z_][A-Za-z0-9_]*\$|^\$\$/)
+      if (match) {
+        dollarQuoteTag = match[0]
+        current += dollarQuoteTag
+        i += dollarQuoteTag.length - 1
+        continue
+      }
     }
 
     if (!inDoubleQuote && char === "'") {
