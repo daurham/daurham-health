@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { coverageLabel } from '@/domain/goal-status'
+import { formatCalendarRange, formatFullCalendarDate } from '@/domain/calendar-format'
 import { formatGoalQuantity, formatGoalTarget, goalKindDefinition, GOAL_KINDS, type GoalKind } from '@/domain/goals'
 import type { GoalProjection } from '@/domain/goal-projection'
 import { healthCalendarDateFromNow } from '@/domain/time'
@@ -27,12 +28,7 @@ const KIND_LABELS: Record<GoalKind, string> = {
 }
 
 function projectionDateLabel(iso: string): string {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso)
-  if (!match) {
-    return iso
-  }
-  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])))
-  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }).format(date)
+  return formatFullCalendarDate(iso)
 }
 
 function formatWeeklyTrend(perWeek: number, unit: string): string {
@@ -68,7 +64,7 @@ function ProjectionPanel({ projection }: { projection: GoalProjection }) {
           <p>
             {projection.estimatedWindowStart === projection.estimatedWindowEnd
               ? projectionDateLabel(projection.estimatedWindowStart)
-              : `${projectionDateLabel(projection.estimatedWindowStart)} – ${projectionDateLabel(projection.estimatedWindowEnd)}`}
+              : formatCalendarRange(projection.estimatedWindowStart, projection.estimatedWindowEnd)}
           </p>
           {projection.estimatedCrossingDate ? <p className="text-zinc-600">Central estimate: {projectionDateLabel(projection.estimatedCrossingDate)}</p> : null}
           {projection.trendPerWeek != null ? <p>Observed trend {formatWeeklyTrend(projection.trendPerWeek, projection.unit)}</p> : null}
@@ -119,7 +115,7 @@ function GoalStatusSection({ goal }: { goal: GoalView }) {
           <dt className="text-zinc-500">Target</dt>
           <dd>
             {formatGoalTarget(goal.currentVersion)}
-            {goal.currentVersion.targetDate ? ` by ${goal.currentVersion.targetDate}` : ''}
+            {goal.currentVersion.targetDate ? ` by ${formatFullCalendarDate(goal.currentVersion.targetDate)}` : ''}
           </dd>
         </div>
         <div>
@@ -198,7 +194,7 @@ function GoalCard({ goal }: { goal: GoalView }) {
         <span className="text-sm text-zinc-500">v{goal.currentVersion.version}</span>
       </div>
       <p className="mt-1 text-sm text-zinc-800">{formatGoalTarget(goal.currentVersion)}</p>
-      {goal.currentVersion.targetDate ? <p className="text-sm text-zinc-600">Target date {goal.currentVersion.targetDate}</p> : null}
+      {goal.currentVersion.targetDate ? <p className="text-sm text-zinc-600">Target date {formatFullCalendarDate(goal.currentVersion.targetDate)}</p> : null}
       {goal.goalStatus ? <p className="mt-2 text-sm text-zinc-800">{goal.goalStatus.targetLabel}</p> : null}
       {goal.status === 'active' && goal.goalStatus?.deadlineLabel ? <p className="text-sm text-zinc-600">{goal.goalStatus.deadlineLabel}</p> : null}
       <p className="mt-2 text-sm text-zinc-600">Current {evidenceText(goal)}</p>
@@ -617,7 +613,7 @@ export function GoalDetailPage() {
       <div>
         <h1 className="text-xl font-semibold tracking-tight">{goal.displayName}</h1>
         <p className="mt-1 text-sm text-zinc-600">
-          {goal.status} · started {goal.startedOn}
+          {goal.status} · started {formatFullCalendarDate(goal.startedOn)}
         </p>
         {goal.selectorContext.message ? <p className="mt-1 text-sm text-zinc-600">{goal.selectorContext.message}</p> : null}
       </div>
@@ -771,7 +767,7 @@ export function GoalDetailPage() {
               v{version.version} · {version.isCurrent ? 'current' : 'historical'}
             </p>
             <p>{formatGoalTarget(version)}</p>
-            {version.targetDate ? <p className="text-zinc-600">Target date {version.targetDate}</p> : null}
+            {version.targetDate ? <p className="text-zinc-600">Target date {formatFullCalendarDate(version.targetDate)}</p> : null}
             {version.notes ? <p className="text-zinc-700">{version.notes}</p> : null}
           </article>
         ))}
