@@ -80,6 +80,9 @@ export function TrainingPage() {
           <Link to="/training/new" className={primaryButtonClass}>
             Start workout
           </Link>
+          <Link to="/training/exercises" className={secondaryButtonClass}>
+            Exercises
+          </Link>
           <Link to="/training/routines" className={secondaryButtonClass}>
             Manage routines
           </Link>

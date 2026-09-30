@@ -4,3 +4,5 @@ export { ImportWorkoutPage } from './ImportWorkoutPage'
 export { WorkoutDetailPage } from './WorkoutDetailPage'
 
 export { RoutinesPage } from './RoutinesPage'
+
+export { ExerciseLibraryPage } from './ExerciseLibraryPage'

@@ -1,10 +1,12 @@
 import {
   createSessionResponseSchema,
   exerciseListResponseSchema,
+  exerciseLibraryResponseSchema,
   sessionDetailResponseSchema,
   sessionListResponseSchema,
   templateListResponseSchema,
   type ExerciseDefinition,
+  type ExerciseLibraryItem,
   exerciseDefinitionSchema,
   type ManualWorkoutRequest,
   type OwnerExerciseRequest,
@@ -29,6 +31,33 @@ export async function fetchExercises(): Promise<ExerciseDefinition[]> {
     throw new Error(await readApiError(response))
   }
   return exerciseListResponseSchema.parse(await response.json()).exercises
+}
+
+export async function fetchExerciseLibrary(): Promise<ExerciseLibraryItem[]> {
+  const response = await healthFetch('/api/training/exercises?management=true')
+  if (!response.ok) throw new Error(await readApiError(response))
+  return exerciseLibraryResponseSchema.parse(await response.json()).exercises
+}
+
+export async function updateOwnerExercise(id: string, input: OwnerExerciseRequest): Promise<ExerciseDefinition> {
+  const response = await healthFetch(`/api/training/exercises/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+  if (!response.ok) throw new Error(await readApiError(response))
+  return exerciseDefinitionSchema.parse((await response.json()).exercise)
+}
+
+export async function archiveExercise(id: string): Promise<void> {
+  const response = await healthFetch(`/api/training/exercises/${id}`, { method: 'DELETE' })
+  if (!response.ok) throw new Error(await readApiError(response))
+}
+
+export async function restoreExercise(id: string): Promise<ExerciseDefinition> {
+  const response = await healthFetch(`/api/training/exercises/${id}/restore`, { method: 'POST' })
+  if (!response.ok) throw new Error(await readApiError(response))
+  return exerciseDefinitionSchema.parse((await response.json()).exercise)
 }
 
 export async function createOwnerExercise(input: OwnerExerciseRequest): Promise<ExerciseDefinition> {

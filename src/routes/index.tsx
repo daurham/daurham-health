@@ -34,6 +34,7 @@ const StartWorkoutPage = lazy(() => import('@/features/training').then((module) 
 const ImportWorkoutPage = lazy(() => import('@/features/training').then((module) => ({ default: module.ImportWorkoutPage })))
 const WorkoutDetailPage = lazy(() => import('@/features/training').then((module) => ({ default: module.WorkoutDetailPage })))
 const RoutinesPage = lazy(() => import('@/features/training').then((module) => ({ default: module.RoutinesPage })))
+const ExerciseLibraryPage = lazy(() => import('@/features/training').then((module) => ({ default: module.ExerciseLibraryPage })))
 const ProgressPage = lazy(() => import('@/features/progress').then((module) => ({ default: module.ProgressPage })))
 const ProgressOverviewRoute = lazy(() => import('@/features/progress').then((module) => ({ default: module.ProgressOverviewRoute })))
 const ProgressActivityRoute = lazy(() => import('@/features/progress').then((module) => ({ default: module.ProgressActivityRoute })))
@@ -83,6 +84,7 @@ const router = createBrowserRouter([
       { path: 'training', element: <TrainingPage /> },
       { path: 'training/new', element: <StartWorkoutPage /> },
       { path: 'training/import', element: <ImportWorkoutPage /> },
+      { path: 'training/exercises', element: <ExerciseLibraryPage /> },
       { path: 'training/routines', element: <RoutinesPage /> },
       { path: 'training/:sessionId', element: <WorkoutDetailPage /> },
       { path: 'body', element: <BodyPage /> },
