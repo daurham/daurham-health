@@ -1,4 +1,4 @@
-import type { ElementType, ReactNode } from 'react'
+import type { HTMLAttributes, ReactNode } from 'react'
 import { cn } from '@/lib'
 
 export type SurfaceRole = 'hero' | 'standard' | 'compact' | 'quiet' | 'attention'
@@ -13,20 +13,16 @@ const ROLE_CLASS: Record<SurfaceRole, string> = {
 
 export function Surface({
   role = 'standard',
-  as,
   className,
   children,
   ...props
 }: {
   role?: SurfaceRole
-  as?: ElementType
-  className?: string
   children: ReactNode
-} & Record<string, unknown>) {
-  const Component = as ?? 'section'
+} & HTMLAttributes<HTMLElement>) {
   return (
-    <Component className={cn(ROLE_CLASS[role], className)} {...props}>
+    <section className={cn(ROLE_CLASS[role], className)} {...props}>
       {children}
-    </Component>
+    </section>
   )
 }
