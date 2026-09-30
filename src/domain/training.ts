@@ -960,6 +960,48 @@ export const ownerRoutineRequestSchema = z.object({
 
 export type OwnerRoutineRequest = z.infer<typeof ownerRoutineRequestSchema>
 
+function positiveRangeError(min: number | undefined, max: number | undefined, label: string, integer = false): string | null {
+  for (const value of [min, max]) {
+    if (value != null && (!Number.isFinite(value) || value <= 0 || (integer && !Number.isInteger(value)))) {
+      return `${label} values must be positive${integer ? ' whole numbers' : ''}.`
+    }
+  }
+  if (min != null && max != null && min > max) return `${label} minimum cannot exceed maximum.`
+  return null
+}
+
+export function ownerRoutinePrescriptionError(
+  measurementKind: MeasurementKind,
+  prescription: TemplatePrescription,
+): string | null {
+  if (prescription.measurement !== measurementKind) return 'Routine prescription must match the exercise measurement.'
+  const repsPresent = prescription.min != null || prescription.max != null
+  const durationPresent = prescription.min_sec != null || prescription.max_sec != null
+  const distancePresent = prescription.min_distance_m != null || prescription.max_distance_m != null
+  const completionPresent = prescription.completion != null
+
+  if (measurementKind === 'reps' || measurementKind === 'reps_per_side') {
+    if (durationPresent || distancePresent || completionPresent) return 'Reps prescriptions cannot contain duration, distance, or completion fields.'
+    return positiveRangeError(prescription.min, prescription.max, 'Rep prescription', true)
+  }
+  if (measurementKind === 'duration' || measurementKind === 'duration_per_side') {
+    if (repsPresent || distancePresent || completionPresent) return 'Duration prescriptions cannot contain reps, distance, or completion fields.'
+    return positiveRangeError(prescription.min_sec, prescription.max_sec, 'Duration prescription', true)
+  }
+  if (measurementKind === 'distance') {
+    if (repsPresent || durationPresent || completionPresent) return 'Distance prescriptions cannot contain reps, duration, or completion fields.'
+    return positiveRangeError(prescription.min_distance_m, prescription.max_distance_m, 'Distance prescription')
+  }
+  if (measurementKind === 'distance_duration') {
+    if (repsPresent || completionPresent) return 'Distance + duration prescriptions cannot contain reps or completion fields.'
+    return positiveRangeError(prescription.min_distance_m, prescription.max_distance_m, 'Distance prescription') ??
+      positiveRangeError(prescription.min_sec, prescription.max_sec, 'Duration prescription', true)
+  }
+  if (repsPresent || durationPresent || distancePresent) return 'Skill prescriptions cannot contain reps, duration, or distance fields.'
+  if (prescription.completion != null && prescription.completion !== true) return 'Skill routine prescriptions must represent an achievement attempt.'
+  return null
+}
+
 export function planOwnerExercisePatch(input: {
   existing: {
     externalId: string | null
