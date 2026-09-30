@@ -1,5 +1,5 @@
 export const primaryButtonClass =
-  'motion-pressable inline-flex min-h-11 cursor-pointer items-center justify-center rounded-md bg-accent px-4 text-sm font-medium text-accent-fg hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50'
+  'motion-pressable inline-flex min-h-11 w-full cursor-pointer items-center justify-center rounded-md bg-accent px-4 text-sm font-medium text-accent-fg hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50'
 
 export const secondaryButtonClass =
   'motion-pressable inline-flex min-h-11 cursor-pointer items-center justify-center rounded-md border border-zinc-300 bg-white px-4 text-sm font-medium text-zinc-900 hover:bg-zinc-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50'
