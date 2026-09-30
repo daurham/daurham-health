@@ -212,7 +212,11 @@ export function ExerciseLibraryPage() {
                       {item.lastPerformedDate ? ` · Last ${dateLabel(item.lastPerformedDate)}` : ''}
                       {info.primaryMuscleGroup ? ` · ${info.primaryMuscleGroup.replace(/_/g, ' ')}` : ''}
                     </p>
-                    {item.activeRoutines.length > 0 ? <p className="mt-1 text-xs text-zinc-500">Routines · {item.activeRoutines.map((routine) => routine.name).join(', ')}</p> : null}
+                    {item.activeRoutines.length > 0 ? (
+                      <p className="mt-1 text-xs text-zinc-500">
+                        Archive blocked by active routine{item.activeRoutines.length === 1 ? '' : 's'} · {item.activeRoutines.map((routine) => routine.name).join(', ')}
+                      </p>
+                    ) : null}
                   </div>
                   <div className="flex shrink-0 flex-wrap gap-2">
                     <button type="button" className={secondaryButtonClass} onClick={() => setEditing(item)}>Edit</button>
