@@ -1,6 +1,6 @@
 import { getNutritionDay, parseNutritionDayQuery } from '../nutrition/service.js'
 import { withOwnerAuth } from '../auth/with-owner.js'
-import { handleApiError, queryStringParam, sendJson, type ApiRequest, type ApiResponse } from '../http.js'
+import { handleApiError, requestQueryValue, sendJson, type ApiRequest, type ApiResponse } from '../http.js'
 
 export default withOwnerAuth(async function nutritionDayHandler(req: ApiRequest, res: ApiResponse) {
   try {
@@ -9,7 +9,7 @@ export default withOwnerAuth(async function nutritionDayHandler(req: ApiRequest,
       sendJson(res, 405, { error: 'Method not allowed' })
       return
     }
-    sendJson(res, 200, await getNutritionDay(parseNutritionDayQuery(queryStringParam(req, 'date'))))
+    sendJson(res, 200, await getNutritionDay(parseNutritionDayQuery(requestQueryValue(req, 'date'))))
   } catch (error) {
     handleApiError(res, error)
   }
