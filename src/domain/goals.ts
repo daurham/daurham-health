@@ -544,8 +544,13 @@ function targetOf(
       return fail('A skill goal is achieved with one completion.')
     }
   }
-  if (kind === 'training_pace' && (targetMode !== 'at_most' || targetMax == null)) {
-    return fail('A pace goal uses an at-most pace target.')
+  if (kind === 'training_pace') {
+    if (targetMode !== 'at_most' || targetMax == null) {
+      return fail('A pace goal uses an at-most pace target.')
+    }
+    if (!Number.isInteger(targetMax)) {
+      return fail('A pace target must be whole seconds per mile.')
+    }
   }
   const notes = notesOf(record.notes)
   if (notes && typeof notes === 'object') {
