@@ -59,15 +59,16 @@ export function StartWorkoutPage() {
       }
     }
     let cancelled = false
-    fetchTemplates()
-      .then((next) => {
+    Promise.all([fetchTemplates(), fetchExercises()])
+      .then(([nextTemplates, nextCatalog]) => {
         if (!cancelled) {
-          setTemplates(next)
+          setTemplates(nextTemplates)
+          setCatalog(nextCatalog)
         }
       })
       .catch((caught: unknown) => {
         if (!cancelled) {
-          setError(caught instanceof Error ? caught.message : 'Could not load templates')
+          setError(caught instanceof Error ? caught.message : 'Could not load Training')
         }
       })
       .finally(() => {
@@ -200,6 +201,8 @@ export function StartWorkoutPage() {
     )
   }
 
+  const draftIsAdHoc = draft.sessionType === 'ad_hoc'
+
   return (
     <>
       <p className="mb-4 text-sm text-zinc-500">
@@ -207,13 +210,13 @@ export function StartWorkoutPage() {
           Training
         </Link>
         {' / '}
-        {experimentWorkout ? 'Experiment workout' : adHoc ? 'Ad-hoc workout' : draft.template?.name}
+        {experimentWorkout ? 'Experiment workout' : draftIsAdHoc ? 'Ad-hoc workout' : draft.template?.name}
       </p>
       <WorkoutEditor
         title={
           experimentWorkout
             ? trainingSessionDisplayName({ sessionType: 'experiment', sessionName: draft.sessionName })
-            : adHoc
+            : draftIsAdHoc
               ? trainingSessionDisplayName({ sessionType: 'ad_hoc', sessionName: draft.sessionName })
               : (draft.template?.name ?? 'Workout')
         }
@@ -226,10 +229,10 @@ export function StartWorkoutPage() {
         onCommit={() => {
           void onSave()
         }}
-        onCancel={adHoc || experimentWorkout ? () => navigate(experimentWorkout ? '/lab' : '/training') : () => setDraft(null)}
-        cancelLabel={adHoc || experimentWorkout ? 'Cancel' : 'Change template'}
-        allowExerciseManagement={adHoc || experimentWorkout}
-        allowSessionName={adHoc || experimentWorkout}
+        onCancel={experimentWorkout ? () => navigate('/lab') : draftIsAdHoc ? () => navigate('/training') : () => setDraft(null)}
+        cancelLabel={draftIsAdHoc || experimentWorkout ? 'Cancel' : 'Change template'}
+        allowExerciseManagement={draftIsAdHoc || experimentWorkout}
+        allowSessionName={draftIsAdHoc || experimentWorkout}
         exerciseCatalog={catalog}
         onCreateExercise={async (input) => {
           const created = await createOwnerExercise(input)
