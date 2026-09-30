@@ -1,5 +1,6 @@
-import type { RewardItemInput, RewardsState } from '@/domain/rewards'
+import type { RewardItemInput, RewardSummary, RewardsState } from '@/domain/rewards'
 import { healthFetch, readApiError } from '@/lib'
+import { notifyRewardStateChanged } from '@/lib/reward-events'
 
 async function send(
   path: string,
@@ -14,11 +15,29 @@ async function send(
   if (!response.ok) {
     throw new Error(await readApiError(response))
   }
-  return (await response.json()) as RewardsState
+  const state = (await response.json()) as RewardsState
+  if (method !== 'GET') {
+    notifyRewardStateChanged({
+      kind: path.includes('/refund')
+        ? 'refund'
+        : path.includes('/purchases')
+          ? 'purchase'
+          : 'catalog',
+    })
+  }
+  return state
 }
 
 export function fetchRewards(): Promise<RewardsState> {
   return send('/api/rewards', 'GET')
+}
+
+export async function fetchRewardSummary(): Promise<RewardSummary> {
+  const response = await healthFetch('/api/rewards/summary')
+  if (!response.ok) {
+    throw new Error(await readApiError(response))
+  }
+  return (await response.json()) as RewardSummary
 }
 
 export function createReward(input: RewardItemInput): Promise<RewardsState> {
