@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate'
-import { bodyGoalDisplayName, goalKindDefinition } from '../../src/domain/goals.js'
+import { bodyGoalDisplayName, goalDisplayName, goalKindDefinition } from '../../src/domain/goals.js'
 import { NUTRITION_FOOD_ENTITY, USDA_FOODDATA_SOURCE_KEY } from '../../src/domain/nutrition/config.js'
 import { HEALTH_CALENDAR_TIME_ZONE } from '../../src/domain/time.js'
 import {
@@ -334,8 +334,17 @@ export function withPortableGoalContext(
     let selectorLabel = goalKindDefinition(kind)?.displayName ?? kind
     if (kind === 'body_metric' && typeof goal.body_metric_key === 'string') {
       selectorLabel = bodyGoalDisplayName(goal.body_metric_key)
-    } else if (kind === 'strength_e1rm' && typeof goal.exercise_definition_id === 'string') {
-      selectorLabel = `${exercises.get(goal.exercise_definition_id) ?? 'Exercise'} e1RM`
+    } else if (
+      ['strength_e1rm', 'training_reps', 'training_duration', 'training_distance', 'training_pace', 'training_skill'].includes(kind) &&
+      typeof goal.exercise_definition_id === 'string'
+    ) {
+      selectorLabel = goalDisplayName({
+        goalKind: kind as Parameters<typeof goalDisplayName>[0]['goalKind'],
+        bodyMetricKey: null,
+        exerciseName: exercises.get(goal.exercise_definition_id) ?? null,
+        benchmarkLabel: null,
+        supplementName: null,
+      })
     } else if (kind === 'benchmark_result' && typeof goal.benchmark_requirement_id === 'string') {
       selectorLabel = requirements.get(goal.benchmark_requirement_id) ?? benchmarks.get(String(goal.benchmark_definition_id)) ?? selectorLabel
     } else if (kind === 'supplement_adherence' && typeof goal.supplement_id === 'string') {
