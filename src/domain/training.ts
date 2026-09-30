@@ -989,26 +989,13 @@ export function isOwnerCreatedExercise(exercise: {
 }
 
 function optionalExerciseText(max: number) {
-  return z
-    .union([z.string(), z.null()])
-    .optional()
-    .transform((value, ctx) => {
-      if (value === undefined) return undefined
-      if (value === null) return null
-      const next = value.trim()
-      if (next.length === 0) return null
-      if (next.length > max) {
-        ctx.addIssue({ code: 'custom', message: `Must be ${max} characters or fewer` })
-        return z.NEVER
-      }
-      return next
-    })
+  return z.union([z.string().trim().min(1).max(max), z.null()]).optional()
 }
 
-const optionalExerciseUrlSchema = optionalExerciseText(1000).refine(
-  (value) => value == null || /^https?:\/\/[^\s]+$/i.test(value),
-  'Use an http(s) URL',
-)
+const optionalExerciseUrlSchema = z
+  .union([z.string().trim().min(1).max(1000), z.null()])
+  .optional()
+  .refine((value) => value == null || /^https?:\/\/[^\s]+$/i.test(value), 'Use an http(s) URL')
 
 export const ownerExerciseRequestSchema = z.object({
   name: z.string().trim().min(1, 'Exercise name is required').max(120),
