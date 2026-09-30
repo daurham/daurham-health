@@ -7,6 +7,8 @@ describe('H4 experience-system source contract', () => {
   const layout = readFileSync('src/components/Layout.tsx', 'utf8')
   const settings = readFileSync('src/features/settings/SettingsPage.tsx', 'utf8')
   const rewards = readFileSync('src/features/rewards/RewardsPage.tsx', 'utf8')
+  const overview = readFileSync('src/features/progress/OverviewSection.tsx', 'utf8')
+  const nutrition = readFileSync('src/features/nutrition/NutritionPage.tsx', 'utf8')
   const css = readFileSync('src/index.css', 'utf8')
   const inventory = readFileSync('server/backup/inventory.ts', 'utf8')
 
@@ -57,6 +59,14 @@ describe('H4 experience-system source contract', () => {
     expect(css).toContain('.app-shell')
     expect(css).toContain('.signal-positive-surface')
     expect(css).toContain('.signal-negative-surface')
+  })
+
+  it('keeps motivating signals attached to the specific change and bounds the mobile Nutrition action', () => {
+    expect(overview).toContain('findingDetailLabel')
+    expect(overview).toContain("return 'Estimated strength improved'")
+    expect(overview).toContain('label={findingDetailLabel(finding) ?? undefined}')
+    expect(nutrition).toContain('fixed left-4 right-4')
+    expect(nutrition).toContain('!w-auto')
   })
 
   it('keeps H4 presentation-only and event-driven', () => {
