@@ -4,6 +4,7 @@ import {
   measurementFamilyMatches,
   measurementFamilyOf,
   ownerExerciseAnalyticsDefaults,
+  ownerRoutinePrescriptionError,
   toCanonicalSetInsert,
 } from '../src/domain/training.ts'
 import { milesToMeters } from '../src/domain/units.ts'
@@ -107,6 +108,18 @@ describe('H2D canonical Training measurements', () => {
     ]
     const skill = trainingPerformanceObservations(skillSets, [skillExercise])
     expect(bestTrainingPerformance(skill, { exerciseId: EXERCISE, kind: 'skill' })?.completed).toBe(true)
+  })
+})
+
+describe('H2D Saved Routine prescriptions', () => {
+  it('rejects mismatched, negative, reversed, and irrelevant prescription fields', () => {
+    expect(ownerRoutinePrescriptionError('reps', { measurement: 'duration', min_sec: 30 })).toMatch(/match/)
+    expect(ownerRoutinePrescriptionError('reps', { measurement: 'reps', min: -1 })).toMatch(/positive/)
+    expect(ownerRoutinePrescriptionError('reps', { measurement: 'reps', min: 12, max: 8 })).toMatch(/minimum/)
+    expect(ownerRoutinePrescriptionError('duration', { measurement: 'duration', min_sec: 30, max_sec: 60, min: 5 })).toMatch(/cannot contain/)
+    expect(ownerRoutinePrescriptionError('distance_duration', { measurement: 'distance_duration', min_distance_m: 1000, max_distance_m: 2000, min_sec: 600, max_sec: 900 })).toBeNull()
+    expect(ownerRoutinePrescriptionError('completion', { measurement: 'completion', completion: true })).toBeNull()
+    expect(ownerRoutinePrescriptionError('completion', { measurement: 'completion', completion: false })).toMatch(/achievement/)
   })
 })
 
