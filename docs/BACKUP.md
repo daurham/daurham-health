@@ -38,7 +38,7 @@ Point `DATABASE_URL` at an empty Health database that has already had `npm run m
 HEALTH_BACKUP_RESTORE=yes npm run backup:restore -- ./backups/health-2026-09-22.health-backup.zip --apply
 ```
 
-If the destination already has nutrition, training, body, activity, sleep, supplement, or measurement-cadence rows, restore stops. It does not merge and it does not overwrite newer rows.
+If the destination already has nutrition, training, body, activity, sleep, supplement, reward-wallet, or measurement-cadence rows, restore stops. It does not merge and it does not overwrite newer rows.
 
 ## Verify recovery
 
@@ -67,6 +67,12 @@ Owner Health data includes Body sessions, metrics, and measurement cadence (`bod
 Owner Health data includes supplement definitions, schedules, lifecycle events, and explicit taken/skipped adherence (`supplements`, `supplement_schedules`, `supplement_status_events`, `supplement_adherence`). They are in the full archive and in the portable export. An absent adherence row means the dose is unknown, not skipped. Restore keeps the original ids, dates, timestamps, and nulls.
 
 Owner Health data includes goals and their target versions (`goals`, `goal_versions`). Both are in the full archive and in the portable export. Restore inserts exercise definitions, supplements, lab protocol requirements, and benchmark definitions before goals, then goal versions. A goal keeps its selector, status, start date, and every version, including a null target date and a range. The portable export adds `selector_label` and `source_key` so the metric can be read without only a UUID. The full archive does not add those fields, and they are not restored.
+
+## XP and rewards
+
+Owner reward data includes the reward catalog, immutable redemption snapshots, and the append-only XP ledger (`reward_items`, `reward_purchases`, `xp_ledger`). All three are in the full archive and portable export. A reward purchase keeps the exact name and XP cost that were current when it was redeemed. Catalog edits or archive state do not rewrite historical purchases.
+
+Lifetime XP and Spendable XP are derived from ledger rows and are not backed up as separate balances. Awards add to both; purchases reduce only Spendable XP; refunds restore only Spendable XP. Coach award entries retain their frozen rule version and Coach-task identity. Reward purchase/refund entries retain purchase identity. Restore preserves exact ids, amounts, metadata, timestamps, idempotency keys, and archive state.
 
 ## Daily context
 
