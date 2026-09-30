@@ -4,44 +4,85 @@
   --color-accent: var(--health-accent);
   --color-accent-muted: var(--health-accent-muted);
   --color-accent-fg: var(--health-accent-fg);
+  --color-reward: var(--health-reward);
+  --color-reward-muted: var(--health-reward-muted);
+  --color-toward: var(--health-toward);
+  --color-away: var(--health-away);
+  --color-within: var(--health-within);
   --color-success: var(--health-success);
   --color-warning: var(--health-warning);
   --color-danger: var(--health-danger);
   --color-info: var(--health-info);
 }
 
-/* iOS Safari will paint a second glyph over the first when it synthesizes a
-   missing weight, which reads as doubled letters on every word. */
+/*
+ * H4 theme packs use semantic variables and then bridge them into the neutral
+ * Tailwind vocabulary already used throughout the app. A new pack therefore
+ * changes the whole product without forking page markup.
+ */
 html {
   font-synthesis: none;
-  --health-accent: oklch(0.44 0.08 250);
-  --health-accent-muted: oklch(0.94 0.02 250);
-  --health-accent-fg: #fff;
+  --health-accent: #42648f;
+  --health-accent-muted: #edf3f9;
+  --health-accent-fg: #ffffff;
+  --health-accent-secondary: #758ba7;
+  --health-canvas: #f7f7f8;
+  --health-surface: #ffffff;
+  --health-surface-raised: #ffffff;
+  --health-surface-soft: #f2f3f5;
+  --health-border: #e1e3e7;
+  --health-border-strong: #c6c9cf;
+  --health-text: #18181b;
+  --health-text-muted: #62636a;
+  --health-text-faint: #8b8c94;
+  --health-reward: #b97d0d;
+  --health-reward-muted: #fff3cf;
+  --health-glow: rgb(66 100 143 / 0.18);
+  --health-hero-gradient: linear-gradient(135deg, rgb(66 100 143 / 0.08), transparent 58%);
   --health-success: oklch(0.47 0.1 155);
   --health-warning: oklch(0.68 0.12 80);
   --health-danger: oklch(0.52 0.16 27);
   --health-info: oklch(0.5 0.07 230);
+  --health-toward: oklch(0.47 0.11 150);
+  --health-away: oklch(0.55 0.14 30);
+  --health-within: var(--health-accent);
   --chart-ink: var(--health-accent);
-  --chart-muted: #71717a;
-  --chart-grid: #e4e4e7;
-  --chart-soft: #a1a1aa;
+  --chart-secondary: var(--health-accent-secondary);
+  --chart-tertiary: var(--health-reward);
+  --chart-muted: var(--health-text-muted);
+  --chart-grid: var(--health-border);
+  --chart-soft: var(--health-text-faint);
+
+  --color-white: var(--health-surface);
+  --color-zinc-50: var(--health-canvas);
+  --color-zinc-100: var(--health-surface-soft);
+  --color-zinc-200: var(--health-border);
+  --color-zinc-300: var(--health-border-strong);
+  --color-zinc-400: var(--health-text-faint);
+  --color-zinc-500: var(--health-text-muted);
+  --color-zinc-600: color-mix(in srgb, var(--health-text) 76%, var(--health-text-muted));
+  --color-zinc-700: color-mix(in srgb, var(--health-text) 86%, var(--health-text-muted));
+  --color-zinc-800: color-mix(in srgb, var(--health-text) 94%, var(--health-text-muted));
+  --color-zinc-900: var(--health-text);
 }
 
-/* Dark mode reuses the existing zinc utilities. Buttons and cards follow
-   those variables, so pages do not need their own dark overrides. */
 html.dark {
   color-scheme: dark;
-  --color-white: #2a2a2e;
-  --color-zinc-50: #1c1c1f;
-  --color-zinc-100: #2f2f33;
-  --color-zinc-200: #3a3a40;
-  --color-zinc-300: #52525b;
-  --color-zinc-400: #a1a1aa;
-  --color-zinc-500: #b4b4bc;
-  --color-zinc-600: #d4d4d8;
-  --color-zinc-700: #e4e4e7;
-  --color-zinc-800: #f4f4f5;
-  --color-zinc-900: #fafafa;
+  --health-canvas: #17181b;
+  --health-surface: #23252a;
+  --health-surface-raised: #292c31;
+  --health-surface-soft: #2d3036;
+  --health-border: #393d45;
+  --health-border-strong: #50555f;
+  --health-text: #f4f4f5;
+  --health-text-muted: #b9bbc2;
+  --health-text-faint: #8e919b;
+  --health-success: oklch(0.74 0.1 155);
+  --health-warning: oklch(0.82 0.12 80);
+  --health-danger: oklch(0.72 0.14 27);
+  --health-info: oklch(0.74 0.07 230);
+  --health-toward: oklch(0.75 0.11 150);
+  --health-away: oklch(0.74 0.13 30);
   --color-red-50: #3a2426;
   --color-red-200: #7f1d1d;
   --color-red-700: #fecaca;
@@ -57,99 +98,679 @@ html.dark {
   --color-emerald-50: #1c332c;
   --color-emerald-200: #065f46;
   --color-emerald-800: #a7f3d0;
-  --health-accent: oklch(0.72 0.08 250);
-  --health-accent-muted: oklch(0.32 0.03 250);
-  --health-accent-fg: #18181b;
-  --health-success: oklch(0.74 0.1 155);
-  --health-warning: oklch(0.82 0.12 80);
-  --health-danger: oklch(0.72 0.14 27);
-  --health-info: oklch(0.74 0.07 230);
-  --chart-ink: var(--health-accent);
-  --chart-muted: #a1a1aa;
-  --chart-grid: #3f3f46;
-  --chart-soft: #d4d4d8;
 }
 
-/* Palettes change accent chrome only. Danger, warning, and success stay on the
-   base rules above so a pack cannot turn a warning into a decorative hue. */
+/* Classic */
 html[data-health-palette='classic'] {
-  --health-accent: oklch(0.44 0.08 250);
-  --health-accent-muted: oklch(0.94 0.02 250);
-  --health-accent-fg: #fff;
-  --health-info: oklch(0.5 0.07 230);
-  --chart-ink: var(--health-accent);
+  --health-accent: #42648f;
+  --health-accent-muted: #edf3f9;
+  --health-accent-fg: #ffffff;
+  --health-accent-secondary: #758ba7;
+  --health-canvas: #f7f7f8;
+  --health-surface: #ffffff;
+  --health-surface-raised: #ffffff;
+  --health-surface-soft: #f2f3f5;
+  --health-border: #e1e3e7;
+  --health-border-strong: #c6c9cf;
+  --health-text: #18181b;
+  --health-text-muted: #62636a;
+  --health-text-faint: #8b8c94;
+  --health-reward: #b97d0d;
+  --health-reward-muted: #fff3cf;
+  --health-glow: rgb(66 100 143 / 0.18);
+  --health-hero-gradient: linear-gradient(135deg, rgb(66 100 143 / 0.08), transparent 58%);
 }
-
-html[data-health-palette='forest'] {
-  --health-accent: oklch(0.42 0.08 195);
-  --health-accent-muted: oklch(0.94 0.03 195);
-  --health-accent-fg: #fff;
-  --health-info: oklch(0.48 0.06 200);
-  --chart-ink: var(--health-accent);
-}
-
-html[data-health-palette='ocean'] {
-  --health-accent: oklch(0.46 0.14 235);
-  --health-accent-muted: oklch(0.94 0.03 235);
-  --health-accent-fg: #fff;
-  --health-info: oklch(0.5 0.08 220);
-  --chart-ink: var(--health-accent);
-}
-
-html[data-health-palette='sunset'] {
-  --health-accent: oklch(0.5 0.13 48);
-  --health-accent-muted: oklch(0.95 0.03 55);
-  --health-accent-fg: #fff;
-  --health-info: oklch(0.48 0.06 40);
-  --chart-ink: var(--health-accent);
-}
-
-html[data-health-palette='plum'] {
-  --health-accent: oklch(0.46 0.12 330);
-  --health-accent-muted: oklch(0.95 0.03 330);
-  --health-accent-fg: #fff;
-  --health-info: oklch(0.48 0.07 310);
-  --chart-ink: var(--health-accent);
-}
-
 html.dark[data-health-palette='classic'] {
-  --health-accent: oklch(0.72 0.08 250);
-  --health-accent-muted: oklch(0.32 0.03 250);
-  --health-accent-fg: #18181b;
-  --health-info: oklch(0.74 0.07 230);
-  --chart-ink: var(--health-accent);
+  --health-accent: #94add0;
+  --health-accent-muted: #29394d;
+  --health-accent-fg: #14171c;
+  --health-accent-secondary: #6f89ad;
+  --health-canvas: #18191c;
+  --health-surface: #25272b;
+  --health-surface-raised: #2a2d32;
+  --health-surface-soft: #303238;
+  --health-border: #3b3e45;
+  --health-border-strong: #565a64;
+  --health-text: #f5f6f7;
+  --health-text-muted: #b8bbc2;
+  --health-text-faint: #8f939d;
+  --health-reward: #e2b34d;
+  --health-reward-muted: #4b3d1f;
+  --health-glow: rgb(148 173 208 / 0.22);
+  --health-hero-gradient: linear-gradient(135deg, rgb(148 173 208 / 0.11), transparent 58%);
 }
 
+/* Forest */
+html[data-health-palette='forest'] {
+  --health-accent: #16716a;
+  --health-accent-muted: #e8f4ef;
+  --health-accent-fg: #ffffff;
+  --health-accent-secondary: #59866e;
+  --health-canvas: #f2f6f3;
+  --health-surface: #fbfdfb;
+  --health-surface-raised: #ffffff;
+  --health-surface-soft: #eaf1ec;
+  --health-border: #d5e0d8;
+  --health-border-strong: #b8c9bd;
+  --health-text: #17211c;
+  --health-text-muted: #5c6d63;
+  --health-text-faint: #839188;
+  --health-reward: #a87418;
+  --health-reward-muted: #fbf0ce;
+  --health-glow: rgb(22 113 106 / 0.17);
+  --health-hero-gradient: linear-gradient(135deg, rgb(22 113 106 / 0.09), rgb(89 134 110 / 0.04) 42%, transparent 70%);
+}
 html.dark[data-health-palette='forest'] {
-  --health-accent: oklch(0.76 0.08 195);
-  --health-accent-muted: oklch(0.32 0.04 195);
-  --health-accent-fg: #18181b;
-  --health-info: oklch(0.74 0.05 200);
-  --chart-ink: var(--health-accent);
+  --health-accent: #77c5b7;
+  --health-accent-muted: #21433d;
+  --health-accent-fg: #10211d;
+  --health-accent-secondary: #789c82;
+  --health-canvas: #151c19;
+  --health-surface: #202b26;
+  --health-surface-raised: #26322c;
+  --health-surface-soft: #2b3831;
+  --health-border: #394840;
+  --health-border-strong: #53665b;
+  --health-text: #eff7f2;
+  --health-text-muted: #b6c8bd;
+  --health-text-faint: #8da093;
+  --health-reward: #dfb354;
+  --health-reward-muted: #473c22;
+  --health-glow: rgb(119 197 183 / 0.2);
+  --health-hero-gradient: linear-gradient(135deg, rgb(119 197 183 / 0.11), transparent 62%);
 }
 
+/* Ocean */
+html[data-health-palette='ocean'] {
+  --health-accent: #1476b8;
+  --health-accent-muted: #e7f3fa;
+  --health-accent-fg: #ffffff;
+  --health-accent-secondary: #29a7bb;
+  --health-canvas: #f1f7fa;
+  --health-surface: #fbfdff;
+  --health-surface-raised: #ffffff;
+  --health-surface-soft: #e8f2f7;
+  --health-border: #d4e3eb;
+  --health-border-strong: #b2cedd;
+  --health-text: #15222b;
+  --health-text-muted: #566c78;
+  --health-text-faint: #7d929e;
+  --health-reward: #b98218;
+  --health-reward-muted: #fdf0ca;
+  --health-glow: rgb(20 118 184 / 0.18);
+  --health-hero-gradient: linear-gradient(140deg, rgb(20 118 184 / 0.10), rgb(41 167 187 / 0.06) 44%, transparent 72%);
+}
 html.dark[data-health-palette='ocean'] {
-  --health-accent: oklch(0.76 0.11 235);
-  --health-accent-muted: oklch(0.32 0.05 235);
-  --health-accent-fg: #18181b;
-  --health-info: oklch(0.76 0.06 220);
-  --chart-ink: var(--health-accent);
+  --health-accent: #6cb8ec;
+  --health-accent-muted: #203f55;
+  --health-accent-fg: #0d1c25;
+  --health-accent-secondary: #5bc2cf;
+  --health-canvas: #121b21;
+  --health-surface: #1c2931;
+  --health-surface-raised: #22313b;
+  --health-surface-soft: #283943;
+  --health-border: #354955;
+  --health-border-strong: #4c6675;
+  --health-text: #eff8fd;
+  --health-text-muted: #b4cbd7;
+  --health-text-faint: #89a4b2;
+  --health-reward: #e3b550;
+  --health-reward-muted: #463a20;
+  --health-glow: rgb(108 184 236 / 0.23);
+  --health-hero-gradient: linear-gradient(140deg, rgb(108 184 236 / 0.13), rgb(91 194 207 / 0.07) 48%, transparent 75%);
 }
 
+/* Sunset */
+html[data-health-palette='sunset'] {
+  --health-accent: #b75b31;
+  --health-accent-muted: #faede5;
+  --health-accent-fg: #ffffff;
+  --health-accent-secondary: #cb7e4a;
+  --health-canvas: #faf5f1;
+  --health-surface: #fffdfb;
+  --health-surface-raised: #ffffff;
+  --health-surface-soft: #f6ebe4;
+  --health-border: #ead8cc;
+  --health-border-strong: #d6bcae;
+  --health-text: #2a1c17;
+  --health-text-muted: #765f54;
+  --health-text-faint: #9a8478;
+  --health-reward: #b47d14;
+  --health-reward-muted: #fff0c9;
+  --health-glow: rgb(183 91 49 / 0.18);
+  --health-hero-gradient: linear-gradient(135deg, rgb(183 91 49 / 0.10), rgb(203 126 74 / 0.06) 45%, transparent 74%);
+}
 html.dark[data-health-palette='sunset'] {
-  --health-accent: oklch(0.78 0.11 55);
-  --health-accent-muted: oklch(0.34 0.05 50);
-  --health-accent-fg: #18181b;
-  --health-info: oklch(0.78 0.05 45);
-  --chart-ink: var(--health-accent);
+  --health-accent: #ee9a6f;
+  --health-accent-muted: #513125;
+  --health-accent-fg: #24140d;
+  --health-accent-secondary: #d28b5c;
+  --health-canvas: #1c1715;
+  --health-surface: #2b2421;
+  --health-surface-raised: #332a26;
+  --health-surface-soft: #3a2f2a;
+  --health-border: #4c3c35;
+  --health-border-strong: #695148;
+  --health-text: #fff5ef;
+  --health-text-muted: #d5beb2;
+  --health-text-faint: #aa8d7f;
+  --health-reward: #efb94c;
+  --health-reward-muted: #503b1f;
+  --health-glow: rgb(238 154 111 / 0.23);
+  --health-hero-gradient: linear-gradient(135deg, rgb(238 154 111 / 0.13), transparent 66%);
 }
 
+/* Plum */
+html[data-health-palette='plum'] {
+  --health-accent: #8d3979;
+  --health-accent-muted: #f6eaf3;
+  --health-accent-fg: #ffffff;
+  --health-accent-secondary: #7351a2;
+  --health-canvas: #f8f3f7;
+  --health-surface: #fffafe;
+  --health-surface-raised: #ffffff;
+  --health-surface-soft: #f1e8f0;
+  --health-border: #e2d3df;
+  --health-border-strong: #ccb7c7;
+  --health-text: #281a25;
+  --health-text-muted: #735f6d;
+  --health-text-faint: #998593;
+  --health-reward: #b5871e;
+  --health-reward-muted: #fbefcf;
+  --health-glow: rgb(141 57 121 / 0.18);
+  --health-hero-gradient: linear-gradient(135deg, rgb(141 57 121 / 0.10), rgb(115 81 162 / 0.06) 45%, transparent 74%);
+}
 html.dark[data-health-palette='plum'] {
-  --health-accent: oklch(0.76 0.1 330);
-  --health-accent-muted: oklch(0.33 0.05 330);
-  --health-accent-fg: #18181b;
-  --health-info: oklch(0.76 0.06 310);
-  --chart-ink: var(--health-accent);
+  --health-accent: #d98bc8;
+  --health-accent-muted: #4b2b45;
+  --health-accent-fg: #21101e;
+  --health-accent-secondary: #ae8bd7;
+  --health-canvas: #1c161b;
+  --health-surface: #2a2229;
+  --health-surface-raised: #322831;
+  --health-surface-soft: #392f38;
+  --health-border: #4b3b49;
+  --health-border-strong: #675361;
+  --health-text: #fff3fc;
+  --health-text-muted: #d4bacd;
+  --health-text-faint: #aa8fa4;
+  --health-reward: #e4b84e;
+  --health-reward-muted: #493c22;
+  --health-glow: rgb(217 139 200 / 0.22);
+  --health-hero-gradient: linear-gradient(135deg, rgb(217 139 200 / 0.13), rgb(174 139 215 / 0.06), transparent 72%);
+}
+
+/* Aura */
+html[data-health-palette='aura'] {
+  --health-accent: #6650d8;
+  --health-accent-muted: #efecff;
+  --health-accent-fg: #ffffff;
+  --health-accent-secondary: #31a9b7;
+  --health-canvas: #f5f4fb;
+  --health-surface: #fdfcff;
+  --health-surface-raised: #ffffff;
+  --health-surface-soft: #eeecf8;
+  --health-border: #ddd9ee;
+  --health-border-strong: #c4bddf;
+  --health-text: #211c32;
+  --health-text-muted: #686078;
+  --health-text-faint: #8e86a0;
+  --health-reward: #b98513;
+  --health-reward-muted: #fff0c6;
+  --health-glow: rgb(102 80 216 / 0.24);
+  --health-hero-gradient: radial-gradient(circle at 10% 0%, rgb(49 169 183 / 0.12), transparent 38%), linear-gradient(135deg, rgb(102 80 216 / 0.13), transparent 68%);
+}
+html.dark[data-health-palette='aura'] {
+  --health-accent: #a895ff;
+  --health-accent-muted: #372f65;
+  --health-accent-fg: #171227;
+  --health-accent-secondary: #64d3dd;
+  --health-canvas: #161421;
+  --health-surface: #232036;
+  --health-surface-raised: #2a2640;
+  --health-surface-soft: #312d48;
+  --health-border: #433d5b;
+  --health-border-strong: #5d5577;
+  --health-text: #f7f4ff;
+  --health-text-muted: #c8c1de;
+  --health-text-faint: #9991b4;
+  --health-reward: #efbd46;
+  --health-reward-muted: #4b3c20;
+  --health-glow: rgb(168 149 255 / 0.31);
+  --health-hero-gradient: radial-gradient(circle at 12% 0%, rgb(100 211 221 / 0.14), transparent 34%), linear-gradient(135deg, rgb(168 149 255 / 0.18), transparent 68%);
+}
+
+/* Saiyan Dawn */
+html[data-health-palette='saiyan-dawn'] {
+  --health-accent: #3453b8;
+  --health-accent-muted: #e9edfc;
+  --health-accent-fg: #ffffff;
+  --health-accent-secondary: #db682d;
+  --health-canvas: #f4f5fa;
+  --health-surface: #fcfcff;
+  --health-surface-raised: #ffffff;
+  --health-surface-soft: #eaeef8;
+  --health-border: #d9ddeb;
+  --health-border-strong: #bdc4db;
+  --health-text: #1b2031;
+  --health-text-muted: #60677a;
+  --health-text-faint: #878da0;
+  --health-reward: #c58d08;
+  --health-reward-muted: #fff0b9;
+  --health-glow: rgb(52 83 184 / 0.22);
+  --health-hero-gradient: radial-gradient(circle at 86% 14%, rgb(219 104 45 / 0.12), transparent 30%), linear-gradient(135deg, rgb(52 83 184 / 0.12), transparent 65%);
+}
+html.dark[data-health-palette='saiyan-dawn'] {
+  --health-accent: #879df0;
+  --health-accent-muted: #293664;
+  --health-accent-fg: #141a2b;
+  --health-accent-secondary: #f18a53;
+  --health-canvas: #131725;
+  --health-surface: #1f2538;
+  --health-surface-raised: #252c42;
+  --health-surface-soft: #2b334b;
+  --health-border: #39435c;
+  --health-border-strong: #53607c;
+  --health-text: #f4f6ff;
+  --health-text-muted: #bdc5df;
+  --health-text-faint: #8e99ba;
+  --health-reward: #f1c342;
+  --health-reward-muted: #4e4020;
+  --health-glow: rgb(135 157 240 / 0.28);
+  --health-hero-gradient: radial-gradient(circle at 86% 14%, rgb(241 138 83 / 0.16), transparent 32%), linear-gradient(135deg, rgb(135 157 240 / 0.16), transparent 67%);
+}
+
+/* Grand Line */
+html[data-health-palette='grand-line'] {
+  --health-accent: #197a9c;
+  --health-accent-muted: #e7f3f5;
+  --health-accent-fg: #ffffff;
+  --health-accent-secondary: #b94e43;
+  --health-canvas: #f2f7f7;
+  --health-surface: #fcffff;
+  --health-surface-raised: #ffffff;
+  --health-surface-soft: #e8f1f1;
+  --health-border: #d3e2e1;
+  --health-border-strong: #b4ccca;
+  --health-text: #172628;
+  --health-text-muted: #5a7073;
+  --health-text-faint: #809699;
+  --health-reward: #b98915;
+  --health-reward-muted: #fff1c6;
+  --health-glow: rgb(25 122 156 / 0.19);
+  --health-hero-gradient: radial-gradient(circle at 90% 5%, rgb(185 78 67 / 0.09), transparent 28%), linear-gradient(135deg, rgb(25 122 156 / 0.11), transparent 68%);
+}
+html.dark[data-health-palette='grand-line'] {
+  --health-accent: #68c0d7;
+  --health-accent-muted: #204451;
+  --health-accent-fg: #102027;
+  --health-accent-secondary: #df8177;
+  --health-canvas: #111b1e;
+  --health-surface: #1d2a2d;
+  --health-surface-raised: #233236;
+  --health-surface-soft: #29393d;
+  --health-border: #374a4e;
+  --health-border-strong: #4e676c;
+  --health-text: #eff9fa;
+  --health-text-muted: #b5cdd0;
+  --health-text-faint: #88a3a7;
+  --health-reward: #e5b94c;
+  --health-reward-muted: #493c20;
+  --health-glow: rgb(104 192 215 / 0.25);
+  --health-hero-gradient: radial-gradient(circle at 90% 5%, rgb(223 129 119 / 0.13), transparent 29%), linear-gradient(135deg, rgb(104 192 215 / 0.15), transparent 68%);
+}
+
+/* Hidden Leaf */
+html[data-health-palette='hidden-leaf'] {
+  --health-accent: #b9602d;
+  --health-accent-muted: #f8ece4;
+  --health-accent-fg: #ffffff;
+  --health-accent-secondary: #47745a;
+  --health-canvas: #f7f5ef;
+  --health-surface: #fffdf8;
+  --health-surface-raised: #ffffff;
+  --health-surface-soft: #f1ede3;
+  --health-border: #e2d9c8;
+  --health-border-strong: #cabca6;
+  --health-text: #29231b;
+  --health-text-muted: #70675a;
+  --health-text-faint: #968d7f;
+  --health-reward: #b98514;
+  --health-reward-muted: #fff0c4;
+  --health-glow: rgb(185 96 45 / 0.19);
+  --health-hero-gradient: radial-gradient(circle at 88% 12%, rgb(71 116 90 / 0.09), transparent 30%), linear-gradient(135deg, rgb(185 96 45 / 0.11), transparent 67%);
+}
+html.dark[data-health-palette='hidden-leaf'] {
+  --health-accent: #ef9b67;
+  --health-accent-muted: #503426;
+  --health-accent-fg: #23150e;
+  --health-accent-secondary: #7fb18d;
+  --health-canvas: #1a1813;
+  --health-surface: #29251d;
+  --health-surface-raised: #312c22;
+  --health-surface-soft: #383126;
+  --health-border: #4a4031;
+  --health-border-strong: #645744;
+  --health-text: #fff8ed;
+  --health-text-muted: #d2c5b0;
+  --health-text-faint: #a49783;
+  --health-reward: #edbb45;
+  --health-reward-muted: #4c3d1f;
+  --health-glow: rgb(239 155 103 / 0.24);
+  --health-hero-gradient: radial-gradient(circle at 88% 12%, rgb(127 177 141 / 0.12), transparent 30%), linear-gradient(135deg, rgb(239 155 103 / 0.14), transparent 67%);
+}
+
+/* Super Saiyan Gold */
+html[data-health-palette='super-saiyan-gold'] {
+  --health-accent: #9c7308;
+  --health-accent-muted: #f8f0d2;
+  --health-accent-fg: #201a08;
+  --health-accent-secondary: #30466f;
+  --health-canvas: #f8f6ef;
+  --health-surface: #fffefa;
+  --health-surface-raised: #ffffff;
+  --health-surface-soft: #f2edde;
+  --health-border: #e3dbc5;
+  --health-border-strong: #cbbd98;
+  --health-text: #272317;
+  --health-text-muted: #706956;
+  --health-text-faint: #968e79;
+  --health-reward: #bd8500;
+  --health-reward-muted: #fff0ad;
+  --health-glow: rgb(218 169 21 / 0.25);
+  --health-hero-gradient: radial-gradient(circle at 12% 0%, rgb(232 190 42 / 0.17), transparent 34%), linear-gradient(135deg, rgb(48 70 111 / 0.08), transparent 70%);
+}
+html.dark[data-health-palette='super-saiyan-gold'] {
+  --health-accent: #f2ce5c;
+  --health-accent-muted: #51451f;
+  --health-accent-fg: #211b09;
+  --health-accent-secondary: #7591c2;
+  --health-canvas: #151720;
+  --health-surface: #222532;
+  --health-surface-raised: #292d3b;
+  --health-surface-soft: #303442;
+  --health-border: #414757;
+  --health-border-strong: #5b6377;
+  --health-text: #fff9df;
+  --health-text-muted: #d8cfaf;
+  --health-text-faint: #a79e82;
+  --health-reward: #ffd75b;
+  --health-reward-muted: #55471d;
+  --health-glow: rgb(255 215 91 / 0.33);
+  --health-hero-gradient: radial-gradient(circle at 12% 0%, rgb(255 215 91 / 0.20), transparent 34%), linear-gradient(135deg, rgb(117 145 194 / 0.10), transparent 70%);
+}
+
+/* Spartan */
+html[data-health-palette='spartan'] {
+  --health-accent: #647244;
+  --health-accent-muted: #eef0e5;
+  --health-accent-fg: #ffffff;
+  --health-accent-secondary: #1f99a7;
+  --health-canvas: #f2f4ef;
+  --health-surface: #fafcf8;
+  --health-surface-raised: #ffffff;
+  --health-surface-soft: #eaeee5;
+  --health-border: #d6dccd;
+  --health-border-strong: #bbc5ad;
+  --health-text: #20251d;
+  --health-text-muted: #636d5c;
+  --health-text-faint: #899383;
+  --health-reward: #a9841f;
+  --health-reward-muted: #f8efcc;
+  --health-glow: rgb(31 153 167 / 0.18);
+  --health-hero-gradient: linear-gradient(120deg, rgb(100 114 68 / 0.11), transparent 52%), radial-gradient(circle at 92% 8%, rgb(31 153 167 / 0.11), transparent 30%);
+}
+html.dark[data-health-palette='spartan'] {
+  --health-accent: #a5b47a;
+  --health-accent-muted: #384126;
+  --health-accent-fg: #172016;
+  --health-accent-secondary: #59c7d1;
+  --health-canvas: #151914;
+  --health-surface: #232920;
+  --health-surface-raised: #2a3126;
+  --health-surface-soft: #30382c;
+  --health-border: #414b3b;
+  --health-border-strong: #596650;
+  --health-text: #f3f6ec;
+  --health-text-muted: #c1c9b7;
+  --health-text-faint: #939d8a;
+  --health-reward: #e0b94f;
+  --health-reward-muted: #493d22;
+  --health-glow: rgb(89 199 209 / 0.24);
+  --health-hero-gradient: linear-gradient(120deg, rgb(165 180 122 / 0.12), transparent 54%), radial-gradient(circle at 92% 8%, rgb(89 199 209 / 0.14), transparent 30%);
+}
+
+/* Namek Sky */
+html[data-health-palette='namek-sky'] {
+  --health-accent: #3c8b4a;
+  --health-accent-muted: #e8f4e9;
+  --health-accent-fg: #ffffff;
+  --health-accent-secondary: #4b77c9;
+  --health-canvas: #f2f7f2;
+  --health-surface: #fbfffb;
+  --health-surface-raised: #ffffff;
+  --health-surface-soft: #e9f1ea;
+  --health-border: #d3e2d4;
+  --health-border-strong: #b7cdb9;
+  --health-text: #19251b;
+  --health-text-muted: #5d705f;
+  --health-text-faint: #829785;
+  --health-reward: #b08618;
+  --health-reward-muted: #fbf0ca;
+  --health-glow: rgb(75 119 201 / 0.18);
+  --health-hero-gradient: radial-gradient(circle at 85% 8%, rgb(75 119 201 / 0.11), transparent 32%), linear-gradient(135deg, rgb(60 139 74 / 0.11), transparent 67%);
+}
+html.dark[data-health-palette='namek-sky'] {
+  --health-accent: #79c886;
+  --health-accent-muted: #27452d;
+  --health-accent-fg: #112016;
+  --health-accent-secondary: #89a9e7;
+  --health-canvas: #131b15;
+  --health-surface: #202b22;
+  --health-surface-raised: #263329;
+  --health-surface-soft: #2c3a2f;
+  --health-border: #3b4b3e;
+  --health-border-strong: #536957;
+  --health-text: #f0faef;
+  --health-text-muted: #bbcfbb;
+  --health-text-faint: #8da68f;
+  --health-reward: #e1b64d;
+  --health-reward-muted: #493c21;
+  --health-glow: rgb(137 169 231 / 0.23);
+  --health-hero-gradient: radial-gradient(circle at 85% 8%, rgb(137 169 231 / 0.14), transparent 32%), linear-gradient(135deg, rgb(121 200 134 / 0.14), transparent 67%);
+}
+
+/* Wasteland */
+html[data-health-palette='wasteland'] {
+  --health-accent: #77722c;
+  --health-accent-muted: #f1edd6;
+  --health-accent-fg: #ffffff;
+  --health-accent-secondary: #3f774b;
+  --health-canvas: #f4f1e7;
+  --health-surface: #fbf8ef;
+  --health-surface-raised: #fffdf5;
+  --health-surface-soft: #ece8d9;
+  --health-border: #ddd6bf;
+  --health-border-strong: #c4b99a;
+  --health-text: #282618;
+  --health-text-muted: #716c52;
+  --health-text-faint: #979176;
+  --health-reward: #a9700d;
+  --health-reward-muted: #fae8b9;
+  --health-glow: rgb(63 119 75 / 0.17);
+  --health-hero-gradient: repeating-linear-gradient(90deg, rgb(63 119 75 / 0.025) 0 1px, transparent 1px 5px), linear-gradient(135deg, rgb(119 114 44 / 0.11), transparent 66%);
+}
+html.dark[data-health-palette='wasteland'] {
+  --health-accent: #c3bd68;
+  --health-accent-muted: #44421e;
+  --health-accent-fg: #1b1a0c;
+  --health-accent-secondary: #78b284;
+  --health-canvas: #181810;
+  --health-surface: #27261b;
+  --health-surface-raised: #2f2e20;
+  --health-surface-soft: #363426;
+  --health-border: #484534;
+  --health-border-strong: #635f45;
+  --health-text: #f8f5dc;
+  --health-text-muted: #cdc8a8;
+  --health-text-faint: #9f9a7c;
+  --health-reward: #e4ad3e;
+  --health-reward-muted: #49391a;
+  --health-glow: rgb(120 178 132 / 0.21);
+  --health-hero-gradient: repeating-linear-gradient(90deg, rgb(120 178 132 / 0.035) 0 1px, transparent 1px 5px), linear-gradient(135deg, rgb(195 189 104 / 0.13), transparent 66%);
+}
+
+/* Bonfire */
+html[data-health-palette='bonfire'] {
+  --health-accent: #a94c2f;
+  --health-accent-muted: #f7e9e3;
+  --health-accent-fg: #ffffff;
+  --health-accent-secondary: #625651;
+  --health-canvas: #f5f2ef;
+  --health-surface: #fdfbf9;
+  --health-surface-raised: #ffffff;
+  --health-surface-soft: #eee9e5;
+  --health-border: #dfd6d0;
+  --health-border-strong: #c6b8b0;
+  --health-text: #27201d;
+  --health-text-muted: #6e625d;
+  --health-text-faint: #948781;
+  --health-reward: #bd7215;
+  --health-reward-muted: #fbe8c2;
+  --health-glow: rgb(169 76 47 / 0.22);
+  --health-hero-gradient: radial-gradient(circle at 50% 0%, rgb(217 112 58 / 0.13), transparent 36%), linear-gradient(135deg, rgb(98 86 81 / 0.07), transparent 70%);
+}
+html.dark[data-health-palette='bonfire'] {
+  --health-accent: #e17f58;
+  --health-accent-muted: #4e2d24;
+  --health-accent-fg: #24130d;
+  --health-accent-secondary: #95817a;
+  --health-canvas: #151312;
+  --health-surface: #24201e;
+  --health-surface-raised: #2d2724;
+  --health-surface-soft: #342d2a;
+  --health-border: #463a35;
+  --health-border-strong: #614f47;
+  --health-text: #fff4ee;
+  --health-text-muted: #cfbbb1;
+  --health-text-faint: #9e887f;
+  --health-reward: #efaa42;
+  --health-reward-muted: #4e361a;
+  --health-glow: rgb(225 127 88 / 0.29);
+  --health-hero-gradient: radial-gradient(circle at 50% 0%, rgb(239 170 66 / 0.15), transparent 36%), linear-gradient(135deg, rgb(225 127 88 / 0.11), transparent 72%);
+}
+
+/* Clone Legion */
+html[data-health-palette='clone-legion'] {
+  --health-accent: #3f68a5;
+  --health-accent-muted: #eaf0f8;
+  --health-accent-fg: #ffffff;
+  --health-accent-secondary: #7f8b9c;
+  --health-canvas: #f3f5f7;
+  --health-surface: #ffffff;
+  --health-surface-raised: #ffffff;
+  --health-surface-soft: #eceff3;
+  --health-border: #d8dde4;
+  --health-border-strong: #bcc5d0;
+  --health-text: #1d2229;
+  --health-text-muted: #626b77;
+  --health-text-faint: #89939f;
+  --health-reward: #a97c18;
+  --health-reward-muted: #f8edcc;
+  --health-glow: rgb(63 104 165 / 0.17);
+  --health-hero-gradient: linear-gradient(115deg, rgb(63 104 165 / 0.10), transparent 44%), linear-gradient(245deg, rgb(127 139 156 / 0.06), transparent 45%);
+}
+html.dark[data-health-palette='clone-legion'] {
+  --health-accent: #8daee0;
+  --health-accent-muted: #2c3d57;
+  --health-accent-fg: #151b24;
+  --health-accent-secondary: #a8b4c4;
+  --health-canvas: #15181c;
+  --health-surface: #22272d;
+  --health-surface-raised: #292f36;
+  --health-surface-soft: #30373f;
+  --health-border: #414a55;
+  --health-border-strong: #596675;
+  --health-text: #f5f8fb;
+  --health-text-muted: #bec7d2;
+  --health-text-faint: #929daa;
+  --health-reward: #dfb34f;
+  --health-reward-muted: #483c22;
+  --health-glow: rgb(141 174 224 / 0.23);
+  --health-hero-gradient: linear-gradient(115deg, rgb(141 174 224 / 0.13), transparent 44%), linear-gradient(245deg, rgb(168 180 196 / 0.07), transparent 45%);
+}
+
+/* Silver Instinct */
+html[data-health-palette='silver-instinct'] {
+  --health-accent: #5c6fa8;
+  --health-accent-muted: #eaedf7;
+  --health-accent-fg: #ffffff;
+  --health-accent-secondary: #46a8ba;
+  --health-canvas: #f3f5f9;
+  --health-surface: #fcfdff;
+  --health-surface-raised: #ffffff;
+  --health-surface-soft: #e9edf4;
+  --health-border: #d5dce8;
+  --health-border-strong: #b7c2d3;
+  --health-text: #1b2130;
+  --health-text-muted: #5e687c;
+  --health-text-faint: #8490a6;
+  --health-reward: #b08b2b;
+  --health-reward-muted: #f9efca;
+  --health-glow: rgb(70 168 186 / 0.23);
+  --health-hero-gradient: radial-gradient(circle at 16% 0%, rgb(70 168 186 / 0.13), transparent 34%), linear-gradient(135deg, rgb(92 111 168 / 0.12), transparent 68%);
+}
+html.dark[data-health-palette='silver-instinct'] {
+  --health-accent: #bac6ee;
+  --health-accent-muted: #333b5b;
+  --health-accent-fg: #171b29;
+  --health-accent-secondary: #79d3df;
+  --health-canvas: #11151d;
+  --health-surface: #1e2531;
+  --health-surface-raised: #252d3a;
+  --health-surface-soft: #2b3442;
+  --health-border: #3a4657;
+  --health-border-strong: #526176;
+  --health-text: #f8faff;
+  --health-text-muted: #c4ccdd;
+  --health-text-faint: #949fb5;
+  --health-reward: #f0c960;
+  --health-reward-muted: #51451f;
+  --health-glow: rgb(121 211 223 / 0.31);
+  --health-hero-gradient: radial-gradient(circle at 16% 0%, rgb(121 211 223 / 0.17), transparent 34%), linear-gradient(135deg, rgb(186 198 238 / 0.16), transparent 68%);
+}
+
+.health-hero-surface {
+  background:
+    var(--health-hero-gradient),
+    var(--health-surface);
+}
+
+.health-raised-surface {
+  background: var(--health-surface-raised);
+  box-shadow: 0 12px 32px -26px var(--health-glow);
+}
+
+.xp-badge {
+  border: 1px solid color-mix(in srgb, var(--health-reward) 35%, transparent);
+  background: var(--health-reward-muted);
+  color: var(--health-reward);
+}
+
+.trend-toward {
+  color: var(--health-toward);
+}
+
+.trend-away {
+  color: var(--health-away);
+}
+
+.trend-neutral {
+  color: var(--health-text-muted);
+}
+
+.trend-within {
+  color: var(--health-within);
 }
 
 .theme-scrim {
