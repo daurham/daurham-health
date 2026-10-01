@@ -60,6 +60,85 @@ function prescription(kind: MeasurementKind, slot: SlotDraft): TemplatePrescript
   return { measurement: 'completion', completion: true }
 }
 
+function RoutineExercisePicker({
+  exercises,
+  value,
+  onChange,
+}: {
+  exercises: ExerciseDefinition[]
+  value: string
+  onChange: (exerciseId: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const selected = exercises.find((exercise) => exercise.id === value) ?? exercises[0] ?? null
+  const needle = query.trim().toLowerCase()
+  const matches = needle
+    ? exercises.filter((exercise) => {
+        const metadata = exercise.metadata
+        const aliases = Array.isArray(metadata.aliases)
+          ? metadata.aliases.filter((alias): alias is string => typeof alias === 'string')
+          : []
+        return [exercise.name, ...aliases].some((label) => label.toLowerCase().includes(needle))
+      })
+    : exercises
+
+  return (
+    <div className="relative mt-1">
+      <button
+        type="button"
+        className="flex min-h-11 w-full items-center justify-between gap-3 rounded-md border border-zinc-300 bg-white px-3 text-left text-base"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => {
+          setOpen((current) => !current)
+          if (open) setQuery('')
+        }}
+      >
+        <span className="truncate">{selected?.name ?? 'Choose exercise'}</span>
+        <span aria-hidden="true" className="text-zinc-500">⌄</span>
+      </button>
+
+      {open ? (
+        <div className="absolute inset-x-0 top-full z-30 mt-1 overflow-hidden rounded-lg border border-zinc-300 bg-white shadow-xl">
+          <div className="border-b border-zinc-200 p-2">
+            <input
+              autoFocus
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search exercises"
+              className="min-h-10 w-full rounded-md border border-zinc-300 bg-white px-3 text-base"
+            />
+          </div>
+          <div role="listbox" aria-label="Exercises" className="max-h-64 overflow-y-auto p-1">
+            {matches.length === 0 ? (
+              <p className="px-3 py-3 text-sm text-zinc-500">No matching exercises.</p>
+            ) : (
+              matches.map((exercise) => (
+                <button
+                  key={exercise.id}
+                  type="button"
+                  role="option"
+                  aria-selected={exercise.id === selected?.id}
+                  className="flex min-h-10 w-full items-center rounded-md px-3 text-left text-sm hover:bg-zinc-100 aria-selected:bg-zinc-100 aria-selected:font-medium"
+                  onClick={() => {
+                    onChange(exercise.id)
+                    setOpen(false)
+                    setQuery('')
+                  }}
+                >
+                  {exercise.name}
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 function PrescriptionFields({ exercise, slot, onChange }: {
   exercise: ExerciseDefinition
   slot: SlotDraft
@@ -179,7 +258,14 @@ export function RoutinesPage() {
             <button type="button" className={quietButtonClass} disabled={index === slots.length-1} onClick={() => setSlots(current => { const next=[...current]; const [item]=next.splice(index,1); if(item) next.splice(index+1,0,item); return next })}>↓</button>
             <button type="button" className={quietButtonClass} disabled={slots.length === 1} onClick={() => setSlots(current => current.filter((_,i)=>i!==index))}>Remove</button>
           </div></div>
-          <label className="block text-sm">Exercise<select className="mt-1 min-h-11 w-full rounded-md border border-zinc-300 px-3 text-base" value={slot.exerciseDefinitionId} onChange={e => updateSlot(index,{...emptySlot(e.target.value),plannedSets:slot.plannedSets})}>{exercises.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+          <label className="block text-sm">
+            Exercise
+            <RoutineExercisePicker
+              exercises={exercises}
+              value={slot.exerciseDefinitionId}
+              onChange={(exerciseId) => updateSlot(index, { ...emptySlot(exerciseId), plannedSets: slot.plannedSets })}
+            />
+          </label>
           <label className="block text-sm">Planned sets<input className="mt-1 min-h-11 w-full rounded-md border border-zinc-300 px-3 text-base" type="number" min="1" max="20" value={slot.plannedSets} onChange={e=>updateSlot(index,{...slot,plannedSets:Number(e.target.value)})} /></label>
           {exercise ? <PrescriptionFields exercise={exercise} slot={slot} onChange={next=>updateSlot(index,next)} /> : null}
         </article>

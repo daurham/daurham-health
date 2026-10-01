@@ -8,7 +8,7 @@ import {
   updateOwnerExercise,
 } from '../training/owner-exercises.js'
 import { withOwnerAuth } from '../auth/with-owner.js'
-import { handleApiError, queryStringParam, readJsonBody, requestApiPathname, sendJson, type ApiRequest, type ApiResponse } from '../http.js'
+import { handleApiError, requestApiPathname, requestQueryValue, readJsonBody, sendJson, type ApiRequest, type ApiResponse } from '../http.js'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -36,7 +36,7 @@ export async function handleTrainingExercises(req: ApiRequest, res: ApiResponse)
         sendJson(
           res,
           200,
-          queryStringParam(req, 'management') === 'true'
+          requestQueryValue(req, 'management') === 'true'
             ? await listExerciseLibrary()
             : await listExercises(),
         )
