@@ -45,12 +45,16 @@ export function reloadForStaleChunkOnce(
     now?: number
   } = {},
 ): boolean {
-  if (!isStaleChunkError(error) || typeof window === 'undefined') {
+  if (!isStaleChunkError(error)) {
     return false
   }
 
-  const storage = options.storage ?? window.sessionStorage
-  const location = options.location ?? window.location
+  const runtimeWindow = typeof window === 'undefined' ? null : window
+  const storage = options.storage ?? runtimeWindow?.sessionStorage
+  const location = options.location ?? runtimeWindow?.location
+  if (!storage || !location) {
+    return false
+  }
   const now = options.now ?? Date.now()
   const path = `${location.pathname}${location.search}${location.hash}`
 
