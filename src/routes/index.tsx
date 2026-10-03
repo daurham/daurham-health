@@ -3,6 +3,7 @@ import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import { ResetPasswordPage, SignInPage } from '@/auth'
 import { Layout } from '@/components'
 import { NotFoundPage } from '@/components/NotFoundPage'
+import { RouteErrorBoundary } from '@/components/RouteErrorBoundary'
 import { TodayPage } from '@/features/today'
 
 const NutritionPage = lazy(() => import('@/features/nutrition').then((module) => ({ default: module.NutritionPage })))
@@ -72,6 +73,7 @@ const router = createBrowserRouter([
   {
     path: '/',
     element: <Layout />,
+    errorElement: <RouteErrorBoundary />,
     children: [
       { index: true, element: <TodayPage /> },
       { path: 'nutrition', element: <NutritionPage /> },
