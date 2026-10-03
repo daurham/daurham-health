@@ -232,12 +232,12 @@ export function PantryPage() {
                       className={quietButtonClass}
                       disabled={busyId === food.id}
                       onClick={() => {
-                        if (globalThis.confirm(`Remove “${food.name}” from Pantry? Previous logs and Recipe Versions stay unchanged.`)) {
+                        if (globalThis.confirm(`Archive “${food.name}”? It will disappear from normal search and logging. Previous logs and Recipe Versions stay unchanged.`)) {
                           void setArchived(food, true)
                         }
                       }}
                     >
-                      Remove from Pantry
+                      Archive
                     </button>
                   )}
                 </div>
