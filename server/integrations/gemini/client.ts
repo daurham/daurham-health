@@ -35,6 +35,7 @@ export type GeminiGenerateRequest = {
   image?: { mimeType: string; base64: string }
   images?: Array<{ mimeType: string; base64: string }>
   usageKind?: NutritionGeminiUsageKind
+  responseJsonSchema?: Record<string, unknown>
 }
 
 export type GeminiGenerateResult = {
@@ -217,6 +218,7 @@ async function generateOnce(config: GeminiConfig, request: GeminiGenerateRequest
       contents: [{ role: 'user', parts }],
       config: {
         responseMimeType: 'application/json',
+        responseJsonSchema: request.responseJsonSchema,
         thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
         maxOutputTokens: request.maxOutputTokens,
         mediaResolution: request.mediaResolution,
