@@ -15,10 +15,12 @@ import {
   type MealEstimateNutrients,
   type MealPortionScale,
   type NutritionEntry,
+  type NutritionFood,
 } from '@/domain/nutrition'
-import { commitFoodDescription, describeFoodText } from './api'
+import { commitFoodDescription, describeFoodText, saveAiReusableFood } from './api'
 import { mealLabel } from './format'
 import { NutritionSheet } from './Sheet'
+import { CatalogCommitFooter } from './CatalogCommitFooter'
 
 const inputClass =
   'min-h-11 w-full rounded-md border border-zinc-300 bg-white px-3 text-base text-zinc-900 outline-none focus:border-zinc-500 md:text-sm'
@@ -42,9 +44,11 @@ export function DescribeFoodSheet({
   review,
   unavailable,
   message,
+  provider,
   onClose,
   onBack,
   onLogged,
+  onSavedFood,
   onManual,
   onRetry,
   onTryLocal,
@@ -54,9 +58,11 @@ export function DescribeFoodSheet({
   review: DescriptionEstimateCandidate | null
   unavailable: boolean
   message?: string | null
+  provider: 'gemini' | 'home_ai'
   onClose: () => void
   onBack: () => void
   onLogged: (entries: NutritionEntry[]) => void
+  onSavedFood?: (food: NutritionFood) => void
   onManual: () => void
   onRetry?: () => void
   onTryLocal?: () => void
@@ -93,9 +99,11 @@ export function DescribeFoodSheet({
       date={date}
       text={text}
       review={review}
+      provider={provider}
       onClose={onClose}
       onBack={onBack}
       onLogged={onLogged}
+      onSavedFood={onSavedFood}
     />
   )
 }
@@ -104,16 +112,20 @@ function DescriptionEstimateSheet({
   date,
   text,
   review,
+  provider,
   onClose,
   onBack,
   onLogged,
+  onSavedFood,
 }: {
   date: string
   text: string
   review: DescriptionEstimateCandidate
+  provider: 'gemini' | 'home_ai'
   onClose: () => void
   onBack: () => void
   onLogged: (entries: NutritionEntry[]) => void
+  onSavedFood?: (food: NutritionFood) => void
 }) {
   const [current, setCurrent] = useState(review)
   const [name, setName] = useState(review.name)
@@ -152,7 +164,7 @@ function DescriptionEstimateSheet({
     setBusy(true)
     setError(null)
     try {
-      const next = await describeFoodText(reconstructDescriptionText(items) || text)
+      const next = await describeFoodText(reconstructDescriptionText(items) || text, provider)
       const nextBaseline = sumDescriptionEstimateItems(next.items)
       setCurrent(next)
       setName(next.name)
@@ -169,7 +181,39 @@ function DescriptionEstimateSheet({
     }
   }
 
-  async function saveMeal() {
+  function reusableFoodInput() {
+    const grams = items.length > 0 && items.every((item) => item.estimatedGrams != null)
+      ? items.reduce((sum, item) => sum + (item.estimatedGrams ?? 0), 0)
+      : null
+    const single = items.length === 1 ? items[0] : null
+    return {
+      name: name.trim(),
+      text: current.original || text,
+      servingQuantity: single?.quantity && single.quantity > 0 ? single.quantity : 1,
+      servingUnit: single?.unit.trim() || 'meal',
+      servingGrams: grams && grams > 0 ? grams : null,
+      calories: values.calories,
+      protein: values.proteinGrams,
+      carbs: values.carbsGrams,
+      fat: values.fatGrams,
+      fiber: values.fiberGrams,
+      sodium: values.sodiumMg,
+      provider,
+      model: current.model ?? null,
+      originalCalories: baseline.calories,
+      adjusted:
+        name.trim() !== review.name.trim() ||
+        scale !== 1 ||
+        values.calories !== baseline.calories ||
+        values.proteinGrams !== baseline.proteinGrams ||
+        values.carbsGrams !== baseline.carbsGrams ||
+        values.fatGrams !== baseline.fatGrams ||
+        values.fiberGrams !== baseline.fiberGrams ||
+        values.sodiumMg !== baseline.sodiumMg,
+    } as const
+  }
+
+  async function save(log: boolean) {
     const nextErrors = validateMealEstimateReview({ name, calories: values.calories })
     if (nextErrors.length > 0) {
       setError(nextErrors[0]?.message ?? 'Review the estimate before saving.')
@@ -178,6 +222,22 @@ function DescriptionEstimateSheet({
     setBusy(true)
     setError(null)
     try {
+      let reusable: NutritionFood | null = null
+      try {
+        reusable = (await saveAiReusableFood(reusableFoodInput())).food
+      } catch (caught) {
+        const duplicate = caught instanceof Error && /already exists/i.test(caught.message)
+        if (!log || !duplicate) {
+          throw caught
+        }
+      }
+      if (!log) {
+        if (!reusable) {
+          throw new Error('Could not save this AI food to Pantry.')
+        }
+        onSavedFood?.(reusable)
+        return
+      }
       const saved = await commitFoodDescription({
         text: current.original || text,
         logDate: date,
@@ -191,11 +251,11 @@ function DescriptionEstimateSheet({
         fiberGrams: values.fiberGrams,
         sodiumMg: values.sodiumMg,
         portionScale: scale,
-        items: current.items,
+        items,
       })
       onLogged(saved.entries)
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Could not save meal')
+      setError(caught instanceof Error ? caught.message : log ? 'Could not save meal' : 'Could not save food')
     } finally {
       setBusy(false)
     }
@@ -279,13 +339,14 @@ function DescriptionEstimateSheet({
         </select>
       </label>
       {error ? <p className="mt-3 text-sm text-red-700">{error}</p> : null}
-      <div className="mt-4 space-y-2">
-        <button type="button" className={primaryClass} disabled={busy} onClick={() => void saveMeal()}>
-          {busy ? 'Saving…' : 'Save meal'}
-        </button>
-        <button type="button" className="text-sm text-zinc-600 underline" onClick={onBack}>
-          Back
-        </button>
+      <div className="mt-4">
+        <CatalogCommitFooter
+          date={date}
+          busy={busy}
+          onBack={onBack}
+          onSaveForLater={() => void save(false)}
+          onAddToDate={() => void save(true)}
+        />
       </div>
     </NutritionSheet>
   )
