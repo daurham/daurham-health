@@ -20,6 +20,7 @@ import { boundedProviderCostUsd } from '../ai-usage/cost.js'
 import { HttpError } from '../http.js'
 import { askHealthCacheKey, getAskHealthGate, type AskHealthGate } from './gate.js'
 import { loadAskHealthPacketInput } from './load.js'
+import { classifyGeminiError } from '../integrations/gemini/client.js'
 import { askHealthGemini, askHealthModel } from './provider.js'
 
 const FAILURE = "Ask Health couldn't generate an explanation. Your Health data is unchanged."
@@ -27,7 +28,7 @@ const BUDGET = 'Ask Health unavailable — AI monthly budget reached.'
 const RATE = 'Ask Health is receiving requests too quickly. Wait a moment and try again.'
 const READ_FAILURE = "Ask Health couldn't read Health evidence. Your Health data is unchanged."
 
-export type AskHealthProvider = (input: { system: string; user: string; model: string }) => Promise<{
+export type AskHealthProvider = (input: { system: string; user: string; model: string; evidenceIds: string[] }) => Promise<{
   text: string
   model: string
   inputTokens: number | null
@@ -77,7 +78,8 @@ export async function answerAskHealth(input: {
     if (error instanceof HttpError) {
       throw error
     }
-    throw new HttpError(503, READ_FAILURE)
+    console.error('ask-health failure stage=evidence_load')
+    throw new HttpError(503, READ_FAILURE, undefined, 'ASK_HEALTH_EVIDENCE_LOAD')
   }
   return explainAskHealth({
     packet,
@@ -134,8 +136,9 @@ export async function explainAskHealth(input: {
   let decision: Awaited<ReturnType<AskHealthGate['take']>>
   try {
     decision = await input.gate.take(key, now, input.model)
-  } catch {
-    throw new HttpError(503, FAILURE)
+  } catch (error) {
+    console.error('ask-health failure stage=usage_gate')
+    throw new HttpError(503, FAILURE, undefined, 'ASK_HEALTH_USAGE_GATE')
   }
   if (!decision.ok) {
     throw new HttpError(429, decision.reason === 'budget' ? BUDGET : RATE)
@@ -153,15 +156,19 @@ export async function explainAskHealth(input: {
       system: ASK_HEALTH_SYSTEM_PROMPT,
       user: askHealthUserPrompt({ packet: input.packet, question: input.question, conversation: input.conversation }),
       model: input.model,
+      evidenceIds: input.packet.evidence.map((item) => item.id),
     })
   } catch (error) {
     await settleFailure(input.gate, decision.usageId, error, now)
-    throw new HttpError(502, FAILURE)
+    const code = classifyGeminiError(error)
+    console.error(`ask-health failure stage=provider code=${code} model=${input.model}`)
+    throw new HttpError(502, FAILURE, undefined, `ASK_HEALTH_${code}`)
   }
   const validated = validateAskHealthAnswer(generated.text, input.packet.evidence)
   await settleComplete(input.gate, decision.usageId, generated, now)
   if (!validated.ok) {
-    throw new HttpError(502, FAILURE)
+    console.error(`ask-health failure stage=validation reason=${validated.error} model=${generated.model}`)
+    throw new HttpError(502, FAILURE, undefined, 'ASK_HEALTH_INVALID_RESPONSE')
   }
   input.gate.store(key, { answer: validated.answer, evidence: citedEvidence(input.packet, validated.answer) })
   return responseFor(input, {
