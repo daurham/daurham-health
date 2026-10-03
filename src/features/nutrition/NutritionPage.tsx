@@ -517,6 +517,12 @@ export function NutritionPage() {
             setCaptures((current) => current.filter((job) => job.id !== panel.jobId))
             setPanel(null)
           }}
+          onSavedFood={(food) => {
+            prependRecent(food)
+            setNotice('Saved to My Foods without logging.')
+            setCaptures((current) => current.filter((job) => job.id !== panel.jobId))
+            setPanel(null)
+          }}
           onLogged={(entries) => {
             resource.replaceData((current) => {
               const ids = new Set(entries.map((item) => item.id))
