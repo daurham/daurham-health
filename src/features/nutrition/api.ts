@@ -42,7 +42,7 @@ async function parseOk<T>(response: Response): Promise<T> {
 }
 
 export async function fetchNutritionDay(date: string, signal?: AbortSignal): Promise<NutritionDayPayload> {
-  return parseOk(await healthFetch(`/api/nutrition/day?date=${encodeURIComponent(date)}`, { signal }))
+  return parseOk(await healthFetch(`/api/nutrition/day?date=${encodeURIComponent(date)}`, { signal, cache: 'no-store' }))
 }
 
 export async function searchNutritionFoods(query: string, signal?: AbortSignal): Promise<NutritionFood[]> {
@@ -52,20 +52,20 @@ export async function searchNutritionFoods(query: string, signal?: AbortSignal):
   }
   const suffix = params.size > 0 ? `?${params.toString()}` : ''
   const body = await parseOk<{ foods: NutritionFood[] }>(
-    await healthFetch(`/api/nutrition/foods${suffix}`, { signal }),
+    await healthFetch(`/api/nutrition/foods${suffix}`, { signal, cache: 'no-store' }),
   )
   return body.foods
 }
 
 export async function fetchPantryFoods(signal?: AbortSignal): Promise<NutritionFoodManagement[]> {
   const body = await parseOk<{ foods: NutritionFoodManagement[] }>(
-    await healthFetch('/api/nutrition/foods?management=true', { signal }),
+    await healthFetch('/api/nutrition/foods?management=true', { signal, cache: 'no-store' }),
   )
   return body.foods
 }
 
 export async function fetchNutritionFood(id: string): Promise<NutritionFood> {
-  return parseOk(await healthFetch(`/api/nutrition/foods/${id}`))
+  return parseOk(await healthFetch(`/api/nutrition/foods/${id}`, { cache: 'no-store' }))
 }
 
 export async function createNutritionFood(input: NutritionFoodCreate): Promise<NutritionFood> {
