@@ -350,10 +350,6 @@ export function AddFoodSheet({
           onSavedFood?.(food)
           onClose()
         }}
-        onSavedFood={(food) => {
-          onSavedFood?.(food)
-          onClose()
-        }}
         onLogged={(entries) => {
           if (onMealLogged) {
             onMealLogged(entries)
@@ -389,6 +385,10 @@ export function AddFoodSheet({
           setDescribe(null)
           setDescribeUnavailable(false)
           setManual(true)
+        }}
+        onSavedFood={(food) => {
+          onSavedFood?.(food)
+          onClose()
         }}
         onLogged={(entries) => {
           if (onMealLogged) {
