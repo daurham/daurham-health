@@ -7,7 +7,6 @@ import {
   applyHundredGramServing,
   matchCurrentRecipes,
   rankFoodsForQuery,
-  shouldOfferFoodDescription,
   snapshotFromDefinition,
   validatePackagedReview,
   type LoggableRecipeVersion,
@@ -39,6 +38,7 @@ import { MealCaptureSheet } from './MealCapture'
 import { catalogKindLabel, formatGrams, formatKcal, formatNumber, formatQuantity, mealLabel, provenanceLabel } from './format'
 import { NutritionSheet } from './Sheet'
 import { RecipePortionSheet } from './RecipePortionSheet'
+import { RecipeIngredientSheet } from './RecipeIngredientSheet'
 
 const BarcodeScanner = lazy(() => import('./BarcodeScanner').then((module) => ({ default: module.BarcodeScanner })))
 
@@ -83,7 +83,9 @@ export function AddFoodSheet({
   const [scan, setScan] = useState(false)
   const [label, setLabel] = useState(false)
   const [mealPhoto, setMealPhoto] = useState(false)
+  const [referenceIngredient, setReferenceIngredient] = useState(false)
   const [describe, setDescribe] = useState<FoodDescriptionReview | null>(null)
+  const [describeProvider, setDescribeProvider] = useState<'gemini' | 'home_ai'>('gemini')
   const [describeUnavailable, setDescribeUnavailable] = useState(false)
   const [describeError, setDescribeError] = useState<string | null>(null)
   const [describeBusy, setDescribeBusy] = useState(false)
@@ -131,6 +133,27 @@ export function AddFoodSheet({
     }
   }, [query, quickAdd.recents])
 
+  function runDescription(provider: 'gemini' | 'home_ai' = 'gemini') {
+    const text = query.trim()
+    if (!text || describeBusy) {
+      return
+    }
+    setDescribeBusy(true)
+    setDescribeProvider(provider)
+    setDescribeError(null)
+    void describeFoodText(text, provider)
+      .then((review) => {
+        setDescribe(review)
+        setDescribeUnavailable(false)
+      })
+      .catch((caught: unknown) => {
+        setDescribe(null)
+        setDescribeUnavailable(true)
+        setDescribeError(caught instanceof Error ? caught.message : null)
+      })
+      .finally(() => setDescribeBusy(false))
+  }
+
   async function onBarcode(raw: string) {
     if (lookupLock.current) {
       return
@@ -167,6 +190,24 @@ export function AddFoodSheet({
       lookupLock.current = false
       setLookupBusy(false)
     }
+  }
+
+  if (referenceIngredient) {
+    return (
+      <RecipeIngredientSheet
+        initialQuery={query.trim()}
+        initialStep="usda"
+        onClose={() => setReferenceIngredient(false)}
+        onFood={(food) => {
+          onSavedFood?.(food)
+          onClose()
+        }}
+        onLabel={() => {
+          setReferenceIngredient(false)
+          setLabel(true)
+        }}
+      />
+    )
   }
 
   if (confirmRecipe) {
@@ -305,6 +346,14 @@ export function AddFoodSheet({
         recipes={quickAdd.recipes}
         onClose={onClose}
         onBack={() => setMealPhoto(false)}
+        onSavedFood={(food) => {
+          onSavedFood?.(food)
+          onClose()
+        }}
+        onSavedFood={(food) => {
+          onSavedFood?.(food)
+          onClose()
+        }}
         onLogged={(entries) => {
           if (onMealLogged) {
             onMealLogged(entries)
@@ -328,37 +377,14 @@ export function AddFoodSheet({
         review={describe}
         unavailable={!describe}
         message={describeError}
+        provider={describeProvider}
         onClose={onClose}
         onBack={() => {
           setDescribe(null)
           setDescribeUnavailable(false)
         }}
-        onRetry={() => {
-          setDescribeBusy(true)
-          void describeFoodText(query.trim())
-            .then((review) => {
-              setDescribe(review)
-              setDescribeUnavailable(false)
-            })
-            .catch((caught: unknown) => {
-              setDescribeUnavailable(true)
-              setDescribeError(caught instanceof Error ? caught.message : null)
-            })
-            .finally(() => setDescribeBusy(false))
-        }}
-        onTryLocal={() => {
-          setDescribeBusy(true)
-          void describeFoodText(query.trim(), 'home_ai')
-            .then((review) => {
-              setDescribe(review)
-              setDescribeUnavailable(false)
-            })
-            .catch((caught: unknown) => {
-              setDescribeUnavailable(true)
-              setDescribeError(caught instanceof Error ? caught.message : null)
-            })
-            .finally(() => setDescribeBusy(false))
-        }}
+        onRetry={() => runDescription('gemini')}
+        onTryLocal={() => runDescription('home_ai')}
         onManual={() => {
           setDescribe(null)
           setDescribeUnavailable(false)
@@ -426,6 +452,22 @@ export function AddFoodSheet({
             <button type="button" className={secondaryClass + ' px-2 text-center text-xs leading-tight'} onClick={() => setMealPhoto(true)}>
               Meal photo
             </button>
+            <button
+              type="button"
+              className={secondaryClass + ' px-2 text-center text-xs leading-tight'}
+              disabled={describeBusy || query.trim().length === 0}
+              onClick={() => runDescription('gemini')}
+            >
+              {describeBusy ? 'Asking AI…' : 'Ask AI'}
+            </button>
+            <button
+              type="button"
+              className={secondaryClass + ' px-2 text-center text-xs leading-tight'}
+              disabled={query.trim().length === 0}
+              onClick={() => setReferenceIngredient(true)}
+            >
+              Search USDA
+            </button>
             <button type="button" className={secondaryClass + ' px-2 text-center text-xs leading-tight'} onClick={() => setManual(true)}>
               Manual entry
             </button>
@@ -440,29 +482,14 @@ export function AddFoodSheet({
           foods={results ?? []}
           empty={searching ? 'Searching…' : 'No matching saved foods.'}
           action={
-            shouldOfferFoodDescription(query, results, searching) ? (
-              <button
-                type="button"
-                className={secondaryClass + ' mt-3 w-full'}
-                disabled={describeBusy}
-                onClick={() => {
-                  setDescribeBusy(true)
-                  void describeFoodText(query.trim())
-                    .then((review) => {
-                      setDescribe(review)
-                      setDescribeUnavailable(false)
-                    })
-                    .catch((caught: unknown) => {
-                      setDescribe(null)
-                      setDescribeUnavailable(true)
-                      setDescribeError(caught instanceof Error ? caught.message : null)
-                    })
-                    .finally(() => setDescribeBusy(false))
-                }}
-              >
-                {describeBusy ? 'Reading description…' : 'Use this description'}
-              </button>
-            ) : null
+            <button
+              type="button"
+              className={secondaryClass + ' mt-3 w-full'}
+              disabled={describeBusy}
+              onClick={() => runDescription('gemini')}
+            >
+              {describeBusy ? 'Asking AI…' : 'Ask AI about this'}
+            </button>
           }
           onSelect={setConfirmFood}
           onQuickLog={onQuickLog}
