@@ -26,6 +26,7 @@ import {
   fetchNutritionMealJob,
   reanalyzeNutritionMealJob,
   nutritionMealImageUrl,
+  saveAiReusableFood,
 } from './api'
 import { MEAL_PHOTO_SET_CLIENT_MAX_BYTES, MEAL_PHOTO_SET_MAX_COUNT, MealPhotoPrepareError, prepareMealPhotoSet } from './prepare-meal-photo'
 import { mealLabel } from './format'
@@ -63,10 +64,11 @@ type MealCaptureProps = {
   onClose: () => void
   onBack: () => void
   onLogged: (entries: NutritionEntry[]) => void
+  onSavedFood?: (food: NutritionFood) => void
   onDiscarded?: () => void
 }
 
-export function MealCaptureSheet({ date, jobId, onClose, onBack, onLogged, onDiscarded }: MealCaptureProps) {
+export function MealCaptureSheet({ date, jobId, onClose, onBack, onLogged, onSavedFood, onDiscarded }: MealCaptureProps) {
   const [phase, setPhase] = useState<'pick' | 'preview' | 'working' | 'review' | 'failed'>(jobId ? 'working' : 'pick')
   const [activeJobId, setActiveJobId] = useState<string | null>(jobId ?? null)
   const [payload, setPayload] = useState<NutritionMealJobResponse | null>(null)
@@ -308,7 +310,7 @@ export function MealCaptureSheet({ date, jobId, onClose, onBack, onLogged, onDis
         candidate={payload?.candidate ?? emptyMealEstimate()}
         imageUrls={reviewImageUrls(activeJobId, payload?.job.imageCount, payload?.job.imageAvailable, views)}
         userContext={payload?.userContext ?? (context.trim() || null)}
-        provider={payload?.job.provider === 'gemini' ? 'gemini' : null}
+        provider={payload?.job.provider ?? null}
         onRefine={activeJobId ? (answers) => void refineEstimate(answers) : undefined}
         onEditContext={activeJobId || views.length > 0 ? editContext : undefined}
         onClose={onClose}
@@ -318,6 +320,7 @@ export function MealCaptureSheet({ date, jobId, onClose, onBack, onLogged, onDis
         }}
         onDiscard={activeJobId ? () => void discardCapture() : undefined}
         onLogged={onLogged}
+        onSavedFood={onSavedFood}
       />
     )
   }
@@ -566,19 +569,21 @@ function MealEstimateSheet({
   onBack,
   onDiscard,
   onLogged,
+  onSavedFood,
 }: {
   date: string
   jobId: string | null
   candidate: MealEstimateCandidate
   imageUrls: string[]
   userContext?: string | null
-  provider?: 'gemini' | null
+  provider?: 'gemini' | 'home_ai' | null
   onRefine?: (answers: Array<{ id: string; answer: string }>) => void
   onEditContext?: () => void
   onClose: () => void
   onBack: () => void
   onDiscard?: () => void
   onLogged: (entries: NutritionEntry[]) => void
+  onSavedFood?: (food: NutritionFood) => void
 }) {
   const [name, setName] = useState(candidate.name)
   const [meal, setMeal] = useState<(typeof NUTRITION_MEALS)[number] | ''>('')
@@ -598,7 +603,7 @@ function MealEstimateSheet({
     setValues(scaleMealEstimate(baseline, next))
   }
 
-  async function saveMeal() {
+  async function save(log: boolean) {
     const nextErrors = validateMealEstimateReview({ name, calories: values.calories })
     if (nextErrors.length > 0) {
       setError(nextErrors[0]?.message ?? 'Review the estimate before saving.')
@@ -607,6 +612,43 @@ function MealEstimateSheet({
     setBusy(true)
     setError(null)
     try {
+      let reusable: NutritionFood | null = null
+      if (provider) {
+        try {
+          reusable = (await saveAiReusableFood({
+            name: name.trim(),
+            text: userContext?.trim() || candidate.foodsSeen.join(', ') || candidate.name,
+            servingQuantity: 1,
+            servingUnit: 'meal',
+            servingGrams: null,
+            calories: values.calories,
+            protein: values.proteinGrams,
+            carbs: values.carbsGrams,
+            fat: values.fatGrams,
+            fiber: values.fiberGrams,
+            sodium: values.sodiumMg,
+            provider,
+            model: candidate.model ?? null,
+            originalCalories: baseline.calories,
+            adjusted: reviewEdited || scale !== 1,
+          })).food
+        } catch (caught) {
+          const duplicate = caught instanceof Error && /already exists/i.test(caught.message)
+          if (!log || !duplicate) {
+            throw caught
+          }
+        }
+      }
+      if (!log) {
+        if (!provider) {
+          throw new Error('Only AI-analyzed meals can be saved to Pantry from this screen.')
+        }
+        if (!reusable) {
+          throw new Error('Could not save this AI meal to Pantry.')
+        }
+        onSavedFood?.(reusable)
+        return
+      }
       const saved = await commitNutritionMealReview({
         jobId: jobId ?? undefined,
         logDate: date,
@@ -623,7 +665,7 @@ function MealEstimateSheet({
       })
       onLogged(saved.entries)
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Could not save meal')
+      setError(caught instanceof Error ? caught.message : log ? 'Could not save meal' : 'Could not save food')
     } finally {
       setBusy(false)
     }
@@ -783,7 +825,12 @@ function MealEstimateSheet({
       ) : null}
       {error ? <p className="mt-3 text-sm text-red-700">{error}</p> : null}
       <div className="mt-4 space-y-2">
-        <button type="button" className={primaryClass} disabled={busy} onClick={() => void saveMeal()}>
+        {provider ? (
+          <button type="button" className={secondaryClass + ' w-full'} disabled={busy} onClick={() => void save(false)}>
+            {busy ? 'Saving…' : 'Save to Pantry'}
+          </button>
+        ) : null}
+        <button type="button" className={primaryClass} disabled={busy} onClick={() => void save(true)}>
           {busy ? 'Saving…' : 'Save meal'}
         </button>
         {onEditContext ? (
