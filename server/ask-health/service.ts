@@ -136,7 +136,7 @@ export async function explainAskHealth(input: {
   let decision: Awaited<ReturnType<AskHealthGate['take']>>
   try {
     decision = await input.gate.take(key, now, input.model)
-  } catch (error) {
+  } catch {
     console.error('ask-health failure stage=usage_gate')
     throw new HttpError(503, FAILURE, undefined, 'ASK_HEALTH_USAGE_GATE')
   }

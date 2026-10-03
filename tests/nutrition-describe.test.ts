@@ -80,7 +80,9 @@ describe('food description detection', () => {
     const effect = panels.slice(panels.indexOf('useEffect(() => {'), panels.indexOf('async function onBarcode'))
     expect(effect).toContain('searchNutritionFoods')
     expect(effect).not.toContain('describeFoodText')
-    expect(panels).toContain('Use this description')
+    expect(panels).toContain('Ask AI about this')
+    expect(panels).toContain('Search USDA')
+    expect(panels).not.toContain('shouldOfferFoodDescription(query')
   })
 })
 
