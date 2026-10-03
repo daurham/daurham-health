@@ -77,7 +77,7 @@ describe('food description detection', () => {
 
   it('does not call description while the search effect is typing', () => {
     const panels = readFileSync('src/features/nutrition/panels.tsx', 'utf8')
-    const effect = panels.slice(panels.indexOf('useEffect(() => {'), panels.indexOf('async function onBarcode'))
+    const effect = panels.slice(panels.indexOf('useEffect(() => {'), panels.indexOf('function runDescription'))
     expect(effect).toContain('searchNutritionFoods')
     expect(effect).not.toContain('describeFoodText')
     expect(panels).toContain('Ask AI about this')

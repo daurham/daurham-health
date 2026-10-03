@@ -171,7 +171,7 @@ describe('Gemini nutrition interpretation', () => {
     expect(client).not.toContain('googleSearch')
     expect(client).not.toContain('google_search')
     expect(client).toContain("responseMimeType: 'application/json'")
-    expect(client).not.toContain('responseJsonSchema')
+    expect(client).toContain('responseJsonSchema: request.responseJsonSchema')
     expect(client).not.toContain('responseSchema')
     expect(client).not.toContain('responseFormat')
   })
@@ -183,6 +183,7 @@ describe('Gemini nutrition interpretation', () => {
       generate: async (request) => {
         seenPrompt = request.prompt
         expect(request).not.toHaveProperty('schema')
+        expect(request).not.toHaveProperty('responseJsonSchema')
         return fakeGenerate(mealJson)(request)
       },
     })
@@ -353,7 +354,7 @@ describe('Gemini routing, context, and boundaries', () => {
     expect(geminiClient).toContain('thinkingLevel: ThinkingLevel.MINIMAL')
     expect(geminiClient).not.toContain('thinkingBudget')
     expect(geminiClient).not.toContain('temperature')
-    expect(geminiClient).not.toContain('responseJsonSchema')
+    expect(geminiClient).toContain('responseJsonSchema: request.responseJsonSchema')
     expect(geminiClient).not.toContain('responseSchema')
     expect(geminiClient).toContain("responseMimeType: 'application/json'")
     expect(geminiClient).toContain('attempts: 1')
