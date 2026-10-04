@@ -450,6 +450,7 @@ export function NutritionPage() {
       {panel?.kind === 'targets' ? (
         <TargetSheet
           date={date}
+          targets={day?.targets ?? null}
           onClose={() => setPanel(null)}
           onSaved={() => {
             void fetchNutritionDay(date).then((next) => resource.replaceData(() => next))

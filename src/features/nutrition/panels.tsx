@@ -29,6 +29,7 @@ import {
   patchNutritionFood,
   saveNutritionTarget,
   savePackagedFoodAndLog,
+  type NutritionDayPayload,
   searchNutritionFoods,
 } from './api'
 import { DescribeFoodSheet } from './DescribeFood'
@@ -1029,19 +1030,21 @@ export function EntryEditorSheet({
 
 export function TargetSheet({
   date,
+  targets,
   onClose,
   onSaved,
 }: {
   date: string
+  targets: NutritionDayPayload['targets']
   onClose: () => void
   onSaved: () => void
 }) {
-  const [calories, setCalories] = useState('2100')
-  const [protein, setProtein] = useState('160')
-  const [carbs, setCarbs] = useState('')
-  const [fat, setFat] = useState('')
-  const [fiber, setFiber] = useState('')
-  const [sodium, setSodium] = useState('')
+  const [calories, setCalories] = useState(() => String(targets?.caloriesTarget ?? 2100))
+  const [protein, setProtein] = useState(() => String(targets?.proteinTarget ?? 160))
+  const [carbs, setCarbs] = useState(() => (targets?.carbsTarget == null ? '' : String(targets.carbsTarget)))
+  const [fat, setFat] = useState(() => (targets?.fatTarget == null ? '' : String(targets.fatTarget)))
+  const [fiber, setFiber] = useState(() => (targets?.fiberTarget == null ? '' : String(targets.fiberTarget)))
+  const [sodium, setSodium] = useState(() => (targets?.sodiumTarget == null ? '' : String(targets.sodiumTarget)))
   const [effectiveFrom, setEffectiveFrom] = useState(date)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
