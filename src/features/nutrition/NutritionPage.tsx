@@ -293,6 +293,30 @@ export function NutritionPage() {
     }
   }
 
+  async function logAgainToday(entry: NutritionEntry) {
+    await createNutritionEntry({
+      logDate: today,
+      timezone: NUTRITION_CONFIG.calendarTimeZone,
+      meal: entry.meal,
+      foodId: entry.foodId,
+      foodName: entry.foodName,
+      brand: entry.brand,
+      servingQuantity: entry.servingQuantity,
+      servingUnit: entry.servingUnit,
+      grams: entry.grams,
+      calories: entry.calories,
+      protein: entry.protein,
+      carbs: entry.carbs,
+      fat: entry.fat,
+      fiber: entry.fiber,
+      sodium: entry.sodium ?? null,
+      notes: entry.notes,
+      sourceKind: 'manual',
+    })
+    setPanel(null)
+    setNotice(`${entry.foodName} logged again for today.`)
+  }
+
   const groups = useMemo(() => groupedEntries(day?.entries ?? []), [day?.entries])
   const navBase = resource.pendingKey ?? intentDate
 
@@ -438,6 +462,7 @@ export function NutritionPage() {
             })
           }}
           onDeleted={(entry) => void onDeleted(entry)}
+          onLogAgainToday={panel.entry.logDate !== today ? logAgainToday : undefined}
           onEditFood={(foodId) => {
             void fetchNutritionFood(foodId)
               .then((food) => setPanel({ kind: 'food', food }))

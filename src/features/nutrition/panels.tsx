@@ -877,12 +877,14 @@ export function EntryEditorSheet({
   onClose,
   onSaved,
   onDeleted,
+  onLogAgainToday,
   onEditFood,
 }: {
   entry: NutritionEntry
   onClose: () => void
   onSaved: (entry: NutritionEntry) => void
   onDeleted: (entry: NutritionEntry) => void
+  onLogAgainToday?: (entry: NutritionEntry) => Promise<void>
   onEditFood: (foodId: string) => void
 }) {
   const [quantity, setQuantity] = useState(entry.servingQuantity)
@@ -896,6 +898,7 @@ export function EntryEditorSheet({
   const [meal, setMeal] = useState(entry.meal ?? '')
   const [notes, setNotes] = useState(entry.notes ?? '')
   const [busy, setBusy] = useState(false)
+  const [repeatBusy, setRepeatBusy] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const linked = Boolean(entry.foodId)
@@ -934,6 +937,21 @@ export function EntryEditorSheet({
       setError(caught instanceof Error ? caught.message : 'Could not update entry')
     } finally {
       setBusy(false)
+    }
+  }
+
+  async function logAgainToday() {
+    if (!onLogAgainToday) {
+      return
+    }
+    setRepeatBusy(true)
+    setError(null)
+    try {
+      await onLogAgainToday(entry)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Could not log this entry again')
+    } finally {
+      setRepeatBusy(false)
     }
   }
 
@@ -985,6 +1003,19 @@ export function EntryEditorSheet({
             </Link>
             . Changing this log does not change the Recipe Version.
           </p>
+        ) : null}
+        {onLogAgainToday ? (
+          <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+            <button
+              type="button"
+              className={`${secondaryClass} w-full`}
+              onClick={() => void logAgainToday()}
+              disabled={busy || repeatBusy}
+            >
+              {repeatBusy ? 'Logging…' : 'Log again today'}
+            </button>
+            <p className="mt-2 text-xs text-zinc-500">Copies this saved serving amount and nutrition snapshot to today.</p>
+          </div>
         ) : null}
         <QuantityControls quantity={quantity} unit={entry.servingUnit} onChange={setQuantity} />
         <Field label="Calories" htmlFor="entry-kcal">

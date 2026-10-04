@@ -139,6 +139,10 @@ describe('nutrition daily UX source', () => {
     expect(page).toContain('Pending captures')
     expect(page).toContain('Dismiss')
     expect(page).toContain('onDismiss')
+    expect(page).toContain('onLogAgainToday={panel.entry.logDate !== today ? logAgainToday : undefined}')
+    expect(page).toContain("sourceKind: 'manual'")
+    expect(panels).toContain('Log again today')
+    expect(panels).toContain('Copies this saved serving amount and nutrition snapshot to today.')
   })
 })
 
