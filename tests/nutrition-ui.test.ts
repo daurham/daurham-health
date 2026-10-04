@@ -143,6 +143,9 @@ describe('nutrition daily UX source', () => {
     expect(page).toContain("sourceKind: 'manual'")
     expect(panels).toContain('Log again today')
     expect(panels).toContain('Copies this saved serving amount and nutrition snapshot to today.')
+    expect(panels).toContain('const [quantityText, setQuantityText] = useState(String(quantity))')
+    expect(panels).toContain("setQuantityText(raw)")
+    expect(panels).toContain("quantityText.trim() === ''")
   })
 })
 

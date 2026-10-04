@@ -689,6 +689,13 @@ function QuantityControls({
   unit: string
   onChange: (value: number) => void
 }) {
+  const [quantityText, setQuantityText] = useState(String(quantity))
+
+  function commitQuantity(next: number) {
+    setQuantityText(String(next))
+    onChange(next)
+  }
+
   return (
     <div>
       <p className={labelClass} id="quantity-label">
@@ -699,18 +706,26 @@ function QuantityControls({
           type="button"
           aria-label="Decrease quantity"
           className="min-h-11 min-w-11 rounded-md border border-zinc-300 text-lg"
-          onClick={() => onChange(Math.max(0.25, roundQty(quantity - 0.5)))}
+          onClick={() => commitQuantity(Math.max(0.25, roundQty(quantity - 0.5)))}
         >
           −
         </button>
         <input
           aria-label="Serving quantity"
           inputMode="decimal"
-          value={String(quantity)}
+          value={quantityText}
           onChange={(event) => {
-            const next = Number(event.target.value)
-            if (Number.isFinite(next) && next > 0) {
+            const raw = event.target.value
+            setQuantityText(raw)
+            const next = Number(raw)
+            if (raw.trim() !== '' && Number.isFinite(next) && next > 0) {
               onChange(next)
+            }
+          }}
+          onBlur={() => {
+            const next = Number(quantityText)
+            if (quantityText.trim() === '' || !Number.isFinite(next) || next <= 0) {
+              setQuantityText(String(quantity))
             }
           }}
           className={cn(inputClass, 'text-center')}
@@ -719,7 +734,7 @@ function QuantityControls({
           type="button"
           aria-label="Increase quantity"
           className="min-h-11 min-w-11 rounded-md border border-zinc-300 text-lg"
-          onClick={() => onChange(roundQty(quantity + 0.5))}
+          onClick={() => commitQuantity(roundQty(quantity + 0.5))}
         >
           +
         </button>
