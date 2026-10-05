@@ -431,7 +431,7 @@ describe('ask health evidence', () => {
     expect(packet.clarification).toContain('Bench Dip')
   })
 
-  it('puts owner notes in the user prompt and rejects fabricated evidence refs', () => {
+  it('keeps owner notes untrusted, allows uncited general context, and rejects fabricated evidence refs', () => {
     const packet = buildAskHealthEvidencePacket(
       packetInput({
         context: {
@@ -450,18 +450,38 @@ describe('ask health evidence', () => {
       packet.evidence,
     )
     expect(bad.ok).toBe(false)
-    const missing = validateAskHealthAnswer(
-      JSON.stringify({ blocks: [{ text: 'Your weight fell.', evidence_refs: [] }], limitations: [], follow_ups: [] }),
+    const general = validateAskHealthAnswer(
+      JSON.stringify({
+        blocks: [{ text: 'Hard training can temporarily increase scale weight through water shifts.', evidence_refs: [] }],
+        limitations: [],
+        follow_ups: [],
+      }),
       packet.evidence,
     )
-    expect(missing.ok).toBe(false)
+    expect(general.ok).toBe(true)
+    if (general.ok) expect(general.answer.blocks[0]?.evidenceRefs).toEqual([])
+    const fenced = validateAskHealthAnswer(
+      ```json
+{"blocks":[{"text":"General context","evidence_refs":[]}],"limitations":[],"followUps":["Compare a longer range"]}
+```,
+      packet.evidence,
+    )
+    expect(fenced.ok).toBe(true)
     const malformed = validateAskHealthAnswer('not json', packet.evidence)
     expect(malformed.ok).toBe(false)
-    const literature = validateAskHealthAnswer(
-      JSON.stringify({ blocks: [{ text: 'See the paper.', evidence_refs: ['ask.range'] }], citations: ['doi:10.1/example'], limitations: [], follow_ups: [] }),
+    const extra = validateAskHealthAnswer(
+      JSON.stringify({ blocks: [{ text: 'Range context.', evidence_refs: ['ask.range'] }], citations: ['doi:10.1/example'], limitations: [], follow_ups: [] }),
       packet.evidence,
     )
-    expect(literature.ok).toBe(false)
+    expect(extra.ok).toBe(true)
+  })
+
+  it('keeps the provider schema small and permits evidence-first general health context', () => {
+    const providerSource = readFileSync('server/ask-health/provider.ts', 'utf8')
+    expect(providerSource).not.toContain('enum: evidenceIds')
+    expect(providerSource).toContain("classifyGeminiError(error) !== 'GEMINI_SCHEMA'")
+    expect(ASK_HEALTH_SYSTEM_PROMPT).toContain('general health and physiology knowledge')
+    expect(ASK_HEALTH_SYSTEM_PROMPT).toContain('General health context may use an empty evidence_refs array')
   })
 
   it('accepts a concise structured answer that exceeds the old 4000-character envelope', () => {
@@ -636,6 +656,48 @@ describe('ask health explanation', () => {
       }),
     ).rejects.toThrow('too quickly')
     expect(rushed).toHaveBeenCalledTimes(1)
+  })
+
+  it('accepts useful general context without pretending it came from personal evidence', async () => {
+    const useful = buildAskHealthEvidencePacket(
+      packetInput({
+        goals: [
+          {
+            id: 'goal-1',
+            kind: 'body_metric',
+            lifecycle: 'active',
+            label: 'Weight',
+            targetText: '≥ 175 lb',
+            targetState: 'below_target',
+            deadlineState: 'none',
+            projectionState: 'insufficient_data',
+            projectionReason: null,
+          },
+        ],
+      }),
+    )
+    const mixed = provider(
+      JSON.stringify({
+        blocks: [
+          { text: 'Health shows the weight goal is below target.', evidence_refs: ['goals.goal-1'] },
+          { text: 'Short-term scale changes can reflect water and glycogen as well as tissue change.', evidence_refs: [] },
+        ],
+        limitations: [{ text: 'These data cannot prove which mechanism explains the change.', evidence_refs: [] }],
+        follow_ups: [],
+      }),
+    )
+    const response = await explainAskHealth({
+      packet: useful,
+      question: 'Why did my weight change?',
+      conversation: [],
+      provider: mixed,
+      gate: createAskHealthGate(),
+      model: 'gemini-test',
+      now: 45_000,
+    })
+    expect(response.answer.blocks).toHaveLength(2)
+    expect(response.answer.blocks[1]?.evidenceRefs).toEqual([])
+    expect(response.evidence.map((item) => item.id)).toContain('goals.goal-1')
   })
 
   it('hides malformed provider prose and does not write canonical records', async () => {
