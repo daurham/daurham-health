@@ -67,7 +67,7 @@ export function AskHealthPage() {
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Ask Health</h1>
-          <p className="mt-1 text-sm text-zinc-600">Questions are answered from the evidence Health already has.</p>
+          <p className="mt-1 text-sm text-zinc-600">Answers use your Health evidence first, with general health context when useful.</p>
         </div>
         <button
           type="button"
