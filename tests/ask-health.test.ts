@@ -658,6 +658,50 @@ describe('ask health explanation', () => {
     expect(rushed).toHaveBeenCalledTimes(1)
   })
 
+  it('retries once when the first model response cannot be validated', async () => {
+    const useful = buildAskHealthEvidencePacket(
+      packetInput({
+        goals: [
+          {
+            id: 'goal-1',
+            kind: 'body_metric',
+            lifecycle: 'active',
+            label: 'Weight',
+            targetText: '≥ 175 lb',
+            targetState: 'below_target',
+            deadlineState: 'none',
+            projectionState: 'insufficient_data',
+            projectionReason: null,
+          },
+        ],
+      }),
+    )
+    const repairing = vi
+      .fn()
+      .mockResolvedValueOnce({ text: 'not json', model: 'gemini-test', inputTokens: 10, outputTokens: 5 })
+      .mockResolvedValueOnce({
+        text: JSON.stringify({
+          blocks: [{ text: 'Short-term scale changes can reflect water shifts as well as tissue change.', evidence_refs: [] }],
+          limitations: [],
+          follow_ups: [],
+        }),
+        model: 'gemini-test',
+        inputTokens: 12,
+        outputTokens: 7,
+      })
+    const response = await explainAskHealth({
+      packet: useful,
+      question: 'Why did my weight change?',
+      conversation: [],
+      provider: repairing,
+      gate: createAskHealthGate(),
+      model: 'gemini-test',
+      now: 44_000,
+    })
+    expect(repairing).toHaveBeenCalledTimes(2)
+    expect(response.answer.blocks[0]?.text).toContain('water shifts')
+  })
+
   it('accepts useful general context without pretending it came from personal evidence', async () => {
     const useful = buildAskHealthEvidencePacket(
       packetInput({
