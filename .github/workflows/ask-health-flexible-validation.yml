@@ -8,9 +8,6 @@ on:
 env:
   TZ: America/Phoenix
 
-concurrency:
-  group: ask-health-flexible-validation
-  cancel-in-progress: true
 
 jobs:
   validate:
