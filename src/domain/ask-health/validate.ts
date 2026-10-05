@@ -119,7 +119,13 @@ function readBlock(item: unknown, ids: ReadonlySet<string>): AskHealthAnswer['bl
     : Array.isArray(record.evidenceRefs)
       ? record.evidenceRefs
       : []
-  const evidenceRefs = [...new Set(rawRefs.filter((ref): ref is string => typeof ref === 'string' && ids.has(ref)))]
+  const stringRefs = rawRefs.filter((ref): ref is string => typeof ref === 'string' && ref.length > 0)
+  const evidenceRefs = [...new Set(stringRefs.filter((ref) => ids.has(ref)))]
+  if (stringRefs.length > 0 && evidenceRefs.length === 0) {
+    // A block that tried to cite evidence but cited nothing real is not safe to show
+    // as uncited "general context". Drop it instead.
+    return null
+  }
   return { text, evidenceRefs }
 }
 
