@@ -55,7 +55,6 @@ function askHealthResponseSchema(): Record<string, unknown> {
       text: { type: 'string', description: `Concise evidence-grounded explanation. Keep under ${ASK_BLOCK_TEXT_MAX} characters.` },
       evidence_refs: {
         type: 'array',
-        minItems: 1,
         items: evidenceRef,
       },
     },
