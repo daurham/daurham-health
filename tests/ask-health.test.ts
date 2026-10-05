@@ -461,9 +461,7 @@ describe('ask health evidence', () => {
     expect(general.ok).toBe(true)
     if (general.ok) expect(general.answer.blocks[0]?.evidenceRefs).toEqual([])
     const fenced = validateAskHealthAnswer(
-      ```json
-{"blocks":[{"text":"General context","evidence_refs":[]}],"limitations":[],"followUps":["Compare a longer range"]}
-```,
+      '```json\\n{"blocks":[{"text":"General context","evidence_refs":[]}],"limitations":[],"followUps":["Compare a longer range"]}\\n```',
       packet.evidence,
     )
     expect(fenced.ok).toBe(true)
