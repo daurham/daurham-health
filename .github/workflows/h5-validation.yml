@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - h5-pantry-exercise-library
-      - fix-ask-health-general-synthesis
   workflow_dispatch:
 
 env:
