@@ -164,7 +164,29 @@ export async function explainAskHealth(input: {
     console.error(`ask-health failure stage=provider code=${code} model=${input.model}`)
     throw new HttpError(502, FAILURE, undefined, `ASK_HEALTH_${code}`)
   }
-  const validated = validateAskHealthAnswer(generated.text, input.packet.evidence)
+  let validated = validateAskHealthAnswer(generated.text, input.packet.evidence)
+  if (!validated.ok) {
+    console.warn(`ask-health retry stage=validation reason=${validated.error} model=${generated.model}`)
+    try {
+      const repaired = await input.provider({
+        system: `${ASK_HEALTH_SYSTEM_PROMPT}\nThe previous attempt did not validate. Regenerate the answer in the required JSON shape. Use only supplied evidence ids for claims about the owner; use an empty evidence_refs array for general health context.`,
+        user: askHealthUserPrompt({ packet: input.packet, question: input.question, conversation: input.conversation }),
+        model: input.model,
+        evidenceIds: input.packet.evidence.map((item) => item.id),
+      })
+      generated = {
+        ...repaired,
+        inputTokens: addTokenCounts(generated.inputTokens, repaired.inputTokens),
+        outputTokens: addTokenCounts(generated.outputTokens, repaired.outputTokens),
+      }
+      validated = validateAskHealthAnswer(repaired.text, input.packet.evidence)
+    } catch (error) {
+      await settleFailure(input.gate, decision.usageId, error, now)
+      const code = classifyGeminiError(error)
+      console.error(`ask-health failure stage=repair code=${code} model=${input.model}`)
+      throw new HttpError(502, FAILURE, undefined, `ASK_HEALTH_${code}`)
+    }
+  }
   await settleComplete(input.gate, decision.usageId, generated, now)
   if (!validated.ok) {
     console.error(`ask-health failure stage=validation reason=${validated.error} model=${generated.model}`)
@@ -177,6 +199,13 @@ export async function explainAskHealth(input: {
     model: generated.model,
     cached: false,
   })
+}
+
+function addTokenCounts(left: number | null, right: number | null): number | null {
+  if (left == null && right == null) {
+    return null
+  }
+  return (left ?? 0) + (right ?? 0)
 }
 
 async function settleComplete(

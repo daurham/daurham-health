@@ -3,8 +3,9 @@
 ## 2026-10-05 maintenance
 
 - General Ask Health cross-domain synthesis was hardened for questions combining body, nutrition, and training evidence.
-- The Gemini structured-output schema now uses only supported JSON Schema keywords; local validation still enforces answer limits.
-- Ask Health prompt version is `ask-health-v2`.
+- Ask Health now uses a smaller structured-output contract, retries JSON mode if Gemini rejects the schema, and tolerates harmless response-shape differences without accepting fabricated evidence refs.
+- Personal claims stay evidence-grounded, while established general health/physiology context can be used as clearly qualified possibilities.
+- Ask Health prompt version is `ask-health-v3`.
 - No migration or environment-variable change is required.
 
 Snapshot recorded 2026-09-30 after **V2-H4 — Experience System**.
