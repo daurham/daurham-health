@@ -39,7 +39,7 @@ function askHealthResponseSchema(evidenceIds: string[]): Record<string, unknown>
     type: 'object',
     additionalProperties: false,
     properties: {
-      text: { type: 'string', maxLength: ASK_BLOCK_TEXT_MAX },
+      text: { type: 'string', description: `Concise evidence-grounded explanation. Keep under ${ASK_BLOCK_TEXT_MAX} characters.` },
       evidence_refs: {
         type: 'array',
         minItems: 1,
@@ -52,7 +52,7 @@ function askHealthResponseSchema(evidenceIds: string[]): Record<string, unknown>
     type: 'object',
     additionalProperties: false,
     properties: {
-      text: { type: 'string', maxLength: ASK_BLOCK_TEXT_MAX },
+      text: { type: 'string', description: `Concise limitation or uncertainty. Keep under ${ASK_BLOCK_TEXT_MAX} characters.` },
       evidence_refs: {
         type: 'array',
         items: evidenceRef,
@@ -78,7 +78,7 @@ function askHealthResponseSchema(evidenceIds: string[]): Record<string, unknown>
       follow_ups: {
         type: 'array',
         maxItems: 3,
-        items: { type: 'string', maxLength: 160 },
+        items: { type: 'string', description: 'Short optional follow-up question, under 160 characters.' },
       },
     },
     required: ['blocks', 'limitations', 'follow_ups'],
