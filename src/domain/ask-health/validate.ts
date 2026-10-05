@@ -41,8 +41,8 @@ function parseProviderJson(raw: string): unknown {
     return null
   }
   const unfenced = trimmed
-    .replace(/^\`\`\`(?:json)?\s*/i, '')
-    .replace(/\s*\`\`\`$/i, '')
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```$/i, '')
     .trim()
 
   for (const candidate of [unfenced, jsonObjectSlice(unfenced)]) {
