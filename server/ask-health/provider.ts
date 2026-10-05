@@ -1,7 +1,7 @@
 import { ASK_BLOCK_MAX, ASK_BLOCK_TEXT_MAX } from '../../src/domain/ask-health/config.js'
 import { GEMINI_NUTRITION_MODEL_DEFAULT } from '../../src/domain/nutrition/interpret.js'
 import { getGeminiConfig } from '../integrations/gemini/config.js'
-import { generateWithGemini } from '../integrations/gemini/client.js'
+import { classifyGeminiError, generateWithGemini } from '../integrations/gemini/client.js'
 
 export function askHealthModel(env: NodeJS.ProcessEnv = process.env): string {
   return env.AI_ASK_HEALTH_MODEL?.trim() || env.GEMINI_NUTRITION_MODEL?.trim() || GEMINI_NUTRITION_MODEL_DEFAULT
@@ -14,13 +14,26 @@ export async function askHealthGemini(input: { system: string; user: string; mod
   outputTokens: number | null
 }> {
   const config = await getGeminiConfig()
-  const result = await generateWithGemini(config, {
+  const request = {
     model: input.model,
     prompt: `${input.system}\n\n${input.user}`,
     timeoutMs: 30_000,
     maxOutputTokens: 1200,
-    responseJsonSchema: askHealthResponseSchema(input.evidenceIds),
-  })
+  }
+  let result
+  try {
+    result = await generateWithGemini(config, {
+      ...request,
+      responseJsonSchema: askHealthResponseSchema(),
+    })
+  } catch (error) {
+    if (classifyGeminiError(error) !== 'GEMINI_SCHEMA') {
+      throw error
+    }
+    // Keep Ask Health usable if Gemini rejects a structured-output schema.
+    // JSON mode plus local validation is a safer fallback than failing the whole question.
+    result = await generateWithGemini(config, request)
+  }
   return {
     text: result.text,
     model: result.model,
@@ -30,10 +43,10 @@ export async function askHealthGemini(input: { system: string; user: string; mod
 }
 
 
-function askHealthResponseSchema(evidenceIds: string[]): Record<string, unknown> {
+function askHealthResponseSchema(): Record<string, unknown> {
   const evidenceRef = {
     type: 'string',
-    enum: evidenceIds,
+    description: 'Use an evidence id exactly as it appears in EVIDENCE. Leave the array empty for general health context that is not a claim about the owner.',
   }
   const factualBlock = {
     type: 'object',
