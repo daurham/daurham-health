@@ -141,6 +141,7 @@ describe('nutrition daily UX source', () => {
     expect(page).toContain('onDismiss')
     expect(page).toContain('onLogAgainToday={panel.entry.logDate !== today ? logAgainToday : undefined}')
     expect(page).toContain("sourceKind: 'manual'")
+    expect(page).toContain('resource.invalidate(today)')
     expect(panels).toContain('Log again today')
     expect(panels).toContain('Copies this saved serving amount and nutrition snapshot to today.')
     expect(panels).toContain('const [quantityText, setQuantityText] = useState(String(quantity))')

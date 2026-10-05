@@ -313,6 +313,7 @@ export function NutritionPage() {
       notes: entry.notes,
       sourceKind: 'manual',
     })
+    resource.invalidate(today)
     setPanel(null)
     setNotice(`${entry.foodName} logged again for today.`)
   }

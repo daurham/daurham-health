@@ -121,5 +121,7 @@ describe('atomic keyed-resource transition', () => {
     expect(cache.has(SEP_19)).toBe(false)
     expect(cache.get(SEP_20)?.calories).toBe(2)
     expect(cache.get(SEP_21)?.calories).toBe(3)
+    cache.delete(SEP_20)
+    expect(cache.has(SEP_20)).toBe(false)
   })
 })

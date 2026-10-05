@@ -144,6 +144,7 @@ export function useAtomicKeyedResource<K, T>(options: {
   pendingVisible: boolean
   error: { key: K; message: string } | null
   retry: () => void
+  invalidate: (key: K) => void
   replaceData: (updater: (current: T) => T) => void
 } {
   const { requestedKey, load, prefetchKeys, indicatorDelayMs = 150 } = options
@@ -166,6 +167,10 @@ export function useAtomicKeyedResource<K, T>(options: {
       }
       return next
     })
+  }, [])
+
+  const invalidate = useCallback((key: K) => {
+    cacheRef.current.delete(key)
   }, [])
 
   useEffect(() => {
@@ -264,6 +269,7 @@ export function useAtomicKeyedResource<K, T>(options: {
     pendingVisible,
     error: state.error,
     retry: () => setRetryNonce((value) => value + 1),
+    invalidate,
     replaceData,
   }
 }
