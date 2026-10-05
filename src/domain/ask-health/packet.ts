@@ -16,7 +16,7 @@ type PushItem = Omit<AskEvidence, 'period'> & { period?: AskEvidence['period']; 
 type Draft = AskEvidence & { priority: number }
 
 const BODY_TERMS: Array<{ pattern: RegExp; key: string }> = [
-  { pattern: /\bbody[\s-]?fat\b/i, key: 'body_fat_percentage' },
+  { pattern: /\bbody[\s-]?fat\b|\bbodyfat\b|\bfat\s*%|\bbf\s*%/i, key: 'body_fat_percentage' },
   { pattern: /\bwaist\b/i, key: 'waist' },
   { pattern: /\bweight\b|\bweigh\b/i, key: 'weight' },
 ]
@@ -224,25 +224,77 @@ function addBody(
     return
   }
   for (const metric of body.metrics) {
-    if (metric.key === 'weight' || !keys.has(metric.key) && !matchedMetric(metric.key, keys)) {
+    if (metric.key === 'weight' || (!keys.has(metric.key) && !matchedMetric(metric.key, keys))) {
       continue
     }
     if (!metric.latest || metric.latest.calendarDate > input.asOf) {
       continue
     }
+    const label = bodyMetricLabel(metric.key)
     push({
       id: `body.${metric.key}.latest`,
       domain: 'body',
-      label: metric.key,
+      label,
       value: metric.latest.value,
       unit: metric.latest.unit,
-      text: `Latest ${metric.key} on ${metric.latest.calendarDate}.`,
+      text: `Latest ${label.toLowerCase()} on ${metric.latest.calendarDate}.`,
       coverage: null,
       detailPath: '/progress/body',
       userEntered: false,
       substantive: true,
-      priority: 3,
+      priority: 1,
     })
+    const comparison = metric.comparison
+    if (comparison.status === 'available') {
+      const start = comparison.value.periodStartNearest
+      const end = comparison.value.periodEndNearest
+      const periodChange = start && end && start.calendarDate !== end.calendarDate ? end.value - start.value : comparison.value.change
+      push({
+        id: `body.${metric.key}.change`,
+        domain: 'body',
+        label: `${label} change`,
+        value: periodChange,
+        unit: comparison.value.unit,
+        text:
+          start && end && start.calendarDate !== end.calendarDate
+            ? `Change from the measurement nearest the selected range start on ${start.calendarDate} to the measurement nearest the range end on ${end.calendarDate}. Positive means the later measurement is higher.`
+            : `Change from the previous comparable measurement on ${comparison.value.previous?.calendarDate ?? 'unknown'} to the latest measurement on ${comparison.value.current?.calendarDate ?? metric.latest.calendarDate}. Positive means the latest measurement is higher.`,
+        coverage: {
+          observations: comparison.observations,
+          startDate: start?.calendarDate ?? comparison.value.previous?.calendarDate ?? null,
+          startValue: start?.value ?? comparison.value.previous?.value ?? null,
+          endDate: end?.calendarDate ?? comparison.value.current?.calendarDate ?? null,
+          endValue: end?.value ?? comparison.value.current?.value ?? null,
+          valueKind: metric.latest.valueKind,
+        },
+        detailPath: '/progress/body',
+        userEntered: false,
+        substantive: true,
+        priority: 1,
+      })
+    } else if (comparison.status === 'insufficient_data') {
+      push({
+        id: `body.${metric.key}.change`,
+        domain: 'body',
+        label: `${label} change`,
+        value: null,
+        unit: metric.latest.unit,
+        text: `Health does not have enough comparable ${label.toLowerCase()} measurements to confirm a change.`,
+        coverage: {
+          observations: comparison.observations,
+          required: comparison.required ?? 2,
+        },
+        detailPath: '/progress/body',
+        userEntered: false,
+        substantive: comparison.observations > 0,
+        priority: 1,
+      })
+      limitations.push({
+        code: `body_${metric.key}_insufficient_comparison`,
+        text: `${label} needs at least ${comparison.required ?? 2} comparable measurements to confirm whether it changed.`,
+        evidenceId: `body.${metric.key}.change`,
+      })
+    }
   }
 }
 
@@ -255,6 +307,17 @@ function matchedMetric(key: string, keys: ReadonlySet<string>): boolean {
     return true
   }
   return key.includes('waist') && keys.has('waist')
+}
+
+function bodyMetricLabel(key: string): string {
+  if (key === 'body_fat_percentage') {
+    return 'Body fat percentage'
+  }
+  return key
+    .split('_')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
 }
 
 function addNutrition(input: AskHealthPacketInput, push: (item: PushItem) => void, limitations: AskLimitation[]) {
@@ -287,6 +350,28 @@ function addNutrition(input: AskHealthPacketInput, push: (item: PushItem) => voi
     })
   }
   addNutrient(push, 'nutrition.calories', 'Average calories on logged days', nutrition.calories.averageOnLoggedDays, 'kcal', nutrition.calories.observedDays)
+  const calorieTarget = nutrition.calories.targetContext
+  if (calorieTarget) {
+    const difference = calorieTarget.averageDifference
+    const roundedDifference = Math.round(Math.abs(difference))
+    const relation = difference < 0 ? `${roundedDifference} kcal/day below` : difference > 0 ? `${roundedDifference} kcal/day above` : 'at'
+    push({
+      id: 'nutrition.calories_vs_target',
+      domain: 'nutrition',
+      label: 'Calories vs configured target',
+      value: difference,
+      unit: 'kcal/day',
+      text: `Across ${calorieTarget.daysWithTarget} logged days with a configured calorie target, logged intake averaged ${relation} that target. This compares intake with the configured target; it does not measure total energy expenditure or prove a physiological energy deficit.`,
+      coverage: {
+        daysWithTarget: calorieTarget.daysWithTarget,
+        averageDifference: difference,
+      },
+      detailPath: '/nutrition',
+      userEntered: false,
+      substantive: true,
+      priority: 1,
+    })
+  }
   addNutrient(push, 'nutrition.protein', 'Average protein on logged days', nutrition.protein.averageOnObservedDays, 'g', nutrition.protein.observedDays)
   addNutrient(push, 'nutrition.carbs', 'Average carbs on logged days', nutrition.carbs.averageOnObservedDays, 'g', nutrition.carbs.observedDays)
   addNutrient(push, 'nutrition.fat', 'Average fat on logged days', nutrition.fat.averageOnObservedDays, 'g', nutrition.fat.observedDays)
@@ -521,6 +606,25 @@ function addTraining(input: AskHealthPacketInput, push: (item: PushItem) => void
       substantive: count > 0,
       priority: 2,
     })
+    if (training.consistency.status === 'available') {
+      push({
+        id: 'training.frequency',
+        domain: 'training',
+        label: 'Training frequency',
+        value: training.consistency.value.workoutsPerWeek,
+        unit: 'sessions/week',
+        text: 'Canonical Training frequency calculated across the selected range.',
+        coverage: {
+          workouts: training.consistency.value.workoutCount,
+          uniqueDates: training.consistency.value.uniqueDates,
+          medianGapDays: training.consistency.value.medianGapDays,
+        },
+        detailPath: '/progress/strength',
+        userEntered: false,
+        substantive: training.consistency.value.workoutCount > 0,
+        priority: 2,
+      })
+    }
   }
   if (!detail) {
     return

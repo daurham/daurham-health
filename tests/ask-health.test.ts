@@ -22,7 +22,7 @@ import {
 import { buildProgressOverview } from '../src/domain/progress/overview.ts'
 import { buildSleepProgressView } from '../src/domain/sleep/progress-view.ts'
 import type { SleepNightlySummary } from '../src/domain/sleep/summarize.ts'
-import type { NutritionEntry } from '../src/domain/nutrition/types.ts'
+import type { NutritionEntry, NutritionTarget } from '../src/domain/nutrition/types.ts'
 import type { BodyObservation } from '../src/domain/progress/types.ts'
 import { EVERY_DAY_MASK } from '../src/domain/supplements/weekday.ts'
 import { AppSurfaceProvider } from '../src/lib/app-prefix.ts'
@@ -93,6 +93,35 @@ function weight(date: string, value: number): BodyObservation {
     measuredAt: `${date}T15:00:00.000Z`,
     timezone: 'America/Phoenix',
     calendarDate: date,
+  }
+}
+
+function bodyMetric(date: string, key: string, value: number, unit: string): BodyObservation {
+  return {
+    measurementId: `${key}-${date}`,
+    measurementSessionId: `${key}-${date}`,
+    key,
+    value,
+    unit,
+    valueKind: 'measurement',
+    measuredAt: `${date}T15:00:00.000Z`,
+    timezone: 'America/Phoenix',
+    calendarDate: date,
+  }
+}
+
+function nutritionTarget(effectiveFrom: string, caloriesTarget: number): NutritionTarget {
+  return {
+    id: `target-${effectiveFrom}`,
+    effectiveFrom,
+    caloriesTarget,
+    proteinTarget: 150,
+    carbsTarget: null,
+    fatTarget: null,
+    fiberTarget: null,
+    sodiumTarget: null,
+    createdAt: `${effectiveFrom}T07:00:00.000Z`,
+    updatedAt: `${effectiveFrom}T07:00:00.000Z`,
   }
 }
 
@@ -229,6 +258,40 @@ describe('ask health evidence', () => {
     const coverage = packet.evidence.find((item) => item.id === 'nutrition.coverage')
     expect(coverage?.coverage).toMatchObject({ loggedDays: 1, calendarDays: 30 })
     expect(packet.evidence.find((item) => item.id === 'body.weight.trend')?.value).toBeNull()
+  })
+
+  it('supplies cross-domain evidence for a general weight, body-fat, deficit, and training question', () => {
+    const overview = buildProgressOverview({
+      asOf: '2026-09-15',
+      range: '30d',
+      exercises: [],
+      workouts: [
+        { sessionId: 's1', sessionDate: '2026-09-01', createdAt: '2026-09-01T15:00:00.000Z' },
+        { sessionId: 's2', sessionDate: '2026-09-05', createdAt: '2026-09-05T15:00:00.000Z' },
+        { sessionId: 's3', sessionDate: '2026-09-09', createdAt: '2026-09-09T15:00:00.000Z' },
+        { sessionId: 's4', sessionDate: '2026-09-13', createdAt: '2026-09-13T15:00:00.000Z' },
+      ],
+      sets: [],
+      bodyObservations: [
+        weight('2026-09-01', 80),
+        weight('2026-09-15', 81),
+        bodyMetric('2026-09-01', 'body_fat_percentage', 20, '%'),
+        bodyMetric('2026-09-15', 'body_fat_percentage', 21, '%'),
+      ],
+      nutritionEntries: [entry('2026-09-10', 1800), entry('2026-09-11', 1900)],
+      nutritionTargets: [nutritionTarget('2026-08-01', 2000)],
+    })
+    const question = "My body weight and fat% is increasing and I've been eating at a deficit and working out for 3 weeks. Why?"
+    const packet = buildAskHealthEvidencePacket(packetInput({ overview, question }))
+
+    expect(packet.evidence.find((item) => item.id === 'body.body_fat_percentage.latest')?.value).toBe(21)
+    expect(packet.evidence.find((item) => item.id === 'body.body_fat_percentage.change')?.value).toBe(1)
+    expect(packet.evidence.find((item) => item.id === 'nutrition.calories_vs_target')?.value).toBe(-150)
+    expect(packet.evidence.find((item) => item.id === 'nutrition.calories_vs_target')?.text).toContain('does not measure total energy expenditure')
+    expect(packet.evidence.find((item) => item.id === 'training.sessions')?.value).toBe(4)
+    expect(packet.evidence.find((item) => item.id === 'training.frequency')?.value).toBeCloseTo(4 * 7 / 30)
+    expect(ASK_HEALTH_SYSTEM_PROMPT).toContain('cross-domain')
+    expect(ASK_HEALTH_SYSTEM_PROMPT).toContain('not a direct measurement of total energy expenditure')
   })
 
   it('keeps provisional activity out of the completed-day average', () => {
@@ -399,6 +462,35 @@ describe('ask health evidence', () => {
       packet.evidence,
     )
     expect(literature.ok).toBe(false)
+  })
+
+  it('accepts a concise structured answer that exceeds the old 4000-character envelope', () => {
+    const packet = buildAskHealthEvidencePacket(
+      packetInput({
+        goals: [
+          {
+            id: 'goal-1',
+            kind: 'body_metric',
+            lifecycle: 'active',
+            label: 'Weight',
+            targetText: '≥ 175 lb',
+            targetState: 'below_target',
+            deadlineState: 'none',
+            projectionState: 'insufficient_data',
+            projectionReason: null,
+          },
+        ],
+      }),
+    )
+    const text = 'Evidence-grounded explanation. '.repeat(22)
+    const raw = JSON.stringify({
+      blocks: Array.from({ length: 6 }, () => ({ text, evidence_refs: ['goals.goal-1'] })),
+      limitations: [],
+      follow_ups: [],
+    })
+    expect(raw.length).toBeGreaterThan(4000)
+    expect(validateAskHealthAnswer(raw, packet.evidence).ok).toBe(true)
+    expect(readFileSync('server/ask-health/provider.ts', 'utf8')).not.toContain('maxLength')
   })
 
   it('bounds conversation history', () => {
