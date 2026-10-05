@@ -246,17 +246,26 @@ function addBody(
     })
     const comparison = metric.comparison
     if (comparison.status === 'available') {
+      const start = comparison.value.periodStartNearest
+      const end = comparison.value.periodEndNearest
+      const periodChange = start && end && start.calendarDate !== end.calendarDate ? end.value - start.value : comparison.value.change
       push({
         id: `body.${metric.key}.change`,
         domain: 'body',
         label: `${label} change`,
-        value: comparison.value.change,
+        value: periodChange,
         unit: comparison.value.unit,
-        text: `Change from the previous comparable measurement on ${comparison.value.previous?.calendarDate ?? 'unknown'} to the latest measurement on ${comparison.value.current?.calendarDate ?? metric.latest.calendarDate}. Positive means the latest measurement is higher.`,
+        text:
+          start && end && start.calendarDate !== end.calendarDate
+            ? `Change from the measurement nearest the selected range start on ${start.calendarDate} to the measurement nearest the range end on ${end.calendarDate}. Positive means the later measurement is higher.`
+            : `Change from the previous comparable measurement on ${comparison.value.previous?.calendarDate ?? 'unknown'} to the latest measurement on ${comparison.value.current?.calendarDate ?? metric.latest.calendarDate}. Positive means the latest measurement is higher.`,
         coverage: {
           observations: comparison.observations,
-          previousValue: comparison.value.previous?.value ?? null,
-          currentValue: comparison.value.current?.value ?? null,
+          startDate: start?.calendarDate ?? comparison.value.previous?.calendarDate ?? null,
+          startValue: start?.value ?? comparison.value.previous?.value ?? null,
+          endDate: end?.calendarDate ?? comparison.value.current?.calendarDate ?? null,
+          endValue: end?.value ?? comparison.value.current?.value ?? null,
+          valueKind: metric.latest.valueKind,
         },
         detailPath: '/progress/body',
         userEntered: false,
@@ -307,7 +316,7 @@ function bodyMetricLabel(key: string): string {
   return key
     .split('_')
     .filter(Boolean)
-    .map((part) => part[0]?.toUpperCase() + part.slice(1))
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(' ')
 }
 
