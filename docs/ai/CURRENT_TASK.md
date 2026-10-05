@@ -1,5 +1,7 @@
 # Current task
 
+> 2026-10-05 maintenance note: General Ask Health cross-domain synthesis was fixed without changing the H5 owner-QA scope recorded below. No migration or environment-variable change is required.
+
 ## V2-H5 — Pantry + Exercise Library + Flexible Programmed Workouts
 
 ### Implementation status — owner visual QA pending
