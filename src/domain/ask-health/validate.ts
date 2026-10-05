@@ -1,27 +1,18 @@
 import { ASK_ANSWER_MAX_CHARS, ASK_BLOCK_MAX, ASK_BLOCK_TEXT_MAX } from './config.js'
 import type { AskEvidence, AskHealthAnswer } from './types.js'
 
-const ALLOWED_KEYS = new Set(['blocks', 'limitations', 'follow_ups'])
-
 export function validateAskHealthAnswer(
   raw: string,
   evidence: readonly AskEvidence[],
 ): { ok: true; answer: AskHealthAnswer } | { ok: false; error: string } {
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(raw)
-  } catch {
-    return { ok: false, error: 'provider response invalid' }
-  }
+  const parsed = parseProviderJson(raw)
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
     return { ok: false, error: 'provider response invalid' }
   }
+
   const record = parsed as Record<string, unknown>
-  if (Object.keys(record).some((key) => !ALLOWED_KEYS.has(key))) {
-    return { ok: false, error: 'provider response invalid' }
-  }
   const ids = new Set(evidence.map((item) => item.id))
-  const blocks = readBlocks(record.blocks, ids, true)
+  const blocks = readBlocks(record.blocks ?? record.answer ?? record.text, ids, true)
   if (!blocks.ok) {
     return blocks
   }
@@ -29,20 +20,51 @@ export function validateAskHealthAnswer(
   if (!limitations.ok) {
     return limitations
   }
-  const followUps = readFollowUps(record.follow_ups ?? [])
+  const followUps = readFollowUps(record.follow_ups ?? record.followUps ?? [])
   if (!followUps.ok) {
     return followUps
   }
-  const answer: AskHealthAnswer = {
-    blocks: blocks.blocks,
-    limitations: limitations.blocks,
-    followUps: followUps.values,
+
+  return {
+    ok: true,
+    answer: fitAnswerSize({
+      blocks: blocks.blocks,
+      limitations: limitations.blocks,
+      followUps: followUps.values,
+    }),
   }
-  const size = JSON.stringify(answer).length
-  if (size > ASK_ANSWER_MAX_CHARS) {
-    return { ok: false, error: 'provider response invalid' }
+}
+
+function parseProviderJson(raw: string): unknown {
+  const trimmed = raw.trim()
+  if (!trimmed) {
+    return null
   }
-  return { ok: true, answer }
+  const unfenced = trimmed
+    .replace(/^\`\`\`(?:json)?\s*/i, '')
+    .replace(/\s*\`\`\`$/i, '')
+    .trim()
+
+  for (const candidate of [unfenced, jsonObjectSlice(unfenced)]) {
+    if (!candidate) {
+      continue
+    }
+    try {
+      return JSON.parse(candidate) as unknown
+    } catch {
+      // Try the next representation.
+    }
+  }
+  return null
+}
+
+function jsonObjectSlice(value: string): string | null {
+  const start = value.indexOf('{')
+  const end = value.lastIndexOf('}')
+  if (start < 0 || end <= start) {
+    return null
+  }
+  return value.slice(start, end + 1)
 }
 
 function readBlocks(
@@ -50,46 +72,106 @@ function readBlocks(
   ids: ReadonlySet<string>,
   required: boolean,
 ): { ok: true; blocks: AskHealthAnswer['blocks'] } | { ok: false; error: string } {
-  if (!Array.isArray(value) || value.length > ASK_BLOCK_MAX || (required && value.length === 0)) {
-    return { ok: false, error: 'provider response invalid' }
+  const source = typeof value === 'string' ? [value] : value
+  if (!Array.isArray(source)) {
+    return required ? { ok: false, error: 'provider response invalid' } : { ok: true, blocks: [] }
   }
+
   const blocks: AskHealthAnswer['blocks'] = []
-  for (const item of value) {
-    if (!item || typeof item !== 'object' || Array.isArray(item)) {
-      return { ok: false, error: 'provider response invalid' }
+  for (const item of source.slice(0, ASK_BLOCK_MAX)) {
+    const normalized = readBlock(item, ids)
+    if (normalized) {
+      blocks.push(normalized)
     }
-    const record = item as Record<string, unknown>
-    if (typeof record.text !== 'string' || record.text.trim().length === 0 || record.text.length > ASK_BLOCK_TEXT_MAX) {
-      return { ok: false, error: 'provider response invalid' }
-    }
-    if (!Array.isArray(record.evidence_refs)) {
-      return { ok: false, error: 'provider response invalid' }
-    }
-    const refs = record.evidence_refs.filter((ref): ref is string => typeof ref === 'string' && ref.length > 0)
-    if (refs.length !== record.evidence_refs.length) {
-      return { ok: false, error: 'provider response invalid' }
-    }
-    if (required && refs.length === 0) {
-      return { ok: false, error: 'provider response invalid' }
-    }
-    if (refs.some((ref) => !ids.has(ref) || ref.startsWith('literature.') || ref.startsWith('doi.'))) {
-      return { ok: false, error: 'provider response invalid' }
-    }
-    blocks.push({ text: record.text.trim(), evidenceRefs: refs })
+  }
+
+  if (required && blocks.length === 0) {
+    return { ok: false, error: 'provider response invalid' }
   }
   return { ok: true, blocks }
 }
 
+function readBlock(item: unknown, ids: ReadonlySet<string>): AskHealthAnswer['blocks'][number] | null {
+  if (typeof item === 'string') {
+    const text = normalizeText(item, ASK_BLOCK_TEXT_MAX)
+    return text ? { text, evidenceRefs: [] } : null
+  }
+  if (!item || typeof item !== 'object' || Array.isArray(item)) {
+    return null
+  }
+
+  const record = item as Record<string, unknown>
+  const rawText =
+    typeof record.text === 'string'
+      ? record.text
+      : typeof record.content === 'string'
+        ? record.content
+        : typeof record.answer === 'string'
+          ? record.answer
+          : ''
+  const text = normalizeText(rawText, ASK_BLOCK_TEXT_MAX)
+  if (!text) {
+    return null
+  }
+
+  const rawRefs = Array.isArray(record.evidence_refs)
+    ? record.evidence_refs
+    : Array.isArray(record.evidenceRefs)
+      ? record.evidenceRefs
+      : []
+  const evidenceRefs = [...new Set(rawRefs.filter((ref): ref is string => typeof ref === 'string' && ids.has(ref)))]
+  return { text, evidenceRefs }
+}
+
 function readFollowUps(value: unknown): { ok: true; values: string[] } | { ok: false; error: string } {
-  if (!Array.isArray(value) || value.length > 3) {
-    return { ok: false, error: 'provider response invalid' }
+  if (value == null) {
+    return { ok: true, values: [] }
   }
-  const values: string[] = []
-  for (const item of value) {
-    if (typeof item !== 'string' || item.trim().length === 0 || item.length > 160) {
-      return { ok: false, error: 'provider response invalid' }
-    }
-    values.push(item.trim())
+  const source = typeof value === 'string' ? [value] : value
+  if (!Array.isArray(source)) {
+    return { ok: true, values: [] }
   }
+
+  const values = source
+    .filter((item): item is string => typeof item === 'string')
+    .map((item) => normalizeText(item, 160))
+    .filter((item): item is string => Boolean(item))
+    .slice(0, 3)
   return { ok: true, values }
+}
+
+function normalizeText(value: string, max: number): string | null {
+  const trimmed = value.trim()
+  if (!trimmed) {
+    return null
+  }
+  if (trimmed.length <= max) {
+    return trimmed
+  }
+  return trimmed.slice(0, Math.max(1, max - 1)).trimEnd() + '…'
+}
+
+function fitAnswerSize(answer: AskHealthAnswer): AskHealthAnswer {
+  const next: AskHealthAnswer = {
+    blocks: [...answer.blocks],
+    limitations: [...answer.limitations],
+    followUps: [...answer.followUps],
+  }
+
+  while (JSON.stringify(next).length > ASK_ANSWER_MAX_CHARS && next.followUps.length > 0) {
+    next.followUps.pop()
+  }
+  while (JSON.stringify(next).length > ASK_ANSWER_MAX_CHARS && next.limitations.length > 0) {
+    next.limitations.pop()
+  }
+  while (JSON.stringify(next).length > ASK_ANSWER_MAX_CHARS && next.blocks.length > 1) {
+    next.blocks.pop()
+  }
+  if (JSON.stringify(next).length > ASK_ANSWER_MAX_CHARS && next.blocks[0]) {
+    next.blocks[0] = {
+      ...next.blocks[0],
+      text: normalizeText(next.blocks[0].text, Math.max(120, ASK_ANSWER_MAX_CHARS / 2)) ?? next.blocks[0].text,
+    }
+  }
+  return next
 }
