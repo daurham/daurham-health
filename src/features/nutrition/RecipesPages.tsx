@@ -10,8 +10,7 @@ import {
   type RecipeAssistDraft,
 } from '@/domain/nutrition/recipe-assist'
 import { composeRecipe, supportedDisplayUnits, type RecipeFoodBasis } from '@/domain/nutrition/recipes'
-import { healthCalendarDateFromNow } from '@/domain/time'
-import { LoadErrorNotice, primaryButtonClass, secondaryButtonClass } from '@/lib'
+import { LoadErrorNotice, primaryButtonClass, secondaryButtonClass, useHealthCalendarDate } from '@/lib'
 import { patchNutritionFood } from './api'
 import { parseNutritionDateParam } from './date'
 import { formatNumber } from './format'
@@ -309,6 +308,7 @@ type UnresolvedLine = {
 type DraftLine = ResolvedLine | UnresolvedLine
 
 export function NewRecipePage() {
+  const today = useHealthCalendarDate()
   const navigate = useNavigate()
   const [name, setName] = useState('')
   const [notes, setNotes] = useState('')
@@ -554,7 +554,7 @@ export function NewRecipePage() {
       ) : null}
       {flow?.kind === 'label' ? (
         <LabelCaptureSheet
-          date={healthCalendarDateFromNow()}
+          date={today}
           purpose="recipe"
           onClose={() => setFlow({ kind: 'sources', lineKey: flow.lineKey })}
           onBack={() => setFlow({ kind: 'sources', lineKey: flow.lineKey })}
@@ -567,6 +567,7 @@ export function NewRecipePage() {
 }
 
 export function RecipeDetailPage() {
+  const today = useHealthCalendarDate()
   const { recipeId = '' } = useParams()
   const [recipe, setRecipe] = useState<RecipeDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -606,7 +607,7 @@ export function RecipeDetailPage() {
   if (logging) {
     return (
       <RecipePortionSheet
-        date={parseNutritionDateParam(searchParams.get('date'))}
+        date={parseNutritionDateParam(searchParams.get('date'), today)}
         recipe={loggableFrom(recipe)}
         title={version.isCurrent ? `Log ${version.name}` : `Log ${version.name} · v${version.version}`}
         onClose={() => setLogging(false)}
@@ -704,6 +705,7 @@ export function RecipeDetailPage() {
 }
 
 export function RecipeVersionPage() {
+  const today = useHealthCalendarDate()
   const { recipeId = '', version: versionParam = '' } = useParams()
   const [searchParams] = useSearchParams()
   const [recipe, setRecipe] = useState<RecipeDetail | null>(null)
@@ -728,7 +730,7 @@ export function RecipeVersionPage() {
   if (logging) {
     return (
       <RecipePortionSheet
-        date={parseNutritionDateParam(searchParams.get('date'))}
+        date={parseNutritionDateParam(searchParams.get('date'), today)}
         recipe={loggableFrom(recipe)}
         title={`Log ${version.name} · v${version.version}`}
         onClose={() => setLogging(false)}
@@ -780,6 +782,7 @@ export function RecipeVersionPage() {
 type EditLine = { key: string; foodId: string | null; name: string; amount: string; unit: string }
 
 export function RecipeEditPage() {
+  const today = useHealthCalendarDate()
   const { recipeId = '' } = useParams()
   const navigate = useNavigate()
   const [recipe, setRecipe] = useState<RecipeDetail | null>(null)
@@ -972,7 +975,7 @@ export function RecipeEditPage() {
       ) : null}
       {flow === 'label' ? (
         <LabelCaptureSheet
-          date={healthCalendarDateFromNow()}
+          date={today}
           purpose="recipe"
           onClose={() => setFlow('sources')}
           onBack={() => setFlow('sources')}
