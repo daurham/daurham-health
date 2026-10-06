@@ -10,6 +10,7 @@ import {
 } from '../../src/domain/sleep/index.js'
 import { APPLE_HEALTH_SOURCE_SQL } from '../apple-health/queries.js'
 import { getSql } from '../db.js'
+import { getInstanceConfig } from '../instance-config.js'
 import {
   DELETE_SLEEP_NIGHTS_SQL,
   listSleepIntervals,
@@ -23,10 +24,11 @@ export async function resolveAppleHealthSourceId(): Promise<string | null> {
   return rows[0]?.id ?? null
 }
 
-export async function materializeSleepNightlySummaries(): Promise<SleepNightlySummary[]> {
+export async function materializeSleepNightlySummaries(timezone?: string): Promise<SleepNightlySummary[]> {
+  const resolvedTimezone = timezone ?? (await getInstanceConfig()).calendarTimeZone
   const intervals = await listSleepIntervals()
-  const candidates = sleepNightCandidates(classifySleepIntervals(intervals))
-  return sleepNightlySummariesFromDecisions(arbitrateSleepNights(candidates))
+  const candidates = sleepNightCandidates(classifySleepIntervals(intervals), resolvedTimezone)
+  return sleepNightlySummariesFromDecisions(arbitrateSleepNights(candidates), resolvedTimezone)
 }
 
 export function nightlySemanticFingerprint(nights: readonly SleepNightlySummary[]): string {
@@ -38,7 +40,8 @@ export async function backfillSleepNightlySummaries(): Promise<{
   written: number
   sourceId: string | null
 }> {
-  const [nights, sourceId] = await Promise.all([materializeSleepNightlySummaries(), resolveAppleHealthSourceId()])
+  const timezone = (await getInstanceConfig()).calendarTimeZone
+  const [nights, sourceId] = await Promise.all([materializeSleepNightlySummaries(timezone), resolveAppleHealthSourceId()])
   const written = await upsertSleepNightlySummaries(nights, sourceId)
   return { nights, written, sourceId }
 }
@@ -47,7 +50,10 @@ export async function storedSleepNightlyFingerprint(): Promise<string> {
   return nightlySemanticFingerprint(await listSleepNightlySummaries())
 }
 
-export async function syncSleepNightlySummaries(provenanceSourceId: string | null): Promise<{
+export async function syncSleepNightlySummaries(
+  provenanceSourceId: string | null,
+  timezone?: string,
+): Promise<{
   nightsInserted: number
   nightsUpdated: number
   nightsUnchanged: number
@@ -55,8 +61,15 @@ export async function syncSleepNightlySummaries(provenanceSourceId: string | nul
   partialObservations: number
   inBedOnly: number
 }> {
-  const [intervals, stored] = await Promise.all([listSleepIntervals(), listSleepNightlySummaries()])
-  const derived = sleepNightlySummariesFromDecisions(arbitrateSleepNights(sleepNightCandidates(classifySleepIntervals(intervals))))
+  const resolvedTimezone = timezone ?? (await getInstanceConfig()).calendarTimeZone
+  const [intervals, stored] = await Promise.all([
+    listSleepIntervals(),
+    listSleepNightlySummaries(resolvedTimezone),
+  ])
+  const derived = sleepNightlySummariesFromDecisions(
+    arbitrateSleepNights(sleepNightCandidates(classifySleepIntervals(intervals), resolvedTimezone)),
+    resolvedTimezone,
+  )
   if (intervals.length > 0 && derived.length === 0) {
     throw new SleepMaterializationError('Sleep nightly materialization produced no nights')
   }
@@ -73,7 +86,7 @@ export async function syncSleepNightlySummaries(provenanceSourceId: string | nul
   }
   if (diff.removedDates.length > 0) {
     const sql = await getSql()
-    await sql.query(DELETE_SLEEP_NIGHTS_SQL, [derived[0]?.timezone ?? stored[0]?.timezone ?? 'America/Phoenix', diff.removedDates])
+    await sql.query(DELETE_SLEEP_NIGHTS_SQL, [resolvedTimezone, diff.removedDates])
   }
   return {
     nightsInserted: diff.nightsInserted,
