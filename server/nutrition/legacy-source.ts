@@ -9,6 +9,16 @@ import type {
   LegacyPackagedFood,
 } from '../../src/domain/nutrition/legacy.js'
 
+export type LegacyMealComboIngredient = {
+  id: number
+  name: string
+  quantity: number
+}
+
+export type LegacyMealComboDefinition = LegacyMealCombo & {
+  ingredients: LegacyMealComboIngredient[]
+}
+
 function asNumber(value: unknown): number | null {
   if (value == null || value === '') {
     return null
@@ -46,6 +56,56 @@ export async function getLegacyNutritionDatabaseUrl(): Promise<string> {
     )
   }
   return url
+}
+
+export async function loadLegacyMealCombo(id: number): Promise<LegacyMealComboDefinition | null> {
+  if (!Number.isInteger(id) || id <= 0) {
+    throw new HttpError(400, 'Legacy recipe id is invalid.')
+  }
+  const sql = neon(await getLegacyNutritionDatabaseUrl())
+  const rows = (await sql.query(
+    `SELECT
+       mc.id, mc.name, mc.meal_type, mc.calories, mc.protein, mc.carbs, mc.fat, mc.notes, mc.instructions,
+       COALESCE(
+         json_agg(
+           json_build_object('id', i.id, 'name', i.name, 'quantity', mci.quantity)
+           ORDER BY i.id
+         ) FILTER (WHERE i.id IS NOT NULL),
+         '[]'::json
+       ) AS ingredients
+     FROM meal_combos mc
+     LEFT JOIN meal_combo_ingredients mci ON mci.meal_combo_id = mc.id
+     LEFT JOIN ingredients i ON i.id = mci.ingredient_id
+     WHERE mc.id = $1
+     GROUP BY mc.id`,
+    [id],
+  )) as Array<Record<string, unknown>>
+  const row = rows[0]
+  if (!row) {
+    return null
+  }
+  const rawIngredients = Array.isArray(row.ingredients) ? row.ingredients : []
+  const ingredients = rawIngredients.flatMap((value): LegacyMealComboIngredient[] => {
+    const item = asRecord(value)
+    const ingredientId = asNumber(item?.id)
+    const quantity = asNumber(item?.quantity)
+    if (ingredientId == null || quantity == null || !(quantity > 0)) {
+      return []
+    }
+    return [{ id: ingredientId, name: String(item?.name ?? ''), quantity }]
+  })
+  return {
+    id: Number(row.id),
+    name: String(row.name ?? ''),
+    meal_type: row.meal_type == null ? null : String(row.meal_type),
+    calories: requireNumber(row.calories),
+    protein: requireNumber(row.protein),
+    carbs: requireNumber(row.carbs),
+    fat: requireNumber(row.fat),
+    notes: row.notes == null ? null : String(row.notes),
+    instructions: row.instructions == null ? null : String(row.instructions),
+    ingredients,
+  }
 }
 
 export async function loadLegacyNutritionDump(): Promise<LegacyNutritionDump> {

@@ -12,6 +12,7 @@ import {
 import { composeRecipe, supportedDisplayUnits, type RecipeFoodBasis } from '@/domain/nutrition/recipes'
 import { healthCalendarDateFromNow } from '@/domain/time'
 import { LoadErrorNotice, primaryButtonClass, secondaryButtonClass } from '@/lib'
+import { patchNutritionFood } from './api'
 import { parseNutritionDateParam } from './date'
 import { formatNumber } from './format'
 import { LabelCaptureSheet } from './LabelCapture'
@@ -21,14 +22,16 @@ import { RecipePortionSheet } from './RecipePortionSheet'
 import {
   archiveRecipe,
   commitRecipeVersion,
+  convertLegacyRecipe,
   createRecipe,
   fetchRecipe,
-  fetchRecipes,
+  fetchRecipeIndex,
   fetchRecipeVersion,
   previewRecipeChange,
   restoreRecipe,
+  type LegacyRecipeListItem,
   type RecipeDetail,
-  type RecipeListItem,
+  type RecipeIndex,
   type RecipePreview,
 } from './recipes-api'
 
@@ -107,14 +110,17 @@ function foodBasis(food: NutritionFood): RecipeFoodBasis {
 }
 
 export function RecipesPage() {
-  const [recipes, setRecipes] = useState<RecipeListItem[] | null>(null)
+  const navigate = useNavigate()
+  const [index, setIndex] = useState<RecipeIndex | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [busyLegacyId, setBusyLegacyId] = useState<string | null>(null)
+  const [showHiddenLegacy, setShowHiddenLegacy] = useState(false)
 
   useEffect(() => {
     let active = true
-    fetchRecipes()
+    fetchRecipeIndex()
       .then((next) => {
-        if (active) setRecipes(next)
+        if (active) setIndex(next)
       })
       .catch((caught: unknown) => {
         if (active) setError(caught instanceof Error ? caught.message : 'Could not load recipes')
@@ -123,6 +129,54 @@ export function RecipesPage() {
       active = false
     }
   }, [])
+
+  const legacyRecipes = index?.legacyRecipes ?? []
+  const hiddenLegacyCount = legacyRecipes.filter((recipe) => recipe.archived).length
+  const visibleLegacyRecipes = showHiddenLegacy ? legacyRecipes : legacyRecipes.filter((recipe) => !recipe.archived)
+
+  async function changeLegacyVisibility(recipe: LegacyRecipeListItem, archived: boolean) {
+    if (busyLegacyId) return
+    if (
+      archived &&
+      !window.confirm(
+        `Hide "${recipe.name}"? It will stop appearing in Add Food and Recent. Historical logs will stay unchanged.`,
+      )
+    ) {
+      return
+    }
+    setBusyLegacyId(recipe.id)
+    setError(null)
+    try {
+      const updated = await patchNutritionFood(recipe.id, { archived })
+      setIndex((current) =>
+        current
+          ? {
+              ...current,
+              legacyRecipes: current.legacyRecipes.map((item) =>
+                item.id === recipe.id ? { ...item, archived: updated.archived } : item,
+              ),
+            }
+          : current,
+      )
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Could not update the legacy recipe')
+    } finally {
+      setBusyLegacyId(null)
+    }
+  }
+
+  async function convertLegacy(recipe: LegacyRecipeListItem) {
+    if (busyLegacyId) return
+    setBusyLegacyId(recipe.id)
+    setError(null)
+    try {
+      const converted = await convertLegacyRecipe(recipe.id)
+      void navigate(`/nutrition/recipes/${converted.recipe.id}`)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Could not convert the legacy recipe')
+      setBusyLegacyId(null)
+    }
+  }
 
   return (
     <section className="w-full min-w-0 space-y-4">
@@ -140,10 +194,10 @@ export function RecipesPage() {
         </Link>
       </div>
       {error ? <LoadErrorNotice message={error} /> : null}
-      {recipes == null && !error ? <p className="text-sm text-zinc-600">Loading recipes…</p> : null}
-      {recipes?.length === 0 ? <p className="text-sm text-zinc-600">No active recipes yet.</p> : null}
+      {index == null && !error ? <p className="text-sm text-zinc-600">Loading recipes…</p> : null}
+      {index?.recipes.length === 0 ? <p className="text-sm text-zinc-600">No active recipes yet.</p> : null}
       <ul className="space-y-2">
-        {recipes?.map((recipe) => (
+        {index?.recipes.map((recipe) => (
           <li key={recipe.id}>
             <Link to={`/nutrition/recipes/${recipe.id}`} className="block rounded-xl border border-zinc-200 bg-white px-4 py-3">
               <p className="font-medium">{recipe.name}</p>
@@ -156,6 +210,79 @@ export function RecipesPage() {
           </li>
         ))}
       </ul>
+
+      {legacyRecipes.length > 0 ? (
+        <section id="legacy-recipes" className="space-y-3 rounded-xl border border-amber-200 bg-amber-50/50 p-4">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <h2 className="font-semibold">Legacy recipes from the old app</h2>
+              <p className="mt-1 max-w-3xl text-sm text-zinc-700">
+                These were migrated as flat food records before the current versioned Recipe system existed. Convert rebuilds a
+                composed recipe from its old ingredient links and then hides the flat copy, so it stops competing in Add Food.
+                Hiding a copy never changes old nutrition logs.
+              </p>
+            </div>
+            {hiddenLegacyCount > 0 ? (
+              <button
+                type="button"
+                className={secondaryButtonClass}
+                onClick={() => setShowHiddenLegacy((current) => !current)}
+              >
+                {showHiddenLegacy ? 'Hide archived' : `Show hidden (${hiddenLegacyCount})`}
+              </button>
+            ) : null}
+          </div>
+          {visibleLegacyRecipes.length === 0 ? (
+            <p className="text-sm text-zinc-600">All legacy recipe copies are hidden.</p>
+          ) : (
+            <ul className="space-y-2">
+              {visibleLegacyRecipes.map((recipe) => (
+                <li key={recipe.id} className={`rounded-lg border border-zinc-200 bg-white p-3 ${recipe.archived ? 'opacity-70' : ''}`}>
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-medium">{recipe.name}</p>
+                      <p className="text-sm text-zinc-600">
+                        Legacy recipe · {recipeKcal(recipe.caloriesKcal)}
+                        {recipe.usageCount > 0 ? ` · used ${recipe.usageCount} time${recipe.usageCount === 1 ? '' : 's'}` : ''}
+                      </p>
+                      {recipe.fiberG == null || recipe.sodiumMg == null ? (
+                        <p className="mt-1 text-sm text-zinc-600">Old flat nutrition is missing fiber and/or sodium.</p>
+                      ) : null}
+                      {recipe.matchingRecipeId ? (
+                        <p className="mt-1 text-sm text-zinc-700">A current Recipe with this exact name already exists.</p>
+                      ) : null}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {recipe.matchingRecipeId ? (
+                        <Link to={`/nutrition/recipes/${recipe.matchingRecipeId}`} className={secondaryButtonClass}>
+                          Open current recipe
+                        </Link>
+                      ) : recipe.archived ? null : (
+                        <button
+                          type="button"
+                          className={primaryButtonClass}
+                          disabled={busyLegacyId != null}
+                          onClick={() => void convertLegacy(recipe)}
+                        >
+                          {busyLegacyId === recipe.id ? 'Converting…' : 'Convert to recipe'}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className={secondaryButtonClass}
+                        disabled={busyLegacyId != null}
+                        onClick={() => void changeLegacyVisibility(recipe, !recipe.archived)}
+                      >
+                        {recipe.archived ? 'Restore old copy' : 'Hide old copy'}
+                      </button>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      ) : null}
     </section>
   )
 }
