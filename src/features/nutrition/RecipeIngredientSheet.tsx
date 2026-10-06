@@ -1,5 +1,4 @@
 import { lazy, Suspense, useRef, useState } from 'react'
-import { NUTRITION_CONFIG } from '@/domain/nutrition'
 import {
   COMPOSITE_FOOD_GUIDANCE,
   looksLikeCompositeFoodDescription,
