@@ -1,16 +1,16 @@
-name: H4 validation
+name: Branch validation
 
 on:
   push:
-    branches:
-      - h4-experience-system
+    branches-ignore:
+      - main
   workflow_dispatch:
 
 env:
   TZ: America/Phoenix
 
 concurrency:
-  group: h4-validation
+  group: branch-validation-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
