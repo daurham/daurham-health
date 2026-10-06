@@ -6,9 +6,9 @@ import {
   parseManualPatch,
   type PlannedManualMetric,
 } from '../../src/domain/body-manual.js'
-import { HEALTH_CALENDAR_TIME_ZONE } from '../../src/domain/time.js'
 import { getSql, type Sql } from '../db.js'
 import { HttpError } from '../http.js'
+import { healthCalendarTimeZone } from '../health-time.js'
 import { getBodyMeasurement } from './fit-profile-import.js'
 
 const EDITABLE_SESSION = `
@@ -86,7 +86,7 @@ function metricInsert(sql: Sql, sessionId: string, metric: PlannedManualMetric) 
 export async function createManualMeasurement(body: unknown, now = new Date()) {
   try {
     const plan = parseManualCreate(body, now)
-    const sql = await getSql()
+    const [sql, timezone] = await Promise.all([getSql(), healthCalendarTimeZone()])
     const sourceId = await manualSourceId(sql)
     const sessionId = randomUUID()
     await sql.transaction([
@@ -96,7 +96,7 @@ export async function createManualMeasurement(body: unknown, now = new Date()) {
          ) VALUES (
            $1::uuid, $2::timestamptz, $3, $4::uuid, NULL, NULL, $5
          )`,
-        [sessionId, plan.measuredAt.toISOString(), HEALTH_CALENDAR_TIME_ZONE, sourceId, plan.notes],
+        [sessionId, plan.measuredAt.toISOString(), timezone, sourceId, plan.notes],
       ),
       ...plan.metrics.map((metric) => metricInsert(sql, sessionId, metric)),
     ])
