@@ -90,7 +90,12 @@ export async function readDestinationCounts(sql: Sql): Promise<Record<string, nu
   return counts
 }
 
-export async function createBackupArchive(sql: Sql, profile: BackupProfile, createdAt = new Date().toISOString()): Promise<Uint8Array> {
+export async function createBackupArchive(
+  sql: Sql,
+  profile: BackupProfile,
+  createdAt = new Date().toISOString(),
+  calendarTimezone?: string,
+): Promise<Uint8Array> {
   const snapshot = await readBackupTables(sql)
   if (snapshot.schemaMigration !== LATEST_SCHEMA_MIGRATION) {
     throw new Error(`Database schema is ${snapshot.schemaMigration || 'unknown'}. Backup requires ${LATEST_SCHEMA_MIGRATION}.`)
@@ -100,16 +105,20 @@ export async function createBackupArchive(sql: Sql, profile: BackupProfile, crea
     createdAt,
     schemaMigration: snapshot.schemaMigration,
     appVersionOrCommit: appVersion,
+    calendarTimezone,
     rowsByTable: snapshot.rowsByTable,
   })
 }
 
-export async function createOwnerExport(sql: Sql): Promise<{ bytes: Uint8Array; profile: BackupProfile }> {
-  const full = await createBackupArchive(sql, 'full')
+export async function createOwnerExport(
+  sql: Sql,
+  calendarTimezone?: string,
+): Promise<{ bytes: Uint8Array; profile: BackupProfile }> {
+  const full = await createBackupArchive(sql, 'full', new Date().toISOString(), calendarTimezone)
   if (full.byteLength <= PORTABLE_EXPORT_BYTE_LIMIT) {
     return { bytes: full, profile: 'full' }
   }
-  const portable = await createBackupArchive(sql, 'portable')
+  const portable = await createBackupArchive(sql, 'portable', new Date().toISOString(), calendarTimezone)
   return { bytes: portable, profile: 'portable' }
 }
 
