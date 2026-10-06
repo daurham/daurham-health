@@ -98,7 +98,7 @@ const FOOD_BASIS_SQL = `SELECT id::text AS id, name, barcode, serving_quantity, 
 
 export async function listRecipes(): Promise<RecipeIndex> {
   const sql = await getSql()
-  const [rows, legacyRows] = await Promise.all([
+  const [rowsResult, legacyRowsResult] = await Promise.all([
     sql.query(
       `SELECT recipes.id::text AS id, versions.version, versions.name, versions.is_current,
               versions.calories_kcal, versions.yield_servings, versions.finished_weight_g
@@ -107,7 +107,7 @@ export async function listRecipes(): Promise<RecipeIndex> {
        WHERE recipes.is_active
        ORDER BY versions.name ASC, recipes.id ASC`,
       [],
-    ) as Promise<RecipeListRow[]>,
+    ),
     sql.query(
       `SELECT foods.id::text AS id, foods.name, foods.calories, foods.protein, foods.carbs, foods.fat,
               foods.fiber, foods.sodium, foods.archived,
@@ -128,8 +128,10 @@ export async function listRecipes(): Promise<RecipeIndex> {
          AND foods.source_kind = 'migrated'
        ORDER BY foods.archived ASC, foods.name ASC, foods.id ASC`,
       [],
-    ) as Promise<LegacyRecipeFoodRow[]>,
+    ),
   ])
+  const rows = rowsResult as RecipeListRow[]
+  const legacyRows = legacyRowsResult as LegacyRecipeFoodRow[]
   return {
     recipes: rows.map(mapListItem),
     legacyRecipes: legacyRows.map(mapLegacyRecipeFood),
