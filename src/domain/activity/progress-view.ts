@@ -103,13 +103,14 @@ function metricView(
 
 export function buildActivityProgressView(
   rows: readonly ActivityDailyRow[],
-  input: { range: ProgressRange; asOf: string; today?: string },
+  input: { range: ProgressRange; asOf: string; today?: string; timezone?: string },
 ): ActivityProgressView {
   const observedDates = rows.map((row) => row.date).filter((date) => date <= input.asOf)
   const earliest = observedDates.length > 0 ? observedDates.reduce((min, date) => (date < min ? date : min)) : null
   const period = trailingPeriod(input.range, input.asOf, earliest)
   const today = input.today
-  const summary = activityRangeSummary(rows, period.start, period.end, ACTIVITY_TIMEZONE, today)
+  const timezone = input.timezone ?? ACTIVITY_TIMEZONE
+  const summary = activityRangeSummary(rows, period.start, period.end, timezone, today)
   const recent = activityShortTermChange(rows, input.asOf, today)
   const provisionalRow =
     today && today >= period.start && today <= period.end ? rows.find((row) => row.date === today) ?? null : null
@@ -118,7 +119,7 @@ export function buildActivityProgressView(
     asOf: input.asOf,
     start: period.start,
     end: period.end,
-    timezone: ACTIVITY_TIMEZONE,
+    timezone,
     calendarDays: period.dayCount,
     completedCalendarDays: summary.completedCalendarDays,
     provisionalDay: provisionalRow
