@@ -5,9 +5,9 @@ import {
   parseHealthAutoExport,
   type HaeParseResult,
 } from '../../src/domain/apple-health/hae.js'
-import { HEALTH_CALENDAR_TIME_ZONE } from '../../src/domain/time.js'
 import { formatDatabaseError, getSql } from '../db.js'
 import { HttpError } from '../http.js'
+import { getInstanceConfig } from '../instance-config.js'
 import { INSERT_APPLE_HEALTH_JOB_SQL, UPDATE_APPLE_HEALTH_JOB_SQL } from './queries.js'
 import { latestHaeSleepStatus } from './hae-sleep-service.js'
 import { latestHaeWorkoutStatus, type HaeWorkoutSyncChannel } from './hae-workout-service.js'
@@ -57,6 +57,7 @@ async function haeSourceId(): Promise<string> {
 }
 
 export async function latestHealthAutoExportStatus(): Promise<HaeSyncStatus> {
+  const timezone = (await getInstanceConfig()).calendarTimeZone
   const sql = await getSql()
   const sourceRows = (await sql.query(HAE_SOURCE_SQL)) as Array<{ id: string }>
   const sourceId = sourceRows[0]?.id
@@ -68,7 +69,7 @@ export async function latestHealthAutoExportStatus(): Promise<HaeSyncStatus> {
     status: string
   }>
   const job = jobs[0]
-  const days = (await sql.query(LATEST_ACTIVITY_DAY_SQL, [HEALTH_CALENDAR_TIME_ZONE])) as Array<{
+  const days = (await sql.query(LATEST_ACTIVITY_DAY_SQL, [timezone])) as Array<{
     latest_day: string | null
   }>
   const activity = job
@@ -78,7 +79,7 @@ export async function latestHealthAutoExportStatus(): Promise<HaeSyncStatus> {
         latestDay: days[0]?.latest_day ?? null,
       }
     : null
-  const sleep = await latestHaeSleepStatus()
+  const sleep = await latestHaeSleepStatus(timezone)
   const workouts = await latestHaeWorkoutStatus(sourceId)
   const headline =
     activity ??
@@ -102,7 +103,8 @@ export async function ingestHealthAutoExport(input: {
   sourceFilename?: string
   contentHash?: string | null
 }): Promise<HaeIngestResult> {
-  const parsed = parseHealthAutoExport(input.payload)
+  const timezone = (await getInstanceConfig()).calendarTimeZone
+  const parsed = parseHealthAutoExport(input.payload, timezone)
   const sourceId = await haeSourceId()
   const sql = await getSql()
   const jobId = randomUUID()
