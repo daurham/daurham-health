@@ -242,7 +242,7 @@ export async function commitRecipeVersion(id: string, body: unknown): Promise<Re
     Array<{ id?: string }>,
   ]
 
-  if (results[2]?.[0]?.id === versionId && results[4]?.[0]?.id) {
+  if (results[2]?.[0]?.id && results[4]?.[0]?.id) {
     return getRecipe(id)
   }
 
