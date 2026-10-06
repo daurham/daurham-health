@@ -7,6 +7,7 @@ import { APPLE_HEALTH_PARSER_VERSION } from '../../src/domain/apple-health/confi
 import { compactImportMetadata, createDailyAccumulator } from '../../src/domain/apple-health/compact-plan.js'
 import { createAppleHealthXmlScanner } from '../../src/domain/apple-health/parse.js'
 import { ACTIVITY_CALCULATION_VERSION, SOURCE_PRIORITY } from '../../src/domain/apple-health/priority.js'
+import { getInstanceConfig } from '../instance-config.js'
 
 const COMPACT_COMMIT_BLOCK =
   'Compact historical commit is waiting on Apple Health UI validation. The approved entry point is commitCompactAppleHealth in server/apple-health/compact-service.ts, which writes daily summaries, sleep intervals, and workouts directly with getSql. Re-run without --commit.'
@@ -87,7 +88,8 @@ async function previewExport(filePath: string) {
   const zip = filePath.toLowerCase().endsWith('.zip')
   const sha256 = await sha256File(filePath)
   const started = Date.now()
-  const accumulator = createDailyAccumulator()
+  const timezone = (await getInstanceConfig()).calendarTimeZone
+  const accumulator = createDailyAccumulator(timezone)
   let xmlBytes = 0
   let encountered = 0
   const scanner = createAppleHealthXmlScanner({
@@ -170,7 +172,7 @@ async function previewExport(filePath: string) {
         'Apple ActivitySummary when that element exists. Explicit 0 stays 0. A missing summary stays null and is not replaced by a sum of raw samples. Goals stay source context.',
       restingHeartRate:
         'Highest-priority source with a valid sample owns the Health day. One observation is used as-is. Multiple observations from that source use the latest end, then latest start, then the lower bpm. They are not averaged.',
-      timezone: 'America/Phoenix. Samples that cross midnight are split by duration. ActivitySummary dateComponents is kept as the calendar date.',
+      timezone: `${timezone}. Samples that cross midnight are split by duration. ActivitySummary dateComponents is kept as the calendar date.`,
     },
     metadata,
     activitySummary: plan.coverage,

@@ -52,8 +52,10 @@ export function buildActivityDailySummary(input: {
   resting: readonly RestingObservation[]
   summary: AppleActivitySummary | null
   calculationVersion?: string
+  timezone?: string
 }): ActivityDailySummary | null {
   const calculationVersion = input.calculationVersion ?? ACTIVITY_CALCULATION_VERSION
+  const timezone = healthTimeZone(input.timezone)
   const steps = reconcileIntervalMetric(input.steps, 'steps', calculationVersion)
   const distance = reconcileIntervalMetric(input.distance, 'walking_running_distance', calculationVersion)
   const resting = reconcileRestingHeartRate(input.resting, calculationVersion)
@@ -71,7 +73,7 @@ export function buildActivityDailySummary(input: {
   }
   return {
     date: input.date,
-    timezone: healthTimeZone(),
+    timezone,
     stepsCount: steps.value,
     activeEnergyKcal,
     exerciseMinutes,

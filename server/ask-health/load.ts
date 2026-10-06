@@ -6,7 +6,6 @@ import { buildProgressOverview } from '../../src/domain/progress/index.js'
 import type { ProgressRange } from '../../src/domain/progress/types.js'
 import { buildSleepProgressView } from '../../src/domain/sleep/index.js'
 import { dailyContextTagLabel } from '../../src/domain/context.js'
-import { healthCalendarDateFromNow } from '../../src/domain/time.js'
 import { listActivityDailySummaries } from '../activity/queries.js'
 import { listGoalAskSnapshots } from '../goals/service.js'
 import { listDailyContexts } from '../context/service.js'
@@ -15,6 +14,7 @@ import { getSql } from '../db.js'
 import { loadProgressCanonicalRows } from '../progress/queries.js'
 import { listSleepNightlySummaries } from '../sleep/queries.js'
 import { listSupplementRangeInputs } from '../supplements/queries.js'
+import { healthTimeContext } from '../health-time.js'
 
 export async function loadAskHealthPacketInput(input: {
   lens: AskHealthPacketInput['lens']
@@ -23,7 +23,7 @@ export async function loadAskHealthPacketInput(input: {
   question: string
   generatedAt: string
 }): Promise<AskHealthPacketInput> {
-  const today = healthCalendarDateFromNow()
+  const { date: today, timezone } = await healthTimeContext()
   const rows = await loadProgressCanonicalRows()
   const overview = buildProgressOverview({
     asOf: input.asOf,
@@ -37,8 +37,8 @@ export async function loadAskHealthPacketInput(input: {
   })
   const period = { start: overview.period.start, end: overview.period.end }
   const [activityRows, sleepNights, goals, supplements, experiments, benchmarks, contexts] = await Promise.all([
-    listActivityDailySummaries(),
-    listSleepNightlySummaries(),
+    listActivityDailySummaries(timezone),
+    listSleepNightlySummaries(timezone),
     listGoalAskSnapshots(input.asOf),
     listSupplementRangeInputs(period.start, period.end),
     loadExperiments(input.asOf),
@@ -47,16 +47,17 @@ export async function loadAskHealthPacketInput(input: {
   ])
   const activity = buildActivityProgressView(
     activityRows.filter((row) => row.date <= input.asOf),
-    { range: input.range, asOf: input.asOf, today },
+    { range: input.range, asOf: input.asOf, today, timezone },
   )
   const sleep = buildSleepProgressView(
     sleepNights.filter((night) => night.sleepDate <= input.asOf),
-    { range: input.range, asOf: input.asOf },
+    { range: input.range, asOf: input.asOf, timezone },
   )
   const patterns = analyzeCrossDomain({
     range: input.range,
     asOf: input.asOf,
     today: input.asOf === today ? today : null,
+    timezone,
     activityDays: activityRows.filter((row) => row.date <= input.asOf),
     sleepNights: sleepNights.filter((night) => night.sleepDate <= input.asOf),
     nutritionDays: overview.nutrition.observations,

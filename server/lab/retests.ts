@@ -6,8 +6,8 @@ import {
   type RetestExperimentLink,
   type RetestResultInput,
 } from '../../src/domain/lab-retests.js'
-import { healthCalendarDateFromNow } from '../../src/domain/time.js'
 import { HttpError } from '../http.js'
+import { currentHealthDate } from '../health-time.js'
 import { getSql } from '../db.js'
 
 type ProtocolRow = {
@@ -60,24 +60,27 @@ const PROTOCOL_SQL = `
   WHERE ($1::uuid IS NULL OR b.id = $1::uuid)
   ORDER BY b.id, v.version, r.result_date, r.created_at, req.position`
 
-export async function listBenchmarkRetests(asOf = healthCalendarDateFromNow()): Promise<{ asOf: string; retests: BenchmarkRetestView[] }> {
-  const built = await loadRetests(null, asOf)
+export async function listBenchmarkRetests(asOf?: string): Promise<{ asOf: string; retests: BenchmarkRetestView[] }> {
+  const resolvedAsOf = asOf ?? await currentHealthDate()
+  const built = await loadRetests(null, resolvedAsOf)
   return {
-    asOf,
+    asOf: resolvedAsOf,
     retests: orderAutomaticRetests(activeProtocolRetests(built)),
   }
 }
 
-export async function listProtocolRetestViews(asOf = healthCalendarDateFromNow()): Promise<BenchmarkRetestView[]> {
-  const built = await loadRetests(null, asOf)
+export async function listProtocolRetestViews(asOf?: string): Promise<BenchmarkRetestView[]> {
+  const resolvedAsOf = asOf ?? await currentHealthDate()
+  const built = await loadRetests(null, resolvedAsOf)
   return built.map((item) => item.view)
 }
 
 export async function getBenchmarkRetest(
   benchmarkDefinitionId: string,
-  asOf = healthCalendarDateFromNow(),
+  asOf?: string,
 ): Promise<{ isActive: boolean; asOf: string; current: BenchmarkRetestView; history: BenchmarkRetestView[] }> {
-  const built = await loadRetests(benchmarkDefinitionId, asOf)
+  const resolvedAsOf = asOf ?? await currentHealthDate()
+  const built = await loadRetests(benchmarkDefinitionId, resolvedAsOf)
   if (built.length === 0) {
     throw new HttpError(404, 'Benchmark was not found.')
   }
@@ -91,7 +94,7 @@ export async function getBenchmarkRetest(
     .map((item) => item.view)
   return {
     isActive: built.some((item) => item.isActive),
-    asOf,
+    asOf: resolvedAsOf,
     current: current.view,
     history,
   }

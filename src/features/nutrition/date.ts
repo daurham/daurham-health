@@ -2,8 +2,8 @@ import { addCalendarDays } from '@/domain/progress/dates'
 import { healthCalendarDateFromNow } from '@/domain/time'
 import { isCalendarDate } from '@/domain/training'
 
-export function todayNutritionDate(now = new Date()): string {
-  return healthCalendarDateFromNow(now)
+export function todayNutritionDate(now = new Date(), timezone?: string): string {
+  return healthCalendarDateFromNow(now, timezone)
 }
 
 export function parseNutritionDateParam(value: string | null, today = todayNutritionDate()): string {

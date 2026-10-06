@@ -1,5 +1,21 @@
 # Dev state
 
+## 2026-10-06 I0B complete — dynamic instance identity + canonical timezone
+
+- Completed deployment-level timezone portability without adding a schema migration; schema head remains `0041_exercise_library_calisthenics.sql`.
+- `HEALTH_CALENDAR_TIMEZONE` is now the runtime calendar authority across owner-facing server flows. Shared domain helpers retain `America/Phoenix` only as the backward-compatible default and receive explicit timezone context in live paths.
+- Today, Activity, Sleep, Progress, Goals, Coach, Weekly Coach, Lab evidence, intelligence/Ask Health inputs, Nutrition, Training defaults, Body capture, backup metadata, and Apple/Health Auto Export runtime paths were wired to instance time.
+- Historical Apple compact reconciliation now accepts an arbitrary IANA timezone and splits cross-midnight samples at DST-aware Health-calendar boundaries.
+- Added DST regression coverage using `America/New_York`, including spring-forward/fall-back midnight behavior and Body local-time editing offsets.
+- App chrome now consumes the I0A public instance config for app name, external home link, public-demo capability, and calendar timezone. Date-sensitive owner routes wait for config before mounting to avoid a first-render Phoenix fallback race.
+- Current deployment defaults remain `Daurham Health`, `https://daurham.com`, and `America/Phoenix`; another deployment can override them without source edits.
+- Demo exposure is capability-driven and fails closed when disabled.
+- Body Shortcut documentation is deployment-neutral and Open Food Facts fallback branding is neutral.
+- Backups record the instance calendar timezone rather than a universal Phoenix value.
+- Stored historical timezone/provenance rows were not rewritten.
+- Independent validation run `37541015943` passed TypeScript, ESLint, all Vitest tests, and production build.
+- Remaining portability work is intentionally separated into the next candidate slice: fresh-instance bootstrap and Jake-specific legacy seed/routine separation. Historical diagnostic/backfill scripts may retain legacy Phoenix defaults when they are explicitly reproducing old-owner data; they are not runtime calendar authorities.
+
 ## 2026-10-06 I0A complete — instance configuration foundation
 
 - Added the master program at `docs/ai/NEXT_INTELLIGENCE_ROADMAP.md`.

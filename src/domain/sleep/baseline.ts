@@ -109,7 +109,7 @@ function priorNights(nights: readonly SleepNightlySummary[], target: SleepNightl
   const seen = new Set<string>()
   const rows: SleepNightlySummary[] = []
   for (const night of nights) {
-    if (night.timezone !== SLEEP_TIMEZONE || night.sleepDate < window.start || night.sleepDate > window.end) {
+    if (night.timezone !== target.timezone || night.sleepDate < window.start || night.sleepDate > window.end) {
       continue
     }
     if (night.sleepDate >= target.sleepDate || seen.has(night.sleepDate)) {
@@ -255,11 +255,12 @@ export function computeVitalBaseline(input: {
 export function latestBaselineNight(
   nights: readonly SleepNightlySummary[],
   bounds: { start: string; end: string },
+  timezone = SLEEP_TIMEZONE,
 ): SleepNightlySummary | null {
   const eligible = nights
     .filter(
       (night) =>
-        night.timezone === SLEEP_TIMEZONE &&
+        night.timezone === timezone &&
         night.sleepDate >= bounds.start &&
         night.sleepDate <= bounds.end &&
         night.analysisEligible &&

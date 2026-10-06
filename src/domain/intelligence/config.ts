@@ -1,5 +1,8 @@
+import { DEFAULT_HEALTH_CALENDAR_TIME_ZONE } from '../time.js'
+
 /** Product heuristics for surfacing patterns. They are not significance tests. */
-export const INTELLIGENCE_TIMEZONE = 'America/Phoenix'
+/** Backward-compatible default only. Runtime callers should pass instance timezone. */
+export const INTELLIGENCE_TIMEZONE = DEFAULT_HEALTH_CALENDAR_TIME_ZONE
 
 export const SPEARMAN_MIN_PAIRS = 20
 export const BODY_NUTRITION_MIN_MEASUREMENTS = 10

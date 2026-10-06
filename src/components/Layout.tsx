@@ -3,9 +3,11 @@ import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { LockedScreen, useAuth } from '@/auth'
 import { useRewardSummary } from '@/features/rewards/useRewardSummary'
 import { PROGRESSION_THEME_UNLOCKS, progressionState } from '@/domain/progression'
+import type { PublicInstanceConfig } from '@/domain/instance-config'
+import { DEFAULT_HEALTH_CALENDAR_TIME_ZONE } from '@/domain/time'
 import { themePack } from '@/theme'
 import { AppSurfaceProvider } from '@/lib/app-prefix'
-import { cn, quietButtonClass, RouteFallback, selectedTabClass, SHELL_MAX_WIDTH_CLASS, tabClass } from '@/lib'
+import { cn, fetchPublicInstanceConfig, InstanceConfigContext, quietButtonClass, RouteFallback, selectedTabClass, SHELL_MAX_WIDTH_CLASS, tabClass } from '@/lib'
 import type { NavItem } from '@/types'
 
 const navItems: NavItem[] = [
@@ -23,6 +25,22 @@ const demoNavItems: NavItem[] = [
   { id: 'body', to: '/demo/body', label: 'Body' },
   { id: 'progress', to: '/demo/progress', label: 'Progress' },
 ]
+
+const SSR_INSTANCE_FALLBACK: PublicInstanceConfig = {
+  appName: 'Daurham Health',
+  externalHomeUrl: 'https://daurham.com',
+  calendarTimeZone: DEFAULT_HEALTH_CALENDAR_TIME_ZONE,
+  capabilities: {
+    geminiNutrition: false,
+    askHealthAi: false,
+    usdaLookup: false,
+    homeAi: false,
+    trainingPhotoImport: false,
+    appleHealthSync: false,
+    bodyCapture: false,
+    publicDemo: true,
+  },
+}
 
 function DemoBanner({ status }: { status: string }) {
   const privateLink =
@@ -46,6 +64,10 @@ export function Layout() {
   const location = useLocation()
   const publicAuthRoute = location.pathname === '/sign-in' || location.pathname === '/reset-password'
   const demoRoute = location.pathname === '/demo' || location.pathname.startsWith('/demo/')
+  const [instance, setInstance] = useState<PublicInstanceConfig | null>(() =>
+    typeof window === 'undefined' ? SSR_INSTANCE_FALLBACK : null,
+  )
+  const [instanceFailed, setInstanceFailed] = useState(false)
   const showOwnerChrome = !demoRoute && (status === 'owner' || status === 'unauthorized')
   const items = demoRoute ? demoNavItems : navItems
   const mobileMenuRef = useRef<HTMLDetailsElement>(null)
@@ -53,6 +75,26 @@ export function Layout() {
   const previousWallet = useRef<{ spendableXp: number; lifetimeXp: number } | null>(null)
   const [walletPulse, setWalletPulse] = useState(false)
   const [levelCelebration, setLevelCelebration] = useState<{ level: number; themes: string[] } | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    fetchPublicInstanceConfig()
+      .then((config) => {
+        if (!cancelled) {
+          setInstance(config)
+          setInstanceFailed(false)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setInstance(null)
+          setInstanceFailed(true)
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     const next = wallet.summary
@@ -90,13 +132,14 @@ export function Layout() {
   }, [location.pathname, location.search])
 
   return (
-    <div className="app-shell min-h-dvh bg-zinc-50 text-zinc-900">
+    <InstanceConfigContext.Provider value={instance}>
+      <div className="app-shell min-h-dvh bg-zinc-50 text-zinc-900">
       <header className="border-b border-zinc-200 bg-white pt-[env(safe-area-inset-top)]">
         <div className={cn('mx-auto flex items-center justify-between gap-3 px-4 py-3', SHELL_MAX_WIDTH_CLASS)}>
-          <p className="text-sm font-semibold tracking-tight">Daurham Health</p>
-          {demoRoute ? (
-            <a href="https://daurham.com" className="text-sm text-zinc-500 hover:text-zinc-900">
-              daurham.com
+          <p className="text-sm font-semibold tracking-tight">{instance?.appName ?? 'Health'}</p>
+          {demoRoute && instance?.externalHomeUrl ? (
+            <a href={instance.externalHomeUrl} className="text-sm text-zinc-500 hover:text-zinc-900">
+              {new URL(instance.externalHomeUrl).hostname}
             </a>
           ) : null}
           {showOwnerChrome ? (
@@ -208,12 +251,18 @@ export function Layout() {
             <Outlet />
           </Suspense>
         ) : demoRoute ? (
-          <AppSurfaceProvider prefix="/demo" readOnly>
-            <DemoBanner status={status} />
-            <Suspense fallback={<RouteFallback />}>
-              <Outlet />
-            </Suspense>
-          </AppSurfaceProvider>
+          instance == null ? (
+            <RouteFallback />
+          ) : instance.capabilities.publicDemo ? (
+            <AppSurfaceProvider prefix="/demo" readOnly>
+              <DemoBanner status={status} />
+              <Suspense fallback={<RouteFallback />}>
+                <Outlet />
+              </Suspense>
+            </AppSurfaceProvider>
+          ) : (
+            <p className="text-sm text-zinc-600">Demo is not available for this Health instance.</p>
+          )
         ) : status === 'loading' ? (
           <p className="text-zinc-600">Loading…</p>
         ) : status === 'anonymous' ? (
@@ -225,7 +274,7 @@ export function Layout() {
               label: 'Owner Sign In',
               state: { from: `${location.pathname}${location.search}` },
             }}
-            secondary={{ to: '/demo', label: 'Explore demo' }}
+            secondary={instance?.capabilities.publicDemo ? { to: '/demo', label: 'Explore demo' } : undefined}
           />
         ) : status === 'unauthorized' ? (
           <LockedScreen
@@ -238,6 +287,10 @@ export function Layout() {
               label: 'Sign out',
             }}
           />
+        ) : instanceFailed ? (
+          <p className="text-sm text-zinc-600">Instance configuration is unavailable.</p>
+        ) : instance == null ? (
+          <RouteFallback />
         ) : (
           <Suspense fallback={<RouteFallback />}>
             <Outlet />
@@ -268,6 +321,7 @@ export function Layout() {
           </div>
         </nav>
       )}
-    </div>
+      </div>
+    </InstanceConfigContext.Provider>
   )
 }

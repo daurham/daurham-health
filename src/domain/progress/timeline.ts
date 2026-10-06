@@ -372,6 +372,7 @@ export function buildProgressTimeline(
       status?: 'valid' | 'invalidated'
       primary: Array<{ label: string; value: number; unit: string }>
     }>
+    activityTimezone?: string
     experimentResults?: ReadonlyArray<{
       id: string
       title: string
@@ -568,6 +569,7 @@ export function buildProgressTimeline(
     input.activityWorkouts ?? [],
     period.start,
     period.end,
+    input.activityTimezone,
   ).map((workout) => ({
     id: `activity_workout:${workout.id}`,
     domain: 'activity',

@@ -4,17 +4,26 @@ const WALL_CLOCK =
   /^(\d{1,2})\/(\d{1,2})\/(\d{4})[ T](\d{1,2}):(\d{2}):(\d{2})$/
 
 /**
- * Canonical Health calendar timezone.
- * Phoenix has no DST; Los Angeles must not be substituted for day bucketing.
+ * Backward-compatible default for the original owner deployment.
+ * Runtime server flows pass the configured instance timezone explicitly.
  */
-export const HEALTH_CALENDAR_TIME_ZONE = 'America/Phoenix'
+export const DEFAULT_HEALTH_CALENDAR_TIME_ZONE = 'America/Phoenix'
 
-export function healthCalendarDateFromInstant(instant: Date): string {
-  return calendarDateFromInstant(instant, HEALTH_CALENDAR_TIME_ZONE)
+/** @deprecated Prefer DEFAULT_HEALTH_CALENDAR_TIME_ZONE or an explicit configured timezone. */
+export const HEALTH_CALENDAR_TIME_ZONE = DEFAULT_HEALTH_CALENDAR_TIME_ZONE
+
+export function healthCalendarDateFromInstant(
+  instant: Date,
+  timeZone = DEFAULT_HEALTH_CALENDAR_TIME_ZONE,
+): string {
+  return calendarDateFromInstant(instant, assertIanaTimeZone(timeZone))
 }
 
-export function healthCalendarDateFromNow(now = new Date()): string {
-  return healthCalendarDateFromInstant(now)
+export function healthCalendarDateFromNow(
+  now = new Date(),
+  timeZone = DEFAULT_HEALTH_CALENDAR_TIME_ZONE,
+): string {
+  return healthCalendarDateFromInstant(now, timeZone)
 }
 
 export function assertIanaTimeZone(timeZone: string): string {
@@ -28,6 +37,36 @@ export function assertIanaTimeZone(timeZone: string): string {
     throw new Error('Invalid timezone')
   }
   return value
+}
+
+export function instantAtStartOfCalendarDate(
+  isoDate: string,
+  timeZone = DEFAULT_HEALTH_CALENDAR_TIME_ZONE,
+): Date {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate)
+  if (!match) {
+    throw new Error('Date must be YYYY-MM-DD')
+  }
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const check = new Date(Date.UTC(year, month - 1, day))
+  if (
+    check.getUTCFullYear() !== year ||
+    check.getUTCMonth() !== month - 1 ||
+    check.getUTCDate() !== day
+  ) {
+    throw new Error('Date must be YYYY-MM-DD')
+  }
+  const zone = assertIanaTimeZone(timeZone)
+  const utcGuess = Date.UTC(year, month - 1, day)
+  const offset1 = timeZoneOffsetMs(new Date(utcGuess), zone)
+  let instant = utcGuess - offset1
+  const offset2 = timeZoneOffsetMs(new Date(instant), zone)
+  if (offset1 !== offset2) {
+    instant = utcGuess - offset2
+  }
+  return new Date(instant)
 }
 
 function timeZoneOffsetMs(date: Date, timeZone: string): number {

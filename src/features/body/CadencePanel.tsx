@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import { ARM_CADENCE_KEYS, FULL_CIRCUMFERENCE_KEYS, MANUAL_BODY_METRICS } from '@/domain/body-manual'
-import { healthCalendarDateFromNow } from '@/domain/time'
 import type { BodyCadenceItem } from './api'
-import { quietButtonClass, secondaryButtonClass } from '@/lib'
+import { quietButtonClass, secondaryButtonClass, useHealthCalendarDate } from '@/lib'
 
 const fieldClass =
   'min-h-11 w-24 rounded-md border border-zinc-300 bg-white px-3 text-base text-zinc-900'
@@ -24,7 +23,7 @@ export function CadencePanel({
   const [drafts, setDrafts] = useState<Record<string, string>>({})
   const [error, setError] = useState<string | null>(null)
   const [expanded, setExpanded] = useState(false)
-  const today = healthCalendarDateFromNow()
+  const today = useHealthCalendarDate()
   const attention = items.filter((item) => item.status !== 'current' && item.dueDate <= today)
   const overdueCount = attention.filter((item) => item.daysOverdue > 0).length
   const activeCount = items.length

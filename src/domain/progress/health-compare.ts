@@ -75,7 +75,8 @@ function blankActivitySide(start: string, end: string, applicable: boolean): Act
 }
 
 function activitySide(rows: readonly ActivityDailyRow[], start: string, end: string, today?: string): ActivityCompareSide {
-  const summary = activityRangeSummary(rows, start, end, ACTIVITY_TIMEZONE, today)
+  const timezone = rows[0]?.timezone ?? ACTIVITY_TIMEZONE
+  const summary = activityRangeSummary(rows, start, end, timezone, today)
   return {
     selectedCalendarDays: summary.calendarDays,
     completedCalendarDays: summary.completedCalendarDays,

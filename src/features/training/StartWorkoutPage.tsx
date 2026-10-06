@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import type { ReviewFieldError } from '@/domain/paper-load'
 import { trainingSessionDisplayName } from '@/domain/training'
 import type { ExerciseDefinition, ExerciseLibraryItem, WorkoutTemplate } from '@/domain/training'
-import { interactiveCardClass } from '@/lib'
+import { interactiveCardClass, useHealthCalendarTimeZone } from '@/lib'
 import { createOwnerExercise, createSession, fetchExerciseLibrary, fetchTemplates } from './api'
 import { WorkoutEditor } from './WorkoutEditor'
 import {
@@ -17,6 +17,7 @@ import {
 } from './draft'
 
 export function StartWorkoutPage() {
+  const timezone = useHealthCalendarTimeZone()
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const adHoc = params.get('type') === 'ad_hoc'
@@ -30,10 +31,10 @@ export function StartWorkoutPage() {
   const [error, setError] = useState<string | null>(null)
   const [draft, setDraft] = useState<WorkoutDraft | null>(() => {
     if (adHoc) {
-      return draftForAdHocWorkout()
+      return draftForAdHocWorkout(new Date(), timezone)
     }
     if (experimentWorkout && (experimentId || benchmarkProtocolVersionId)) {
-      return draftForExperimentWorkout({ experimentId, benchmarkProtocolVersionId })
+      return draftForExperimentWorkout({ experimentId, benchmarkProtocolVersionId, timezone })
     }
     return null
   })
@@ -159,7 +160,7 @@ export function StartWorkoutPage() {
                     <button
                       type="button"
                       className={`w-full px-4 py-4 text-left ${interactiveCardClass}`}
-                      onClick={() => setDraft(draftFromTemplate(template))}
+                      onClick={() => setDraft(draftFromTemplate(template, new Date(), timezone))}
                     >
                       <p className="font-semibold">{template.name}</p>
                       <p className="mt-1 text-sm text-zinc-500">Routine {template.routineCode} · v{template.version}</p>
@@ -180,7 +181,7 @@ export function StartWorkoutPage() {
                       <button
                         type="button"
                         className={`w-full px-4 py-4 text-left ${interactiveCardClass}`}
-                        onClick={() => setDraft(draftFromTemplate(template))}
+                        onClick={() => setDraft(draftFromTemplate(template, new Date(), timezone))}
                       >
                         <p className="font-semibold">{template.name}</p>
                         <p className="mt-1 text-sm text-zinc-500">Saved routine · v{template.version}</p>
@@ -195,7 +196,7 @@ export function StartWorkoutPage() {
               <button
                 type="button"
                 className={`mt-3 w-full px-4 py-4 text-left ${interactiveCardClass}`}
-                onClick={() => setDraft(draftForAdHocWorkout())}
+                onClick={() => setDraft(draftForAdHocWorkout(new Date(), timezone))}
               >
                 <p className="font-semibold">Empty workout</p>
                 <p className="mt-1 text-sm text-zinc-500">Add exercises as you go.</p>

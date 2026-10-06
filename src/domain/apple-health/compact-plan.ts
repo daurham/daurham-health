@@ -1,5 +1,6 @@
 import type { AppleActivitySummary } from './activity-summary.js'
-import { addIsoDays, phoenixCalendarDate, splitSampleOnPhoenixDays } from './calendar.js'
+import { addIsoDays, healthCalendarDate, splitSampleOnHealthDays } from './calendar.js'
+import { DEFAULT_HEALTH_CALENDAR_TIME_ZONE } from '../time.js'
 import { buildActivityDailySummary, type ActivityDailySummary } from './daily.js'
 import { ACTIVITY_CALCULATION_VERSION, SOURCE_PRIORITY } from './priority.js'
 import type { NormalizedQuantitySample } from './parse.js'
@@ -339,7 +340,7 @@ export function summarizeActivityCoverage(input: {
   }
 }
 
-export function createDailyAccumulator() {
+export function createDailyAccumulator(timezone = DEFAULT_HEALTH_CALENDAR_TIME_ZONE) {
   const names: string[] = []
   const nameIds = new Map<string, number>()
   const days = new Map<string, DayParts>()
@@ -392,7 +393,7 @@ export function createDailyAccumulator() {
         if (!Number.isFinite(startMs)) {
           return
         }
-        const day = parts(phoenixCalendarDate(startMs))
+        const day = parts(healthCalendarDate(startMs, timezone))
         day.resting.push({
           sourceId: sourceId(record.sourceName),
           startMs,
@@ -402,14 +403,14 @@ export function createDailyAccumulator() {
         restingKept += 1
         return
       }
-      const pieces = splitSampleOnPhoenixDays({
+      const pieces = splitSampleOnHealthDays({
         sourceName: record.sourceName,
         startMs,
         endMs,
         value: record.value,
-      })
+      }, timezone)
       for (const piece of pieces) {
-        const date = phoenixCalendarDate(piece.startMs)
+        const date = healthCalendarDate(piece.startMs, timezone)
         const stored = {
           sourceId: sourceId(piece.sourceName),
           startMs: piece.startMs,
@@ -465,6 +466,7 @@ export function createDailyAccumulator() {
           distance: day.distance.map(toSample),
           resting: day.resting.map(toSample),
           summary: day.summary,
+          timezone,
         })
         if (summary) {
           built.push(summary)

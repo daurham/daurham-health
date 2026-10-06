@@ -1,5 +1,4 @@
 import { randomUUID } from 'node:crypto'
-import { ACTIVITY_TIMEZONE } from '../../src/domain/activity/config.js'
 import {
   classificationCopy,
   evaluateExperiment,
@@ -19,9 +18,9 @@ import { calendarDateFromInstant } from '../../src/domain/progress/dates.js'
 import type { CanonicalSetRecord } from '../../src/domain/progress/types.js'
 import { resolveOccurrence } from '../../src/domain/supplements/resolve.js'
 import type { AdherenceWindow, OccurrenceState, ScheduleWindow, StatusEventWindow } from '../../src/domain/supplements/types.js'
-import { HEALTH_CALENDAR_TIME_ZONE, healthCalendarDateFromNow } from '../../src/domain/time.js'
 import { getSql, type Sql } from '../db.js'
 import { HttpError } from '../http.js'
+import { currentHealthDate, healthCalendarTimeZone } from '../health-time.js'
 
 type ExperimentRow = {
   id: string
@@ -36,15 +35,17 @@ type ExperimentRow = {
   window_end: string | null
 }
 
-export async function previewExperimentResult(experimentId: string, body: unknown, today = healthCalendarDateFromNow()) {
+export async function previewExperimentResult(experimentId: string, body: unknown, today?: string) {
+  const resolvedToday = today ?? await currentHealthDate()
   const attestation = parsedAttestation(body)
-  const built = await buildEvaluation(experimentId, attestation, today)
+  const built = await buildEvaluation(experimentId, attestation, resolvedToday)
   return publicPreview(built.evaluation, built.experiment, built.fingerprint)
 }
 
-export async function commitExperimentResult(experimentId: string, body: unknown, today = healthCalendarDateFromNow()) {
+export async function commitExperimentResult(experimentId: string, body: unknown, today?: string) {
+  const resolvedToday = today ?? await currentHealthDate()
   const attestation = parsedAttestation(body)
-  const built = await buildEvaluation(experimentId, attestation, today)
+  const built = await buildEvaluation(experimentId, attestation, resolvedToday)
   if (!built.evaluation.canCommit || !built.evaluation.classification || !built.evaluation.effectiveEndDate) {
     throw new HttpError(409, built.evaluation.message ?? 'This experiment is not ready to finalize.')
   }
@@ -219,7 +220,7 @@ async function buildEvaluation(
   attestation: Exclude<ReturnType<typeof parseResultAttestation>, { error: string }>,
   today: string,
 ) {
-  const sql = await getSql()
+  const [sql, timezone] = await Promise.all([getSql(), healthCalendarTimeZone()])
   const experiment = await loadExperiment(sql, experimentId)
   if (experiment.status === 'abandoned' || experiment.status === 'superseded') {
     throw new HttpError(409, 'That experiment is not open for a result.')
@@ -243,7 +244,7 @@ async function buildEvaluation(
   const effectiveEnd = open ? null : window.effectiveEndDate
   const loadEnd = effectiveEnd ?? plannedEnd
   const requirements = await loadRequirements(sql, experiment.protocol_version_id)
-  const evidence = await loadEvidence(sql, experiment, requirements, start, loadEnd)
+  const evidence = await loadEvidence(sql, experiment, requirements, start, loadEnd, timezone)
   const evaluation = evaluateExperiment({
     windowStart: start,
     plannedWindowEnd: plannedEnd,
@@ -345,6 +346,7 @@ async function loadEvidence(
   requirements: ExperimentRequirementSpec[],
   start: string,
   end: string,
+  timezone: string,
 ): Promise<ExperimentEvidence> {
   const benchmarkIds = requirements.map((item) => item.selector.benchmarkDefinitionId).filter((id): id is string => Boolean(id))
   const supplementIds = [
@@ -354,10 +356,10 @@ async function loadEvidence(
   const [benchmarks, training, body, nutrition, activity, sleep, adherence, context, controls] = await Promise.all([
     loadBenchmarks(sql, experiment.id, benchmarkIds),
     loadTraining(sql, experiment.id, start, end),
-    loadBody(sql, requirements, start, end),
+    loadBody(sql, requirements, start, end, timezone),
     loadNutrition(sql, start, end),
-    loadActivity(sql, start, end),
-    loadSleep(sql, start, end),
+    loadActivity(sql, start, end, timezone),
+    loadSleep(sql, start, end, timezone),
     loadAdherence(sql, [...new Set(supplementIds)], start, end),
     loadContext(sql, start, end),
     loadControls(sql, experiment.protocol_version_id),
@@ -472,7 +474,13 @@ function canonicalSet(row: Record<string, unknown>, session: { id: string; worko
   }
 }
 
-async function loadBody(sql: Sql, requirements: ExperimentRequirementSpec[], start: string, end: string) {
+async function loadBody(
+  sql: Sql,
+  requirements: ExperimentRequirementSpec[],
+  start: string,
+  end: string,
+  fallbackTimezone: string,
+) {
   const metricKeys = requirements.filter((item) => item.requirementKind === 'body_metric').map((item) => item.selector.metricKey).filter(Boolean)
   if (metricKeys.length === 0) return []
   const rows = (await sql.query(
@@ -486,7 +494,7 @@ async function loadBody(sql: Sql, requirements: ExperimentRequirementSpec[], sta
     const value = finite(row.value)
     if (value == null || !(row.measured_at instanceof Date) && typeof row.measured_at !== 'string') return []
     const instant = row.measured_at instanceof Date ? row.measured_at : new Date(String(row.measured_at))
-    const timezone = typeof row.timezone === 'string' && row.timezone.trim() ? row.timezone : HEALTH_CALENDAR_TIME_ZONE
+    const timezone = typeof row.timezone === 'string' && row.timezone.trim() ? row.timezone : fallbackTimezone
     const calendarDate = calendarDateFromInstant(instant, timezone)
     if (calendarDate < start || calendarDate > end) return []
     return [{ measurementId: String(row.id), calendarDate, metricKey: String(row.metric_key), value, unit: String(row.unit) }]
@@ -511,12 +519,12 @@ async function loadNutrition(sql: Sql, start: string, end: string) {
   return points
 }
 
-async function loadActivity(sql: Sql, start: string, end: string) {
+async function loadActivity(sql: Sql, start: string, end: string, timezone: string) {
   const rows = (await sql.query(
     `SELECT summary_date::text AS summary_date, steps_count, active_energy_kcal, exercise_minutes, resting_heart_rate_bpm
      FROM activity_daily_summaries
      WHERE timezone = $3 AND summary_date BETWEEN $1::date AND $2::date`,
-    [start, end, ACTIVITY_TIMEZONE],
+    [start, end, timezone],
   )) as Array<Record<string, unknown>>
   const points: ExperimentEvidence['activity'] = []
   for (const row of rows) {
@@ -527,12 +535,12 @@ async function loadActivity(sql: Sql, start: string, end: string) {
   return points
 }
 
-async function loadSleep(sql: Sql, start: string, end: string) {
+async function loadSleep(sql: Sql, start: string, end: string, timezone: string) {
   const rows = (await sql.query(
     `SELECT sleep_date::text AS sleep_date, total_sleep_minutes, analysis_eligible
      FROM sleep_nightly_summaries
      WHERE timezone = $3 AND sleep_date BETWEEN $1::date AND $2::date`,
-    [start, end, ACTIVITY_TIMEZONE],
+    [start, end, timezone],
   )) as Array<Record<string, unknown>>
   return rows.map((row) => ({
     date: String(row.sleep_date),

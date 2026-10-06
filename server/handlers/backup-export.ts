@@ -1,7 +1,7 @@
-import { healthCalendarDateFromNow } from '../../src/domain/time.js'
 import { createOwnerExport, openBackupSql } from '../backup/database.js'
 import { withOwnerAuth } from '../auth/with-owner.js'
 import { handleApiError, sendJson, type ApiRequest, type ApiResponse } from '../http.js'
+import { healthTimeContext } from '../health-time.js'
 
 export default withOwnerAuth(async function backupExportHandler(req: ApiRequest, res: ApiResponse) {
   try {
@@ -10,8 +10,8 @@ export default withOwnerAuth(async function backupExportHandler(req: ApiRequest,
       sendJson(res, 405, { error: 'Method not allowed' })
       return
     }
-    const exported = await createOwnerExport(await openBackupSql())
-    const day = healthCalendarDateFromNow()
+    const { date: day, timezone } = await healthTimeContext()
+    const exported = await createOwnerExport(await openBackupSql(), timezone)
     res.statusCode = 200
     res.setHeader('Content-Type', 'application/zip')
     res.setHeader('Content-Disposition', `attachment; filename="health-${exported.profile}-${day}.health-backup.zip"`)

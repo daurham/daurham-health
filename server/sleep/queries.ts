@@ -1,3 +1,4 @@
+import { DEFAULT_HEALTH_CALENDAR_TIME_ZONE } from '../../src/domain/time.js'
 import type { SleepIntervalRow, SleepNightlySummary, SleepObservationStatus, SleepSelectionReason, SleepVitalMetricKey, SleepVitalObservation } from '../../src/domain/sleep/index.js'
 import type { ProgressSleepObservation } from '../../src/domain/progress/health-timeline.js'
 import { getSql } from '../db.js'
@@ -199,7 +200,7 @@ export const LIST_SLEEP_OBSERVATIONS_SQL = `SELECT sleep_date::text AS sleep_dat
          WHERE timezone = $1
          ORDER BY sleep_date ASC`
 
-export async function listSleepObservationsForProgress(timezone = 'America/Phoenix'): Promise<ProgressSleepObservation[]> {
+export async function listSleepObservationsForProgress(timezone = DEFAULT_HEALTH_CALENDAR_TIME_ZONE): Promise<ProgressSleepObservation[]> {
   const sql = await getSql()
   const rows = (await sql.query(LIST_SLEEP_OBSERVATIONS_SQL, [timezone])) as Array<Record<string, unknown>>
   return rows.map((row) => ({
@@ -248,7 +249,7 @@ export function mapSleepNightlySummaryRow(row: Record<string, unknown>): SleepNi
 
 export async function readSleepNightRecord(
   sleepDate: string,
-  timezone = 'America/Phoenix',
+  timezone = DEFAULT_HEALTH_CALENDAR_TIME_ZONE,
 ): Promise<{ night: SleepNightlySummary; transportName: string | null; previousSleepDate: string | null; nextSleepDate: string | null } | null> {
   const sql = await getSql()
   const rows = (await sql.query(
@@ -362,9 +363,17 @@ export async function listSleepVitalSamples(episodeStart: string, episodeEnd: st
   return samples
 }
 
-export async function listSleepNightlySummaries(): Promise<SleepNightlySummary[]> {
+export async function listSleepNightlySummaries(timezone?: string): Promise<SleepNightlySummary[]> {
   const sql = await getSql()
-  const rows = (await sql.query(LIST_SLEEP_NIGHTLY_SUMMARIES_SQL)) as Array<Record<string, unknown>>
+  const rows = timezone
+    ? ((await sql.query(
+        LIST_SLEEP_NIGHTLY_SUMMARIES_SQL.replace(
+          'ORDER BY sleep_date ASC',
+          'WHERE timezone = $1 ORDER BY sleep_date ASC',
+        ),
+        [timezone],
+      )) as Array<Record<string, unknown>>)
+    : ((await sql.query(LIST_SLEEP_NIGHTLY_SUMMARIES_SQL)) as Array<Record<string, unknown>>)
   return rows.map((row) => mapSleepNightlySummaryRow(row))
 }
 

@@ -124,7 +124,7 @@ export type CrossDomainFinding =
   | (FindingBase & { kind: 'period_context'; metrics: PeriodContextMetrics })
 
 export type CrossDomainState = {
-  timezone: 'America/Phoenix'
+  timezone: string
   period: IntelligencePeriod
   today: string | null
   provisionalActivityDate: string | null

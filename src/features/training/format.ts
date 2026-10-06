@@ -5,8 +5,8 @@ import { formatPrescription } from '@/domain/training'
 
 import { healthCalendarDateFromNow } from '@/domain/time'
 
-export function localIsoDate(now = new Date()): string {
-  return healthCalendarDateFromNow(now)
+export function localIsoDate(now = new Date(), timezone?: string): string {
+  return healthCalendarDateFromNow(now, timezone)
 }
 
 export function formatWorkoutDate(isoDate: string): string {

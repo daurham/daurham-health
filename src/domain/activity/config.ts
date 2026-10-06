@@ -1,4 +1,7 @@
-export const ACTIVITY_TIMEZONE = 'America/Phoenix'
+import { DEFAULT_HEALTH_CALENDAR_TIME_ZONE } from '../time.js'
+
+/** Backward-compatible default only. Runtime callers should pass instance timezone. */
+export const ACTIVITY_TIMEZONE = DEFAULT_HEALTH_CALENDAR_TIME_ZONE
 
 export const ACTIVITY_METRICS = [
   'steps_count',

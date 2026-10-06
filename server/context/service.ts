@@ -8,9 +8,9 @@ import {
   type DailyContext,
   type DailyContextTagKey,
 } from '../../src/domain/context.js'
-import { healthCalendarDateFromNow } from '../../src/domain/time.js'
 import { getSql, type Sql } from '../db.js'
 import { HttpError } from '../http.js'
+import { currentHealthDate } from '../health-time.js'
 
 type ContextRow = {
   id: string
@@ -155,7 +155,7 @@ async function loadContexts(sql: Sql, rows: readonly ContextRow[]): Promise<Dail
 }
 
 export async function getDailyContext(date: string, now = new Date()): Promise<DailyContext | null> {
-  const today = healthCalendarDateFromNow(now)
+  const today = await currentHealthDate(now)
   const dateError = contextDateError(date, today)
   if (dateError) {
     throw new HttpError(400, dateError)
@@ -245,7 +245,7 @@ async function applyWrite(
 }
 
 export async function putDailyContext(date: string, body: unknown, now = new Date()): Promise<DailyContext> {
-  const today = healthCalendarDateFromNow(now)
+  const today = await currentHealthDate(now)
   const dateError = contextDateError(date, today)
   if (dateError) {
     throw new HttpError(400, dateError)
@@ -279,7 +279,7 @@ export async function putDailyContext(date: string, body: unknown, now = new Dat
 }
 
 export async function deleteDailyContext(date: string, now = new Date()): Promise<boolean> {
-  const today = healthCalendarDateFromNow(now)
+  const today = await currentHealthDate(now)
   const dateError = contextDateError(date, today)
   if (dateError) {
     throw new HttpError(400, dateError)

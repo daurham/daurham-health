@@ -7,7 +7,7 @@ import path from 'node:path'
 import { createInterface } from 'node:readline'
 import { createAppleHealthXmlScanner } from '../../src/domain/apple-health/parse.js'
 import type { NormalizedAppleHealthRecord, SkippedAppleHealthRecord } from '../../src/domain/apple-health/parse.js'
-import { HEALTH_CALENDAR_TIME_ZONE, healthCalendarDateFromInstant } from '../../src/domain/time.js'
+import { DEFAULT_HEALTH_CALENDAR_TIME_ZONE, healthCalendarDateFromInstant } from '../../src/domain/time.js'
 
 const APPLE_HEALTH_COMMIT_BATCH = 400
 
@@ -430,8 +430,10 @@ export async function streamAppleHealthPreview(input: {
   zipPath?: string
   xmlPath?: string
   zipBytes?: number | null
+  calendarTimeZone?: string
 }): Promise<AppleHealthStreamReport> {
   const started = Date.now()
+  const calendarTimeZone = input.calendarTimeZone ?? DEFAULT_HEALTH_CALENDAR_TIME_ZONE
   let peakRss = process.memoryUsage().rss
   const dir = await mkdtemp(path.join(tmpdir(), 'apple-health-preview-'))
   const fingerprintFile = path.join(dir, 'fingerprints.txt')
@@ -562,7 +564,7 @@ export async function streamAppleHealthPreview(input: {
       if (item.metric === 'resting_heart_rate') {
         bump(rhrBySource, item.sourceName)
         if (Number.isFinite(startMs)) {
-          rhrDays.add(healthCalendarDateFromInstant(new Date(startMs)))
+          rhrDays.add(healthCalendarDateFromInstant(new Date(startMs), calendarTimeZone))
           if (startMs < rhrBounds.earliestMs) {
             rhrBounds.earliestMs = startMs
             rhrBounds.earliest = item.startAt
@@ -720,6 +722,6 @@ export async function streamAppleHealthPreview(input: {
       approxPayloadBytes,
     browserPath: xmlBytes > 40 * 1024 * 1024 ? 'unsafe' : 'ok',
   },
-    calendarTimeZone: HEALTH_CALENDAR_TIME_ZONE,
+    calendarTimeZone,
   }
 }

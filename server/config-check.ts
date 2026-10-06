@@ -1,5 +1,5 @@
 import { pathToFileURL } from 'node:url'
-import { assertIanaTimeZone, HEALTH_CALENDAR_TIME_ZONE } from '../src/domain/time.js'
+import { assertIanaTimeZone, DEFAULT_HEALTH_CALENDAR_TIME_ZONE } from '../src/domain/time.js'
 import { loadLocalEnv } from './env.js'
 import { optionalBoolean, resolveInstanceConfig } from './instance-config.js'
 
@@ -55,7 +55,7 @@ export function inspectInstanceConfiguration(
 
   try {
     assertIanaTimeZone(
-      env.HEALTH_CALENDAR_TIMEZONE?.trim() || HEALTH_CALENDAR_TIME_ZONE,
+      env.HEALTH_CALENDAR_TIMEZONE?.trim() || DEFAULT_HEALTH_CALENDAR_TIME_ZONE,
     )
     diagnostics.push({
       level: 'ok',

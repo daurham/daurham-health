@@ -77,11 +77,12 @@ export function activityWorkoutsInRange(
   workouts: readonly ProgressActivityWorkout[],
   start: string,
   end: string,
+  timezone = ACTIVITY_TIMEZONE,
 ): Array<ProgressActivityWorkout & { date: string }> {
   return workouts
     .map((workout) => ({
       ...workout,
-      date: calendarDateFromInstant(new Date(workout.startAt), ACTIVITY_TIMEZONE),
+      date: calendarDateFromInstant(new Date(workout.startAt), timezone),
     }))
     .filter((workout) => dateInInclusiveRange(workout.date, start, end))
 }

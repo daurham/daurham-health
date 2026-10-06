@@ -7,9 +7,9 @@ import {
   type BodyCapture,
 } from '../../src/domain/body-capture.js'
 import { BodyInputError, metricDefinition, parseManualCreate, type StagedManualMetric } from '../../src/domain/body-manual.js'
-import { HEALTH_CALENDAR_TIME_ZONE } from '../../src/domain/time.js'
 import { getSql } from '../db.js'
 import { HttpError } from '../http.js'
+import { healthCalendarTimeZone } from '../health-time.js'
 import {
   BODY_CAPTURE_COMMIT_SQL,
   BODY_CAPTURE_DETAIL_SQL,
@@ -66,7 +66,7 @@ async function sourceIds(): Promise<{ manual: string; shortcut: string }> {
 export async function stageBodyCapture(payload: unknown, now = new Date()): Promise<BodyCaptureIntake> {
   let capture: BodyCapture
   try {
-    capture = parseBodyCapture(payload, now)
+    capture = parseBodyCapture(payload, now, await healthCalendarTimeZone())
   } catch (error) {
     asInputError(error)
   }
@@ -154,7 +154,10 @@ export async function commitBodyCapture(id: string, body: unknown, now = new Dat
   } catch (error) {
     asInputError(error)
   }
-  const { manual, shortcut } = await sourceIds()
+  const [{ manual, shortcut }, timezone] = await Promise.all([
+    sourceIds(),
+    healthCalendarTimeZone(),
+  ])
   const sessionId = randomUUID()
   const metricIds = plan.metrics.map(() => randomUUID())
   const sql = await getSql()
@@ -162,7 +165,7 @@ export async function commitBodyCapture(id: string, body: unknown, now = new Dat
     id,
     sessionId,
     plan.measuredAt.toISOString(),
-    HEALTH_CALENDAR_TIME_ZONE,
+    timezone,
     manual,
     plan.notes,
     metricIds,
@@ -225,8 +228,8 @@ function storedCapture(row: Record<string, unknown>): BodyCapture {
   const metrics = readMetrics(row.metrics)
   const notes = row.notes == null ? null : typeof row.notes === 'string' ? row.notes : null
   const capturedAt = asIso(row.captured_at)
-  const timezone = 'America/Phoenix' as const
-  if (!capturedAt || metrics == null) {
+  const timezone = typeof row.timezone === 'string' && row.timezone.trim() ? row.timezone : null
+  if (!capturedAt || metrics == null || !timezone) {
     throw new HttpError(409, 'This capture id was already used with different measurements')
   }
   return {

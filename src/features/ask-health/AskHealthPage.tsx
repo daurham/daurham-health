@@ -2,8 +2,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useState } from 'react'
 import { ASK_LENS_LABELS, ASK_SUGGESTIONS, type AskLens, type AskTurn } from '@/domain/ask-health'
 import type { ProgressRange } from '@/domain/progress'
-import { healthCalendarDateFromNow } from '@/domain/time'
-import { primaryButtonClass, quietButtonClass } from '@/lib'
+import { primaryButtonClass, quietButtonClass, useHealthCalendarDate } from '@/lib'
 import { ProgressRangeControl } from '@/features/progress/ProgressRangeControl'
 import { askHealth } from './api'
 import { AskHealthAnswerView } from './AnswerView'
@@ -23,6 +22,7 @@ function initialRange(value: string | null): ProgressRange {
 }
 
 export function AskHealthPage() {
+  const today = useHealthCalendarDate()
   const [params] = useSearchParams()
   const [lens, setLens] = useState<AskLens>(() => initialLens(params.get('lens')))
   const [range, setRange] = useState<ProgressRange>(() => initialRange(params.get('range')))
@@ -45,7 +45,7 @@ export function AskHealthPage() {
         question: trimmed,
         lens,
         range,
-        asOf: healthCalendarDateFromNow(),
+        asOf: today,
         conversation: turns.slice(-6),
       })
       const assistant = response.answer.blocks.map((block) => block.text).join('\n')

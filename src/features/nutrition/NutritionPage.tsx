@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
-  NUTRITION_CONFIG,
   nutritionDayTotals,
   recipePortionDescription,
   snapshotFromDefinition,
@@ -17,6 +16,7 @@ import {
   primaryButtonClass,
   secondaryButtonClass,
   useAtomicKeyedResource,
+  useHealthCalendarTimeZone,
 } from '@/lib'
 import type { NutrientTotal } from '@/domain/nutrition'
 import {
@@ -59,11 +59,12 @@ type Panel =
   | { kind: 'meal'; jobId: string }
 
 export function NutritionPage() {
+  const timezone = useHealthCalendarTimeZone()
+  const today = todayNutritionDate(new Date(), timezone)
   const [params, setParams] = useSearchParams()
-  const urlDate = parseNutritionDateParam(params.get('date'))
+  const urlDate = parseNutritionDateParam(params.get('date'), today)
   const [intentDate, setIntentDate] = useState(urlDate)
   const urlDateRef = useRef(urlDate)
-  const today = todayNutritionDate()
   const loadDay = useCallback((date: string, signal: AbortSignal) => fetchNutritionDay(date, signal), [])
   const resource = useAtomicKeyedResource({
     requestedKey: intentDate,
@@ -196,7 +197,7 @@ export function NutritionPage() {
       id: optimisticId,
       logDate: date,
       consumedAt: null,
-      timezone: NUTRITION_CONFIG.calendarTimeZone,
+      timezone,
       meal: null,
       foodId: food.id,
       foodName: food.name,
@@ -222,7 +223,7 @@ export function NutritionPage() {
     try {
       const created = await createNutritionEntry({
         logDate: date,
-        timezone: NUTRITION_CONFIG.calendarTimeZone,
+        timezone,
         foodId: food.id,
         servingQuantity: 1,
       })
@@ -296,7 +297,7 @@ export function NutritionPage() {
   async function logAgainToday(entry: NutritionEntry) {
     await createNutritionEntry({
       logDate: today,
-      timezone: NUTRITION_CONFIG.calendarTimeZone,
+      timezone,
       meal: entry.meal,
       foodId: entry.foodId,
       foodName: entry.foodName,

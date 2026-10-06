@@ -13,7 +13,7 @@ The capture token is a server secret. It is not an owner session, and it cannot 
    - Date: Current Date
    - Format: Custom
    - Format String: `yyyy-MM-dd'T'HH:mm:ssxxx`
-   Phoenix time then looks like `2026-09-27T17:06:00-07:00`.
+   For an Arizona deployment, that can look like `2026-09-27T17:06:00-07:00`. Other instance timezones may use a different offset.
 5. Dictionary:
 
 ```json
@@ -21,7 +21,7 @@ The capture token is a server secret. It is not an owner session, and it cannot 
   "version": "body-capture-v1",
   "captureId": "<UUID from step 1>",
   "capturedAt": "<formatted date>",
-  "timezone": "America/Phoenix",
+  "timezone": "<HEALTH_CALENDAR_TIMEZONE>",
   "metrics": [
     { "key": "weight", "value": 190.4, "unit": "lb" }
   ],
@@ -31,11 +31,11 @@ The capture token is a server secret. It is not an owner session, and it cannot 
 
 6. Get Contents of URL:
    - Method: POST
-   - URL: `https://health.daurham.com/api/ingest/body`
+   - URL: `https://<your-health-domain>/api/ingest/body`
    - Request body: JSON, the dictionary from step 5
    - Headers: `Authorization` = `Bearer <BODY_CAPTURE_TOKEN>`
 7. Get `reviewPath` from the response dictionary.
-8. Open URL: `https://health.daurham.com` plus `reviewPath`.
+8. Open URL: your Health instance origin (for example `https://<your-health-domain>`) plus `reviewPath`.
 
 The review address is only `/body/inbox/` and the capture id. It does not include the weight, notes, or token.
 

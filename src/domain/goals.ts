@@ -8,6 +8,7 @@ import type { CanonicalSetRecord, ProgressExerciseDefinition } from './progress/
 import { aggregateOccurrenceStates, resolveScheduleRange } from './supplements/resolve.js'
 import type { AdherenceWindow, ScheduleWindow, StatusEventWindow } from './supplements/types.js'
 import { isCalendarDate } from './training.js'
+import { DEFAULT_HEALTH_CALENDAR_TIME_ZONE } from './time.js'
 import { centimetersToInches, kilogramsToPounds } from './units.js'
 
 export const GOAL_KINDS = [
@@ -996,7 +997,8 @@ export function goalEvidence(input: {
   } else if (input.goalKind === 'activity_steps') {
     const days = input.target.evaluationWindowDays ?? 7
     const start = addCalendarDays(input.asOf, -days)
-    const summary = activityRangeSummary(input.activityRows, start, input.asOf, 'America/Phoenix', input.asOf)
+    const activityTimezone = input.activityRows[0]?.timezone ?? DEFAULT_HEALTH_CALENDAR_TIME_ZONE
+    const summary = activityRangeSummary(input.activityRows, start, input.asOf, activityTimezone, input.asOf)
     base.current = summary.steps.status === 'available' ? summary.steps.value : null
     base.coverage = {
       ...emptyCoverage(summary.steps.completedCalendarDays),

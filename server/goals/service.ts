@@ -28,9 +28,9 @@ import { calendarDateFromInstant } from '../../src/domain/progress/dates.js'
 import { bestTrainingPerformance, trainingPerformanceObservations } from '../../src/domain/progress/training-performance.js'
 import type { BodyObservation, CanonicalSetRecord, ProgressExerciseDefinition } from '../../src/domain/progress/types.js'
 import type { AdherenceWindow, ScheduleWindow, StatusEventWindow } from '../../src/domain/supplements/types.js'
-import { healthCalendarDateFromNow } from '../../src/domain/time.js'
 import { getSql, type Sql } from '../db.js'
 import { HttpError } from '../http.js'
+import { currentHealthDate, healthCalendarTimeZone } from '../health-time.js'
 
 const STALE = 'stale_version'
 
@@ -357,7 +357,13 @@ function selectorContext(row: GoalRow): { archived: boolean; message: string | n
   return { archived: false, message: null }
 }
 
-async function loadEvidence(sql: Sql, row: GoalRow, target: GoalTarget, asOf: string): Promise<GoalEvidence> {
+async function loadEvidence(
+  sql: Sql,
+  row: GoalRow,
+  target: GoalTarget,
+  asOf: string,
+  timezone: string,
+): Promise<GoalEvidence> {
   const empty: Omit<Parameters<typeof goalEvidence>[0], 'goalKind' | 'target' | 'asOf'> = {
     body: null,
     strength: null,
@@ -371,20 +377,24 @@ async function loadEvidence(sql: Sql, row: GoalRow, target: GoalTarget, asOf: st
   }
   if (row.goal_kind === 'body_metric' && row.body_metric_key) {
     const metrics = (await sql.query(
-      `SELECT metrics.value::text AS value, metrics.unit, sessions.measured_at::text AS measured_at
+      `SELECT metrics.value::text AS value, metrics.unit, sessions.measured_at::text AS measured_at,
+              sessions.timezone
        FROM body_metrics metrics
        JOIN body_measurement_sessions sessions ON sessions.id = metrics.measurement_session_id
        WHERE metrics.metric_key = $1
        ORDER BY sessions.measured_at DESC
        LIMIT 1`,
       [row.body_metric_key],
-    )) as Array<{ value: string; unit: string; measured_at: string }>
+    )) as Array<{ value: string; unit: string; measured_at: string; timezone: string | null }>
     const metric = metrics[0]
     if (metric) {
       empty.body = {
         value: Number(metric.value),
         unit: metric.unit,
-        observedOn: metric.measured_at.slice(0, 10),
+        observedOn: calendarDateFromInstant(
+          new Date(metric.measured_at),
+          metric.timezone?.trim() || timezone,
+        ),
       }
     }
   }
@@ -579,12 +589,13 @@ async function loadEvidence(sql: Sql, row: GoalRow, target: GoalTarget, asOf: st
   if (row.goal_kind === 'activity_steps') {
     const rows = (await sql.query(
       `SELECT summary_date::text AS date, steps_count::text AS steps_count
-       FROM activity_daily_summaries`,
-      [],
+       FROM activity_daily_summaries
+       WHERE timezone = $1`,
+      [timezone],
     )) as Array<{ date: string; steps_count: string | null }>
     empty.activityRows = rows.map((item) => ({
       date: item.date,
-      timezone: 'America/Phoenix',
+      timezone,
       stepsCount: numberOrNull(item.steps_count),
       activeEnergyKcal: null,
       exerciseMinutes: null,
@@ -610,8 +621,9 @@ async function loadEvidence(sql: Sql, row: GoalRow, target: GoalTarget, asOf: st
   if (row.goal_kind === 'sleep_duration') {
     const rows = (await sql.query(
       `SELECT sleep_date::text AS date, total_sleep_minutes::text AS minutes, analysis_eligible, observation_status
-       FROM sleep_nightly_summaries`,
-      [],
+       FROM sleep_nightly_summaries
+       WHERE timezone = $1`,
+      [timezone],
     )) as Array<{ date: string; minutes: string | null; analysis_eligible: boolean; observation_status: string }>
     empty.sleepNights = rows.map((item) => ({
       date: item.date,
@@ -720,7 +732,7 @@ async function overlapWarning(sql: Sql, selector: GoalSelector, exceptId?: strin
   return match ? 'Another active goal already uses this metric.' : null
 }
 
-async function goalById(sql: Sql, id: string, asOf: string) {
+async function goalById(sql: Sql, id: string, asOf: string, timezone: string) {
   const rows = await readGoalRows(sql, id)
   const row = rows[0]
   if (!row) {
@@ -732,15 +744,18 @@ async function goalById(sql: Sql, id: string, asOf: string) {
     throw new HttpError(500, 'Goal is missing a current version')
   }
   const target = targetFrom(current)
-  const evidence = await loadEvidence(sql, row, target, asOf)
+  const evidence = await loadEvidence(sql, row, target, asOf, timezone)
   const warning = row.status === 'active' ? await overlapWarning(sql, selectorFrom(row), row.id) : null
   const derived = await deriveGoalStatus(sql, row, current, evidence, asOf)
   return presentGoal(row, versions, evidence, warning, derived)
 }
 
 export async function listGoals() {
-  const sql = await getSql()
-  const asOf = healthCalendarDateFromNow()
+  const [sql, timezone, asOf] = await Promise.all([
+    getSql(),
+    healthCalendarTimeZone(),
+    currentHealthDate(),
+  ])
   const rows = await readGoalRows(sql)
   const goals = []
   for (const row of rows) {
@@ -749,7 +764,7 @@ export async function listGoals() {
     if (!current) {
       continue
     }
-    const evidence = await loadEvidence(sql, row, targetFrom(current), asOf)
+    const evidence = await loadEvidence(sql, row, targetFrom(current), asOf, timezone)
     const derived = await deriveGoalStatus(sql, row, current, evidence, asOf)
     goals.push(presentGoal(row, versions, evidence, null, { goalStatus: derived.goalStatus, projection: null }))
   }
@@ -757,7 +772,7 @@ export async function listGoals() {
 }
 
 export async function listGoalAskSnapshots(asOf: string) {
-  const sql = await getSql()
+  const [sql, timezone] = await Promise.all([getSql(), healthCalendarTimeZone()])
   const rows = await readGoalRows(sql)
   const goals = []
   for (const row of rows) {
@@ -770,7 +785,7 @@ export async function listGoalAskSnapshots(asOf: string) {
       continue
     }
     const target = targetFrom(current)
-    const evidence = await loadEvidence(sql, row, target, asOf)
+    const evidence = await loadEvidence(sql, row, target, asOf, timezone)
     const derived = await deriveGoalStatus(sql, row, current, evidence, asOf)
     goals.push({
       id: row.id,
@@ -833,8 +848,12 @@ async function loadCatalog(sql: Sql) {
 }
 
 export async function getGoal(id: string) {
-  const sql = await getSql()
-  const goal = await goalById(sql, id, healthCalendarDateFromNow())
+  const [sql, timezone, today] = await Promise.all([
+    getSql(),
+    healthCalendarTimeZone(),
+    currentHealthDate(),
+  ])
+  const goal = await goalById(sql, id, today, timezone)
   if (!goal) {
     throw new HttpError(404, 'Goal not found')
   }
@@ -842,7 +861,7 @@ export async function getGoal(id: string) {
 }
 
 export async function createGoal(body: unknown) {
-  const today = healthCalendarDateFromNow()
+  const [today, timezone] = await Promise.all([currentHealthDate(), healthCalendarTimeZone()])
   const record = body != null && typeof body === 'object' ? (body as Record<string, unknown>) : {}
   const sql = await getSql()
   const context = await loadContext(sql, record, today)
@@ -852,7 +871,7 @@ export async function createGoal(body: unknown) {
   }
   const sourceId = await manualSourceId(sql)
   const id = await insertGoal(sql, draft, sourceId, new Date().toISOString())
-  const goal = await goalById(sql, id, today)
+  const goal = await goalById(sql, id, today, timezone)
   if (!goal) {
     throw new HttpError(500, 'Goal could not be read after save')
   }
@@ -868,9 +887,12 @@ export async function reviseGoal(id: string, body: unknown) {
   if (typeof sourceVersionId !== 'string') {
     throw new HttpError(400, 'The current goal version is required.')
   }
-  const sql = await getSql()
-  const today = healthCalendarDateFromNow()
-  const existing = await goalById(sql, id, today)
+  const [sql, today, timezone] = await Promise.all([
+    getSql(),
+    currentHealthDate(),
+    healthCalendarTimeZone(),
+  ])
+  const existing = await goalById(sql, id, today, timezone)
   if (!existing) {
     throw new HttpError(404, 'Goal not found')
   }
@@ -1180,7 +1202,7 @@ export async function goalAttentionForToday(
   cadence: { configs: readonly CadenceConfig[]; observations: readonly CadenceObservation[] },
   retests: readonly BenchmarkRetestView[],
 ): Promise<GoalAttentionItem[]> {
-  const sql = await getSql()
+  const [sql, timezone] = await Promise.all([getSql(), healthCalendarTimeZone()])
   const rows = await readGoalRows(sql)
   const items: GoalAttentionItem[] = []
   for (const row of rows) {
@@ -1192,7 +1214,7 @@ export async function goalAttentionForToday(
     if (!current) {
       continue
     }
-    const evidence = await loadEvidence(sql, row, targetFrom(current), asOf)
+    const evidence = await loadEvidence(sql, row, targetFrom(current), asOf, timezone)
     const derived = await deriveGoalStatus(sql, row, current, evidence, asOf)
     items.push(
       ...goalAttentionCandidates({

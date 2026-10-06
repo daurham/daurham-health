@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { trailingPeriod } from '@/domain/progress'
-import { healthCalendarDateFromNow } from '@/domain/time'
 import type {
   CompareExercise,
   MetricResult,
@@ -9,7 +8,7 @@ import type {
   ProgressCompare,
   ProgressCheckpoint,
 } from '@/domain/progress'
-import { cn } from '@/lib'
+import { cn, useHealthCalendarDate } from '@/lib'
 import { formatGrams, formatKcal } from '@/features/nutrition/format'
 import { formatSleepDuration } from './activity-sleep-copy'
 import {
@@ -49,7 +48,7 @@ function defaultCompareParams(asOf: string): { startA: string; endA: string; sta
 
 export function CompareSection({ onEvidence }: { onEvidence: (topic: EvidenceTopic) => void }) {
   const [params, setParams] = useSearchParams()
-  const asOf = healthCalendarDateFromNow()
+  const asOf = useHealthCalendarDate()
   const defaults = useMemo(() => defaultCompareParams(asOf), [asOf])
   const checkpointId = params.get('checkpoint')
   const startA = params.get('startA') ?? defaults.startA
@@ -229,7 +228,8 @@ function CheckpointManager({
   onDeleted: (id: string) => void
 }) {
   const [label, setLabel] = useState('')
-  const [date, setDate] = useState(healthCalendarDateFromNow())
+  const today = useHealthCalendarDate()
+  const [date, setDate] = useState(today)
   const [notes, setNotes] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [editing, setEditing] = useState<string | null>(null)

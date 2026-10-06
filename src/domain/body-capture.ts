@@ -6,7 +6,11 @@ import {
   parseStagedManualMetrics,
   type StagedManualMetric,
 } from './body-manual.js'
-import { HEALTH_CALENDAR_TIME_ZONE } from './time.js'
+import {
+  DEFAULT_HEALTH_CALENDAR_TIME_ZONE,
+  assertIanaTimeZone,
+  parseWallClockInTimeZone,
+} from './time.js'
 import { centimetersToInches, kilogramsToPounds } from './units.js'
 
 export const BODY_CAPTURE_VERSION = 'body-capture-v1'
@@ -23,7 +27,7 @@ const METRIC_FIELDS = new Set(['key', 'value', 'unit'])
 export type BodyCapture = {
   captureId: string
   capturedAt: string
-  timezone: typeof HEALTH_CALENDAR_TIME_ZONE
+  timezone: string
   metrics: StagedManualMetric[]
   notes: string | null
 }
@@ -39,7 +43,11 @@ export function bodyShortcutFingerprint(captureId: string): string {
   return `body_shortcut|${BODY_CAPTURE_VERSION}|${captureId}`
 }
 
-export function parseBodyCapture(payload: unknown, now: Date): BodyCapture {
+export function parseBodyCapture(
+  payload: unknown,
+  now: Date,
+  expectedTimeZone = DEFAULT_HEALTH_CALENDAR_TIME_ZONE,
+): BodyCapture {
   if (payload == null || typeof payload !== 'object' || Array.isArray(payload)) {
     throw new BodyInputError('Capture body is invalid')
   }
@@ -55,8 +63,9 @@ export function parseBodyCapture(payload: unknown, now: Date): BodyCapture {
   if (typeof record.captureId !== 'string' || !CAPTURE_ID.test(record.captureId)) {
     throw new BodyInputError('Capture id is invalid')
   }
-  if (record.timezone !== HEALTH_CALENDAR_TIME_ZONE) {
-    throw new BodyInputError('Capture timezone must be America/Phoenix')
+  const timeZone = assertIanaTimeZone(expectedTimeZone)
+  if (record.timezone !== timeZone) {
+    throw new BodyInputError(`Capture timezone must be ${timeZone}`)
   }
   const measuredAt = parseOffsetAwareMeasuredAt(record.capturedAt, now)
   if (!Array.isArray(record.metrics) || record.metrics.length > MANUAL_BODY_METRICS.length) {
@@ -76,7 +85,7 @@ export function parseBodyCapture(payload: unknown, now: Date): BodyCapture {
   return {
     captureId: record.captureId,
     capturedAt: measuredAt.toISOString(),
-    timezone: HEALTH_CALENDAR_TIME_ZONE,
+    timezone: timeZone,
     metrics,
     notes: parseCaptureNotes(record.notes),
   }
@@ -122,14 +131,17 @@ export function stagedFormValue(metric: StagedManualMetric): string {
   return String(Math.round(value * 1_000_000) / 1_000_000)
 }
 
-export function phoenixDateTimeLocal(iso: string): string {
+export function dateTimeLocalInTimeZone(
+  iso: string,
+  timeZone = DEFAULT_HEALTH_CALENDAR_TIME_ZONE,
+): string {
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) {
     throw new BodyInputError('Measurement time is invalid')
   }
   const parts = Object.fromEntries(
     new Intl.DateTimeFormat('en-US', {
-      timeZone: HEALTH_CALENDAR_TIME_ZONE,
+      timeZone: assertIanaTimeZone(timeZone),
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
@@ -146,23 +158,62 @@ export function phoenixDateTimeLocal(iso: string): string {
   return `${parts.year}-${parts.month}-${parts.day}T${hour}:${parts.minute}:${second}`
 }
 
-export function measuredAtFromPhoenixLocal(local: string): string {
+export function measuredAtFromLocalTime(
+  local: string,
+  timeZone = DEFAULT_HEALTH_CALENDAR_TIME_ZONE,
+): string {
   const match = LOCAL_MEASURED_AT.exec(local)
   if (!match?.[1]) {
     throw new BodyInputError('Measurement time must include a real time')
   }
-  return `${match[1]}:${match[2] ?? '00'}-07:00`
+  const [date, hourMinute] = match[1].split('T')
+  const [year, month, day] = (date ?? '').split('-')
+  const seconds = match[2] ?? '00'
+  try {
+    const instant = parseWallClockInTimeZone(
+      `${month}/${day}/${year} ${hourMinute}:${seconds}`,
+      timeZone,
+    )
+    const timeZoneName = new Intl.DateTimeFormat('en-US', {
+      timeZone: assertIanaTimeZone(timeZone),
+      timeZoneName: 'longOffset',
+    })
+      .formatToParts(instant)
+      .find((part) => part.type === 'timeZoneName')?.value
+    const offset = timeZoneName === 'GMT'
+      ? '+00:00'
+      : timeZoneName?.match(/^GMT([+-]\d{2}:\d{2})$/)?.[1]
+    if (!offset) {
+      throw new Error('Timezone offset unavailable')
+    }
+    return `${match[1]}:${seconds}${offset}`
+  } catch {
+    throw new BodyInputError('Measurement time is invalid')
+  }
+}
+
+/** Backward-compatible aliases for older callers/tests. */
+export function phoenixDateTimeLocal(iso: string): string {
+  return dateTimeLocalInTimeZone(iso, DEFAULT_HEALTH_CALENDAR_TIME_ZONE)
+}
+
+export function measuredAtFromPhoenixLocal(local: string): string {
+  return measuredAtFromLocalTime(local, DEFAULT_HEALTH_CALENDAR_TIME_ZONE)
 }
 
 export function reviewCommitMeasuredAt(input: {
   originalCapturedAt: string
   measuredAtLocal: string
   measuredAtEdited: boolean
+  timeZone?: string
 }): string {
   if (!input.measuredAtEdited) {
     return input.originalCapturedAt
   }
-  return measuredAtFromPhoenixLocal(input.measuredAtLocal)
+  return measuredAtFromLocalTime(
+    input.measuredAtLocal,
+    input.timeZone ?? DEFAULT_HEALTH_CALENDAR_TIME_ZONE,
+  )
 }
 
 function metricKey(metrics: readonly StagedManualMetric[]): string {

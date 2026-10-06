@@ -318,3 +318,16 @@ Observed from the current code and product docs. Where the original rationale is
 **Reason:** Supporting another owner does not justify converting the personal Health record into a multi-tenant SaaS. Separate deployments provide stronger isolation while preserving the existing owner-only authorization model.  
 **Implications:** A normal new instance should require infrastructure/environment configuration rather than source edits. Deployment secrets and capability flags belong in instance configuration; editable Health state belongs in PostgreSQL. Optional providers must degrade cleanly. A GitHub fork is optional: the same repository may back multiple Vercel projects with separate databases and environment values. True multi-tenancy is out of scope unless a future product decision explicitly requires it.
 
+
+
+## Decision: Deployment configuration owns the Health calendar timezone
+
+**Status:** Active  
+**Reason:** Separate one-owner deployments must be able to use a different IANA calendar timezone without source edits, while deterministic domain logic must remain testable and independent of server environment reads.  
+**Implications:** `HEALTH_CALENDAR_TIMEZONE` is resolved by the server instance configuration and passed into live owner flows. Shared domain helpers may retain `America/Phoenix` as a backward-compatible default for the original deployment, fixtures, or explicitly historical tooling, but that default is not the universal runtime authority. Browser owner pages receive the public instance timezone before date-sensitive state initializes. Provider billing months for `ai_usage` remain UTC. Existing stored timezone/provenance is not rewritten merely because deployment configuration changes.
+
+## Decision: Instance identity is deployment presentation, not owner Health state
+
+**Status:** Active  
+**Reason:** App name, external home link, public-demo availability, and optional provider capabilities differ between deployments but are not canonical health facts or ordinary owner preferences.  
+**Implications:** Public-safe instance presentation/capabilities come from the typed instance configuration exposed by `GET /api/health`. Current Jake defaults preserve `Daurham Health`, `https://daurham.com`, and public demo behavior unless env overrides them. A normal second deployment should not require source search-and-replace for branding, domain, or timezone. True multi-tenancy remains out of scope.

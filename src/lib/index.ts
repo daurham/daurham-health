@@ -34,3 +34,5 @@ export {
 } from './interactive'
 
 export { fetchPublicInstanceConfig, clearInstanceConfigCacheForTests } from './instance-config'
+
+export { InstanceConfigContext, useHealthCalendarDate, useHealthCalendarTimeZone, useInstanceConfig } from './instance-config-context'

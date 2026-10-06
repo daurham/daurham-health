@@ -84,15 +84,17 @@ Example:
 
 ## 2.3 Current-day data can be provisional
 
-Existing Activity already treats the current Phoenix day as provisional.
+Existing Activity already treats the current configured Health-calendar day as provisional.
 
 New current-day totals should follow similar semantics. Analytics that require a complete day should avoid treating 10:00 AM hydration, calories, steps, or bowel logs as a completed daily total.
 
-## 2.4 America/Phoenix remains the Health calendar
+## 2.4 The configured instance timezone is the Health calendar
 
-Every daily record, backlog flow, weekly plan, XP day cap, and daily analytics window must respect the existing Health calendar date authority.
+Every daily record, backlog flow, weekly plan, XP day cap, and daily analytics window must respect the deployment-level `HEALTH_CALENDAR_TIMEZONE` authority.
 
-Do not silently use browser UTC dates.
+The original/default owner deployment remains `America/Phoenix`, but a second instance may use another valid IANA timezone without source changes.
+
+Do not silently use browser-local or UTC dates when Health-calendar semantics are required.
 
 ## 2.5 High-frequency actions must not be buried in Progress
 
@@ -5885,7 +5887,7 @@ Before an AI coding agent starts any phase from this roadmap, it should:
 
 6. Preserve:
    - missing != zero;
-   - Phoenix calendar;
+   - configured instance Health calendar;
    - owner-only writes;
    - deterministic analytics;
    - AI as interpreter;

@@ -7,10 +7,10 @@ import {
   readGoalProjection,
   reviseGoal,
 } from '../goals/service.js'
-import { healthCalendarDateFromNow } from '../../src/domain/time.js'
 import { parseProjectionAsOf } from '../../src/domain/goal-projection.js'
 import { withOwnerAuth } from '../auth/with-owner.js'
 import { HttpError, readJsonBody, requestApiPathname, sendJson, type ApiRequest, type ApiResponse } from '../http.js'
+import { currentHealthDate } from '../health-time.js'
 
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}'
 const ITEM = new RegExp(`^/api/goals/(${UUID})(?:/(pause|resume|complete|reopen|versions|projection))?$`, 'i')
@@ -58,7 +58,7 @@ export async function handleGoals(req: ApiRequest, res: ApiResponse): Promise<vo
       return
     }
     const url = new URL(req.url ?? '/', 'http://health.local')
-    const parsed = parseProjectionAsOf(url.searchParams.get('asOf'), healthCalendarDateFromNow())
+    const parsed = parseProjectionAsOf(url.searchParams.get('asOf'), await currentHealthDate())
     if ('error' in parsed) {
       throw new HttpError(400, parsed.error)
     }

@@ -39,8 +39,8 @@ import {
   readExperimentSuggestion,
 } from '../lab/suggestions.js'
 import { parseRetestAsOf } from '../../src/domain/lab-retests.js'
-import { healthCalendarDateFromNow } from '../../src/domain/time.js'
 import { withOwnerAuth } from '../auth/with-owner.js'
+import { currentHealthDate } from '../health-time.js'
 import {
   handleApiError,
   HttpError,
@@ -249,7 +249,7 @@ export async function handleLab(req: ApiRequest, res: ApiResponse) {
       methodNotAllowed(res, 'GET')
       return
     }
-    sendJson(res, 200, await listBenchmarkRetests(retestAsOf(req)))
+    sendJson(res, 200, await listBenchmarkRetests(await retestAsOf(req)))
     return
   }
   if (route.kind === 'benchmarks') {
@@ -301,7 +301,7 @@ export async function handleLab(req: ApiRequest, res: ApiResponse) {
       methodNotAllowed(res, 'GET')
       return
     }
-    sendJson(res, 200, await getBenchmarkRetest(route.id, retestAsOf(req)))
+    sendJson(res, 200, await getBenchmarkRetest(route.id, await retestAsOf(req)))
     return
   }
   if (route.action === 'results' && route.preview) {
@@ -348,9 +348,9 @@ export async function handleLab(req: ApiRequest, res: ApiResponse) {
   sendJson(res, 200, await addBenchmarkProtocolVersion(route.id, await readJsonBody(req)))
 }
 
-function retestAsOf(req: ApiRequest): string {
+async function retestAsOf(req: ApiRequest): Promise<string> {
   const url = new URL(req.url ?? '/', 'http://health.local')
-  const parsed = parseRetestAsOf(url.searchParams.get('asOf'), healthCalendarDateFromNow())
+  const parsed = parseRetestAsOf(url.searchParams.get('asOf'), await currentHealthDate())
   if ('error' in parsed) {
     throw new HttpError(400, parsed.error)
   }

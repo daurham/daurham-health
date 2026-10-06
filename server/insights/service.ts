@@ -3,20 +3,20 @@ import { deriveProactiveInsights, type ProactiveInsights } from '../../src/domai
 import { addCalendarDays } from '../../src/domain/progress/dates.js'
 import { nutritionDailyObservations } from '../../src/domain/progress/nutrition.js'
 import { buildProgressOverview } from '../../src/domain/progress/index.js'
-import { healthCalendarDateFromNow } from '../../src/domain/time.js'
 import { listActivityDailySummaries } from '../activity/queries.js'
 import { getSql } from '../db.js'
 import { loadProgressCanonicalRows } from '../progress/queries.js'
 import { parseProgressQuery } from '../progress/service.js'
 import { listSleepNightlySummaries } from '../sleep/queries.js'
+import { healthTimeContext } from '../health-time.js'
 
 export async function getProactiveInsights(input: {
   range: string | null
   asOf: string | null
   now?: Date
 }): Promise<ProactiveInsights> {
-  const query = parseProgressQuery(input)
-  const today = healthCalendarDateFromNow(input.now ?? new Date())
+  const { date: today, timezone } = await healthTimeContext(input.now ?? new Date())
+  const query = parseProgressQuery({ ...input, timezone })
   const rows = await loadProgressCanonicalRows()
   const overview = buildProgressOverview({
     asOf: query.asOf,
@@ -29,8 +29,8 @@ export async function getProactiveInsights(input: {
     nutritionTargets: rows.nutritionTargets,
   })
   const [activityRows, sleepNights, trainingSessions, weightGoalId] = await Promise.all([
-    listActivityDailySummaries(),
-    listSleepNightlySummaries(),
+    listActivityDailySummaries(timezone),
+    listSleepNightlySummaries(timezone),
     listCanonicalTrainingSessions(query.asOf),
     activeWeightGoalId(query.asOf),
   ])
@@ -39,6 +39,7 @@ export async function getProactiveInsights(input: {
     range: query.range,
     asOf: query.asOf,
     today: query.asOf === today ? today : null,
+    timezone,
     activityDays: activityRows.filter((row) => row.date <= query.asOf),
     sleepNights: sleepNights.filter((night) => night.sleepDate <= query.asOf),
     nutritionDays: overview.nutrition.observations,
@@ -54,6 +55,7 @@ export async function getProactiveInsights(input: {
     range: query.range,
     asOf: query.asOf,
     today: query.asOf === today ? today : null,
+    timezone,
     activityDays: activityRows.filter((row) => row.date <= query.asOf),
     sleepNights: sleepNights
       .filter((night) => night.sleepDate <= query.asOf)

@@ -7,9 +7,9 @@ import {
 } from '../../src/domain/body-manual.js'
 import { resolveCadence, type CadenceObservation, type CadenceResolution } from '../../src/domain/body-cadence.js'
 import { calendarDateFromInstant } from '../../src/domain/progress/dates.js'
-import { healthCalendarDateFromNow } from '../../src/domain/time.js'
 import { getSql, type Sql } from '../db.js'
 import { HttpError } from '../http.js'
+import { healthTimeContext } from '../health-time.js'
 
 export type CadenceListItem = CadenceResolution & {
   label: string
@@ -79,7 +79,7 @@ export async function loadCadenceEvidence(): Promise<{
 }
 
 export async function listCadences(now = new Date()) {
-  const asOf = healthCalendarDateFromNow(now)
+  const { date: asOf, timezone } = await healthTimeContext(now)
   const evidence = await loadCadenceEvidence()
   const items: CadenceListItem[] = evidence.configs.map((config) => {
     const resolution = resolveCadence(config, evidence.observations, asOf)
@@ -89,13 +89,13 @@ export async function listCadences(now = new Date()) {
       enabledFrom: config.enabledFrom,
     }
   })
-  return { asOf, timezone: 'America/Phoenix', items }
+  return { asOf, timezone, items }
 }
 
 export async function saveCadence(metricKey: string, body: unknown, now = new Date()) {
   try {
     assertCadenceMetric(metricKey)
-    const today = healthCalendarDateFromNow(now)
+    const { date: today } = await healthTimeContext(now)
     const input = parseCadenceWrite(body, today)
     const sql = await getSql()
     const sourceId = await manualSourceId(sql)

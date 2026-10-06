@@ -47,6 +47,7 @@ export type CrossDomainInput = {
   range: ProgressRange
   asOf: string
   today?: string | null
+  timezone?: string
   activityDays: readonly ActivityDailyRow[]
   sleepNights: readonly SleepSummaryNight[]
   nutritionDays: readonly NutritionDailyObservation[]
@@ -957,7 +958,7 @@ export function analyzeCrossDomain(input: CrossDomainInput): CrossDomainState {
   }
   const findings = relationships.filter((item) => item.surfaced).sort(compareCrossDomainFindings)
   return {
-    timezone: INTELLIGENCE_TIMEZONE,
+    timezone: input.timezone ?? INTELLIGENCE_TIMEZONE,
     period,
     today: input.today ?? null,
     provisionalActivityDate: provisional,

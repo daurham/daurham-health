@@ -67,6 +67,7 @@ export type WeeklySleepBaseline = {
 
 export type WeeklyCoachInput = {
   asOf: string
+  timezone?: string
   activityDays: readonly ActivityDailyRow[]
   sleepNights: readonly (SleepSummaryNight & { sourceName?: string | null })[]
   nutritionEntries: readonly NutritionEntry[]

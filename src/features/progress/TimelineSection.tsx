@@ -40,6 +40,7 @@ import {
 } from './format'
 import { parseTimelineFocusParam, progressSearch } from './range'
 import { TimelineLaneLegend, TimelineLanes } from './TimelineLanes'
+import { useHealthCalendarTimeZone } from '@/lib'
 
 const BODY_CARD_KEYS = ['weight', 'bmi', 'body_fat_percentage'] as const
 
@@ -425,6 +426,7 @@ function ActivityDayCard({ event }: { event: TimelineActivityDayEvent }) {
 }
 
 function ActivityWorkoutCard({ event }: { event: TimelineActivityWorkoutEvent }) {
+  const timezone = useHealthCalendarTimeZone()
   const duration = event.data.durationMinutes == null ? null : `${Math.round(event.data.durationMinutes)} min`
   return (
     <article id={event.id} tabIndex={-1} className="rounded-lg border border-dashed border-zinc-300 bg-zinc-50 px-3 py-3 outline-none focus:ring-2 focus:ring-zinc-400 md:px-4">
@@ -433,7 +435,7 @@ function ActivityWorkoutCard({ event }: { event: TimelineActivityWorkoutEvent })
         <div>
           <p className="font-medium tracking-tight">{event.data.label}</p>
           <p className="mt-0.5 text-sm text-zinc-600">
-            {formatCalendarDate(event.date)} · {formatClockTime(event.occurredAt, 'America/Phoenix')}
+            {formatCalendarDate(event.date)} · {formatClockTime(event.occurredAt, timezone)}
             {duration ? ` · ${duration}` : ''}
           </p>
         </div>
@@ -444,6 +446,7 @@ function ActivityWorkoutCard({ event }: { event: TimelineActivityWorkoutEvent })
 
 function SleepNightCard({ event }: { event: TimelineSleepNightEvent }) {
   const prefix = useAppPathPrefix()
+  const timezone = useHealthCalendarTimeZone()
   const complete = event.data.status === 'analysis_eligible'
   const duration =
     event.data.totalSleepMinutes == null
@@ -463,7 +466,7 @@ function SleepNightCard({ event }: { event: TimelineSleepNightEvent }) {
             {event.data.sourceName ? ` · ${event.data.sourceName}` : ''}
           </p>
           <p className="mt-1 text-sm text-zinc-700">
-            {formatClockTime(event.data.startAt, 'America/Phoenix')} – {formatClockTime(event.data.endAt, 'America/Phoenix')}
+            {formatClockTime(event.data.startAt, timezone)} – {formatClockTime(event.data.endAt, timezone)}
             {complete ? '' : ' · Partial'}
           </p>
           <Link to={prefixedPath(prefix, `/progress/sleep/${event.date}`)} className="mt-2 inline-flex min-h-11 items-center text-sm underline">
