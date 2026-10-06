@@ -1,5 +1,4 @@
 import { calendarDateFromInstant } from '../progress/dates.js'
-import { healthCalendarDateFromInstant } from '../time.js'
 import { SLEEP_GAP_BOUNDARIES_MINUTES, SLEEP_SESSION_GAP_MINUTES, SLEEP_TIMEZONE } from './config.js'
 import { intervalMs, type TimeInterval } from './intervals.js'
 import { logicalSleepSource } from './sources.js'
@@ -73,7 +72,10 @@ export function classifySleepIntervals(rows: readonly SleepIntervalRow[]): Class
     .sort((left, right) => left.startMs - right.startMs || left.endMs - right.endMs || left.id.localeCompare(right.id))
 }
 
-export function sessionizeSleepEpisodes(intervals: readonly ClassifiedSleepInterval[]): SleepEpisode[] {
+export function sessionizeSleepEpisodes(
+  intervals: readonly ClassifiedSleepInterval[],
+  timeZone = SLEEP_TIMEZONE,
+): SleepEpisode[] {
   const bySource = new Map<string, ClassifiedSleepInterval[]>()
   for (const interval of intervals) {
     const list = bySource.get(interval.sourceKey) ?? []
@@ -88,20 +90,24 @@ export function sessionizeSleepEpisodes(intervals: readonly ClassifiedSleepInter
     let episodeEnd = Number.NEGATIVE_INFINITY
     for (const interval of sorted) {
       if (current.length > 0 && interval.startMs - episodeEnd > gapMs) {
-        episodes.push(episodeFrom(sourceKey, current))
+        episodes.push(episodeFrom(sourceKey, current, timeZone))
         current = []
       }
       current.push(interval)
       episodeEnd = Math.max(episodeEnd === Number.NEGATIVE_INFINITY ? interval.endMs : episodeEnd, interval.endMs)
     }
     if (current.length > 0) {
-      episodes.push(episodeFrom(sourceKey, current))
+      episodes.push(episodeFrom(sourceKey, current, timeZone))
     }
   }
   return episodes.sort((left, right) => left.endMs - right.endMs || left.startMs - right.startMs || left.sourceKey.localeCompare(right.sourceKey))
 }
 
-function episodeFrom(sourceKey: string, intervals: ClassifiedSleepInterval[]): SleepEpisode {
+function episodeFrom(
+  sourceKey: string,
+  intervals: ClassifiedSleepInterval[],
+  timeZone: string,
+): SleepEpisode {
   const startMs = Math.min(...intervals.map((item) => item.startMs))
   const endMs = Math.max(...intervals.map((item) => item.endMs))
   return {
@@ -111,7 +117,7 @@ function episodeFrom(sourceKey: string, intervals: ClassifiedSleepInterval[]): S
     endMs,
     startAt: new Date(startMs).toISOString(),
     endAt: new Date(endMs).toISOString(),
-    sleepDate: healthCalendarDateFromInstant(new Date(endMs)),
+    sleepDate: calendarDateFromInstant(new Date(endMs), timeZone),
     intervals,
   }
 }
