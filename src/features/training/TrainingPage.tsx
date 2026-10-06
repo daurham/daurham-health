@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { sessionIntentLabel, trainingSessionDisplayName, type WorkoutSessionSummary } from '@/domain/training'
 import type { PendingTranscriptionJob } from '@/domain/training-transcription'
-import { interactiveCardClass, ListPlaceholder, primaryButtonClass, secondaryButtonClass } from '@/lib'
+import { fetchPublicInstanceConfig, interactiveCardClass, ListPlaceholder, primaryButtonClass, secondaryButtonClass } from '@/lib'
 import { fetchSessions, fetchTranscriptionJobs } from './api'
 import { formatWorkoutDate } from './format'
 
@@ -13,6 +13,21 @@ export function TrainingPage() {
   const [jobs, setJobs] = useState<PendingTranscriptionJob[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [photoImportAvailable, setPhotoImportAvailable] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    fetchPublicInstanceConfig()
+      .then((config) => {
+        if (!cancelled) setPhotoImportAvailable(config.capabilities.trainingPhotoImport)
+      })
+      .catch(() => {
+        if (!cancelled) setPhotoImportAvailable(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -38,6 +53,10 @@ export function TrainingPage() {
   }, [])
 
   useEffect(() => {
+    if (!photoImportAvailable) {
+      setJobs([])
+      return
+    }
     let cancelled = false
     let timer: number | undefined
 
@@ -67,14 +86,18 @@ export function TrainingPage() {
         window.clearTimeout(timer)
       }
     }
-  }, [])
+  }, [photoImportAvailable])
 
   return (
     <section className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Training</h1>
-          <p className="mt-2 text-zinc-600">Start a routine, build an empty workout, or import a workout photo.</p>
+          <p className="mt-2 text-zinc-600">
+            {photoImportAvailable
+              ? 'Start a routine, build an empty workout, or import a workout photo.'
+              : 'Start a routine or build an empty workout.'}
+          </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Link to="/training/new" className={primaryButtonClass}>
@@ -86,9 +109,11 @@ export function TrainingPage() {
           <Link to="/training/routines" className={secondaryButtonClass}>
             Manage routines
           </Link>
-          <Link to="/training/import" className={secondaryButtonClass}>
-            Import workout photo
-          </Link>
+          {photoImportAvailable ? (
+            <Link to="/training/import" className={secondaryButtonClass}>
+              Import workout photo
+            </Link>
+          ) : null}
         </div>
       </div>
 
