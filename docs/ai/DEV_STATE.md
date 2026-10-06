@@ -1,5 +1,14 @@
 # Dev state
 
+## 2026-10-06 next-intelligence program start
+
+- Current `main` includes the H5 Pantry/Exercise Library work and later maintenance fixes.
+- Repository schema head is `0041_exercise_library_calisthenics.sql`.
+- The prior H5 owner-QA wording in `CURRENT_TASK.md` was stale relative to current `main`; I0A replaces it as the active task.
+- The master next-intelligence/portability program is checked in at `docs/ai/NEXT_INTELLIGENCE_ROADMAP.md`.
+- I0A establishes one-owner-per-deployment instance configuration and safe capability discovery before later Health Profile/intelligence phases.
+- No I0A schema migration is planned.
+
 ## 2026-10-05 maintenance
 
 - General Ask Health cross-domain synthesis was hardened for questions combining body, nutrition, and training evidence.
