@@ -1381,9 +1381,8 @@ export async function snoozeCoachLabItem(body: unknown, now = new Date()): Promi
 }
 
 export async function ensureCoach(now = new Date()): Promise<CoachState> {
-  const date = await currentHealthDate(now)
+  const [{ date, timezone }, sql] = await Promise.all([healthTimeContext(now), getSql()])
   const week = coachWeek(date)
-  const sql = await getSql()
   await reconcile(sql, date, now, timezone)
   const recent = await recentRules(sql, date)
   const [weekly, daily] = await Promise.all([weeklyCandidates(date), dailyCandidates(date)])
