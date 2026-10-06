@@ -1,12 +1,10 @@
 # Current task
 
-## I0C — Fresh-Instance Bootstrap + Owner-Specific Seed Separation
+## Status
 
-### Status
+No active implementation task.
 
-Implementation prepared as one batched commit object on top of `main`.
-
-Do not move a Git branch ref until the current Vercel deployment-rate window clears.
+I0C — Fresh-Instance Bootstrap + Owner-Specific Seed Separation is complete and validated for merge.
 
 Repository schema head after I0C:
 
@@ -16,131 +14,55 @@ Master program:
 
 `docs/ai/NEXT_INTELLIGENCE_ROADMAP.md`
 
-## Product intent
+## Completed I0C outcome
 
-A normal second-owner deployment should begin as **their** Health instance, not as a copy of Jake's owner state.
+- Historical A/B/C 1.3.1 templates are classified as `legacy_owner` seeds.
+- Beginner Calisthenics is explicitly classified as a `product_builtin`.
+- A fresh database automatically deactivates the original A/B/C family when no historical Training session references it.
+- An established database preserves the A/B/C family when canonical Training history references it.
+- Historical templates and sessions are never deleted or rewritten.
+- Owner-created routines remain untouched.
+- `npm run instance:check` reports migration currency, legacy-routine state, product built-ins, exercise-catalog availability, and active owner-routine count without printing secrets.
+- `docs/SINGLE_OWNER_DEPLOYMENT.md` documents the second-owner setup path: separate Neon/auth/database, separate Vercel project/env, optional providers, migration/validation, and first-use checks.
+- The repository now has one generic branch validation workflow instead of stale H4/H5/I0B branch-specific validation workflows.
 
-The codebase may contain shared product/reference seeds, but schema migration history must not make a clean database look like the original owner's account.
+## Validation
 
-### Seed classes
+GitHub Actions run `37545271735` passed:
 
-**Product/reference seeds**
-- data-source definitions;
-- canonical exercise catalog;
-- exercise guidance/metadata;
-- Beginner Calisthenics built-in.
+- `npx tsc -b`
+- `npx eslint .`
+- `npm test`
+- `npm run build`
 
-These may exist on every instance.
+The first I0C validation run caught one TypeScript-only initialization error in the new instance checker; that was fixed in a single corrective commit before the successful run above.
 
-**Legacy owner seed**
-- original A/B/C 1.3.1 paper routine family from migration 0003.
+## Deployment note
 
-These exist for historical compatibility but are not universal product defaults.
+Vercel Hobby deployment creation is currently rate-limited because earlier I0B work produced too many remote commits.
 
-**Owner state**
-- owner-created routines;
-- goals;
-- supplements;
-- nutrition history;
-- body measurements;
-- experiments;
-- Coach/XP history;
-- Daily Context;
-- Health Profile/preferences.
+I0C was therefore developed with the new batched workflow:
+- dormant Git objects first;
+- one feature branch;
+- minimal corrective commits;
+- generic GitHub Actions validation;
+- one merge.
 
-These start empty on a fresh deployment.
+Production deployment may remain blocked until Vercel's rolling limit clears. The Git repository state is independent of that temporary deployment quota.
 
-## Implementation contract
+## Next planning slice
 
-### 1. Migration 0042 classifies historical Training seeds
+**I1 — Health Profile + Flexible Training Intent**
 
-Add metadata:
-- A/B/C 1.3.1 → `seed_scope = legacy_owner`;
-- CAL-BEG 1.0.0 → `seed_scope = product_builtin`.
+Expected focus:
 
-Do not delete historical templates.
+- canonical Health Profile;
+- DOB-derived age;
+- height;
+- bounded persistent owner context;
+- baseline training frequency/sequence/preferences;
+- current-week overrides and movable rest/training days;
+- sequence-first programmed session intent;
+- no punitive missed-day semantics.
 
-### 2. Fresh databases hide A/B/C automatically
-
-If no historical Training session references the original A/B/C family:
-- mark A/B/C inactive.
-
-No environment flag is required.
-
-### 3. Established databases preserve history
-
-If any Training session references the A/B/C family by:
-- snapshotted `routine_code`; or
-- `workout_template_id`;
-
-then migration 0042 must not deactivate that legacy family.
-
-Do not reactivate a template that the owner had already intentionally deactivated.
-
-### 4. Product built-ins remain
-
-Fresh instances must retain:
-- active exercise catalog;
-- Beginner Calisthenics built-in.
-
-Owner-created routines are untouched.
-
-### 5. Instance doctor
-
-Add:
-
-`npm run instance:check`
-
-It must report, without printing secrets:
-- migration currency;
-- fresh/established legacy-routine state;
-- Beginner Calisthenics availability;
-- exercise-catalog availability;
-- owner-created routine count.
-
-### 6. Deployment guide
-
-Add:
-
-`docs/SINGLE_OWNER_DEPLOYMENT.md`
-
-The guide must cover:
-- same-repo vs fork choice;
-- separate Neon project/database/auth;
-- Vercel project;
-- required env;
-- Gemini;
-- USDA;
-- Open Food Facts;
-- optional Home-AI/photo import;
-- optional Apple/Body ingest;
-- migration/config/instance checks;
-- first-use smoke tests;
-- batching Git pushes to avoid preview-deployment exhaustion.
-
-A normal setup must not require source search-and-replace.
-
-## Non-goals
-
-I0C does not:
-- create multi-tenancy;
-- copy Jake data into another owner instance;
-- implement Health Profile;
-- redesign Training routines;
-- make built-in routines editable;
-- alter historical workout sessions;
-- share databases or auth between owners.
-
-## Validation before branch publication
-
-Once Vercel's deployment window clears, expose this batched commit on one branch and run:
-
-- `npm run config:check`;
-- `npm run migrate` against a disposable/test database as appropriate;
-- `npm run instance:check`;
-- `npx tsc -b`;
-- `npx eslint .`;
-- `npm test`;
-- `npm run build`.
-
-Do not merge unless the fresh-instance and established-instance migration scenarios both pass.
+Draft the I1 contract before implementation.
