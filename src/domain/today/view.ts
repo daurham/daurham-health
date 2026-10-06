@@ -22,7 +22,7 @@ import {
 } from '../body-cadence.js'
 import { todayContextFromRecord, type DailyContext, type TodayContextSnapshot } from '../context.js'
 import { selectTodayRetest, type BenchmarkRetestView } from '../lab-retests.js'
-import { healthCalendarDateFromNow, HEALTH_CALENDAR_TIME_ZONE } from '../time.js'
+import { DEFAULT_HEALTH_CALENDAR_TIME_ZONE, healthCalendarDateFromNow } from '../time.js'
 
 export const TODAY_PATTERN_RANGE = '90d' as const
 export const TODAY_PATTERN_LIMIT = 3
@@ -54,6 +54,7 @@ export type TodayLabExperiment = {
 
 export type TodaySources = {
   now?: Date
+  calendarTimeZone?: string
   activityDays: readonly ActivityDailyRow[]
   activityWorkouts?: readonly ProgressActivityWorkout[]
   nutritionEntries: readonly TodayNutritionEntry[]
@@ -107,12 +108,16 @@ function activityWorkoutLine(label: string, durationMinutes: number | null): str
   return `${label} · ${formatActivityWorkoutDuration(durationMinutes)}`
 }
 
-function todayActivityWorkouts(workouts: readonly ProgressActivityWorkout[] | undefined, date: string): {
+function todayActivityWorkouts(
+  workouts: readonly ProgressActivityWorkout[] | undefined,
+  date: string,
+  timezone = DEFAULT_HEALTH_CALENDAR_TIME_ZONE,
+): {
   workouts: TodayActivityWorkout[]
   additionalWorkoutCount: number
 } {
   const todays = (workouts ?? [])
-    .filter((workout) => calendarDateFromInstant(new Date(workout.startAt), HEALTH_CALENDAR_TIME_ZONE) === date)
+    .filter((workout) => calendarDateFromInstant(new Date(workout.startAt), timezone) === date)
     .slice()
     .sort((left, right) => left.startAt.localeCompare(right.startAt) || left.id.localeCompare(right.id))
   return {
@@ -142,7 +147,7 @@ export type TodayNutrientTarget = {
 
 export type TodayViewModel = {
   date: string
-  timezone: typeof HEALTH_CALENDAR_TIME_ZONE
+  timezone: string
   activity: {
     inProgress: boolean
     steps: number | null
@@ -281,7 +286,8 @@ function todayLab(sources: TodaySources): TodayViewModel['lab'] {
 }
 
 export function buildTodayView(sources: TodaySources): TodayViewModel {
-  const date = healthCalendarDateFromNow(sources.now ?? new Date())
+  const timezone = sources.calendarTimeZone ?? DEFAULT_HEALTH_CALENDAR_TIME_ZONE
+  const date = healthCalendarDateFromNow(sources.now ?? new Date(), timezone)
   const activityRow = sources.activityDays.find((row) => row.date === date) ?? null
   const steps = activityRow && finite(activityRow.stepsCount) ? activityRow.stepsCount : null
   const activeEnergyKcal = activityRow && finite(activityRow.activeEnergyKcal) ? activityRow.activeEnergyKcal : null
@@ -322,7 +328,7 @@ export function buildTodayView(sources: TodaySources): TodayViewModel {
   const kind = sleepKind(night)
   const latest = sources.latestCompleteSleep
   const showLatest = kind === 'none' && latest && latest.sleepDate !== date && latest.analysisEligible && finite(latest.totalSleepMinutes)
-  const activityWorkouts = todayActivityWorkouts(sources.activityWorkouts, date)
+  const activityWorkouts = todayActivityWorkouts(sources.activityWorkouts, date, timezone)
   const change = activityShortTermChange(sources.activityDays, date, date)
   const changedItems: TodayViewModel['changedItems'] = []
   if (change.steps.status === 'available' && change.steps.value.absoluteDelta !== 0) {
@@ -358,6 +364,7 @@ export function buildTodayView(sources: TodaySources): TodayViewModel {
     range: TODAY_PATTERN_RANGE,
     asOf: date,
     today: date,
+    timezone,
     activityDays: sources.activityDays,
     sleepNights: sources.sleepNights,
     nutritionDays: sources.nutritionDays ?? [],
@@ -375,7 +382,7 @@ export function buildTodayView(sources: TodaySources): TodayViewModel {
 
   return {
     date,
-    timezone: HEALTH_CALENDAR_TIME_ZONE,
+    timezone,
     activity: {
       inProgress:
         steps != null ||
