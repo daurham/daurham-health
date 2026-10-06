@@ -2,12 +2,12 @@ import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { parseAppleHealthFile, previewAppleHealth } from '@/domain/apple-health'
 import { formatCalendarRange } from '@/domain/calendar-format'
-import { healthCalendarDateFromNow } from '@/domain/time'
 import { progressionState } from '@/domain/progression'
 import { XpAmount } from '@/components/XpAmount'
 import { DEFAULT_TREND_PREFERENCES, type TrendPreferenceDirection, type TrendPreferences } from '@/domain/trend-intent'
 import { clearTrendPreferences, readTrendPreferences, writeTrendPreferences } from '@/trend-intent'
 import { useRewardSummary } from '@/features/rewards/useRewardSummary'
+import { useHealthCalendarDate } from '@/lib'
 import {
   MODE_LABELS,
   THEME_PACKS,
@@ -341,6 +341,7 @@ function PreviewReport({ preview }: { preview: AppleHealthPreview }) {
 }
 
 export function SettingsPage() {
+  const today = useHealthCalendarDate()
   const location = useLocation()
 
   useEffect(() => {
@@ -435,7 +436,7 @@ export function SettingsPage() {
       const link = document.createElement('a')
       link.href = url
       const profile = response.headers.get('X-Health-Backup-Profile') === 'portable' ? 'portable' : 'full'
-      link.download = `health-${profile}-${healthCalendarDateFromNow()}.health-backup.zip`
+      link.download = `health-${profile}-${today}.health-backup.zip`
       link.click()
       URL.revokeObjectURL(url)
     } catch (caught) {
