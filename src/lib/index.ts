@@ -32,3 +32,5 @@ export {
   themeChoiceClass,
   themeChoiceSelectedClass,
 } from './interactive'
+
+export { fetchPublicInstanceConfig, clearInstanceConfigCacheForTests } from './instance-config'
