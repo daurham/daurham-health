@@ -1,4 +1,4 @@
-import { SLEEP_CALCULATION_VERSION, SLEEP_EXCLUSIVE_STAGES } from './config.js'
+import { SLEEP_CALCULATION_VERSION, SLEEP_EXCLUSIVE_STAGES, SLEEP_TIMEZONE } from './config.js'
 import {
   asTimeInterval,
   episodeHasActualSleep,
@@ -130,8 +130,11 @@ function primarySort(left: SleepEpisode, right: SleepEpisode): number {
   return left.sourceKey.localeCompare(right.sourceKey)
 }
 
-export function sleepNightCandidates(intervals: readonly ClassifiedSleepInterval[]): SleepNightCandidate[] {
-  const episodes = sessionizeSleepEpisodes(intervals)
+export function sleepNightCandidates(
+  intervals: readonly ClassifiedSleepInterval[],
+  timeZone = SLEEP_TIMEZONE,
+): SleepNightCandidate[] {
+  const episodes = sessionizeSleepEpisodes(intervals, timeZone)
   const groups = new Map<string, SleepEpisode[]>()
   for (const episode of episodes) {
     const key = `${episode.sourceKey}|${episode.sleepDate}`
