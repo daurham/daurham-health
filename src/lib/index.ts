@@ -34,3 +34,5 @@ export {
 } from './interactive'
 
 export { fetchPublicInstanceConfig, clearInstanceConfigCacheForTests } from './instance-config'
+
+export { InstanceConfigContext, useInstanceConfig } from './instance-config-context'
