@@ -122,7 +122,7 @@ async function listTrainingSessions(end: string): Promise<WeeklyCoachInput['trai
        FROM workout_sessions
       WHERE workout_date <= $1::date
       ORDER BY workout_date, id`,
-    [end, timezone],
+    [end],
   )) as Array<Record<string, unknown>>
   return rows.map((row) => ({ performedOn: String(row.performed_on), sessionType: String(row.session_type) }))
 }
@@ -202,7 +202,7 @@ async function listReviewCaptures(
         AND workout_session_id IS NULL
         AND (created_at AT TIME ZONE $2)::date <= $1::date
       ORDER BY created_at, home_ai_job_id`,
-    [end],
+    [end, timezone],
   )) as Array<Record<string, unknown>>
   return rows.map((row) => ({
     id: String(row.home_ai_job_id),
