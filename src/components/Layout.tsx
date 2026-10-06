@@ -55,8 +55,7 @@ function DemoBanner({ status }: { status: string }) {
       <Link to={privateLink.to} className="shrink-0 text-sm font-medium underline">
         {privateLink.label}
       </Link>
-      </div>
-    </InstanceConfigContext.Provider>
+    </div>
   )
 }
 
@@ -322,6 +321,7 @@ export function Layout() {
           </div>
         </nav>
       )}
-    </div>
+      </div>
+    </InstanceConfigContext.Provider>
   )
 }
