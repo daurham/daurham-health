@@ -9,9 +9,8 @@ import {
   type DailyContextTagKey,
 } from '@/domain/context'
 import { formatWeekdayCalendarDate } from '@/domain/calendar-format'
-import { healthCalendarDateFromNow } from '@/domain/time'
 import { healthFetch, readApiError } from '@/lib/health-api'
-import { dangerButtonClass, primaryButtonClass, quietButtonClass } from '@/lib'
+import { dangerButtonClass, primaryButtonClass, quietButtonClass, useHealthCalendarDate } from '@/lib'
 
 type EditorState = {
   recordedId: string | null
@@ -22,7 +21,7 @@ type EditorState = {
 export function ContextPage() {
   const [search] = useSearchParams()
   const navigate = useNavigate()
-  const today = healthCalendarDateFromNow()
+  const today = useHealthCalendarDate()
   const requested = search.get('date')?.trim() ?? ''
   const date = requested.length > 0 ? requested : today
   const dateError = contextDateError(date, today)
