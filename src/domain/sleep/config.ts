@@ -1,3 +1,5 @@
+import { DEFAULT_HEALTH_CALENDAR_TIME_ZONE } from '../time.js'
+
 export const SLEEP_SESSION_GAP_MINUTES = 90
 export const SLEEP_CALCULATION_VERSION = 'sleep-night-candidate-v1'
 export const SLEEP_NIGHT_CALCULATION_VERSION = 'sleep-night-v1'
@@ -7,7 +9,8 @@ export const SLEEP_SOURCE_ATTRIBUTION_VERSION = 'sleep-source-attribution-v1'
 export const SLEEP_BASELINE_PRIOR_DAYS = 30
 export const SLEEP_BASELINE_MIN_OBSERVATIONS = 7
 export const SLEEP_STAGE_SUMMARY_MIN_NIGHTS = 3
-export const SLEEP_TIMEZONE = 'America/Phoenix'
+/** Backward-compatible default only. Runtime callers should pass instance timezone. */
+export const SLEEP_TIMEZONE = DEFAULT_HEALTH_CALENDAR_TIME_ZONE
 
 export const MIN_ANALYSIS_SLEEP_MINUTES = 240
 export const MIN_STAGE_COVERAGE_PCT = 90
