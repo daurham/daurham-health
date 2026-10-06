@@ -21,7 +21,6 @@ import {
   type RecentCoachRule,
 } from '../../src/domain/coach.js'
 import { bodyReminderCopy, measureHref, selectTodayBodyReminder } from '../../src/domain/body-cadence.js'
-import { healthCalendarDateFromNow } from '../../src/domain/time.js'
 import { addCalendarDays } from '../../src/domain/progress/dates.js'
 import {
   STRETCH_CONFIG,
@@ -46,6 +45,7 @@ import { loadCoachLabState, snoozeCoachLabPresentation } from './lab.js'
 import { coachTaskAttentionReason } from '../../src/domain/coach-lab.js'
 import { listGoals } from '../goals/service.js'
 import { HttpError } from '../http.js'
+import { currentHealthDate, healthTimeContext } from '../health-time.js'
 import { reconcileCoachAwards } from '../rewards/service.js'
 import { ensureOwnerExercise, getExerciseDefinition } from '../training/owner-exercises.js'
 import {
@@ -1000,7 +1000,7 @@ async function transitionStretch(
   reason?: string,
 ): Promise<boolean> {
   const eventKind = status === 'active' ? 'accepted' : status
-  const acceptedOn = healthCalendarDateFromNow(now)
+  const acceptedOn = await currentHealthDate(now)
   const expiresOn = status === 'active' ? stretchChallengeExpiresOn(acceptedOn) : row.expires_on
   const metadata = status === 'active'
     ? { ...metadataOf(row), stretch: { ...stretchMetadata(row), acceptedOn, challengeExpiresOn: expiresOn } }
@@ -1344,14 +1344,14 @@ async function currentState(sql: Sql, date: string, now: Date): Promise<CoachSta
 }
 
 export async function readCoach(now = new Date()): Promise<CoachState> {
-  const date = healthCalendarDateFromNow(now)
+  const date = await currentHealthDate(now)
   const sql = await getSql()
   await reconcile(sql, date, now)
   return currentState(sql, date, now)
 }
 
 export async function snoozeCoachLabItem(body: unknown, now = new Date()): Promise<CoachState & { snoozedUntil: string }> {
-  const date = healthCalendarDateFromNow(now)
+  const date = await currentHealthDate(now)
   const sql = await getSql()
   await reconcile(sql, date, now)
   const snoozedUntil = await snoozeCoachLabPresentation(sql, body, date, now)
@@ -1359,7 +1359,7 @@ export async function snoozeCoachLabItem(body: unknown, now = new Date()): Promi
 }
 
 export async function ensureCoach(now = new Date()): Promise<CoachState> {
-  const date = healthCalendarDateFromNow(now)
+  const date = await currentHealthDate(now)
   const week = coachWeek(date)
   const sql = await getSql()
   await reconcile(sql, date, now)
@@ -1373,7 +1373,7 @@ export async function ensureCoach(now = new Date()): Promise<CoachState> {
 }
 
 export async function passCoachTask(id: string, now = new Date()): Promise<CoachState> {
-  const date = healthCalendarDateFromNow(now)
+  const date = await currentHealthDate(now)
   const sql = await getSql()
   await reconcile(sql, date, now)
   const row = await loadTask(sql, id)
@@ -1407,7 +1407,7 @@ export async function passCoachTask(id: string, now = new Date()): Promise<Coach
 }
 
 export async function acceptCoachTask(id: string, now = new Date()): Promise<CoachState> {
-  const date = healthCalendarDateFromNow(now)
+  const date = await currentHealthDate(now)
   const sql = await getSql()
   await reconcile(sql, date, now)
   const row = await loadTask(sql, id)
@@ -1426,7 +1426,7 @@ export async function acceptCoachTask(id: string, now = new Date()): Promise<Coa
 }
 
 export async function endCoachTask(id: string, now = new Date()): Promise<CoachState> {
-  const date = healthCalendarDateFromNow(now)
+  const date = await currentHealthDate(now)
   const sql = await getSql()
   await reconcile(sql, date, now)
   const row = await loadTask(sql, id)
@@ -1446,7 +1446,7 @@ export async function endCoachTask(id: string, now = new Date()): Promise<CoachS
 export async function logCoachTraining(id: string, body: unknown, now = new Date()): Promise<CoachState> {
   const parsed = coachTrainingLogSchema.safeParse(body)
   if (!parsed.success) throw new HttpError(400, parsed.error.issues[0]?.message ?? 'Invalid Training log')
-  const date = healthCalendarDateFromNow(now)
+  const date = await currentHealthDate(now)
   const sql = await getSql()
   await reconcile(sql, date, now)
   const row = await loadTask(sql, id)
@@ -1593,7 +1593,7 @@ export async function logCoachTraining(id: string, body: unknown, now = new Date
 export async function logCoachSelfReport(id: string, body: unknown, now = new Date()): Promise<CoachState> {
   const parsed = coachSelfReportSchema.safeParse(body)
   if (!parsed.success) throw new HttpError(400, parsed.error.issues[0]?.message ?? 'Invalid Coach log')
-  const date = healthCalendarDateFromNow(now)
+  const date = await currentHealthDate(now)
   const sql = await getSql()
   await reconcile(sql, date, now)
   const row = await loadTask(sql, id)
