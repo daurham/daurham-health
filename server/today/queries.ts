@@ -3,7 +3,7 @@ import { addCalendarDays, calendarDateFromInstant } from '../../src/domain/progr
 import type { ProgressActivityWorkout, ProgressSleepObservation } from '../../src/domain/progress/health-timeline.js'
 import type { BodyObservation } from '../../src/domain/progress/types.js'
 import type { SleepObservationStatus } from '../../src/domain/sleep/completeness.js'
-import { HEALTH_CALENDAR_TIME_ZONE } from '../../src/domain/time.js'
+import { DEFAULT_HEALTH_CALENDAR_TIME_ZONE, instantAtStartOfCalendarDate } from '../../src/domain/time.js'
 import { trainingSessionDisplayName, type TrainingSessionType } from '../../src/domain/training.js'
 import type { TodayTrainingSession } from '../../src/domain/today/index.js'
 import type { IntelligenceTrainingSession } from '../../src/domain/intelligence/index.js'
@@ -66,7 +66,11 @@ function activityRow(row: Record<string, unknown>): ActivityDailyRow {
   }
 }
 
-export async function listActivityDaysBetween(start: string, end: string): Promise<ActivityDailyRow[]> {
+export async function listActivityDaysBetween(
+  start: string,
+  end: string,
+  timezone = DEFAULT_HEALTH_CALENDAR_TIME_ZONE,
+): Promise<ActivityDailyRow[]> {
   const sql = await getSql()
   const rows = (await sql.query(
     `SELECT summary_date::text AS summary_date,
@@ -80,24 +84,31 @@ export async function listActivityDaysBetween(start: string, end: string): Promi
      FROM activity_daily_summaries
      WHERE timezone = $1 AND summary_date >= $2::date AND summary_date <= $3::date
      ORDER BY summary_date ASC`,
-    [HEALTH_CALENDAR_TIME_ZONE, start, end],
+    [timezone, start, end],
   )) as Array<Record<string, unknown>>
   return rows.map(activityRow)
 }
 
-export async function listSleepNightsBetween(start: string, end: string): Promise<ProgressSleepObservation[]> {
+export async function listSleepNightsBetween(
+  start: string,
+  end: string,
+  timezone = DEFAULT_HEALTH_CALENDAR_TIME_ZONE,
+): Promise<ProgressSleepObservation[]> {
   const sql = await getSql()
   const rows = (await sql.query(
     `SELECT ${SLEEP_COLUMNS}
      FROM sleep_nightly_summaries
      WHERE timezone = $1 AND sleep_date >= $2::date AND sleep_date <= $3::date
      ORDER BY sleep_date ASC`,
-    [HEALTH_CALENDAR_TIME_ZONE, start, end],
+    [timezone, start, end],
   )) as Array<Record<string, unknown>>
   return rows.map(sleepRow)
 }
 
-export async function latestCompleteSleepNight(asOf: string): Promise<ProgressSleepObservation | null> {
+export async function latestCompleteSleepNight(
+  asOf: string,
+  timezone = DEFAULT_HEALTH_CALENDAR_TIME_ZONE,
+): Promise<ProgressSleepObservation | null> {
   const sql = await getSql()
   const rows = (await sql.query(
     `SELECT ${SLEEP_COLUMNS}
@@ -105,7 +116,7 @@ export async function latestCompleteSleepNight(asOf: string): Promise<ProgressSl
      WHERE timezone = $1 AND analysis_eligible = true AND sleep_date <= $2::date
      ORDER BY sleep_date DESC
      LIMIT 1`,
-    [HEALTH_CALENDAR_TIME_ZONE, asOf],
+    [timezone, asOf],
   )) as Array<Record<string, unknown>>
   return rows[0] ? sleepRow(rows[0]) : null
 }
@@ -215,10 +226,13 @@ export async function listBodyWeights(): Promise<BodyObservation[]> {
   return weights
 }
 
-export async function listTodayActivityWorkouts(date: string): Promise<ProgressActivityWorkout[]> {
+export async function listTodayActivityWorkouts(
+  date: string,
+  timezone = DEFAULT_HEALTH_CALENDAR_TIME_ZONE,
+): Promise<ProgressActivityWorkout[]> {
   const sql = await getSql()
-  const start = new Date(`${date}T00:00:00-07:00`).toISOString()
-  const end = new Date(`${addCalendarDays(date, 1)}T00:00:00-07:00`).toISOString()
+  const start = instantAtStartOfCalendarDate(date, timezone).toISOString()
+  const end = instantAtStartOfCalendarDate(addCalendarDays(date, 1), timezone).toISOString()
   const rows = (await sql.query(
     `SELECT id::text AS id,
             activity_type,
