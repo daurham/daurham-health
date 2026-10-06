@@ -13,22 +13,24 @@ import { listBenchmarkRetests } from '../lab/retests.js'
 import { loadProgressCanonicalRows } from '../progress/queries.js'
 import { listSleepNightlySummaries } from '../sleep/queries.js'
 import { listSupplementRangeInputs } from '../supplements/queries.js'
+import { healthCalendarTimeZone } from '../health-time.js'
 
 export async function loadWeeklyCoachInput(asOf: string): Promise<WeeklyCoachInput> {
+  const timezone = await healthCalendarTimeZone()
   const { period } = weeklyCoachPeriods(asOf)
   const [rows, activityDays, sleepNights, supplements, goals, insights, retests, cadence, experiments, benchmarks, captures] =
     await Promise.all([
       loadProgressCanonicalRows(),
-      listActivityDailySummaries(),
-      listSleepNightlySummaries(),
+      listActivityDailySummaries(timezone),
+      listSleepNightlySummaries(timezone),
       listSupplementRangeInputs(period.start, period.end),
       listGoalAskSnapshots(asOf),
       getProactiveInsights({ range: '30d', asOf }),
       listBenchmarkRetests(asOf),
       loadCadenceEvidence(),
-      listWeeklyExperiments(asOf, period.start, period.end),
-      listWeeklyBenchmarks(asOf, period.start, period.end),
-      listReviewCaptures(period.end),
+      listWeeklyExperiments(asOf, period.start, period.end, timezone),
+      listWeeklyBenchmarks(asOf, period.start, period.end, timezone),
+      listReviewCaptures(period.end, timezone),
     ])
   const visibleSets = rows.sets.filter((set) => set.sessionDate <= period.end)
   const performanceBests = rows.exercises.flatMap((exercise) =>
@@ -45,7 +47,7 @@ export async function loadWeeklyCoachInput(asOf: string): Promise<WeeklyCoachInp
       })),
   )
   const nights = sleepNights.filter((night) => night.sleepDate <= period.end)
-  const baselineNight = latestBaselineNight(nights, period)
+  const baselineNight = latestBaselineNight(nights, period, timezone)
   const baseline = baselineNight ? computeSleepDurationBaseline(nights, baselineNight) : null
   return {
     asOf,
@@ -119,12 +121,17 @@ async function listTrainingSessions(end: string): Promise<WeeklyCoachInput['trai
        FROM workout_sessions
       WHERE workout_date <= $1::date
       ORDER BY workout_date, id`,
-    [end],
+    [end, timezone],
   )) as Array<Record<string, unknown>>
   return rows.map((row) => ({ performedOn: String(row.performed_on), sessionType: String(row.session_type) }))
 }
 
-async function listWeeklyExperiments(asOf: string, start: string, end: string): Promise<WeeklyCoachInput['experiments']> {
+async function listWeeklyExperiments(
+  asOf: string,
+  start: string,
+  end: string,
+  timezone: string,
+): Promise<WeeklyCoachInput['experiments']> {
   const sql = await getSql()
   const rows = (await sql.query(
     `SELECT e.id::text AS id,
@@ -135,18 +142,18 @@ async function listWeeklyExperiments(asOf: string, start: string, end: string): 
               SELECT 1 FROM experiment_results r
                WHERE r.experiment_id = e.id
                  AND r.status = 'valid'
-                 AND (r.created_at AT TIME ZONE 'America/Phoenix')::date <= $1::date
+                 AND (r.created_at AT TIME ZONE $4)::date <= $1::date
             ) AS has_valid,
             EXISTS (
               SELECT 1 FROM experiment_results r
                WHERE r.experiment_id = e.id
                  AND r.status = 'valid'
                  AND r.effective_end_date BETWEEN $2::date AND $3::date
-                 AND (r.created_at AT TIME ZONE 'America/Phoenix')::date <= $1::date
+                 AND (r.created_at AT TIME ZONE $4)::date <= $1::date
             ) AS completed_in_week
        FROM experiments e
-      WHERE (e.created_at AT TIME ZONE 'America/Phoenix')::date <= $1::date`,
-    [asOf, start, end],
+      WHERE (e.created_at AT TIME ZONE $4)::date <= $1::date`,
+    [asOf, start, end, timezone],
   )) as Array<Record<string, unknown>>
   return rows.map((row) => ({
     id: String(row.id),
@@ -161,7 +168,12 @@ async function listWeeklyExperiments(asOf: string, start: string, end: string): 
   }))
 }
 
-async function listWeeklyBenchmarks(asOf: string, start: string, end: string): Promise<WeeklyCoachInput['benchmarkResults']> {
+async function listWeeklyBenchmarks(
+  asOf: string,
+  start: string,
+  end: string,
+  timezone: string,
+): Promise<WeeklyCoachInput['benchmarkResults']> {
   const sql = await getSql()
   const rows = (await sql.query(
     `SELECT r.id::text AS id, p.title, r.result_date::text AS result_date
@@ -170,21 +182,24 @@ async function listWeeklyBenchmarks(asOf: string, start: string, end: string): P
        JOIN lab_protocols p ON p.id = b.protocol_id
       WHERE r.status = 'valid'
         AND r.result_date BETWEEN $1::date AND $2::date
-        AND (r.created_at AT TIME ZONE 'America/Phoenix')::date <= $3::date
+        AND (r.created_at AT TIME ZONE $4)::date <= $3::date
       ORDER BY r.result_date, r.id`,
-    [start, end, asOf],
+    [start, end, asOf, timezone],
   )) as Array<Record<string, unknown>>
   return rows.map((row) => ({ id: String(row.id), title: String(row.title), date: String(row.result_date) }))
 }
 
-async function listReviewCaptures(end: string): Promise<WeeklyCoachInput['reviewCaptures']> {
+async function listReviewCaptures(
+  end: string,
+  timezone: string,
+): Promise<WeeklyCoachInput['reviewCaptures']> {
   const sql = await getSql()
   const rows = (await sql.query(
     `SELECT home_ai_job_id
        FROM workout_transcription_jobs
       WHERE status = 'completed'
         AND workout_session_id IS NULL
-        AND (created_at AT TIME ZONE 'America/Phoenix')::date <= $1::date
+        AND (created_at AT TIME ZONE $2)::date <= $1::date
       ORDER BY created_at, home_ai_job_id`,
     [end],
   )) as Array<Record<string, unknown>>
