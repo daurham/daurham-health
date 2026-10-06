@@ -2,7 +2,7 @@ import { calendarDaysBetween } from '../progress/dates.js'
 import type { ProgressRange } from '../progress/types.js'
 import { sleepBaselineWindow, type SleepPersonalBaseline } from './baseline.js'
 import { SLEEP_SELECTION_REASONS, type SleepObservationStatus, type SleepSelectionReason } from './completeness.js'
-import { SLEEP_SOURCE_ATTRIBUTION_VERSION, SLEEP_TIMEZONE } from './config.js'
+import { SLEEP_SOURCE_ATTRIBUTION_VERSION } from './config.js'
 import { compareSleepSourcePriority } from './sources.js'
 import type { SleepNightAlternativeEvidence, SleepNightlySummary } from './summarize.js'
 
@@ -168,7 +168,7 @@ function onePerDate(nights: readonly SleepNightlySummary[]): SleepNightlySummary
   const seen = new Set<string>()
   const rows: SleepNightlySummary[] = []
   for (const night of nights) {
-    if (night.timezone !== SLEEP_TIMEZONE || seen.has(night.sleepDate)) {
+    if (seen.has(night.sleepDate)) {
       continue
     }
     seen.add(night.sleepDate)
