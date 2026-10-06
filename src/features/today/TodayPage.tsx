@@ -8,7 +8,6 @@ import { formatWeekdayCalendarDate, formatCalendarRange } from '@/domain/calenda
 import { sessionIntentLabel } from '@/domain/training'
 import { dailyContextTagLabel } from '@/domain/context'
 import type { TodayViewModel } from '@/domain/today'
-import { HEALTH_CALENDAR_TIME_ZONE } from '@/domain/time'
 import {
   LoadErrorNotice,
   PendingLoadRegion,
@@ -104,7 +103,7 @@ export function TodayPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Today</h1>
           <p className="mt-1 text-sm text-zinc-600">
-            {view ? formatWeekdayCalendarDate(view.date) : 'America/Phoenix'}
+            {view ? formatWeekdayCalendarDate(view.date) : 'Loading date…'}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
@@ -734,7 +733,7 @@ function TrainingCard({ view }: { view: TodayViewModel }) {
 
 function ActivityCard({ view }: { view: TodayViewModel }) {
   const activity = view.activity
-  const synced = activity.updatedAt ? formatClockTime(activity.updatedAt, HEALTH_CALENDAR_TIME_ZONE) : null
+  const synced = activity.updatedAt ? formatClockTime(activity.updatedAt, view.timezone) : null
   const secondary = [
     activity.activeEnergyKcal != null ? `${formatCount(activity.activeEnergyKcal)} active kcal` : null,
     activity.exerciseMinutes != null ? `${formatCount(activity.exerciseMinutes)} exercise min` : null,
