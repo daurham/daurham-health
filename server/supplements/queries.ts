@@ -1,4 +1,3 @@
-import { healthCalendarDateFromNow, HEALTH_CALENDAR_TIME_ZONE } from '../../src/domain/time.js'
 import { lifecycleStatusOnDate } from '../../src/domain/supplements/resolve.js'
 import type {
   AdherenceWindow,
@@ -14,6 +13,7 @@ import type {
   TodaySupplementInput,
 } from '../../src/domain/supplements/types.js'
 import { getSql, type Sql } from '../db.js'
+import { healthTimeContext } from '../health-time.js'
 
 function asNumber(value: unknown): number {
   const parsed = typeof value === 'number' ? value : Number(value)
@@ -123,7 +123,7 @@ export async function manualSourceId(sql?: Sql): Promise<string> {
 }
 
 export async function listSupplementRecords(now = new Date()): Promise<SupplementList> {
-  const date = healthCalendarDateFromNow(now)
+  const { date, timezone } = await healthTimeContext(now)
   const sql = await getSql()
   const [supplements, schedules, events, adherence] = await Promise.all([
     sql.query(
@@ -152,7 +152,7 @@ export async function listSupplementRecords(now = new Date()): Promise<Supplemen
   const adherenceRows = adherence.map(adherenceFrom)
   return {
     date,
-    timezone: HEALTH_CALENDAR_TIME_ZONE,
+    timezone,
     supplements: supplements.map((row) => {
       const id = String(row.id)
       const statusEvents = eventRows.filter((event) => event.supplementId === id)
