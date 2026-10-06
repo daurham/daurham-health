@@ -4,7 +4,7 @@ Daurham Health is a personal health record for one owner. Package version is `1.
 
 The durable product rule is: Health owns canonical facts. Sources provide observations. Deterministic code validates, calculates, and derives. AI interprets or phrases. Missing evidence stays missing.
 
-Calendar dates use America/Phoenix (`HEALTH_CALENDAR_TIME_ZONE` in `src/domain/time.ts`). Phoenix has no daylight-saving shift. Provider billing months for `ai_usage` use UTC.
+Calendar dates use the instance-configured IANA timezone from `HEALTH_CALENDAR_TIMEZONE`. The original/default owner deployment is `America/Phoenix`, but runtime owner flows receive the configured instance timezone explicitly. Provider billing months for `ai_usage` remain UTC.
 
 ## Domains
 
@@ -51,7 +51,7 @@ The H3 reward wallet is durable owner state rather than a derived Health score. 
 
 ## Important flows
 
-- Today assembles the owner's current Phoenix day from canonical domains. Activity for the current day can be provisional.
+- Today assembles the owner's current instance-calendar day from canonical domains. Activity for the current day can be provisional.
 - Nutrition logs foods, recipes, targets, barcode lookups, label photos, meal photos, and text descriptions. A meal capture can include one to three photos of the same meal. Gemini sees every view in one request. The meal prompt is `meal-photo-v3`. After a Gemini estimate, Health may show up to three optional clarification questions. Refine estimate reuses the same job and stored photos for one new `nutrition_meal_photo` attempt. Home-AI remains an explicit one-photo fallback and does not accept clarification answers. New Recipe can draft ingredients from pasted text. The owner resolves each line to a canonical food before save. Gemini does not calculate recipe nutrition or fetch recipe pages.
 - Training stores exercises, templates, and workout sessions. A workout photo becomes a Home-AI transcription job. The owner reviews it before it becomes a session.
 - Body stores manual measurements, an XLSX fit-profile import, and optional measurement cadence. A Shortcut can stage a capture with `POST /api/ingest/body`. That row stays in `body_capture_inbox` until the owner reviews it and saves one ordinary manual measurement. Pending captures are not observations. Setup is `docs/body-shortcut.md`.
@@ -133,13 +133,13 @@ Values belong in the host environment or `.env.local`, never in docs or client b
 
 The authoritative placeholder inventory is `.env.example`. `npm run config:check` validates required deployment configuration and optional capability readiness without printing secret values.
 
-`HEALTH_CALENDAR_TIMEZONE` is validated and exposed by the I0A instance configuration layer, but the existing Phoenix constants remain the date-bucketing authority until I0B completes the timezone migration.
+`HEALTH_CALENDAR_TIMEZONE` is the deployment-level runtime authority for Health calendar dates. Shared domain helpers retain an `America/Phoenix` default only for backward-compatible fixtures/tests and must receive the instance timezone in live owner flows.
 ## Invariants
 
 - One owner. The demo is not a second account.
 - Missing measurements stay missing. They are not zeros.
 - Deterministic analytics define numbers. Models may explain, select, or phrase. They may not invent measurements, correlations, diagnoses, treatments, or canonical writes.
-- Activity's current Phoenix day stays provisional until the day is complete.
+- Activity's current instance-calendar day stays provisional until the day is complete.
 - Sleep identity uses canonical `sleep_date` and the stored logical source. Source priority is not an accuracy ranking.
 - Overnight vital metrics stay disabled until a payload is verified. The production registry currently has every metric `enabled: false`.
 - Supplement states stay distinct: taken, skipped, unknown, paused, not scheduled. Unknown is not skipped.
