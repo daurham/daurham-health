@@ -5,8 +5,7 @@ import {
   looksLikeCompositeFoodDescription,
   scalePer100Grams,
 } from '@/domain/nutrition/recipe-ingredients'
-import { healthCalendarDateFromNow } from '@/domain/time'
-import { primaryButtonClass, secondaryButtonClass } from '@/lib'
+import { primaryButtonClass, secondaryButtonClass, useHealthCalendarDate, useHealthCalendarTimeZone } from '@/lib'
 import {
   createNutritionFood,
   describeFoodText,
@@ -64,6 +63,8 @@ export function RecipeIngredientSheet({
   initialQuery?: string
   initialStep?: Step
 }) {
+  const today = useHealthCalendarDate()
+  const timezone = useHealthCalendarTimeZone()
   const boundedQuery = initialQuery.trim().slice(0, 120)
   const [step, setStep] = useState<Step>(initialStep)
   const [error, setError] = useState<string | null>(null)
@@ -201,8 +202,8 @@ export function RecipeIngredientSheet({
         carbs: packCarbs.trim() ? Number(packCarbs) : null,
         fat: packFat.trim() ? Number(packFat) : null,
         log: false,
-        logDate: healthCalendarDateFromNow(),
-        timezone: NUTRITION_CONFIG.calendarTimeZone,
+        logDate: today,
+        timezone,
       }),
     )
     if (saved) {
