@@ -6,6 +6,9 @@ const calls = vi.hoisted(() => ({
   transactions: 0,
   active: true,
   calories: 100,
+  fiber: null as number | null,
+  sodium: null as number | null,
+  linkedIngredient: false,
   versionId: 'version-1',
   versionNumber: 1,
 }))
@@ -29,6 +32,8 @@ vi.mock('../server/db.ts', () => ({
             protein: id === 'unknown' ? null : 10,
             carbs: 3,
             fat: 2,
+            fiber: id === 'turkey' ? calls.fiber : null,
+            sodium: id === 'turkey' ? calls.sodium : null,
             source_kind: 'manual',
             archived: false,
           }))
@@ -50,9 +55,11 @@ vi.mock('../server/db.ts', () => ({
           yield_servings: '6',
           finished_weight_g: null,
           calories_kcal: '200',
-          protein_g: null,
+          protein_g: calls.linkedIngredient ? '20' : null,
           carbs_g: '8',
           fat_g: '4',
+          fiber_g: null,
+          sodium_mg: null,
           calculation_version: 'recipe-v1',
           created_at: '2026-09-27T07:00:00.000Z',
         }]
@@ -61,7 +68,7 @@ vi.mock('../server/db.ts', () => ({
         return [{
           id: 'line-1',
           position: 1,
-          food_id: null,
+          food_id: calls.linkedIngredient ? 'turkey' : null,
           amount: '2',
           unit: 'serving',
           scale_factor: '2',
@@ -72,13 +79,17 @@ vi.mock('../server/db.ts', () => ({
           base_serving_unit_snapshot: 'serving',
           base_weight_grams_snapshot: null,
           base_calories_kcal_snapshot: '100',
-          base_protein_g_snapshot: null,
+          base_protein_g_snapshot: calls.linkedIngredient ? '10' : null,
           base_carbs_g_snapshot: '3',
           base_fat_g_snapshot: '2',
+          base_fiber_g_snapshot: null,
+          base_sodium_mg_snapshot: null,
           line_calories_kcal: '200',
-          line_protein_g: null,
+          line_protein_g: calls.linkedIngredient ? '20' : null,
           line_carbs_g: '6',
           line_fat_g: '4',
+          line_fiber_g: null,
+          line_sodium_mg: null,
         }]
       }
       if (text.includes('FROM recipes')) {
@@ -103,6 +114,9 @@ describe('recipe creation', () => {
     calls.transactions = 0
     calls.active = true
     calls.calories = 100
+    calls.fiber = null
+    calls.sodium = null
+    calls.linkedIngredient = false
     calls.versionId = 'version-1'
     calls.versionNumber = 1
   })
@@ -184,7 +198,7 @@ describe('recipe creation', () => {
     expect(versionSql).toContain('version + 1')
     expect(versionSql).not.toContain('MAX(version)')
     expect(calls.texts.some((text) => text.includes('FOR UPDATE'))).toBe(true)
-    expect(calls.texts.some((text) => text.includes('version_guard'))).toBe(true)
+    expect(calls.texts.some((text) => text.includes('version_guard'))).toBe(false)
     expect(calls.texts.some((text) => text.startsWith('UPDATE recipe_versions') && text.includes('is_current = false'))).toBe(true)
     expect(calls.texts.some((text) => text.includes('SET name'))).toBe(false)
     expect(calls.texts.join('\n')).not.toContain('nutrition_entries')
@@ -201,6 +215,34 @@ describe('recipe creation', () => {
     expect(again.currentVersion).toBe(2)
     expect(again.candidateVersionNumber).toBe(3)
     expect(again.canCommit).toBe(true)
+  })
+
+  it('saves a refreshed recipe version when linked foods gain fiber and sodium', async () => {
+    calls.linkedIngredient = true
+    calls.fiber = 3
+    calls.sodium = 75
+    const preview = await previewRecipeEdit('recipe-1', {
+      sourceVersionId: 'version-1',
+      name: 'Sundubu-jjigae',
+      notes: null,
+      yieldServings: 6,
+      finishedWeightG: null,
+      ingredients: [turkey],
+    })
+    expect(preview.canCommit).toBe(true)
+    expect(preview.ingredientBasisChanges).toHaveLength(1)
+    expect(preview.ingredientBasisChanges[0]?.to?.basis.fiberG).toBe(3)
+    expect(preview.ingredientBasisChanges[0]?.to?.basis.sodiumMg).toBe(75)
+    expect(preview.candidateWholeNutrition?.fiberG).toBe(6)
+    expect(preview.candidateWholeNutrition?.sodiumMg).toBe(150)
+
+    calls.transactions = 0
+    const saved = await commitRecipeVersion('recipe-1', {
+      ...previewBody(),
+      previewFingerprint: preview.previewFingerprint,
+    })
+    expect(saved.id).toBe('recipe-1')
+    expect(calls.transactions).toBe(1)
   })
 
   it('rejects a stale food preview and a stale recipe version before writing', async () => {
