@@ -5,7 +5,6 @@ import {
   SLEEP_SHORT_TERM_MIN_OBSERVED,
   SLEEP_STAGE_ANALYTICS_VERSION,
   SLEEP_STAGE_SUMMARY_MIN_NIGHTS,
-  SLEEP_TIMEZONE,
 } from './config.js'
 import type { SleepNightlySummary } from './summarize.js'
 
@@ -109,7 +108,7 @@ function onePerDate(nights: readonly SleepNightlySummary[]): SleepNightlySummary
   const seen = new Set<string>()
   const rows: SleepNightlySummary[] = []
   for (const night of nights) {
-    if (night.timezone !== SLEEP_TIMEZONE || seen.has(night.sleepDate)) {
+    if (seen.has(night.sleepDate)) {
       continue
     }
     seen.add(night.sleepDate)
