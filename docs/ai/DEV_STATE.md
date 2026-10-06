@@ -1,5 +1,32 @@
 # Dev state
 
+## 2026-10-06 I0C complete — fresh-instance bootstrap + seed separation
+
+- Proposed schema head is now `0042_instance_seed_scope.sql`.
+- The original A/B/C 1.3.1 routine family is tagged `legacy_owner`; Beginner Calisthenics is tagged `product_builtin`.
+- Fresh databases deactivate the legacy A/B/C family when no canonical Training history references it.
+- Established databases preserve that legacy family when historical Training references it by routine snapshot or template identity.
+- Historical templates/sessions are never deleted or rewritten.
+- Owner-created routines remain unchanged.
+- Added `npm run instance:check` for migration/bootstrap diagnostics.
+- Added `docs/SINGLE_OWNER_DEPLOYMENT.md` covering a second private one-owner deployment.
+- Replaced stale phase-specific validation workflows with one generic non-main branch validation workflow.
+- Validation run `37545271735` passed TypeScript, ESLint, the full Vitest suite, and production build.
+- No Health data was copied between owners; separate deployment/database/auth remains the portability model.
+- Next planning slice: I1 Health Profile + Flexible Training Intent.
+
+## 2026-10-06 I0C prepared — fresh-instance bootstrap
+
+- I0C is prepared as a single batched Git commit object on top of current `main`; its branch ref is intentionally not published while Vercel's rolling deployment limit is active.
+- Proposed schema head is `0042_instance_seed_scope.sql`.
+- The migration classifies original A/B/C 1.3.1 as `legacy_owner` seeds and Beginner Calisthenics as a `product_builtin`.
+- A fresh database deactivates the original A/B/C family automatically.
+- An established database preserves the A/B/C family when historical Training references it.
+- No templates or historical sessions are deleted.
+- Added a read-only `npm run instance:check` diagnostic contract.
+- Added `docs/SINGLE_OWNER_DEPLOYMENT.md` for a second-owner installation.
+- Full validation is intentionally deferred until the dormant commit is exposed to a branch after the Vercel rate window clears.
+
 ## 2026-10-06 I0B complete — dynamic instance identity + canonical timezone
 
 - Completed deployment-level timezone portability without adding a schema migration; schema head remains `0041_exercise_library_calisthenics.sql`.

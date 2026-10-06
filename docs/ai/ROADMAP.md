@@ -32,18 +32,19 @@ Frozen v1.0.0, then the v2 slices the blueprint marks implemented:
 - V2-H5 Pantry + Exercise Library + Flexible Programmed Workouts: saved-food management, exercise-library management/guidance, one-session programmed extras, and beginner calisthenics support.
 - I0A Instance Configuration Foundation: typed deployment config, safe capability discovery, config diagnostics, optional-feature degradation, and one-owner-per-deployment portability foundation.
 - I0B Dynamic Instance Identity + Canonical Timezone: configured instance identity/timezone in live owner flows, DST-aware calendar behavior, deployment-neutral setup docs, and dynamic demo capability behavior.
+- I0C Fresh-Instance Bootstrap + Owner-Specific Seed Separation: data-aware legacy-owner seed handling, fresh-instance routine cleanup, deployment doctor, single-owner deployment guide, and generic branch validation.
 
 Also present from v1 and the import work: Nutrition, Training, Body, Progress, Activity, Sleep, Timeline, Compare, checkpoints, Apple Health archive import, Health Auto Export ingest, Gemini nutrition capture, Home-AI transcription, backup and portable export, and the public demo.
 
 ## Current work
 
-I0B — Dynamic Instance Identity + Canonical Timezone is complete. There is no active implementation task.
+I0C — Fresh-Instance Bootstrap + Owner-Specific Seed Separation is complete. There is no active implementation task.
 
-The next candidate portability slice is I0C — fresh-instance bootstrap + owner-specific seed separation. Draft its contract in `CURRENT_TASK.md` before implementation.
+The next accepted slice is I1 — Health Profile + Flexible Training Intent. Draft its contract in `CURRENT_TASK.md` before implementation.
 
 ## Known planned work
 
-- I0C fresh-instance bootstrap + owner-specific seed separation: preserve Jake's historical routine references while preventing legacy Jake-specific owner seed state from appearing as ordinary owner-created state in a fresh deployment; verify the documented first-run setup path.
+- I1 Health Profile + Flexible Training Intent: stable owner profile context, DOB-derived age, height, sequence-first training intent, preferred weekdays, flexible rest/training moves, and current-week overrides without punitive missed-day semantics.
 
 
 Named by the current manual or blueprint, and not marked implemented:

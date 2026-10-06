@@ -21,7 +21,8 @@
     "backup:verify": "tsx server/backup/cli.ts verify",
     "backup:restore": "tsx server/backup/cli.ts restore",
     "test": "vitest run",
-    "config:check": "tsx server/config-check.ts"
+    "config:check": "tsx server/config-check.ts",
+    "instance:check": "tsx server/instance-check.ts"
   },
   "dependencies": {
     "@google/genai": "^2.24.0",

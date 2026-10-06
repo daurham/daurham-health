@@ -331,3 +331,15 @@ Observed from the current code and product docs. Where the original rationale is
 **Status:** Active  
 **Reason:** App name, external home link, public-demo availability, and optional provider capabilities differ between deployments but are not canonical health facts or ordinary owner preferences.  
 **Implications:** Public-safe instance presentation/capabilities come from the typed instance configuration exposed by `GET /api/health`. Current Jake defaults preserve `Daurham Health`, `https://daurham.com`, and public demo behavior unless env overrides them. A normal second deployment should not require source search-and-replace for branding, domain, or timezone. True multi-tenancy remains out of scope.
+
+## Decision: Product seeds and owner seeds have different portability semantics
+
+**Status:** Active  
+**Reason:** Historical migrations contain both reusable product/reference data and original-owner setup data. Treating both as universal built-ins makes a clean second-owner deployment look like Jake's account.  
+**Implications:** Shared exercise definitions, data-source definitions, and explicitly generic built-in routines may be active on every instance. The original A/B/C 1.3.1 paper routine family is classified as `legacy_owner`. Migration 0042 hides that family on a fresh database but preserves it when historical Training references the family. Historical templates are never deleted merely to make a new instance clean. Owner-created Health state remains database-owned and starts empty on a new deployment.
+
+## Decision: Fresh-instance bootstrap is data-aware, not an environment toggle
+
+**Status:** Active  
+**Reason:** Whether the original A/B/C routine family belongs to an instance is a historical-data question, not deployment presentation/configuration. An env flag would be easy to forget, could silently change behavior after redeploy, and would mix owner history with infrastructure configuration.  
+**Implications:** Migration 0042 determines preservation from canonical Training references. New instances need no `HEALTH_LEGACY_*` setting. The deployment guide and `instance:check` verify the resulting state.
