@@ -5,7 +5,7 @@ import { useRewardSummary } from '@/features/rewards/useRewardSummary'
 import { PROGRESSION_THEME_UNLOCKS, progressionState } from '@/domain/progression'
 import { themePack } from '@/theme'
 import { AppSurfaceProvider } from '@/lib/app-prefix'
-import { cn, fetchPublicInstanceConfig, quietButtonClass, RouteFallback, selectedTabClass, SHELL_MAX_WIDTH_CLASS, tabClass } from '@/lib'
+import { cn, fetchPublicInstanceConfig, InstanceConfigContext, quietButtonClass, RouteFallback, selectedTabClass, SHELL_MAX_WIDTH_CLASS, tabClass } from '@/lib'
 import type { NavItem } from '@/types'
 
 const navItems: NavItem[] = [
@@ -37,7 +37,8 @@ function DemoBanner({ status }: { status: string }) {
       <Link to={privateLink.to} className="shrink-0 text-sm font-medium underline">
         {privateLink.label}
       </Link>
-    </div>
+      </div>
+    </InstanceConfigContext.Provider>
   )
 }
 
@@ -46,11 +47,7 @@ export function Layout() {
   const location = useLocation()
   const publicAuthRoute = location.pathname === '/sign-in' || location.pathname === '/reset-password'
   const demoRoute = location.pathname === '/demo' || location.pathname.startsWith('/demo/')
-  const [instance, setInstance] = useState<{
-    appName: string
-    externalHomeUrl: string | null
-    publicDemo: boolean
-  } | null>(null)
+  const [instance, setInstance] = useState<Awaited<ReturnType<typeof fetchPublicInstanceConfig>> | null>(null)
   const showOwnerChrome = !demoRoute && (status === 'owner' || status === 'unauthorized')
   const items = demoRoute ? demoNavItems : navItems
   const mobileMenuRef = useRef<HTMLDetailsElement>(null)
@@ -64,16 +61,12 @@ export function Layout() {
     fetchPublicInstanceConfig()
       .then((config) => {
         if (!cancelled) {
-          setInstance({
-            appName: config.appName,
-            externalHomeUrl: config.externalHomeUrl,
-            publicDemo: config.capabilities.publicDemo,
-          })
+          setInstance(config)
         }
       })
       .catch(() => {
         if (!cancelled) {
-          setInstance({ appName: 'Health', externalHomeUrl: null, publicDemo: false })
+          setInstance(null)
         }
       })
     return () => {
@@ -117,7 +110,8 @@ export function Layout() {
   }, [location.pathname, location.search])
 
   return (
-    <div className="app-shell min-h-dvh bg-zinc-50 text-zinc-900">
+    <InstanceConfigContext.Provider value={instance}>
+      <div className="app-shell min-h-dvh bg-zinc-50 text-zinc-900">
       <header className="border-b border-zinc-200 bg-white pt-[env(safe-area-inset-top)]">
         <div className={cn('mx-auto flex items-center justify-between gap-3 px-4 py-3', SHELL_MAX_WIDTH_CLASS)}>
           <p className="text-sm font-semibold tracking-tight">{instance?.appName ?? 'Health'}</p>
@@ -237,7 +231,7 @@ export function Layout() {
         ) : demoRoute ? (
           instance == null ? (
             <RouteFallback />
-          ) : instance.publicDemo ? (
+          ) : instance.capabilities.publicDemo ? (
             <AppSurfaceProvider prefix="/demo" readOnly>
               <DemoBanner status={status} />
               <Suspense fallback={<RouteFallback />}>
@@ -258,7 +252,7 @@ export function Layout() {
               label: 'Owner Sign In',
               state: { from: `${location.pathname}${location.search}` },
             }}
-            secondary={instance?.publicDemo ? { to: '/demo', label: 'Explore demo' } : undefined}
+            secondary={instance?.capabilities.publicDemo ? { to: '/demo', label: 'Explore demo' } : undefined}
           />
         ) : status === 'unauthorized' ? (
           <LockedScreen
