@@ -95,8 +95,9 @@ export type InsightStrengthExercise = {
 export type InsightDetectorInput = {
   range: ProgressRange
   asOf: string
-  /** America/Phoenix today. When it equals asOf, the current Activity day stays out of the comparison. */
+  /** Instance-calendar today. When it equals asOf, the current Activity day stays out of the comparison. */
   today: string | null
+  timezone?: string
   activityDays: readonly ActivityDailyRow[]
   sleepNights: readonly InsightSleepNight[]
   nutritionDays: readonly InsightNutritionDay[]
