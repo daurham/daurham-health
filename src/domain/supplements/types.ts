@@ -73,7 +73,7 @@ export type SupplementRecord = {
 
 export type SupplementList = {
   date: string
-  timezone: 'America/Phoenix'
+  timezone: string
   supplements: SupplementRecord[]
 }
 
