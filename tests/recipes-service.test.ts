@@ -17,6 +17,9 @@ vi.mock('../server/db.ts', () => ({
   getSql: async () => ({
     query: async (text: string, params: unknown[] = []) => {
       calls.texts.push(text)
+      if (text.includes("WHERE foods.catalog_kind = 'recipe'")) {
+        return []
+      }
       if (text.includes('FROM nutrition_foods')) {
         const ids = params[0] as string[]
         return ids

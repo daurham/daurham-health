@@ -576,7 +576,11 @@ function FoodSection({
                 <span className="truncate text-sm text-zinc-500">
                   {[
                     food.brand,
-                    showKind ? catalogKindLabel(food.catalogKind) : null,
+                    showKind
+                      ? food.catalogKind === 'recipe' && food.sourceKind === 'migrated'
+                        ? 'Legacy recipe'
+                        : catalogKindLabel(food.catalogKind)
+                      : null,
                     formatQuantity(food.servingQuantity, food.servingUnit),
                     formatKcal(food.calories),
                     formatGrams(food.protein) ? `${formatGrams(food.protein)} protein` : null,
@@ -585,13 +589,22 @@ function FoodSection({
                     .join(' · ')}
                 </span>
               </button>
-              <button
-                type="button"
-                className="px-2 text-xs text-zinc-500 hover:text-zinc-900"
-                onClick={() => onOpenFood(food)}
-              >
-                Edit
-              </button>
+              {food.catalogKind === 'recipe' && food.sourceKind === 'migrated' ? (
+                <Link
+                  to="/nutrition/recipes#legacy-recipes"
+                  className="flex items-center px-2 text-xs text-zinc-500 hover:text-zinc-900"
+                >
+                  Manage
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  className="px-2 text-xs text-zinc-500 hover:text-zinc-900"
+                  onClick={() => onOpenFood(food)}
+                >
+                  Edit
+                </button>
+              )}
               <button
                 type="button"
                 aria-label={`Quick log 1 serving of ${food.name}`}

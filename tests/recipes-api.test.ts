@@ -17,6 +17,7 @@ const service = vi.hoisted(() => ({
   previewRecipeEdit: vi.fn(),
   commitRecipeVersion: vi.fn(),
   getRecipeVersion: vi.fn(),
+  convertLegacyRecipeFood: vi.fn(),
 }))
 
 vi.mock('../server/nutrition/recipes.ts', () => service)
@@ -84,6 +85,7 @@ describe('recipe API auth', () => {
     service.previewRecipeEdit.mockResolvedValue({ canCommit: true, candidateVersionNumber: 2 })
     service.commitRecipeVersion.mockResolvedValue({ id: RECIPE, version: { version: 2, isCurrent: true } })
     service.getRecipeVersion.mockResolvedValue({ id: RECIPE, version: { version: 1, isCurrent: false } })
+    service.convertLegacyRecipeFood.mockResolvedValue({ recipe: { id: RECIPE }, legacyFoodId: RECIPE, reused: false })
     consumption.logRecipeConsumption.mockResolvedValue({ id: 'entry-1', recipeVersionId: 'version-1' })
   })
 
@@ -93,6 +95,8 @@ describe('recipe API auth', () => {
     expect(matchRecipeRoute(`/api/nutrition/recipes/${RECIPE}/versions/preview`)).toEqual({ kind: 'versions', id: RECIPE, action: 'preview' })
     expect(matchRecipeRoute(`/api/nutrition/recipes/${RECIPE}/versions`)).toEqual({ kind: 'versions', id: RECIPE, action: 'commit' })
     expect(matchRecipeRoute(`/api/nutrition/recipes/${RECIPE}/versions/1`)).toEqual({ kind: 'versions', id: RECIPE, action: 1 })
+    expect(matchRecipeRoute(`/api/nutrition/recipes/legacy/${RECIPE}/convert`)).toEqual({ kind: 'legacy-convert', id: RECIPE })
+    expect(matchHealthApiRoute(`/api/nutrition/recipes/legacy/${RECIPE}/convert`)).toBe('nutrition-recipes')
     expect(matchHealthApiRoute('/api/ingest/apple-health')).toBe('apple-health-sync')
     const handler = readFileSync('server/handlers/nutrition-recipes.ts', 'utf8')
     expect(handler).toContain('withOwnerAuth')
@@ -117,6 +121,10 @@ describe('recipe API auth', () => {
     expect(service.getRecipe).not.toHaveBeenCalled()
     expect((await call('POST', `/api/nutrition/recipes/${RECIPE}/archive`, owner)).status()).toBe(200)
     expect((await call('POST', `/api/nutrition/recipes/${RECIPE}/restore`, owner)).status()).toBe(200)
+    expect((await call('POST', `/api/nutrition/recipes/legacy/${RECIPE}/convert`, owner)).status()).toBe(200)
+    const legacyWrongMethod = await call('GET', `/api/nutrition/recipes/legacy/${RECIPE}/convert`, owner)
+    expect(legacyWrongMethod.status()).toBe(405)
+    expect(legacyWrongMethod.allow()).toBe('POST')
     expect((await call('POST', `/api/nutrition/recipes/${RECIPE}/versions/preview`, null, { name: 'Stew' })).status()).toBe(401)
     expect((await call('POST', `/api/nutrition/recipes/${RECIPE}/versions`, owner, { name: 'Stew' })).status()).toBe(201)
     const versionGet = await call('POST', `/api/nutrition/recipes/${RECIPE}/versions/1`, owner)

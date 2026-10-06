@@ -155,6 +155,18 @@ const ENTRY_READ_FROM = `nutrition_entries
 export const LIST_FOODS_SQL = `SELECT ${FOOD_COLUMNS}
          FROM nutrition_foods
          WHERE archived = false
+           AND NOT (
+             catalog_kind = 'recipe'
+             AND source_kind = 'migrated'
+             AND EXISTS (
+               SELECT 1
+               FROM recipes canonical_recipes
+               JOIN recipe_versions canonical_versions
+                 ON canonical_versions.recipe_id = canonical_recipes.id AND canonical_versions.is_current
+               WHERE canonical_recipes.is_active
+                 AND lower(btrim(canonical_versions.name)) = lower(btrim(nutrition_foods.name))
+             )
+           )
            AND ($1::text IS NULL OR lower(name) LIKE '%' || lower($1) || '%' OR (brand IS NOT NULL AND lower(brand) LIKE '%' || lower($1) || '%'))
          ORDER BY
            CASE
@@ -307,6 +319,17 @@ export const LIST_STAPLES_SQL = `SELECT ${FOOD_COLUMNS}
 export const LIST_RECIPES_SQL = `SELECT ${FOOD_COLUMNS}
          FROM nutrition_foods
          WHERE archived = false AND catalog_kind = 'recipe'
+           AND NOT (
+             source_kind = 'migrated'
+             AND EXISTS (
+               SELECT 1
+               FROM recipes canonical_recipes
+               JOIN recipe_versions canonical_versions
+                 ON canonical_versions.recipe_id = canonical_recipes.id AND canonical_versions.is_current
+               WHERE canonical_recipes.is_active
+                 AND lower(btrim(canonical_versions.name)) = lower(btrim(nutrition_foods.name))
+             )
+           )
          ORDER BY name ASC, id ASC
          LIMIT $1`
 
@@ -319,6 +342,18 @@ export const LIST_RECENTS_SQL = `SELECT ${FOOD_COLUMNS}
            GROUP BY food_id
          ) r ON r.food_id = f.id
          WHERE f.archived = false
+           AND NOT (
+             f.catalog_kind = 'recipe'
+             AND f.source_kind = 'migrated'
+             AND EXISTS (
+               SELECT 1
+               FROM recipes canonical_recipes
+               JOIN recipe_versions canonical_versions
+                 ON canonical_versions.recipe_id = canonical_recipes.id AND canonical_versions.is_current
+               WHERE canonical_recipes.is_active
+                 AND lower(btrim(canonical_versions.name)) = lower(btrim(f.name))
+             )
+           )
          ORDER BY r.last_at DESC
          LIMIT $1`
 

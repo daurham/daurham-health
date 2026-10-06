@@ -18,6 +18,7 @@ import {
 } from '../../src/domain/nutrition/recipes.js'
 import { getSql, type Sql } from '../db.js'
 import { HttpError } from '../http.js'
+import { loadLegacyMealCombo } from './legacy-source.js'
 
 export type RecipeIngredientView = RecipeLine & {
   id: string
@@ -70,23 +71,267 @@ export type RecipeListItem = {
   finishedWeightG: number | null
 }
 
+export type LegacyRecipeFoodListItem = {
+  id: string
+  name: string
+  caloriesKcal: number
+  proteinG: number | null
+  carbsG: number | null
+  fatG: number | null
+  fiberG: number | null
+  sodiumMg: number | null
+  archived: boolean
+  usageCount: number
+  lastUsedDate: string | null
+  matchingRecipeId: string | null
+}
+
+export type RecipeIndex = {
+  recipes: RecipeListItem[]
+  legacyRecipes: LegacyRecipeFoodListItem[]
+}
+
 const FOOD_BASIS_SQL = `SELECT id::text AS id, name, barcode, serving_quantity, serving_unit, serving_grams,
   calories, protein, carbs, fat, fiber, sodium, source_kind, archived
   FROM nutrition_foods
   WHERE id = ANY($1::uuid[])`
 
-export async function listRecipes(): Promise<{ recipes: RecipeListItem[] }> {
+export async function listRecipes(): Promise<RecipeIndex> {
   const sql = await getSql()
-  const rows = (await sql.query(
-    `SELECT recipes.id::text AS id, versions.version, versions.name, versions.is_current,
-            versions.calories_kcal, versions.yield_servings, versions.finished_weight_g
+  const [rows, legacyRows] = await Promise.all([
+    sql.query(
+      `SELECT recipes.id::text AS id, versions.version, versions.name, versions.is_current,
+              versions.calories_kcal, versions.yield_servings, versions.finished_weight_g
+       FROM recipes
+       JOIN recipe_versions versions ON versions.recipe_id = recipes.id AND versions.is_current
+       WHERE recipes.is_active
+       ORDER BY versions.name ASC, recipes.id ASC`,
+      [],
+    ) as Promise<RecipeListRow[]>,
+    sql.query(
+      `SELECT foods.id::text AS id, foods.name, foods.calories, foods.protein, foods.carbs, foods.fat,
+              foods.fiber, foods.sodium, foods.archived,
+              COALESCE((SELECT count(*) FROM nutrition_entries entries WHERE entries.food_id = foods.id), 0)::int AS usage_count,
+              (SELECT max(entries.log_date)::text FROM nutrition_entries entries WHERE entries.food_id = foods.id) AS last_used_date,
+              (
+                SELECT current_recipes.id::text
+                FROM recipes current_recipes
+                JOIN recipe_versions current_versions
+                  ON current_versions.recipe_id = current_recipes.id AND current_versions.is_current
+                WHERE current_recipes.is_active
+                  AND lower(btrim(current_versions.name)) = lower(btrim(foods.name))
+                ORDER BY current_recipes.updated_at DESC, current_recipes.id ASC
+                LIMIT 1
+              ) AS matching_recipe_id
+       FROM nutrition_foods foods
+       WHERE foods.catalog_kind = 'recipe'
+         AND foods.source_kind = 'migrated'
+       ORDER BY foods.archived ASC, foods.name ASC, foods.id ASC`,
+      [],
+    ) as Promise<LegacyRecipeFoodRow[]>,
+  ])
+  return {
+    recipes: rows.map(mapListItem),
+    legacyRecipes: legacyRows.map(mapLegacyRecipeFood),
+  }
+}
+
+export async function convertLegacyRecipeFood(foodId: string): Promise<{
+  recipe: RecipeDetail
+  legacyFoodId: string
+  reused: boolean
+}> {
+  const sql = await getSql()
+  const foodRows = (await sql.query(
+    `SELECT id::text AS id, name, archived
+     FROM nutrition_foods
+     WHERE id = $1::uuid
+       AND catalog_kind = 'recipe'
+       AND source_kind = 'migrated'
+     LIMIT 1`,
+    [foodId],
+  )) as Array<{ id: string; name: string; archived: boolean }>
+  const legacyFood = foodRows[0]
+  if (!legacyFood) {
+    throw new HttpError(404, 'Legacy recipe was not found.')
+  }
+
+  const sourceRows = (await sql.query(
+    `SELECT source_id::text AS source_id, external_id, external_fingerprint
+     FROM source_record_links
+     WHERE entity_type = 'nutrition_food'
+       AND entity_id = $1::uuid
+       AND external_fingerprint LIKE 'legacy:meal_combo:%'
+     ORDER BY created_at ASC
+     LIMIT 1`,
+    [foodId],
+  )) as Array<{ source_id: string; external_id: string | null; external_fingerprint: string }>
+  const source = sourceRows[0]
+  if (!source) {
+    throw new HttpError(422, 'This legacy recipe has no source link. Create a new Recipe, then hide the old copy.')
+  }
+  const externalId = Number(source.external_id ?? source.external_fingerprint.split(':').at(-1))
+  if (!Number.isInteger(externalId) || externalId <= 0) {
+    throw new HttpError(422, 'This legacy recipe has an invalid source id. Create a new Recipe, then hide the old copy.')
+  }
+
+  const conversionFingerprint = `legacy:meal_combo_recipe:${externalId}`
+  const existingConversion = (await sql.query(
+    `SELECT entity_id::text AS id
+     FROM source_record_links
+     WHERE source_id = $1::uuid
+       AND external_fingerprint = $2
+       AND entity_type = 'recipe'
+     LIMIT 1`,
+    [source.source_id, conversionFingerprint],
+  )) as Array<{ id: string }>
+  if (existingConversion[0]?.id) {
+    await archiveLegacyRecipeFood(sql, foodId)
+    return {
+      recipe: await getRecipe(existingConversion[0].id),
+      legacyFoodId: foodId,
+      reused: true,
+    }
+  }
+
+  const sameName = (await sql.query(
+    `SELECT recipes.id::text AS id
      FROM recipes
      JOIN recipe_versions versions ON versions.recipe_id = recipes.id AND versions.is_current
      WHERE recipes.is_active
-     ORDER BY versions.name ASC, recipes.id ASC`,
-    [],
-  )) as RecipeListRow[]
-  return { recipes: rows.map(mapListItem) }
+       AND lower(btrim(versions.name)) = lower(btrim($1))
+     ORDER BY recipes.updated_at DESC, recipes.id ASC
+     LIMIT 1`,
+    [legacyFood.name],
+  )) as Array<{ id: string }>
+  if (sameName[0]?.id) {
+    await recordLegacyRecipeConversion(sql, {
+      sourceId: source.source_id,
+      externalId,
+      fingerprint: conversionFingerprint,
+      legacyFoodId: foodId,
+      recipeId: sameName[0].id,
+    })
+    await archiveLegacyRecipeFood(sql, foodId)
+    return {
+      recipe: await getRecipe(sameName[0].id),
+      legacyFoodId: foodId,
+      reused: true,
+    }
+  }
+
+  const legacy = await loadLegacyMealCombo(externalId)
+  if (!legacy) {
+    throw new HttpError(404, 'The original recipe is no longer available in the legacy tracker.')
+  }
+  if (legacy.ingredients.length === 0) {
+    throw new HttpError(
+      422,
+      'This old recipe has no ingredient breakdown to convert. Create a new Recipe, then hide the old copy.',
+    )
+  }
+
+  const ingredientFingerprints = legacy.ingredients.map((ingredient) => `legacy:ingredient:${ingredient.id}`)
+  const ingredientLinks = (await sql.query(
+    `SELECT external_fingerprint, entity_id::text AS entity_id
+     FROM source_record_links
+     WHERE source_id = $1::uuid
+       AND entity_type = 'nutrition_food'
+       AND external_fingerprint = ANY($2::text[])`,
+    [source.source_id, ingredientFingerprints],
+  )) as Array<{ external_fingerprint: string; entity_id: string }>
+  const foodIdByFingerprint = new Map(
+    ingredientLinks.map((link) => [link.external_fingerprint, link.entity_id] as const),
+  )
+  const missingLinks = legacy.ingredients.filter(
+    (ingredient) => !foodIdByFingerprint.has(`legacy:ingredient:${ingredient.id}`),
+  )
+  if (missingLinks.length > 0) {
+    throw new HttpError(
+      422,
+      `Some old ingredients are no longer linked in Health: ${missingLinks.map((item) => item.name).join(', ')}. Rebuild this Recipe manually, then hide the old copy.`,
+    )
+  }
+
+  const ingredientFoodIds = legacy.ingredients.map(
+    (ingredient) => foodIdByFingerprint.get(`legacy:ingredient:${ingredient.id}`) ?? '',
+  )
+  const linkedFoods = (await sql.query(
+    `SELECT id::text AS id, name, archived
+     FROM nutrition_foods
+     WHERE id = ANY($1::uuid[])`,
+    [ingredientFoodIds],
+  )) as Array<{ id: string; name: string; archived: boolean }>
+  const linkedById = new Map(linkedFoods.map((food) => [food.id, food] as const))
+  const unavailable = legacy.ingredients.flatMap((ingredient) => {
+    const id = foodIdByFingerprint.get(`legacy:ingredient:${ingredient.id}`)
+    const food = id ? linkedById.get(id) : null
+    return !food || food.archived ? [food?.name ?? ingredient.name] : []
+  })
+  if (unavailable.length > 0) {
+    throw new HttpError(
+      422,
+      `Restore these Pantry foods before converting: ${unavailable.join(', ')}.`,
+    )
+  }
+
+  const notes = [legacy.notes?.trim() || null, legacy.instructions?.trim() || null].filter(Boolean).join('\n\n')
+  const created = await createRecipe({
+    name: legacyFood.name,
+    notes,
+    yieldServings: 1,
+    finishedWeightG: null,
+    ingredients: legacy.ingredients.map((ingredient) => ({
+      foodId: foodIdByFingerprint.get(`legacy:ingredient:${ingredient.id}`) ?? '',
+      amount: ingredient.quantity,
+      unit: 'serving',
+    })),
+  })
+  await recordLegacyRecipeConversion(sql, {
+    sourceId: source.source_id,
+    externalId,
+    fingerprint: conversionFingerprint,
+    legacyFoodId: foodId,
+    recipeId: created.id,
+  })
+  await archiveLegacyRecipeFood(sql, foodId)
+  return { recipe: created, legacyFoodId: foodId, reused: false }
+}
+
+async function recordLegacyRecipeConversion(
+  sql: Sql,
+  input: {
+    sourceId: string
+    externalId: number
+    fingerprint: string
+    legacyFoodId: string
+    recipeId: string
+  },
+): Promise<void> {
+  await sql.query(
+    `INSERT INTO source_record_links (
+       source_id, import_job_id, external_id, external_fingerprint, entity_type, entity_id, source_payload
+     ) VALUES ($1::uuid, NULL, $2, $3, 'recipe', $4::uuid, $5::jsonb)
+     ON CONFLICT (source_id, external_fingerprint) DO NOTHING`,
+    [
+      input.sourceId,
+      String(input.externalId),
+      input.fingerprint,
+      input.recipeId,
+      JSON.stringify({ table: 'meal_combos', id: input.externalId, converted_from_food_id: input.legacyFoodId }),
+    ],
+  )
+}
+
+async function archiveLegacyRecipeFood(sql: Sql, foodId: string): Promise<void> {
+  await sql.query(
+    `UPDATE nutrition_foods
+     SET archived = true, updated_at = now()
+     WHERE id = $1::uuid
+       AND catalog_kind = 'recipe'
+       AND source_kind = 'migrated'`,
+    [foodId],
+  )
 }
 
 export async function getRecipe(id: string): Promise<RecipeDetail> {
@@ -624,6 +869,23 @@ function mapListItem(row: RecipeListRow): RecipeListItem {
   }
 }
 
+function mapLegacyRecipeFood(row: LegacyRecipeFoodRow): LegacyRecipeFoodListItem {
+  return {
+    id: row.id,
+    name: row.name,
+    caloriesKcal: numberValue(row.calories),
+    proteinG: optionalNumber(row.protein),
+    carbsG: optionalNumber(row.carbs),
+    fatG: optionalNumber(row.fat),
+    fiberG: optionalNumber(row.fiber),
+    sodiumMg: optionalNumber(row.sodium),
+    archived: row.archived,
+    usageCount: Number(row.usage_count ?? 0),
+    lastUsedDate: row.last_used_date,
+    matchingRecipeId: row.matching_recipe_id,
+  }
+}
+
 function mapIngredient(row: IngredientRow): RecipeIngredientView {
   const line: RecipeLine = {
     position: row.position,
@@ -715,6 +977,20 @@ type RecipeListRow = {
   calories_kcal: unknown
   yield_servings: unknown
   finished_weight_g: unknown
+}
+type LegacyRecipeFoodRow = {
+  id: string
+  name: string
+  calories: unknown
+  protein: unknown
+  carbs: unknown
+  fat: unknown
+  fiber: unknown
+  sodium: unknown
+  archived: boolean
+  usage_count: number | string
+  last_used_date: string | null
+  matching_recipe_id: string | null
 }
 type HistoryRow = { id: string; version: number; is_current: boolean; name: string; created_at: unknown }
 type VersionRow = {
