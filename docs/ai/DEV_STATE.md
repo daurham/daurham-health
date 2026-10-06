@@ -1,5 +1,28 @@
 # Dev state
 
+## 2026-10-06 I0A complete — instance configuration foundation
+
+- Added the master program at `docs/ai/NEXT_INTELLIGENCE_ROADMAP.md`.
+- Added a typed server-side instance configuration and safe public capability payload through `GET /api/health`.
+- Optional capabilities now include Gemini, USDA, Home-AI, training photo import, Apple Health sync, Body Shortcut, and public demo state.
+- Training photo import is capability-driven: without Home-AI/feature enablement, Training hides photo import and does not poll transcription jobs.
+- Today → Training → **Log workout** now routes to `/training/new`; photo import is no longer the primary logging path.
+- Added `npm run config:check` for non-secret deployment diagnostics.
+- Updated `.env.example` and `PROJECT.md` with the portable instance configuration contract.
+- Recorded the one-owner-per-deployment portability decision.
+- No schema migration was added; repository schema head remains `0041_exercise_library_calisthenics.sql`.
+- Validation run `37535917165` passed TypeScript, ESLint, the full Vitest suite, and production build.
+- Next planned slice: I0B dynamic canonical timezone + instance identity/origin wiring.
+
+## 2026-10-06 next-intelligence program start
+
+- Current `main` includes the H5 Pantry/Exercise Library work and later maintenance fixes.
+- Repository schema head is `0041_exercise_library_calisthenics.sql`.
+- The prior H5 owner-QA wording in `CURRENT_TASK.md` was stale relative to current `main`; I0A replaces it as the active task.
+- The master next-intelligence/portability program is checked in at `docs/ai/NEXT_INTELLIGENCE_ROADMAP.md`.
+- I0A establishes one-owner-per-deployment instance configuration and safe capability discovery before later Health Profile/intelligence phases.
+- No I0A schema migration is planned.
+
 ## 2026-10-05 maintenance
 
 - General Ask Health cross-domain synthesis was hardened for questions combining body, nutrition, and training evidence.

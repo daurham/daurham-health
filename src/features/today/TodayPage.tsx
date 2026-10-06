@@ -722,7 +722,7 @@ function TrainingCard({ view }: { view: TodayViewModel }) {
           <p>No training session logged today</p>
           {readOnly ? null : (
             <div className="mt-3 flex flex-wrap gap-2">
-              <PrimaryAction to={prefixedPath(prefix, '/training/import')}>Log workout</PrimaryAction>
+              <PrimaryAction to={prefixedPath(prefix, '/training/new')}>Log workout</PrimaryAction>
               <QuietAction to={prefixedPath(prefix, '/training/new?type=ad_hoc')}>Ad-hoc workout</QuietAction>
             </div>
           )}

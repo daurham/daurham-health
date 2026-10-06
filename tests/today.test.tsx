@@ -239,6 +239,20 @@ describe('today attention, patterns, and payload', () => {
   })
 })
 
+describe('today training routing', () => {
+  it('uses manual workout entry as the primary Today training action', () => {
+    const view = buildTodayView(sources())
+    const html = renderToStaticMarkup(
+      <MemoryRouter>
+        <TodayBoard view={view} />
+      </MemoryRouter>,
+    )
+    expect(html).toContain('href="/training/new"')
+    expect(html).toContain('Log workout')
+    expect(html).not.toContain('href="/training/import">Log workout')
+  })
+})
+
 describe('today page', () => {
   it('renders provisional activity, unlogged nutrition, historical sleep, and no patterns section', () => {
     const view = buildTodayView(

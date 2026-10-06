@@ -93,24 +93,34 @@ Production is the Vite client plus the single Vercel function. `vercel.json` rew
 Values belong in the host environment or `.env.local`, never in docs or client bundles.
 
 - `DATABASE_URL`
-- `HOME_AI_BASE_URL`
-- `HOME_AI_API_KEY`
 - `NEON_AUTH_BASE_URL`
 - `NEON_AUTH_COOKIE_SECRET`
 - `HEALTH_OWNER_USER_ID`
 - `HEALTH_OWNER_EMAIL`
+- `HEALTH_APP_NAME`
+- `HEALTH_EXTERNAL_HOME_URL`
+- `HEALTH_PUBLIC_DEMO_ENABLED`
+- `HEALTH_FEATURE_TRAINING_PHOTO_IMPORT`
+- `HEALTH_CALENDAR_TIMEZONE`
+- `HOME_AI_BASE_URL`
+- `HOME_AI_API_KEY`
 - `LEGACY_NUTRITION_DATABASE_URL`
 - `APPLE_HEALTH_SYNC_TOKEN`
-- `HEALTH_CALENDAR_TIMEZONE`
+- `BODY_CAPTURE_TOKEN`
 - `GEMINI_API_KEY`
 - `GEMINI_NUTRITION_MODEL`
 - `GEMINI_NUTRITION_DESCRIPTION_MODEL`
 - `GEMINI_NUTRITION_MEAL_MODEL`
 - `GEMINI_NUTRITION_LABEL_MODEL`
+- `GEMINI_NUTRITION_RECIPE_MODEL`
 - `AI_ASK_HEALTH_MODEL`
 - `AI_MONTHLY_BUDGET_USD`
 - `AI_WARNING_BUDGET_USD`
 - `AI_ASK_HEALTH_MAX_REQUEST_COST_USD`
+- `AI_NUTRITION_DESCRIPTION_MAX_REQUEST_COST_USD`
+- `AI_NUTRITION_MEAL_MAX_REQUEST_COST_USD`
+- `AI_NUTRITION_LABEL_MAX_REQUEST_COST_USD`
+- `AI_NUTRITION_RECIPE_ASSIST_MAX_REQUEST_COST_USD`
 - `AI_WEEKLY_COACH_MODEL`
 - `AI_WEEKLY_COACH_MAX_REQUEST_COST_USD`
 - `AI_EXPERIMENT_SUGGESTION_MODEL`
@@ -121,8 +131,9 @@ Values belong in the host environment or `.env.local`, never in docs or client b
 - `OPEN_FOOD_FACTS_USER_AGENT`
 - `OPEN_FOOD_FACTS_BASE_URL`
 
-`AI_WARNING_BUDGET_USD` is not a spending gate. `HEALTH_CALENDAR_TIMEZONE` documents the zone; the code constant is the source of truth.
+The authoritative placeholder inventory is `.env.example`. `npm run config:check` validates required deployment configuration and optional capability readiness without printing secret values.
 
+`HEALTH_CALENDAR_TIMEZONE` is validated and exposed by the I0A instance configuration layer, but the existing Phoenix constants remain the date-bucketing authority until I0B completes the timezone migration.
 ## Invariants
 
 - One owner. The demo is not a second account.

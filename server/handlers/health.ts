@@ -1,3 +1,5 @@
+import { getPublicInstanceConfig } from '../instance-config.js'
+
 type HealthRequest = {
   method?: string
 }
@@ -8,12 +10,15 @@ type HealthResponse = {
   json: (body: unknown) => void
 }
 
-export default function handler(req: HealthRequest, res: HealthResponse) {
+export default async function handler(req: HealthRequest, res: HealthResponse) {
   if (req.method !== 'GET') {
     res.setHeader('Allow', 'GET')
     res.status(405).json({ error: 'Method not allowed' })
     return
   }
 
-  res.status(200).json({ status: 'ok' })
+  res.status(200).json({
+    status: 'ok',
+    instance: await getPublicInstanceConfig(),
+  })
 }

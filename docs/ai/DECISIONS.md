@@ -311,3 +311,10 @@ Observed from the current code and product docs. Where the original rationale is
 **Status:** Active  
 **Reason:** Owner rewards are editable catalog choices, while a historical redemption must retain what was actually bought and what it cost.  
 **Implications:** Reward items can be created, edited, and archived. A redemption freezes reward name and XP cost in `reward_purchases`; later item changes do not rewrite it. Spending appends one purchase ledger entry. Refund appends one compensating refund entry and restores Spendable XP without changing Lifetime XP. Concurrent purchases serialize at the database boundary and cannot overdraft the one-owner wallet.
+
+## Decision: Separate single-owner deployments share one portable codebase
+
+**Status:** Active  
+**Reason:** Supporting another owner does not justify converting the personal Health record into a multi-tenant SaaS. Separate deployments provide stronger isolation while preserving the existing owner-only authorization model.  
+**Implications:** A normal new instance should require infrastructure/environment configuration rather than source edits. Deployment secrets and capability flags belong in instance configuration; editable Health state belongs in PostgreSQL. Optional providers must degrade cleanly. A GitHub fork is optional: the same repository may back multiple Vercel projects with separate databases and environment values. True multi-tenancy is out of scope unless a future product decision explicitly requires it.
+
