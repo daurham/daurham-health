@@ -22,21 +22,21 @@ function sources(): TodaySources {
 }
 
 describe('today actions', () => {
-  it('opens Add food from Today and defaults Log workout to photo import', () => {
+  it('opens Add food from Today and defaults Log workout to manual workout entry', () => {
     const today = readFileSync('src/features/today/TodayPage.tsx', 'utf8')
     const nutrition = readFileSync('src/features/nutrition/NutritionPage.tsx', 'utf8')
     expect(today).toContain('TodayAddFoodAction')
     expect(today).toContain('AddFoodSheet')
     expect(today).toContain('fetchNutritionDay(date)')
-    expect(today).toContain("prefixedPath(prefix, '/training/import')")
+    expect(today).toContain("prefixedPath(prefix, '/training/new')")
     expect(today).toContain("prefixedPath(prefix, '/training/new?type=ad_hoc')")
-    expect(today).not.toMatch(/prefixedPath\(prefix, '\/training\/new'\)/)
+    expect(today).not.toContain("prefixedPath(prefix, '/training/import')")
     expect(nutrition).toContain("params.get('action') !== 'add'")
     expect(nutrition).toContain("setPanel({ kind: 'add' })")
     expect(nutrition).toContain("next.delete('action')")
   })
 
-  it('renders Log workout as the import route and Add food as an immediate action', () => {
+  it('renders Log workout as the manual-entry route and Add food as an immediate action', () => {
     const html = renderToStaticMarkup(
       <MemoryRouter>
         <TodayBoard view={buildTodayView(sources())} />
@@ -44,7 +44,8 @@ describe('today actions', () => {
     )
     expect(html).toContain('Add food')
     expect(html).toMatch(/<button[^>]*>Add food<\/button>/)
-    expect(html).toContain('/training/import')
+    expect(html).toContain('href="/training/new"')
+    expect(html).not.toContain('/training/import')
     expect(html).toContain('/training/new?type=ad_hoc')
     expect(html).toContain('Ad-hoc workout')
     expect(html).toContain('Log workout')
