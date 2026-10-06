@@ -222,6 +222,7 @@ export async function getProgressTimeline(input: {
     nutritionTargets: rows.nutritionTargets,
     dailyContexts,
     benchmarkResults,
+    activityTimezone: timezone,
     experimentResults: experimentResults.map((item) => ({
       id: item.id,
       title: item.title,
