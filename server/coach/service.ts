@@ -783,25 +783,36 @@ async function weekProteinAverage(sql: Sql, start: string, end: string): Promise
   }
 }
 
-async function activitySteps(sql: Sql, date: string): Promise<number | null> {
+async function activitySteps(
+  sql: Sql,
+  date: string,
+  timezone: string,
+): Promise<number | null> {
   const rows = (await sql.query(
     `SELECT steps_count::text AS steps
        FROM activity_daily_summaries
       WHERE summary_date = $1::date
+        AND timezone = $2
       ORDER BY updated_at DESC
       LIMIT 1`,
-    [date],
+    [date, timezone],
   )) as Array<{ steps: string | null }>
   return numberOrNull(rows[0]?.steps)
 }
 
-async function weekStepAverage(sql: Sql, start: string, end: string): Promise<{ value: number | null; observedDays: number }> {
+async function weekStepAverage(
+  sql: Sql,
+  start: string,
+  end: string,
+  timezone: string,
+): Promise<{ value: number | null; observedDays: number }> {
   const rows = (await sql.query(
     `SELECT steps_count::text AS steps
        FROM activity_daily_summaries
       WHERE summary_date BETWEEN $1::date AND $2::date
+        AND timezone = $3
         AND steps_count IS NOT NULL`,
-    [start, end],
+    [start, end, timezone],
   )) as Array<{ steps: string }>
   const values = rows.map((row) => Number(row.steps)).filter(Number.isFinite)
   return {
@@ -813,20 +824,21 @@ async function weekStepAverage(sql: Sql, start: string, end: string): Promise<{ 
 async function bodyCompletion(
   sql: Sql,
   row: CoachTaskRow,
+  timezone: string,
 ): Promise<{ progress: CoachProgress; evidence: CompletionEvidence | null }> {
   const metricKey = stringMeta(row, 'metricKey')
   if (!metricKey) return { progress: { current: null, target: 1, unit: 'measurement', label: null }, evidence: null }
   const baseline = stringMeta(row, 'baselineMeasuredDate')
   const rows = (await sql.query(
     `SELECT sessions.id::text AS session_id,
-            (sessions.measured_at AT TIME ZONE 'America/Phoenix')::date::text AS measured_date
+            (sessions.measured_at AT TIME ZONE $3)::date::text AS measured_date
        FROM body_metrics metrics
        JOIN body_measurement_sessions sessions ON sessions.id = metrics.measurement_session_id
       WHERE metrics.metric_key = $1
-        AND (sessions.measured_at AT TIME ZONE 'America/Phoenix')::date >= $2::date
+        AND (sessions.measured_at AT TIME ZONE $3)::date >= $2::date
       ORDER BY sessions.measured_at DESC
       LIMIT 1`,
-    [metricKey, row.starts_on],
+    [metricKey, row.starts_on, timezone],
   )) as Array<{ session_id: string; measured_date: string }>
   const found = rows[0]
   const qualifies = found && (baseline == null || found.measured_date > baseline)
@@ -1093,12 +1105,13 @@ async function evaluateTask(
   row: CoachTaskRow,
   today: string,
   now = new Date(),
+  timezone: string,
 ): Promise<{ progress: CoachProgress | null; evidence: CompletionEvidence | null }> {
   if (row.task_kind === 'stretch_quest') return stretchProgress(sql, row, today, now)
   const target = numberOrNull(row.target_value)
   const rule = completionRule(row)
 
-  if (rule === 'body_metric') return bodyCompletion(sql, row)
+  if (rule === 'body_metric') return bodyCompletion(sql, row, timezone)
 
   if (rule === 'training_today_count' || rule === 'training_week_count') {
     const count = await trainingCount(sql, row.starts_on, rule === 'training_today_count' ? row.starts_on : row.expires_on)
@@ -1117,7 +1130,7 @@ async function evaluateTask(
   }
 
   if (rule === 'activity_steps_today') {
-    const steps = await activitySteps(sql, row.starts_on)
+    const steps = await activitySteps(sql, row.starts_on, timezone)
     return {
       progress: { current: steps, target, unit: 'steps', label: steps == null ? null : Math.round(steps).toLocaleString('en-US') },
       evidence:
@@ -1149,7 +1162,7 @@ async function evaluateTask(
   }
 
   if (rule === 'activity_week_average') {
-    const summary = await weekStepAverage(sql, row.starts_on, row.expires_on)
+    const summary = await weekStepAverage(sql, row.starts_on, row.expires_on, timezone)
     const final = today > row.expires_on
     return {
       progress: { current: summary.value, target, unit: 'steps/day', label: summary.value == null ? null : `${Math.round(summary.value).toLocaleString('en-US')} avg` },
@@ -1229,7 +1242,7 @@ async function expireTask(sql: Sql, row: CoachTaskRow) {
   })
 }
 
-async function reconcile(sql: Sql, today: string, now: Date) {
+async function reconcile(sql: Sql, today: string, now: Date, timezone: string) {
   const rows = (await sql.query(
     `SELECT ${TASK_COLUMNS}
        FROM coach_tasks
@@ -1247,7 +1260,7 @@ async function reconcile(sql: Sql, today: string, now: Date) {
       }
       continue
     }
-    const evaluated = await evaluateTask(sql, row, today, now)
+    const evaluated = await evaluateTask(sql, row, today, now, timezone)
     if (evaluated.evidence) {
       if (row.task_kind === 'stretch_quest') {
         await transitionStretch(sql, row, 'completed', now, evaluated.evidence)
@@ -1266,8 +1279,14 @@ async function reconcile(sql: Sql, today: string, now: Date) {
   }
 }
 
-async function toView(sql: Sql, row: CoachTaskRow, today: string, now: Date): Promise<CoachTaskView> {
-  const evaluated = row.status === 'active' ? await evaluateTask(sql, row, today, now) : { progress: null, evidence: null }
+async function toView(
+  sql: Sql,
+  row: CoachTaskRow,
+  today: string,
+  now: Date,
+  timezone: string,
+): Promise<CoachTaskView> {
+  const evaluated = row.status === 'active' ? await evaluateTask(sql, row, today, now, timezone) : { progress: null, evidence: null }
   const completedEvidence = row.status === 'completed' ? await latestEvidenceKind(sql, row.id) : null
   let progress = evaluated.progress
   if (row.task_kind === 'stretch_quest' && row.status === 'completed') {
@@ -1316,7 +1335,12 @@ async function toView(sql: Sql, row: CoachTaskRow, today: string, now: Date): Pr
   }
 }
 
-async function currentState(sql: Sql, date: string, now: Date): Promise<CoachState> {
+async function currentState(
+  sql: Sql,
+  date: string,
+  now: Date,
+  timezone: string,
+): Promise<CoachState> {
   await reconcileCoachAwards(sql)
   const week = coachWeek(date)
   const [weeklyRow, dailyRow, stretchRow] = await Promise.all([
@@ -1325,9 +1349,9 @@ async function currentState(sql: Sql, date: string, now: Date): Promise<CoachSta
     loadCurrentStretch(sql, date),
   ])
   const [weeklyFocus, dailyQuest, stretchQuest, lab] = await Promise.all([
-    weeklyRow ? toView(sql, weeklyRow, date, now) : Promise.resolve(null),
-    dailyRow ? toView(sql, dailyRow, date, now) : Promise.resolve(null),
-    stretchRow ? toView(sql, stretchRow, date, now) : Promise.resolve(null),
+    weeklyRow ? toView(sql, weeklyRow, date, now, timezone) : Promise.resolve(null),
+    dailyRow ? toView(sql, dailyRow, date, now, timezone) : Promise.resolve(null),
+    stretchRow ? toView(sql, stretchRow, date, now, timezone) : Promise.resolve(null),
     loadCoachLabState(sql, date),
   ])
   return {
@@ -1344,48 +1368,45 @@ async function currentState(sql: Sql, date: string, now: Date): Promise<CoachSta
 }
 
 export async function readCoach(now = new Date()): Promise<CoachState> {
-  const date = await currentHealthDate(now)
-  const sql = await getSql()
-  await reconcile(sql, date, now)
-  return currentState(sql, date, now)
+  const [{ date, timezone }, sql] = await Promise.all([healthTimeContext(now), getSql()])
+  await reconcile(sql, date, now, timezone)
+  return currentState(sql, date, now, timezone)
 }
 
 export async function snoozeCoachLabItem(body: unknown, now = new Date()): Promise<CoachState & { snoozedUntil: string }> {
-  const date = await currentHealthDate(now)
-  const sql = await getSql()
-  await reconcile(sql, date, now)
+  const [{ date, timezone }, sql] = await Promise.all([healthTimeContext(now), getSql()])
+  await reconcile(sql, date, now, timezone)
   const snoozedUntil = await snoozeCoachLabPresentation(sql, body, date, now)
-  return { ...await currentState(sql, date, now), snoozedUntil }
+  return { ...await currentState(sql, date, now, timezone), snoozedUntil }
 }
 
 export async function ensureCoach(now = new Date()): Promise<CoachState> {
   const date = await currentHealthDate(now)
   const week = coachWeek(date)
   const sql = await getSql()
-  await reconcile(sql, date, now)
+  await reconcile(sql, date, now, timezone)
   const recent = await recentRules(sql, date)
   const [weekly, daily] = await Promise.all([weeklyCandidates(date), dailyCandidates(date)])
   await ensurePeriodTask(sql, 'weekly_focus', week.start, weekly, [], date)
   await ensurePeriodTask(sql, 'daily_quest', date, daily, recent, date)
   await ensureStretch(sql, date, now)
-  await reconcile(sql, date, now)
-  return currentState(sql, date, now)
+  await reconcile(sql, date, now, timezone)
+  return currentState(sql, date, now, timezone)
 }
 
 export async function passCoachTask(id: string, now = new Date()): Promise<CoachState> {
-  const date = await currentHealthDate(now)
-  const sql = await getSql()
-  await reconcile(sql, date, now)
+  const [{ date, timezone }, sql] = await Promise.all([healthTimeContext(now), getSql()])
+  await reconcile(sql, date, now, timezone)
   const row = await loadTask(sql, id)
   if (!row) throw new HttpError(404, 'Coach task not found')
-  if (row.status === 'passed') return currentState(sql, date, now)
+  if (row.status === 'passed') return currentState(sql, date, now, timezone)
   if (row.task_kind === 'stretch_quest') {
     if (row.status !== 'offered') throw new HttpError(409, 'Only an offered Stretch Quest can be passed')
     const changed = await transitionStretch(sql, row, 'passed', now)
     if (!changed && (await loadTask(sql, id))?.status !== 'passed') {
       throw new HttpError(409, 'Stretch Quest is no longer offered')
     }
-    return currentState(sql, date, now)
+    return currentState(sql, date, now, timezone)
   }
   if (row.status !== 'active') throw new HttpError(409, 'Only an active Coach task can be passed')
   await sql.transaction([
@@ -1403,36 +1424,34 @@ export async function passCoachTask(id: string, now = new Date()): Promise<Coach
       [randomUUID(), id],
     ),
   ])
-  return currentState(sql, date, now)
+  return currentState(sql, date, now, timezone)
 }
 
 export async function acceptCoachTask(id: string, now = new Date()): Promise<CoachState> {
-  const date = await currentHealthDate(now)
-  const sql = await getSql()
-  await reconcile(sql, date, now)
+  const [{ date, timezone }, sql] = await Promise.all([healthTimeContext(now), getSql()])
+  await reconcile(sql, date, now, timezone)
   const row = await loadTask(sql, id)
   if (!row) throw new HttpError(404, 'Coach task not found')
   if (row.task_kind !== 'stretch_quest') throw new HttpError(409, 'Only a Stretch Quest can be accepted')
-  if (row.accepted_at != null) return currentState(sql, date, now)
+  if (row.accepted_at != null) return currentState(sql, date, now, timezone)
   if (row.status !== 'offered') throw new HttpError(409, 'This Stretch offer is no longer available')
   const current = await loadCurrentStretch(sql, date)
   if (current?.id !== row.id) throw new HttpError(409, 'This Stretch offer is no longer current')
   const changed = await transitionStretch(sql, row, 'active', now)
   if (!changed && (await loadTask(sql, id))?.accepted_at == null) {
-    await reconcile(sql, date, now)
+    await reconcile(sql, date, now, timezone)
     throw new HttpError(409, 'This Stretch offer is no longer available')
   }
-  return currentState(sql, date, now)
+  return currentState(sql, date, now, timezone)
 }
 
 export async function endCoachTask(id: string, now = new Date()): Promise<CoachState> {
-  const date = await currentHealthDate(now)
-  const sql = await getSql()
-  await reconcile(sql, date, now)
+  const [{ date, timezone }, sql] = await Promise.all([healthTimeContext(now), getSql()])
+  await reconcile(sql, date, now, timezone)
   const row = await loadTask(sql, id)
   if (!row) throw new HttpError(404, 'Coach task not found')
   if (row.task_kind !== 'stretch_quest') throw new HttpError(409, 'Only an accepted Stretch Quest can be ended')
-  if (row.status === 'failed') return currentState(sql, date, now)
+  if (row.status === 'failed') return currentState(sql, date, now, timezone)
   if (row.status !== 'active' || row.accepted_at == null) {
     throw new HttpError(409, 'Only an accepted active Stretch Quest can be ended')
   }
@@ -1440,18 +1459,17 @@ export async function endCoachTask(id: string, now = new Date()): Promise<CoachS
   if (!changed && (await loadTask(sql, id))?.status !== 'failed') {
     throw new HttpError(409, 'This Stretch Quest is no longer active')
   }
-  return currentState(sql, date, now)
+  return currentState(sql, date, now, timezone)
 }
 
 export async function logCoachTraining(id: string, body: unknown, now = new Date()): Promise<CoachState> {
   const parsed = coachTrainingLogSchema.safeParse(body)
   if (!parsed.success) throw new HttpError(400, parsed.error.issues[0]?.message ?? 'Invalid Training log')
-  const date = await currentHealthDate(now)
-  const sql = await getSql()
-  await reconcile(sql, date, now)
+  const [{ date, timezone }, sql] = await Promise.all([healthTimeContext(now), getSql()])
+  await reconcile(sql, date, now, timezone)
   const row = await loadTask(sql, id)
   if (!row) throw new HttpError(404, 'Coach task not found')
-  if (row.status === 'completed') return currentState(sql, date, now)
+  if (row.status === 'completed') return currentState(sql, date, now, timezone)
   if (row.status !== 'active' || row.verification_mode !== 'training_log') {
     throw new HttpError(409, 'This Coach task is not awaiting a Training log')
   }
@@ -1587,18 +1605,17 @@ export async function logCoachTraining(id: string, body: unknown, now = new Date
     }
   }
 
-  return currentState(sql, date, now)
+  return currentState(sql, date, now, timezone)
 }
 
 export async function logCoachSelfReport(id: string, body: unknown, now = new Date()): Promise<CoachState> {
   const parsed = coachSelfReportSchema.safeParse(body)
   if (!parsed.success) throw new HttpError(400, parsed.error.issues[0]?.message ?? 'Invalid Coach log')
-  const date = await currentHealthDate(now)
-  const sql = await getSql()
-  await reconcile(sql, date, now)
+  const [{ date, timezone }, sql] = await Promise.all([healthTimeContext(now), getSql()])
+  await reconcile(sql, date, now, timezone)
   const row = await loadTask(sql, id)
   if (!row) throw new HttpError(404, 'Coach task not found')
-  if (row.status === 'completed') return currentState(sql, date, now)
+  if (row.status === 'completed') return currentState(sql, date, now, timezone)
   if (row.status !== 'active' || row.verification_mode !== 'owner_self_report') {
     throw new HttpError(409, 'This Coach task is not awaiting an owner report')
   }
@@ -1638,5 +1655,5 @@ export async function logCoachSelfReport(id: string, body: unknown, now = new Da
       ],
     ),
   ])
-  return currentState(sql, date, now)
+  return currentState(sql, date, now, timezone)
 }
