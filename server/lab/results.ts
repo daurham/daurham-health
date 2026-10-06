@@ -1,5 +1,4 @@
 import { randomUUID } from 'node:crypto'
-import { ACTIVITY_TIMEZONE } from '../../src/domain/activity/config.js'
 import {
   type ActivityDayEvidence,
   type BodyMetricEvidence,
@@ -23,9 +22,9 @@ import {
   type ResultRequest,
 } from '../../src/domain/lab-results.js'
 import { calendarDateFromInstant } from '../../src/domain/progress/dates.js'
-import { HEALTH_CALENDAR_TIME_ZONE } from '../../src/domain/time.js'
 import { getSql, type Sql } from '../db.js'
 import { HttpError } from '../http.js'
+import { healthCalendarTimeZone } from '../health-time.js'
 
 /**
  * Duplicate commits return 409 with the existing result id.
@@ -487,14 +486,14 @@ export async function listTimelineBenchmarkResults(start: string, end: string, r
 }
 
 async function buildPreview(benchmarkId: string, request: ResultRequest): Promise<BenchmarkPreview> {
-  const sql = await getSql()
+  const [sql, timezone] = await Promise.all([getSql(), healthCalendarTimeZone()])
   const benchmark = await loadBenchmark(sql, benchmarkId)
   const version = await loadVersion(sql, request.protocolVersionId)
   if (version.protocol_kind !== 'benchmark' || version.benchmark_id !== benchmarkId || version.protocol_id !== benchmark.protocol_id) {
     throw new HttpError(400, version.protocol_kind === 'experiment' ? 'Experiment protocols are not benchmark results.' : 'That protocol version belongs to a different benchmark.')
   }
   const requirements = await loadRequirements(sql, version.id)
-  const loaded = await loadEvidence(sql, request, requirements)
+  const loaded = await loadEvidence(sql, request, requirements, timezone)
   const preview = composeBenchmarkPreview({
     benchmarkDefinitionId: benchmarkId,
     protocolVersionId: version.id,
@@ -598,7 +597,12 @@ async function loadRequirements(sql: Sql, versionId: string): Promise<OutcomeReq
   }))
 }
 
-async function loadEvidence(sql: Sql, request: ResultRequest, requirements: OutcomeRequirement[]) {
+async function loadEvidence(
+  sql: Sql,
+  request: ResultRequest,
+  requirements: OutcomeRequirement[],
+  timezone: string,
+) {
   const outcomes = requirements.filter((item) => item.role === 'primary_outcome' || item.role === 'secondary_outcome')
   const exerciseIds = [...new Set(outcomes.flatMap((item) => (item.requirementKind === 'training_measure' ? [item.selector.exerciseDefinitionId] : [])))]
   const metricKeys = [...new Set(outcomes.flatMap((item) => (item.requirementKind === 'body_metric' ? [item.selector.metricKey] : [])))]
@@ -609,8 +613,8 @@ async function loadEvidence(sql: Sql, request: ResultRequest, requirements: Outc
   if (sessionHeader?.benchmark_protocol_version_id && sessionHeader.benchmark_protocol_version_id !== request.protocolVersionId) {
     throw new HttpError(400, 'This workout is linked to a different benchmark protocol.')
   }
-  const metrics = metricKeys.length > 0 ? await loadBodyMetrics(sql, metricKeys) : []
-  const selectedMeasurement = request.measurementId ? metrics.find((metric) => metric.measurementId === request.measurementId) ?? await loadBodyMetric(sql, request.measurementId) : null
+  const metrics = metricKeys.length > 0 ? await loadBodyMetrics(sql, metricKeys, timezone) : []
+  const selectedMeasurement = request.measurementId ? metrics.find((metric) => metric.measurementId === request.measurementId) ?? await loadBodyMetric(sql, request.measurementId, timezone) : null
   if (request.measurementId && !selectedMeasurement) {
     throw new HttpError(400, 'That measurement was not found.')
   }
@@ -640,12 +644,12 @@ async function loadEvidence(sql: Sql, request: ResultRequest, requirements: Outc
     activity: !outcomes.some((item) => item.requirementKind === 'activity_metric')
       ? 'absent'
       : day
-        ? await loadActivity(sql, day)
+        ? await loadActivity(sql, day, timezone)
         : 'unselected',
     sleep: !outcomes.some((item) => item.requirementKind === 'sleep_metric')
       ? 'absent'
       : day
-        ? await loadSleep(sql, day)
+        ? await loadSleep(sql, day, timezone)
         : 'unselected',
   }
   return { pool, request: withMeasurementSelection(request, outcomes, selectedMeasurement) }
@@ -774,7 +778,11 @@ function setFromRow(row: SessionRow): TrainingSetEvidence {
   }
 }
 
-async function loadBodyMetrics(sql: Sql, metricKeys: string[]): Promise<BodyMetricEvidence[]> {
+async function loadBodyMetrics(
+  sql: Sql,
+  metricKeys: string[],
+  fallbackTimezone: string,
+): Promise<BodyMetricEvidence[]> {
   const rows = (await sql.query(
     `SELECT m.id::text AS measurement_id,
             m.metric_key,
@@ -794,11 +802,15 @@ async function loadBodyMetrics(sql: Sql, metricKeys: string[]): Promise<BodyMetr
     if (value == null) {
       return []
     }
-    return [bodyEvidence(row, value)]
+    return [bodyEvidence(row, value, fallbackTimezone)]
   })
 }
 
-async function loadBodyMetric(sql: Sql, id: string): Promise<BodyMetricEvidence | null> {
+async function loadBodyMetric(
+  sql: Sql,
+  id: string,
+  fallbackTimezone: string,
+): Promise<BodyMetricEvidence | null> {
   const rows = (await sql.query(
     `SELECT m.id::text AS measurement_id,
             m.metric_key,
@@ -818,12 +830,16 @@ async function loadBodyMetric(sql: Sql, id: string): Promise<BodyMetricEvidence 
   if (!row || value == null) {
     return null
   }
-  return bodyEvidence(row, value)
+  return bodyEvidence(row, value, fallbackTimezone)
 }
 
-function bodyEvidence(row: BodyRow, value: number): BodyMetricEvidence {
+function bodyEvidence(
+  row: BodyRow,
+  value: number,
+  fallbackTimezone: string,
+): BodyMetricEvidence {
   const measuredAt = row.measured_at instanceof Date ? row.measured_at : new Date(String(row.measured_at))
-  const timezone = row.timezone?.trim() ? row.timezone : HEALTH_CALENDAR_TIME_ZONE
+  const timezone = row.timezone?.trim() ? row.timezone : fallbackTimezone
   return {
     measurementId: row.measurement_id,
     measurementSessionId: row.measurement_session_id,
@@ -858,13 +874,17 @@ async function loadNutrition(sql: Sql, date: string): Promise<NutritionDayEviden
   }
 }
 
-async function loadActivity(sql: Sql, date: string): Promise<ActivityDayEvidence | 'absent'> {
+async function loadActivity(
+  sql: Sql,
+  date: string,
+  timezone: string,
+): Promise<ActivityDayEvidence | 'absent'> {
   const rows = (await sql.query(
     `SELECT id::text AS id, summary_date::text AS summary_date, timezone,
             steps_count, active_energy_kcal, exercise_minutes, resting_heart_rate_bpm
      FROM activity_daily_summaries
      WHERE summary_date = $1::date AND timezone = $2`,
-    [date, ACTIVITY_TIMEZONE],
+    [date, timezone],
   )) as Array<{
     id: string
     summary_date: string
@@ -889,13 +909,17 @@ async function loadActivity(sql: Sql, date: string): Promise<ActivityDayEvidence
   }
 }
 
-async function loadSleep(sql: Sql, date: string): Promise<SleepNightEvidence | 'absent'> {
+async function loadSleep(
+  sql: Sql,
+  date: string,
+  timezone: string,
+): Promise<SleepNightEvidence | 'absent'> {
   const rows = (await sql.query(
     `SELECT sleep_date::text AS sleep_date, timezone, logical_source_key, source_name,
             total_sleep_minutes, observation_status, analysis_eligible
      FROM sleep_nightly_summaries
      WHERE sleep_date = $1::date AND timezone = $2`,
-    [date, ACTIVITY_TIMEZONE],
+    [date, timezone],
   )) as Array<{
     sleep_date: string
     timezone: string
