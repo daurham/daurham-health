@@ -106,11 +106,14 @@ describe('requireHealthOwner', () => {
 })
 
 describe('withOwnerAuth boundary', () => {
-  it('keeps GET /api/health public', () => {
+  it('keeps GET /api/health public', async () => {
     const captured = captureResponse()
-    healthHandler({ method: 'GET' }, captured.res)
+    await healthHandler({ method: 'GET' }, captured.res)
     expect(captured.status()).toBe(200)
-    expect(captured.body()).toEqual({ status: 'ok' })
+    expect(captured.body()).toMatchObject({
+      status: 'ok',
+      instance: { capabilities: expect.any(Object) },
+    })
   })
 
   it('denies anonymous private GET and POST', async () => {
