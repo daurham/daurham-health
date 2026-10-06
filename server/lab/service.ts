@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { benchmarkOutcomeRoleError } from '../../src/domain/lab-results.js'
 import { experimentNeedsReview } from '../../src/domain/experiment-results.js'
-import { healthCalendarDateFromNow } from '../../src/domain/time.js'
 import {
   cleanOptionalText,
   cleanRequiredText,
@@ -23,6 +22,7 @@ import {
 } from '../../src/domain/lab.js'
 import { getSql, type Sql } from '../db.js'
 import { HttpError } from '../http.js'
+import { currentHealthDate } from '../health-time.js'
 
 type VersionContent = {
   instructions: string
@@ -354,7 +354,7 @@ async function loadVersionBundle(sql: Sql, protocolId: string) {
   }))
 }
 
-async function experimentDetail(sql: Sql, id: string) {
+async function experimentDetail(sql: Sql, id: string, today?: string) {
   const row = await loadExperimentRow(sql, id)
   const versions = await loadVersionBundle(sql, row.protocol_id)
   const supplements = (await sql.query(
@@ -419,7 +419,7 @@ async function experimentDetail(sql: Sql, id: string) {
     reviewReady: experimentNeedsReview({
       status: row.status,
       windowEnd: row.window_end,
-      today: healthCalendarDateFromNow(),
+      today: today ?? await currentHealthDate(),
       hasValidResult: currentResultId != null,
     }),
   }
@@ -822,7 +822,7 @@ export async function archiveBenchmark(id: string) {
 }
 
 export async function listTodayLabExperiments() {
-  const sql = await getSql()
+  const [sql, today] = await Promise.all([getSql(), currentHealthDate()])
   const rows = (await sql.query(
     `SELECT e.id::text AS id, e.title, e.status, e.window_start::text AS window_start, e.window_end::text AS window_end,
             EXISTS (
@@ -834,7 +834,6 @@ export async function listTodayLabExperiments() {
      ORDER BY e.window_start, e.title`,
     [],
   )) as Array<{ id: string; title: string; status: 'scheduled' | 'active'; window_start: string; window_end: string; has_valid_result: boolean }>
-  const today = healthCalendarDateFromNow()
   return rows.map((row) => ({
     id: row.id,
     title: row.title,
