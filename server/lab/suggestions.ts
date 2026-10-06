@@ -19,11 +19,11 @@ import {
   type SuggestionInput,
   type SuggestionProtocolFact,
 } from '../../src/domain/experiment-suggestions/index.js'
-import { healthCalendarDateFromNow } from '../../src/domain/time.js'
 import { boundedProviderCostUsd } from '../ai-usage/cost.js'
 import { readAiUsageConfig } from '../ai-usage/config.js'
 import { getSql } from '../db.js'
 import { HttpError } from '../http.js'
+import { currentHealthDate } from '../health-time.js'
 import { listGoals } from '../goals/service.js'
 import { getExperiment } from './service.js'
 import { getSuggestionGate, suggestionCacheKey, type SuggestionGate } from './suggestion-gate.js'
@@ -73,7 +73,8 @@ function finite(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null
 }
 
-export async function loadSuggestionInput(asOf = healthCalendarDateFromNow()): Promise<SuggestionInput> {
+export async function loadSuggestionInput(asOf?: string): Promise<SuggestionInput> {
+  const resolvedAsOf = asOf ?? await currentHealthDate()
   const sql = await getSql()
   const versions = (await sql.query(
     `SELECT b.id::text AS benchmark_id,
@@ -119,7 +120,7 @@ export async function loadSuggestionInput(asOf = healthCalendarDateFromNow()): P
      WHERE e.status IN ('proposed', 'accepted', 'scheduled', 'active')`,
     [],
   )) as Array<{ status: string; benchmark_definition_id: string | null; goal_id: string | null }>
-  const protocols = versions.map((version) => protocolFact(version, results, asOf))
+  const protocols = versions.map((version) => protocolFact(version, results, resolvedAsOf))
   const listed = await listGoals()
   return {
     protocols,
