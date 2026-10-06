@@ -51,6 +51,7 @@ export async function loadWeeklyCoachInput(asOf: string): Promise<WeeklyCoachInp
   const baseline = baselineNight ? computeSleepDurationBaseline(nights, baselineNight) : null
   return {
     asOf,
+    timezone,
     activityDays: activityDays.filter((row) => row.date <= period.end),
     sleepNights: nights.map((night) => ({
       sleepDate: night.sleepDate,
