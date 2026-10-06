@@ -25,7 +25,7 @@ export function openFoodFactsUserAgent(env: NodeJS.ProcessEnv = process.env): st
   if (configured) {
     return configured
   }
-  return 'DaurhamHealth/1.0 (personal nutrition app)'
+  return 'Health/1.0 (personal nutrition app)'
 }
 
 export function openFoodFactsBaseUrl(env: NodeJS.ProcessEnv = process.env): string {
