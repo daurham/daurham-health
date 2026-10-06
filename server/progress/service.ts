@@ -24,11 +24,12 @@ import { addCalendarDays } from '../../src/domain/progress/dates.js'
 import { healthCalendarDateFromNow } from '../../src/domain/time.js'
 import { buildActivityProgressView, type ActivityProgressView } from '../../src/domain/activity/index.js'
 import { baselineVitalDefinitions, buildSleepNightDetail, buildSleepProgressView, parseSleepDetailDate, type SleepNightDetail, type SleepProgressView } from '../../src/domain/sleep/index.js'
-import { SLEEP_BASELINE_PRIOR_DAYS, SLEEP_TIMEZONE } from '../../src/domain/sleep/config.js'
+import { SLEEP_BASELINE_PRIOR_DAYS } from '../../src/domain/sleep/config.js'
 import { listActivityDailySummaries, listActivityWorkoutsForProgress } from '../activity/queries.js'
 import { listSleepNightlySummaries, listSleepNightsBetween, listSleepObservationsForProgress, listSleepVitalSamples, readSleepNightRecord } from '../sleep/queries.js'
 import { HttpError } from '../http.js'
 import { getSql } from '../db.js'
+import { getInstanceConfig } from '../instance-config.js'
 import { listTimelineContexts } from '../context/service.js'
 import { listTimelineExperimentResults } from '../lab/experiment-results.js'
 import { listTimelineBenchmarkResults } from '../lab/results.js'
@@ -48,12 +49,13 @@ export function parseProgressQuery(input: {
   range: string | null
   asOf: string | null
   now?: Date
+  timezone?: string
 }): { range: ProgressRange; asOf: string } {
   const range = input.range ? input.range.trim().toLowerCase() : DEFAULT_RANGE
   if (!isProgressRange(range)) {
     throw new HttpError(400, 'range must be 30d, 90d, 6m, 1y, or all')
   }
-  const asOf = input.asOf?.trim() || healthCalendarDateFromNow(input.now ?? new Date())
+  const asOf = input.asOf?.trim() || healthCalendarDateFromNow(input.now ?? new Date(), input.timezone)
   if (!isCalendarDate(asOf)) {
     throw new HttpError(400, 'asOf must be YYYY-MM-DD')
   }
@@ -76,6 +78,7 @@ export function parseCompareQuery(input: {
   checkpointId: string | null
   asOf: string | null
   now?: Date
+  timezone?: string
 }):
   | { mode: 'range'; periodA: ReturnType<typeof comparePeriod>; periodB: ReturnType<typeof comparePeriod> }
   | { mode: 'since_checkpoint'; checkpointId: string; asOf: string } {
@@ -84,7 +87,7 @@ export function parseCompareQuery(input: {
     if (!parsed.success) {
       throw new HttpError(400, 'checkpointId is invalid')
     }
-    const asOf = input.asOf?.trim() || healthCalendarDateFromNow(input.now ?? new Date())
+    const asOf = input.asOf?.trim() || healthCalendarDateFromNow(input.now ?? new Date(), input.timezone)
     if (!isCalendarDate(asOf)) {
       throw new HttpError(400, 'asOf must be YYYY-MM-DD')
     }
@@ -106,7 +109,8 @@ export async function getProgressOverview(input: {
   asOf: string | null
   now?: Date
 }): Promise<ProgressOverview> {
-  const query = parseProgressQuery(input)
+  const timezone = (await getInstanceConfig()).calendarTimeZone
+  const query = parseProgressQuery({ ...input, timezone })
   const rows = await loadProgressCanonicalRows()
   return buildProgressOverview({
     asOf: query.asOf,
@@ -125,10 +129,12 @@ export async function getProgressActivity(input: {
   asOf: string | null
   now?: Date
 }): Promise<ActivityProgressView> {
-  const query = parseProgressQuery(input)
-  return buildActivityProgressView(await listActivityDailySummaries(), {
+  const timezone = (await getInstanceConfig()).calendarTimeZone
+  const query = parseProgressQuery({ ...input, timezone })
+  return buildActivityProgressView(await listActivityDailySummaries(timezone), {
     ...query,
-    today: healthCalendarDateFromNow(input.now ?? new Date()),
+    timezone,
+    today: healthCalendarDateFromNow(input.now ?? new Date(), timezone),
   })
 }
 
@@ -137,23 +143,25 @@ export async function getProgressSleep(input: {
   asOf: string | null
   now?: Date
 }): Promise<SleepProgressView> {
-  const query = parseProgressQuery(input)
-  return buildSleepProgressView(await listSleepNightlySummaries(), query)
+  const timezone = (await getInstanceConfig()).calendarTimeZone
+  const query = parseProgressQuery({ ...input, timezone })
+  return buildSleepProgressView(await listSleepNightlySummaries(timezone), { ...query, timezone })
 }
 
 export async function getSleepNightDetail(sleepDate: string | null, now = new Date()): Promise<SleepNightDetail> {
-  const parsed = parseSleepDetailDate(sleepDate, healthCalendarDateFromNow(now))
+  const timezone = (await getInstanceConfig()).calendarTimeZone
+  const parsed = parseSleepDetailDate(sleepDate, healthCalendarDateFromNow(now, timezone))
   if ('error' in parsed) {
     throw new HttpError(400, parsed.error)
   }
-  const record = await readSleepNightRecord(parsed.sleepDate, SLEEP_TIMEZONE)
+  const record = await readSleepNightRecord(parsed.sleepDate, timezone)
   if (!record) {
     throw new HttpError(404, 'No sleep observation for that date.')
   }
   const history = await listSleepNightsBetween(
     addCalendarDays(record.night.sleepDate, -SLEEP_BASELINE_PRIOR_DAYS),
     record.night.sleepDate,
-    SLEEP_TIMEZONE,
+    timezone,
   )
   const currentSamples = await listSleepVitalSamples(record.night.startAt, record.night.endAt)
   let historySamples = currentSamples
@@ -173,17 +181,17 @@ export async function getSleepNightDetail(sleepDate: string | null, now = new Da
   )
 }
 
-async function loadActivitySleepContext(now?: Date) {
+async function loadActivitySleepContext(timezone: string, now?: Date) {
   const [activityDays, sleepNights, activityWorkouts] = await Promise.all([
-    listActivityDailySummaries(),
-    listSleepObservationsForProgress(),
+    listActivityDailySummaries(timezone),
+    listSleepObservationsForProgress(timezone),
     listActivityWorkoutsForProgress(),
   ])
   return {
     activityDays,
     sleepNights,
     activityWorkouts,
-    today: healthCalendarDateFromNow(now ?? new Date()),
+    today: healthCalendarDateFromNow(now ?? new Date(), timezone),
   }
 }
 
@@ -192,11 +200,12 @@ export async function getProgressTimeline(input: {
   asOf: string | null
   now?: Date
 }): Promise<ProgressTimeline> {
-  const query = parseProgressQuery(input)
+  const timezone = (await getInstanceConfig()).calendarTimeZone
+  const query = parseProgressQuery({ ...input, timezone })
   const period = trailingPeriod(query.range, query.asOf)
   const [rows, health, dailyContexts, benchmarkResults, experimentResults] = await Promise.all([
     loadProgressCanonicalRows(),
-    loadActivitySleepContext(input.now),
+    loadActivitySleepContext(timezone, input.now),
     listTimelineContexts(period.start, period.end, query.range === 'all'),
     listTimelineBenchmarkResults(period.start, period.end, query.range === 'all'),
     listTimelineExperimentResults(period.start, period.end, query.range === 'all'),
@@ -233,8 +242,9 @@ export async function getProgressCompare(input: {
   asOf: string | null
   now?: Date
 }): Promise<ProgressCompare> {
-  const query = parseCompareQuery(input)
-  const [rows, health] = await Promise.all([loadProgressCanonicalRows(), loadActivitySleepContext(input.now)])
+  const timezone = (await getInstanceConfig()).calendarTimeZone
+  const query = parseCompareQuery({ ...input, timezone })
+  const [rows, health] = await Promise.all([loadProgressCanonicalRows(), loadActivitySleepContext(timezone, input.now)])
   const canonical = {
     asOf: query.mode === 'since_checkpoint' ? query.asOf : query.periodB.end,
     range: 'all' as const,
