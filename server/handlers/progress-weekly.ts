@@ -1,10 +1,12 @@
 import { handleApiError, requestQueryValue, sendJson, type ApiRequest, type ApiResponse } from '../http.js'
 import { withOwnerAuth } from '../auth/with-owner.js'
 import { generateWeeklyCoach, parseWeeklyAsOf, readWeeklyCoach } from '../weekly-coach/service.js'
+import { healthCalendarTimeZone } from '../health-time.js'
 
 async function readWeeklyCoachRequest(req: ApiRequest, res: ApiResponse) {
   try {
-    sendJson(res, 200, await readWeeklyCoach(parseWeeklyAsOf(requestQueryValue(req, 'asOf'))))
+    const timezone = await healthCalendarTimeZone()
+    sendJson(res, 200, await readWeeklyCoach(parseWeeklyAsOf(requestQueryValue(req, 'asOf'), new Date(), timezone)))
   } catch (error) {
     handleApiError(res, error)
   }
@@ -12,7 +14,8 @@ async function readWeeklyCoachRequest(req: ApiRequest, res: ApiResponse) {
 
 async function generateWeeklyCoachRequest(req: ApiRequest, res: ApiResponse) {
   try {
-    sendJson(res, 200, await generateWeeklyCoach({ asOf: parseWeeklyAsOf(requestQueryValue(req, 'asOf')) }))
+    const timezone = await healthCalendarTimeZone()
+    sendJson(res, 200, await generateWeeklyCoach({ asOf: parseWeeklyAsOf(requestQueryValue(req, 'asOf'), new Date(), timezone) }))
   } catch (error) {
     handleApiError(res, error)
   }
