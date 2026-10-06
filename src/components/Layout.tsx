@@ -3,6 +3,8 @@ import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { LockedScreen, useAuth } from '@/auth'
 import { useRewardSummary } from '@/features/rewards/useRewardSummary'
 import { PROGRESSION_THEME_UNLOCKS, progressionState } from '@/domain/progression'
+import type { PublicInstanceConfig } from '@/domain/instance-config'
+import { DEFAULT_HEALTH_CALENDAR_TIME_ZONE } from '@/domain/time'
 import { themePack } from '@/theme'
 import { AppSurfaceProvider } from '@/lib/app-prefix'
 import { cn, fetchPublicInstanceConfig, InstanceConfigContext, quietButtonClass, RouteFallback, selectedTabClass, SHELL_MAX_WIDTH_CLASS, tabClass } from '@/lib'
@@ -23,6 +25,22 @@ const demoNavItems: NavItem[] = [
   { id: 'body', to: '/demo/body', label: 'Body' },
   { id: 'progress', to: '/demo/progress', label: 'Progress' },
 ]
+
+const SSR_INSTANCE_FALLBACK: PublicInstanceConfig = {
+  appName: 'Daurham Health',
+  externalHomeUrl: 'https://daurham.com',
+  calendarTimeZone: DEFAULT_HEALTH_CALENDAR_TIME_ZONE,
+  capabilities: {
+    geminiNutrition: false,
+    askHealthAi: false,
+    usdaLookup: false,
+    homeAi: false,
+    trainingPhotoImport: false,
+    appleHealthSync: false,
+    bodyCapture: false,
+    publicDemo: true,
+  },
+}
 
 function DemoBanner({ status }: { status: string }) {
   const privateLink =
@@ -47,7 +65,10 @@ export function Layout() {
   const location = useLocation()
   const publicAuthRoute = location.pathname === '/sign-in' || location.pathname === '/reset-password'
   const demoRoute = location.pathname === '/demo' || location.pathname.startsWith('/demo/')
-  const [instance, setInstance] = useState<Awaited<ReturnType<typeof fetchPublicInstanceConfig>> | null>(null)
+  const [instance, setInstance] = useState<PublicInstanceConfig | null>(() =>
+    typeof window === 'undefined' ? SSR_INSTANCE_FALLBACK : null,
+  )
+  const [instanceFailed, setInstanceFailed] = useState(false)
   const showOwnerChrome = !demoRoute && (status === 'owner' || status === 'unauthorized')
   const items = demoRoute ? demoNavItems : navItems
   const mobileMenuRef = useRef<HTMLDetailsElement>(null)
@@ -62,11 +83,13 @@ export function Layout() {
       .then((config) => {
         if (!cancelled) {
           setInstance(config)
+          setInstanceFailed(false)
         }
       })
       .catch(() => {
         if (!cancelled) {
           setInstance(null)
+          setInstanceFailed(true)
         }
       })
     return () => {
@@ -265,6 +288,10 @@ export function Layout() {
               label: 'Sign out',
             }}
           />
+        ) : instanceFailed ? (
+          <p className="text-sm text-zinc-600">Instance configuration is unavailable.</p>
+        ) : instance == null ? (
+          <RouteFallback />
         ) : (
           <Suspense fallback={<RouteFallback />}>
             <Outlet />
