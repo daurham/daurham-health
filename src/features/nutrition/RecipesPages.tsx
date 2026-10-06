@@ -908,8 +908,12 @@ function RecipeReview({ preview, saving, onSave }: { preview: RecipePreview; sav
       <p className="text-sm">Protein {deltaText(preview.nutritionDelta.proteinG, 'g')}</p>
       <p className="text-sm">Carbs {deltaText(preview.nutritionDelta.carbsG, 'g')}</p>
       <p className="text-sm">Fat {deltaText(preview.nutritionDelta.fatG, 'g')}</p>
-      <p className="text-sm">Fiber {deltaText(preview.nutritionDelta.fiberG, 'g')}</p>
-      <p className="text-sm">Sodium {deltaText(preview.nutritionDelta.sodiumMg, 'mg')}</p>
+      <p className="text-sm">
+        Fiber {nutritionChangeText(preview.currentWholeNutrition.fiberG, preview.candidateWholeNutrition?.fiberG ?? null, 'g')}
+      </p>
+      <p className="text-sm">
+        Sodium {nutritionChangeText(preview.currentWholeNutrition.sodiumMg, preview.candidateWholeNutrition?.sodiumMg ?? null, 'mg')}
+      </p>
       {preview.warnings.map((warning) => (
         <p key={warning} className="text-sm text-zinc-700">
           {warning}
@@ -938,5 +942,12 @@ function basisSummary(
 function deltaText(value: number | null, unit: string): string {
   if (value == null) return 'Unavailable'
   const sign = value > 0 ? '+' : ''
-  return `${sign}${formatNumber(value, 1)} ${unit}`
+  return `${sign}${formatNumber(value, unit === 'mg' ? 0 : 1)} ${unit}`
+}
+
+function nutritionChangeText(current: number | null, next: number | null, unit: string): string {
+  if (current == null && next == null) return 'still incomplete'
+  if (current == null && next != null) return `now ${formatNumber(next, unit === 'mg' ? 0 : 1)} ${unit} · previously incomplete`
+  if (current != null && next == null) return 'now incomplete'
+  return deltaText((next ?? 0) - (current ?? 0), unit)
 }
