@@ -531,7 +531,10 @@ export function RecipeDetailPage() {
             <p className="text-sm text-zinc-700">{macroText(line.lineProteinG, 'Protein')}</p>
             <p className="text-sm text-zinc-700">{macroText(line.lineCarbsG, 'Carbs')}</p>
             <p className="text-sm text-zinc-700">{macroText(line.lineFatG, 'Fat')}</p>
-             <p className="text-sm text-zinc-700">{macroText(line.lineFiberG, 'Fiber')}</p>
+            <p className="text-sm text-zinc-700">{macroText(line.lineFiberG, 'Fiber')}</p>
+            <p className="text-sm text-zinc-700">
+              {line.lineSodiumMg == null ? 'Sodium not fully known' : `${formatNumber(line.lineSodiumMg, 0)} mg sodium`}
+            </p>
           </li>
         ))}
       </ol>
@@ -787,7 +790,7 @@ export function RecipeEditPage() {
         </Link>
       </p>
       <h1 className="text-xl font-semibold tracking-tight">Edit recipe</h1>
-      <p className="text-sm text-zinc-600">Saving creates v{recipe.version.version + 1}. v{recipe.version.version} remains unchanged.</p>
+      <p className="text-sm text-zinc-600">Saving updates this recipe. The previous version stays in history so past logs keep their original nutrition.</p>
       <label className="block text-sm">
         Name
         <input className={fieldClass} value={name} onChange={(event) => setName(event.target.value)} />
@@ -868,8 +871,10 @@ function moveLine<T>(lines: T[], index: number, direction: -1 | 1): T[] {
 function RecipeReview({ preview, saving, onSave }: { preview: RecipePreview; saving: boolean; onSave: () => void }) {
   return (
     <div className="space-y-3 rounded-xl border border-zinc-200 bg-white p-4">
-      <h2 className="text-base font-medium">Create Recipe v{preview.candidateVersionNumber}</h2>
-      <p className="text-sm text-zinc-700">This creates Recipe v{preview.candidateVersionNumber}. Recipe v{preview.currentVersion} remains unchanged.</p>
+      <h2 className="text-base font-medium">Review recipe update</h2>
+      <p className="text-sm text-zinc-700">
+        Saving makes v{preview.candidateVersionNumber} current. v{preview.currentVersion} stays in history so previous logs are unchanged.
+      </p>
       {preview.metadataChanges.map((change) => (
         <p key={change.field} className="text-sm">
           {change.field === 'name' ? 'Name' : 'Notes'}: {change.from || '—'} → {change.to || '—'}
@@ -903,6 +908,12 @@ function RecipeReview({ preview, saving, onSave }: { preview: RecipePreview; sav
       <p className="text-sm">Protein {deltaText(preview.nutritionDelta.proteinG, 'g')}</p>
       <p className="text-sm">Carbs {deltaText(preview.nutritionDelta.carbsG, 'g')}</p>
       <p className="text-sm">Fat {deltaText(preview.nutritionDelta.fatG, 'g')}</p>
+      <p className="text-sm">
+        Fiber {nutritionChangeText(preview.currentWholeNutrition.fiberG, preview.candidateWholeNutrition?.fiberG ?? null, 'g')}
+      </p>
+      <p className="text-sm">
+        Sodium {nutritionChangeText(preview.currentWholeNutrition.sodiumMg, preview.candidateWholeNutrition?.sodiumMg ?? null, 'mg')}
+      </p>
       {preview.warnings.map((warning) => (
         <p key={warning} className="text-sm text-zinc-700">
           {warning}
@@ -910,22 +921,33 @@ function RecipeReview({ preview, saving, onSave }: { preview: RecipePreview; sav
       ))}
       {preview.canCommit ? (
         <button type="button" className={primaryButtonClass} disabled={saving} onClick={onSave}>
-          Create v{preview.candidateVersionNumber}
+          Save recipe update
         </button>
       ) : null}
     </div>
   )
 }
 
-function basisSummary(basis: { caloriesKcal: number | null; proteinG: number | null } | null | undefined): string {
+function basisSummary(
+  basis: { caloriesKcal: number | null; proteinG: number | null; fiberG: number | null; sodiumMg: number | null } | null | undefined,
+): string {
   if (!basis) return '—'
-  const calories = basis.caloriesKcal == null ? '—' : recipeKcal(basis.caloriesKcal)
-  const protein = basis.proteinG == null ? 'protein not fully known' : `${formatNumber(basis.proteinG, 1)} g protein`
-  return `${calories} · ${protein}`
+  const calories = basis.caloriesKcal == null ? '— kcal' : recipeKcal(basis.caloriesKcal)
+  const protein = basis.proteinG == null ? 'protein —' : `${formatNumber(basis.proteinG, 1)} g protein`
+  const fiber = basis.fiberG == null ? 'fiber —' : `${formatNumber(basis.fiberG, 1)} g fiber`
+  const sodium = basis.sodiumMg == null ? 'sodium —' : `${formatNumber(basis.sodiumMg, 0)} mg sodium`
+  return `${calories} · ${protein} · ${fiber} · ${sodium}`
 }
 
 function deltaText(value: number | null, unit: string): string {
   if (value == null) return 'Unavailable'
   const sign = value > 0 ? '+' : ''
-  return `${sign}${formatNumber(value, 1)} ${unit}`
+  return `${sign}${formatNumber(value, unit === 'mg' ? 0 : 1)} ${unit}`
+}
+
+function nutritionChangeText(current: number | null, next: number | null, unit: string): string {
+  if (current == null && next == null) return 'still incomplete'
+  if (current == null && next != null) return `now ${formatNumber(next, unit === 'mg' ? 0 : 1)} ${unit} · previously incomplete`
+  if (current != null && next == null) return 'now incomplete'
+  return deltaText((next ?? 0) - (current ?? 0), unit)
 }
