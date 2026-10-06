@@ -1,5 +1,17 @@
 # Dev state
 
+## 2026-10-06 I0C prepared — fresh-instance bootstrap
+
+- I0C is prepared as a single batched Git commit object on top of current `main`; its branch ref is intentionally not published while Vercel's rolling deployment limit is active.
+- Proposed schema head is `0042_instance_seed_scope.sql`.
+- The migration classifies original A/B/C 1.3.1 as `legacy_owner` seeds and Beginner Calisthenics as a `product_builtin`.
+- A fresh database deactivates the original A/B/C family automatically.
+- An established database preserves the A/B/C family when historical Training references it.
+- No templates or historical sessions are deleted.
+- Added a read-only `npm run instance:check` diagnostic contract.
+- Added `docs/SINGLE_OWNER_DEPLOYMENT.md` for a second-owner installation.
+- Full validation is intentionally deferred until the dormant commit is exposed to a branch after the Vercel rate window clears.
+
 ## 2026-10-06 I0B complete — dynamic instance identity + canonical timezone
 
 - Completed deployment-level timezone portability without adding a schema migration; schema head remains `0041_exercise_library_calisthenics.sql`.

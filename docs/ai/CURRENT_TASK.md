@@ -1,57 +1,146 @@
 # Current task
 
-## Status
+## I0C — Fresh-Instance Bootstrap + Owner-Specific Seed Separation
 
-No active implementation task.
+### Status
 
-I0B — Dynamic Instance Identity + Canonical Timezone is complete and is being merged to `main`.
+Implementation prepared as one batched commit object on top of `main`.
 
-Repository schema head remains:
+Do not move a Git branch ref until the current Vercel deployment-rate window clears.
 
-`0041_exercise_library_calisthenics.sql`
+Repository schema head after I0C:
 
-No database migration was added for I0B.
+`0042_instance_seed_scope.sql`
 
 Master program:
 
 `docs/ai/NEXT_INTELLIGENCE_ROADMAP.md`
 
-## Completed I0B outcome
+## Product intent
 
-- `HEALTH_CALENDAR_TIMEZONE` is the runtime Health-calendar authority for owner flows.
-- Shared deterministic date/domain helpers accept an explicit IANA timezone; `America/Phoenix` remains only the backward-compatible/default owner value.
-- Today, Activity, Sleep, Progress, Ask Health/intelligence, Goals, Coach, Weekly Coach, Lab evidence, Nutrition, Training defaults, Body capture/review, backups, and Apple/HAE runtime paths use the configured instance calendar where applicable.
-- DST-observing regression coverage was added, including `America/New_York` spring-forward/fall-back boundaries.
-- App chrome consumes public instance configuration for display name, external home link, public-demo capability, and calendar timezone.
-- Owner pages wait for instance configuration before initializing date-sensitive browser state.
-- Public-demo links/content fail closed when the capability is disabled.
-- Body Shortcut setup is deployment-neutral.
-- Open Food Facts fallback identity is neutral; env override remains supported.
-- Existing stored timezone/provenance rows were not rewritten.
-- Current Jake deployment defaults remain `Daurham Health`, `https://daurham.com`, and `America/Phoenix` unless deployment env overrides them.
+A normal second-owner deployment should begin as **their** Health instance, not as a copy of Jake's owner state.
 
-## Validation
+The codebase may contain shared product/reference seeds, but schema migration history must not make a clean database look like the original owner's account.
 
-Independent final validation workflow run `37541015943` passed:
+### Seed classes
 
-- `npx tsc -b`
-- `npx eslint .`
-- `npm test`
-- `npm run build`
+**Product/reference seeds**
+- data-source definitions;
+- canonical exercise catalog;
+- exercise guidance/metadata;
+- Beginner Calisthenics built-in.
 
-No source changes were made after that validation other than documentation/workflow cleanup.
+These may exist on every instance.
 
-## Next planning slice
+**Legacy owner seed**
+- original A/B/C 1.3.1 paper routine family from migration 0003.
 
-Next candidate portability slice:
+These exist for historical compatibility but are not universal product defaults.
 
-**I0C — Fresh-instance bootstrap + owner-specific seed separation**
+**Owner state**
+- owner-created routines;
+- goals;
+- supplements;
+- nutrition history;
+- body measurements;
+- experiments;
+- Coach/XP history;
+- Daily Context;
+- Health Profile/preferences.
 
-Expected focus:
+These start empty on a fresh deployment.
 
-- prevent legacy Jake-specific routine/owner seed state from appearing as owner-created data in a fresh instance;
-- preserve historical references in Jake's existing database;
-- document/verify a clean first-run deployment path;
-- keep one-owner-per-deployment architecture.
+## Implementation contract
 
-Draft the I0C contract before implementation.
+### 1. Migration 0042 classifies historical Training seeds
+
+Add metadata:
+- A/B/C 1.3.1 → `seed_scope = legacy_owner`;
+- CAL-BEG 1.0.0 → `seed_scope = product_builtin`.
+
+Do not delete historical templates.
+
+### 2. Fresh databases hide A/B/C automatically
+
+If no historical Training session references the original A/B/C family:
+- mark A/B/C inactive.
+
+No environment flag is required.
+
+### 3. Established databases preserve history
+
+If any Training session references the A/B/C family by:
+- snapshotted `routine_code`; or
+- `workout_template_id`;
+
+then migration 0042 must not deactivate that legacy family.
+
+Do not reactivate a template that the owner had already intentionally deactivated.
+
+### 4. Product built-ins remain
+
+Fresh instances must retain:
+- active exercise catalog;
+- Beginner Calisthenics built-in.
+
+Owner-created routines are untouched.
+
+### 5. Instance doctor
+
+Add:
+
+`npm run instance:check`
+
+It must report, without printing secrets:
+- migration currency;
+- fresh/established legacy-routine state;
+- Beginner Calisthenics availability;
+- exercise-catalog availability;
+- owner-created routine count.
+
+### 6. Deployment guide
+
+Add:
+
+`docs/SINGLE_OWNER_DEPLOYMENT.md`
+
+The guide must cover:
+- same-repo vs fork choice;
+- separate Neon project/database/auth;
+- Vercel project;
+- required env;
+- Gemini;
+- USDA;
+- Open Food Facts;
+- optional Home-AI/photo import;
+- optional Apple/Body ingest;
+- migration/config/instance checks;
+- first-use smoke tests;
+- batching Git pushes to avoid preview-deployment exhaustion.
+
+A normal setup must not require source search-and-replace.
+
+## Non-goals
+
+I0C does not:
+- create multi-tenancy;
+- copy Jake data into another owner instance;
+- implement Health Profile;
+- redesign Training routines;
+- make built-in routines editable;
+- alter historical workout sessions;
+- share databases or auth between owners.
+
+## Validation before branch publication
+
+Once Vercel's deployment window clears, expose this batched commit on one branch and run:
+
+- `npm run config:check`;
+- `npm run migrate` against a disposable/test database as appropriate;
+- `npm run instance:check`;
+- `npx tsc -b`;
+- `npx eslint .`;
+- `npm test`;
+- `npm run build`.
+
+Do not merge unless the fresh-instance and established-instance migration scenarios both pass.
