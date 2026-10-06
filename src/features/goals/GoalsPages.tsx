@@ -4,9 +4,8 @@ import { coverageLabel } from '@/domain/goal-status'
 import { formatCalendarRange, formatFullCalendarDate } from '@/domain/calendar-format'
 import { formatGoalQuantity, formatGoalTarget, goalKindDefinition, GOAL_KINDS, type GoalKind } from '@/domain/goals'
 import type { GoalProjection } from '@/domain/goal-projection'
-import { healthCalendarDateFromNow } from '@/domain/time'
 import { milesToMeters, metersToMiles } from '@/domain/units'
-import { dangerButtonClass, LoadErrorNotice, primaryButtonClass, quietButtonClass, secondaryButtonClass } from '@/lib'
+import { dangerButtonClass, LoadErrorNotice, primaryButtonClass, quietButtonClass, secondaryButtonClass, useHealthCalendarDate } from '@/lib'
 import { changeGoalStatus, createGoal, fetchGoal, fetchGoals, removeGoal, reviseGoal, type GoalCatalog, type GoalView } from './api'
 
 const fieldClass = 'w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm'
@@ -208,7 +207,8 @@ function GoalCard({ goal }: { goal: GoalView }) {
 export function GoalsPage() {
   const [goals, setGoals] = useState<GoalView[]>([])
   const [catalog, setCatalog] = useState<GoalCatalog | null>(null)
-  const [asOf, setAsOf] = useState(healthCalendarDateFromNow())
+  const today = useHealthCalendarDate()
+  const [asOf, setAsOf] = useState(today)
   const [error, setError] = useState<string | null>(null)
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
 
