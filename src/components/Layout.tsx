@@ -5,7 +5,7 @@ import { useRewardSummary } from '@/features/rewards/useRewardSummary'
 import { PROGRESSION_THEME_UNLOCKS, progressionState } from '@/domain/progression'
 import { themePack } from '@/theme'
 import { AppSurfaceProvider } from '@/lib/app-prefix'
-import { cn, quietButtonClass, RouteFallback, selectedTabClass, SHELL_MAX_WIDTH_CLASS, tabClass } from '@/lib'
+import { cn, fetchPublicInstanceConfig, quietButtonClass, RouteFallback, selectedTabClass, SHELL_MAX_WIDTH_CLASS, tabClass } from '@/lib'
 import type { NavItem } from '@/types'
 
 const navItems: NavItem[] = [
@@ -46,6 +46,11 @@ export function Layout() {
   const location = useLocation()
   const publicAuthRoute = location.pathname === '/sign-in' || location.pathname === '/reset-password'
   const demoRoute = location.pathname === '/demo' || location.pathname.startsWith('/demo/')
+  const [instance, setInstance] = useState<{
+    appName: string
+    externalHomeUrl: string | null
+    publicDemo: boolean
+  } | null>(null)
   const showOwnerChrome = !demoRoute && (status === 'owner' || status === 'unauthorized')
   const items = demoRoute ? demoNavItems : navItems
   const mobileMenuRef = useRef<HTMLDetailsElement>(null)
@@ -53,6 +58,28 @@ export function Layout() {
   const previousWallet = useRef<{ spendableXp: number; lifetimeXp: number } | null>(null)
   const [walletPulse, setWalletPulse] = useState(false)
   const [levelCelebration, setLevelCelebration] = useState<{ level: number; themes: string[] } | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    fetchPublicInstanceConfig()
+      .then((config) => {
+        if (!cancelled) {
+          setInstance({
+            appName: config.appName,
+            externalHomeUrl: config.externalHomeUrl,
+            publicDemo: config.capabilities.publicDemo,
+          })
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setInstance({ appName: 'Health', externalHomeUrl: null, publicDemo: false })
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     const next = wallet.summary
@@ -93,10 +120,10 @@ export function Layout() {
     <div className="app-shell min-h-dvh bg-zinc-50 text-zinc-900">
       <header className="border-b border-zinc-200 bg-white pt-[env(safe-area-inset-top)]">
         <div className={cn('mx-auto flex items-center justify-between gap-3 px-4 py-3', SHELL_MAX_WIDTH_CLASS)}>
-          <p className="text-sm font-semibold tracking-tight">Daurham Health</p>
-          {demoRoute ? (
-            <a href="https://daurham.com" className="text-sm text-zinc-500 hover:text-zinc-900">
-              daurham.com
+          <p className="text-sm font-semibold tracking-tight">{instance?.appName ?? 'Health'}</p>
+          {demoRoute && instance?.externalHomeUrl ? (
+            <a href={instance.externalHomeUrl} className="text-sm text-zinc-500 hover:text-zinc-900">
+              {new URL(instance.externalHomeUrl).hostname}
             </a>
           ) : null}
           {showOwnerChrome ? (
@@ -208,12 +235,18 @@ export function Layout() {
             <Outlet />
           </Suspense>
         ) : demoRoute ? (
-          <AppSurfaceProvider prefix="/demo" readOnly>
-            <DemoBanner status={status} />
-            <Suspense fallback={<RouteFallback />}>
-              <Outlet />
-            </Suspense>
-          </AppSurfaceProvider>
+          instance == null ? (
+            <RouteFallback />
+          ) : instance.publicDemo ? (
+            <AppSurfaceProvider prefix="/demo" readOnly>
+              <DemoBanner status={status} />
+              <Suspense fallback={<RouteFallback />}>
+                <Outlet />
+              </Suspense>
+            </AppSurfaceProvider>
+          ) : (
+            <p className="text-sm text-zinc-600">Demo is not available for this Health instance.</p>
+          )
         ) : status === 'loading' ? (
           <p className="text-zinc-600">Loading…</p>
         ) : status === 'anonymous' ? (
@@ -225,7 +258,7 @@ export function Layout() {
               label: 'Owner Sign In',
               state: { from: `${location.pathname}${location.search}` },
             }}
-            secondary={{ to: '/demo', label: 'Explore demo' }}
+            secondary={instance?.publicDemo ? { to: '/demo', label: 'Explore demo' } : undefined}
           />
         ) : status === 'unauthorized' ? (
           <LockedScreen
