@@ -17,9 +17,9 @@ import {
   type AdherenceCommand,
   type SupplementRecord,
 } from '../../src/domain/supplements/index.js'
-import { healthCalendarDateFromNow } from '../../src/domain/time.js'
 import { getSql } from '../db.js'
 import { HttpError } from '../http.js'
+import { currentHealthDate } from '../health-time.js'
 import {
   getSupplementRecord,
   listSupplementRecords,
@@ -55,7 +55,7 @@ export async function listSupplements(now = new Date()) {
 
 export async function createSupplement(body: unknown, now = new Date()): Promise<SupplementRecord> {
   try {
-    const today = healthCalendarDateFromNow(now)
+    const today = await currentHealthDate(now)
     const input = parseCreateSupplement(body, today)
     const sql = await getSql()
     const sourceId = await manualSourceId(sql)
@@ -177,7 +177,7 @@ export async function deleteSupplement(id: string): Promise<{ deleted: true; id:
 export async function addSchedule(supplementId: string, body: unknown, now = new Date()): Promise<SupplementRecord> {
   try {
     await requireSupplement(supplementId, now)
-    const draft = parseDoseDraft(body, healthCalendarDateFromNow(now))
+    const draft = parseDoseDraft(body, await currentHealthDate(now))
     const sql = await getSql()
     const sourceId = await manualSourceId(sql)
     await sql.query(
@@ -329,7 +329,7 @@ export async function updateFutureSchedule(
   now = new Date(),
 ): Promise<SupplementRecord> {
   try {
-    const today = healthCalendarDateFromNow(now)
+    const today = await currentHealthDate(now)
     const schedule = await requireOwnedSchedule(supplementId, scheduleId)
     assertFutureScheduleEditable({
       schedule,
@@ -404,7 +404,7 @@ export async function setLifecycleStatus(supplementId: string, body: unknown, no
 export async function recordAdherence(body: unknown, now = new Date()) {
   try {
     const command = parseAdherenceCommand(body, now)
-    const today = healthCalendarDateFromNow(now)
+    const today = await currentHealthDate(now)
     const schedule = await loadScheduleWindow(command.scheduleId)
     if (!schedule) {
       throw new HttpError(404, 'Schedule not found')
