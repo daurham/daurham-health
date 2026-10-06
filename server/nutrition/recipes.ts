@@ -153,17 +153,7 @@ export async function commitRecipeVersion(id: string, body: unknown): Promise<Re
     line_fiber_g: line.lineFiberG,
     line_sodium_mg: line.lineSodiumMg,
   }))
-  let results: [
-    unknown,
-    Array<{ version?: number }>,
-    Array<{ id?: string }>,
-    unknown,
-    Array<{ id?: string }>,
-    Array<{ status?: string }>,
-    unknown,
-  ]
-  try {
-    results = (await sql.transaction([
+  await sql.transaction([
     sql.query(
       `SELECT recipes.id::text AS id
        FROM recipes
@@ -244,54 +234,37 @@ export async function commitRecipeVersion(id: string, body: unknown): Promise<Re
        RETURNING id::text AS id`,
       [id, now, versionId],
     ),
-    sql.query(
-      `SELECT CASE
-         WHEN NOT EXISTS (SELECT 1 FROM recipes WHERE id = $1::uuid) THEN 'missing'
-         WHEN NOT EXISTS (SELECT 1 FROM recipes WHERE id = $1::uuid AND is_active) THEN 'archived'
-         WHEN NOT EXISTS (
-           SELECT 1 FROM recipe_versions WHERE recipe_id = $1::uuid AND is_current AND id = $2::uuid
-         ) THEN 'stale_version'
-         WHEN EXISTS (${FOOD_MISMATCH_SQL}) THEN 'stale_preview'
-         ELSE 'ok'
-       END AS status`,
-      [id, preview.sourceVersionId, JSON.stringify(preview.expectedFoods)],
-    ),
-    sql.query(
-      `SELECT CASE
-         WHEN EXISTS (
-           SELECT 1 FROM recipe_versions
-           WHERE id = $2::uuid AND recipe_id = $1::uuid AND is_current = false
-         )
-         AND NOT EXISTS (SELECT 1 FROM recipe_versions WHERE id = $3::uuid)
-         THEN 1 / 0
-         ELSE 1
-       END AS version_guard`,
-      [id, preview.sourceVersionId, versionId],
-    ),
-  ])) as [
-    unknown,
-    Array<{ version?: number }>,
-    Array<{ id?: string }>,
-    unknown,
-    Array<{ id?: string }>,
-    Array<{ status?: string }>,
-    unknown,
-  ]
-  } catch (error) {
-    const message = error instanceof Error ? error.message : ''
-    if (message.includes('division by zero') || message.includes('22012')) {
-      throw new HttpError(409, 'Recipe changed since editing began.', undefined, RECIPE_STALE_VERSION)
-    }
-    throw error
+  ])
+
+  // Treat the database state as authoritative. The previous implementation tried to
+  // infer success from the shape of the batched transaction response and could report
+  // a stale-version conflict even after a valid recipe refresh. Re-read the current
+  // recipe instead; if the new immutable version is current, the save succeeded.
+  const current = await getRecipe(id)
+  if (current.version.id === versionId) {
+    return current
   }
-  if (!results[2]?.[0]?.id || !results[4]?.[0]?.id) {
-    const status = results[5]?.[0]?.status
-    if (status === 'archived') throw new HttpError(409, 'Restore this Recipe before editing.', undefined, RECIPE_ARCHIVED)
-    if (status === 'stale_preview') throw new HttpError(409, 'Recipe ingredients changed since preview.', undefined, RECIPE_STALE_PREVIEW)
-    if (status === 'missing') throw new HttpError(404, 'Recipe not found')
-    throw new HttpError(409, 'Recipe changed since editing began.', undefined, RECIPE_STALE_VERSION)
+  if (!current.isActive) {
+    throw new HttpError(409, 'Restore this Recipe before editing.', undefined, RECIPE_ARCHIVED)
   }
-  return getRecipe(id)
+  if (current.version.id !== preview.sourceVersionId) {
+    throw new HttpError(
+      409,
+      'This recipe was updated elsewhere. Reload the latest version before saving.',
+      undefined,
+      RECIPE_STALE_VERSION,
+    )
+  }
+
+  const foodStatus = (await sql.query(
+    `SELECT EXISTS (${FOOD_MISMATCH_SQL}) AS stale_preview`,
+    [id, preview.sourceVersionId, JSON.stringify(preview.expectedFoods)],
+  )) as Array<{ stale_preview?: boolean }>
+  if (foodStatus[0]?.stale_preview) {
+    throw new HttpError(409, 'Ingredient nutrition changed again. Review the refreshed values and save again.', undefined, RECIPE_STALE_PREVIEW)
+  }
+
+  throw new HttpError(409, 'Recipe update could not be completed. Review changes and try again.')
 }
 
 async function buildRecipePreview(id: string, body: unknown, committing: boolean) {
