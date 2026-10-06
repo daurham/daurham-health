@@ -15,60 +15,9 @@ import { withOwnerAuth } from '../auth/with-owner.js'
 import { handleApiError, HttpError, readJsonBody, requestApiPathname, sendJson, type ApiRequest, type ApiResponse } from '../http.js'
 
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}'
-const ITEM = new RegExp(`^/api/nutrition/recipes/(${UUID})(?:/(archive|restore))?import { draftRecipeAssist } from '../nutrition/recipe-assist.js'
-import {
-  archiveRecipe,
-  commitRecipeVersion,
-  convertLegacyRecipeFood,
-  createRecipe,
-  getRecipe,
-  getRecipeVersion,
-  listRecipes,
-  previewRecipeEdit,
-  restoreRecipe,
-} from '../nutrition/recipes.js'
-import { logRecipeConsumption } from '../nutrition/recipe-consumption.js'
-import { withOwnerAuth } from '../auth/with-owner.js'
-import { handleApiError, HttpError, readJsonBody, requestApiPathname, sendJson, type ApiRequest, type ApiResponse } from '../http.js'
-
-const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}'
-, 'i')
-const VERSIONS = new RegExp(`^/api/nutrition/recipes/(${UUID})/versions(?:/(preview|[1-9]\\d*))?import { draftRecipeAssist } from '../nutrition/recipe-assist.js'
-import {
-  archiveRecipe,
-  commitRecipeVersion,
-  convertLegacyRecipeFood,
-  createRecipe,
-  getRecipe,
-  getRecipeVersion,
-  listRecipes,
-  previewRecipeEdit,
-  restoreRecipe,
-} from '../nutrition/recipes.js'
-import { logRecipeConsumption } from '../nutrition/recipe-consumption.js'
-import { withOwnerAuth } from '../auth/with-owner.js'
-import { handleApiError, HttpError, readJsonBody, requestApiPathname, sendJson, type ApiRequest, type ApiResponse } from '../http.js'
-
-const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}'
-, 'i')
-const LEGACY_CONVERT = new RegExp(`^/api/nutrition/recipes/legacy/(${UUID})/convertimport { draftRecipeAssist } from '../nutrition/recipe-assist.js'
-import {
-  archiveRecipe,
-  commitRecipeVersion,
-  convertLegacyRecipeFood,
-  createRecipe,
-  getRecipe,
-  getRecipeVersion,
-  listRecipes,
-  previewRecipeEdit,
-  restoreRecipe,
-} from '../nutrition/recipes.js'
-import { logRecipeConsumption } from '../nutrition/recipe-consumption.js'
-import { withOwnerAuth } from '../auth/with-owner.js'
-import { handleApiError, HttpError, readJsonBody, requestApiPathname, sendJson, type ApiRequest, type ApiResponse } from '../http.js'
-
-const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}'
-, 'i')
+const ITEM = new RegExp(`^/api/nutrition/recipes/(${UUID})(?:/(archive|restore))?$`, 'i')
+const VERSIONS = new RegExp(`^/api/nutrition/recipes/(${UUID})/versions(?:/(preview|[1-9]\\d*))?$`, 'i')
+const LEGACY_CONVERT = new RegExp(`^/api/nutrition/recipes/legacy/(${UUID})/convert$`, 'i')
 
 export function matchRecipeRoute(pathname: string):
   | { kind: 'list' }
