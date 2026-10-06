@@ -55,6 +55,7 @@ export async function getProactiveInsights(input: {
     range: query.range,
     asOf: query.asOf,
     today: query.asOf === today ? today : null,
+    timezone,
     activityDays: activityRows.filter((row) => row.date <= query.asOf),
     sleepNights: sleepNights
       .filter((night) => night.sleepDate <= query.asOf)
