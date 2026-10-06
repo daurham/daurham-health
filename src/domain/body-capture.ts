@@ -170,10 +170,23 @@ export function measuredAtFromLocalTime(
   const [year, month, day] = (date ?? '').split('-')
   const seconds = match[2] ?? '00'
   try {
-    return parseWallClockInTimeZone(
+    const instant = parseWallClockInTimeZone(
       `${month}/${day}/${year} ${hourMinute}:${seconds}`,
       timeZone,
-    ).toISOString()
+    )
+    const timeZoneName = new Intl.DateTimeFormat('en-US', {
+      timeZone: assertIanaTimeZone(timeZone),
+      timeZoneName: 'longOffset',
+    })
+      .formatToParts(instant)
+      .find((part) => part.type === 'timeZoneName')?.value
+    const offset = timeZoneName === 'GMT'
+      ? '+00:00'
+      : timeZoneName?.match(/^GMT([+-]\d{2}:\d{2})$/)?.[1]
+    if (!offset) {
+      throw new Error('Timezone offset unavailable')
+    }
+    return `${match[1]}:${seconds}${offset}`
   } catch {
     throw new BodyInputError('Measurement time is invalid')
   }
