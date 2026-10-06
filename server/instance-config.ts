@@ -1,5 +1,5 @@
 import { publicInstanceConfigSchema, type PublicInstanceConfig } from '../src/domain/instance-config.js'
-import { assertIanaTimeZone, HEALTH_CALENDAR_TIME_ZONE } from '../src/domain/time.js'
+import { assertIanaTimeZone, DEFAULT_HEALTH_CALENDAR_TIME_ZONE } from '../src/domain/time.js'
 import { loadLocalEnv } from './env.js'
 
 export type InstanceConfig = PublicInstanceConfig & {
@@ -43,7 +43,7 @@ export function resolveInstanceConfig(env: NodeJS.ProcessEnv = process.env): Ins
   const appName = value(env, 'HEALTH_APP_NAME') ?? 'Health'
   const externalHomeUrl = optionalHttpUrl(value(env, 'HEALTH_EXTERNAL_HOME_URL'), 'HEALTH_EXTERNAL_HOME_URL')
   const calendarTimeZone = assertIanaTimeZone(
-    value(env, 'HEALTH_CALENDAR_TIMEZONE') ?? HEALTH_CALENDAR_TIME_ZONE,
+    value(env, 'HEALTH_CALENDAR_TIMEZONE') ?? DEFAULT_HEALTH_CALENDAR_TIME_ZONE,
   )
 
   const geminiConfigured = value(env, 'GEMINI_API_KEY') != null
