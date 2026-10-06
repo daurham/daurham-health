@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { phoenixDateTimeLocal, reviewCommitMeasuredAt, stagedFormValue } from '@/domain/body-capture'
+import { dateTimeLocalInTimeZone, reviewCommitMeasuredAt, stagedFormValue } from '@/domain/body-capture'
 import { dangerButtonClass, quietButtonClass } from '@/lib'
 import { commitBodyInbox, discardBodyInbox, fetchBodyInboxItem, type BodyInboxDetail } from './api'
 import { MeasureForm } from './MeasureForm'
@@ -25,7 +25,7 @@ export function BodyInboxPage() {
       .then((next) => {
         if (!cancelled) {
           setItem(next)
-          setMeasuredAt(phoenixDateTimeLocal(next.capturedAt))
+          setMeasuredAt(dateTimeLocalInTimeZone(next.capturedAt, next.timezone))
           setMeasuredAtEdited(false)
         }
       })
@@ -114,6 +114,7 @@ export function BodyInboxPage() {
                     originalCapturedAt: item.capturedAt,
                     measuredAtLocal: measuredAt,
                     measuredAtEdited,
+                    timeZone: item.timezone,
                   }),
                   notes: body.notes,
                   metrics: body.metrics,
