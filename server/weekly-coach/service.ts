@@ -1,6 +1,6 @@
 import { NutritionInterpretError } from '../../src/domain/nutrition/interpret.js'
 import { isCalendarDate } from '../../src/domain/training.js'
-import { healthCalendarDateFromNow } from '../../src/domain/time.js'
+import { DEFAULT_HEALTH_CALENDAR_TIME_ZONE, healthCalendarDateFromNow } from '../../src/domain/time.js'
 import {
   WEEKLY_COACH_FALLBACK_COPY,
   WEEKLY_COACH_PACKET_VERSION,
@@ -44,12 +44,17 @@ export type WeeklyCoachResponse = {
   }
 }
 
-export function parseWeeklyAsOf(asOf: string | null, now = new Date()): string {
-  const value = asOf?.trim() || healthCalendarDateFromNow(now)
+export function parseWeeklyAsOf(
+  asOf: string | null,
+  now = new Date(),
+  timezone = DEFAULT_HEALTH_CALENDAR_TIME_ZONE,
+): string {
+  const today = healthCalendarDateFromNow(now, timezone)
+  const value = asOf?.trim() || today
   if (!isCalendarDate(value)) {
     throw new HttpError(400, 'asOf must be YYYY-MM-DD')
   }
-  if (value > healthCalendarDateFromNow(now)) {
+  if (value > today) {
     throw new HttpError(400, 'asOf cannot be in the future')
   }
   return value
