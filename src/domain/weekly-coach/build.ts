@@ -103,8 +103,8 @@ function coverageOf(
 type DomainBits = { substantive: boolean; facts: WeeklyFactLine[] }
 
 function activityFacts(input: WeeklyCoachInput, period: WeeklyPeriod, previous: WeeklyPeriod): DomainBits {
-  const current = activityRangeSummary(dated(input.activityDays, period.end), period.start, period.end, ACTIVITY_TIMEZONE, input.asOf)
-  const prior = activityRangeSummary(dated(input.activityDays, period.end), previous.start, previous.end, ACTIVITY_TIMEZONE, input.asOf)
+  const current = activityRangeSummary(dated(input.activityDays, period.end), period.start, period.end, input.timezone ?? ACTIVITY_TIMEZONE, input.asOf)
+  const prior = activityRangeSummary(dated(input.activityDays, period.end), previous.start, previous.end, input.timezone ?? ACTIVITY_TIMEZONE, input.asOf)
   const metrics = [
     { key: 'steps', label: 'step', unit: '/day', current: current.steps, prior: prior.steps },
     { key: 'active-energy', label: 'active energy', unit: ' kcal/day', current: current.activeEnergy, prior: prior.activeEnergy },
