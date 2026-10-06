@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate'
 import { bodyGoalDisplayName, goalDisplayName, goalKindDefinition } from '../../src/domain/goals.js'
 import { NUTRITION_FOOD_ENTITY, USDA_FOODDATA_SOURCE_KEY } from '../../src/domain/nutrition/config.js'
-import { HEALTH_CALENDAR_TIME_ZONE } from '../../src/domain/time.js'
+import { DEFAULT_HEALTH_CALENDAR_TIME_ZONE } from '../../src/domain/time.js'
 import {
   AUTH_TABLES_EXCLUDED,
   BACKUP_FORMAT,
@@ -29,7 +29,7 @@ export type BackupManifest = {
   formatVersion: number
   profile: BackupProfile
   createdAt: string
-  calendarTimezone: typeof HEALTH_CALENDAR_TIME_ZONE
+  calendarTimezone: string
   schemaMigration: string
   appVersionOrCommit: string
   tables: Record<string, BackupTableFile>
@@ -169,12 +169,14 @@ function csvBundle(tables: Record<string, BackupRow[]>): Record<string, Uint8Arr
   return files
 }
 
-function readme(manifest: Pick<BackupManifest, 'createdAt' | 'profile' | 'schemaMigration'>): string {
+function readme(
+  manifest: Pick<BackupManifest, 'createdAt' | 'profile' | 'schemaMigration' | 'calendarTimezone'>,
+): string {
   return [
     'Daurham Health backup',
     '',
     `Created: ${manifest.createdAt}`,
-    `Calendar timezone: ${HEALTH_CALENDAR_TIME_ZONE}`,
+    `Calendar timezone: ${manifest.calendarTimezone}`,
     `Schema migration: ${manifest.schemaMigration}`,
     `Profile: ${manifest.profile}`,
     '',
@@ -198,6 +200,7 @@ export function buildBackupArchive(input: {
   createdAt: string
   schemaMigration: string
   appVersionOrCommit: string
+  calendarTimezone?: string
   rowsByTable: Record<string, readonly BackupRow[]>
 }): Uint8Array {
   const selected = tablesForProfile(input.profile)
@@ -225,7 +228,7 @@ export function buildBackupArchive(input: {
     formatVersion: BACKUP_FORMAT_VERSION,
     profile: input.profile,
     createdAt: input.createdAt,
-    calendarTimezone: HEALTH_CALENDAR_TIME_ZONE,
+    calendarTimezone: input.calendarTimezone ?? DEFAULT_HEALTH_CALENDAR_TIME_ZONE,
     schemaMigration: input.schemaMigration,
     appVersionOrCommit: input.appVersionOrCommit,
     tables: tableMeta,
@@ -564,7 +567,7 @@ function emptyManifest(): BackupManifest {
     formatVersion: 0,
     profile: 'full',
     createdAt: '',
-    calendarTimezone: HEALTH_CALENDAR_TIME_ZONE,
+    calendarTimezone: DEFAULT_HEALTH_CALENDAR_TIME_ZONE,
     schemaMigration: '',
     appVersionOrCommit: '',
     tables: {},
