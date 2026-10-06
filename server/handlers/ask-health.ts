@@ -1,8 +1,8 @@
 import { parseAskHealthRequest } from '../../src/domain/ask-health/index.js'
-import { healthCalendarDateFromNow } from '../../src/domain/time.js'
 import { withOwnerAuth } from '../auth/with-owner.js'
 import { handleApiError, readJsonBody, sendJson, type ApiRequest, type ApiResponse } from '../http.js'
 import { answerAskHealth } from '../ask-health/service.js'
+import { currentHealthDate } from '../health-time.js'
 
 export async function handleAskHealth(req: ApiRequest, res: ApiResponse): Promise<void> {
   try {
@@ -12,7 +12,7 @@ export async function handleAskHealth(req: ApiRequest, res: ApiResponse): Promis
       return
     }
     const body = await readJsonBody(req)
-    const parsed = parseAskHealthRequest(body, healthCalendarDateFromNow())
+    const parsed = parseAskHealthRequest(body, await currentHealthDate())
     if (!parsed.ok) {
       sendJson(res, 400, { error: parsed.error })
       return
