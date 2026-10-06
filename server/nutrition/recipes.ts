@@ -153,7 +153,7 @@ export async function commitRecipeVersion(id: string, body: unknown): Promise<Re
     line_fiber_g: line.lineFiberG,
     line_sodium_mg: line.lineSodiumMg,
   }))
-  await sql.transaction([
+  const results = (await sql.transaction([
     sql.query(
       `SELECT recipes.id::text AS id
        FROM recipes
@@ -234,9 +234,19 @@ export async function commitRecipeVersion(id: string, body: unknown): Promise<Re
        RETURNING id::text AS id`,
       [id, now, versionId],
     ),
-  ])
+  ])) as [
+    unknown,
+    Array<{ version?: number }>,
+    Array<{ id?: string }>,
+    unknown,
+    Array<{ id?: string }>,
+  ]
 
-  // Treat the database state as authoritative. The previous implementation tried to
+  if (results[2]?.[0]?.id === versionId && results[4]?.[0]?.id) {
+    return getRecipe(id)
+  }
+
+  // Treat the database state as authoritative when the batched response is ambiguous. The previous implementation tried to
   // infer success from the shape of the batched transaction response and could report
   // a stale-version conflict even after a valid recipe refresh. Re-read the current
   // recipe instead; if the new immutable version is current, the save succeeded.
