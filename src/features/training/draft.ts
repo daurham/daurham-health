@@ -117,12 +117,12 @@ export function draftFromTranscription(
   }
 }
 
-export function draftFromTemplate(template: WorkoutTemplate, now = new Date()): WorkoutDraft {
+export function draftFromTemplate(template: WorkoutTemplate, now = new Date(), timezone?: string): WorkoutDraft {
   return {
     template,
     sessionType: 'programmed',
     sessionName: '',
-    workoutDate: localIsoDate(now),
+    workoutDate: localIsoDate(now, timezone),
     durationMin: '',
     effort: null,
     painLevel: null,
@@ -227,13 +227,13 @@ function numberField(value: number | null | undefined): string {
   return value == null ? '' : String(value)
 }
 
-export function draftForAdHocWorkout(now = new Date()): WorkoutDraft {
+export function draftForAdHocWorkout(now = new Date(), timezone?: string): WorkoutDraft {
   return {
     template: null,
     workoutTemplateId: null,
     sessionType: 'ad_hoc',
     sessionName: '',
-    workoutDate: localIsoDate(now),
+    workoutDate: localIsoDate(now, timezone),
     durationMin: '',
     effort: null,
     painLevel: null,
@@ -248,9 +248,10 @@ export function draftForExperimentWorkout(input: {
   benchmarkProtocolVersionId?: string | null
   sessionName?: string
   now?: Date
+  timezone?: string
 }): WorkoutDraft {
   return {
-    ...draftForAdHocWorkout(input.now),
+    ...draftForAdHocWorkout(input.now, input.timezone),
     sessionType: 'experiment',
     sessionName: input.sessionName ?? '',
     experimentId: input.experimentId ?? null,
