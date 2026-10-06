@@ -1,5 +1,4 @@
-import { phoenixCalendarDate } from './calendar.js'
-import { HEALTH_CALENDAR_TIME_ZONE } from '../time.js'
+import { DEFAULT_HEALTH_CALENDAR_TIME_ZONE, healthCalendarDateFromInstant } from '../time.js'
 
 /**
  * Health Auto Export JSON v2 daily summaries.
@@ -62,7 +61,7 @@ export type HaeMetricEvidence = {
 
 export type HaeDayPatch = {
   date: string
-  timezone: typeof HEALTH_CALENDAR_TIME_ZONE
+  timezone: string
   stepsCount: number | null
   activeEnergyKcal: number | null
   exerciseMinutes: number | null
@@ -98,8 +97,11 @@ function calendarDateOnly(value: string): string | null {
   return value
 }
 
-/** Offset-aware HAE timestamps become an America/Phoenix calendar day. */
-export function healthDayFromHaeDate(value: string): string {
+/** Offset-aware HAE timestamps become the configured Health calendar day. */
+export function healthDayFromHaeDate(
+  value: string,
+  timeZone = DEFAULT_HEALTH_CALENDAR_TIME_ZONE,
+): string {
   const match = HAE_DATE.exec(value.trim())
   if (!match) {
     throw new HealthAutoExportError('Health Auto Export date is invalid')
@@ -116,7 +118,7 @@ export function healthDayFromHaeDate(value: string): string {
   if (!Number.isFinite(instant)) {
     throw new HealthAutoExportError('Health Auto Export date is invalid')
   }
-  return phoenixCalendarDate(instant)
+  return healthCalendarDateFromInstant(new Date(instant), timeZone)
 }
 
 export function truncateHaeSteps(qty: number): number {
@@ -130,10 +132,10 @@ function canonicalMetric(name: string): HaeCanonicalMetric | null {
   return (HAE_CANONICAL_METRICS as readonly string[]).includes(name) ? (name as HaeCanonicalMetric) : null
 }
 
-function emptyDay(date: string): HaeDayPatch {
+function emptyDay(date: string, timeZone: string): HaeDayPatch {
   return {
     date,
-    timezone: HEALTH_CALENDAR_TIME_ZONE,
+    timezone: timeZone,
     stepsCount: null,
     activeEnergyKcal: null,
     exerciseMinutes: null,
@@ -183,7 +185,12 @@ function applyPoint(day: HaeDayPatch, metric: HaeCanonicalMetric, qty: number, u
   }
 }
 
-function readPoint(metric: HaeCanonicalMetric, point: unknown, declaredUnit: string): {
+function readPoint(
+  metric: HaeCanonicalMetric,
+  point: unknown,
+  declaredUnit: string,
+  timeZone: string,
+): {
   qty: number
   unit: string
   date: string
@@ -207,7 +214,7 @@ function readPoint(metric: HaeCanonicalMetric, point: unknown, declaredUnit: str
   return {
     qty,
     unit: unit.trim(),
-    date: healthDayFromHaeDate(point.date),
+    date: healthDayFromHaeDate(point.date, timeZone),
     providerSource: providerSource && providerSource.length > 0 ? providerSource : null,
   }
 }
@@ -222,7 +229,10 @@ export function healthAutoExportHasActivityMetrics(payload: unknown): boolean {
   return payload.data.metrics.some((metric) => isRecord(metric) && metric.name !== 'sleep_analysis')
 }
 
-export function parseHealthAutoExport(payload: unknown): HaeParseResult {
+export function parseHealthAutoExport(
+  payload: unknown,
+  timeZone = DEFAULT_HEALTH_CALENDAR_TIME_ZONE,
+): HaeParseResult {
   if (!isRecord(payload) || !isRecord(payload.data) || !Array.isArray(payload.data.metrics)) {
     throw new HealthAutoExportError('Health Auto Export payload must contain data.metrics')
   }
@@ -253,8 +263,8 @@ export function parseHealthAutoExport(payload: unknown): HaeParseResult {
     }
     const declaredUnit = typeof metric.units === 'string' ? metric.units : ''
     for (const point of data) {
-      const parsed = readPoint(canonical, point, declaredUnit)
-      const day = days.get(parsed.date) ?? emptyDay(parsed.date)
+      const parsed = readPoint(canonical, point, declaredUnit, timeZone)
+      const day = days.get(parsed.date) ?? emptyDay(parsed.date, timeZone)
       applyPoint(day, canonical, parsed.qty, parsed.unit, parsed.providerSource)
       days.set(parsed.date, day)
       metricsApplied[canonical] += 1
