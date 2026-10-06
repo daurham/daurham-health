@@ -1,99 +1,57 @@
 # Current task
 
-## I0B — Dynamic Instance Identity + Canonical Timezone
+## Status
 
-### Status
+No active implementation task.
 
-Active implementation slice on branch `i0b-instance-identity-timezone`.
+I0B — Dynamic Instance Identity + Canonical Timezone is complete and is being merged to `main`.
 
 Repository schema head remains:
 
 `0041_exercise_library_calisthenics.sql`
 
-No database migration is planned for I0B.
+No database migration was added for I0B.
 
 Master program:
 
 `docs/ai/NEXT_INTELLIGENCE_ROADMAP.md`
 
-## Product intent
+## Completed I0B outcome
 
-Finish the deployment-level portability work started in I0A so a second single-owner instance can use a different name, domain, feature set, and IANA calendar timezone without changing source code.
-
-The design rule is:
-
-> Deployment configuration owns instance identity and canonical calendar timezone. Shared domain code receives timezone explicitly; it does not read server environment state.
-
-## Deliverables
-
-### 1. Canonical timezone configuration
-
-- Rename the hard-coded Phoenix value conceptually to a backward-compatible default, not the universal authority.
-- `HEALTH_CALENDAR_TIMEZONE` from instance configuration becomes the server runtime authority.
-- Shared deterministic date functions accept a timezone explicitly, while retaining a Phoenix default only where backwards-compatible tests/demo fixtures require it.
-- Today, Activity, Sleep, cross-domain intelligence, Ask Health, Progress, and ingest/date bucketing must not silently use a different timezone from the configured instance.
-- `ai_usage` billing months remain UTC.
-
-### 2. DST-aware correctness
-
-Add tests using at least one DST-observing timezone (for example `America/New_York`) covering:
-- UTC/calendar-date boundaries;
-- spring-forward/fall-back behavior where relevant;
-- historical/as-of reads;
-- no future-day leakage.
-
-### 3. Dynamic instance presentation
-
-Consume I0A public instance config in application chrome:
-- app display name;
-- optional external/home link;
-- public demo availability.
-
-Default values must preserve the current Jake deployment unless env is changed.
-
-### 4. Demo capability behavior
-
-When public demo is disabled:
-- do not advertise demo from locked/public chrome;
-- direct demo navigation must fail closed to a neutral unavailable/not-found experience rather than showing synthetic demo content.
-
-No auth/private data behavior may change.
-
-### 5. Deployment-neutral external setup
-
-Update setup documentation and generated/external URL guidance so it does not require:
-- `health.daurham.com`;
-- `daurham.com`;
-- Phoenix as a literal deployment assumption.
-
-Body Shortcut / Health Auto Export instructions should use placeholders or safe instance-derived values.
-
-### 6. Neutral provider identity
-
-Remove Jake-specific provider fallback branding where practical (for example Open Food Facts default User-Agent) while preserving env overrides.
-
-## Non-goals
-
-I0B does not:
-- make timezone an ordinary editable owner preference;
-- rewrite historical stored timezone/provenance fields;
-- implement multi-tenancy;
-- solve Jake-specific routine seeds (I0C);
-- add Health Profile or intelligence features;
-- add a schema migration.
+- `HEALTH_CALENDAR_TIMEZONE` is the runtime Health-calendar authority for owner flows.
+- Shared deterministic date/domain helpers accept an explicit IANA timezone; `America/Phoenix` remains only the backward-compatible/default owner value.
+- Today, Activity, Sleep, Progress, Ask Health/intelligence, Goals, Coach, Weekly Coach, Lab evidence, Nutrition, Training defaults, Body capture/review, backups, and Apple/HAE runtime paths use the configured instance calendar where applicable.
+- DST-observing regression coverage was added, including `America/New_York` spring-forward/fall-back boundaries.
+- App chrome consumes public instance configuration for display name, external home link, public-demo capability, and calendar timezone.
+- Owner pages wait for instance configuration before initializing date-sensitive browser state.
+- Public-demo links/content fail closed when the capability is disabled.
+- Body Shortcut setup is deployment-neutral.
+- Open Food Facts fallback identity is neutral; env override remains supported.
+- Existing stored timezone/provenance rows were not rewritten.
+- Current Jake deployment defaults remain `Daurham Health`, `https://daurham.com`, and `America/Phoenix` unless deployment env overrides them.
 
 ## Validation
 
-Focused tests plus:
+Independent final validation workflow run `37541015943` passed:
+
 - `npx tsc -b`
 - `npx eslint .`
 - `npm test`
 - `npm run build`
 
-## Completion
+No source changes were made after that validation other than documentation/workflow cleanup.
 
-When green:
-- update DEV_STATE and DECISIONS;
-- set CURRENT_TASK to no active task / I0C next;
-- merge to main;
-- record any remaining portability gaps.
+## Next planning slice
+
+Next candidate portability slice:
+
+**I0C — Fresh-instance bootstrap + owner-specific seed separation**
+
+Expected focus:
+
+- prevent legacy Jake-specific routine/owner seed state from appearing as owner-created data in a fresh instance;
+- preserve historical references in Jake's existing database;
+- document/verify a clean first-run deployment path;
+- keep one-owner-per-deployment architecture.
+
+Draft the I0C contract before implementation.
