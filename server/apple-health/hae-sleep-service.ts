@@ -10,10 +10,10 @@ import {
   type HaeSleepSegment,
 } from '../../src/domain/apple-health/hae-sleep.js'
 import { logicalSleepSource } from '../../src/domain/sleep/sources.js'
-import { HEALTH_CALENDAR_TIME_ZONE } from '../../src/domain/time.js'
 import { resolveAppleHealthSourceId, syncSleepNightlySummaries } from '../sleep/backfill.js'
 import { formatDatabaseError, getSql } from '../db.js'
 import { HttpError } from '../http.js'
+import { getInstanceConfig } from '../instance-config.js'
 import { INSERT_APPLE_HEALTH_JOB_SQL, UPDATE_APPLE_HEALTH_JOB_SQL } from './queries.js'
 import { HAE_SOURCE_SQL } from './hae-sql.js'
 import {
@@ -222,6 +222,7 @@ async function persistSleepSegments(input: {
 }
 
 export async function ingestHealthAutoExportSleep(input: { payload: unknown }): Promise<HaeSleepIngestResult> {
+  const timezone = (await getInstanceConfig()).calendarTimeZone
   const parsed = parseHealthAutoExportSleep(input.payload)
   if (!parsed.metricPresent) {
     return emptySleepResult(parsed)
@@ -252,7 +253,7 @@ export async function ingestHealthAutoExportSleep(input: { payload: unknown }): 
     ])
     const result = await commitSleepIngest({
       persist: () => persistSleepSegments({ sourceId, jobId, segments: parsed.segments }),
-      materialize: async () => syncSleepNightlySummaries(await resolveAppleHealthSourceId()),
+      materialize: async () => syncSleepNightlySummaries(await resolveAppleHealthSourceId(), timezone),
     })
     await sql.query(UPDATE_APPLE_HEALTH_JOB_SQL, [
       jobId,
@@ -296,7 +297,10 @@ export async function ingestHealthAutoExportSleep(input: { payload: unknown }): 
   }
 }
 
-export async function latestHaeSleepStatus(): Promise<{ importedAt: string; status: string; latestNight: string | null } | null> {
+export async function latestHaeSleepStatus(
+  timezone?: string,
+): Promise<{ importedAt: string; status: string; latestNight: string | null } | null> {
+  const resolvedTimezone = timezone ?? (await getInstanceConfig()).calendarTimeZone
   const sql = await getSql()
   const sourceRows = (await sql.query(HAE_SOURCE_SQL)) as Array<{ id: string }>
   const sourceId = sourceRows[0]?.id
@@ -311,7 +315,7 @@ export async function latestHaeSleepStatus(): Promise<{ importedAt: string; stat
   if (!job) {
     return null
   }
-  const nights = (await sql.query(LATEST_SLEEP_NIGHT_SQL, [HEALTH_CALENDAR_TIME_ZONE])) as Array<{
+  const nights = (await sql.query(LATEST_SLEEP_NIGHT_SQL, [resolvedTimezone])) as Array<{
     latest_night: string | null
   }>
   return {
