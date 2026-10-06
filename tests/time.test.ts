@@ -4,6 +4,7 @@ import {
   HEALTH_CALENDAR_TIME_ZONE,
   assertIanaTimeZone,
   healthCalendarDateFromInstant,
+  instantAtStartOfCalendarDate,
   parseWallClockInTimeZone,
 } from '../src/domain/time.ts'
 
@@ -36,5 +37,35 @@ describe('canonical Health timezone', () => {
     const summer = new Date('2026-09-21T06:30:00.000Z')
     expect(healthCalendarDateFromInstant(summer)).toBe('2026-09-20')
     expect(calendarDateFromInstant(summer, 'America/Los_Angeles')).toBe('2026-09-20')
+  })
+})
+
+
+describe('configured instance timezone and DST', () => {
+  it('buckets instants by a DST-observing instance timezone', () => {
+    expect(
+      healthCalendarDateFromInstant(new Date('2026-03-08T04:30:00.000Z'), 'America/New_York'),
+    ).toBe('2026-03-07')
+    expect(
+      healthCalendarDateFromInstant(new Date('2026-03-08T05:30:00.000Z'), 'America/New_York'),
+    ).toBe('2026-03-08')
+  })
+
+  it('finds local midnight across the spring DST transition', () => {
+    expect(
+      instantAtStartOfCalendarDate('2026-03-08', 'America/New_York').toISOString(),
+    ).toBe('2026-03-08T05:00:00.000Z')
+    expect(
+      instantAtStartOfCalendarDate('2026-03-09', 'America/New_York').toISOString(),
+    ).toBe('2026-03-09T04:00:00.000Z')
+  })
+
+  it('finds local midnight across the fall DST transition', () => {
+    expect(
+      instantAtStartOfCalendarDate('2026-11-01', 'America/New_York').toISOString(),
+    ).toBe('2026-11-01T04:00:00.000Z')
+    expect(
+      instantAtStartOfCalendarDate('2026-11-02', 'America/New_York').toISOString(),
+    ).toBe('2026-11-02T05:00:00.000Z')
   })
 })
