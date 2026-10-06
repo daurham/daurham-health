@@ -112,9 +112,10 @@ function averageMinutes(values: readonly number[]): MetricResult<number> {
 
 export function buildSleepProgressView(
   nights: readonly SleepNightlySummary[],
-  input: { range: ProgressRange; asOf: string },
+  input: { range: ProgressRange; asOf: string; timezone?: string },
 ): SleepProgressView {
-  const owned = nights.filter((night) => night.timezone === SLEEP_TIMEZONE && night.sleepDate <= input.asOf)
+  const timezone = input.timezone ?? SLEEP_TIMEZONE
+  const owned = nights.filter((night) => night.timezone === timezone && night.sleepDate <= input.asOf)
   const earliest = owned.reduce<string | null>((min, night) => (min == null || night.sleepDate < min ? night.sleepDate : min), null)
   const period = trailingPeriod(input.range, input.asOf, earliest)
   const inRange = owned.filter((night) => night.sleepDate >= period.start && night.sleepDate <= period.end)
@@ -131,7 +132,7 @@ export function buildSleepProgressView(
     recent.totalSleep.status === 'available' &&
     summary.observedSleepNights > 0 &&
     recent.currentDates.some((date) => date >= period.start && date <= period.end)
-  const baselineTarget = latestBaselineNight(owned, { start: period.start, end: period.end })
+  const baselineTarget = latestBaselineNight(owned, { start: period.start, end: period.end }, timezone)
   const personalBaseline = baselineTarget ? computeSleepDurationBaseline(owned, baselineTarget) : null
   const sourceAttribution = deriveSleepSourceAttribution(inRange, {
     range: input.range,
@@ -147,7 +148,7 @@ export function buildSleepProgressView(
     asOf: input.asOf,
     start: period.start,
     end: period.end,
-    timezone: SLEEP_TIMEZONE,
+    timezone,
     calendarNights: summary.calendarNights,
     analysisEligibleNights: summary.observedSleepNights,
     coveragePct: summary.coveragePct,
@@ -175,7 +176,7 @@ export function buildSleepProgressView(
       .sort((left, right) => right.sleepDate.localeCompare(left.sleepDate))
       .slice(0, RECENT_NIGHT_LIMIT)
       .map(toSleepProgressNight),
-    stageAnalytics: buildSleepStageAnalytics(nights, input),
+    stageAnalytics: buildSleepStageAnalytics(owned, input),
     personalBaseline,
     sourceAttribution,
   }
