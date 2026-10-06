@@ -100,14 +100,15 @@ export function inspectInstanceBootstrap(
 }
 
 export async function readInstanceBootstrapSnapshot(
-  sql: Sql = await getSql(),
+  sql?: Sql,
 ): Promise<InstanceBootstrapSnapshot> {
+  const database = sql ?? await getSql()
   const expectedMigrations = await listMigrationFiles()
-  const appliedRows = (await sql.query(
+  const appliedRows = (await database.query(
     'SELECT filename FROM schema_migrations ORDER BY filename',
   )) as Array<{ filename: string }>
 
-  const legacyRows = (await sql.query(
+  const legacyRows = (await database.query(
     `SELECT routine_code
        FROM workout_templates
       WHERE origin_kind = 'seeded'
@@ -117,7 +118,7 @@ export async function readInstanceBootstrapSnapshot(
       ORDER BY routine_code`,
   )) as Array<{ routine_code: string }>
 
-  const referenceRows = (await sql.query(
+  const referenceRows = (await database.query(
     `SELECT COUNT(*)::int AS count
        FROM workout_sessions AS session
       WHERE session.routine_code IN ('A','B','C')
@@ -130,7 +131,7 @@ export async function readInstanceBootstrapSnapshot(
          )`,
   )) as Array<{ count: number | string }>
 
-  const builtinRows = (await sql.query(
+  const builtinRows = (await database.query(
     `SELECT EXISTS (
        SELECT 1
          FROM workout_templates
@@ -141,11 +142,11 @@ export async function readInstanceBootstrapSnapshot(
      ) AS active`,
   )) as Array<{ active: boolean }>
 
-  const exerciseRows = (await sql.query(
+  const exerciseRows = (await database.query(
     'SELECT COUNT(*)::int AS count FROM exercise_definitions WHERE is_active = true',
   )) as Array<{ count: number | string }>
 
-  const ownerRoutineRows = (await sql.query(
+  const ownerRoutineRows = (await database.query(
     `SELECT COUNT(*)::int AS count
        FROM workout_templates
       WHERE origin_kind = 'owner' AND is_active = true`,
