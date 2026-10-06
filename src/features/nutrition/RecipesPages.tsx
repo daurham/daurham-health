@@ -13,6 +13,7 @@ import { composeRecipe, supportedDisplayUnits, type RecipeFoodBasis } from '@/do
 import { healthCalendarDateFromNow } from '@/domain/time'
 import { LoadErrorNotice, primaryButtonClass, secondaryButtonClass } from '@/lib'
 import { parseNutritionDateParam } from './date'
+import { patchNutritionFood } from './api'
 import { formatNumber } from './format'
 import { LabelCaptureSheet } from './LabelCapture'
 import { RecipeAssistSheet } from './RecipeAssistSheet'
@@ -24,9 +25,12 @@ import {
   createRecipe,
   fetchRecipe,
   fetchRecipes,
+  fetchLegacyRecipes,
   fetchRecipeVersion,
   previewRecipeChange,
+  promoteLegacyRecipe,
   restoreRecipe,
+  type LegacyRecipeListItem,
   type RecipeDetail,
   type RecipeListItem,
   type RecipePreview,
@@ -108,13 +112,24 @@ function foodBasis(food: NutritionFood): RecipeFoodBasis {
 
 export function RecipesPage() {
   const [recipes, setRecipes] = useState<RecipeListItem[] | null>(null)
+  const [legacyRecipes, setLegacyRecipes] = useState<LegacyRecipeListItem[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+  const [legacyBusyId, setLegacyBusyId] = useState<string | null>(null)
+
+  async function reload() {
+    const [nextRecipes, nextLegacy] = await Promise.all([fetchRecipes(), fetchLegacyRecipes()])
+    setRecipes(nextRecipes)
+    setLegacyRecipes(nextLegacy)
+  }
 
   useEffect(() => {
     let active = true
-    fetchRecipes()
-      .then((next) => {
-        if (active) setRecipes(next)
+    Promise.all([fetchRecipes(), fetchLegacyRecipes()])
+      .then(([nextRecipes, nextLegacy]) => {
+        if (!active) return
+        setRecipes(nextRecipes)
+        setLegacyRecipes(nextLegacy)
       })
       .catch((caught: unknown) => {
         if (active) setError(caught instanceof Error ? caught.message : 'Could not load recipes')
@@ -123,6 +138,49 @@ export function RecipesPage() {
       active = false
     }
   }, [])
+
+  async function upgradeLegacy(item: LegacyRecipeListItem) {
+    setLegacyBusyId(item.foodId)
+    setError(null)
+    setNotice(null)
+    try {
+      const result = await promoteLegacyRecipe(item.foodId)
+      await reload()
+      setNotice(
+        result.alreadyPromoted
+          ? `${item.name} already has an editable Recipe. The imported copy is out of active search.`
+          : `${item.name} is now an editable Recipe. The imported copy was removed from active search.`,
+      )
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Could not upgrade that imported recipe')
+    } finally {
+      setLegacyBusyId(null)
+    }
+  }
+
+  async function setLegacyArchived(item: LegacyRecipeListItem, archived: boolean) {
+    setLegacyBusyId(item.foodId)
+    setError(null)
+    setNotice(null)
+    try {
+      await patchNutritionFood(item.foodId, { archived })
+      setLegacyRecipes((current) =>
+        current?.map((legacy) => (legacy.foodId === item.foodId ? { ...legacy, archived } : legacy)) ?? current,
+      )
+      setNotice(
+        archived
+          ? `${item.name} was removed from active search. Past logs are unchanged.`
+          : `${item.name} is available in search again.`,
+      )
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Could not update that imported recipe')
+    } finally {
+      setLegacyBusyId(null)
+    }
+  }
+
+  const activeLegacy = legacyRecipes?.filter((item) => !item.archived) ?? []
+  const archivedLegacy = legacyRecipes?.filter((item) => item.archived) ?? []
 
   return (
     <section className="w-full min-w-0 space-y-4">
@@ -140,6 +198,7 @@ export function RecipesPage() {
         </Link>
       </div>
       {error ? <LoadErrorNotice message={error} /> : null}
+      {notice ? <p className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-700">{notice}</p> : null}
       {recipes == null && !error ? <p className="text-sm text-zinc-600">Loading recipes…</p> : null}
       {recipes?.length === 0 ? <p className="text-sm text-zinc-600">No active recipes yet.</p> : null}
       <ul className="space-y-2">
@@ -156,7 +215,117 @@ export function RecipesPage() {
           </li>
         ))}
       </ul>
+
+      {activeLegacy.length > 0 ? (
+        <section id="legacy" className="space-y-3 rounded-xl border border-amber-200 bg-amber-50/50 p-4">
+          <div>
+            <h2 className="font-medium">Imported legacy recipes</h2>
+            <p className="mt-1 text-sm text-zinc-700">
+              These came from the old calorie tracker as frozen food snapshots, so they are not the same as today&apos;s editable Recipes.
+              Upgrade composed dishes when possible, or remove an old item from search. Historical logs stay unchanged.
+            </p>
+          </div>
+          <ul className="space-y-3">
+            {activeLegacy.map((item) => (
+              <LegacyRecipeCard
+                key={item.foodId}
+                item={item}
+                busy={legacyBusyId === item.foodId}
+                onUpgrade={() => void upgradeLegacy(item)}
+                onArchive={() => void setLegacyArchived(item, true)}
+              />
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {archivedLegacy.length > 0 ? (
+        <details className="rounded-xl border border-zinc-200 bg-white p-4">
+          <summary className="cursor-pointer text-sm font-medium">Removed legacy recipes ({archivedLegacy.length})</summary>
+          <p className="mt-2 text-sm text-zinc-600">These no longer appear in active food search or recents.</p>
+          <ul className="mt-3 space-y-3">
+            {archivedLegacy.map((item) => (
+              <LegacyRecipeCard
+                key={item.foodId}
+                item={item}
+                busy={legacyBusyId === item.foodId}
+                onUpgrade={() => void upgradeLegacy(item)}
+                onRestore={() => void setLegacyArchived(item, false)}
+              />
+            ))}
+          </ul>
+        </details>
+      ) : null}
     </section>
+  )
+}
+
+function LegacyRecipeCard({
+  item,
+  busy,
+  onUpgrade,
+  onArchive,
+  onRestore,
+}: {
+  item: LegacyRecipeListItem
+  busy: boolean
+  onUpgrade: () => void
+  onArchive?: () => void
+  onRestore?: () => void
+}) {
+  return (
+    <li className="rounded-lg border border-zinc-200 bg-white p-3">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="font-medium">{item.name}</p>
+          <p className="text-sm text-zinc-600">
+            Legacy {item.mealType === 'composed' ? 'composed recipe' : item.mealType === 'standalone' ? 'standalone item' : 'recipe'} ·{' '}
+            {recipeKcal(item.caloriesKcal)}
+          </p>
+          <p className="text-sm text-zinc-600">
+            Fiber {item.fiberG == null ? 'missing' : `${formatNumber(item.fiberG, 1)} g`} · Sodium{' '}
+            {item.sodiumMg == null ? 'missing' : `${formatNumber(item.sodiumMg, 0)} mg`}
+          </p>
+        </div>
+        {item.promotedRecipeId ? (
+          <Link className="text-sm underline" to={`/nutrition/recipes/${item.promotedRecipeId}`}>
+            Open upgraded recipe
+          </Link>
+        ) : null}
+      </div>
+      {item.canUpgrade && !item.promotedRecipeId ? (
+        <p className="mt-2 text-sm text-zinc-700">
+          Health can rebuild this from its original ingredient links and use the current ingredient nutrition, including fiber and sodium.
+        </p>
+      ) : null}
+      {!item.canUpgrade && !item.promotedRecipeId ? (
+        <p className="mt-2 text-sm text-zinc-700">
+          The old app stored this as a standalone item, so there is no ingredient list to recover automatically. You can rebuild it as a new Recipe or remove this old copy from search.
+        </p>
+      ) : null}
+      <div className="mt-3 flex flex-wrap gap-2">
+        {item.canUpgrade && !item.promotedRecipeId ? (
+          <button type="button" className={primaryButtonClass} disabled={busy} onClick={onUpgrade}>
+            {busy ? 'Upgrading…' : 'Upgrade to editable recipe'}
+          </button>
+        ) : null}
+        {!item.canUpgrade && !item.promotedRecipeId ? (
+          <Link to="/nutrition/recipes/new" className={secondaryButtonClass}>
+            Rebuild as recipe
+          </Link>
+        ) : null}
+        {onArchive ? (
+          <button type="button" className={secondaryButtonClass} disabled={busy} onClick={onArchive}>
+            Remove from search
+          </button>
+        ) : null}
+        {onRestore ? (
+          <button type="button" className={secondaryButtonClass} disabled={busy} onClick={onRestore}>
+            Restore to search
+          </button>
+        ) : null}
+      </div>
+    </li>
   )
 }
 

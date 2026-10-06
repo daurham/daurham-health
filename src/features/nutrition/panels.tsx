@@ -93,6 +93,8 @@ export function AddFoodSheet({
   const [confirmFood, setConfirmFood] = useState<NutritionFood | null>(null)
   const [confirmRecipe, setConfirmRecipe] = useState<LoggableRecipeVersion | null>(null)
   const recipeMatches = matchCurrentRecipes(quickAdd.currentRecipes ?? [], query)
+  const searchedFoods = (results ?? []).filter((food) => !isLegacyRecipeFood(food))
+  const legacyRecipeMatches = (results ?? []).filter(isLegacyRecipeFood)
   const [candidate, setCandidate] = useState<PackagedFoodCandidate | null>(null)
   const [lookupError, setLookupError] = useState<{
     code: 'not_found' | 'provider_unavailable' | 'invalid_barcode'
@@ -478,25 +480,6 @@ export function AddFoodSheet({
     >
       {query.trim().length > 0 ? (
         <div className="space-y-4">
-        <FoodSection
-          title="My Food"
-          foods={results ?? []}
-          empty={searching ? 'Searching…' : 'No matching saved foods.'}
-          action={
-            <button
-              type="button"
-              className={secondaryClass + ' mt-3 w-full'}
-              disabled={describeBusy}
-              onClick={() => runDescription('gemini')}
-            >
-              {describeBusy ? 'Asking AI…' : 'Ask AI about this'}
-            </button>
-          }
-          onSelect={setConfirmFood}
-          onQuickLog={onQuickLog}
-          onOpenFood={onOpenFood}
-          showKind
-        />
         {recipeMatches.length > 0 ? (
           <section>
             <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Recipe</h3>
@@ -518,6 +501,41 @@ export function AddFoodSheet({
             </ul>
           </section>
         ) : null}
+        <FoodSection
+          title="My Food"
+          foods={searchedFoods}
+          empty={searching ? 'Searching…' : 'No matching saved foods.'}
+          action={
+            <button
+              type="button"
+              className={secondaryClass + ' mt-3 w-full'}
+              disabled={describeBusy}
+              onClick={() => runDescription('gemini')}
+            >
+              {describeBusy ? 'Asking AI…' : 'Ask AI about this'}
+            </button>
+          }
+          onSelect={setConfirmFood}
+          onQuickLog={onQuickLog}
+          onOpenFood={onOpenFood}
+          showKind
+        />
+        {legacyRecipeMatches.length > 0 ? (
+          <FoodSection
+            title="Imported legacy recipe"
+            foods={legacyRecipeMatches}
+            empty=""
+            action={
+              <Link to="/nutrition/recipes#legacy" className="mt-2 block text-sm text-zinc-600 underline">
+                Manage or upgrade imported recipes
+              </Link>
+            }
+            onSelect={setConfirmFood}
+            onQuickLog={onQuickLog}
+            onOpenFood={onOpenFood}
+            showKind
+          />
+        ) : null}
         </div>
       ) : (
         <FoodSection
@@ -531,6 +549,10 @@ export function AddFoodSheet({
       )}
     </NutritionSheet>
   )
+}
+
+function isLegacyRecipeFood(food: NutritionFood): boolean {
+  return food.catalogKind === 'recipe' && food.sourceKind === 'migrated'
 }
 
 function FoodSection({
@@ -576,7 +598,7 @@ function FoodSection({
                 <span className="truncate text-sm text-zinc-500">
                   {[
                     food.brand,
-                    showKind ? catalogKindLabel(food.catalogKind) : null,
+                    isLegacyRecipeFood(food) ? 'Legacy recipe' : showKind ? catalogKindLabel(food.catalogKind) : null,
                     formatQuantity(food.servingQuantity, food.servingUnit),
                     formatKcal(food.calories),
                     formatGrams(food.protein) ? `${formatGrams(food.protein)} protein` : null,

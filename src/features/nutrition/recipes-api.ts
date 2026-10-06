@@ -74,6 +74,28 @@ export type RecipeListItem = {
   finishedWeightG: number | null
 }
 
+export type LegacyRecipeListItem = {
+  foodId: string
+  name: string
+  archived: boolean
+  mealType: string | null
+  caloriesKcal: number
+  proteinG: number | null
+  carbsG: number | null
+  fatG: number | null
+  fiberG: number | null
+  sodiumMg: number | null
+  promotedRecipeId: string | null
+  canUpgrade: boolean
+}
+
+export type LegacyRecipePromotion = {
+  legacyFoodId: string
+  alreadyPromoted: boolean
+  recipe: RecipeDetail
+}
+
+
 async function parseOk<T>(response: Response): Promise<T> {
   if (!response.ok) throw new Error(await readApiError(response))
   return (await response.json()) as T
@@ -82,6 +104,19 @@ async function parseOk<T>(response: Response): Promise<T> {
 export async function fetchRecipes(): Promise<RecipeListItem[]> {
   const body = await parseOk<{ recipes: RecipeListItem[] }>(await healthFetch('/api/nutrition/recipes'))
   return body.recipes
+}
+
+export async function fetchLegacyRecipes(): Promise<LegacyRecipeListItem[]> {
+  const body = await parseOk<{ recipes: LegacyRecipeListItem[] }>(
+    await healthFetch('/api/nutrition/recipes/legacy', { cache: 'no-store' }),
+  )
+  return body.recipes
+}
+
+export async function promoteLegacyRecipe(foodId: string): Promise<LegacyRecipePromotion> {
+  return parseOk<LegacyRecipePromotion>(
+    await healthFetch(`/api/nutrition/recipes/legacy/${foodId}/promote`, { method: 'POST' }),
+  )
 }
 
 export async function fetchRecipe(id: string): Promise<RecipeDetail> {

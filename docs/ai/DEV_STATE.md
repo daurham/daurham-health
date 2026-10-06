@@ -9,6 +9,7 @@
 - No migration or environment-variable change is required.
 - Recipe edits can now save a new current version when linked ingredient nutrition (including fiber/sodium) has changed; immutable prior versions remain intact.
 - Recipe update review now surfaces fiber/sodium completion and uses owner-facing “update” language instead of treating version creation as the primary action.
+- Legacy calorie-tracker meal combos are now explicitly managed as imported legacy recipes: composed meals can be upgraded into first-class editable Recipes, legacy copies can be removed from active search without rewriting historical logs, and Add Food separates modern Recipes from imported legacy snapshots.
 
 Snapshot recorded 2026-09-30 after **V2-H4 — Experience System**.
 

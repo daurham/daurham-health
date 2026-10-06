@@ -48,6 +48,71 @@ export async function getLegacyNutritionDatabaseUrl(): Promise<string> {
   return url
 }
 
+export type LegacyMealComboRecipeIngredient = {
+  ingredientId: number
+  name: string
+  unit: string
+  quantity: number
+}
+
+export type LegacyMealComboRecipe = {
+  id: number
+  name: string
+  mealType: string
+  notes: string | null
+  instructions: string | null
+  ingredients: LegacyMealComboRecipeIngredient[]
+}
+
+export async function loadLegacyMealComboRecipe(id: number): Promise<LegacyMealComboRecipe | null> {
+  if (!Number.isInteger(id) || id <= 0) {
+    return null
+  }
+  const sql = neon(await getLegacyNutritionDatabaseUrl())
+  const rows = (await sql.query(
+    `SELECT
+       mc.id,
+       mc.name,
+       mc.meal_type,
+       mc.notes,
+       mc.instructions,
+       mci.ingredient_id,
+       mci.quantity,
+       i.name AS ingredient_name,
+       i.unit AS ingredient_unit
+     FROM meal_combos mc
+     LEFT JOIN meal_combo_ingredients mci ON mci.meal_combo_id = mc.id
+     LEFT JOIN ingredients i ON i.id = mci.ingredient_id
+     WHERE mc.id = $1
+     ORDER BY mci.ingredient_id ASC`,
+    [id],
+  )) as Array<Record<string, unknown>>
+  const first = rows[0]
+  if (!first) {
+    return null
+  }
+  return {
+    id: Number(first.id),
+    name: String(first.name ?? '').trim(),
+    mealType: String(first.meal_type ?? ''),
+    notes: first.notes == null ? null : String(first.notes),
+    instructions: first.instructions == null ? null : String(first.instructions),
+    ingredients: rows.flatMap((row) => {
+      const ingredientId = asNumber(row.ingredient_id)
+      const quantity = asNumber(row.quantity)
+      if (ingredientId == null || quantity == null || !(quantity > 0)) {
+        return []
+      }
+      return [{
+        ingredientId,
+        name: String(row.ingredient_name ?? `Ingredient ${ingredientId}`).trim(),
+        unit: String(row.ingredient_unit ?? 'serving').trim() || 'serving',
+        quantity,
+      }]
+    }),
+  }
+}
+
 export async function loadLegacyNutritionDump(): Promise<LegacyNutritionDump> {
   const sql = neon(await getLegacyNutritionDatabaseUrl())
   const ingredients = (await sql.query(

@@ -342,7 +342,25 @@ const FOOD_MISMATCH_SQL = `SELECT 1
      OR foods.fiber IS DISTINCT FROM NULLIF(expected.fiber, '')::numeric
      OR foods.sodium IS DISTINCT FROM NULLIF(expected.sodium, '')::numeric`
 
+type RecipeCreateTransactionContext = {
+  sql: Sql
+  recipeId: string
+  versionId: string
+  now: string
+}
+
+export type RecipeCreateTransactionExtras = (
+  context: RecipeCreateTransactionContext,
+) => Array<ReturnType<Sql['query']>>
+
 export async function createRecipe(body: unknown): Promise<RecipeDetail> {
+  return createRecipeWithTransactionExtras(body)
+}
+
+export async function createRecipeWithTransactionExtras(
+  body: unknown,
+  extras?: RecipeCreateTransactionExtras,
+): Promise<RecipeDetail> {
   const ids = recipeFoodIds(body)
   if ('error' in ids) throw new HttpError(422, ids.error)
   const sql = await getSql()
@@ -354,6 +372,7 @@ export async function createRecipe(body: unknown): Promise<RecipeDetail> {
   const versionId = randomUUID()
   const now = new Date().toISOString()
   const ingredientIds = composed.ingredients.map(() => randomUUID())
+  const extraQueries = extras?.({ sql, recipeId, versionId, now }) ?? []
   const results = (await sql.transaction([
     sql.query(
       `INSERT INTO recipes (id, is_active, source_id, created_at, updated_at)
@@ -433,6 +452,7 @@ export async function createRecipe(body: unknown): Promise<RecipeDetail> {
         ],
       ),
     ),
+    ...extraQueries,
   ])) as Array<Array<{ id?: string; created_at?: string; updated_at?: string }>>
   const created = results[0]?.[0]
   const version = results[1]?.[0]

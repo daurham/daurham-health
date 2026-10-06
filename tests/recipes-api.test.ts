@@ -21,6 +21,13 @@ const service = vi.hoisted(() => ({
 
 vi.mock('../server/nutrition/recipes.ts', () => service)
 
+const legacy = vi.hoisted(() => ({
+  listLegacyRecipes: vi.fn(),
+  promoteLegacyRecipe: vi.fn(),
+}))
+
+vi.mock('../server/nutrition/legacy-recipes.ts', () => legacy)
+
 const consumption = vi.hoisted(() => ({
   logRecipeConsumption: vi.fn(),
 }))
@@ -84,6 +91,8 @@ describe('recipe API auth', () => {
     service.previewRecipeEdit.mockResolvedValue({ canCommit: true, candidateVersionNumber: 2 })
     service.commitRecipeVersion.mockResolvedValue({ id: RECIPE, version: { version: 2, isCurrent: true } })
     service.getRecipeVersion.mockResolvedValue({ id: RECIPE, version: { version: 1, isCurrent: false } })
+    legacy.listLegacyRecipes.mockResolvedValue({ recipes: [] })
+    legacy.promoteLegacyRecipe.mockResolvedValue({ legacyFoodId: RECIPE, alreadyPromoted: false, recipe: { id: RECIPE } })
     consumption.logRecipeConsumption.mockResolvedValue({ id: 'entry-1', recipeVersionId: 'version-1' })
   })
 
@@ -93,6 +102,8 @@ describe('recipe API auth', () => {
     expect(matchRecipeRoute(`/api/nutrition/recipes/${RECIPE}/versions/preview`)).toEqual({ kind: 'versions', id: RECIPE, action: 'preview' })
     expect(matchRecipeRoute(`/api/nutrition/recipes/${RECIPE}/versions`)).toEqual({ kind: 'versions', id: RECIPE, action: 'commit' })
     expect(matchRecipeRoute(`/api/nutrition/recipes/${RECIPE}/versions/1`)).toEqual({ kind: 'versions', id: RECIPE, action: 1 })
+    expect(matchRecipeRoute('/api/nutrition/recipes/legacy')).toEqual({ kind: 'legacy-list' })
+    expect(matchRecipeRoute(`/api/nutrition/recipes/legacy/${RECIPE}/promote`)).toEqual({ kind: 'legacy-promote', id: RECIPE })
     expect(matchHealthApiRoute('/api/ingest/apple-health')).toBe('apple-health-sync')
     const handler = readFileSync('server/handlers/nutrition-recipes.ts', 'utf8')
     expect(handler).toContain('withOwnerAuth')
@@ -107,6 +118,8 @@ describe('recipe API auth', () => {
     expect(service.createRecipe).not.toHaveBeenCalled()
     expect((await call('GET', '/api/nutrition/recipes', { id: 'other', email: 'other@example.com' })).status()).toBe(403)
     expect((await call('GET', '/api/nutrition/recipes', owner)).status()).toBe(200)
+    expect((await call('GET', '/api/nutrition/recipes/legacy', owner)).status()).toBe(200)
+    expect((await call('POST', `/api/nutrition/recipes/legacy/${RECIPE}/promote`, owner)).status()).toBe(201)
     expect((await call('POST', '/api/nutrition/recipes', owner, { name: 'Stew' })).status()).toBe(201)
     const wrong = await call('PUT', '/api/nutrition/recipes', owner)
     expect(wrong.status()).toBe(405)
