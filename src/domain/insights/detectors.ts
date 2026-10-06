@@ -141,8 +141,8 @@ export function detectActivityChange(input: InsightDetectorInput): InsightDetect
   const windows = activityComparisonWindows(input.asOf, input.today)
   const rows = input.activityDays.filter((row) => row.date <= windows.current.end)
   const today = input.today ?? undefined
-  const current = activityRangeSummary(rows, windows.current.start, windows.current.end, ACTIVITY_TIMEZONE, today)
-  const previous = activityRangeSummary(rows, windows.previous.start, windows.previous.end, ACTIVITY_TIMEZONE, today)
+  const current = activityRangeSummary(rows, windows.current.start, windows.current.end, input.timezone ?? ACTIVITY_TIMEZONE, today)
+  const previous = activityRangeSummary(rows, windows.previous.start, windows.previous.end, input.timezone ?? ACTIVITY_TIMEZONE, today)
   const candidates: Array<{
     key: string
     label: string
