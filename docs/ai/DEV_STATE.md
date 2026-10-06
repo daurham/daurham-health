@@ -7,6 +7,8 @@
 - Personal claims stay evidence-grounded, while established general health/physiology context can be used as clearly qualified possibilities.
 - Ask Health prompt version is `ask-health-v3`.
 - No migration or environment-variable change is required.
+- Recipe edits can now save a new current version when linked ingredient nutrition (including fiber/sodium) has changed; immutable prior versions remain intact.
+- Recipe update review now surfaces fiber/sodium completion and uses owner-facing “update” language instead of treating version creation as the primary action.
 
 Snapshot recorded 2026-09-30 after **V2-H4 — Experience System**.
 
