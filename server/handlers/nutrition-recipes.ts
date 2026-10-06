@@ -7,26 +7,8 @@ import { handleApiError, HttpError, readJsonBody, requestApiPathname, sendJson, 
 
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}'
 const ITEM = new RegExp(`^/api/nutrition/recipes/(${UUID})(?:/(archive|restore))?$`, 'i')
-const VERSIONS = new RegExp(`^/api/nutrition/recipes/(${UUID})/versions(?:/(preview|[1-9]\\d*))?import { draftRecipeAssist } from '../nutrition/recipe-assist.js'
-import { archiveRecipe, commitRecipeVersion, createRecipe, getRecipe, getRecipeVersion, listRecipes, previewRecipeEdit, restoreRecipe } from '../nutrition/recipes.js'
-import { logRecipeConsumption } from '../nutrition/recipe-consumption.js'
-import { listLegacyRecipes, promoteLegacyRecipe } from '../nutrition/legacy-recipes.js'
-import { withOwnerAuth } from '../auth/with-owner.js'
-import { handleApiError, HttpError, readJsonBody, requestApiPathname, sendJson, type ApiRequest, type ApiResponse } from '../http.js'
-
-const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}'
-const ITEM = new RegExp(`^/api/nutrition/recipes/(${UUID})(?:/(archive|restore))?$`, 'i')
-, 'i')
-const LEGACY_PROMOTE = new RegExp(`^/api/nutrition/recipes/legacy/(${UUID})/promoteimport { draftRecipeAssist } from '../nutrition/recipe-assist.js'
-import { archiveRecipe, commitRecipeVersion, createRecipe, getRecipe, getRecipeVersion, listRecipes, previewRecipeEdit, restoreRecipe } from '../nutrition/recipes.js'
-import { logRecipeConsumption } from '../nutrition/recipe-consumption.js'
-import { listLegacyRecipes, promoteLegacyRecipe } from '../nutrition/legacy-recipes.js'
-import { withOwnerAuth } from '../auth/with-owner.js'
-import { handleApiError, HttpError, readJsonBody, requestApiPathname, sendJson, type ApiRequest, type ApiResponse } from '../http.js'
-
-const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}'
-const ITEM = new RegExp(`^/api/nutrition/recipes/(${UUID})(?:/(archive|restore))?$`, 'i')
-, 'i')
+const VERSIONS = new RegExp(`^/api/nutrition/recipes/(${UUID})/versions(?:/(preview|[1-9]\\d*))?$`, 'i')
+const LEGACY_PROMOTE = new RegExp(`^/api/nutrition/recipes/legacy/(${UUID})/promote$`, 'i')
 
 export function matchRecipeRoute(pathname: string):
   | { kind: 'list' }

@@ -1,10 +1,11 @@
+import { randomUUID } from 'node:crypto'
 import { NUTRITION_FOOD_ENTITY } from '../../src/domain/nutrition/config.js'
 import { ingredientFingerprint } from '../../src/domain/nutrition/legacy.js'
 import { getSql, type Sql } from '../db.js'
 import { HttpError } from '../http.js'
 import { loadLegacyMealComboRecipe, type LegacyMealComboRecipe } from './legacy-source.js'
 import {
-  createRecipeWithTransactionExtras,
+  createRecipeWithId,
   getRecipe,
   type RecipeDetail,
 } from './recipes.js'
@@ -178,42 +179,56 @@ export async function promoteLegacyRecipe(
   }
 
   const promotionFingerprint = `${legacy.external_fingerprint}${PROMOTION_SUFFIX}`
+  const recipeId = randomUUID()
+  const now = new Date().toISOString()
+  const reserved = (await sql.query(
+    `INSERT INTO source_record_links (
+       source_id, import_job_id, external_id, external_fingerprint, entity_type, entity_id, source_payload, created_at
+     ) VALUES (
+       $1::uuid, NULL, $2, $3, $4, $5::uuid, $6::jsonb, $7::timestamptz
+     )
+     ON CONFLICT (source_id, external_fingerprint) DO NOTHING
+     RETURNING entity_id::text AS recipe_id`,
+    [
+      legacy.source_id,
+      legacy.external_id,
+      promotionFingerprint,
+      PROMOTED_RECIPE_ENTITY,
+      recipeId,
+      JSON.stringify({
+        promoted_from_food_id: foodId,
+        legacy_meal_combo_id: combo.id,
+      }),
+      now,
+    ],
+  )) as Array<{ recipe_id?: string }>
+
+  if (!reserved[0]?.recipe_id) {
+    const existing = await findPromotedRecipeId(sql, legacy.source_id, promotionFingerprint)
+    if (!existing) {
+      throw new HttpError(409, 'This imported recipe is already being upgraded. Try again.')
+    }
+    await sql.query('UPDATE nutrition_foods SET archived = true, updated_at = now() WHERE id = $1::uuid', [foodId])
+    return {
+      legacyFoodId: foodId,
+      alreadyPromoted: true,
+      recipe: await getRecipe(existing),
+    }
+  }
+
   try {
-    const recipe = await createRecipeWithTransactionExtras(draft, ({ sql: transactionSql, recipeId, now }) => [
-      transactionSql.query(
-        `INSERT INTO source_record_links (
-           source_id, import_job_id, external_id, external_fingerprint, entity_type, entity_id, source_payload, created_at
-         ) VALUES (
-           $1::uuid, NULL, $2, $3, $4, $5::uuid, $6::jsonb, $7::timestamptz
-         )`,
-        [
-          legacy.source_id,
-          legacy.external_id,
-          promotionFingerprint,
-          PROMOTED_RECIPE_ENTITY,
-          recipeId,
-          JSON.stringify({
-            promoted_from_food_id: foodId,
-            legacy_meal_combo_id: combo.id,
-          }),
-          now,
-        ],
-      ),
-      transactionSql.query(
-        'UPDATE nutrition_foods SET archived = true, updated_at = $2::timestamptz WHERE id = $1::uuid',
-        [foodId, now],
-      ),
-    ])
+    const recipe = await createRecipeWithId(draft, recipeId)
+    await sql.query('UPDATE nutrition_foods SET archived = true, updated_at = now() WHERE id = $1::uuid', [foodId])
     return { legacyFoodId: foodId, alreadyPromoted: false, recipe }
   } catch (error) {
-    const promotedRecipeId = await findPromotedRecipeId(sql, legacy.source_id, promotionFingerprint)
-    if (promotedRecipeId) {
-      return {
-        legacyFoodId: foodId,
-        alreadyPromoted: true,
-        recipe: await getRecipe(promotedRecipeId),
-      }
-    }
+    await sql.query(
+      `DELETE FROM source_record_links
+       WHERE source_id = $1::uuid
+         AND external_fingerprint = $2
+         AND entity_type = $3
+         AND entity_id = $4::uuid`,
+      [legacy.source_id, promotionFingerprint, PROMOTED_RECIPE_ENTITY, recipeId],
+    )
     throw error
   }
 }
