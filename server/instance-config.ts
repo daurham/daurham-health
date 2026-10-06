@@ -40,8 +40,11 @@ function optionalHttpUrl(raw: string | null, key: string): string | null {
 }
 
 export function resolveInstanceConfig(env: NodeJS.ProcessEnv = process.env): InstanceConfig {
-  const appName = value(env, 'HEALTH_APP_NAME') ?? 'Health'
-  const externalHomeUrl = optionalHttpUrl(value(env, 'HEALTH_EXTERNAL_HOME_URL'), 'HEALTH_EXTERNAL_HOME_URL')
+  const appName = value(env, 'HEALTH_APP_NAME') ?? 'Daurham Health'
+  const externalHomeUrl = optionalHttpUrl(
+    value(env, 'HEALTH_EXTERNAL_HOME_URL') ?? 'https://daurham.com',
+    'HEALTH_EXTERNAL_HOME_URL',
+  )
   const calendarTimeZone = assertIanaTimeZone(
     value(env, 'HEALTH_CALENDAR_TIMEZONE') ?? DEFAULT_HEALTH_CALENDAR_TIME_ZONE,
   )
