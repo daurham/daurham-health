@@ -138,7 +138,14 @@ describe('api/index after Vercel nested rewrite', () => {
   it('serves GET /api/health', async () => {
     const captured = await hit('GET', '/api/health')
     expect(captured.status()).toBe(200)
-    expect(captured.body()).toEqual({ status: 'ok' })
+    expect(captured.body()).toMatchObject({
+      status: 'ok',
+      instance: {
+        appName: expect.any(String),
+        calendarTimeZone: expect.any(String),
+        capabilities: expect.any(Object),
+      },
+    })
   })
 
   it('protects GET /api/session', async () => {
