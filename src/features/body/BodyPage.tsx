@@ -25,12 +25,12 @@ import {
 import { CadencePanel } from './CadencePanel'
 import { MeasureForm } from './MeasureForm'
 import { customKeysFor, presetForMetric } from './measure-preset'
-import { HEALTH_CALENDAR_TIME_ZONE } from '@/domain/time'
 import { selectedFingerprints, selectionFromPreview } from './import-state'
+import { useHealthCalendarTimeZone } from '@/lib'
 
-function formatCaptureTime(iso: string): string {
+function formatCaptureTime(iso: string, timeZone: string): string {
   return new Intl.DateTimeFormat('en-US', {
-    timeZone: HEALTH_CALENDAR_TIME_ZONE,
+    timeZone,
     month: 'short',
     day: 'numeric',
     hour: 'numeric',
@@ -77,13 +77,14 @@ function metricByKey(candidate: FitProfilePreviewCandidate, key: string) {
 }
 
 export function BodyPage() {
+  const instanceTimeZone = useHealthCalendarTimeZone()
   const [params, setParams] = useSearchParams()
   const [sessions, setSessions] = useState<BodyMeasurementSession[]>([])
   const [cadences, setCadences] = useState<BodyCadenceItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [file, setFile] = useState<File | null>(null)
-  const [timezone] = useState(HEALTH_CALENDAR_TIME_ZONE)
+  const timezone = instanceTimeZone
   const [preview, setPreview] = useState<FitProfilePreviewResponse | null>(null)
   const [selected, setSelected] = useState<Record<string, boolean>>({})
   const [busy, setBusy] = useState<'preview' | 'commit' | 'save' | null>(null)
@@ -225,7 +226,7 @@ export function BodyPage() {
             {inbox.items.map((item) => (
               <li key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-zinc-200 px-3 py-2">
                 <div className="min-w-0">
-                  <p className="text-sm text-zinc-900">{formatCaptureTime(item.capturedAt)}</p>
+                  <p className="text-sm text-zinc-900">{formatCaptureTime(item.capturedAt, item.timezone || instanceTimeZone)}</p>
                   <p className="truncate text-sm text-zinc-600">{capturePreview(item.metrics)}</p>
                 </div>
                 <Link to={`/body/inbox/${item.id}`} className={quietButtonClass}>
