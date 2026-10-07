@@ -38,15 +38,15 @@ Also present from v1 and the import work: Nutrition, Training, Body, Progress, A
 
 ## Current work
 
-I6 — Goal Control / Weekly Decision Engine is prepared as a dormant batch on top of dormant I5 commit `6fff0fc874a4fa6deee752bcc403b46d37a36bf0`.
+I7 — Observed Maintenance + Plateau Engine is prepared as a dormant batch on top of dormant I6 commit `ed97ff7a9753650fd705504129b5ec958700a96c`.
 
-I6 adds `goal-control-v1`: one deterministic act/maintain/insufficient-evidence decision authority built from Weekly Coach candidates plus I5 coverage/confidence/relationship context. Today and Weekly Coach consume that same decision. Training adherence and Coach daily Training quests are plan/rest-aware, and low-quality Nutrition evidence cannot justify intake changes.
+I7 adds `maintenance-engine-v1`: a quality-gated observed-maintenance estimate, explicit plateau states, scale-noise context, review-only interventions, I6 Goal Control integration, and an owner-reviewed Personal Lab Weight-response calibration suggestion.
 
-No branch ref is moved while the Vercel rolling deployment limit remains active. I6 adds no migration; schema head remains `0046_evidence_semantics_change_watchdog.sql`.
+No branch ref is moved while the Vercel rolling deployment limit remains active. Schema head is `0047_maintenance_calibration_experiment_origin.sql`.
 
 ## Known planned work
 
-- I7 Observed Maintenance + Plateau Engine.
+- I8 Training Progression / Preservation Goals.
 
 
 Named by the current manual or blueprint, and not marked implemented:

@@ -61,6 +61,7 @@ import changeLedgerHandler from './handlers/change-ledger.js'
 import dataQualityHandler from './handlers/data-quality.js'
 import healthIntelligenceHandler from './handlers/health-intelligence.js'
 import goalControlHandler from './handlers/goal-control.js'
+import maintenanceHandler from './handlers/maintenance.js'
 
 export type HealthApiRoute =
   | 'health'
@@ -125,6 +126,7 @@ export type HealthApiRoute =
   | 'data-quality'
   | 'health-intelligence'
   | 'goal-control'
+  | 'maintenance'
 
 type HealthApiHandler = (req: ApiRequest, res: ApiResponse) => unknown | Promise<unknown>
 
@@ -191,6 +193,7 @@ const HANDLERS: Record<HealthApiRoute, HealthApiHandler> = {
   'data-quality': dataQualityHandler,
   'health-intelligence': healthIntelligenceHandler,
   'goal-control': goalControlHandler,
+  maintenance: maintenanceHandler,
 }
 
 function isSingleSegmentAfter(pathname: string, prefix: string): boolean {
@@ -217,6 +220,8 @@ export function matchHealthApiRoute(pathname: string): HealthApiRoute | null {
       return 'health-intelligence'
     case '/api/intelligence/goal-control':
       return 'goal-control'
+    case '/api/intelligence/maintenance':
+      return 'maintenance'
     case '/api/data-quality':
     case '/api/data-quality/reviews':
       return 'data-quality'

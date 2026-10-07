@@ -131,7 +131,7 @@ function WeeklyDecisionCard({ decision, prefix }: { decision: GoalControlState; 
           </Link>
         </div>
       ) : null}
-      <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+      <div className={`mt-3 grid gap-2 text-sm ${decision.maintenance ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
         <div className="rounded-md bg-zinc-50 px-3 py-2">
           <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Training</p>
           <p className="mt-1 text-zinc-700">{decision.trainingAdherence.detail}</p>
@@ -140,6 +140,17 @@ function WeeklyDecisionCard({ decision, prefix }: { decision: GoalControlState; 
           <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Nutrition evidence</p>
           <p className="mt-1 text-zinc-700">{decision.nutritionQuality.detail}</p>
         </div>
+        {decision.maintenance ? (
+          <div className="rounded-md bg-zinc-50 px-3 py-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Weight response</p>
+            <p className="mt-1 text-zinc-700">{decision.maintenance.plateau.headline}</p>
+            {decision.maintenance.estimate.state === 'available' && decision.maintenance.estimate.observedMaintenanceKcal != null ? (
+              <p className="mt-1 text-xs text-zinc-500">
+                Observed maintenance ≈ {Math.round(decision.maintenance.estimate.observedMaintenanceKcal).toLocaleString('en-US')} kcal/day · {decision.maintenance.estimate.confidence} confidence
+              </p>
+            ) : null}
+          </div>
+        ) : null}
       </div>
       {(decision.relationships.length > 0 || decision.limitations.length > 0) ? (
         <details className="mt-3 rounded-md border border-zinc-200 px-3 py-2">
@@ -147,6 +158,11 @@ function WeeklyDecisionCard({ decision, prefix }: { decision: GoalControlState; 
           {decision.relationships.length > 0 ? (
             <ul className="mt-2 space-y-1 text-sm text-zinc-600">
               {decision.relationships.map((item) => <li key={item.id}>{item.summary}</li>)}
+            </ul>
+          ) : null}
+          {decision.maintenance?.noiseFactors.length ? (
+            <ul className="mt-2 space-y-1 text-xs text-zinc-500">
+              {decision.maintenance.noiseFactors.slice(0, 4).map((item) => <li key={item.id}>{item.title}. {item.detail}</li>)}
             </ul>
           ) : null}
           {decision.limitations.length > 0 ? (

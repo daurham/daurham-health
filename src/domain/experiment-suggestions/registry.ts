@@ -7,6 +7,7 @@ import type {
   SuggestionGoalFact,
   SuggestionInput,
   SuggestionKind,
+  MaintenanceCalibrationFact,
   SuggestionProtocolFact,
   SuggestionProtocolSpec,
 } from './types.js'
@@ -134,10 +135,115 @@ export function compileGoalToExperimentCandidate(
   }
 }
 
+function maintenanceCalibrationCandidate(
+  fact: MaintenanceCalibrationFact,
+  covers: readonly SuggestionCover[],
+): ExperimentCandidate | null {
+  if (!fact.eligible) return null
+  if (fact.linkedGoalId && openCover(covers, (cover) => cover.goalId === fact.linkedGoalId)) return null
+  const candidateId = `maintenance-calibration:${fact.linkedGoalId ?? 'unlinked'}`
+  const evidence = fact.evidenceRefs.map((ref) => ({
+    ref,
+    label:
+      ref === 'maintenance:estimate'
+        ? 'Observed maintenance estimate'
+        : ref === 'maintenance:nutrition-quality'
+          ? 'Nutrition evidence quality'
+          : ref === 'maintenance:body-quality'
+            ? 'Body-measurement comparability'
+            : 'Plateau classification',
+  }))
+  const spec: SuggestionProtocolSpec = {
+    instructions: [
+      `For ${fact.durationDays} consecutive days, keep the current intended calorie and activity plan stable when practical.`,
+      'Log all calorie-containing food and drinks.',
+      'Record body weight under usual comparable conditions on at least five days.',
+      'Continue carbohydrate, sodium, logged-water, bowel, and Daily Context tracking so short-term scale noise is visible.',
+      'Do not deliberately manipulate hydration or sodium to change the scale reading.',
+    ].join(' '),
+    durationLabel: `${fact.durationDays}-day observation`,
+    requirements: [
+      {
+        position: 1,
+        role: 'primary_outcome',
+        domain: 'body',
+        requirementKind: 'body_metric',
+        selector: { metricKey: 'weight' },
+        label: 'Body weight',
+        required: true,
+        criteria: { minimumObservations: fact.requiredWeightMeasurements, minimumCoveragePercent: null, minimumAdherencePercent: null },
+      },
+      {
+        position: 2,
+        role: 'adherence',
+        domain: 'nutrition',
+        requirementKind: 'nutrition_metric',
+        selector: { metricKey: 'calories' },
+        label: 'Calories',
+        required: true,
+        criteria: { minimumObservations: fact.requiredNutritionDays, minimumCoveragePercent: 70, minimumAdherencePercent: null },
+      },
+      {
+        position: 3,
+        role: 'context',
+        domain: 'nutrition',
+        requirementKind: 'nutrition_metric',
+        selector: { metricKey: 'carbs' },
+        label: 'Carbohydrate',
+        required: false,
+        criteria: { minimumObservations: 7, minimumCoveragePercent: 50, minimumAdherencePercent: null },
+      },
+    ],
+    contextControls: [
+      'travel',
+      'alcohol',
+      'late_meal',
+      'unusual_stress',
+      'poor_sleep_opportunity',
+      'baby_night_interruption',
+      'sick',
+      'unusual_physical_labor',
+    ].map((tagKey) => ({ tagKey, controlMode: 'observe' as const })),
+    benchmarkDefinitionId: null,
+    benchmarkProtocolVersionId: null,
+    protocolVersionNumber: null,
+    goalId: fact.linkedGoalId,
+    goalVersionId: fact.linkedGoalVersionId,
+  }
+  return {
+    candidateId,
+    candidateFingerprint: fingerprint('maintenance_calibration', {
+      asOf: fact.asOf,
+      goalId: fact.linkedGoalId,
+      goalVersionId: fact.linkedGoalVersionId,
+      estimatePeriodStart: fact.estimatePeriodStart,
+      estimatePeriodEnd: fact.estimatePeriodEnd,
+      observedMaintenanceKcal: fact.observedMaintenanceKcal,
+      plateauState: fact.plateauState,
+      protocol: spec,
+      evidenceRefs: fact.evidenceRefs,
+    }),
+    calculationVersion: EXPERIMENT_SUGGESTION_CALCULATION_VERSION,
+    kind: 'maintenance_calibration',
+    presentation: 'observation',
+    title: 'Weight-response calibration',
+    question: 'Does body weight remain broadly stable when intake, weigh-ins, and short-term scale context are observed more consistently?',
+    hypothesis: 'A controlled observation period will reduce uncertainty around observed maintenance and plateau classification.',
+    rationale: fact.why,
+    limitations: 'This is an observation protocol. It does not prescribe a calorie target, dehydration, sodium manipulation, or a weight-loss rate.',
+    why: fact.why,
+    protocol: spec,
+    evidence,
+    linkedGoalLabel: null,
+    linkedBenchmarkLabel: null,
+  }
+}
+
 function rank(kind: SuggestionKind): number {
   if (kind === 'benchmark_retest_due') return 0
   if (kind === 'benchmark_missing_baseline') return 1
-  return 2
+  if (kind === 'maintenance_calibration') return 2
+  return 3
 }
 
 export function buildExperimentSuggestions(input: SuggestionInput): ExperimentCandidate[] {
@@ -158,6 +264,10 @@ export function buildExperimentSuggestions(input: SuggestionInput): ExperimentCa
       candidates.push(benchmarkCandidate(protocol, 'benchmark_missing_baseline'))
     }
   }
+  const maintenance = input.maintenanceCalibration
+    ? maintenanceCalibrationCandidate(input.maintenanceCalibration, input.covers)
+    : null
+  if (maintenance) candidates.push(maintenance)
   for (const goal of input.goals) {
     const compiled = compileGoalToExperimentCandidate(goal, input.covers)
     if (compiled.supported) {

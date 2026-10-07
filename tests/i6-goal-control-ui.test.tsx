@@ -42,6 +42,7 @@ function decision(): GoalControlState {
     },
     relationships: [],
     limitations: [],
+    maintenance: null,
   }
 }
 

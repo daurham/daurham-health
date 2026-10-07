@@ -229,7 +229,7 @@ describe('experiment suggestions', () => {
       }
     }
     expect(buildExperimentSuggestions(input({ protocols: [], goals: [...kinds] }))).toEqual([])
-    expect(SUGGESTION_KINDS).toEqual(['benchmark_missing_baseline', 'benchmark_retest_due', 'goal_observation'])
+    expect(SUGGESTION_KINDS).toEqual(['benchmark_missing_baseline', 'benchmark_retest_due', 'goal_observation', 'maintenance_calibration'])
     expect(SUGGESTION_KINDS).toContain('goal_observation')
     expect(buildExperimentSuggestions(input({ protocols: [], goals: [goal()] })).some((item) => item.kind === 'goal_observation')).toBe(false)
   })
@@ -399,7 +399,7 @@ describe('experiment suggestions', () => {
   })
 
   it('round-trips origin fields in backup inventory and portable labels', () => {
-    expect(LATEST_SCHEMA_MIGRATION).toBe('0041_exercise_library_calisthenics.sql')
+    expect(LATEST_SCHEMA_MIGRATION).toBe('0047_maintenance_calibration_experiment_origin.sql')
     const experiments = tablesForProfile('full').find((table) => table.name === 'experiments')
     expect(experiments?.columns.map((column) => column.name)).toEqual(
       expect.arrayContaining(['origin_kind', 'origin_trigger', 'origin_fingerprint', 'origin_evidence']),

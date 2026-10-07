@@ -24,6 +24,7 @@ import { readAiUsageConfig } from '../ai-usage/config.js'
 import { getSql } from '../db.js'
 import { HttpError } from '../http.js'
 import { currentHealthDate } from '../health-time.js'
+import { loadMaintenanceState } from '../intelligence/maintenance.js'
 import { listGoals } from '../goals/service.js'
 import { getExperiment } from './service.js'
 import { getSuggestionGate, suggestionCacheKey, type SuggestionGate } from './suggestion-gate.js'
@@ -122,6 +123,7 @@ export async function loadSuggestionInput(asOf?: string): Promise<SuggestionInpu
   )) as Array<{ status: string; benchmark_definition_id: string | null; goal_id: string | null }>
   const protocols = versions.map((version) => protocolFact(version, results, resolvedAsOf))
   const listed = await listGoals()
+  const maintenance = await loadMaintenanceState({ asOf: resolvedAsOf, listedGoals: listed.goals })
   return {
     protocols,
     covers: covers.map((row) => ({
@@ -129,6 +131,21 @@ export async function loadSuggestionInput(asOf?: string): Promise<SuggestionInpu
       benchmarkDefinitionId: row.benchmark_definition_id,
       goalId: row.goal_id,
     })),
+    maintenanceCalibration: {
+      eligible: maintenance.calibration.eligible,
+      asOf: maintenance.asOf,
+      why: maintenance.calibration.why,
+      durationDays: maintenance.calibration.durationDays,
+      requiredNutritionDays: maintenance.calibration.requiredNutritionDays,
+      requiredWeightMeasurements: maintenance.calibration.requiredWeightMeasurements,
+      linkedGoalId: maintenance.calibration.linkedGoalId,
+      linkedGoalVersionId: maintenance.calibration.linkedGoalVersionId,
+      estimatePeriodStart: maintenance.estimate.period?.start ?? null,
+      estimatePeriodEnd: maintenance.estimate.period?.end ?? null,
+      observedMaintenanceKcal: maintenance.estimate.observedMaintenanceKcal,
+      plateauState: maintenance.plateau.state,
+      evidenceRefs: maintenance.calibration.evidenceRefs,
+    },
     goals: listed.goals.map((goal) => ({
       goalId: goal.id,
       goalVersionId: goal.currentVersion.id,

@@ -1,5 +1,23 @@
 # Dev state
 
+## 2026-10-06 I7 prepared — Observed Maintenance + Plateau Engine
+
+- I7 is prepared as a dormant batch on top of dormant I6; no branch ref is moved while the Vercel rolling deployment limit remains active.
+- Schema head advances to `0047_maintenance_calibration_experiment_origin.sql`; the migration only permits `maintenance_calibration` as an owner-reviewed Experiment provenance trigger.
+- Added `maintenance-engine-v1`, using reliable calorie evidence plus a robust Theil–Sen body-weight trend to estimate observed maintenance from 28/21/14-day completed windows.
+- The estimate is explicitly an approximate energy-balance observation, not BMR/TDEE measurement, and implausible values are withheld.
+- Nutrition-quality and body-comparability floors gate the estimate and its confidence.
+- Added `nutrition.carbs_g` to the shared I5 evidence frame so carbohydrate context uses the same provenance/quality semantics as calories, protein, fiber, and sodium.
+- Plateau classification distinguishes insufficient evidence, stability, goal-direction movement, movement away from goal, noise-obscured, possible plateau, and likely plateau.
+- Sodium, carbohydrate, logged-water, bowel, and Daily Context timing can explain why a short scale window is noisy without assigning causality.
+- Candidate interventions remain review-only; no Nutrition target, Goal, or Training Plan is mutated.
+- I7 feeds I6 Goal Control rather than creating a competing decision surface. Today and Weekly Coach show compact weight-response context inside their existing decision cards.
+- Personal Lab can now surface an owner-reviewed 14-day Weight-response calibration suggestion when meaningful uncertainty remains. Existing stale-candidate fingerprint protection and duplicate open-Experiment suppression are reused.
+- Added owner-only `GET /api/intelligence/maintenance`.
+- Focused I7 domain, routing, Lab, compatibility, and schema-head tests are staged. Full TypeScript/lint/test/build validation remains deferred until the dormant stack is exposed to one branch.
+- I8 is next: Training Progression / Preservation Goals.
+
+
 ## 2026-10-06 I6 prepared — Goal Control / Weekly Decision Engine
 
 - I6 is prepared as a dormant batch on top of dormant I5; no branch ref is moved while the Vercel deployment-rate window remains active.

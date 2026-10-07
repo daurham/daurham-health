@@ -54,6 +54,11 @@ export function GoalControlCard({
           </Link>
         )}
       </div>
+      {state.maintenance?.estimate.state === 'available' && state.maintenance.estimate.observedMaintenanceKcal != null ? (
+        <p className="mt-2 text-xs text-zinc-500">
+          Observed maintenance ≈ {Math.round(state.maintenance.estimate.observedMaintenanceKcal).toLocaleString('en-US')} kcal/day · {state.maintenance.estimate.confidence} confidence
+        </p>
+      ) : null}
       {state.trainingAdherence.state === 'rest_day_on_track' ? (
         <p className="mt-2 text-xs text-zinc-500">Rest-aware: {state.trainingAdherence.detail}</p>
       ) : null}

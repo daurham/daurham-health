@@ -3,7 +3,7 @@ import type { LabRequirement } from '../lab.js'
 import type { GoalKind, GoalSelector, GoalTarget } from '../goals.js'
 
 /** `goal_observation` is reserved vocabulary. The registry does not emit it until Lab can evaluate a Goal target exactly. */
-export const SUGGESTION_KINDS = ['benchmark_missing_baseline', 'benchmark_retest_due', 'goal_observation'] as const
+export const SUGGESTION_KINDS = ['benchmark_missing_baseline', 'benchmark_retest_due', 'goal_observation', 'maintenance_calibration'] as const
 export type SuggestionKind = (typeof SUGGESTION_KINDS)[number]
 
 export const OPEN_EXPERIMENT_STATUSES = ['proposed', 'accepted', 'scheduled', 'active'] as const
@@ -45,10 +45,27 @@ export type SuggestionGoalFact = {
   targetState: 'satisfied' | 'unmet' | 'unknown'
 }
 
+export type MaintenanceCalibrationFact = {
+  eligible: boolean
+  asOf: string
+  why: string
+  durationDays: number
+  requiredNutritionDays: number
+  requiredWeightMeasurements: number
+  linkedGoalId: string | null
+  linkedGoalVersionId: string | null
+  estimatePeriodStart: string | null
+  estimatePeriodEnd: string | null
+  observedMaintenanceKcal: number | null
+  plateauState: string
+  evidenceRefs: string[]
+}
+
 export type SuggestionInput = {
   protocols: readonly SuggestionProtocolFact[]
   covers: readonly SuggestionCover[]
   goals: readonly SuggestionGoalFact[]
+  maintenanceCalibration?: MaintenanceCalibrationFact | null
 }
 
 export type SuggestionEvidence = {

@@ -20,4 +20,5 @@ export type {
   SuggestionGoalFact,
   SuggestionInput,
   SuggestionProtocolFact,
+  MaintenanceCalibrationFact,
 } from './types.js'

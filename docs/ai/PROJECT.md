@@ -59,7 +59,7 @@ The reward wallet is durable owner state rather than a derived Health score. `xp
 - Training stores exercises, templates, workout sessions, and a separate versioned Training Plan. Optional set RIR/RPE and explicit failure evidence add effort context; independent-side semantics do not rewrite historical sets. The plan stores intent (weekly target, ordered routine codes, preferred weekdays, and dated overrides); workout sessions remain the observed facts. Daily Context rest tags remain retrospective and are not future schedule authority. A workout photo becomes a Home-AI transcription job. The owner reviews it before it becomes a session.
 - Body stores manual measurements, an XLSX fit-profile import, optional measurement cadence, and owner-reported measurement comparability. A Shortcut can stage a capture with `POST /api/ingest/body`. That row stays in `body_capture_inbox` until the owner reviews it and saves one ordinary manual measurement. Pending captures are not observations. Setup is `docs/body-shortcut.md`.
 - Apple Health history can be imported from export archives. Ongoing Activity, Sleep, and workout sync arrives as `POST /api/ingest/apple-health` with `APPLE_HEALTH_SYNC_TOKEN`. That token cannot read Health data or post a Body capture. Apple and Health Auto Export workouts stay in Activity. They are not Training sessions. Body intake uses a separate `BODY_CAPTURE_TOKEN` and cannot read or save measurements.
-- Progress, insights, and Weekly Coach read canonical rows and deterministic analytics. I5 provides the shared date-aligned Health Intelligence frame; I6 adds `goal-control-v1` above Weekly Coach candidates so Today and Weekly Coach share one primary weekly decision. Timeline also shows an owner-only Change Ledger and day-level Daily check-ins; automatic behavior shifts remain candidates until confirmed.
+- Progress, insights, and Weekly Coach read canonical rows and deterministic analytics. I5 provides the shared date-aligned Health Intelligence frame; I6 adds `goal-control-v1` above Weekly Coach candidates so Today and Weekly Coach share one primary weekly decision. I7 adds `maintenance-engine-v1` beneath Goal Control for observed maintenance, plateau state, scale-noise context, and review-only interventions. Timeline also shows an owner-only Change Ledger and day-level Daily check-ins; automatic behavior shifts remain candidates until confirmed.
 - Ask Health, Weekly Coach, and Experiment Suggestion drafts may call Gemini only after an explicit owner action, and only through the `ai_usage` reservation gate.
 
 ## Authentication
@@ -77,7 +77,7 @@ Ask Health (`ask-health-evidence-v2`, prompt `ask-health-v4`), Weekly Coach (`we
 
 ## API conventions
 
-- JSON over `/api/...`, routed by `matchHealthApiRoute`. Owner-only derived intelligence endpoints include `GET /api/intelligence/snapshot` and `GET /api/intelligence/goal-control`.
+- JSON over `/api/...`, routed by `matchHealthApiRoute`. Owner-only derived intelligence endpoints include `GET /api/intelligence/snapshot`, `GET /api/intelligence/goal-control`, and `GET /api/intelligence/maintenance`.
 - Owner mutations and reads require the owner session, except the two machine ingest routes.
 - Validation uses Zod and domain parsers. Handlers return `HttpError` statuses.
 - `asOf` dates are `YYYY-MM-DD` in the Health calendar. Historical reads must not include later evidence.
@@ -160,4 +160,7 @@ The authoritative placeholder inventory is `.env.example`. `npm run config:check
 - Shared intelligence preserves sparse missingness, descriptive coverage/provenance/confidence, and observational-only relationship semantics. It is not a canonical table or a readiness/recovery score.
 - Goal Control is derived-only. `act`, `maintain`, and `insufficient_evidence` are distinct states; no-change is a valid decision.
 - Training-plan intent is authoritative for daily Training pressure. Planned rest is not a miss, and a goal-driven Training quest cannot remain active after the same day is reclassified as non-Training.
-- Nutrition evidence must meet the I6 quality floor before future intake-change reasoning may treat it as decision-ready.
+- Nutrition evidence must meet the I6 quality floor before ordinary weekly decision logic treats it as ready; I7 applies a stricter multi-week reliable-calorie and body-comparability floor before estimating observed maintenance or calling a plateau.
+- Observed maintenance is an approximate empirical energy-balance estimate from intake plus robust weight trend. It is never presented as directly measured metabolism.
+- Sodium, carbohydrate, logged water, bowel, and Daily Context may be shown as short-term scale-noise context without causal claims.
+- Maintenance calibration is an owner-reviewed Personal Lab suggestion, not an automatically created Experiment or calorie target.

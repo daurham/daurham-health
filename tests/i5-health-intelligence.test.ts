@@ -20,6 +20,7 @@ function obs(
     'sleep.total_minutes': 'min',
     'nutrition.calories': 'kcal',
     'nutrition.protein_g': 'g',
+    'nutrition.carbs_g': 'g',
     'nutrition.fiber_g': 'g',
     'nutrition.sodium_mg': 'mg',
     'training.sessions': 'sessions',

@@ -135,7 +135,7 @@ export async function loadHealthIntelligenceSnapshot(input: {
       [time.timezone, input.asOf],
     ),
     sql.query(
-      "SELECT id::text AS id, log_date::text AS date, calories, protein, fiber, sodium, evidence_quality FROM nutrition_entries WHERE log_date <= $1::date ORDER BY log_date, created_at, id",
+      "SELECT id::text AS id, log_date::text AS date, calories, protein, carbs, fiber, sodium, evidence_quality FROM nutrition_entries WHERE log_date <= $1::date ORDER BY log_date, created_at, id",
       [input.asOf],
     ),
     sql.query(
@@ -200,6 +200,7 @@ export async function loadHealthIntelligenceSnapshot(input: {
     id: string
     calories: number
     protein: number | null
+    carbs: number | null
     fiber: number | null
     sodium: number | null
     evidenceQuality: NutritionEvidenceQuality
@@ -208,7 +209,7 @@ export async function loadHealthIntelligenceSnapshot(input: {
     const id = String(row.id)
     const date = String(row.date)
     if (exclusions.nutritionDays.has(date) || exclusions.nutritionEntries.has(id)) {
-      addExcluded(excludedCounts, ['nutrition.calories', 'nutrition.protein_g', 'nutrition.fiber_g', 'nutrition.sodium_mg'])
+      addExcluded(excludedCounts, ['nutrition.calories', 'nutrition.protein_g', 'nutrition.carbs_g', 'nutrition.fiber_g', 'nutrition.sodium_mg'])
       continue
     }
     const calories = numberOrNull(row.calories)
@@ -224,6 +225,7 @@ export async function loadHealthIntelligenceSnapshot(input: {
       id,
       calories,
       protein: numberOrNull(row.protein),
+      carbs: numberOrNull(row.carbs),
       fiber: numberOrNull(row.fiber),
       sodium: numberOrNull(row.sodium),
       evidenceQuality,
@@ -244,8 +246,9 @@ export async function loadHealthIntelligenceSnapshot(input: {
       quality: quality.kind,
       sourceIds,
     })
-    const nutrients: Array<[IntelligenceSignalKey, 'protein' | 'fiber' | 'sodium', string]> = [
+    const nutrients: Array<[IntelligenceSignalKey, 'protein' | 'carbs' | 'fiber' | 'sodium', string]> = [
       ['nutrition.protein_g', 'protein', 'g'],
+      ['nutrition.carbs_g', 'carbs', 'g'],
       ['nutrition.fiber_g', 'fiber', 'g'],
       ['nutrition.sodium_mg', 'sodium', 'mg'],
     ]

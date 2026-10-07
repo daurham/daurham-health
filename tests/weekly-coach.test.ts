@@ -76,6 +76,7 @@ vi.mock('../server/intelligence/goal-control.ts', () => ({
     },
     relationships: [],
     limitations: [],
+    maintenance: null,
   })),
 }))
 

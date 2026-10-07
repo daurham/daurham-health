@@ -1,6 +1,7 @@
 import { addCalendarDays, type TrainingDayIntent } from './training-plan.js'
 import type { HealthIntelligenceSnapshot, IntelligenceConfidence, IntelligenceRelationship, IntelligenceSignalKey } from './intelligence/shared.js'
 import type { WeeklyCandidate, WeeklyCoachBrief, WeeklyGoalSnapshot, WeeklyTrainingPlanSnapshot } from './weekly-coach/types.js'
+import type { MaintenanceState } from './maintenance.js'
 
 export const GOAL_CONTROL_VERSION = 'goal-control-v1' as const
 
@@ -82,6 +83,7 @@ export type GoalControlState = {
   trainingAdherence: GoalControlTrainingAdherence
   relationships: GoalControlRelationship[]
   limitations: GoalControlLimitation[]
+  maintenance: MaintenanceState | null
 }
 
 export type BuildGoalControlInput = {
@@ -90,6 +92,7 @@ export type BuildGoalControlInput = {
   intelligence: HealthIntelligenceSnapshot
   goals: readonly WeeklyGoalSnapshot[]
   trainingPlan?: WeeklyTrainingPlanSnapshot | null
+  maintenance?: MaintenanceState | null
 }
 
 export function goalNeedsWeeklyAttention(deadlineState: string): boolean {
@@ -258,6 +261,36 @@ function opportunity(candidate: WeeklyCandidate | null): GoalControlOpportunity 
   }
 }
 
+function maintenanceOpportunity(maintenance: MaintenanceState | null | undefined): GoalControlOpportunity | null {
+  if (
+    !maintenance ||
+    !maintenance.plateau.goalUnmet ||
+    (maintenance.plateau.goalDirection !== 'lose' && maintenance.plateau.goalDirection !== 'gain')
+  ) return null
+  const intervention = maintenance.interventions.find((item) =>
+    item.priority === 'primary' &&
+    item.kind !== 'hold_course' &&
+    item.kind !== 'review_activity_adjustment'
+  )
+  if (!intervention) return null
+  return {
+    id: intervention.id,
+    kind: intervention.kind,
+    domain:
+      intervention.kind === 'review_intake_adjustment' || intervention.kind === 'improve_nutrition_evidence'
+        ? 'nutrition'
+        : intervention.kind === 'improve_weigh_in_consistency'
+          ? 'body'
+          : 'goals',
+    title: intervention.title,
+    detail: intervention.detail,
+    actionText: 'Review',
+    detailPath: intervention.detailPath,
+    sourceCandidateId: null,
+    evidenceRefs: ['maintenance:estimate', 'maintenance:plateau-state'],
+  }
+}
+
 function activeGoalSignalKeys(goals: readonly WeeklyGoalSnapshot[]): Set<IntelligenceSignalKey> {
   const keys = new Set<IntelligenceSignalKey>()
   for (const goal of goals) {
@@ -371,7 +404,7 @@ export function buildGoalControlState(input: BuildGoalControlInput): GoalControl
     detailPath: `/goals/${goal.id}`,
   }))
   const confidence = overallConfidence(input.brief, input.intelligence, input.goals)
-  const primaryOpportunity = opportunity(input.brief.focus)
+  const primaryOpportunity = opportunity(input.brief.focus) ?? maintenanceOpportunity(input.maintenance)
   const limitations = limitationsFor(input.intelligence, input.goals, nutrition, confidence)
   const activeControlGoals = goals.filter((goal) => goal.lifecycle === 'active')
   const allActiveGoalsUnknown = activeControlGoals.length > 0 && activeControlGoals.every((goal) => goal.state === 'unknown')
@@ -410,5 +443,6 @@ export function buildGoalControlState(input: BuildGoalControlInput): GoalControl
     trainingAdherence: training,
     relationships: relationshipsFor(input.intelligence, input.goals),
     limitations,
+    maintenance: input.maintenance ?? null,
   }
 }

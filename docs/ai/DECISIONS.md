@@ -460,3 +460,33 @@ Observed from the current code and product docs. Where the original rationale is
 **Reason:** Sparse, estimate-heavy, or unknown-source logging can make mathematically neat intake conclusions practically unreliable.  
 **Implications:** I6 requires at least four logged and four sufficiently reliable completed Nutrition days for intake evidence to be decision-ready. Failing the floor becomes an explicit limitation. I6 does not mutate intake targets; I7 owns observed-maintenance and plateau intervention logic.
 
+## Decision: observed maintenance is an empirical estimate, not measured metabolism
+
+**Status:** Active  
+**Reason:** Logged intake plus body-weight response can provide useful personal energy-balance evidence, but a fixed body-mass energy conversion is still an approximation and cannot directly measure metabolic expenditure.  
+**Implications:** I7 labels the result observed maintenance, reports a confidence-sensitive range, withholds implausible results, and does not call the value BMR or measured TDEE.
+
+## Decision: plateau classification requires Goal direction and evidence maturity
+
+**Status:** Active  
+**Reason:** A temporarily flat scale can be normal stability, sparse measurement, or short-term noise. Treating every flat window as a plateau would create unnecessary intervention pressure.  
+**Implications:** A likely plateau requires an unmet directional body-weight Goal plus a sufficiently complete multi-week intake/weight window. A flat trend without such a Goal is stability. Missing or weak evidence stays explicitly insufficient.
+
+## Decision: short-term scale context remains observational
+
+**Status:** Active  
+**Reason:** Sodium, carbohydrate, hydration logging, bowel patterns, travel, stress, late meals, sickness, and similar context can coincide with transient scale changes but do not establish the cause of an individual weigh-in.  
+**Implications:** I7 may surface these as reasons to defer a short-window plateau judgment, but never labels them as proven causes or diagnoses.
+
+## Decision: maintenance interventions are proposals, never silent target mutations
+
+**Status:** Active  
+**Reason:** The estimator's uncertainty and the owner's preferences make automatic calorie changes inappropriate.  
+**Implications:** I7 can suggest holding course or reviewing one modest intake/activity lever. It never writes Nutrition targets, Goal versions, or Training Plan settings. Strong intake proposals remain review-only.
+
+## Decision: uncertain weight response can become an owner-reviewed Personal Lab calibration
+
+**Status:** Active  
+**Reason:** When evidence is meaningful but still ambiguous, a stable observation protocol is more informative than repeatedly changing targets.  
+**Implications:** I7 may create a deterministic `maintenance_calibration` suggestion. The owner must review and accept it through the existing Lab flow. Stale fingerprints and duplicate open-Goal coverage are enforced. The protocol observes intake, comparable weight, carbohydrate, and Daily Context; it does not prescribe dehydration or sodium manipulation.
+

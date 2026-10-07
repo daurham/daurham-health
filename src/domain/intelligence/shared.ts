@@ -12,6 +12,7 @@ export const INTELLIGENCE_SIGNAL_KEYS = [
   'sleep.total_minutes',
   'nutrition.calories',
   'nutrition.protein_g',
+  'nutrition.carbs_g',
   'nutrition.fiber_g',
   'nutrition.sodium_mg',
   'training.sessions',
@@ -46,6 +47,7 @@ export const INTELLIGENCE_SIGNAL_REGISTRY: Record<IntelligenceSignalKey, Intelli
   'sleep.total_minutes': { key: 'sleep.total_minutes', label: 'Sleep duration', domain: 'sleep', unit: 'min', requiresCompleteDay: false, detailPath: '/progress/sleep' },
   'nutrition.calories': { key: 'nutrition.calories', label: 'Calories', domain: 'nutrition', unit: 'kcal', requiresCompleteDay: true, detailPath: '/nutrition' },
   'nutrition.protein_g': { key: 'nutrition.protein_g', label: 'Protein', domain: 'nutrition', unit: 'g', requiresCompleteDay: true, detailPath: '/nutrition' },
+  'nutrition.carbs_g': { key: 'nutrition.carbs_g', label: 'Carbohydrate', domain: 'nutrition', unit: 'g', requiresCompleteDay: true, detailPath: '/nutrition' },
   'nutrition.fiber_g': { key: 'nutrition.fiber_g', label: 'Fiber', domain: 'nutrition', unit: 'g', requiresCompleteDay: true, detailPath: '/nutrition' },
   'nutrition.sodium_mg': { key: 'nutrition.sodium_mg', label: 'Sodium', domain: 'nutrition', unit: 'mg', requiresCompleteDay: true, detailPath: '/nutrition' },
   'training.sessions': { key: 'training.sessions', label: 'Training sessions', domain: 'training', unit: 'sessions', requiresCompleteDay: true, absenceMeansZero: true, detailPath: '/training' },
@@ -534,15 +536,17 @@ const TERM_GROUPS: Array<{ pattern: RegExp; keys: IntelligenceSignalKey[] }> = [
   { pattern: /sleep|tired|fatigue|recovery/i, keys: ['sleep.total_minutes', 'wellness.energy', 'wellness.soreness', 'wellness.hunger', 'training.effort'] },
   { pattern: /hunger|appetite/i, keys: ['wellness.hunger', 'nutrition.calories', 'sleep.total_minutes'] },
   { pattern: /sore|soreness/i, keys: ['wellness.soreness', 'training.effort', 'nutrition.protein_g', 'sleep.total_minutes'] },
-  { pattern: /weight|scale|body fat|waist|plateau/i, keys: ['body.weight_kg', 'nutrition.calories', 'activity.steps', 'hydration.ml'] },
-  { pattern: /calorie|protein|macro|nutrition|diet/i, keys: ['nutrition.calories', 'nutrition.protein_g', 'nutrition.fiber_g', 'nutrition.sodium_mg', 'body.weight_kg'] },
+  { pattern: /weight|scale|body fat|waist|plateau/i, keys: ['body.weight_kg', 'nutrition.calories', 'nutrition.carbs_g', 'nutrition.sodium_mg', 'activity.steps', 'hydration.ml', 'bowel.count'] },
+  { pattern: /carb|carbohydrate/i, keys: ['nutrition.carbs_g', 'nutrition.calories', 'body.weight_kg'] },
+  { pattern: /sodium|salt/i, keys: ['nutrition.sodium_mg', 'body.weight_kg', 'hydration.ml'] },
+  { pattern: /calorie|protein|macro|nutrition|diet/i, keys: ['nutrition.calories', 'nutrition.protein_g', 'nutrition.carbs_g', 'nutrition.fiber_g', 'nutrition.sodium_mg', 'body.weight_kg'] },
   { pattern: /train|workout|strength|lift|gym/i, keys: ['training.sessions', 'training.effort', 'sleep.total_minutes', 'nutrition.protein_g', 'wellness.soreness'] },
   { pattern: /step|walk|activity|cardio/i, keys: ['activity.steps', 'activity.exercise_minutes', 'activity.active_energy_kcal', 'sleep.total_minutes'] },
 ]
 
 function lensDefaults(lens: string): IntelligenceSignalKey[] {
   if (lens === 'training') return ['training.sessions', 'training.effort', 'sleep.total_minutes', 'nutrition.protein_g', 'wellness.soreness']
-  if (lens === 'nutrition') return ['nutrition.calories', 'nutrition.protein_g', 'nutrition.fiber_g', 'nutrition.sodium_mg', 'body.weight_kg', 'wellness.hunger']
+  if (lens === 'nutrition') return ['nutrition.calories', 'nutrition.protein_g', 'nutrition.carbs_g', 'nutrition.fiber_g', 'nutrition.sodium_mg', 'body.weight_kg', 'wellness.hunger']
   if (lens === 'recovery') return ['sleep.total_minutes', 'wellness.energy', 'wellness.soreness', 'wellness.stress', 'training.effort']
   if (lens === 'experiments') return ['body.weight_kg', 'nutrition.calories', 'activity.steps', 'sleep.total_minutes', 'training.sessions']
   return ['body.weight_kg', 'nutrition.calories', 'activity.steps', 'sleep.total_minutes', 'training.sessions', 'hydration.ml', 'wellness.energy']

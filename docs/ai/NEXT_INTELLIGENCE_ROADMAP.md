@@ -3384,6 +3384,24 @@ Reuse Weekly Coach where possible, but do not create conflicting authority.
 
 ## Phase I7 — Observed Maintenance + Plateau Engine
 
+### Prepared implementation note — 2026-10-06
+
+The first I7 batch establishes `maintenance-engine-v1` and feeds it into the I6 authority rather than creating a parallel coach:
+
+- 28/21/14-day completed-window observed-maintenance estimation using reliable calorie evidence and a Theil–Sen weight trend;
+- confidence derived from calorie quality/coverage plus body-measurement comparability/span;
+- implausible estimates withheld;
+- explicit stability, goal-direction, away-from-goal, noise-obscured, possible-plateau, and likely-plateau states;
+- sodium, carbohydrate, logged-water, bowel, and Daily Context timing used only as observational scale-noise context;
+- `nutrition.carbs_g` added to the shared I5 frame;
+- hold/evidence-improvement/Goal review/small intake-or-activity review candidates with no automatic target mutation;
+- compact Today and Weekly Decision integration through I6 Goal Control;
+- owner-only `GET /api/intelligence/maintenance`;
+- deterministic owner-reviewed Weight-response calibration suggested through the existing Personal Lab flow when uncertainty is meaningful;
+- `0047_maintenance_calibration_experiment_origin.sql` permits that reviewed Experiment provenance trigger without adding a new canonical table.
+
+I7 does not diagnose metabolic adaptation or fluid/gastrointestinal causes and does not directly mutate calorie targets.
+
 ### Deliver
 - robust energy-expenditure estimate;
 - nutrition-quality-aware confidence;

@@ -3,7 +3,7 @@ import { LATEST_SCHEMA_MIGRATION, backupTable } from '../server/backup/inventory
 
 describe('I4 evidence semantics backup', () => {
   it('moves the schema head to I4', () => {
-    expect(LATEST_SCHEMA_MIGRATION).toBe('0046_evidence_semantics_change_watchdog.sql')
+    expect(LATEST_SCHEMA_MIGRATION).toBe('0047_maintenance_calibration_experiment_origin.sql')
   })
 
   it('backs up durable evidence semantics and owner review state', () => {
