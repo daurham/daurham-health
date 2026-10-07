@@ -233,7 +233,8 @@ export function substitutionRelation(
   ) return 'comparable_substitute'
   if (
     source.primaryMuscleGroup &&
-    candidate.primaryMuscleGroup === source.primaryMuscleGroup
+    candidate.primaryMuscleGroup === source.primaryMuscleGroup &&
+    candidate.movementPattern !== source.movementPattern
   ) return 'similar_muscle_group'
   return null
 }

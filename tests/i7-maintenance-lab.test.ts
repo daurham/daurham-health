@@ -89,8 +89,8 @@ describe('I7 maintenance calibration Lab suggestion', () => {
   })
 
   it('updates the provenance constraint and schema head without adding a new canonical table', () => {
-    expect(LATEST_SCHEMA_MIGRATION).toBe('0047_maintenance_calibration_experiment_origin.sql')
-    const migration = readFileSync('migrations/0047_maintenance_calibration_experiment_origin.sql', 'utf8')
+    expect(LATEST_SCHEMA_MIGRATION).toBe('0049_passive_recovery_clinical_context.sql')
+    const migration = readFileSync('migrations/0049_passive_recovery_clinical_context.sql', 'utf8')
     expect(migration).toContain("'maintenance_calibration'")
     expect(migration).not.toMatch(/CREATE TABLE/i)
   })

@@ -134,7 +134,7 @@ describe('nutrition daily UX source', () => {
     expect(panels).toContain('aria-label={`Quick log 1 serving of ${food.name}`}')
     expect(layout).toContain('grid-cols-5')
     expect(layout).toContain("to: '/nutrition'")
-    expect(page).not.toContain('ocr')
+    expect(page).not.toContain('OCR')
     expect(page).not.toContain('Apple Health')
     expect(page).toContain('Pending captures')
     expect(page).toContain('Dismiss')

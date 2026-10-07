@@ -3,7 +3,8 @@ import { isoDateSchema } from './training.js'
 
 const boundedOptionalText = (max: number) =>
   z
-    .union([z.string().max(max), z.null(), z.undefined()])
+    .union([z.string().max(max), z.null()])
+    .optional()
     .transform((value) => {
       if (value == null) return null
       const trimmed = value.trim()

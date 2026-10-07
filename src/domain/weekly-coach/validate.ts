@@ -185,7 +185,7 @@ function cleanComment(comment: string): boolean {
 }
 
 const DEEP_PROHIBITED =
-  /\b(diagnos(?:e|is|tic)?|disease|treatment|medication|dose|apnea|metabolic|hormonal|overtraining)\b|\b(increase|decrease|raise|lower|cut|change|start|stop)\b[^.]{0,60}\b(calorie|supplement|medication|dose)\b/i
+  /\b(diagnos(?:e|is|tic)?|disease|treatment|medication|dose|apnea|metabolic|hormonal|overtraining)\b|\b(increase|decrease|raise|lower|cut|change|start|stop)\b[^.]{0,60}\b(calories?|supplements?|medications?|doses?)\b/i
 
 function cleanDeepText(value: unknown, max = 320): string | null {
   if (typeof value !== 'string') return null

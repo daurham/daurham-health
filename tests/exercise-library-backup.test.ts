@@ -22,6 +22,7 @@ describe('H5 Exercise Library backup', () => {
     measurement_kind: 'reps',
     load_type: 'barbell',
     unilateral: false,
+    side_tracking_mode: 'shared',
     metadata: JSON.stringify({
       primary_muscle_group: 'chest',
       movement_pattern: 'horizontal_push',
