@@ -47,6 +47,7 @@ export async function getTodayView(now = new Date()): Promise<TodayViewModel> {
       listTodaySupplementInputs(date),
       loadCadenceEvidence(),
       getDailyContext(date, now),
+      getDailySignalsDay(date, now),
       listTodayLabExperiments(),
       listBenchmarkRetests(date),
       listRetestExperimentLinks(),

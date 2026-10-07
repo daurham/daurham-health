@@ -211,7 +211,8 @@ export function todayDailySignalsFromDay(day: DailySignalsDay | null | undefined
     }
   }
   const hydrationTotalMl = day.hydrationEvents.reduce((sum, event) => sum + event.amountMl, 0)
-  const latestBowel = [...day.bowelEvents].sort((a, b) => (a.occurredAt ?? a.createdAt).localeCompare(b.occurredAt ?? b.createdAt)).at(-1) ?? null
+  const orderedBowel = [...day.bowelEvents].sort((a, b) => (a.occurredAt ?? a.createdAt).localeCompare(b.occurredAt ?? b.createdAt))
+  const latestBowel = orderedBowel[orderedBowel.length - 1] ?? null
   return {
     hydration: {
       tracked: day.hydrationEvents.length > 0,

@@ -930,6 +930,7 @@ function ExercisePicker({
         measurementKind,
         loadType: noLoad ? 'none' : loadType,
         unilateral: perSide,
+        sideTrackingMode: perSide ? 'paired' : 'shared',
       })
       onSelect(created)
       setCreating(false)

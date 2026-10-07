@@ -299,7 +299,7 @@ function baselinesFor(
     const values = observations.map((item) => item.value)
     const average = mean(values)
     const middle = median(values)
-    const latest = observations.at(-1)?.value ?? null
+    const latest = observations[observations.length - 1]?.value ?? null
     const coverageState = coverage.find((item) => item.key === key)
     const state = observations.length >= 5 ? 'available' : 'insufficient_data'
     return {
@@ -309,7 +309,7 @@ function baselinesFor(
       unit: definition.unit,
       observations: observations.length,
       start: observations[0]?.date ?? null,
-      end: observations.at(-1)?.date ?? null,
+      end: observations[observations.length - 1]?.date ?? null,
       mean: state === 'available' ? average : null,
       median: state === 'available' ? middle : null,
       latest,

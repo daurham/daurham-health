@@ -6,6 +6,7 @@ import {
   measurementKindSchema,
   painLevelSchema,
   setTypeSchema,
+  sideTrackingModeSchema,
   templatePrescriptionSchema,
   workoutTemplateSchema,
   type LoadState,
@@ -174,6 +175,7 @@ export const transcriptionDraftExerciseSchema = z.object({
   slotId: z.string().min(1).nullable(),
   name: z.string().min(1),
   measurementKind: measurementKindSchema,
+  sideTrackingMode: sideTrackingModeSchema.optional().default('shared'),
   plannedSets: z.int().positive().nullable(),
   prescription: templatePrescriptionSchema,
   notes: z.string(),
@@ -506,6 +508,7 @@ export type LibraryExercise = {
   externalId: string | null
   name: string
   measurementKind: TranscriptionDraft['exercises'][number]['measurementKind']
+  sideTrackingMode: TranscriptionDraft['exercises'][number]['sideTrackingMode']
   unilateral: boolean
 }
 
@@ -559,6 +562,7 @@ export function adaptHomeAiCandidate(input: {
         slotId: slot.slotId,
         name: slot.exercise.name,
         measurementKind: slot.exercise.measurementKind,
+        sideTrackingMode: slot.exercise.sideTrackingMode,
         plannedSets: slot.plannedSets,
         prescription: slot.prescription,
         notes: '',
@@ -578,6 +582,7 @@ export function adaptHomeAiCandidate(input: {
         slotId: slot.slotId,
         name: slot.exercise.name,
         measurementKind: slot.exercise.measurementKind,
+        sideTrackingMode: slot.exercise.sideTrackingMode,
         plannedSets: slot.plannedSets,
         prescription: slot.prescription,
         notes: '',
@@ -590,6 +595,7 @@ export function adaptHomeAiCandidate(input: {
       slotId: slot.slotId,
       name: slot.exercise.name,
       measurementKind: slot.exercise.measurementKind,
+      sideTrackingMode: slot.exercise.sideTrackingMode,
       plannedSets: slot.plannedSets,
       prescription: slot.prescription,
       notes: candidateExercise.notes ?? '',
@@ -622,6 +628,7 @@ export function adaptHomeAiCandidate(input: {
       slotId: template ? null : candidateExercise.slot_id,
       name: definition.name,
       measurementKind: definition.measurementKind,
+      sideTrackingMode: definition.sideTrackingMode,
       plannedSets: candidateExercise.sets.length || 1,
       prescription: { measurement: definition.measurementKind },
       notes: candidateExercise.notes ?? '',

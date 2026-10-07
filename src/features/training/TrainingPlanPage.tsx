@@ -76,13 +76,6 @@ export function TrainingPlanPage() {
     }
   }
 
-  async function reload() {
-    setError(null)
-    const [nextTemplates, nextPlan] = await Promise.all([fetchTemplates(), fetchTrainingPlan()])
-    setTemplates(nextTemplates)
-    applyPlan(nextPlan, nextTemplates)
-  }
-
   useEffect(() => {
     let cancelled = false
     Promise.all([fetchTemplates(), fetchTrainingPlan()])

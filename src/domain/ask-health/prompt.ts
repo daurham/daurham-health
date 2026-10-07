@@ -46,9 +46,9 @@ export function evidenceForModel(evidence: readonly AskEvidence[]): Array<Omit<A
     period: item.period,
     coverage: item.coverage,
     userEntered: item.userEntered,
-    confidence: item.confidence ?? null,
-    provenance: item.provenance ?? null,
-    evidenceDates: item.evidenceDates ?? null,
+    confidence: item.confidence,
+    provenance: item.provenance,
+    evidenceDates: item.evidenceDates,
   }))
 }
 

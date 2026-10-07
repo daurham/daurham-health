@@ -184,7 +184,7 @@ function weightQuality(observation: IntelligenceObservation): 'usual' | 'unknown
 function spanDays(items: readonly IntelligenceObservation[]): number {
   if (items.length < 2) return 0
   const ordered = [...items].sort((a, b) => a.date.localeCompare(b.date))
-  return calendarDaysBetween(ordered[0]!.date, ordered.at(-1)!.date)
+  return calendarDaysBetween(ordered[0]!.date, ordered[ordered.length - 1]!.date)
 }
 
 function windowEvidence(
@@ -356,7 +356,7 @@ function buildEstimate(input: BuildMaintenanceInput, completeThrough: string): M
       rangeHighKcal: null,
       weightSlopeKgPerWeek: null,
       weightSlopePctPerWeek: null,
-      latestWeightKg: fallback.weights.at(-1)?.value ?? null,
+      latestWeightKg: fallback.weights[fallback.weights.length - 1]?.value ?? null,
       confidence: 'limited',
       quality: qualityFor(fallback, 28),
       explanation: 'Observed maintenance needs at least about two weeks of sufficiently complete Nutrition logging plus five reasonably comparable weight measurements spanning roughly twelve days.',
@@ -364,7 +364,8 @@ function buildEstimate(input: BuildMaintenanceInput, completeThrough: string): M
   }
   const intake = robustMean(chosen.calories.map((item) => item.value))
   const slopePerDay = weightSlopePerDay(chosen.usedWeights)
-  const latestWeight = [...chosen.usedWeights].sort((a, b) => a.date.localeCompare(b.date)).at(-1)?.value ?? null
+  const orderedWeights = [...chosen.usedWeights].sort((a, b) => a.date.localeCompare(b.date))
+  const latestWeight = orderedWeights[orderedWeights.length - 1]?.value ?? null
   if (!finite(intake) || !finite(slopePerDay) || !finite(latestWeight) || latestWeight <= 0) {
     return {
       state: 'insufficient_evidence',

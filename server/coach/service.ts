@@ -1541,6 +1541,7 @@ export async function logCoachTraining(id: string, body: unknown, now = new Date
         measurementKind: rule.training.measurementKind,
         loadType: rule.training.loadType,
         unilateral: false,
+        sideTrackingMode: 'shared',
       })
     }
     const set =

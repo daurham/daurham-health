@@ -288,7 +288,7 @@ function classifySeries(points: readonly SessionPoint[]): Omit<TrainingProgressi
     recentValue != null && priorValue != null && priorValue !== 0
       ? ((recentValue - priorValue) / Math.abs(priorValue)) * 100
       : null
-  const span = points.length > 1 ? calendarDaysBetween(points[0]!.date, points.at(-1)!.date) : 0
+  const span = points.length > 1 ? calendarDaysBetween(points[0]!.date, points[points.length - 1]!.date) : 0
   let state: TrainingProgressionKind = 'insufficient_evidence'
   let explanation = 'At least four comparable exercise exposures are needed before Health calls a progression trend.'
   if (points.length >= 4 && changePct != null) {

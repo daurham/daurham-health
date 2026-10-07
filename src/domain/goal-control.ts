@@ -1,5 +1,5 @@
 import { addCalendarDays, type TrainingDayIntent } from './training-plan.js'
-import type { HealthIntelligenceSnapshot, IntelligenceConfidence, IntelligenceRelationship, IntelligenceSignalKey } from './intelligence/shared.js'
+import type { HealthIntelligenceSnapshot, IntelligenceConfidence, IntelligenceSignalKey } from './intelligence/shared.js'
 import type { WeeklyCandidate, WeeklyCoachBrief, WeeklyGoalSnapshot, WeeklyTrainingPlanSnapshot } from './weekly-coach/types.js'
 import type { MaintenanceState } from './maintenance.js'
 import type { TrainingProgressionState } from './training-progression.js'
