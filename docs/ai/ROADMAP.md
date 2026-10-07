@@ -38,18 +38,15 @@ Also present from v1 and the import work: Nutrition, Training, Body, Progress, A
 
 ## Current work
 
-I3 — XP Participation Expansion + Theme Runway is prepared as a dormant batch on top of dormant I2 commit `a8437e0b8afe90723af289d2041b8bf5ca47ef83`.
+I4 — Evidence Semantics, Effort, and Change Ledger is prepared as a dormant batch on top of dormant I3 commit `a615965bfa6a5547447be85e395f695d63050c7d`.
 
-I3 expands the append-only wallet from Coach-only awards to two bounded award families: frozen Coach completion awards and idempotent daily participation awards. Participation is capped at 65 XP per Health date across hydration, bowel tracking, wellness, and a fully recorded supplement day. Only today/yesterday can mint backlog participation XP.
+I4 adds optional Training effort/failure/limitation evidence, independent-side exercise semantics, Nutrition evidence quality, Body measurement comparability, a derived owner-confirmed Change Ledger, and a deterministic Data Quality review inbox. Canonical Health rows are never silently corrected.
 
-Existing progression thresholds are preserved. Eight new theme packs extend the progression runway from Level 12 through Level 20.
-
-No branch ref is moved while the Vercel rolling deployment limit remains active. Migration `0045_xp_participation_themes.sql` must be applied before I3 server code is exposed.
+No branch ref is moved while the Vercel rolling deployment limit remains active. Migration `0046_evidence_semantics_change_watchdog.sql` must be applied before I4 server code is exposed.
 
 ## Known planned work
 
-- I4 Evidence Semantics, Effort, and Change Ledger.
-- I5 Shared Health Intelligence Engine + Ask Health Context, including Daily Signals Timeline/Ask Health integration.
+- I5 Shared Health Intelligence Engine + Ask Health Context, including Daily Signals Timeline/Ask Health integration and Data Quality exclusion semantics.
 
 
 Named by the current manual or blueprint, and not marked implemented:

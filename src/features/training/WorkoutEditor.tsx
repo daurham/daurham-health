@@ -8,6 +8,8 @@ import type {
   LoadState,
   MeasurementKind,
   OwnerExerciseRequest,
+  SetFailureKind,
+  SideTrackingMode,
 } from '@/domain/training'
 import { OWNER_EXERCISE_LOAD_TYPES, MEASUREMENT_KINDS } from '@/domain/training'
 import type { TranscriptionGuidance } from '@/domain/training-transcription'
@@ -329,6 +331,46 @@ function SessionMeta({
         options={[0, 1, 2, 3]}
         onChange={(painLevel) => onChange({ ...draft, painLevel })}
       />
+      <details className="mt-4 rounded-md border border-zinc-200 px-3 py-2">
+        <summary className="cursor-pointer text-sm font-medium text-zinc-700">
+          Workout limitation <span className="font-normal text-zinc-500">(optional)</span>
+        </summary>
+        <div className="mt-3 grid gap-3 sm:grid-cols-[12rem_minmax(0,1fr)]">
+          <label className="block text-sm font-medium text-zinc-700">
+            What affected it?
+            <select
+              className={`${inputClass} mt-1`}
+              value={draft.limitationKind ?? ''}
+              onChange={(event) => onChange({
+                ...draft,
+                limitationKind: event.target.value === '' ? null : event.target.value as WorkoutDraft['limitationKind'],
+              })}
+            >
+              <option value="">No limitation recorded</option>
+              <option value="pain">Pain</option>
+              <option value="fatigue">Fatigue</option>
+              <option value="illness">Illness</option>
+              <option value="time">Time</option>
+              <option value="equipment">Equipment</option>
+              <option value="other">Other</option>
+            </select>
+          </label>
+          <label className="block text-sm font-medium text-zinc-700">
+            Context
+            <input
+              type="text"
+              maxLength={500}
+              className={`${inputClass} mt-1`}
+              placeholder="Optional note about what changed the workout"
+              value={draft.limitationNote}
+              onChange={(event) => onChange({ ...draft, limitationNote: event.target.value })}
+            />
+          </label>
+        </div>
+        {draft.painLevel != null && draft.painLevel > 0 && draft.limitationKind == null ? (
+          <p className="mt-2 text-xs text-zinc-500">Pain is recorded. Add a limitation only if it materially affected the workout.</p>
+        ) : null}
+      </details>
       <label className="mt-4 block text-sm font-medium text-zinc-700">
         Notes
         <textarea
@@ -493,7 +535,7 @@ function ExerciseCard({
         </p>
       ) : null}
       <div className="mt-4 space-y-3">
-        <SetHeader measurementKind={exercise.measurementKind} />
+        <SetHeader measurementKind={exercise.measurementKind} sideTrackingMode={exercise.sideTrackingMode} />
         {interpreted.map((item, setIndex) => (
           <div key={item.set.setNumber}>
             <SetRow
@@ -502,6 +544,7 @@ function ExerciseCard({
               setIndex={setIndex}
               interpretation={item}
               measurementKind={exercise.measurementKind}
+              sideTrackingMode={exercise.sideTrackingMode}
               fieldErrors={fieldErrors}
               onChange={(next) => {
                 onChange({
@@ -542,7 +585,9 @@ function isNoLoadMeasurement(kind: MeasurementKind): boolean {
   return kind === 'distance' || kind === 'distance_duration' || kind === 'completion'
 }
 
-function measurementLabel(kind: MeasurementKind): string {
+function measurementLabel(kind: MeasurementKind, sideTrackingMode: SideTrackingMode = 'shared'): string {
+  if (sideTrackingMode === 'independent' && kind === 'reps') return 'Left / Right reps'
+  if (sideTrackingMode === 'independent' && kind === 'duration') return 'Left / Right seconds'
   if (kind === 'reps') return 'Reps'
   if (kind === 'duration') return 'Seconds'
   if (kind === 'reps_per_side') return 'Left / Right'
@@ -552,12 +597,12 @@ function measurementLabel(kind: MeasurementKind): string {
   return 'Skill'
 }
 
-function SetHeader({ measurementKind }: { measurementKind: MeasurementKind }) {
+function SetHeader({ measurementKind, sideTrackingMode }: { measurementKind: MeasurementKind; sideTrackingMode: SideTrackingMode }) {
   return (
     <div className="grid grid-cols-[2.5rem_minmax(0,1fr)_minmax(0,1.4fr)] gap-2 text-xs uppercase tracking-wide text-zinc-500">
       <span>Set</span>
       <span>{isNoLoadMeasurement(measurementKind) ? '' : 'Weight'}</span>
-      <span>{measurementLabel(measurementKind)}</span>
+      <span>{measurementLabel(measurementKind, sideTrackingMode)}</span>
     </div>
   )
 }
@@ -568,6 +613,7 @@ function SetRow({
   setIndex,
   interpretation,
   measurementKind,
+  sideTrackingMode,
   fieldErrors,
   onChange,
 }: {
@@ -576,21 +622,32 @@ function SetRow({
   setIndex: number
   interpretation: InterpretedPaperSet<DraftSet>
   measurementKind: MeasurementKind
+  sideTrackingMode: SideTrackingMode
   fieldErrors: ReviewFieldError[]
   onChange: (set: DraftSet) => void
 }) {
-  const noLoad = isNoLoadMeasurement(measurementKind)
+  const sharedHistorical =
+    sideTrackingMode === 'independent' &&
+    ((measurementKind === 'reps' && set.reps.trim() !== '') ||
+      (measurementKind === 'duration' && set.durationSec.trim() !== ''))
+  const displayMeasurementKind: MeasurementKind =
+    !sharedHistorical && sideTrackingMode === 'independent' && measurementKind === 'reps'
+      ? 'reps_per_side'
+      : !sharedHistorical && sideTrackingMode === 'independent' && measurementKind === 'duration'
+        ? 'duration_per_side'
+        : measurementKind
+  const noLoad = isNoLoadMeasurement(displayMeasurementKind)
   const loadPath = `exercises.${exerciseIndex}.sets.${setIndex}.weightLb`
   const measurementPath =
-    measurementKind === 'duration' || measurementKind === 'distance_duration'
+    displayMeasurementKind === 'duration' || displayMeasurementKind === 'distance_duration'
       ? `exercises.${exerciseIndex}.sets.${setIndex}.durationSec`
-      : measurementKind === 'distance'
+      : displayMeasurementKind === 'distance'
         ? `exercises.${exerciseIndex}.sets.${setIndex}.distance`
-        : measurementKind === 'completion'
+        : displayMeasurementKind === 'completion'
           ? `exercises.${exerciseIndex}.sets.${setIndex}.completed`
-          : measurementKind === 'reps_per_side'
+          : displayMeasurementKind === 'reps_per_side'
             ? `exercises.${exerciseIndex}.sets.${setIndex}.leftReps`
-            : measurementKind === 'duration_per_side'
+            : displayMeasurementKind === 'duration_per_side'
               ? `exercises.${exerciseIndex}.sets.${setIndex}.leftDurationSec`
               : `exercises.${exerciseIndex}.sets.${setIndex}.reps`
   const loadMessage = noLoad ? null : fieldError(fieldErrors, loadPath)
@@ -650,13 +707,109 @@ function SetRow({
       <div data-field-path={measurementPath} tabIndex={-1} className="min-w-0 outline-none">
         <MeasurementInputs
           set={set}
-          measurementKind={measurementKind}
+          measurementKind={displayMeasurementKind}
           invalid={Boolean(measurementMessage)}
           onChange={onChange}
         />
         {measurementMessage ? <p className="mt-0.5 text-xs text-red-700">{measurementMessage}</p> : null}
       </div>
+      <SetEffortDetails
+        set={set}
+        independent={sideTrackingMode === 'independent'}
+        onChange={onChange}
+      />
     </div>
+  )
+}
+
+
+function SetEffortDetails({
+  set,
+  independent,
+  onChange,
+}: {
+  set: DraftSet
+  independent: boolean
+  onChange: (set: DraftSet) => void
+}) {
+  const patch = (partial: Partial<DraftSet>) => onChange({ ...set, ...partial })
+  const failureOptions: Array<{ value: SetFailureKind; label: string }> = [
+    { value: 'reached_failure', label: 'Reached failure' },
+    { value: 'failed_rep', label: 'Failed rep' },
+  ]
+  const selectFailure = (
+    value: string,
+    key: 'failureKind' | 'leftFailureKind' | 'rightFailureKind',
+  ) => patch({ [key]: value === '' ? null : value as SetFailureKind })
+  const hasEvidence =
+    (set.rir?.trim() ?? '') !== '' ||
+    (set.rpe?.trim() ?? '') !== '' ||
+    set.failureKind != null ||
+    set.leftFailureKind != null ||
+    set.rightFailureKind != null
+
+  return (
+    <details className="col-start-2 col-span-2 rounded-md border border-zinc-100 px-2 py-1" open={hasEvidence || undefined}>
+      <summary className="cursor-pointer text-xs font-medium text-zinc-500">Effort / failure</summary>
+      <div className="mt-2 grid gap-2 sm:grid-cols-2">
+        <label className="text-xs font-medium text-zinc-600">
+          RIR
+          <input
+            type="number"
+            min={0}
+            max={10}
+            inputMode="numeric"
+            className={`${inputClass} mt-1`}
+            value={set.rir ?? ''}
+            disabled={(set.rpe?.trim() ?? '') !== ''}
+            placeholder="0–10"
+            onChange={(event) => patch({ rir: event.target.value })}
+          />
+        </label>
+        <label className="text-xs font-medium text-zinc-600">
+          RPE
+          <input
+            type="number"
+            min={1}
+            max={10}
+            step="0.5"
+            inputMode="decimal"
+            className={`${inputClass} mt-1`}
+            value={set.rpe ?? ''}
+            disabled={(set.rir?.trim() ?? '') !== ''}
+            placeholder="1–10"
+            onChange={(event) => patch({ rpe: event.target.value })}
+          />
+        </label>
+      </div>
+      {independent ? (
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <label className="text-xs font-medium text-zinc-600">
+            Left failure
+            <select className={`${inputClass} mt-1`} value={set.leftFailureKind ?? ''} onChange={(event) => selectFailure(event.target.value, 'leftFailureKind')}>
+              <option value="">None</option>
+              {failureOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+          </label>
+          <label className="text-xs font-medium text-zinc-600">
+            Right failure
+            <select className={`${inputClass} mt-1`} value={set.rightFailureKind ?? ''} onChange={(event) => selectFailure(event.target.value, 'rightFailureKind')}>
+              <option value="">None</option>
+              {failureOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+          </label>
+        </div>
+      ) : (
+        <label className="mt-2 block text-xs font-medium text-zinc-600">
+          Failure evidence
+          <select className={`${inputClass} mt-1`} value={set.failureKind ?? ''} onChange={(event) => selectFailure(event.target.value, 'failureKind')}>
+            <option value="">None</option>
+            {failureOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select>
+        </label>
+      )}
+      <p className="mt-2 text-[11px] text-zinc-500">Optional. “Hard” is not automatically failure.</p>
+    </details>
   )
 }
 

@@ -479,6 +479,16 @@ export function SettingsPage() {
       </section>
 
       <section className="space-y-3 rounded-lg border border-zinc-200 bg-white p-4">
+        <h2 className="text-base font-semibold">Data Quality</h2>
+        <p className="text-sm text-zinc-600">
+          Review unusual values, possible duplicates, future timestamps, incomplete independent-side sets, and source changes before future Health intelligence uses them.
+        </p>
+        <Link to="/settings/data-quality" className={primaryButtonClass}>
+          Review data quality
+        </Link>
+      </section>
+
+      <section className="space-y-3 rounded-lg border border-zinc-200 bg-white p-4">
         <h2 className="text-base font-semibold">Data & Backup</h2>
         <p className="text-sm text-zinc-600">This export contains private health information.</p>
         <p className="text-sm text-zinc-600">

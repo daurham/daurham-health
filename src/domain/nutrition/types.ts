@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { isCalendarDate } from '../training.js'
 import { calendarDateFromInstant } from '../progress/dates.js'
 import { assertIanaTimeZone } from '../time.js'
+import type { NutritionEvidenceQuality } from './quality.js'
 import {
   NUTRITION_CATALOG_KINDS,
   NUTRITION_CONFIG,
@@ -62,6 +63,7 @@ export type NutritionEntry = {
   fiber: number | null
   sodium?: number | null
   sourceKind: NutritionSourceKind
+  evidenceQuality?: NutritionEvidenceQuality
   notes: string | null
   mealGroupId: string | null
   recipeVersionId?: string | null

@@ -1,11 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { LATEST_SCHEMA_MIGRATION, backupTable } from '../server/backup/inventory.ts'
+import { backupTable } from '../server/backup/inventory.ts'
 
 describe('I3 XP participation backup', () => {
-  it('moves the schema head to I3', () => {
-    expect(LATEST_SCHEMA_MIGRATION).toBe('0045_xp_participation_themes.sql')
-  })
-
   it('keeps the append-only XP ledger in portable canonical backup', () => {
     expect(backupTable('xp_ledger')).toMatchObject({
       backupClass: 'canonical',

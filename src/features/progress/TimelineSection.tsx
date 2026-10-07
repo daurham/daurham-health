@@ -40,6 +40,7 @@ import {
 } from './format'
 import { parseTimelineFocusParam, progressSearch } from './range'
 import { TimelineLaneLegend, TimelineLanes } from './TimelineLanes'
+import { ChangeLedgerPanel } from './ChangeLedgerPanel'
 import { useHealthCalendarTimeZone } from '@/lib'
 
 const BODY_CARD_KEYS = ['weight', 'bmi', 'body_fat_percentage'] as const
@@ -54,6 +55,7 @@ export function TimelineSection({
   onEvidence: (topic: EvidenceTopic) => void
 }) {
   const [params, setParams] = useSearchParams()
+  const readOnly = useDemoReadOnly()
   const focus = parseTimelineFocusParam(params.get('focus'))
   const series = timelineSeriesForFocus(timeline, focus)
   const events = timelineEventsForFocus(timeline, focus)
@@ -86,6 +88,8 @@ export function TimelineSection({
           Recorded training, body, nutrition, activity, sleep, and performance bests in chronological order.
         </p>
       </div>
+
+      {readOnly ? null : <ChangeLedgerPanel />}
 
       <div className="flex gap-1 overflow-x-auto" role="group" aria-label="Timeline domain">
         {TIMELINE_FOCUS_OPTIONS.map((option) => (

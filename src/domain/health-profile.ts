@@ -16,6 +16,7 @@ export const healthProfileSchema = z.object({
   persistentHealthContext: z.string().nullable(),
   trainingLimitations: z.string().nullable(),
   dietaryContext: z.string().nullable(),
+  bodyMeasurementProtocol: z.string().nullable(),
   updatedAt: z.string().nullable(),
 })
 export type HealthProfile = z.infer<typeof healthProfileSchema>
@@ -26,6 +27,7 @@ export const healthProfileInputSchema = z.object({
   persistentHealthContext: boundedOptionalText(2000),
   trainingLimitations: boundedOptionalText(2000),
   dietaryContext: boundedOptionalText(2000),
+  bodyMeasurementProtocol: boundedOptionalText(1000),
 })
 export type HealthProfileInput = z.infer<typeof healthProfileInputSchema>
 

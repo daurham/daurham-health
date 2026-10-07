@@ -18,7 +18,7 @@ import { HttpError } from '../http.js'
 
 const TABLES_UNAVAILABLE = 'Training tables are not available. Apply pending migrations.'
 
-const EXERCISE_COLUMNS = `id, external_id, name, measurement_kind, load_type, unilateral, metadata, gif_url, youtube_url, form_instructions, notes, is_active, created_at, updated_at`
+const EXERCISE_COLUMNS = `id, external_id, name, measurement_kind, load_type, unilateral, side_tracking_mode, metadata, gif_url, youtube_url, form_instructions, notes, is_active, created_at, updated_at`
 
 function asMissingRelation(error: unknown): boolean {
   return formatDatabaseError(error).includes('does not exist')
@@ -116,12 +116,12 @@ export async function createOwnerExercise(body: unknown): Promise<{ exercise: Ex
   const rows = await queryOrUnavailable(() =>
     sql.query(
       `INSERT INTO exercise_definitions (
-         id, external_id, name, measurement_kind, load_type, unilateral, metadata,
+         id, external_id, name, measurement_kind, load_type, unilateral, side_tracking_mode, metadata,
          performance_type, analytics_load_type, analytics_rep_mode,
          gif_url, youtube_url, form_instructions, notes
        ) VALUES (
-         $1::uuid, NULL, $2, $3, $4, $5, $6::jsonb,
-         $7, $8, $9, $10, $11, $12, $13
+         $1::uuid, NULL, $2, $3, $4, $5, $6, $7::jsonb,
+         $8, $9, $10, $11, $12, $13, $14
        )
        RETURNING ${EXERCISE_COLUMNS}`,
       [
@@ -130,6 +130,7 @@ export async function createOwnerExercise(body: unknown): Promise<{ exercise: Ex
         request.measurementKind,
         request.loadType,
         request.unilateral,
+        request.sideTrackingMode,
         JSON.stringify(mergePresentationMetadata(OWNER_EXERCISE_ORIGIN, request)),
         analytics.performanceType,
         analytics.analyticsLoadType,
@@ -168,9 +169,10 @@ export async function ensureOwnerExercise(
          AND measurement_kind = $2
          AND load_type = $3
          AND unilateral = $4
+         AND side_tracking_mode = $5
        ORDER BY created_at
        LIMIT 1`,
-      [request.name, request.measurementKind, request.loadType, request.unilateral],
+      [request.name, request.measurementKind, request.loadType, request.unilateral, request.sideTrackingMode],
     ),
   )
   if (rows[0]) {
@@ -199,14 +201,15 @@ export async function updateOwnerExercise(
            measurement_kind = CASE WHEN $3::boolean THEN $4 ELSE measurement_kind END,
            load_type = CASE WHEN $3::boolean THEN $5 ELSE load_type END,
            unilateral = CASE WHEN $3::boolean THEN $6 ELSE unilateral END,
-           performance_type = CASE WHEN $3::boolean THEN $7 ELSE performance_type END,
-           analytics_load_type = CASE WHEN $3::boolean THEN $8 ELSE analytics_load_type END,
-           analytics_rep_mode = CASE WHEN $3::boolean THEN $9 ELSE analytics_rep_mode END,
-           gif_url = CASE WHEN $10::boolean THEN $11 ELSE gif_url END,
-           youtube_url = CASE WHEN $12::boolean THEN $13 ELSE youtube_url END,
-           form_instructions = CASE WHEN $14::boolean THEN $15 ELSE form_instructions END,
-           notes = CASE WHEN $16::boolean THEN $17 ELSE notes END,
-           metadata = $18::jsonb,
+           side_tracking_mode = CASE WHEN $3::boolean THEN $7 ELSE side_tracking_mode END,
+           performance_type = CASE WHEN $3::boolean THEN $8 ELSE performance_type END,
+           analytics_load_type = CASE WHEN $3::boolean THEN $9 ELSE analytics_load_type END,
+           analytics_rep_mode = CASE WHEN $3::boolean THEN $10 ELSE analytics_rep_mode END,
+           gif_url = CASE WHEN $11::boolean THEN $12 ELSE gif_url END,
+           youtube_url = CASE WHEN $13::boolean THEN $14 ELSE youtube_url END,
+           form_instructions = CASE WHEN $15::boolean THEN $16 ELSE form_instructions END,
+           notes = CASE WHEN $17::boolean THEN $18 ELSE notes END,
+           metadata = $19::jsonb,
            updated_at = now()
        WHERE id = $1::uuid
        RETURNING ${EXERCISE_COLUMNS}`,
@@ -217,6 +220,7 @@ export async function updateOwnerExercise(
         plan.measurementKind,
         plan.loadType,
         plan.unilateral,
+        plan.sideTrackingMode,
         plan.analytics.performanceType,
         plan.analytics.analyticsLoadType,
         plan.analytics.analyticsRepMode,

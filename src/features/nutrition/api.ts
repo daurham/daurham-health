@@ -10,6 +10,7 @@ import type {
   NutritionTarget,
   NutritionTargetCreate,
   NutritionDayTotals,
+  NutritionDayQuality,
   PackagedFoodCandidate,
   PendingNutritionCapture,
   NutritionLabelJobResponse,
@@ -25,6 +26,7 @@ export type NutritionDayPayload = {
   date: string
   entries: NutritionEntry[]
   totals: NutritionDayTotals
+  quality: NutritionDayQuality
   targets: NutritionTarget | null
   quickAdd: {
     recents: NutritionFood[]

@@ -329,6 +329,7 @@ export async function listBodyMeasurements(): Promise<BodyHistoryResponse> {
               sessions.timezone,
               sessions.device_name,
               sessions.notes,
+              sessions.comparability,
               sessions.import_job_id,
               sources.key AS source_key
        FROM body_measurement_sessions AS sessions
@@ -390,6 +391,7 @@ type SessionHistoryRow = {
   timezone: string | null
   device_name: string | null
   notes: string | null
+  comparability: 'usual' | 'different_conditions' | 'unknown'
   import_job_id: string | null
   source_key: string
 }
@@ -406,6 +408,7 @@ function sessionFrom(
     timezone: row.timezone,
     deviceName: row.device_name,
     notes: row.notes,
+    comparability: row.comparability,
     importJobId,
     sourceKey,
     manual: importJobId == null && sourceKey === 'manual',

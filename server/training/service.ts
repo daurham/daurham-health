@@ -7,7 +7,7 @@ import {
   exerciseListResponseSchema,
   manualWorkoutRequestSchema,
   manualWorkoutRequestValuesSchema,
-  measurementFamilyMatches,
+  measurementFamilyAllowedForExercise,
   measurementFamilyOf,
   ownerRoutinePrescriptionError,
   ownerRoutineRequestSchema,
@@ -138,7 +138,7 @@ export async function listExercises(): Promise<{ exercises: ExerciseDefinition[]
   const sql = await getSql()
   const rows = await queryOrUnavailable(() =>
     sql.query(
-      `SELECT id, external_id, name, measurement_kind, load_type, unilateral, metadata, gif_url, youtube_url, form_instructions, notes, is_active, created_at, updated_at
+      `SELECT id, external_id, name, measurement_kind, load_type, unilateral, side_tracking_mode, metadata, gif_url, youtube_url, form_instructions, notes, is_active, created_at, updated_at
        FROM exercise_definitions
        WHERE is_active = true
        ORDER BY external_id NULLS LAST, name`,
@@ -177,7 +177,7 @@ export async function listTemplates(): Promise<TemplateListResponse> {
     exerciseIds.length === 0
       ? []
       : await sql.query(
-          `SELECT id, external_id, name, measurement_kind, load_type, unilateral, metadata, gif_url, youtube_url, form_instructions, notes, is_active, created_at, updated_at
+          `SELECT id, external_id, name, measurement_kind, load_type, unilateral, side_tracking_mode, metadata, gif_url, youtube_url, form_instructions, notes, is_active, created_at, updated_at
            FROM exercise_definitions
            WHERE id = ANY($1::uuid[])`,
           [exerciseIds],
@@ -235,7 +235,7 @@ async function loadExercisesById(ids: string[]): Promise<Map<string, ExerciseDef
   const sql = await getSql()
   const rows = await queryOrUnavailable(() =>
     sql.query(
-      `SELECT id, external_id, name, measurement_kind, load_type, unilateral, metadata, gif_url, youtube_url, form_instructions, notes, is_active, created_at, updated_at
+      `SELECT id, external_id, name, measurement_kind, load_type, unilateral, side_tracking_mode, metadata, gif_url, youtube_url, form_instructions, notes, is_active, created_at, updated_at
        FROM exercise_definitions
        WHERE id = ANY($1::uuid[])`,
       [unique],
@@ -261,6 +261,8 @@ export type PreparedManualSession = {
   durationMin: number | null
   effort: number | null
   painLevel: number | null
+  limitationKind: ManualWorkoutRequest['limitationKind']
+  limitationNote: string | null
   bodyweightKg: number | null
   notes: string | null
   sourceKind: SessionSourceKind
@@ -327,11 +329,20 @@ export function prepareManualSession(input: {
     const sets = exerciseInput.sets.map((setInput) => {
       const canonical = toCanonicalSetInsert(setInput)
       const family = measurementFamilyOf(canonical)
-      if (!measurementFamilyMatches(definition.measurementKind, family)) {
+      if (!measurementFamilyAllowedForExercise(definition.measurementKind, definition.sideTrackingMode, family)) {
         throw new HttpError(
           400,
           `${definition.name} expects ${definition.measurementKind.replaceAll('_', ' ')}`,
         )
+      }
+      if (definition.sideTrackingMode !== 'independent' && (canonical.leftFailureKind != null || canonical.rightFailureKind != null)) {
+        throw new HttpError(400, `${definition.name} does not support side-specific failure evidence`)
+      }
+      if (definition.sideTrackingMode === 'independent' && family === 'reps_per_side' && (canonical.leftReps == null || canonical.rightReps == null)) {
+        throw new HttpError(400, `${definition.name} needs both left and right reps when using independent-side tracking`)
+      }
+      if (definition.sideTrackingMode === 'independent' && family === 'duration_per_side' && (canonical.leftDurationSec == null || canonical.rightDurationSec == null)) {
+        throw new HttpError(400, `${definition.name} needs both left and right durations when using independent-side tracking`)
       }
       return canonical
     })
@@ -363,6 +374,8 @@ export function prepareManualSession(input: {
     durationMin: request.durationMin,
     effort: request.effort,
     painLevel: request.painLevel,
+    limitationKind: request.limitationKind ?? null,
+    limitationNote: request.limitationNote ?? null,
     bodyweightKg:
       request.bodyweightLb == null ? null : poundsToKilograms(request.bodyweightLb),
     notes: request.notes ?? null,
@@ -390,12 +403,12 @@ export function buildSessionInsertQueries(
     sql.query(
       `INSERT INTO workout_sessions (
          id, workout_date, workout_template_id, routine_code, template_version, template_name,
-         duration_min, effort, pain_level, bodyweight_kg, notes, source_kind, metadata,
+         duration_min, effort, pain_level, limitation_kind, limitation_note, bodyweight_kg, notes, source_kind, metadata,
          session_type, session_name, experiment_id, benchmark_protocol_version_id
        ) VALUES (
          $1::uuid, $2::date, $3::uuid, $4, $5, $6,
-         $7::numeric, $8::int, $9::int, $10::numeric, $11, $12, $13::jsonb,
-         $14, $15, $16::uuid, $17::uuid
+         $7::numeric, $8::int, $9::int, $10, $11, $12::numeric, $13, $14, $15::jsonb,
+         $16, $17, $18::uuid, $19::uuid
        )`,
       [
         prepared.sessionId,
@@ -407,6 +420,8 @@ export function buildSessionInsertQueries(
         prepared.durationMin == null ? null : decimalString(prepared.durationMin),
         prepared.effort,
         prepared.painLevel,
+        prepared.limitationKind,
+        prepared.limitationNote,
         prepared.bodyweightKg == null ? null : decimalString(prepared.bodyweightKg),
         prepared.notes,
         prepared.sourceKind,
@@ -447,11 +462,11 @@ export function buildSessionInsertQueries(
           `INSERT INTO workout_sets (
              workout_session_exercise_id, set_number, set_type, load_state, weight_kg,
              reps, duration_sec, left_reps, right_reps, left_duration_sec, right_duration_sec,
-             distance_m, completed, notes
+             distance_m, completed, rir, rpe, failure_kind, left_failure_kind, right_failure_kind, notes
            ) VALUES (
              $1::uuid, $2::int, $3, $4, $5::numeric,
              $6::int, $7::int, $8::int, $9::int, $10::int, $11::int,
-             $12::numeric, $13::boolean, $14
+             $12::numeric, $13::boolean, $14::int, $15::numeric, $16, $17, $18, $19
            )`,
           [
             exercise.id,
@@ -467,6 +482,11 @@ export function buildSessionInsertQueries(
             set.rightDurationSec,
             set.distanceM == null ? null : decimalString(set.distanceM),
             set.completed,
+            set.rir,
+            set.rpe == null ? null : decimalString(set.rpe),
+            set.failureKind,
+            set.leftFailureKind,
+            set.rightFailureKind,
             set.notes,
           ],
         ),
@@ -553,10 +573,12 @@ export const UPDATE_WORKOUT_SESSION_SQL = `UPDATE workout_sessions
              duration_min = $7::numeric,
              effort = $8::int,
              pain_level = $9::int,
-             bodyweight_kg = $10::numeric,
-             notes = $11,
-             metadata = $12::jsonb,
-             session_name = $13,
+             limitation_kind = $10,
+             limitation_note = $11,
+             bodyweight_kg = $12::numeric,
+             notes = $13,
+             metadata = $14::jsonb,
+             session_name = $15,
              updated_at = now()
          WHERE id = $1::uuid`
 
@@ -676,6 +698,8 @@ export async function createImportedSession(
         prepared.durationMin == null ? null : decimalString(prepared.durationMin),
         prepared.effort,
         prepared.painLevel,
+        prepared.limitationKind,
+        prepared.limitationNote,
         prepared.bodyweightKg == null ? null : decimalString(prepared.bodyweightKg),
         prepared.notes,
         prepared.sourceKind,
@@ -716,7 +740,7 @@ export async function listSessions(): Promise<SessionListResponse> {
     sql.query(
       `SELECT id, workout_date, workout_template_id, routine_code, template_version, template_name,
               session_type, session_name, experiment_id, benchmark_protocol_version_id,
-              duration_min, effort, pain_level, bodyweight_kg, notes, source_kind, metadata, created_at, updated_at
+              duration_min, effort, pain_level, limitation_kind, limitation_note, bodyweight_kg, notes, source_kind, metadata, created_at, updated_at
        FROM workout_sessions
        ORDER BY workout_date DESC, created_at DESC`,
     ),
@@ -820,7 +844,7 @@ export async function getSession(sessionId: string): Promise<SessionDetailRespon
     sql.query(
       `SELECT id, workout_date, workout_template_id, routine_code, template_version, template_name,
               session_type, session_name, experiment_id, benchmark_protocol_version_id,
-              duration_min, effort, pain_level, bodyweight_kg, notes, source_kind, metadata, created_at, updated_at
+              duration_min, effort, pain_level, limitation_kind, limitation_note, bodyweight_kg, notes, source_kind, metadata, created_at, updated_at
        FROM workout_sessions
        WHERE id = $1
        LIMIT 1`,
@@ -836,7 +860,7 @@ export async function getSession(sessionId: string): Promise<SessionDetailRespon
     `SELECT session_exercises.id, session_exercises.workout_session_id,
             session_exercises.exercise_definition_id, session_exercises.position, session_exercises.slot_id,
             session_exercises.exercise_external_id, session_exercises.exercise_name,
-            definitions.measurement_kind, session_exercises.notes, session_exercises.metadata, session_exercises.created_at
+            definitions.measurement_kind, definitions.side_tracking_mode, session_exercises.notes, session_exercises.metadata, session_exercises.created_at
      FROM workout_session_exercises session_exercises
      JOIN exercise_definitions definitions ON definitions.id = session_exercises.exercise_definition_id
      WHERE session_exercises.workout_session_id = $1
@@ -854,7 +878,7 @@ export async function getSession(sessionId: string): Promise<SessionDetailRespon
       : await sql.query(
           `SELECT id, workout_session_exercise_id, set_number, set_type, load_state, weight_kg,
                   reps, duration_sec, left_reps, right_reps, left_duration_sec, right_duration_sec,
-                  distance_m, completed, notes, metadata, created_at
+                  distance_m, completed, rir, rpe, failure_kind, left_failure_kind, right_failure_kind, notes, metadata, created_at
            FROM workout_sets
            WHERE workout_session_exercise_id = ANY($1::uuid[])
            ORDER BY set_number`,
@@ -882,6 +906,7 @@ export async function getSession(sessionId: string): Promise<SessionDetailRespon
       exerciseExternalId: exercise.exercise_external_id,
       exerciseName: exercise.exercise_name,
       measurementKind: exercise.measurement_kind,
+      sideTrackingMode: exercise.side_tracking_mode,
       notes: exercise.notes,
       sets: setsByExercise.get(exercise.id) ?? [],
       performanceBests: performanceBestsByExercise.get(exercise.exercise_definition_id) ?? [],
@@ -1168,6 +1193,8 @@ export async function updateManualSession(sessionId: string, body: unknown): Pro
         prepared.durationMin == null ? null : decimalString(prepared.durationMin),
         prepared.effort,
         prepared.painLevel,
+        prepared.limitationKind,
+        prepared.limitationNote,
         prepared.bodyweightKg == null ? null : decimalString(prepared.bodyweightKg),
         prepared.notes,
         JSON.stringify(prepared.metadata),

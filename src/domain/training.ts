@@ -97,6 +97,18 @@ export const LOAD_STATES = ['external', 'bodyweight', 'unknown'] as const
 export const loadStateSchema = z.enum(LOAD_STATES)
 export type LoadState = z.infer<typeof loadStateSchema>
 
+export const SIDE_TRACKING_MODES = ['shared', 'paired', 'independent'] as const
+export const sideTrackingModeSchema = z.enum(SIDE_TRACKING_MODES)
+export type SideTrackingMode = z.infer<typeof sideTrackingModeSchema>
+
+export const SET_FAILURE_KINDS = ['reached_failure', 'failed_rep'] as const
+export const setFailureKindSchema = z.enum(SET_FAILURE_KINDS)
+export type SetFailureKind = z.infer<typeof setFailureKindSchema>
+
+export const WORKOUT_LIMITATION_KINDS = ['pain', 'fatigue', 'illness', 'time', 'equipment', 'other'] as const
+export const workoutLimitationKindSchema = z.enum(WORKOUT_LIMITATION_KINDS)
+export type WorkoutLimitationKind = z.infer<typeof workoutLimitationKindSchema>
+
 export const SESSION_SOURCE_KINDS = ['manual', 'imported_candidate'] as const
 export const sessionSourceKindSchema = z.enum(SESSION_SOURCE_KINDS)
 export type SessionSourceKind = z.infer<typeof sessionSourceKindSchema>
@@ -149,6 +161,14 @@ const optionalNotesSchema = z
   .optional()
   .transform((value) => (value == null || value === '' ? null : value))
 
+const optionalLimitationNoteSchema = z
+  .string()
+  .trim()
+  .max(500)
+  .nullable()
+  .optional()
+  .transform((value) => (value == null || value === '' ? null : value))
+
 function nonemptyText(label: string) {
   return z.string().trim().min(1, `${label} is required`)
 }
@@ -175,6 +195,7 @@ export const exerciseDefinitionRowSchema = z.object({
   measurement_kind: measurementKindSchema,
   load_type: nonemptyText('Load type'),
   unilateral: z.boolean(),
+  side_tracking_mode: sideTrackingModeSchema.optional().default('shared'),
   metadata: jsonRecordSchema,
   gif_url: z.string().nullable(),
   youtube_url: z.string().nullable(),
@@ -194,6 +215,7 @@ export const exerciseDefinitionSchema = z.object({
   measurementKind: measurementKindSchema,
   loadType: nonemptyText('Load type'),
   unilateral: z.boolean(),
+  sideTrackingMode: sideTrackingModeSchema.optional().default('shared'),
   metadata: jsonRecordSchema,
   gifUrl: z.string().nullable(),
   youtubeUrl: z.string().nullable(),
@@ -212,6 +234,7 @@ export function exerciseDefinitionFromRow(row: ExerciseDefinitionRow): ExerciseD
     measurementKind: row.measurement_kind,
     loadType: row.load_type,
     unilateral: row.unilateral,
+    sideTrackingMode: row.side_tracking_mode,
     metadata: row.metadata,
     gifUrl: row.gif_url,
     youtubeUrl: row.youtube_url,
@@ -337,6 +360,11 @@ export const workoutSetRowSchema = z.object({
   right_duration_sec: nullableInt(),
   distance_m: nullableNumber(),
   completed: z.boolean().nullable(),
+  rir: z.coerce.number().int().min(0).max(10).nullable().optional().transform((value) => value ?? null),
+  rpe: z.coerce.number().min(1).max(10).nullable().optional().transform((value) => value ?? null),
+  failure_kind: setFailureKindSchema.nullable().optional().transform((value) => value ?? null),
+  left_failure_kind: setFailureKindSchema.nullable().optional().transform((value) => value ?? null),
+  right_failure_kind: setFailureKindSchema.nullable().optional().transform((value) => value ?? null),
   notes: z.string().nullable(),
   metadata: jsonRecordSchema,
   created_at: timestamptzSchema,
@@ -361,6 +389,11 @@ export const workoutSetSchema = z
     rightDurationSec: nonnegativeInt.nullable(),
     distanceM: z.number().positive().nullable().optional().transform((value) => value ?? null),
     completed: z.boolean().nullable().optional().transform((value) => value ?? null),
+    rir: z.number().int().min(0).max(10).nullable().optional().transform((value) => value ?? null),
+    rpe: z.number().min(1).max(10).nullable().optional().transform((value) => value ?? null),
+    failureKind: setFailureKindSchema.nullable().optional().transform((value) => value ?? null),
+    leftFailureKind: setFailureKindSchema.nullable().optional().transform((value) => value ?? null),
+    rightFailureKind: setFailureKindSchema.nullable().optional().transform((value) => value ?? null),
     notes: z.string().nullable(),
   })
   .superRefine((set, ctx) => addSetInvariantIssues(set, ctx))
@@ -390,6 +423,7 @@ export const workoutSessionExerciseRowSchema = z.object({
   exercise_external_id: z.string().min(1).nullable(),
   exercise_name: nonemptyText('Exercise name'),
   measurement_kind: measurementKindSchema.optional(),
+  side_tracking_mode: sideTrackingModeSchema.optional().default('shared'),
   notes: z.string().nullable(),
   metadata: jsonRecordSchema,
   created_at: timestamptzSchema,
@@ -405,6 +439,7 @@ export const workoutSessionExerciseSchema = z.object({
   exerciseExternalId: z.string().min(1).nullable(),
   exerciseName: nonemptyText('Exercise name'),
   measurementKind: measurementKindSchema.optional(),
+  sideTrackingMode: sideTrackingModeSchema.optional().default('shared'),
   notes: z.string().nullable(),
   sets: z.array(workoutSetSchema).min(1),
   performanceBests: z.array(trainingPerformanceBestViewSchema).default([]),
@@ -429,6 +464,8 @@ export const workoutSessionRowSchema = z.object({
   duration_min: nullableNumber(),
   effort: nullableInt(),
   pain_level: nullableInt(),
+  limitation_kind: workoutLimitationKindSchema.nullable().optional().transform((value) => value ?? null),
+  limitation_note: z.string().nullable().optional().transform((value) => value ?? null),
   bodyweight_kg: nullableNumber(),
   notes: z.string().nullable(),
   source_kind: sessionSourceKindSchema,
@@ -456,6 +493,8 @@ export const workoutSessionSummarySchema = z.object({
   durationMin: z.number().positive().nullable(),
   effort: effortSchema.nullable(),
   painLevel: painLevelSchema.nullable(),
+  limitationKind: workoutLimitationKindSchema.nullable().optional().transform((value) => value ?? null),
+  limitationNote: z.string().nullable().optional().transform((value) => value ?? null),
   sourceKind: sessionSourceKindSchema,
   hasProgrammedExtras: z.boolean().optional(),
 })
@@ -562,6 +601,17 @@ export function measurementFamilyMatches(kind: MeasurementKind, family: Measurem
   return kind === family
 }
 
+export function measurementFamilyAllowedForExercise(
+  kind: MeasurementKind,
+  sideTrackingMode: SideTrackingMode,
+  family: MeasurementFamily,
+): boolean {
+  if (measurementFamilyMatches(kind, family)) return true
+  if (sideTrackingMode !== 'independent') return false
+  return (kind === 'reps' && family === 'reps_per_side') ||
+    (kind === 'duration' && family === 'duration_per_side')
+}
+
 function addLoadIssues(
   set: { loadState: LoadState; weightKg?: number | null; weightLb?: number | null },
   ctx: z.RefinementCtx,
@@ -629,7 +679,19 @@ export const manualWorkoutSetValuesSchema = z.object({
   distance: z.number().positive().nullable().optional().transform((value) => value ?? null),
   distanceUnit: distanceUnitSchema.nullable().optional().transform((value) => value ?? null),
   completed: z.boolean().nullable().optional().transform((value) => value ?? null),
+  rir: z.number().int().min(0).max(10).nullable().optional().transform((value) => value ?? null),
+  rpe: z.number().min(1).max(10).nullable().optional().transform((value) => value ?? null),
+  failureKind: setFailureKindSchema.nullable().optional().transform((value) => value ?? null),
+  leftFailureKind: setFailureKindSchema.nullable().optional().transform((value) => value ?? null),
+  rightFailureKind: setFailureKindSchema.nullable().optional().transform((value) => value ?? null),
   notes: optionalNotesSchema,
+}).superRefine((set, ctx) => {
+  if (set.rir != null && set.rpe != null) {
+    ctx.addIssue({ code: 'custom', path: ['rpe'], message: 'Use RIR or RPE, not both' })
+  }
+  if (set.failureKind != null && (set.leftFailureKind != null || set.rightFailureKind != null)) {
+    ctx.addIssue({ code: 'custom', path: ['failureKind'], message: 'Use whole-set or side-specific failure, not both' })
+  }
 })
 
 export const manualWorkoutSetInputSchema = manualWorkoutSetValuesSchema.superRefine((set, ctx) => {
@@ -684,6 +746,8 @@ export const manualWorkoutRequestSchema = z.object({
   durationMin: z.number().positive().nullable(),
   effort: effortSchema.nullable(),
   painLevel: painLevelSchema.nullable(),
+  limitationKind: workoutLimitationKindSchema.nullable().optional().transform((value) => value ?? null),
+  limitationNote: optionalLimitationNoteSchema,
   bodyweightLb: z.number().positive().nullable(),
   notes: optionalNotesSchema,
   experimentId: uuidSchema.nullish(),
@@ -702,6 +766,8 @@ export const manualWorkoutRequestValuesSchema = z.object({
   durationMin: z.number().positive().nullable(),
   effort: effortSchema.nullable(),
   painLevel: painLevelSchema.nullable(),
+  limitationKind: workoutLimitationKindSchema.nullable().optional().transform((value) => value ?? null),
+  limitationNote: optionalLimitationNoteSchema,
   bodyweightLb: z.number().positive().nullable(),
   notes: optionalNotesSchema,
   experimentId: uuidSchema.nullish(),
@@ -724,6 +790,11 @@ export type CanonicalWorkoutSetInsert = {
   rightDurationSec: number | null
   distanceM: number | null
   completed: boolean | null
+  rir: number | null
+  rpe: number | null
+  failureKind: SetFailureKind | null
+  leftFailureKind: SetFailureKind | null
+  rightFailureKind: SetFailureKind | null
   notes: string | null
 }
 
@@ -741,6 +812,11 @@ export function toCanonicalSetInsert(set: ManualWorkoutSetInput): CanonicalWorko
     rightDurationSec: set.rightDurationSec,
     distanceM: set.distance == null ? null : distanceToMeters(set.distance, set.distanceUnit!),
     completed: set.completed,
+    rir: set.rir ?? null,
+    rpe: set.rpe ?? null,
+    failureKind: set.failureKind ?? null,
+    leftFailureKind: set.leftFailureKind ?? null,
+    rightFailureKind: set.rightFailureKind ?? null,
     notes: set.notes ?? null,
   }
 }
@@ -757,6 +833,11 @@ export type DraftSetFields = {
   distance?: string
   distanceUnit?: DistanceUnit
   completed?: boolean | null
+  rir?: string
+  rpe?: string
+  failureKind?: SetFailureKind | null
+  leftFailureKind?: SetFailureKind | null
+  rightFailureKind?: SetFailureKind | null
   notes: string
   transcribedLoadState?: LoadState
   transcribedWeightLb?: string
@@ -794,6 +875,11 @@ export function isDraftSetUntouched(set: DraftSetFields): boolean {
     set.rightDurationSec.trim() === '' &&
     (set.distance?.trim() ?? '') === '' &&
     set.completed == null &&
+    (set.rir?.trim() ?? '') === '' &&
+    (set.rpe?.trim() ?? '') === '' &&
+    set.failureKind == null &&
+    set.leftFailureKind == null &&
+    set.rightFailureKind == null &&
     set.notes.trim() === ''
   )
 }
@@ -816,6 +902,11 @@ export function draftSetToManualInput(
     distance: parseOptionalNumber(set.distance ?? ''),
     distanceUnit: (set.distance?.trim() ?? '') === '' ? null : (set.distanceUnit ?? 'mi'),
     completed: set.completed,
+    rir: parseOptionalInt(set.rir ?? ''),
+    rpe: parseOptionalNumber(set.rpe ?? ''),
+    failureKind: set.failureKind ?? null,
+    leftFailureKind: set.leftFailureKind ?? null,
+    rightFailureKind: set.rightFailureKind ?? null,
     notes: set.notes.trim() === '' ? null : set.notes.trim(),
   }
 }
@@ -839,6 +930,8 @@ export function sessionSummaryFromRow(row: WorkoutSessionRow): WorkoutSessionSum
     durationMin: row.duration_min,
     effort: row.effort,
     painLevel: row.pain_level,
+    limitationKind: row.limitation_kind,
+    limitationNote: row.limitation_note,
     sourceKind: row.source_kind,
     ...(row.metadata.has_programmed_extras === true ? { hasProgrammedExtras: true } : {}),
   })
@@ -859,6 +952,11 @@ export function workoutSetFromRow(row: WorkoutSetRow): WorkoutSet {
     rightDurationSec: row.right_duration_sec,
     distanceM: row.distance_m,
     completed: row.completed,
+    rir: row.rir,
+    rpe: row.rpe,
+    failureKind: row.failure_kind,
+    leftFailureKind: row.left_failure_kind,
+    rightFailureKind: row.right_failure_kind,
     notes: row.notes,
   })
 }
@@ -996,13 +1094,28 @@ export function ownerExerciseAnalyticsDefaults(
   }
 }
 
+function defaultSideTrackingMode(measurementKind: MeasurementKind): SideTrackingMode {
+  return measurementKind === 'reps_per_side' || measurementKind === 'duration_per_side' ? 'paired' : 'shared'
+}
+
 export function ownerExerciseCoherenceError(input: {
   measurementKind: MeasurementKind
   unilateral: boolean
+  sideTrackingMode?: SideTrackingMode
 }): string | null {
   const perSide = input.measurementKind === 'reps_per_side' || input.measurementKind === 'duration_per_side'
+  const sideTrackingMode = input.sideTrackingMode ?? defaultSideTrackingMode(input.measurementKind)
   if (input.unilateral !== perSide) {
     return 'Unilateral must match the measurement family.'
+  }
+  if (perSide && sideTrackingMode === 'shared') {
+    return 'Per-side measurements require paired or independent side tracking.'
+  }
+  if (
+    sideTrackingMode === 'independent'
+    && !['reps', 'duration', 'reps_per_side', 'duration_per_side'].includes(input.measurementKind)
+  ) {
+    return 'Independent-side tracking is only available for reps or duration exercises.'
   }
   return null
 }
@@ -1028,6 +1141,7 @@ export const ownerExerciseRequestSchema = z.object({
   measurementKind: measurementKindSchema,
   loadType: ownerExerciseLoadTypeSchema,
   unilateral: z.boolean(),
+  sideTrackingMode: sideTrackingModeSchema.optional(),
   gifUrl: optionalExerciseUrlSchema,
   youtubeUrl: optionalExerciseUrlSchema,
   formInstructions: optionalExerciseText(3000),
@@ -1036,7 +1150,11 @@ export const ownerExerciseRequestSchema = z.object({
   secondaryMuscleGroups: z.array(z.string().trim().min(1).max(80)).max(12).nullable().optional(),
   movementPattern: optionalExerciseText(80),
   aliases: z.array(z.string().trim().min(1).max(80)).max(20).nullable().optional(),
-})
+}).transform((value) => ({
+  ...value,
+  sideTrackingMode: value.sideTrackingMode ??
+    (value.measurementKind === 'reps_per_side' || value.measurementKind === 'duration_per_side' ? 'paired' : 'shared'),
+}))
 
 export type OwnerExerciseRequest = z.infer<typeof ownerExerciseRequestSchema>
 
@@ -1103,8 +1221,9 @@ export function planOwnerExercisePatch(input: {
     measurementKind: MeasurementKind
     loadType: string
     unilateral: boolean
+    sideTrackingMode?: SideTrackingMode
   }
-  next: OwnerExerciseRequest
+  next: Omit<OwnerExerciseRequest, 'sideTrackingMode'> & { sideTrackingMode?: SideTrackingMode }
   used: boolean
 }):
   | {
@@ -1113,6 +1232,7 @@ export function planOwnerExercisePatch(input: {
       measurementKind: MeasurementKind
       loadType: OwnerExerciseLoadType
       unilateral: boolean
+      sideTrackingMode: SideTrackingMode
       semanticEditable: boolean
       semanticChanged: boolean
       analytics: ReturnType<typeof ownerExerciseAnalyticsDefaults>
@@ -1123,9 +1243,12 @@ export function planOwnerExercisePatch(input: {
     return { ok: false, status: 400, message: coherence }
   }
   const ownerCreated = isOwnerCreatedExercise(input.existing)
+  const nextSideTrackingMode = input.next.sideTrackingMode ?? defaultSideTrackingMode(input.next.measurementKind)
+  const existingSideTrackingMode = input.existing.sideTrackingMode ?? defaultSideTrackingMode(input.existing.measurementKind)
   const semanticChange =
     input.next.measurementKind !== input.existing.measurementKind ||
     input.next.unilateral !== input.existing.unilateral ||
+    nextSideTrackingMode !== existingSideTrackingMode ||
     input.next.loadType !== input.existing.loadType
   if (!ownerCreated && semanticChange) {
     return {
@@ -1147,6 +1270,7 @@ export function planOwnerExercisePatch(input: {
     measurementKind: input.next.measurementKind,
     loadType: input.next.loadType,
     unilateral: input.next.unilateral,
+    sideTrackingMode: nextSideTrackingMode,
     semanticEditable: ownerCreated && !input.used,
     semanticChanged: semanticChange,
     analytics: ownerExerciseAnalyticsDefaults(input.next.measurementKind, input.next.unilateral),

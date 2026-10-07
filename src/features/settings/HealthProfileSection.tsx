@@ -45,6 +45,7 @@ export function HealthProfileSection() {
   const [persistentHealthContext, setPersistentHealthContext] = useState('')
   const [trainingLimitations, setTrainingLimitations] = useState('')
   const [dietaryContext, setDietaryContext] = useState('')
+  const [bodyMeasurementProtocol, setBodyMeasurementProtocol] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -56,6 +57,7 @@ export function HealthProfileSection() {
     setPersistentHealthContext(next.persistentHealthContext ?? '')
     setTrainingLimitations(next.trainingLimitations ?? '')
     setDietaryContext(next.dietaryContext ?? '')
+    setBodyMeasurementProtocol(next.bodyMeasurementProtocol ?? '')
   }
 
   useEffect(() => {
@@ -97,6 +99,7 @@ export function HealthProfileSection() {
         persistentHealthContext,
         trainingLimitations,
         dietaryContext,
+        bodyMeasurementProtocol,
       })
       setProfile(healthProfileSchema.parse(next))
       loadDraft(next)
@@ -205,6 +208,18 @@ export function HealthProfileSection() {
               placeholder="Durable dietary restrictions or preferences that should affect recommendations."
               className="mt-1 min-h-20 w-full rounded-md border border-zinc-300 px-3 py-2 text-base"
             />
+          </label>
+
+          <label className="block text-sm font-medium text-zinc-700">
+            Usual body-measurement conditions
+            <textarea
+              value={bodyMeasurementProtocol}
+              maxLength={1000}
+              onChange={(event) => setBodyMeasurementProtocol(event.target.value)}
+              placeholder="Example: morning, after bathroom, before food/drink, same scale and tape positions."
+              className="mt-1 min-h-20 w-full rounded-md border border-zinc-300 px-3 py-2 text-base"
+            />
+            <span className="mt-1 block text-xs font-normal text-zinc-500">Used only to interpret comparability; different conditions are still valid measurements.</span>
           </label>
 
           <p className="text-xs leading-5 text-zinc-500">

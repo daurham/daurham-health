@@ -1,5 +1,23 @@
 # Dev state
 
+## 2026-10-06 I4 prepared — evidence semantics, effort, Change Ledger + data-quality watchdog
+
+- I4 is prepared as a dormant batch on top of dormant I3; no branch ref is moved while the Vercel deployment-rate window remains active.
+- Proposed schema head is `0046_evidence_semantics_change_watchdog.sql`.
+- Training keeps existing session effort/pain and adds optional set RIR/RPE, explicit whole-set or per-side failure evidence, exercise side-tracking semantics, and optional session limitation context.
+- Historical Training is not rewritten. Independent-side semantics improve new logging while old shared-rep sets remain valid.
+- Nutrition entries gain coarse provenance/evidence quality and Nutrition-day responses derive a calorie-weighted quality label. The label describes evidence, not dietary healthfulness.
+- Manual Body sessions gain comparability state and Health Profile gains an optional usual-measurement protocol.
+- Event/effective time continues to use existing domain timestamps/dates; `created_at` remains storage/entry time rather than a duplicate observation timestamp.
+- Progress Timeline gains an owner-only derived Change Ledger from existing target/plan/goal/supplement/experiment/context histories.
+- Initial automatic behavior candidates cover steps, Training frequency, and logged water. Candidates require owner confirmation/dismissal and never rewrite canonical intent.
+- Settings gains a deterministic Data Quality review inbox for unusual values, duplicate-like Nutrition entries, future timestamps, incomplete independent-side sets, possible incomplete Nutrition days, and Body source changes.
+- Data-quality review decisions are durable annotations: confirmed valid or excluded from future intelligence. They do not mutate/delete the source record.
+- Backup/export includes all I4 durable semantics plus Change candidate and Data Quality review state.
+- I5, not I4, will make the shared evidence frame honor exclusions and use quality/change context for cross-domain intelligence.
+- Focused I4 domain, routing, migration-contract, and backup tests are staged. Full TypeScript/lint/test/build validation remains deferred until this dormant commit is exposed to one branch.
+
+
 ## 2026-10-06 I3 prepared — XP participation expansion + theme runway
 
 - I3 is prepared as a dormant batch on top of dormant I2; no branch ref is moved while the Vercel deployment-rate window remains active.

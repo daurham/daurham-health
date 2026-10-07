@@ -16,6 +16,7 @@ const RecipeVersionPage = lazy(() => import('@/features/nutrition').then((module
 const BodyPage = lazy(() => import('@/features/body').then((module) => ({ default: module.BodyPage })))
 const BodyInboxPage = lazy(() => import('@/features/body').then((module) => ({ default: module.BodyInboxPage })))
 const SettingsPage = lazy(() => import('@/features/settings').then((module) => ({ default: module.SettingsPage })))
+const DataQualityPage = lazy(() => import('@/features/settings').then((module) => ({ default: module.DataQualityPage })))
 const SupplementsPage = lazy(() => import('@/features/supplements').then((module) => ({ default: module.SupplementsPage })))
 const ContextPage = lazy(() => import('@/features/context').then((module) => ({ default: module.ContextPage })))
 const DailyCheckInPage = lazy(() => import('@/features/daily-signals').then((module) => ({ default: module.DailyCheckInPage })))
@@ -95,6 +96,7 @@ const router = createBrowserRouter([
       { path: 'body', element: <BodyPage /> },
       { path: 'body/inbox/:captureId', element: <BodyInboxPage /> },
       { path: 'settings', element: <SettingsPage /> },
+      { path: 'settings/data-quality', element: <DataQualityPage /> },
       { path: 'supplements', element: <SupplementsPage /> },
       { path: 'context', element: <ContextPage /> },
       { path: 'check-in', element: <DailyCheckInPage /> },

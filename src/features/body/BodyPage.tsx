@@ -530,6 +530,7 @@ function valuesFromSession(session: BodyMeasurementSession | null): Record<strin
     const display = ownerInputNumber(metric.unit, metric.value)
     values[metric.key] = String(Math.round(display * 10) / 10)
   }
+  values.comparability = session.comparability
   if (session.notes) {
     values.notes = session.notes
   }
@@ -550,7 +551,9 @@ function HistoryCard({
       <li className="rounded-lg border border-zinc-200 bg-white p-4">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <p className="font-medium">{formatWhen(session.measuredAt, session.timezone)}</p>
-          <p className="text-xs text-zinc-500">Manual</p>
+          <p className="text-xs text-zinc-500">
+            Manual{session.comparability === 'usual' ? ' · usual conditions' : session.comparability === 'different_conditions' ? ' · different conditions' : ''}
+          </p>
         </div>
         {session.notes ? <p className="mt-1 text-sm text-zinc-600">{session.notes}</p> : null}
         <dl className="mt-3 space-y-1 text-sm">

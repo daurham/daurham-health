@@ -40,6 +40,7 @@ export const bodyMeasurementSessionRowSchema = z.object({
   import_job_id: uuidSchema.nullable(),
   device_name: z.string().nullable(),
   notes: z.string().nullable(),
+  comparability: z.enum(['usual', 'different_conditions', 'unknown']).optional().default('unknown'),
   metadata: jsonRecordSchema,
   created_at: timestamptzSchema,
 })
@@ -52,6 +53,7 @@ export const bodyMeasurementSessionSchema = z.object({
   timezone: z.string().nullable(),
   deviceName: z.string().nullable(),
   notes: z.string().nullable(),
+  comparability: z.enum(['usual', 'different_conditions', 'unknown']).optional().default('unknown'),
   importJobId: uuidSchema.nullable(),
   sourceKey: z.string().min(1),
   manual: z.boolean(),

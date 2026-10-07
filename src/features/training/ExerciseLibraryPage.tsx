@@ -3,12 +3,14 @@ import { Link } from 'react-router-dom'
 import {
   MEASUREMENT_KINDS,
   OWNER_EXERCISE_LOAD_TYPES,
+  SIDE_TRACKING_MODES,
   ownerExerciseRequestSchema,
   type ExerciseDefinition,
   type ExerciseLibraryItem,
   type MeasurementKind,
   type OwnerExerciseLoadType,
   type OwnerExerciseRequest,
+  type SideTrackingMode,
 } from '@/domain/training'
 import { primaryButtonClass, quietButtonClass, secondaryButtonClass } from '@/lib'
 import {
@@ -205,6 +207,7 @@ export function ExerciseLibraryPage() {
                     <p className="mt-1 text-sm text-zinc-700">
                       {item.exercise.measurementKind.replace(/_/g, ' ')} · {item.exercise.loadType.replace(/_/g, ' ')}
                       {item.exercise.unilateral ? ' · unilateral' : ''}
+                      {item.exercise.sideTrackingMode !== 'shared' ? ` · ${item.exercise.sideTrackingMode} sides` : ''}
                       {info.movementPattern ? ` · ${info.movementPattern.replace(/_/g, ' ')}` : ''}
                     </p>
                     <p className="mt-1 text-xs text-zinc-500">
@@ -272,6 +275,7 @@ function ExerciseEditorSheet({
   const [name, setName] = useState(exercise?.name ?? '')
   const [measurementKind, setMeasurementKind] = useState<MeasurementKind>(exercise?.measurementKind ?? 'reps')
   const [loadType, setLoadType] = useState<OwnerExerciseLoadType>((exercise?.loadType as OwnerExerciseLoadType | undefined) ?? 'bodyweight')
+  const [sideTrackingMode, setSideTrackingMode] = useState<SideTrackingMode>(exercise?.sideTrackingMode ?? 'shared')
   const [gifUrl, setGifUrl] = useState(exercise?.gifUrl ?? '')
   const [youtubeUrl, setYoutubeUrl] = useState(exercise?.youtubeUrl ?? '')
   const [formInstructions, setFormInstructions] = useState(exercise?.formInstructions ?? '')
@@ -306,6 +310,7 @@ function ExerciseEditorSheet({
       measurementKind,
       loadType,
       unilateral,
+      sideTrackingMode,
       gifUrl: gifUrl.trim() || null,
       youtubeUrl: youtubeUrl.trim() || null,
       formInstructions: formInstructions.trim() || null,
@@ -340,9 +345,20 @@ function ExerciseEditorSheet({
           <label className="block text-sm font-medium">Name<input autoFocus className={inputClass} value={name} onChange={(event) => setName(event.target.value)} /></label>
           {duplicate ? <p className="rounded-md border border-amber-300 bg-amber-50 p-2 text-sm text-amber-900">An exercise named “{duplicate.exercise.name}” already exists.</p> : null}
           <div className="grid gap-3 sm:grid-cols-2">
-            <label className="block text-sm font-medium">Measurement<select className={inputClass} value={measurementKind} disabled={!semanticEditable} onChange={(event) => setMeasurementKind(event.target.value as MeasurementKind)}>{MEASUREMENT_KINDS.map((kind) => <option key={kind} value={kind}>{kind.replace(/_/g, ' ')}</option>)}</select></label>
+            <label className="block text-sm font-medium">Measurement<select className={inputClass} value={measurementKind} disabled={!semanticEditable} onChange={(event) => {
+              const next = event.target.value as MeasurementKind
+              setMeasurementKind(next)
+              if ((next === 'reps_per_side' || next === 'duration_per_side') && sideTrackingMode === 'shared') setSideTrackingMode('paired')
+            }}>{MEASUREMENT_KINDS.map((kind) => <option key={kind} value={kind}>{kind.replace(/_/g, ' ')}</option>)}</select></label>
             <label className="block text-sm font-medium">Load / equipment<select className={inputClass} value={loadType} disabled={!semanticEditable} onChange={(event) => setLoadType(event.target.value as OwnerExerciseLoadType)}>{OWNER_EXERCISE_LOAD_TYPES.map((kind) => <option key={kind} value={kind}>{kind.replace(/_/g, ' ')}</option>)}</select></label>
           </div>
+          <label className="block text-sm font-medium">
+            Side tracking
+            <select className={inputClass} value={sideTrackingMode} disabled={!semanticEditable} onChange={(event) => setSideTrackingMode(event.target.value as SideTrackingMode)}>
+              {SIDE_TRACKING_MODES.map((mode) => <option key={mode} value={mode}>{mode === 'shared' ? 'Shared result' : mode === 'paired' ? 'Record both sides together' : 'Sides can continue / fail independently'}</option>)}
+            </select>
+            <span className="mt-1 block text-xs font-normal text-zinc-500">Independent is for movements where one limb can stop before the other.</span>
+          </label>
           {!semanticEditable ? <p className="text-xs text-zinc-500">Measurement semantics are locked because this is built-in or already has workout history. Presentation fields can still be edited.</p> : null}
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block text-sm font-medium">Primary muscle<input className={inputClass} value={primaryMuscleGroup} onChange={(event) => setPrimaryMuscleGroup(event.target.value)} placeholder="back" /></label>

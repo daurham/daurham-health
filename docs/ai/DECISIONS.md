@@ -393,3 +393,22 @@ Observed from the current code and product docs. Where the original rationale is
 **Status:** Active  
 **Reason:** New recurring XP increases Lifetime XP velocity, but moving existing unlock thresholds would make prior progress feel revoked.  
 **Implications:** The `progression-v1` threshold formula stays unchanged. I3 appends eight theme packs at Levels 13–20: Crimson Surge, Sun God, Sage Storm, Mjolnir Night, Vault Neon, Abyss Knight, Republic Red, and Cosmic Instinct. Level 20 unlocks at 10,450 lifetime XP. Future velocity tuning should change new award values prospectively or append more runway rather than moving previously earned theme thresholds.
+
+## Decision: I4 evidence quality is descriptive, not a universal score
+
+**Status:** Active  
+**Reason:** Nutrition, Body, and Training evidence have different uncertainty semantics. One opaque quality number would imply precision and comparability the app cannot justify.  
+**Implications:** Nutrition uses coarse provenance classes and a day-level evidence label. Body stores owner-reported comparability. Training stores explicit effort/failure context. I5 may combine coverage/provenance/confidence states, but I4 does not rank all Health evidence on one scale.
+
+## Decision: Change candidates never rewrite canonical intent
+
+**Status:** Active  
+**Reason:** A sustained behavioral shift can be real without proving the owner changed a Goal, Training Plan, Nutrition target, or other declared intent.  
+**Implications:** I4 derives explicit change events from existing histories and stores only candidate confirmation/dismissal state for undeclared shifts. Initial detectors cover steps, Training frequency, and logged water. Missing hydration days stay missing. Confirming a candidate adds context for intelligence; it does not mutate the underlying Goal/Plan/target/history.
+
+## Decision: Data Quality review annotates analysis; it does not repair source rows
+
+**Status:** Active  
+**Reason:** Suspicious data may be valid, and canonical provenance must remain auditable. Silent correction would destroy evidence and create a second source of truth.  
+**Implications:** The watchdog produces review flags. The owner may confirm a record as valid or exclude it from future intelligence. The source record remains unchanged. I5's shared evidence frame is responsible for honoring exclusions; I4 does not patch every existing Progress formula independently.
+

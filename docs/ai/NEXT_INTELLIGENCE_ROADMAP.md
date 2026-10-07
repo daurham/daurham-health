@@ -3216,6 +3216,19 @@ I2 Daily Signals correctness remains independent of XP. Migration `0045_xp_parti
 
 This phase is the bridge between "more data" and "better intelligence."
 
+### Prepared implementation note — 2026-10-06
+
+The first I4 batch implements the bridge without overreaching:
+
+- Training: optional RIR/RPE, explicit failure evidence, independent-side semantics, and conditional limitation context;
+- Nutrition: entry provenance classes and day-level evidence quality;
+- Body: session comparability plus an owner-authored usual-measurement protocol;
+- Change Ledger: explicit histories plus conservative steps/Training-frequency/logged-water candidates;
+- Data Quality: deterministic review flags with durable confirm/exclude decisions;
+- no AI calls, no causal claims, no automatic repair, and no retroactive source-data rewrite.
+
+The larger examples in this roadmap (for example meal-timing shifts or richer volume-change detection) remain eligible future detector extensions after I5 provides the shared evidence frame. I4 does not duplicate those future cross-domain semantics ad hoc.
+
 ### Deliver
 
 #### Training effort and side-specific performance

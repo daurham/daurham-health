@@ -7,9 +7,11 @@ import {
   type LoadState,
   type ManualWorkoutRequest,
   type MeasurementKind,
+  type SideTrackingMode,
   type SetType,
   type TemplatePrescription,
   type TrainingSessionType,
+  type WorkoutLimitationKind,
   type WorkoutSession,
   type WorkoutTemplate,
 } from '@/domain/training'
@@ -44,6 +46,7 @@ export type DraftExercise = {
   slotId: string | null
   name: string
   measurementKind: MeasurementKind
+  sideTrackingMode: SideTrackingMode
   plannedSets: number | null
   prescription: TemplatePrescription
   notes: string
@@ -59,6 +62,8 @@ export type WorkoutDraft = {
   durationMin: string
   effort: number | null
   painLevel: number | null
+  limitationKind: WorkoutLimitationKind | null
+  limitationNote: string
   bodyweightLb: string
   notes: string
   exercises: DraftExercise[]
@@ -81,6 +86,11 @@ export function emptyDraftSet(setNumber: number, loadState: LoadState = 'externa
     distance: '',
     distanceUnit: 'mi',
     completed: null,
+    rir: '',
+    rpe: '',
+    failureKind: null,
+    leftFailureKind: null,
+    rightFailureKind: null,
     notes: '',
     transcribedLoadState: loadState,
     transcribedWeightLb: '',
@@ -111,6 +121,8 @@ export function draftFromTranscription(
     durationMin: draft.durationMin,
     effort: draft.effort,
     painLevel: draft.painLevel,
+    limitationKind: null,
+    limitationNote: '',
     bodyweightLb: draft.bodyweightLb,
     notes: draft.notes,
     exercises: draft.exercises,
@@ -126,6 +138,8 @@ export function draftFromTemplate(template: WorkoutTemplate, now = new Date(), t
     durationMin: '',
     effort: null,
     painLevel: null,
+    limitationKind: null,
+    limitationNote: '',
     bodyweightLb: '',
     notes: '',
     exercises: template.exercises.map((slot) => ({
@@ -133,6 +147,8 @@ export function draftFromTemplate(template: WorkoutTemplate, now = new Date(), t
       slotId: slot.slotId,
       name: slot.exercise.name,
       measurementKind: slot.exercise.measurementKind,
+      sideTrackingMode: slot.exercise.sideTrackingMode ??
+        (slot.exercise.measurementKind === 'reps_per_side' || slot.exercise.measurementKind === 'duration_per_side' ? 'paired' : 'shared'),
       plannedSets: slot.plannedSets,
       prescription: slot.prescription,
       notes: '',
@@ -170,7 +186,34 @@ export function validateWorkoutDraft(draft: WorkoutDraft): ReviewFieldError[] {
   draft.exercises.forEach((exercise, exerciseIndex) => {
     const interpreted = interpretPaperSets(exercise.sets)
     performed += interpreted.filter((item) => !item.omitted).length
-    errors.push(...validateInterpretedPaperSets(exerciseIndex, exercise.measurementKind, interpreted))
+    const validationKind =
+      exercise.sideTrackingMode === 'independent' && exercise.measurementKind === 'reps'
+        ? 'reps_per_side'
+        : exercise.sideTrackingMode === 'independent' && exercise.measurementKind === 'duration'
+          ? 'duration_per_side'
+          : exercise.measurementKind
+    errors.push(...validateInterpretedPaperSets(exerciseIndex, validationKind, interpreted))
+    if (exercise.sideTrackingMode === 'independent') {
+      interpreted.forEach((item, setIndex) => {
+        if (item.omitted) return
+        if (validationKind === 'reps_per_side') {
+          if (item.set.leftReps.trim() === '') {
+            errors.push({ path: `exercises.${exerciseIndex}.sets.${setIndex}.leftReps`, message: 'Left reps are required for independent-side tracking.' })
+          }
+          if (item.set.rightReps.trim() === '') {
+            errors.push({ path: `exercises.${exerciseIndex}.sets.${setIndex}.rightReps`, message: 'Right reps are required for independent-side tracking.' })
+          }
+        }
+        if (validationKind === 'duration_per_side') {
+          if (item.set.leftDurationSec.trim() === '') {
+            errors.push({ path: `exercises.${exerciseIndex}.sets.${setIndex}.leftDurationSec`, message: 'Left time is required for independent-side tracking.' })
+          }
+          if (item.set.rightDurationSec.trim() === '') {
+            errors.push({ path: `exercises.${exerciseIndex}.sets.${setIndex}.rightDurationSec`, message: 'Right time is required for independent-side tracking.' })
+          }
+        }
+      })
+    }
   })
   if (performed === 0) {
     errors.push({ path: 'exercises', message: 'Log at least one set.' })
@@ -215,6 +258,8 @@ export function buildManualWorkoutPayload(draft: WorkoutDraft): ManualWorkoutReq
     durationMin: parseOptionalPositive(draft.durationMin),
     effort: draft.effort,
     painLevel: draft.painLevel,
+    limitationKind: draft.limitationKind,
+    limitationNote: draft.limitationNote.trim() === '' ? null : draft.limitationNote.trim(),
     bodyweightLb: parseOptionalPositive(draft.bodyweightLb),
     notes: draft.notes.trim() === '' ? null : draft.notes.trim(),
     experimentId: draft.sessionType === 'experiment' ? (draft.experimentId ?? null) : null,
@@ -237,6 +282,8 @@ export function draftForAdHocWorkout(now = new Date(), timezone?: string): Worko
     durationMin: '',
     effort: null,
     painLevel: null,
+    limitationKind: null,
+    limitationNote: '',
     bodyweightLb: '',
     notes: '',
     exercises: [],
@@ -264,12 +311,14 @@ export function draftExerciseFromDefinition(exercise: {
   name: string
   measurementKind: MeasurementKind
   loadType?: string | null
+  sideTrackingMode?: SideTrackingMode
 }): DraftExercise {
   return {
     exerciseDefinitionId: exercise.id,
     slotId: null,
     name: exercise.name,
     measurementKind: exercise.measurementKind,
+    sideTrackingMode: exercise.sideTrackingMode ?? (exercise.measurementKind === 'reps_per_side' || exercise.measurementKind === 'duration_per_side' ? 'paired' : 'shared'),
     plannedSets: null,
     prescription: { measurement: exercise.measurementKind },
     notes: '',
@@ -287,6 +336,8 @@ export function draftFromSession(session: WorkoutSession, template: WorkoutTempl
     durationMin: numberField(session.durationMin),
     effort: session.effort,
     painLevel: session.painLevel,
+    limitationKind: session.limitationKind,
+    limitationNote: session.limitationNote ?? '',
     bodyweightLb: session.bodyweightKg == null ? '' : String(Math.round(kilogramsToPounds(session.bodyweightKg) * 10) / 10),
     notes: session.notes ?? '',
     exercises: session.exercises.map((exercise) => ({
@@ -308,6 +359,9 @@ export function draftFromSession(session: WorkoutSession, template: WorkoutTempl
                   : exercise.sets.some((set) => set.durationSec != null)
                     ? 'duration'
                     : 'reps'),
+      sideTrackingMode: template?.exercises.find((slot) => slot.slotId === exercise.slotId)?.exercise.sideTrackingMode
+        ?? exercise.sideTrackingMode
+        ?? 'shared',
       plannedSets: template?.exercises.find((slot) => slot.slotId === exercise.slotId)?.plannedSets ?? exercise.sets.length,
       prescription: template?.exercises.find((slot) => slot.slotId === exercise.slotId)?.prescription ?? { measurement: 'reps' },
       notes: exercise.notes ?? '',
@@ -325,6 +379,11 @@ export function draftFromSession(session: WorkoutSession, template: WorkoutTempl
         distance: set.distanceM == null ? '' : String(Math.round(metersToMiles(set.distanceM) * 1000) / 1000),
         distanceUnit: 'mi',
         completed: set.completed ?? null,
+        rir: numberField(set.rir),
+        rpe: numberField(set.rpe),
+        failureKind: set.failureKind,
+        leftFailureKind: set.leftFailureKind,
+        rightFailureKind: set.rightFailureKind,
         notes: set.notes ?? '',
         transcribedLoadState: set.loadState,
         transcribedWeightLb: set.weightKg == null ? '' : String(Math.round(kilogramsToPounds(set.weightKg) * 10) / 10),

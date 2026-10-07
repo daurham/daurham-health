@@ -22,6 +22,7 @@ function definition(input: {
     measurementKind: input.measurementKind ?? 'reps',
     loadType: input.loadType ?? 'bodyweight',
     unilateral: false,
+    sideTrackingMode: 'shared',
     metadata: input.origin ? { origin: input.origin } : {},
     gifUrl: null,
     youtubeUrl: null,
@@ -121,8 +122,9 @@ describe('H5 seeded analytics preservation', () => {
     const { readFileSync } = await import('node:fs')
     const source = readFileSync('server/training/owner-exercises.ts', 'utf8')
     expect(source).toContain('measurement_kind = CASE WHEN $3::boolean THEN $4 ELSE measurement_kind END')
-    expect(source).toContain('performance_type = CASE WHEN $3::boolean THEN $7 ELSE performance_type END')
-    expect(source).toContain('analytics_load_type = CASE WHEN $3::boolean THEN $8 ELSE analytics_load_type END')
+    expect(source).toContain('side_tracking_mode = CASE WHEN $3::boolean THEN $7 ELSE side_tracking_mode END')
+    expect(source).toContain('performance_type = CASE WHEN $3::boolean THEN $8 ELSE performance_type END')
+    expect(source).toContain('analytics_load_type = CASE WHEN $3::boolean THEN $9 ELSE analytics_load_type END')
     expect(source).toContain('plan.semanticChanged')
   })
 })

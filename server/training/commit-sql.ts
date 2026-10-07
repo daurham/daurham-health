@@ -11,7 +11,7 @@ WITH claimed AS (
 )
 INSERT INTO workout_sessions (
   id, workout_date, workout_template_id, routine_code, template_version, template_name,
-  duration_min, effort, pain_level, bodyweight_kg, notes, source_kind, metadata,
+  duration_min, effort, pain_level, limitation_kind, limitation_note, bodyweight_kg, notes, source_kind, metadata,
   session_type, session_name
 )
 SELECT
@@ -24,11 +24,13 @@ SELECT
   $14::numeric,
   $15::int,
   $16::int,
-  $17::numeric,
+  $17,
   $18,
-  $19,
-  $20::jsonb,
+  $19::numeric,
+  $20,
   $21,
-  $22
+  $22::jsonb,
+  $23,
+  $24
 FROM claimed
 `.trim()

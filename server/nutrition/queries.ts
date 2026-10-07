@@ -106,6 +106,7 @@ export function mapEntryRow(row: EntryRow): NutritionEntry {
     fiber: asNumber(row.fiber),
     sodium: asNumber(row.sodium),
     sourceKind: row.source_kind as NutritionEntry['sourceKind'],
+    evidenceQuality: row.evidence_quality as NutritionEntry['evidenceQuality'],
     notes: row.notes == null || row.notes === '' ? null : String(row.notes),
     mealGroupId: row.meal_group_id == null ? null : String(row.meal_group_id),
     recipeVersionId: row.recipe_version_id == null || row.recipe_version_id === '' ? null : String(row.recipe_version_id),
@@ -141,7 +142,7 @@ const FOOD_COLUMNS = `id, name, brand, barcode, catalog_kind, serving_quantity, 
          calories, protein, carbs, fat, fiber, sodium, source_kind, is_staple, archived, notes, created_at, updated_at`
 
 const ENTRY_COLUMNS = `id, log_date, consumed_at, timezone, meal, food_id, food_name, brand, serving_quantity,
-         serving_unit, grams, calories, protein, carbs, fat, fiber, sodium, source_kind, notes, meal_group_id,
+         serving_unit, grams, calories, protein, carbs, fat, fiber, sodium, source_kind, evidence_quality, notes, meal_group_id,
          recipe_version_id, recipe_portion_kind, recipe_portion_amount, recipe_fraction, created_at, updated_at`
 
 const ENTRY_READ_COLUMNS = ENTRY_COLUMNS.split(',')

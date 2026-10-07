@@ -9,6 +9,7 @@ type ProfileRow = {
   persistent_health_context: string | null
   training_limitations: string | null
   dietary_context: string | null
+  body_measurement_protocol: string | null
   updated_at: string | Date | null
 }
 
@@ -31,6 +32,7 @@ function emptyProfile() {
     persistentHealthContext: null,
     trainingLimitations: null,
     dietaryContext: null,
+    bodyMeasurementProtocol: null,
     updatedAt: null,
   })
 }
@@ -43,6 +45,7 @@ export async function getHealthProfile() {
             persistent_health_context,
             training_limitations,
             dietary_context,
+            body_measurement_protocol,
             updated_at
        FROM health_profile
       WHERE singleton_id = 1
@@ -56,6 +59,7 @@ export async function getHealthProfile() {
     persistentHealthContext: row.persistent_health_context,
     trainingLimitations: row.training_limitations,
     dietaryContext: row.dietary_context,
+    bodyMeasurementProtocol: row.body_measurement_protocol,
     updatedAt: isoInstant(row.updated_at),
   })
 }
@@ -91,10 +95,11 @@ export async function putHealthProfile(body: unknown) {
        persistent_health_context,
        training_limitations,
        dietary_context,
+       body_measurement_protocol,
        created_at,
        updated_at
      ) VALUES (
-       1, $1::date, $2::numeric, $3, $4, $5, now(), now()
+       1, $1::date, $2::numeric, $3, $4, $5, $6, now(), now()
      )
      ON CONFLICT (singleton_id) DO UPDATE SET
        date_of_birth = EXCLUDED.date_of_birth,
@@ -102,6 +107,7 @@ export async function putHealthProfile(body: unknown) {
        persistent_health_context = EXCLUDED.persistent_health_context,
        training_limitations = EXCLUDED.training_limitations,
        dietary_context = EXCLUDED.dietary_context,
+       body_measurement_protocol = EXCLUDED.body_measurement_protocol,
        updated_at = now()`,
     [
       input.dateOfBirth,
@@ -109,6 +115,7 @@ export async function putHealthProfile(body: unknown) {
       input.persistentHealthContext,
       input.trainingLimitations,
       input.dietaryContext,
+      input.bodyMeasurementProtocol,
     ],
   )
   return getHealthProfile()

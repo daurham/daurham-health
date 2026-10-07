@@ -28,12 +28,15 @@ export function MeasureForm({
   editing: boolean
   busy: boolean
   onCancel: () => void
-  onSubmit: (body: { notes: string | null; metrics: Array<{ key: string; value: string; unit: string }> }) => Promise<void>
+  onSubmit: (body: { notes: string | null; comparability: 'usual' | 'different_conditions' | 'unknown'; metrics: Array<{ key: string; value: string; unit: string }> }) => Promise<void>
 }) {
   const [mode, setMode] = useState<MeasurePreset>(preset)
   const [values, setValues] = useState<Record<string, string>>(initialValues)
   const [customKeys, setCustomKeys] = useState<string[]>(initialCustomKeys)
   const [notes, setNotes] = useState(initialValues.notes ?? '')
+  const [comparability, setComparability] = useState<'usual' | 'different_conditions' | 'unknown'>(
+    initialValues.comparability === 'usual' || initialValues.comparability === 'different_conditions' ? initialValues.comparability : 'unknown',
+  )
   const [error, setError] = useState<string | null>(null)
 
   const fields = useMemo(() => fieldsFor(mode, customKeys), [mode, customKeys])
@@ -48,14 +51,14 @@ export function MeasureForm({
       }
     })
     try {
-      parseManualCreate({ notes, metrics }, new Date())
+      parseManualCreate({ notes, comparability, metrics }, new Date())
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Check the measurements')
       return
     }
     setError(null)
     try {
-      await onSubmit({ notes: notes.trim() === '' ? null : notes.trim(), metrics })
+      await onSubmit({ notes: notes.trim() === '' ? null : notes.trim(), comparability, metrics } as Parameters<typeof onSubmit>[0])
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Could not save the measurement')
     }
@@ -110,6 +113,18 @@ export function MeasureForm({
         focusKey={focusKey}
         onChange={(key, value) => setValues((current) => ({ ...current, [key]: value }))}
       />
+      <label className="block text-sm">
+        <span className="text-zinc-600">Measurement conditions</span>
+        <select
+          className={`${fieldClass} mt-1`}
+          value={comparability}
+          onChange={(event) => setComparability(event.target.value as 'usual' | 'different_conditions' | 'unknown')}
+        >
+          <option value="usual">Usual conditions</option>
+          <option value="different_conditions">Different conditions</option>
+          <option value="unknown">Not sure / not recorded</option>
+        </select>
+      </label>
       <label className="block text-sm">
         <span className="text-zinc-600">Notes</span>
         <input

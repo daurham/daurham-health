@@ -1,16 +1,16 @@
 # Current task
 
-## I3 — XP Participation Expansion + Theme Runway
+## I4 — Evidence Semantics, Effort, and Change Ledger
 
 ### Status
 
-Implementation prepared as a dormant batched Git commit on top of dormant I2 commit `a8437e0b8afe90723af289d2041b8bf5ca47ef83`.
+Implementation prepared as a dormant batched Git commit on top of dormant I3 commit `a615965bfa6a5547447be85e395f695d63050c7d`.
 
 Do not move a feature branch ref while the Vercel rolling deployment limit remains active.
 
-Repository schema head after I3:
+Repository schema head after I4:
 
-`0045_xp_participation_themes.sql`
+`0046_evidence_semantics_change_watchdog.sql`
 
 Master program:
 
@@ -18,191 +18,146 @@ Master program:
 
 ## Product intent
 
-I3 expands XP without turning Health observations into farmable game events.
+I4 makes later Health intelligence safer by improving the meaning, provenance, effort context, and change context of existing Health evidence before I5 builds a shared intelligence frame.
 
-The reward system now has two legitimate award families:
+Canonical Health facts remain authoritative. I4 may derive change candidates and data-quality flags, but it does not silently correct source records or invent missing observations.
 
-1. Coach commitment completion, preserving the existing H3 reward bands.
-2. Bounded daily participation for a few high-value tracking behaviors.
+## Training evidence
 
-Canonical Health facts remain independent of XP. A valid Health write never depends on whether an XP award succeeds.
+- Existing session effort 1–5 and pain 0–3 remain the session-level subjective context.
+- Working sets may optionally record either RIR 0–10 or RPE 1–10. A set cannot record both.
+- Failure evidence is explicit: `reached_failure` or `failed_rep`. Ordinary hard effort is not inferred as failure.
+- Independent-side exercises may record left/right failure separately.
+- Exercise definitions gain `side_tracking_mode`: `shared`, `paired`, or `independent`.
+- Existing per-side measurement families remain valid. Selected dumbbell movements become independent prospectively without rewriting historical shared-rep sets.
+- Optional session limitation context records pain, fatigue, illness, time, equipment, or other constraints plus a bounded note.
 
-## Rule versions
+## Nutrition evidence quality
 
-- Wallet/current rule: `xp-rule-v2`
-- Coach award rule remains: `xp-rule-v1`
-- Daily participation rule: `xp-participation-v1`
+Each Nutrition entry carries a coarse evidence class:
 
-Existing Coach awards are not rewritten.
+- `measured_reference`;
+- `owner_entered`;
+- `ai_estimate`;
+- `legacy_unknown`.
 
-## Daily participation awards
+The classification describes how the nutrition values were obtained. It is not a food-health score.
 
-One Health date can earn at most **65 participation XP**:
+Nutrition day responses derive a calorie-weighted quality summary:
 
-- Hydration: **10 XP** after the first valid water log.
-- Bowel tracking: **10 XP** after the first bowel event or explicit no-BM state.
-- Daily wellness: **20 XP** after saving at least one energy/hunger/soreness/stress rating.
-- Supplements: **25 XP** when every scheduled occurrence for the day is explicitly recorded.
+- `high_confidence`;
+- `mixed`;
+- `estimate_heavy`;
+- `unknown`.
 
-Participation is rewarded for honest tracking, not health outcomes.
+Missing historical quality is treated as unknown, never as measured evidence.
 
-For supplements:
+## Body comparability
 
-- taken counts as recorded;
-- skipped counts as recorded;
-- unknown does not;
-- paused/not-scheduled occurrences do not create work and do not independently mint XP.
+Manual Body measurement sessions may be marked:
 
-No per-glass, per-bowel-movement, or per-rating XP exists.
+- `usual`;
+- `different_conditions`;
+- `unknown`.
 
-## Idempotency and corrections
+Health Profile gains one optional owner-authored note describing usual body-measurement conditions. Different-condition measurements remain valid canonical observations; the marker exists for later interpretation.
 
-Each participation award uses one immutable ledger entry per domain + Health date.
+## Event time vs entered time
 
-Idempotency key shape:
+I4 does not add redundant timestamps where the schema already represents both concepts.
 
-`award:daily:<kind>:<YYYY-MM-DD>`
+Observed/effective time continues to use domain fields such as `measured_at`, `consumed_at`, Health dates, and version effective dates. Database `created_at` remains entry/storage time. Later intelligence must preserve that distinction.
 
-Repeated taps, retries, edits, and additional events on the same day do not mint another participation award.
+## Change Ledger
 
-Health corrections do not claw XP back. This preserves the existing rule that the game economy must never discourage correcting Health history.
+Progress → Timeline gains an owner-only **Changes & interventions** panel.
 
-## Backlog behavior
+The ledger is derived from existing canonical histories for:
 
-Participation XP is eligible only for:
+- Nutrition target changes;
+- Training Plan versions;
+- Goal start/target/lifecycle changes;
+- supplement status events;
+- Experiment windows;
+- selected Daily Context intervention/context tags.
 
-- today;
-- yesterday.
+I4 also detects a small first set of behavioral candidates:
 
-Older backlog remains fully valid Health history but does not mint XP.
+- daily steps;
+- Training frequency;
+- logged-water pattern.
 
-The configured Health calendar timezone remains authoritative.
+Detection compares the most recent seven completed days with the prior fourteen days and requires minimum coverage plus a meaningful magnitude. Hydration compares tracked days only; missing water logs are not converted to zero.
 
-No historical Daily Signals or supplement history is automatically backfilled for I3.
+A candidate is not canonical intent. The owner may confirm or dismiss it. Confirmation records the detected change in the derived ledger; neither action rewrites source data.
 
-## Ledger migration
+## Data Quality watchdog
 
-Migration 0045 expands `xp_ledger.source_kind` to include:
+Settings → Data Quality runs deterministic review rules over recent data for:
 
-`daily_participation`
+- broadly implausible or unusual Body values;
+- unusually large Nutrition entries/serving multipliers;
+- possible duplicate Nutrition entries;
+- future Body/Nutrition timestamps;
+- substantially incomplete-looking Nutrition days, labeled as a possibility rather than assumed missing food;
+- missing one side on an independent-side Training set;
+- recent Body measurement source discontinuity.
 
-The append-only ledger, purchase/refund behavior, Lifetime XP, Spendable XP, and immutable reward-purchase snapshots are unchanged.
+Classification is conservative and review-oriented, including `needs_confirmation`, `plausible_but_unusual`, `possible_duplicate`, and `source_discontinuity`.
 
-**Deployment ordering:** apply migration 0045 before exposing I3 server code. The previous database constraint intentionally rejects `daily_participation`.
+Owner review choices are:
 
-## Wallet refresh
+- `confirmed_valid`;
+- `excluded_from_analysis`.
 
-Successful Daily Signals mutations and supplement-adherence mutations trigger the existing reward-state refresh event.
+Review decisions are durable annotations. They do not delete or mutate the source Health row.
 
-If the mutation did not actually earn XP, the refreshed balance remains unchanged.
+## Intelligence boundary
 
-## Health-write failure isolation
+I4 does **not** retrofit current Progress calculations to obey `excluded_from_analysis`. I5 owns the shared evidence frame and will consume these review annotations as part of provenance/coverage/confidence logic.
 
-Canonical Health history is more important than the game economy.
+This preserves one analysis authority instead of adding ad-hoc exclusion logic to existing screens.
 
-The strict wallet service may surface ledger/database failures to its own tests and callers, but Daily Signals and supplement adherence use a best-effort participation wrapper **after** the canonical Health mutation succeeds.
+## Backup
 
-If the wallet write fails:
+Migration 0046 and backup inventory include:
 
-- the Health record remains saved;
-- the Health endpoint still succeeds;
-- the failure does not invite a duplicate Health retry;
-- no synthetic XP is assumed;
-- a later product/ops repair can address the missing ledger event explicitly if needed.
+- Training effort/failure/limitation fields;
+- exercise side-tracking mode;
+- Nutrition evidence quality;
+- Body comparability and Health Profile measurement protocol;
+- `change_candidates`;
+- `data_quality_reviews`.
 
-Migration 0045 is still mandatory before normal I3 deployment; failure isolation is a correctness safeguard, not a substitute for applying the schema.
-
-## Rewards copy
-
-Rewards now explains:
-
-- Coach + participation earning;
-- the 65 XP/day participation cap;
-- per-domain values;
-- honest supplement skips;
-- today/yesterday backlog behavior;
-- no stacking from multiple events;
-- the personal reward-budget convention: **100 XP = $1**.
-
-## Theme runway
-
-Existing unlock thresholds are not moved.
-
-Eight new progression packs are appended:
-
-- Level 13 — Crimson Surge
-- Level 14 — Sun God
-- Level 15 — Sage Storm
-- Level 16 — Mjolnir Night
-- Level 17 — Vault Neon
-- Level 18 — Abyss Knight
-- Level 19 — Republic Red
-- Level 20 — Cosmic Instinct
-
-The existing `progression-v1` threshold formula remains unchanged.
-
-Level 20 unlocks at **10,450 lifetime XP**.
-
-Theme metadata, Theme Studio allowlisting, CSS, pre-render bootstrap allowlisting, and level-up discovery all use the same IDs.
-
-## XP velocity review
-
-Maximum participation-only velocity:
-
-- 65 XP/day;
-- about 1,950 XP per 30-day month.
-
-Typical challenge completion adds roughly:
-
-- Daily Quest: 10–25 XP/day when completed;
-- Weekly commitment: 75 XP;
-- Stretch: 100 XP when completed.
-
-That places a strong-compliance month around the original **$30+** reward-budget target without making routine logging alone worth $30–$50.
-
-At roughly 3,000–5,000 lifetime XP/month, the Level 20 runway is approximately 2–4 months from a fresh wallet. Future runway should be extended by appending levels/themes, not by moving already-earned thresholds upward.
+Owner review/confirmation state is portable.
 
 ## Explicit non-goals
 
-I3 does not:
+I4 does not:
 
-- reward number of glasses;
-- reward number or Bristol quality of bowel movements;
-- reward high/low wellness scores differently;
-- reward supplement ingestion more than an honest skip;
-- create negative XP;
-- claw back awards after Health correction;
-- change Coach reward-band values;
-- change the level threshold formula;
-- add new Health analytics or AI interpretation.
+- calculate recovery/readiness scores;
+- infer causality from changes;
+- add correlations;
+- auto-adjust Nutrition or Training targets;
+- silently repair canonical rows;
+- delete excluded records;
+- treat missing water/Nutrition/Body evidence as zero;
+- require RIR/RPE on every set;
+- rewrite historical Training sets into new left/right semantics;
+- call Gemini or Home-AI for change/watchdog detection.
 
 ## Validation before publication
 
 Once this dormant commit is exposed to one branch:
 
-1. apply migration 0045 to the branch test database;
+1. apply migrations through 0046 to the branch test database;
 2. run `npx tsc -b`;
 3. run `npx eslint .`;
 4. run `npm test`;
 5. run `npm run build`.
 
-Required regression coverage:
-
-- rule-version compatibility;
-- fixed participation values and 65 XP cap;
-- today/yesterday backlog eligibility;
-- duplicate award idempotency;
-- append-only ledger;
-- purchase/refund accounting;
-- supplement-day completion semantics;
-- Daily Signals award hooks;
-- portable ledger backup;
-- old-theme backward compatibility;
-- Level 13–20 unlock thresholds;
-- pre-render/theme/CSS allowlist consistency.
-
 Do not merge until the exact published branch head is green.
 
 ## Next roadmap slice
 
-I4 — Evidence Semantics, Effort, and Change Ledger.
+I5 — Shared Health Intelligence Engine + Ask Health Context.

@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
+  nutritionDayQuality,
+  nutritionDayQualityLabel,
   nutritionDayTotals,
   recipePortionDescription,
   snapshotFromDefinition,
+  type NutrientTotal,
   type NutritionEntry,
+  type NutritionEvidenceQuality,
   type NutritionFood,
   type PendingNutritionCapture,
 } from '@/domain/nutrition'
@@ -18,7 +22,6 @@ import {
   useAtomicKeyedResource,
   useHealthCalendarTimeZone,
 } from '@/lib'
-import type { NutrientTotal } from '@/domain/nutrition'
 import {
   createNutritionEntry,
   deleteNutritionEntry,
@@ -154,6 +157,7 @@ export function NutritionPage() {
       ...extra,
       entries,
       totals: nutritionDayTotals(entries),
+      quality: nutritionDayQuality(entries),
     }))
   }
 
@@ -174,6 +178,12 @@ export function NutritionPage() {
       const recents = [food, ...current.quickAdd.recents.filter((item) => item.id !== food.id)].slice(0, 12)
       return { ...current, quickAdd: { ...current.quickAdd, recents } }
     })
+  }
+
+  function optimisticQuality(food: NutritionFood): NutritionEvidenceQuality {
+    if (food.sourceKind === 'description_ai') return 'ai_estimate'
+    if (food.sourceKind === 'usda' || food.sourceKind === 'barcode' || food.sourceKind === 'ocr') return 'measured_reference'
+    return 'owner_entered'
   }
 
   async function quickLog(food: NutritionFood) {
@@ -212,6 +222,7 @@ export function NutritionPage() {
       fiber: snapshot.fiber,
       sodium: snapshot.sodium,
       sourceKind: 'manual',
+      evidenceQuality: optimisticQuality(food),
       notes: null,
       mealGroupId: null,
       createdAt: new Date().toISOString(),
@@ -229,12 +240,12 @@ export function NutritionPage() {
       })
       resource.replaceData((current) => {
         const entries = current.entries.map((entry) => (entry.id === optimisticId ? created : entry))
-        return { ...current, entries, totals: nutritionDayTotals(entries) }
+        return { ...current, entries, totals: nutritionDayTotals(entries), quality: nutritionDayQuality(entries) }
       })
     } catch (caught) {
       resource.replaceData((current) => {
         const entries = current.entries.filter((entry) => entry.id !== optimisticId)
-        return { ...current, entries, totals: nutritionDayTotals(entries) }
+        return { ...current, entries, totals: nutritionDayTotals(entries), quality: nutritionDayQuality(entries) }
       })
       setNotice(caught instanceof Error ? caught.message : 'Quick log failed')
     }
@@ -287,7 +298,7 @@ export function NutritionPage() {
       })
       resource.replaceData((current) => {
         const entries = [...current.entries, created]
-        return { ...current, entries, totals: nutritionDayTotals(entries) }
+        return { ...current, entries, totals: nutritionDayTotals(entries), quality: nutritionDayQuality(entries) }
       })
     } catch (caught) {
       setNotice(caught instanceof Error ? caught.message : 'Could not undo delete')
@@ -426,7 +437,7 @@ export function NutritionPage() {
           onLogged={(entry, food) => {
             resource.replaceData((current) => {
               const entries = [...current.entries.filter((item) => item.id !== entry.id), entry]
-              return { ...current, entries, totals: nutritionDayTotals(entries) }
+              return { ...current, entries, totals: nutritionDayTotals(entries), quality: nutritionDayQuality(entries) }
             })
             if (food) {
               prependRecent(food)
@@ -437,7 +448,7 @@ export function NutritionPage() {
             resource.replaceData((current) => {
               const ids = new Set(entries.map((item) => item.id))
               const next = [...current.entries.filter((item) => !ids.has(item.id)), ...entries]
-              return { ...current, entries: next, totals: nutritionDayTotals(next) }
+              return { ...current, entries: next, totals: nutritionDayTotals(next), quality: nutritionDayQuality(next) }
             })
             setPanel(null)
           }}
@@ -460,7 +471,7 @@ export function NutritionPage() {
           onSaved={(entry) => {
             resource.replaceData((current) => {
               const entries = current.entries.map((item) => (item.id === entry.id ? entry : item))
-              return { ...current, entries, totals: nutritionDayTotals(entries) }
+              return { ...current, entries, totals: nutritionDayTotals(entries), quality: nutritionDayQuality(entries) }
             })
           }}
           onDeleted={(entry) => void onDeleted(entry)}
@@ -519,7 +530,7 @@ export function NutritionPage() {
           onLogged={(entry, food) => {
             resource.replaceData((current) => {
               const entries = [...current.entries.filter((item) => item.id !== entry.id), entry]
-              return { ...current, entries, totals: nutritionDayTotals(entries) }
+              return { ...current, entries, totals: nutritionDayTotals(entries), quality: nutritionDayQuality(entries) }
             })
             prependRecent(food)
             setCaptures((current) => current.filter((job) => job.id !== panel.jobId))
@@ -555,7 +566,7 @@ export function NutritionPage() {
             resource.replaceData((current) => {
               const ids = new Set(entries.map((item) => item.id))
               const next = [...current.entries.filter((item) => !ids.has(item.id)), ...entries]
-              return { ...current, entries: next, totals: nutritionDayTotals(next) }
+              return { ...current, entries: next, totals: nutritionDayTotals(next), quality: nutritionDayQuality(next) }
             })
             setCaptures((current) => current.filter((job) => job.id !== panel.jobId))
             setPanel(null)
@@ -663,6 +674,12 @@ function SummaryCard({ day, onSetTargets }: { day: NutritionDayPayload; onSetTar
   const target = day.targets
   return (
     <section className="min-w-0 max-w-full rounded-xl border border-zinc-200 bg-white p-4">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Nutrition evidence</p>
+        <span className="rounded-full bg-zinc-100 px-2 py-1 text-xs font-medium text-zinc-700" title="Quality reflects how the nutrition values were obtained, not whether the foods were healthy.">
+          {nutritionDayQualityLabel(day.quality.kind)}
+        </span>
+      </div>
       <MacroProgressRow
         label="Calories"
         total={day.totals.calories}

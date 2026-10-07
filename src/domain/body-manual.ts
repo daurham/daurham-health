@@ -151,14 +151,19 @@ export type PlannedManualMetric = {
   valueKind: 'manual'
 }
 
+export const BODY_COMPARABILITY_VALUES = ['usual', 'different_conditions', 'unknown'] as const
+export type BodyComparability = (typeof BODY_COMPARABILITY_VALUES)[number]
+
 export type ManualCreatePlan = {
   measuredAt: Date
+  comparability: BodyComparability
   notes: string | null
   metrics: PlannedManualMetric[]
 }
 
 export type ManualPatchPlan = {
   measuredAt?: Date
+  comparability?: BodyComparability
   notes?: string | null
   metrics: PlannedManualMetric[]
 }
@@ -183,6 +188,7 @@ export function parseManualCreate(body: unknown, now: Date): ManualCreatePlan {
   const record = objectBody(body)
   return {
     measuredAt: parseMeasuredAt(record.measuredAt, now, true),
+    comparability: parseComparability(record.comparability),
     notes: parseNotes(record.notes),
     metrics: parseMetricList(record.metrics),
   }
@@ -193,6 +199,9 @@ export function parseManualPatch(body: unknown, now: Date): ManualPatchPlan {
   const plan: ManualPatchPlan = { metrics: parseMetricList(record.metrics) }
   if ('measuredAt' in record && record.measuredAt != null && record.measuredAt !== '') {
     plan.measuredAt = parseMeasuredAt(record.measuredAt, now, false)
+  }
+  if ('comparability' in record) {
+    plan.comparability = parseComparability(record.comparability)
   }
   if ('notes' in record) {
     plan.notes = parseNotes(record.notes)
@@ -223,6 +232,14 @@ export function ownerInputNumber(canonicalUnit: CanonicalUnit, canonicalValue: n
     return centimetersToInches(canonicalValue)
   }
   return canonicalValue
+}
+
+function parseComparability(value: unknown): BodyComparability {
+  if (value == null || value === '') return 'unknown'
+  if (typeof value === 'string' && (BODY_COMPARABILITY_VALUES as readonly string[]).includes(value)) {
+    return value as BodyComparability
+  }
+  throw new BodyInputError('Measurement comparability is invalid')
 }
 
 function objectBody(body: unknown): Record<string, unknown> {

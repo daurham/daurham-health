@@ -33,6 +33,8 @@ export {
 } from './recipe-ingredients.js'
 export type { IngredientFoodRef, RecipeIngredientDraft, UsdaPortionChoice } from './recipe-ingredients.js'
 export { nutritionDayTotals } from './totals.js'
+export { NUTRITION_EVIDENCE_QUALITIES, NUTRITION_DAY_QUALITIES, nutritionDayQuality, nutritionDayQualityLabel } from './quality.js'
+export type { NutritionEvidenceQuality, NutritionDayQualityKind, NutritionDayQuality, NutritionQualityEntry } from './quality.js'
 export type { NutritionDayTotals, NutrientTotal, NutritionTotable } from './totals.js'
 export { resolveNutritionTarget } from './targets.js'
 export {

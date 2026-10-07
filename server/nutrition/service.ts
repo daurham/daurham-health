@@ -3,6 +3,7 @@ import { isCalendarDate } from '../../src/domain/training.js'
 import {
   NUTRITION_CONFIG,
   normalizeBarcode,
+  nutritionDayQuality,
   nutritionDayTotals,
   nutritionEntryCreateSchema,
   nutritionEntryPatchSchema,
@@ -17,6 +18,7 @@ import {
   type NutritionEntry,
   type NutritionFood,
   type NutritionTarget,
+  type NutritionDayQuality,
   type NutritionDayTotals,
   type PackagedFoodCandidate,
 } from '../../src/domain/nutrition/index.js'
@@ -78,6 +80,7 @@ export type NutritionDayResponse = {
   date: string
   entries: NutritionEntry[]
   totals: NutritionDayTotals
+  quality: NutritionDayQuality
   targets: NutritionTarget | null
   quickAdd: {
     recents: NutritionFood[]
@@ -100,6 +103,7 @@ export async function getNutritionDay(date: string): Promise<NutritionDayRespons
     date,
     entries,
     totals: nutritionDayTotals(entries),
+    quality: nutritionDayQuality(entries),
     targets,
     quickAdd: { recents, staples, recipes, currentRecipes },
   }

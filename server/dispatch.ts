@@ -57,6 +57,8 @@ import askHealthLiteratureHandler from './handlers/ask-health-literature.js'
 import backupExportHandler from './handlers/backup-export.js'
 import coachHandler from './handlers/coach.js'
 import rewardsHandler from './handlers/rewards.js'
+import changeLedgerHandler from './handlers/change-ledger.js'
+import dataQualityHandler from './handlers/data-quality.js'
 
 export type HealthApiRoute =
   | 'health'
@@ -117,6 +119,8 @@ export type HealthApiRoute =
   | 'backup-export'
   | 'coach'
   | 'rewards'
+  | 'change-ledger'
+  | 'data-quality'
 
 type HealthApiHandler = (req: ApiRequest, res: ApiResponse) => unknown | Promise<unknown>
 
@@ -179,6 +183,8 @@ const HANDLERS: Record<HealthApiRoute, HealthApiHandler> = {
   'backup-export': backupExportHandler,
   coach: coachHandler,
   rewards: rewardsHandler,
+  'change-ledger': changeLedgerHandler,
+  'data-quality': dataQualityHandler,
 }
 
 function isSingleSegmentAfter(pathname: string, prefix: string): boolean {
@@ -199,6 +205,11 @@ export function matchHealthApiRoute(pathname: string): HealthApiRoute | null {
       return 'today'
     case '/api/backup/export':
       return 'backup-export'
+    case '/api/intelligence/changes':
+      return 'change-ledger'
+    case '/api/data-quality':
+    case '/api/data-quality/reviews':
+      return 'data-quality'
     case '/api/coach':
     case '/api/coach/ensure':
     case '/api/coach/lab/snooze':
@@ -308,6 +319,9 @@ export function matchHealthApiRoute(pathname: string): HealthApiRoute | null {
   }
   if (pathname === '/api/rewards' || pathname.startsWith('/api/rewards/')) {
     return 'rewards'
+  }
+  if (pathname.startsWith('/api/intelligence/changes/')) {
+    return 'change-ledger'
   }
   if (pathname === '/api/body/inbox' || pathname.startsWith('/api/body/inbox/')) {
     return 'body-inbox'

@@ -92,11 +92,11 @@ export async function createManualMeasurement(body: unknown, now = new Date()) {
     await sql.transaction([
       sql.query(
         `INSERT INTO body_measurement_sessions (
-           id, measured_at, timezone, source_id, import_job_id, device_name, notes
+           id, measured_at, timezone, source_id, import_job_id, device_name, notes, comparability
          ) VALUES (
-           $1::uuid, $2::timestamptz, $3, $4::uuid, NULL, NULL, $5
+           $1::uuid, $2::timestamptz, $3, $4::uuid, NULL, NULL, $5, $6
          )`,
-        [sessionId, plan.measuredAt.toISOString(), timezone, sourceId, plan.notes],
+        [sessionId, plan.measuredAt.toISOString(), timezone, sourceId, plan.notes, plan.comparability],
       ),
       ...plan.metrics.map((metric) => metricInsert(sql, sessionId, metric)),
     ])
@@ -120,11 +120,12 @@ export async function updateManualMeasurement(id: string, body: unknown, now = n
         `UPDATE body_measurement_sessions AS sessions
          SET measured_at = COALESCE($2::timestamptz, measured_at),
              notes = CASE WHEN $3::bool THEN $4 ELSE notes END,
+             comparability = CASE WHEN $5::bool THEN $6 ELSE comparability END,
              updated_at = now()
          WHERE sessions.id = $1::uuid
            AND ${EDITABLE_SESSION}
          RETURNING sessions.id::text AS id`,
-        [id, plan.measuredAt ? plan.measuredAt.toISOString() : null, plan.notes !== undefined, plan.notes ?? null],
+        [id, plan.measuredAt ? plan.measuredAt.toISOString() : null, plan.notes !== undefined, plan.notes ?? null, plan.comparability !== undefined, plan.comparability ?? null],
       ),
       sql.query(
         `DELETE FROM body_metrics AS metrics
