@@ -1,3 +1,17 @@
+## 2026-10-06 I0–I10 integrated validation complete — rollout gated on database access
+
+- The dormant I0–I10 stack was exposed once on `validate-i0-i10` after the Vercel deployment-rate limit cleared.
+- Last fully validated application commit is `eac16edaa595929b51ec942e402acbd2c7378ee1`.
+- GitHub Actions run `37579440908` passed TypeScript, ESLint, all 1,479 Vitest tests, and the production build.
+- The corresponding Vercel preview deployment completed successfully.
+- Integrated validation fixed cross-phase contract drift plus two real behavior gaps: Training substitution classification no longer labels same-movement/incompatible-equipment exercises as merely similar-muscle substitutes, and Weekly Coach deep-review safety catches plural target-change wording such as “decrease calories.”
+- Repository schema head remains `0049_passive_recovery_clinical_context.sql`.
+- Production database migration state is still unverified and unchanged.
+- A temporary read-only Actions probe could not run `npm run instance:check` because the repository has no `DATABASE_URL` secret. The probe made no database connection and executed no migration.
+- Connected Neon tooling is unscoped and requires the existing Health project's non-secret project ID before it can inspect the default branch; Vercel environment metadata is currently inaccessible through the connected team scope.
+- The temporary readiness workflow is removed from the validation branch after recording the result.
+- `main` remains untouched. Next gate: read-only production instance check, test/apply pending migrations through 0049 with explicit approval, owner mobile QA, then promotion.
+
 # Dev state
 
 ## 2026-10-06 I10 prepared — Passive Recovery + Clinical Context Expansion
