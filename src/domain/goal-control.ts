@@ -2,6 +2,7 @@ import { addCalendarDays, type TrainingDayIntent } from './training-plan.js'
 import type { HealthIntelligenceSnapshot, IntelligenceConfidence, IntelligenceRelationship, IntelligenceSignalKey } from './intelligence/shared.js'
 import type { WeeklyCandidate, WeeklyCoachBrief, WeeklyGoalSnapshot, WeeklyTrainingPlanSnapshot } from './weekly-coach/types.js'
 import type { MaintenanceState } from './maintenance.js'
+import type { TrainingProgressionState } from './training-progression.js'
 
 export const GOAL_CONTROL_VERSION = 'goal-control-v1' as const
 
@@ -84,6 +85,7 @@ export type GoalControlState = {
   relationships: GoalControlRelationship[]
   limitations: GoalControlLimitation[]
   maintenance: MaintenanceState | null
+  trainingProgression: TrainingProgressionState | null
 }
 
 export type BuildGoalControlInput = {
@@ -93,6 +95,7 @@ export type BuildGoalControlInput = {
   goals: readonly WeeklyGoalSnapshot[]
   trainingPlan?: WeeklyTrainingPlanSnapshot | null
   maintenance?: MaintenanceState | null
+  trainingProgression?: TrainingProgressionState | null
 }
 
 export function goalNeedsWeeklyAttention(deadlineState: string): boolean {
@@ -261,6 +264,22 @@ function opportunity(candidate: WeeklyCandidate | null): GoalControlOpportunity 
   }
 }
 
+function trainingProgressionOpportunity(training: TrainingProgressionState | null | undefined): GoalControlOpportunity | null {
+  const item = training?.primaryOpportunity
+  if (!item) return null
+  return {
+    id: item.id,
+    kind: 'training_progression',
+    domain: 'training',
+    title: item.title,
+    detail: item.detail,
+    actionText: item.actionText,
+    detailPath: item.detailPath,
+    sourceCandidateId: null,
+    evidenceRefs: [...item.evidenceRefs],
+  }
+}
+
 function maintenanceOpportunity(maintenance: MaintenanceState | null | undefined): GoalControlOpportunity | null {
   if (
     !maintenance ||
@@ -404,7 +423,7 @@ export function buildGoalControlState(input: BuildGoalControlInput): GoalControl
     detailPath: `/goals/${goal.id}`,
   }))
   const confidence = overallConfidence(input.brief, input.intelligence, input.goals)
-  const primaryOpportunity = opportunity(input.brief.focus) ?? maintenanceOpportunity(input.maintenance)
+  const primaryOpportunity = opportunity(input.brief.focus) ?? maintenanceOpportunity(input.maintenance) ?? trainingProgressionOpportunity(input.trainingProgression)
   const limitations = limitationsFor(input.intelligence, input.goals, nutrition, confidence)
   const activeControlGoals = goals.filter((goal) => goal.lifecycle === 'active')
   const allActiveGoalsUnknown = activeControlGoals.length > 0 && activeControlGoals.every((goal) => goal.state === 'unknown')
@@ -444,5 +463,6 @@ export function buildGoalControlState(input: BuildGoalControlInput): GoalControl
     relationships: relationshipsFor(input.intelligence, input.goals),
     limitations,
     maintenance: input.maintenance ?? null,
+    trainingProgression: input.trainingProgression ?? null,
   }
 }

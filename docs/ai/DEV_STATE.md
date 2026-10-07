@@ -1,5 +1,21 @@
 # Dev state
 
+## 2026-10-06 I8 prepared — Training Progression / Preservation Goals
+
+- I8 is prepared as a dormant batch on top of dormant I7; no branch ref is moved while the Vercel deployment-rate window remains active.
+- No migration is added; schema head remains `0047_maintenance_calibration_experiment_origin.sql`.
+- Added `training-progression-v1` with exact-exercise progression/stall/decline/confounded states.
+- RIR, RPE, and failure evidence contribute to hard-set/proximity interpretation when explicitly logged; missing effort evidence remains missing.
+- Lower recent performance is treated as confounded rather than a true decline when recent effort is materially harder or the session carries a recovery/limitation tag.
+- Bodyweight-relative loaded strength is descriptive context and never rewrites the exact strength series.
+- Movement and muscle exposure are derived from recent canonical Training working sets.
+- Exercise substitution distinguishes same exercise, comparable substitute, and similar muscle group; substitutes never merge historical strength series.
+- Active exercise-linked Goals receive preservation context. Comparable substitutes can preserve movement exposure but do not satisfy exact-exercise progression.
+- Goal Control can use a strong Training progression concern only when higher-priority weekly/maintenance evidence does not already own the decision.
+- Added owner-only `GET /api/intelligence/training-progression`.
+- Focused I8 deterministic tests are staged. Full validation remains deferred until the dormant stack is exposed to one branch.
+- I9 is next: Coach Intelligence / Next Best Actions + Deep Health Review.
+
 ## 2026-10-06 I7 prepared — Observed Maintenance + Plateau Engine
 
 - I7 is prepared as a dormant batch on top of dormant I6; no branch ref is moved while the Vercel rolling deployment limit remains active.

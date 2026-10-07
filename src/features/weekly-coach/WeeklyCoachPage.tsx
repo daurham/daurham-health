@@ -135,6 +135,7 @@ function WeeklyDecisionCard({ decision, prefix }: { decision: GoalControlState; 
         <div className="rounded-md bg-zinc-50 px-3 py-2">
           <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Training</p>
           <p className="mt-1 text-zinc-700">{decision.trainingAdherence.detail}</p>
+          {decision.trainingProgression ? <p className="mt-1 text-xs text-zinc-500">{decision.trainingProgression.summary}</p> : null}
         </div>
         <div className="rounded-md bg-zinc-50 px-3 py-2">
           <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Nutrition evidence</p>

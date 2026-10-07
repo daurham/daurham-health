@@ -3,6 +3,7 @@ import { buildWeeklyCoachBrief, type WeeklyCoachBrief, type WeeklyCoachInput } f
 import { loadWeeklyCoachInput } from '../weekly-coach/load.js'
 import { loadHealthIntelligenceSnapshot } from './snapshot.js'
 import { loadMaintenanceState } from './maintenance.js'
+import { loadTrainingProgressionState } from './training-progression.js'
 
 export async function loadGoalControlState(
   asOf: string,
@@ -11,7 +12,10 @@ export async function loadGoalControlState(
   const weeklyInput = preloaded?.weeklyInput ?? await loadWeeklyCoachInput(asOf)
   const brief = preloaded?.brief ?? buildWeeklyCoachBrief(weeklyInput)
   const intelligence = await loadHealthIntelligenceSnapshot({ range: '30d', asOf })
-  const maintenance = await loadMaintenanceState({ asOf, snapshot: intelligence })
+  const [maintenance, trainingProgression] = await Promise.all([
+    loadMaintenanceState({ asOf, snapshot: intelligence }),
+    loadTrainingProgressionState(asOf),
+  ])
   return buildGoalControlState({
     asOf,
     brief,
@@ -19,5 +23,6 @@ export async function loadGoalControlState(
     goals: weeklyInput.goals,
     trainingPlan: weeklyInput.trainingPlan ?? null,
     maintenance,
+    trainingProgression,
   })
 }

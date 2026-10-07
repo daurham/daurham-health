@@ -3417,6 +3417,8 @@ No automatic calorie-target mutation.
 
 ## Phase I8 — Training Progression / Preservation Goals
 
+**Status:** Prepared as dormant implementation on 2026-10-06; full branch validation deferred.
+
 ### Deliver
 - progression/stall states;
 - RIR/RPE-aware performance interpretation;
