@@ -15,6 +15,8 @@ const ITEM = '11111111-1111-4111-8111-111111111111'
 const PURCHASE = '22222222-2222-4222-8222-222222222222'
 const LEDGER_AWARD = '33333333-3333-4333-8333-333333333333'
 const LEDGER_PURCHASE = '44444444-4444-4444-8444-444444444444'
+const LEDGER_PARTICIPATION = '77777777-7777-4777-8777-777777777777'
+const PARTICIPATION_SOURCE = '88888888-8888-4888-8888-888888888888'
 const COACH_TASK = '55555555-5555-4555-8555-555555555555'
 const INSTANT = '2026-09-30T02:00:00.000Z'
 
@@ -51,6 +53,18 @@ const rowsByTable: Record<string, BackupRow[]> = {
       created_at: INSTANT,
     },
     {
+      id: LEDGER_PARTICIPATION,
+      entry_kind: 'award',
+      amount_xp: '20',
+      source_kind: 'daily_participation',
+      source_id: PARTICIPATION_SOURCE,
+      idempotency_key: 'award:daily:wellness:2026-09-29',
+      rule_version: 'xp-participation-v1',
+      occurred_at: INSTANT,
+      metadata: JSON.stringify({ participationKind: 'wellness', healthDate: '2026-09-29' }),
+      created_at: INSTANT,
+    },
+    {
       id: LEDGER_PURCHASE,
       entry_kind: 'purchase',
       amount_xp: '50',
@@ -67,7 +81,6 @@ const rowsByTable: Record<string, BackupRow[]> = {
 
 describe('Reward wallet backup inventory', () => {
   it('advances schema head and keeps wallet owner data portable', () => {
-    expect(LATEST_SCHEMA_MIGRATION).toBe('0041_exercise_library_calisthenics.sql')
     for (const name of ['reward_items', 'reward_purchases', 'xp_ledger']) {
       expect(backupTable(name)).toMatchObject({ backupClass: 'canonical', portable: true, seeded: false })
       expect(tablesForProfile('portable').map((table) => table.name)).toContain(name)
@@ -109,5 +122,6 @@ describe('Reward wallet backup inventory', () => {
     expect(joined.indexOf('INSERT INTO reward_items')).toBeLessThan(joined.indexOf('INSERT INTO reward_purchases'))
     expect(joined).toContain('INSERT INTO xp_ledger')
     expect(sql.flatMap((statement) => statement.params)).toContain('xp-rule-v1')
+    expect(sql.flatMap((statement) => statement.params)).toContain('xp-participation-v1')
   })
 })

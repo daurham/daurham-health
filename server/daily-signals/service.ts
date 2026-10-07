@@ -14,6 +14,7 @@ import { healthCalendarDateFromNow } from '../../src/domain/time.js'
 import { getSql, type Sql } from '../db.js'
 import { HttpError } from '../http.js'
 import { getInstanceConfig } from '../instance-config.js'
+import { tryAwardDailyParticipation } from '../rewards/service.js'
 
 type HydrationRow = {
   id: string
@@ -163,6 +164,7 @@ export async function addHydrationEvent(body: unknown, now = new Date()): Promis
      RETURNING id::text AS id, hydration_date::text AS hydration_date, occurred_at, amount_ml, note, created_at`,
     [id, parsed.date, occurredAt, parsed.amountMl, sourceId, parsed.note, parsed.requestId],
   )) as HydrationRow[]
+  await tryAwardDailyParticipation(sql, { kind: 'hydration', healthDate: parsed.date, today, awardedAt: now })
   return mapHydration(rows[0]!)
 }
 
@@ -196,6 +198,7 @@ export async function addBowelEvent(body: unknown, now = new Date()): Promise<Bo
   ]
   const result = await sql.transaction(statements)
   const rows = result[1] as BowelRow[]
+  await tryAwardDailyParticipation(sql, { kind: 'bowel', healthDate: parsed.date, today, awardedAt: now })
   return mapBowel(rows[0]!)
 }
 
@@ -206,7 +209,7 @@ export async function deleteBowelEvent(id: string): Promise<boolean> {
 }
 
 export async function setNoBowelMovement(date: string, now = new Date()): Promise<void> {
-  await validatedDate(date, now)
+  const { today } = await validatedDate(date, now)
   const sql = await getSql()
   const existing = (await sql.query(`SELECT count(*)::int AS count FROM bowel_events WHERE bowel_date = $1::date`, [date])) as Array<{ count: number }>
   if ((existing[0]?.count ?? 0) > 0) throw new HttpError(409, 'A bowel movement is already logged for this day.')
@@ -217,6 +220,7 @@ export async function setNoBowelMovement(date: string, now = new Date()): Promis
      ON CONFLICT (bowel_date) DO UPDATE SET state = 'no_bowel_movement', source_id = EXCLUDED.source_id, updated_at = now()`,
     [date, sourceId],
   )
+  await tryAwardDailyParticipation(sql, { kind: 'bowel', healthDate: date, today, awardedAt: now })
 }
 
 export async function clearNoBowelMovement(date: string, now = new Date()): Promise<boolean> {
@@ -227,7 +231,7 @@ export async function clearNoBowelMovement(date: string, now = new Date()): Prom
 }
 
 export async function putDailyWellness(date: string, body: unknown, now = new Date()): Promise<DailyWellness> {
-  await validatedDate(date, now)
+  const { today } = await validatedDate(date, now)
   const parsed = normalizeWellnessWrite(body)
   if ('error' in parsed) throw new HttpError(400, parsed.error)
   const sql = await getSql()
@@ -247,6 +251,7 @@ export async function putDailyWellness(date: string, body: unknown, now = new Da
                created_at, updated_at`,
     [date, parsed.energy, parsed.hunger, parsed.soreness, parsed.stress, sourceId],
   )) as WellnessRow[]
+  await tryAwardDailyParticipation(sql, { kind: 'wellness', healthDate: date, today, awardedAt: now })
   return mapWellness(rows[0]!)
 }
 

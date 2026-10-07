@@ -1,10 +1,17 @@
 import { randomUUID } from 'node:crypto'
 import {
+  COACH_XP_RULE_VERSION,
+  DAILY_PARTICIPATION_RULE_VERSION,
   XP_RULE_VERSION,
+  dailyParticipationIdempotencyKey,
+  dailyParticipationLabel,
+  dailyParticipationXp,
   deriveWalletBalances,
+  participationDateEligible,
   rewardItemInputSchema,
   rewardPurchaseRequestSchema,
   xpForRewardBand,
+  type DailyParticipationKind,
   type RewardActivity,
   type RewardItem,
   type RewardPurchase,
@@ -43,7 +50,7 @@ type LedgerRow = {
   id: string
   entry_kind: XpLedgerEntryKind
   amount_xp: number | string
-  source_kind: 'coach_task' | 'reward_purchase'
+  source_kind: 'coach_task' | 'daily_participation' | 'reward_purchase'
   source_id: string
   idempotency_key: string
   rule_version: string | null
@@ -107,7 +114,21 @@ function mapLedger(row: LedgerRow): WalletLedgerEntry {
 function activityLabel(entry: WalletLedgerEntry): string {
   const title = typeof entry.metadata.title === 'string' ? entry.metadata.title : null
   const rewardName = typeof entry.metadata.rewardName === 'string' ? entry.metadata.rewardName : null
-  if (entry.entryKind === 'award') return title ?? 'Coach completion'
+  if (entry.entryKind === 'award') {
+    if (entry.sourceKind === 'daily_participation') {
+      const participationKind = entry.metadata.participationKind
+      if (
+        participationKind === 'hydration'
+        || participationKind === 'bowel'
+        || participationKind === 'wellness'
+        || participationKind === 'supplements'
+      ) {
+        return dailyParticipationLabel(participationKind)
+      }
+      return 'Daily participation'
+    }
+    return title ?? 'Coach completion'
+  }
   if (entry.entryKind === 'purchase') return rewardName ?? 'Reward purchase'
   return `Refund: ${rewardName ?? 'Reward purchase'}`
 }
@@ -139,7 +160,7 @@ export async function awardCoachTask(sql: Sql, task: CoachAwardSource): Promise<
       amount,
       task.id,
       `award:coach:${task.id}`,
-      XP_RULE_VERSION,
+      COACH_XP_RULE_VERSION,
       task.completedAt,
       JSON.stringify({
         coachTaskId: task.id,
@@ -147,10 +168,72 @@ export async function awardCoachTask(sql: Sql, task: CoachAwardSource): Promise<
         rewardBand: task.rewardBand,
         title: task.title,
         completedAt: task.completedAt,
-        ruleVersion: XP_RULE_VERSION,
+        ruleVersion: COACH_XP_RULE_VERSION,
       }),
     ],
   )
+}
+
+export async function awardDailyParticipation(
+  sql: Sql,
+  input: {
+    kind: DailyParticipationKind
+    healthDate: string
+    today: string
+    awardedAt?: Date
+  },
+): Promise<boolean> {
+  if (!participationDateEligible(input.healthDate, input.today)) {
+    return false
+  }
+  const amount = dailyParticipationXp(input.kind)
+  const awardedAt = input.awardedAt ?? new Date()
+  const rows = (await sql.query(
+    `INSERT INTO xp_ledger (
+       id, entry_kind, amount_xp, source_kind, source_id,
+       idempotency_key, rule_version, occurred_at, metadata
+     ) VALUES (
+       $1::uuid, 'award', $2::int, 'daily_participation', $3::uuid,
+       $4, $5, $6::timestamptz, $7::jsonb
+     )
+     ON CONFLICT DO NOTHING
+     RETURNING id::text AS id`,
+    [
+      randomUUID(),
+      amount,
+      randomUUID(),
+      dailyParticipationIdempotencyKey(input.kind, input.healthDate),
+      DAILY_PARTICIPATION_RULE_VERSION,
+      awardedAt.toISOString(),
+      JSON.stringify({
+        participationKind: input.kind,
+        healthDate: input.healthDate,
+        title: dailyParticipationLabel(input.kind),
+        amountXp: amount,
+        ruleVersion: DAILY_PARTICIPATION_RULE_VERSION,
+      }),
+    ],
+  )) as Array<{ id: string }>
+  return rows.length > 0
+}
+
+export async function tryAwardDailyParticipation(
+  sql: Sql,
+  input: {
+    kind: DailyParticipationKind
+    healthDate: string
+    today: string
+    awardedAt?: Date
+  },
+): Promise<boolean> {
+  try {
+    return await awardDailyParticipation(sql, input)
+  } catch {
+    // Health history is authoritative. A wallet-side failure must not make a
+    // successful canonical Health mutation look failed or invite a duplicate retry.
+    console.error('Daily participation XP award failed after canonical Health write.')
+    return false
+  }
 }
 
 export async function reconcileCoachAwards(sql: Sql): Promise<void> {

@@ -290,9 +290,9 @@ Observed from the current code and product docs. Where the original rationale is
 
 ## Decision: Coach completion is the XP issuance boundary
 
-**Status:** Active  
-**Reason:** Health measurements should stay canonical observations instead of becoming farmable game events. Coach already owns deterministic commitments and freezes a reward band when each task is created.  
-**Implications:** Only a Coach task with status `completed` mints XP. Routine, standard, weekly, and stretch bands award 10, 25, 75, and 100 XP under `xp-rule-v1`. Offered, active, accepted-only, passed, failed, and expired states award zero. One Health action may complete several distinct Coach commitments and each completed task may award once.
+**Status:** Superseded by I3 daily participation XP  
+**Reason:** H3 intentionally began with Coach as the only issuance boundary so Health observations could not become farmable game events.  
+**Implications:** Historical Coach awards remain frozen at 10, 25, 75, and 100 XP under `xp-rule-v1`. I3 broadens issuance through a separate bounded participation rule; it does not rewrite the H3 awards or make raw observation quantity rewardable.
 
 ## Decision: XP history is append-only and balances are derived
 
@@ -374,3 +374,22 @@ Observed from the current code and product docs. Where the original rationale is
 **Status:** Active  
 **Reason:** Adding Timeline/Ask Health integration before the shared evidence-frame phase would create another bespoke path with incomplete provenance/coverage semantics. The raw facts are useful immediately on Today without that duplication.  
 **Implications:** The first I2 batch owns canonical Daily Signals and the consolidated Today Check-in only. XP stays in I3. Cross-domain relationships, Timeline signal integration, Ask Health evidence routing, and confidence/coverage interpretation move to I5. No readiness score is introduced.
+
+
+## Decision: XP issuance is Coach completion plus bounded daily participation
+
+**Status:** Active  
+**Reason:** A small participation reward can make useful owner-entered data more consistent without rewarding symptom quantity, supplement ingestion, or favorable health outcomes. The wallet must still resist retries, multi-event farming, and mass historical backfill.  
+**Implications:** Coach completion remains on `xp-rule-v1`. I3 uses `xp-participation-v1` for four Health-date awards: hydration 10 XP, bowel tracking 10 XP, wellness ratings 20 XP, and a fully recorded supplement day 25 XP. Each domain/date has one immutable idempotency key, so the maximum participation award is 65 XP per Health day. Taken and skipped supplement occurrences both count as honestly recorded; unknown does not. Only today and yesterday may mint participation XP. Older backlog still saves as Health history without currency. Multiple glasses, bowel movements, ratings, retries, or edits never stack extra XP.
+
+## Decision: Participation XP does not alter Health truth or correction behavior
+
+**Status:** Active  
+**Reason:** Health correctness must remain more important than game currency. Rewarding an outcome or clawing currency back after a correction would create incentives to preserve inaccurate records.  
+**Implications:** Canonical Health writes never depend on an XP award. Participation rewards the act of recording, not the value recorded. Later edit/delete/correction does not remove an already-issued participation award. No negative XP exists. The append-only ledger remains the accounting authority.
+
+## Decision: Progression grows by appending unlocks, not moving earned thresholds
+
+**Status:** Active  
+**Reason:** New recurring XP increases Lifetime XP velocity, but moving existing unlock thresholds would make prior progress feel revoked.  
+**Implications:** The `progression-v1` threshold formula stays unchanged. I3 appends eight theme packs at Levels 13–20: Crimson Surge, Sun God, Sage Storm, Mjolnir Night, Vault Neon, Abyss Knight, Republic Red, and Cosmic Instinct. Level 20 unlocks at 10,450 lifetime XP. Future velocity tuning should change new award values prospectively or append more runway rather than moving previously earned theme thresholds.

@@ -12,6 +12,14 @@ export const PROGRESSION_THEME_UNLOCKS = [
   { id: 'bonfire', level: 10 },
   { id: 'clone-legion', level: 11 },
   { id: 'silver-instinct', level: 12 },
+  { id: 'crimson-surge', level: 13 },
+  { id: 'sun-god', level: 14 },
+  { id: 'sage-storm', level: 15 },
+  { id: 'mjolnir-night', level: 16 },
+  { id: 'vault-neon', level: 17 },
+  { id: 'abyss-knight', level: 18 },
+  { id: 'republic-red', level: 19 },
+  { id: 'cosmic-instinct', level: 20 },
 ] as const
 
 export type ProgressionThemeId = (typeof PROGRESSION_THEME_UNLOCKS)[number]['id']

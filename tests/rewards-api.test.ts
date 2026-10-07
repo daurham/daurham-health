@@ -31,7 +31,7 @@ const ownerConfig: HealthOwnerConfig = {
 const ITEM = '11111111-1111-4111-8111-111111111111'
 const PURCHASE = '22222222-2222-4222-8222-222222222222'
 const EMPTY = {
-  ruleVersion: 'xp-rule-v1',
+  ruleVersion: 'xp-rule-v2',
   balances: { lifetimeXp: 0, spendableXp: 0 },
   items: [],
   purchases: [],

@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import {
   assertFutureScheduleEditable,
   assertRecordableOccurrence,
+  buildTodaySupplementSection,
   nextAdherencePersistence,
   parseAdherenceCommand,
   parseCreateSupplement,
@@ -20,9 +21,11 @@ import {
 import { getSql } from '../db.js'
 import { HttpError } from '../http.js'
 import { currentHealthDate } from '../health-time.js'
+import { tryAwardDailyParticipation } from '../rewards/service.js'
 import {
   getSupplementRecord,
   listSupplementRecords,
+  listTodaySupplementInputs,
   loadScheduleWindow,
   loadStatusEvents,
   manualSourceId,
@@ -435,6 +438,18 @@ export async function recordAdherence(body: unknown, now = new Date()) {
       date: command.scheduledDate,
       adherence: observation,
     })
+    const day = buildTodaySupplementSection(
+      command.scheduledDate,
+      await listTodaySupplementInputs(command.scheduledDate),
+    )
+    if (day && day.scheduledCount > 0 && day.unknownCount === 0) {
+      await tryAwardDailyParticipation(sql, {
+        kind: 'supplements',
+        healthDate: command.scheduledDate,
+        today,
+        awardedAt: now,
+      })
+    }
     return {
       scheduleId: schedule.id,
       supplementId: schedule.supplementId,

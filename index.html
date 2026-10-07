@@ -11,7 +11,7 @@
         try {
           var stored = localStorage.getItem('health-theme')
           var dark = stored === 'dark' || (stored !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches)
-          var palettes = { classic: 1, forest: 1, ocean: 1, sunset: 1, plum: 1, aura: 1, 'saiyan-dawn': 1, 'grand-line': 1, 'hidden-leaf': 1, 'super-saiyan-gold': 1, spartan: 1, 'namek-sky': 1, wasteland: 1, bonfire: 1, 'clone-legion': 1, 'silver-instinct': 1 }
+          var palettes = { classic: 1, forest: 1, ocean: 1, sunset: 1, plum: 1, aura: 1, 'saiyan-dawn': 1, 'grand-line': 1, 'hidden-leaf': 1, 'super-saiyan-gold': 1, spartan: 1, 'namek-sky': 1, wasteland: 1, bonfire: 1, 'clone-legion': 1, 'silver-instinct': 1, 'crimson-surge': 1, 'sun-god': 1, 'sage-storm': 1, 'mjolnir-night': 1, 'vault-neon': 1, 'abyss-knight': 1, 'republic-red': 1, 'cosmic-instinct': 1 }
           var palette = localStorage.getItem('health-palette')
           if (!palettes[palette]) palette = 'classic'
           var root = document.documentElement

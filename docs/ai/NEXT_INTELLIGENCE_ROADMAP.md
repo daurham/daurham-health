@@ -2288,15 +2288,14 @@ Reason:
 - XP is reinforcing a useful daily routine and complete data;
 - adherence remains a separate health metric.
 
-Suggested source shape:
+I3 implementation:
 
-`source_kind = 'supplement_day_completion'`
+- `source_kind = 'daily_participation'`
+- metadata records `participationKind = 'supplements'`
+- idempotency key: `award:daily:supplements:<health-date>`
+- award: 25 XP under `xp-participation-v1`
 
-Suggested idempotency shape:
-
-`supplement-day:<health-date>:<rule-version>`
-
-If later there is a separate adherence achievement, it should not encourage unsafe consumption and should be specified independently.
+The same generic source kind is used for the other bounded daily participation domains. If later there is a separate adherence achievement, it must not encourage unsafe consumption and should be specified independently.
 
 ## 20.4 Progression runway and new themes
 
@@ -2310,73 +2309,66 @@ Instead:
 
 The current progression ends at Level 12 with **Silver Instinct**.
 
-Recommended initial extension:
+I3 appends eight packs without changing any existing threshold:
 
-- Level 13 — new theme pack
-- Level 14 — new theme pack
-- Level 15 — new theme pack
-- Level 16 — new theme pack
+- Level 13 — **Crimson Surge** — 4,500 lifetime XP
+- Level 14 — **Sun God** — 5,200 lifetime XP
+- Level 15 — **Sage Storm** — 5,950 lifetime XP
+- Level 16 — **Mjolnir Night** — 6,750 lifetime XP
+- Level 17 — **Vault Neon** — 7,600 lifetime XP
+- Level 18 — **Abyss Knight** — 8,500 lifetime XP
+- Level 19 — **Republic Red** — 9,450 lifetime XP
+- Level 20 — **Cosmic Instinct** — 10,450 lifetime XP
 
-Under the existing `progression-v1` threshold formula, those unlock around:
-
-- Level 13: 4,500 lifetime XP
-- Level 14: 5,200 lifetime XP
-- Level 15: 5,950 lifetime XP
-- Level 16: 6,750 lifetime XP
-
-This gives the new recurring XP sources somewhere meaningful to go without changing historical XP.
-
-### Theme direction
-
-Exact names/palettes should be chosen during implementation, but useful placeholder directions are:
-
-- **Neon Ronin** — dark graphite, electric magenta, cyan;
-- **Crimson Eclipse** — deep red, black, muted gold;
-- **Celestial Forge** — midnight blue, violet, starlight gold;
-- **Void Crown** — near-black, indigo, icy silver.
-
-The final choices should feel meaningfully different from the existing palette set, not just slightly altered accents.
+The final packs are intentionally varied rather than slight recolors of one another. Theme Studio metadata, CSS, the pre-render allowlist, and level-up discovery all use the same IDs.
 
 ### Progression review after implementation
 
-After I3 has real reward values, calculate expected monthly XP from:
+I3 participation values are:
 
-- Coach;
-- supplements;
-- hydration/check-in completion;
-- training;
-- any other accepted new sources.
+- hydration: 10 XP/day;
+- bowel tracking: 10 XP/day;
+- wellness check-in: 20 XP/day;
+- fully recorded supplement day: 25 XP/day.
 
-Then verify that theme unlock cadence still feels rewarding rather than trivial.
+That is a structural maximum of 65 participation XP/day, or about 1,950 XP in a 30-day month.
 
-If XP velocity is much higher than expected, prefer adding future levels/themes or tuning *new* award values rather than moving already-earned unlock thresholds.
+Coach remains additive at the frozen H3 values:
+
+- routine 10 XP;
+- standard 25 XP;
+- weekly 75 XP;
+- stretch 100 XP.
+
+A strong-compliance month therefore lands around the owner's intended $30+ reward-budget range once Coach/challenge completion is included, while routine logging alone remains below $30. At roughly 3,000–5,000 lifetime XP/month, the Level 20 runway is roughly 2–4 months from a fresh wallet.
+
+If future XP velocity grows, prefer adding future levels/themes or tuning only new prospective award values rather than moving already-earned unlock thresholds.
 
 ---
 
 ## 20.5 Backlog XP
 
-Backlogging should be allowed.
+Backlogging remains fully allowed as Health history.
 
-Recommended behavior:
+I3 uses a short grace window:
 
-- same canonical data quality whether logged today or later;
-- optional reduced XP for older backfill;
-- never block backlogging because XP is lower;
-- show event date separately from award date.
+- today: full participation XP;
+- yesterday: full participation XP;
+- older dates: zero participation XP.
 
-Another acceptable design is full XP within a short grace window, reduced or zero XP after that.
+No canonical Health write is blocked because the record is too old to earn currency. Historical Daily Signals and supplement adherence are not automatically backfilled into the wallet.
 
-The exact reward curve should be specified separately.
+The Health date is stored in award metadata; `occurred_at` remains the ledger-award instant.
 
 ## 20.6 Idempotency
 
 XP must be impossible to accidentally duplicate.
 
-A good key shape:
+I3 uses:
 
-`daily-log:<domain>:<health-date>:<rule-version>`
+`award:daily:<participation-kind>:<health-date>`
 
-or a canonical source-id key where appropriate.
+The database unique `idempotency_key` is the final authority. Multiple glasses, bowel events, repeated saves, retries, or later edits on the same domain/date cannot mint another award.
 
 ## 20.7 Deleting/correcting a log
 
@@ -3200,21 +3192,23 @@ The mobile walkthrough has been incorporated into this roadmap. Implementation m
 
 ## Phase I3 — XP Participation Expansion + Theme Runway
 
-### Deliver
-- expanded XP source model;
-- supplement-day completion XP;
-- daily capped logging awards;
-- idempotent award rules;
-- backlog reward behavior;
-- updated Rewards copy;
-- append at least four new progression theme packs after the current Level 12 end;
-- XP-velocity review against theme unlock cadence;
-- ledger/backup/progression tests.
+### Prepared implementation
+- wallet presentation rule advances to `xp-rule-v2`, while Coach awards remain frozen on `xp-rule-v1`;
+- `daily_participation` becomes an allowed append-only ledger source under `xp-participation-v1`;
+- hydration 10 XP/day;
+- bowel tracking 10 XP/day;
+- wellness check-in 20 XP/day;
+- fully recorded supplement day 25 XP/day, with taken and skipped both resolving the occurrence;
+- one award/domain/Health date through immutable idempotency keys;
+- 65 XP/day participation maximum;
+- today/yesterday backlog grace window; older data saves without XP;
+- no historical participation backfill and no correction clawback;
+- Rewards copy explains the economy and 100 XP = $1 owner convention;
+- eight new progression packs extend Levels 13–20 without moving existing thresholds;
+- ledger/database, backup, progression, theme, and source-contract regression coverage.
 
 ### Important
-Do not couple I2 correctness to XP.
-
-Daily tracking should work perfectly before gamification is layered on.
+I2 Daily Signals correctness remains independent of XP. Migration `0045_xp_participation_themes.sql` must be applied before I3 server code is exposed because the prior ledger constraint intentionally rejects the new source kind.
 
 ---
 

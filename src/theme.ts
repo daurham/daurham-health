@@ -152,6 +152,62 @@ export const THEME_PACKS: readonly ThemePack[] = [
     unlockLevel: 12,
     preview: { canvas: '#f4f6fa', surface: '#fcfdff', accent: '#5c6fa8', secondary: '#54b6c8', reward: '#d7ad33' },
   },
+  {
+    id: 'crimson-surge',
+    label: 'Crimson Surge',
+    flavor: 'Crimson energy with cobalt contrast.',
+    unlockLevel: 13,
+    preview: { canvas: '#faf3f4', surface: '#fffafa', accent: '#b83245', secondary: '#315ea8', reward: '#d9a52d' },
+  },
+  {
+    id: 'sun-god',
+    label: 'Sun God',
+    flavor: 'Bright cloud white with magenta and cyan.',
+    unlockLevel: 14,
+    preview: { canvas: '#f7f7fb', surface: '#ffffff', accent: '#b23b78', secondary: '#35a6bc', reward: '#e0aa30' },
+  },
+  {
+    id: 'sage-storm',
+    label: 'Sage Storm',
+    flavor: 'Burnished orange with charcoal and red.',
+    unlockLevel: 15,
+    preview: { canvas: '#f8f4ee', surface: '#fffdf9', accent: '#bd6a24', secondary: '#7b3940', reward: '#d7a128' },
+  },
+  {
+    id: 'mjolnir-night',
+    label: 'Mjolnir Night',
+    flavor: 'Green and midnight steel with cyan contrast.',
+    unlockLevel: 16,
+    preview: { canvas: '#f1f4f1', surface: '#fbfdfb', accent: '#4f6f4a', secondary: '#2498a8', reward: '#c89d2a' },
+  },
+  {
+    id: 'vault-neon',
+    label: 'Vault Neon',
+    flavor: 'Deep blue with electric gold.',
+    unlockLevel: 17,
+    preview: { canvas: '#f2f5fa', surface: '#fbfdff', accent: '#315f9f', secondary: '#c59b21', reward: '#d2a126' },
+  },
+  {
+    id: 'abyss-knight',
+    label: 'Abyss Knight',
+    flavor: 'Cold ash with restrained ember warmth.',
+    unlockLevel: 18,
+    preview: { canvas: '#f3f2f2', surface: '#fbfafa', accent: '#56545c', secondary: '#9b4d35', reward: '#c68b2c' },
+  },
+  {
+    id: 'republic-red',
+    label: 'Republic Red',
+    flavor: 'Clean white, command red, and navy.',
+    unlockLevel: 19,
+    preview: { canvas: '#f5f6f8', surface: '#ffffff', accent: '#a93d43', secondary: '#435f88', reward: '#c99a2c' },
+  },
+  {
+    id: 'cosmic-instinct',
+    label: 'Cosmic Instinct',
+    flavor: 'Violet, rose, and icy cyan.',
+    unlockLevel: 20,
+    preview: { canvas: '#f5f3fa', surface: '#fdfcff', accent: '#6750ad', secondary: '#b84f8d', reward: '#d5aa38' },
+  },
 ] as const
 
 export const PALETTE_LABELS = Object.fromEntries(

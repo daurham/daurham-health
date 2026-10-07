@@ -1,5 +1,22 @@
 # Dev state
 
+## 2026-10-06 I3 prepared — XP participation expansion + theme runway
+
+- I3 is prepared as a dormant batch on top of dormant I2; no branch ref is moved while the Vercel deployment-rate window remains active.
+- Proposed schema head is `0045_xp_participation_themes.sql`.
+- Wallet presentation moves to `xp-rule-v2` while existing Coach awards remain frozen under `xp-rule-v1`.
+- Added `xp-participation-v1` daily participation awards: water 10 XP, bowel tracking 10 XP, daily wellness 20 XP, and fully recorded supplement day 25 XP.
+- Participation is capped structurally at one award per domain/Health date (65 XP/day maximum) through immutable idempotency keys.
+- Today and yesterday are eligible for participation XP; older backlog remains valid Health history but does not mint currency.
+- Supplement completion rewards recording the full scheduled day, including honest skips; it does not reward ingestion or penalize skips.
+- Health corrections do not claw back historical XP.
+- Migration 0045 broadens the existing append-only ledger to `daily_participation`; it must be applied before I3 server code is exposed.
+- Rewards explains the participation values, anti-farming behavior, backlog rule, and the owner convention that 100 XP = $1.
+- Progression thresholds remain unchanged. Eight theme packs extend the runway from Level 12 through Level 20, ending with Cosmic Instinct at 10,450 lifetime XP.
+- Participation-only maximum is about 1,950 XP per 30-day month; Coach/challenge completion remains the main path toward the intended $30–$50/month reward budget.
+- Added wallet/database, backup, progression, theme, and source-contract regression coverage.
+- Full TypeScript/lint/test/build validation remains deferred until this dormant commit is exposed to one branch.
+
 ## 2026-10-06 I2 prepared — Daily Signals foundation + Today check-in
 
 - I2 raw-signal work is prepared on top of dormant I1 without moving a feature branch ref during the Vercel deployment-rate window.

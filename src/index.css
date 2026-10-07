@@ -740,6 +740,176 @@ html.dark[data-health-palette='silver-instinct'] {
   --health-hero-gradient: radial-gradient(circle at 16% 0%, rgb(121 211 223 / 0.17), transparent 34%), linear-gradient(135deg, rgb(186 198 238 / 0.16), transparent 68%);
 }
 
+
+/* I3 progression runway: Levels 13–20. */
+:is(
+  html[data-health-palette='crimson-surge'],
+  html[data-health-palette='sun-god'],
+  html[data-health-palette='sage-storm'],
+  html[data-health-palette='mjolnir-night'],
+  html[data-health-palette='vault-neon'],
+  html[data-health-palette='abyss-knight'],
+  html[data-health-palette='republic-red'],
+  html[data-health-palette='cosmic-instinct']
+) {
+  --health-accent-fg: #ffffff;
+  --health-canvas: #f5f5f7;
+  --health-surface: #fdfdfd;
+  --health-surface-raised: #ffffff;
+  --health-surface-soft: #eeeef2;
+  --health-border: #dcdde3;
+  --health-border-strong: #bec1ca;
+  --health-text: #202126;
+  --health-text-muted: #666a73;
+  --health-text-faint: #8d929c;
+  --health-reward: #b88722;
+  --health-reward-muted: #fbefc9;
+}
+
+:is(
+  html.dark[data-health-palette='crimson-surge'],
+  html.dark[data-health-palette='sun-god'],
+  html.dark[data-health-palette='sage-storm'],
+  html.dark[data-health-palette='mjolnir-night'],
+  html.dark[data-health-palette='vault-neon'],
+  html.dark[data-health-palette='abyss-knight'],
+  html.dark[data-health-palette='republic-red'],
+  html.dark[data-health-palette='cosmic-instinct']
+) {
+  --health-accent-fg: #17181d;
+  --health-canvas: #141519;
+  --health-surface: #22242a;
+  --health-surface-raised: #292c33;
+  --health-surface-soft: #30343c;
+  --health-border: #414650;
+  --health-border-strong: #59616e;
+  --health-text: #f7f8fa;
+  --health-text-muted: #c1c5ce;
+  --health-text-faint: #949ba8;
+  --health-reward: #e9bd55;
+  --health-reward-muted: #4c3e20;
+}
+
+html[data-health-palette='crimson-surge'] {
+  --health-accent: #b83245;
+  --health-accent-muted: #f8e8eb;
+  --health-accent-secondary: #315ea8;
+  --health-glow: rgb(184 50 69 / 0.23);
+  --health-hero-gradient: radial-gradient(circle at 88% 8%, rgb(49 94 168 / 0.11), transparent 30%), linear-gradient(135deg, rgb(184 50 69 / 0.12), transparent 68%);
+}
+html.dark[data-health-palette='crimson-surge'] {
+  --health-accent: #ef8191;
+  --health-accent-muted: #542832;
+  --health-accent-secondary: #78a4ed;
+  --health-glow: rgb(239 129 145 / 0.30);
+  --health-hero-gradient: radial-gradient(circle at 88% 8%, rgb(120 164 237 / 0.14), transparent 30%), linear-gradient(135deg, rgb(239 129 145 / 0.16), transparent 68%);
+}
+
+html[data-health-palette='sun-god'] {
+  --health-accent: #b23b78;
+  --health-accent-muted: #f8e9f1;
+  --health-accent-secondary: #35a6bc;
+  --health-glow: rgb(53 166 188 / 0.22);
+  --health-hero-gradient: radial-gradient(circle at 14% 0%, rgb(53 166 188 / 0.12), transparent 32%), linear-gradient(140deg, rgb(178 59 120 / 0.11), transparent 69%);
+}
+html.dark[data-health-palette='sun-god'] {
+  --health-accent: #eb90be;
+  --health-accent-muted: #512b41;
+  --health-accent-secondary: #7fd4e3;
+  --health-glow: rgb(127 212 227 / 0.29);
+  --health-hero-gradient: radial-gradient(circle at 14% 0%, rgb(127 212 227 / 0.16), transparent 32%), linear-gradient(140deg, rgb(235 144 190 / 0.15), transparent 69%);
+}
+
+html[data-health-palette='sage-storm'] {
+  --health-accent: #bd6a24;
+  --health-accent-muted: #f8ecdf;
+  --health-accent-secondary: #7b3940;
+  --health-glow: rgb(189 106 36 / 0.21);
+  --health-hero-gradient: radial-gradient(circle at 86% 10%, rgb(123 57 64 / 0.10), transparent 31%), linear-gradient(135deg, rgb(189 106 36 / 0.12), transparent 68%);
+}
+html.dark[data-health-palette='sage-storm'] {
+  --health-accent: #eea15f;
+  --health-accent-muted: #513623;
+  --health-accent-secondary: #cf7f88;
+  --health-glow: rgb(238 161 95 / 0.27);
+  --health-hero-gradient: radial-gradient(circle at 86% 10%, rgb(207 127 136 / 0.13), transparent 31%), linear-gradient(135deg, rgb(238 161 95 / 0.15), transparent 68%);
+}
+
+html[data-health-palette='mjolnir-night'] {
+  --health-accent: #4f6f4a;
+  --health-accent-muted: #e9f0e7;
+  --health-accent-secondary: #2498a8;
+  --health-glow: rgb(36 152 168 / 0.22);
+  --health-hero-gradient: linear-gradient(120deg, rgb(79 111 74 / 0.12), transparent 54%), radial-gradient(circle at 90% 8%, rgb(36 152 168 / 0.12), transparent 31%);
+}
+html.dark[data-health-palette='mjolnir-night'] {
+  --health-accent: #9fbc91;
+  --health-accent-muted: #32432e;
+  --health-accent-secondary: #64c9d5;
+  --health-glow: rgb(100 201 213 / 0.29);
+  --health-hero-gradient: linear-gradient(120deg, rgb(159 188 145 / 0.14), transparent 54%), radial-gradient(circle at 90% 8%, rgb(100 201 213 / 0.16), transparent 31%);
+}
+
+html[data-health-palette='vault-neon'] {
+  --health-accent: #315f9f;
+  --health-accent-muted: #e8eef7;
+  --health-accent-secondary: #c59b21;
+  --health-glow: rgb(49 95 159 / 0.21);
+  --health-hero-gradient: repeating-linear-gradient(90deg, rgb(197 155 33 / 0.025) 0 1px, transparent 1px 6px), linear-gradient(135deg, rgb(49 95 159 / 0.12), transparent 68%);
+}
+html.dark[data-health-palette='vault-neon'] {
+  --health-accent: #83a9df;
+  --health-accent-muted: #2b3c56;
+  --health-accent-secondary: #e3c65a;
+  --health-glow: rgb(227 198 90 / 0.27);
+  --health-hero-gradient: repeating-linear-gradient(90deg, rgb(227 198 90 / 0.035) 0 1px, transparent 1px 6px), linear-gradient(135deg, rgb(131 169 223 / 0.15), transparent 68%);
+}
+
+html[data-health-palette='abyss-knight'] {
+  --health-accent: #56545c;
+  --health-accent-muted: #ecebed;
+  --health-accent-secondary: #9b4d35;
+  --health-glow: rgb(155 77 53 / 0.20);
+  --health-hero-gradient: radial-gradient(circle at 50% 0%, rgb(155 77 53 / 0.11), transparent 34%), linear-gradient(135deg, rgb(86 84 92 / 0.10), transparent 70%);
+}
+html.dark[data-health-palette='abyss-knight'] {
+  --health-accent: #aaa6b0;
+  --health-accent-muted: #3b3940;
+  --health-accent-secondary: #d68567;
+  --health-glow: rgb(214 133 103 / 0.28);
+  --health-hero-gradient: radial-gradient(circle at 50% 0%, rgb(214 133 103 / 0.15), transparent 34%), linear-gradient(135deg, rgb(170 166 176 / 0.12), transparent 70%);
+}
+
+html[data-health-palette='republic-red'] {
+  --health-accent: #a93d43;
+  --health-accent-muted: #f6e9ea;
+  --health-accent-secondary: #435f88;
+  --health-glow: rgb(169 61 67 / 0.20);
+  --health-hero-gradient: linear-gradient(115deg, rgb(169 61 67 / 0.11), transparent 45%), linear-gradient(245deg, rgb(67 95 136 / 0.08), transparent 47%);
+}
+html.dark[data-health-palette='republic-red'] {
+  --health-accent: #e38d92;
+  --health-accent-muted: #512d31;
+  --health-accent-secondary: #8ca9d2;
+  --health-glow: rgb(227 141 146 / 0.27);
+  --health-hero-gradient: linear-gradient(115deg, rgb(227 141 146 / 0.14), transparent 45%), linear-gradient(245deg, rgb(140 169 210 / 0.10), transparent 47%);
+}
+
+html[data-health-palette='cosmic-instinct'] {
+  --health-accent: #6750ad;
+  --health-accent-muted: #efebf8;
+  --health-accent-secondary: #b84f8d;
+  --health-glow: rgb(103 80 173 / 0.25);
+  --health-hero-gradient: radial-gradient(circle at 18% 0%, rgb(72 184 202 / 0.12), transparent 32%), radial-gradient(circle at 88% 12%, rgb(184 79 141 / 0.11), transparent 31%), linear-gradient(135deg, rgb(103 80 173 / 0.13), transparent 70%);
+}
+html.dark[data-health-palette='cosmic-instinct'] {
+  --health-accent: #b6a4ee;
+  --health-accent-muted: #393057;
+  --health-accent-secondary: #e18fc1;
+  --health-glow: rgb(182 164 238 / 0.33);
+  --health-hero-gradient: radial-gradient(circle at 18% 0%, rgb(104 210 225 / 0.17), transparent 32%), radial-gradient(circle at 88% 12%, rgb(225 143 193 / 0.15), transparent 31%), linear-gradient(135deg, rgb(182 164 238 / 0.17), transparent 70%);
+}
+
 .health-hero-surface {
   background:
     var(--health-hero-gradient),
@@ -796,7 +966,15 @@ html.dark[data-health-palette='silver-instinct'] {
   html[data-health-palette='wasteland'],
   html[data-health-palette='bonfire'],
   html[data-health-palette='clone-legion'],
-  html[data-health-palette='silver-instinct']
+  html[data-health-palette='silver-instinct'],
+  html[data-health-palette='crimson-surge'],
+  html[data-health-palette='sun-god'],
+  html[data-health-palette='sage-storm'],
+  html[data-health-palette='mjolnir-night'],
+  html[data-health-palette='vault-neon'],
+  html[data-health-palette='abyss-knight'],
+  html[data-health-palette='republic-red'],
+  html[data-health-palette='cosmic-instinct']
 ) .app-shell {
   background-image: var(--health-hero-gradient);
   background-repeat: no-repeat;
@@ -815,7 +993,15 @@ html.dark[data-health-palette='silver-instinct'] {
   html[data-health-palette='wasteland'],
   html[data-health-palette='bonfire'],
   html[data-health-palette='clone-legion'],
-  html[data-health-palette='silver-instinct']
+  html[data-health-palette='silver-instinct'],
+  html[data-health-palette='crimson-surge'],
+  html[data-health-palette='sun-god'],
+  html[data-health-palette='sage-storm'],
+  html[data-health-palette='mjolnir-night'],
+  html[data-health-palette='vault-neon'],
+  html[data-health-palette='abyss-knight'],
+  html[data-health-palette='republic-red'],
+  html[data-health-palette='cosmic-instinct']
 ) .xp-badge {
   box-shadow:
     0 0 0 1px color-mix(in srgb, var(--health-reward) 10%, transparent),
@@ -827,7 +1013,15 @@ html.dark[data-health-palette='silver-instinct'] {
   html[data-health-palette='saiyan-dawn'],
   html[data-health-palette='super-saiyan-gold'],
   html[data-health-palette='bonfire'],
-  html[data-health-palette='silver-instinct']
+  html[data-health-palette='silver-instinct'],
+  html[data-health-palette='crimson-surge'],
+  html[data-health-palette='sun-god'],
+  html[data-health-palette='sage-storm'],
+  html[data-health-palette='mjolnir-night'],
+  html[data-health-palette='vault-neon'],
+  html[data-health-palette='abyss-knight'],
+  html[data-health-palette='republic-red'],
+  html[data-health-palette='cosmic-instinct']
 ) .health-hero-surface {
   box-shadow: 0 18px 46px -38px var(--health-glow);
 }

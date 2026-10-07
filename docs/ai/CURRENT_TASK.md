@@ -1,16 +1,16 @@
 # Current task
 
-## I2 — Daily Signals Foundation + Today Check-in
+## I3 — XP Participation Expansion + Theme Runway
 
 ### Status
 
-Implementation prepared as a batched dormant Git commit on top of dormant I1 commit `48ac3d7bd1ce6094ca61297c3f0bc5f517c482a6`.
+Implementation prepared as a dormant batched Git commit on top of dormant I2 commit `a8437e0b8afe90723af289d2041b8bf5ca47ef83`.
 
-Do not move a feature branch ref while the Vercel rolling deployment limit is still active.
+Do not move a feature branch ref while the Vercel rolling deployment limit remains active.
 
-Repository schema head after this I2 batch:
+Repository schema head after I3:
 
-`0044_daily_signals.sql`
+`0045_xp_participation_themes.sql`
 
 Master program:
 
@@ -18,151 +18,191 @@ Master program:
 
 ## Product intent
 
-This first I2 batch adds a small set of high-value owner-entered daily facts without turning Today into a wall of trackers.
+I3 expands XP without turning Health observations into farmable game events.
 
-The batch deliberately separates:
+The reward system now has two legitimate award families:
 
-- canonical facts recorded by the owner;
-- derived daily summaries;
-- later intelligence/relationship analysis.
+1. Coach commitment completion, preserving the existing H3 reward bands.
+2. Bounded daily participation for a few high-value tracking behaviors.
 
-Missing evidence remains missing. No water entry is not 0 oz. No bowel entry is not an explicit zero-BM day. No wellness row is not a normal rating.
+Canonical Health facts remain independent of XP. A valid Health write never depends on whether an XP award succeeds.
 
-## Canonical data
+## Rule versions
 
-### Hydration
+- Wallet/current rule: `xp-rule-v2`
+- Coach award rule remains: `xp-rule-v1`
+- Daily participation rule: `xp-participation-v1`
 
-`hydration_events` stores event-based water evidence:
+Existing Coach awards are not rewritten.
 
-- Health calendar date;
-- optional observed timestamp;
-- canonical milliliters;
-- manual source;
-- optional note;
-- optional request UUID for idempotent retries.
+## Daily participation awards
 
-Current-day quick logging receives the current instant when no timestamp is supplied. Backlogged date-only entries keep `occurred_at = NULL` rather than inventing a time.
+One Health date can earn at most **65 participation XP**:
 
-No hydration target or tracking-complete state is introduced in this batch.
+- Hydration: **10 XP** after the first valid water log.
+- Bowel tracking: **10 XP** after the first bowel event or explicit no-BM state.
+- Daily wellness: **20 XP** after saving at least one energy/hunger/soreness/stress rating.
+- Supplements: **25 XP** when every scheduled occurrence for the day is explicitly recorded.
 
-### Bowel
+Participation is rewarded for honest tracking, not health outcomes.
 
-`bowel_events` stores:
+For supplements:
 
-- Health calendar date;
-- optional observed timestamp;
-- required Bristol type 1–7;
-- optional straining;
-- optional urgency;
-- optional incomplete feeling;
-- optional note;
-- manual source;
-- optional request UUID.
+- taken counts as recorded;
+- skipped counts as recorded;
+- unknown does not;
+- paused/not-scheduled occurrences do not create work and do not independently mint XP.
 
-`bowel_day_states` stores the explicit `no_bowel_movement` state.
+No per-glass, per-bowel-movement, or per-rating XP exists.
 
-Rules:
+## Idempotency and corrections
 
-- absence of both event and state means unknown;
-- explicit no-BM is a tracked zero day;
-- adding a bowel event clears the no-BM state;
-- setting no-BM is rejected while an event exists;
-- Bristol type 0 does not exist.
+Each participation award uses one immutable ledger entry per domain + Health date.
 
-### Subjective daily check-in
+Idempotency key shape:
 
-`daily_wellness` stores at most one row per Health date:
+`award:daily:<kind>:<YYYY-MM-DD>`
 
-- energy 1–5;
-- hunger 1–5;
-- soreness 1–5;
-- optional stress 1–5.
+Repeated taps, retries, edits, and additional events on the same day do not mint another participation award.
 
-At least one rating is required.
+Health corrections do not claw XP back. This preserves the existing rule that the game economy must never discourage correcting Health history.
 
-Subjective sleep quality is not added in this batch because objective Sleep already exists and the optional subjective field has not been accepted as necessary.
+## Backlog behavior
 
-## Today / UX
+Participation XP is eligible only for:
 
-Today gets one **Daily check-in** card immediately after the Training area and before Supplements.
+- today;
+- yesterday.
 
-It replaces the previous standalone Today Context card.
+Older backlog remains fully valid Health history but does not mint XP.
 
-The compact card shows:
+The configured Health calendar timezone remains authoritative.
 
-- tracked water total or —;
-- bowel count / explicit none / —;
-- energy;
-- hunger;
-- soreness;
-- existing Daily Context summary.
+No historical Daily Signals or supplement history is automatically backfilled for I3.
 
-Owner actions:
+## Ledger migration
 
-- quick-log common water amounts directly from Today;
-- open `/check-in?date=YYYY-MM-DD` for water history/custom amount, Bristol logging, explicit no-BM, and wellness ratings;
-- open the existing Daily Context editor from the same consolidated surface.
+Migration 0045 expands `xp_ledger.source_kind` to include:
 
-The full check-in page supports prior Health dates. Exact event times are not invented for date-only backlog.
+`daily_participation`
 
-Daily Context remains its own canonical authority and table; only its Today presentation is consolidated.
+The append-only ledger, purchase/refund behavior, Lifetime XP, Spendable XP, and immutable reward-purchase snapshots are unchanged.
 
-## APIs
+**Deployment ordering:** apply migration 0045 before exposing I3 server code. The previous database constraint intentionally rejects `daily_participation`.
 
-Owner-only routes handled by the Daily Signals handler:
+## Wallet refresh
 
-- `GET /api/check-in/days/:date`
-- `PUT /api/check-in/days/:date`
-- `DELETE /api/check-in/days/:date`
-- `POST /api/hydration/events`
-- `DELETE /api/hydration/events/:id`
-- `POST /api/bowel/events`
-- `DELETE /api/bowel/events/:id`
-- `PUT /api/bowel/days/:date/no-movement`
-- `DELETE /api/bowel/days/:date/no-movement`
+Successful Daily Signals mutations and supplement-adherence mutations trigger the existing reward-state refresh event.
 
-Canonical mutations participate in the existing Health-data-change refresh path.
+If the mutation did not actually earn XP, the refreshed balance remains unchanged.
 
-## Backup
+## Health-write failure isolation
 
-Portable/full backup inventory includes:
+Canonical Health history is more important than the game economy.
 
-- `hydration_events`;
-- `bowel_events`;
-- `bowel_day_states`;
-- `daily_wellness`.
+The strict wallet service may surface ledger/database failures to its own tests and callers, but Daily Signals and supplement adherence use a best-effort participation wrapper **after** the canonical Health mutation succeeds.
 
-## Explicit deferrals
+If the wallet write fails:
 
-This first dormant I2 batch does **not** add:
+- the Health record remains saved;
+- the Health endpoint still succeeds;
+- the failure does not invite a duplicate Health retry;
+- no synthetic XP is assumed;
+- a later product/ops repair can address the missing ledger event explicitly if needed.
 
-- XP for daily logging — I3 owns participation rewards;
-- personal correlations or relationship claims;
-- a readiness/recovery score;
-- hydration prescriptions;
-- bowel diagnoses;
-- a new Progress tab;
-- Timeline daily-signal lanes;
-- Ask Health daily-signal evidence.
+Migration 0045 is still mandatory before normal I3 deployment; failure isolation is a correctness safeguard, not a substitute for applying the schema.
 
-Timeline and Ask Health integration from the broader master-roadmap I2 description are intentionally deferred to I5, where the shared evidence frame, provenance, coverage, and confidence semantics are built once and reused everywhere.
+## Rewards copy
+
+Rewards now explains:
+
+- Coach + participation earning;
+- the 65 XP/day participation cap;
+- per-domain values;
+- honest supplement skips;
+- today/yesterday backlog behavior;
+- no stacking from multiple events;
+- the personal reward-budget convention: **100 XP = $1**.
+
+## Theme runway
+
+Existing unlock thresholds are not moved.
+
+Eight new progression packs are appended:
+
+- Level 13 — Crimson Surge
+- Level 14 — Sun God
+- Level 15 — Sage Storm
+- Level 16 — Mjolnir Night
+- Level 17 — Vault Neon
+- Level 18 — Abyss Knight
+- Level 19 — Republic Red
+- Level 20 — Cosmic Instinct
+
+The existing `progression-v1` threshold formula remains unchanged.
+
+Level 20 unlocks at **10,450 lifetime XP**.
+
+Theme metadata, Theme Studio allowlisting, CSS, pre-render bootstrap allowlisting, and level-up discovery all use the same IDs.
+
+## XP velocity review
+
+Maximum participation-only velocity:
+
+- 65 XP/day;
+- about 1,950 XP per 30-day month.
+
+Typical challenge completion adds roughly:
+
+- Daily Quest: 10–25 XP/day when completed;
+- Weekly commitment: 75 XP;
+- Stretch: 100 XP when completed.
+
+That places a strong-compliance month around the original **$30+** reward-budget target without making routine logging alone worth $30–$50.
+
+At roughly 3,000–5,000 lifetime XP/month, the Level 20 runway is approximately 2–4 months from a fresh wallet. Future runway should be extended by appending levels/themes, not by moving already-earned thresholds upward.
+
+## Explicit non-goals
+
+I3 does not:
+
+- reward number of glasses;
+- reward number or Bristol quality of bowel movements;
+- reward high/low wellness scores differently;
+- reward supplement ingestion more than an honest skip;
+- create negative XP;
+- claw back awards after Health correction;
+- change Coach reward-band values;
+- change the level threshold formula;
+- add new Health analytics or AI interpretation.
 
 ## Validation before publication
 
-Once the dormant commit is exposed to one branch:
+Once this dormant commit is exposed to one branch:
 
-- `npx tsc -b`
-- `npx eslint .`
-- `npm test`
-- `npm run build`
+1. apply migration 0045 to the branch test database;
+2. run `npx tsc -b`;
+3. run `npx eslint .`;
+4. run `npm test`;
+5. run `npm run build`.
 
-Required regression coverage includes:
+Required regression coverage:
 
-- ounce ↔ milliliter conversion;
-- missing versus explicit zero-BM semantics;
-- Bristol/rating bounds;
-- migration constraints;
-- canonical portable backup inventory;
-- Today/check-in placement and refresh behavior.
+- rule-version compatibility;
+- fixed participation values and 65 XP cap;
+- today/yesterday backlog eligibility;
+- duplicate award idempotency;
+- append-only ledger;
+- purchase/refund accounting;
+- supplement-day completion semantics;
+- Daily Signals award hooks;
+- portable ledger backup;
+- old-theme backward compatibility;
+- Level 13–20 unlock thresholds;
+- pre-render/theme/CSS allowlist consistency.
 
-Do not merge until the exact branch head is green.
+Do not merge until the exact published branch head is green.
+
+## Next roadmap slice
+
+I4 — Evidence Semantics, Effort, and Change Ledger.

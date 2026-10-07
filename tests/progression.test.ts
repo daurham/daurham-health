@@ -17,6 +17,7 @@ describe('H4 Lifetime XP progression', () => {
     expect(xpThresholdForLevel(6)).toBe(1000)
     expect(xpThresholdForLevel(12)).toBe(3850)
     expect(xpThresholdForLevel(13)).toBe(4500)
+    expect(xpThresholdForLevel(20)).toBe(10450)
   })
 
   it('derives level and progress only from Lifetime XP', () => {
@@ -44,5 +45,8 @@ describe('H4 Lifetime XP progression', () => {
     expect(progressionThemeUnlocked('super-saiyan-gold', 999)).toBe(false)
     expect(progressionThemeUnlocked('super-saiyan-gold', 1000)).toBe(true)
     expect(progressionState(1000).nextThemeUnlock).toMatchObject({ id: 'spartan', level: 7 })
+    expect(progressionThemeUnlocked('cosmic-instinct', 10449)).toBe(false)
+    expect(progressionThemeUnlocked('cosmic-instinct', 10450)).toBe(true)
+    expect(progressionState(3850).nextThemeUnlock).toMatchObject({ id: 'crimson-surge', level: 13 })
   })
 })

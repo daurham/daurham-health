@@ -1,6 +1,6 @@
 export const BACKUP_FORMAT = 'daurham-health-backup'
 export const BACKUP_FORMAT_VERSION = 1
-export const LATEST_SCHEMA_MIGRATION = '0044_daily_signals.sql'
+export const LATEST_SCHEMA_MIGRATION = '0045_xp_participation_themes.sql'
 export const PORTABLE_EXPORT_BYTE_LIMIT = 3_500_000
 
 export type ColumnKind = 'uuid' | 'text' | 'date' | 'timestamptz' | 'numeric' | 'int' | 'bool' | 'json' | 'bytea'

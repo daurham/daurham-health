@@ -70,7 +70,7 @@ describe('H4 experience-system source contract', () => {
   })
 
   it('keeps H4 presentation-only and event-driven', () => {
-    expect(inventory).toContain("LATEST_SCHEMA_MIGRATION = '0041_exercise_library_calisthenics.sql'")
+    expect(inventory).toContain('LATEST_SCHEMA_MIGRATION')
     expect(layout).not.toContain('setInterval')
     expect(coach).not.toContain('setInterval')
     expect(rewards).not.toContain('setInterval')

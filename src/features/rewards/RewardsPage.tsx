@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import type { RewardItem, RewardItemInput, RewardsState } from '@/domain/rewards'
+import { DAILY_PARTICIPATION_MAX_XP, DAILY_PARTICIPATION_XP, type RewardItem, type RewardItemInput, type RewardsState } from '@/domain/rewards'
 import { progressionState } from '@/domain/progression'
 import { themePack } from '@/theme'
 import { XpAmount } from '@/components/XpAmount'
@@ -173,7 +173,7 @@ export function RewardsPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Rewards</h1>
         <p className="mt-2 text-zinc-600">
-          Coach completions earn XP. Spend it on rewards you define without changing lifetime progress.
+          Coach challenges and bounded daily participation earn XP. Spend it on rewards you define without changing lifetime progress.
         </p>
       </div>
 
@@ -223,6 +223,22 @@ export function RewardsPage() {
           <Link to="/settings#theme-studio" className={quietButtonClass}>Open Theme Studio</Link>
         </div>
       </div>
+
+      <section className="rounded-xl border border-zinc-200 bg-white p-4 sm:p-5" aria-labelledby="xp-earning-heading">
+        <h2 id="xp-earning-heading" className="text-lg font-semibold tracking-tight">How participation XP works</h2>
+        <p className="mt-1 text-sm text-zinc-600">
+          Logging is rewarded for participation, not for producing a “good” health result. One Health day can earn at most {DAILY_PARTICIPATION_MAX_XP} participation XP.
+        </p>
+        <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+          <p><span className="font-medium">Water</span> · {DAILY_PARTICIPATION_XP.hydration} XP for the first valid water log.</p>
+          <p><span className="font-medium">Bowel</span> · {DAILY_PARTICIPATION_XP.bowel} XP for tracking the day once.</p>
+          <p><span className="font-medium">Daily ratings</span> · {DAILY_PARTICIPATION_XP.wellness} XP for saving at least one rating.</p>
+          <p><span className="font-medium">Supplements</span> · {DAILY_PARTICIPATION_XP.supplements} XP when every scheduled dose is recorded, including honest skips.</p>
+        </div>
+        <p className="mt-3 text-xs text-zinc-500">
+          Today and yesterday can earn participation XP. Older backlogs still save as Health history but do not mint XP. Multiple glasses, bowel events, or edits never stack extra XP. 100 XP = $1 in the personal reward budget.
+        </p>
+      </section>
 
       <section className="rounded-xl border border-zinc-200 bg-white p-4 sm:p-5" aria-labelledby="reward-shop-heading">
         <div className="flex flex-wrap items-center justify-between gap-3">

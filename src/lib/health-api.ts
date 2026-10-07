@@ -1,4 +1,5 @@
 import { isCoachRelevantMutation, notifyHealthDataChanged } from './health-changes'
+import { notifyRewardStateChanged } from './reward-events'
 
 export const OWNER_AUTH_REQUIRED = 'health:owner-auth-required'
 
@@ -31,7 +32,16 @@ export async function healthFetch(input: RequestInfo | URL, init?: RequestInit):
     window.dispatchEvent(new CustomEvent(OWNER_AUTH_REQUIRED))
   }
   const method = init?.method ?? (typeof Request !== 'undefined' && input instanceof Request ? input.method : 'GET')
-  if (response.ok && isCoachRelevantMutation(requestUrl(input), method)) notifyHealthDataChanged()
+  const url = requestUrl(input)
+  if (response.ok && isCoachRelevantMutation(url, method)) notifyHealthDataChanged()
+  if (
+    response.ok
+    && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method.toUpperCase())
+    && (/^\/api\/(hydration|bowel|check-in)(\/|$)/.test(new URL(url, 'http://health.local').pathname)
+      || new URL(url, 'http://health.local').pathname === '/api/supplements/adherence')
+  ) {
+    notifyRewardStateChanged({ kind: 'award' })
+  }
   return response
 }
 

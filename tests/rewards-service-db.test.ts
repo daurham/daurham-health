@@ -20,6 +20,7 @@ vi.mock('../server/db.ts', () => ({
 
 import {
   archiveRewardItem,
+  awardDailyParticipation,
   createRewardItem,
   purchaseReward,
   readRewards,
@@ -125,6 +126,7 @@ describe.sequential.skipIf(!existsSync(`${BIN}/initdb`))('Reward wallet producti
       [BACKFILL_TASK],
     )
     await pool.query(readFileSync('migrations/0039_xp_reward_wallet.sql', 'utf8'))
+    await pool.query(readFileSync('migrations/0045_xp_participation_themes.sql', 'utf8'))
   }, 60_000)
 
   afterAll(async () => {
@@ -150,6 +152,45 @@ describe.sequential.skipIf(!existsSync(`${BIN}/initdb`))('Reward wallet producti
 
     await pool.query('DELETE FROM coach_tasks WHERE id = $1', [BACKFILL_TASK])
     expect((await readRewards()).balances).toEqual({ lifetimeXp: 25, spendableXp: 25 })
+  })
+
+  it('awards daily participation once per kind/date and blocks old backlog', async () => {
+    await reset()
+    const sql = database.sql as never
+    const now = new Date('2026-10-06T20:00:00.000Z')
+
+    expect(await awardDailyParticipation(sql, {
+      kind: 'hydration',
+      healthDate: '2026-10-06',
+      today: '2026-10-06',
+      awardedAt: now,
+    })).toBe(true)
+    expect(await awardDailyParticipation(sql, {
+      kind: 'hydration',
+      healthDate: '2026-10-06',
+      today: '2026-10-06',
+      awardedAt: now,
+    })).toBe(false)
+    expect(await awardDailyParticipation(sql, {
+      kind: 'wellness',
+      healthDate: '2026-10-05',
+      today: '2026-10-06',
+      awardedAt: now,
+    })).toBe(true)
+    expect(await awardDailyParticipation(sql, {
+      kind: 'bowel',
+      healthDate: '2026-10-04',
+      today: '2026-10-06',
+      awardedAt: now,
+    })).toBe(false)
+
+    const state = await readRewards()
+    expect(state.ruleVersion).toBe('xp-rule-v2')
+    expect(state.balances).toEqual({ lifetimeXp: 30, spendableXp: 30 })
+    expect(state.activity.map((item) => item.label)).toEqual(expect.arrayContaining(['Water logged', 'Daily ratings']))
+    expect((await pool.query(
+      "SELECT count(*)::int AS n FROM xp_ledger WHERE source_kind = 'daily_participation'",
+    )).rows[0].n).toBe(2)
   })
 
   it('freezes reward purchase snapshots and refunds spendable XP without changing lifetime XP', async () => {

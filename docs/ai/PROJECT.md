@@ -32,7 +32,7 @@ Vite, React 19, React Router 7, and Tailwind 4. Routes live in `src/routes/index
 
 The demo reuses domain builders and feature components under a `/demo` prefix. Demo modules must not call owner APIs or providers.
 
-Appearance is two browser preferences, `health-theme` and `health-palette`. System, Light, and Dark are independent of Classic, Forest, Ocean, Sunset, and Plum. They change accent chrome. They are not owner records, and they are not in backup or portable export. Interaction motion is CSS only. `prefers-reduced-motion: reduce` removes it. Health numbers do not animate, and there is no stored motion preference.
+Appearance is two browser preferences, `health-theme` and `health-palette`. System, Light, and Dark are independent from palette choice. Classic, Forest, Ocean, Sunset, and Plum are always available starter palettes; additional progression palettes unlock from Lifetime XP without spending it. Palette preferences change presentation only. They are not owner records and are not in backup or portable export. Interaction motion is CSS only. `prefers-reduced-motion: reduce` removes it. Health numbers do not animate, and there is no stored motion preference.
 
 ## Server
 
@@ -50,7 +50,7 @@ The database is the owner's system of record. Full backup, verify, and restore a
 
 Derived products are not stored as tables. That includes goal status, projections, insight cards, weekly coach prose, sleep baselines, and Ask Health transcripts. Correcting a canonical row changes the next read.
 
-The H3 reward wallet is durable owner state rather than a derived Health score. `xp_ledger` is append-only; Lifetime and Spendable XP are derived from it. Coach completion is the only XP issuance boundary. Reward catalog entries and immutable purchase snapshots are owner data.
+The reward wallet is durable owner state rather than a derived Health score. `xp_ledger` is append-only; Lifetime and Spendable XP are derived from it. XP awards come from completed Coach commitments plus bounded daily participation under separate rule versions. Daily participation is one award per eligible domain/Health date, capped at 65 XP/day, and rewards recording rather than health outcomes. Reward catalog entries and immutable purchase snapshots are owner data.
 
 ## Important flows
 
@@ -153,3 +153,4 @@ The authoritative placeholder inventory is `.env.example`. `npm run config:check
 - Health Profile stores stable owner-authored context. Temporary symptoms/events belong in Daily Context.
 - Training Plan sequence is authoritative; preferred weekdays are planning preferences, not failure deadlines.
 - Daily Signals preserve missing-versus-zero semantics. Hydration is event-based, explicit no-BM is separate from missing bowel evidence, and subjective wellness exists only when entered.
+- Participation XP is outcome-neutral and idempotent. Hydration, bowel, wellness, and supplement-day awards can occur at most once per domain/Health date, only today/yesterday may mint backlog XP, and Health corrections never claw currency back.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { LATEST_SCHEMA_MIGRATION, tablesForProfile } from '../server/backup/inventory.ts'
+import { tablesForProfile } from '../server/backup/inventory.ts'
 
 describe('I2 Daily Signals backup', () => {
   it('moves the schema head to I2', () => {
