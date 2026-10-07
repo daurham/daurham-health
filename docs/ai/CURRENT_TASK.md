@@ -1,14 +1,14 @@
 # Current task
 
-## I5 — Shared Health Intelligence Engine + Ask Health Context
+## I6 — Goal Control / Weekly Decision Engine
 
 ### Status
 
-Implementation prepared as a dormant batched Git commit on top of dormant I4 commit `09f305f51c7c4da945fe3a3f771a17f683ed7896`.
+Implementation prepared as a dormant batched Git commit on top of dormant I5 commit `6fff0fc874a4fa6deee752bcc403b46d37a36bf0`.
 
 Do not move a feature branch ref while the Vercel rolling deployment limit remains active.
 
-I5 is derived-only and adds no schema migration. Repository schema head remains:
+I6 is derived-only and adds no schema migration. Repository schema head remains:
 
 `0046_evidence_semantics_change_watchdog.sql`
 
@@ -18,132 +18,193 @@ Master program:
 
 ## Product intent
 
-I5 creates one deterministic evidence layer that can increasingly become the common interpretation input for Ask Health, Progress, Coach, Today, and Personal Lab.
+I6 turns Weekly Coach evidence plus the I5 shared Health Intelligence frame into one deterministic goal-control authority.
 
-It does not replace canonical Health tables. It aligns existing observations by Health date, preserves missingness, applies owner Data Quality exclusions before analysis, calculates coverage/baselines/relationships/change context, and then routes only relevant evidence to a consumer.
+The engine answers three questions:
 
-## Shared evidence frame
+1. Is one concrete thing worth attention now?
+2. Is the correct decision to stay the course?
+3. Is the evidence too limited to justify changing course?
 
-`health-intelligence-v1` defines a typed signal registry and sparse daily frame for:
+The state is explicit:
 
-- Activity: steps, active energy, exercise minutes;
-- Sleep: eligible nightly duration;
-- Nutrition: calories, protein, fiber, sodium;
-- Training: session count and perceived effort;
-- Body: canonical weight in kilograms;
-- Daily Signals: logged water, bowel count / explicit no-BM, energy, hunger, soreness, and stress.
+- `act`;
+- `maintain`;
+- `insufficient_evidence`.
 
-Missing owner-tracked signals remain missing. The only synthesized zero is completed-day Training session count, because no canonical Training session on a completed date is itself a real zero-session observation.
+`maintain` is a successful decision, not an empty fallback.
 
-Current-day totals that require a complete day remain provisional and are excluded from complete-day coverage, baselines, relationships, and intervention comparisons.
+## Authority model
 
-## Quality, provenance, and exclusions
+Weekly Coach remains the deterministic evidence/candidate generator.
 
-The shared loader applies I4 `excluded_from_analysis` reviews before building daily evidence.
+`goal-control-v1` sits above it and selects the weekly decision. It does not create a second set of Goal formulas.
 
-The original Health row is never deleted or rewritten.
+Goal Control also consumes I5 for:
 
-Coverage records include:
-
-- observed versus eligible days;
-- owner exclusions;
-- coarse provenance counts;
-- descriptive confidence.
-
-Nutrition keeps I4 provenance and unknown-nutrient semantics. Body keeps comparability context. No universal Health score, device score, readiness score, or recovery score exists.
-
-## Personal baselines and relationships
-
-The snapshot derives recent personal baselines and a curated relationship catalog.
-
-Initial relationship families include:
-
-- Sleep ↔ energy/hunger/soreness;
-- Sleep ↔ steps;
-- hydration ↔ bowel tracking;
-- fiber ↔ bowel tracking;
-- protein ↔ next-day soreness;
-- steps ↔ next-night sleep.
-
-Both same-day and selected one-day-lag relationships are supported.
-
-Relationships require minimum paired observations and use deterministic Spearman rank association. They are observational only and never presented as causal findings.
-
-## Change context
-
-Confirmed/explicit I4 Change Ledger entries can be compared with surrounding Health evidence.
-
-I5 calculates bounded seven-day before/after summaries when each side has enough observations. These are context comparisons, not proof the intervention caused the difference.
-
-## Question routing and drill-down
-
-The snapshot can route evidence by question/lens instead of sending every available signal to every consumer.
-
-Structured evidence carries:
-
-- signal identity;
-- period;
 - coverage;
-- confidence;
 - provenance;
-- evidence dates;
-- detail destinations.
+- descriptive confidence;
+- mature personal relationships;
+- Data Quality exclusions already applied at the I5 loader boundary.
 
-This supplies the basis for consequential `Why?` drill-down without requiring model-generated provenance.
+Weekly Coach and Today render this same Goal Control decision rather than selecting independent primary recommendations.
 
-## Ask Health
+The gamified Coach remains a mission/reward system. New weekly goal missions are limited to goals that actually need weekly attention; ordinary on-track goals do not automatically become a competing weekly focus.
 
-Ask Health packet version is now `ask-health-evidence-v2`; prompt version is `ask-health-v4`.
+## Evidence window
 
-Ask Health keeps its existing direct Goal/Body/Nutrition/etc evidence but consumes the shared I5 layer for:
+Goal Control uses:
 
-- Daily Signals;
-- personal baselines;
-- personal relationships;
-- intervention comparisons;
-- owner Data Quality exclusions;
-- question-specific context.
+- the Weekly Coach's last seven completed days as the evidence period;
+- the Training Plan effective at the requested historical/current `asOf` date;
+- the I5 30-day evidence frame for coverage, confidence, baselines, and mature relationships.
 
-The owner UI gains a collapsed **What Health knows / Missing context that matters** summary. Sparse relationships become explicit limitations rather than invented patterns.
+Historical `asOf` requests must not leak future plan versions or future Health evidence.
 
-Gemini still phrases/explains only after owner action. Deterministic evidence remains authoritative.
+## Primary opportunity
 
-## Timeline
+The primary opportunity is the deterministic Weekly Coach `focus` candidate.
 
-The I2-deferred Daily Signals Timeline integration is included.
+Goal Control does not invent an alternate action after Weekly Coach has already selected one.
 
-Timeline receives one **Daily check-in** event per Health date containing the day's water total, bowel state/count, and entered wellness ratings. It does not create one Timeline event per glass or bowel event.
+Supported focus families include existing due/past goals, off-track goals, Body cadence, due Lab retests, ready Experiment reviews, pending review captures, Nutrition coverage, and plan-aware Training review/actions.
 
-Explicit no-BM remains different from missing bowel evidence.
+If no primary opportunity is justified, Goal Control may explicitly recommend no change.
 
-## Shared owner API
+## Explicit no-change state
 
-`GET /api/intelligence/snapshot?range=...&asOf=...` exposes the owner-authenticated derived snapshot.
+When evidence is sufficient but no deterministic focus is justified:
 
-The endpoint does not create a second canonical Health store.
+> No change recommended this week. Current evidence does not justify changing your targets or plan.
 
-## Consumer boundary
+This prevents the product from manufacturing a recommendation merely to fill a card.
 
-I5 establishes the engine and converts Ask Health first.
+## Nutrition evidence floor
 
-I6 Goal Control / Weekly Decision Engine is the next phase that should move consequential Today/Coach decision logic onto this shared layer rather than duplicating it inside I5.
+The last seven completed days are assessed separately from the Nutrition target itself.
+
+Initial floor:
+
+- at least four logged days;
+- at least four sufficiently reliable days;
+- estimate-heavy or unknown-source days do not satisfy the reliable-day threshold.
+
+Failing the floor creates an explicit limitation:
+
+> intake-based changes should wait for better coverage.
+
+I6 still does not mutate calorie, macro, fiber, sodium, or other Nutrition targets. I7 owns observed-maintenance/plateau intervention logic.
+
+## Rest-aware Training adherence
+
+Training Plan intent is authoritative for daily pressure.
+
+Goal Control distinguishes:
+
+- weekly target already met;
+- planned Training day;
+- intentional rest/non-Training day with enough planned days remaining;
+- schedule that no longer has enough planned Training days for the weekly target.
+
+An intentional Rest, Active recovery, Flexible, moved-away, or paused/away day is not a missed workout.
+
+The persistent Coach daily `training_frequency` quest is only created when:
+
+- no Training Plan is configured; or
+- today is `training_preferred`; or
+- today is `training_moved_here`.
+
+If such a quest already exists and the owner later changes that date to a non-Training intent, the quest expires without an XP award. Existing completed/passed history is not rewritten.
+
+## Goal status and confidence
+
+Goal Control carries active Goal state as:
+
+- meeting;
+- on track;
+- needs attention;
+- unknown.
+
+Overall confidence is derived from Weekly Coach substantive-domain coverage plus I5 signal coverage relevant to active Goals.
+
+Sparse evidence produces limitations instead of aggressive recommendations.
+
+## Personal relationships
+
+Only I5 relationships that are:
+
+- available;
+- relevant to an active Goal;
+- and at least moderate confidence
+
+may appear in Goal Control.
+
+They remain observational and do not become causal justification.
+
+## Today
+
+Today loads Goal Control as its own owner resource rather than expanding the already-large `/api/today` payload.
+
+The compact **Goal overview** card appears after the Nutrition/Coach/Training cluster and before Daily Check-in.
+
+It shows:
+
+- decision headline;
+- short explanation;
+- confidence;
+- one action when applicable;
+- explicit Stay the course state;
+- rest-aware note when useful;
+- compact Why/limitations disclosure.
+
+Health data change events refresh Today, Coach, and Goal Control.
+
+## Weekly Coach
+
+Weekly Coach responses now include the same deterministic `decision`.
+
+The weekly page renders **Weekly decision** with:
+
+- decision headline/summary;
+- confidence;
+- active-goal status counts;
+- primary action when present;
+- Training adherence;
+- Nutrition evidence quality;
+- mature personal relationships;
+- limitations.
+
+When Goal Control is present, the old standalone **Focus this week** section is suppressed.
+
+AI commentary may still phrase deterministic evidence after owner action, but its intro/focus wording is not rendered as a competing authority.
+
+## Owner API
+
+`GET /api/intelligence/goal-control?asOf=YYYY-MM-DD`
+
+- owner-authenticated;
+- rejects future dates;
+- derived-only;
+- no target mutation;
+- no background AI call.
 
 ## Explicit non-goals
 
-I5 does not:
+I6 does not:
 
-- add a database table or migration;
-- mutate canonical observations;
-- infer missing hydration, bowel, Nutrition, Body, or wellness values as zero;
+- automatically change calories, macros, Goals, supplements, or Training Plan;
+- estimate maintenance calories;
+- declare a plateau;
 - infer causality;
-- create a readiness/recovery/source-quality score;
-- automatically change goals, calories, macros, supplements, or Training;
-- make background AI calls;
-- replace existing deterministic Goal/Lab authorities.
+- create a readiness/recovery score;
+- make every active goal into a weekly mission;
+- penalize planned rest;
+- award XP for an automatically expired Training quest.
 
 ## Validation before publication
 
-Once this dormant commit is exposed to one branch:
+Once the dormant stack is exposed to one branch:
 
 1. apply migrations through existing schema head 0046;
 2. run `npx tsc -b`;
@@ -151,10 +212,21 @@ Once this dormant commit is exposed to one branch:
 4. run `npm test`;
 5. run `npm run build`.
 
-Focused I5 regression coverage is staged for missing-vs-zero semantics, current-day provisional rules, lagged relationships, exclusion accounting, intervention comparisons, question routing, Ask Health context, Daily Signals Timeline integration, and API routing.
+Focused I6 coverage is staged for:
+
+- act / maintain / insufficient-evidence states;
+- explicit no-change behavior;
+- Nutrition quality floor;
+- rest-aware Training adherence;
+- Training-plan focus generation;
+- mature personal-relationship filtering;
+- shared weekly-attention semantics;
+- owner API/auth boundary;
+- Today and Weekly Decision presentation;
+- Coach source-contract alignment and stale daily-quest retirement.
 
 Do not merge until the exact published branch head is green.
 
 ## Next roadmap slice
 
-I6 — Goal Control / Weekly Decision Engine.
+I7 — Observed Maintenance + Plateau Engine.

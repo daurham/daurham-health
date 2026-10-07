@@ -1,4 +1,5 @@
 import { activityRangeSummary, type ActivityMetricSummary } from '../activity/analytics.js'
+import { goalNeedsWeeklyAttention } from '../goal-control.js'
 import { ACTIVITY_SHORT_TERM_MIN_OBSERVED, ACTIVITY_TIMEZONE } from '../activity/config.js'
 import { bodyWeightTrend } from '../progress/body-trend.js'
 import { addCalendarDays } from '../progress/dates.js'
@@ -538,6 +539,17 @@ function focusCandidates(input: WeeklyCoachInput, nutrition: ReturnType<typeof n
         actionText: `Review your ${goal.label} goal because its target date ${goal.deadlineState === 'due_today' ? 'is today' : 'has passed'}.`,
         rank: 1,
       })
+    } else if (goalNeedsWeeklyAttention(goal.deadlineState)) {
+      items.push({
+        id: `focus:goal-off-track:${goal.id}`,
+        section: 'focus',
+        kind: 'goal_off_track',
+        fact: `${goal.label} is projected after its target date.`,
+        evidenceRefs: [`goal:${goal.id}`],
+        detailPath: `/goals/${goal.id}`,
+        actionText: `Review the ${goal.label} goal and its current plan before changing targets.`,
+        rank: 6,
+      })
     }
   }
   for (const cadence of input.cadenceDue) {
@@ -597,6 +609,36 @@ function focusCandidates(input: WeeklyCoachInput, nutrition: ReturnType<typeof n
       rank: 5,
     })
   }
+
+  const plan = input.trainingPlan
+  if (plan?.configured && plan.weeklyFrequencyTarget != null && plan.completedProgrammedSessions < plan.weeklyFrequencyTarget) {
+    const remaining = plan.weeklyFrequencyTarget - plan.completedProgrammedSessions
+    const trainingToday = plan.todayIntent === 'training_preferred' || plan.todayIntent === 'training_moved_here'
+    if (trainingToday) {
+      items.push({
+        id: 'focus:training-plan:today',
+        section: 'focus',
+        kind: 'training_plan_today',
+        fact: `${remaining} programmed session${remaining === 1 ? '' : 's'} remain this week, and today is a planned Training day.`,
+        evidenceRefs: ['training-plan:week'],
+        detailPath: '/training',
+        actionText: plan.todayRoutineName ? `Complete the planned ${plan.todayRoutineName} session when ready.` : 'Complete the planned Training session when ready.',
+        rank: 7,
+      })
+    } else if (plan.futureTrainingDates.length < remaining) {
+      items.push({
+        id: 'focus:training-plan:review',
+        section: 'focus',
+        kind: 'training_plan_review',
+        fact: `${remaining} programmed session${remaining === 1 ? '' : 's'} remain, with only ${plan.futureTrainingDates.length} planned Training day${plan.futureTrainingDates.length === 1 ? '' : 's'} left this week.`,
+        evidenceRefs: ['training-plan:week'],
+        detailPath: '/training/plan',
+        actionText: 'Review this week’s Training Plan. Health will not turn an intentional rest day into a missed-workout penalty.',
+        rank: 9,
+      })
+    }
+  }
+
   if (nutrition.loggedDays < WEEKLY_COACH_NUTRITION_MIN_LOGGED) {
     items.push({
       id: 'focus:nutrition-coverage',
@@ -606,7 +648,7 @@ function focusCandidates(input: WeeklyCoachInput, nutrition: ReturnType<typeof n
       evidenceRefs: ['nutrition:coverage'],
       detailPath: '/nutrition',
       actionText: NUTRITION_FOCUS,
-      rank: 6,
+      rank: 8,
     })
   }
   return items

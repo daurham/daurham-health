@@ -14,11 +14,13 @@ import {
   type WeeklyCoachBrief,
   type WeeklyCoachCommentary,
 } from '../../src/domain/weekly-coach/index.js'
+import type { GoalControlState } from '../../src/domain/goal-control.js'
 import { boundedProviderCostUsd } from '../ai-usage/cost.js'
 import { readAiUsageConfig } from '../ai-usage/config.js'
 import { HttpError } from '../http.js'
 import { getWeeklyCoachGate, weeklyCoachCacheKey, type WeeklyCoachGate } from './gate.js'
 import { loadWeeklyCoachInput } from './load.js'
+import { loadGoalControlState } from '../intelligence/goal-control.js'
 import { weeklyCoachGemini, weeklyCoachModel } from './provider.js'
 
 const BUDGET = 'Weekly Coach wording is unavailable because the AI monthly budget is reached. Showing your weekly evidence instead.'
@@ -35,6 +37,7 @@ export type WeeklyCoachResponse = {
   brief: WeeklyCoachBrief
   commentary: WeeklyCoachCommentary | null
   notice: string | null
+  decision: GoalControlState
   meta: {
     packetVersion: typeof WEEKLY_COACH_PACKET_VERSION
     promptVersion: typeof WEEKLY_COACH_PROMPT_VERSION
@@ -61,8 +64,10 @@ export function parseWeeklyAsOf(
 }
 
 export async function readWeeklyCoach(asOf: string): Promise<WeeklyCoachResponse> {
-  const brief = buildWeeklyCoachBrief(await loadWeeklyCoachInput(asOf))
-  return response(brief, null, null, null, false)
+  const weeklyInput = await loadWeeklyCoachInput(asOf)
+  const brief = buildWeeklyCoachBrief(weeklyInput)
+  const decision = await loadGoalControlState(asOf, { weeklyInput, brief })
+  return response(brief, decision, null, null, null, false)
 }
 
 export async function generateWeeklyCoach(input: {
@@ -72,9 +77,11 @@ export async function generateWeeklyCoach(input: {
   model?: string
   now?: number
 }): Promise<WeeklyCoachResponse> {
-  const brief = buildWeeklyCoachBrief(await loadWeeklyCoachInput(input.asOf))
+  const weeklyInput = await loadWeeklyCoachInput(input.asOf)
+  const brief = buildWeeklyCoachBrief(weeklyInput)
+  const goalControl = await loadGoalControlState(input.asOf, { weeklyInput, brief })
   if (!brief.canGenerate) {
-    return response(brief, null, null, null, false)
+    return response(brief, goalControl, null, null, null, false)
   }
   const model = input.model ?? weeklyCoachModel()
   const gate = input.gate ?? getWeeklyCoachGate()
@@ -83,14 +90,14 @@ export async function generateWeeklyCoach(input: {
   const now = input.now ?? Date.now()
   const decision = await gate.take(key, now, model)
   if (!decision.ok) {
-    return response(brief, null, decision.reason === 'budget' ? BUDGET : RATE, model, false)
+    return response(brief, goalControl, null, decision.reason === 'budget' ? BUDGET : RATE, model, false)
   }
   if (decision.cached) {
-    return response(brief, decision.cached, null, model, true)
+    return response(brief, goalControl, decision.cached, null, model, true)
   }
   const usageId = decision.usageId
   if (!usageId) {
-    return response(brief, null, WEEKLY_COACH_FALLBACK_COPY, model, false)
+    return response(brief, goalControl, null, WEEKLY_COACH_FALLBACK_COPY, model, false)
   }
   try {
     const generated = await (input.provider ?? weeklyCoachGemini)({
@@ -103,22 +110,23 @@ export async function generateWeeklyCoach(input: {
     const cost = boundedProviderCostUsd(generated.inputTokens, generated.outputTokens, reserved)
     await gate.complete(usageId, cost, generated.inputTokens, generated.outputTokens, now)
     if (!commentary) {
-      return response(brief, null, WEEKLY_COACH_FALLBACK_COPY, generated.model, false)
+      return response(brief, goalControl, null, WEEKLY_COACH_FALLBACK_COPY, generated.model, false)
     }
     gate.store(key, commentary)
-    return response(brief, commentary, null, generated.model, false)
+    return response(brief, goalControl, commentary, null, generated.model, false)
   } catch (error) {
     if (error instanceof NutritionInterpretError && error.code === 'GEMINI_NOT_CONFIGURED') {
       await gate.release(usageId, now)
     } else {
       await gate.uncertain(usageId, now)
     }
-    return response(brief, null, WEEKLY_COACH_FALLBACK_COPY, model, false)
+    return response(brief, goalControl, null, WEEKLY_COACH_FALLBACK_COPY, model, false)
   }
 }
 
 function response(
   brief: WeeklyCoachBrief,
+  decision: GoalControlState,
   commentary: WeeklyCoachCommentary | null,
   notice: string | null,
   model: string | null,
@@ -128,6 +136,7 @@ function response(
     brief,
     commentary,
     notice,
+    decision,
     meta: {
       packetVersion: WEEKLY_COACH_PACKET_VERSION,
       promptVersion: WEEKLY_COACH_PROMPT_VERSION,

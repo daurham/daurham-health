@@ -38,15 +38,15 @@ Also present from v1 and the import work: Nutrition, Training, Body, Progress, A
 
 ## Current work
 
-I5 — Shared Health Intelligence Engine + Ask Health Context is prepared as a dormant batch on top of dormant I4 commit `09f305f51c7c4da945fe3a3f771a17f683ed7896`.
+I6 — Goal Control / Weekly Decision Engine is prepared as a dormant batch on top of dormant I5 commit `6fff0fc874a4fa6deee752bcc403b46d37a36bf0`.
 
-I5 adds a derived Health-date evidence frame, signal registry, coverage/provenance/confidence states, personal baselines, curated lagged relationships, Change Ledger comparisons, question-specific evidence routing, I4 Data Quality exclusion semantics, Ask Health shared context, and the deferred Daily Signals Timeline integration.
+I6 adds `goal-control-v1`: one deterministic act/maintain/insufficient-evidence decision authority built from Weekly Coach candidates plus I5 coverage/confidence/relationship context. Today and Weekly Coach consume that same decision. Training adherence and Coach daily Training quests are plan/rest-aware, and low-quality Nutrition evidence cannot justify intake changes.
 
-No branch ref is moved while the Vercel rolling deployment limit remains active. I5 adds no migration; schema head remains `0046_evidence_semantics_change_watchdog.sql`.
+No branch ref is moved while the Vercel rolling deployment limit remains active. I6 adds no migration; schema head remains `0046_evidence_semantics_change_watchdog.sql`.
 
 ## Known planned work
 
-- I6 Goal Control / Weekly Decision Engine, including migration of consequential Today/Coach decision logic onto the shared evidence layer.
+- I7 Observed Maintenance + Plateau Engine.
 
 
 Named by the current manual or blueprint, and not marked implemented:

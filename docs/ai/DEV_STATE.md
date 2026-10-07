@@ -1,5 +1,23 @@
 # Dev state
 
+## 2026-10-06 I6 prepared — Goal Control / Weekly Decision Engine
+
+- I6 is prepared as a dormant batch on top of dormant I5; no branch ref is moved while the Vercel deployment-rate window remains active.
+- No schema migration is added; schema head remains `0046_evidence_semantics_change_watchdog.sql`.
+- Added `goal-control-v1`, a deterministic authority above Weekly Coach evidence/candidates and I5 shared intelligence.
+- Decision states are `act`, `maintain`, and `insufficient_evidence`; `maintain` carries an explicit no-change recommendation instead of manufacturing an action.
+- Goal Control uses the last seven completed days for weekly evidence, the Training Plan effective at `asOf`, and I5 30-day coverage/confidence/relationship context.
+- Added a Nutrition evidence-quality floor: four logged and four sufficiently reliable completed days before intake evidence is considered decision-ready.
+- Training adherence is plan-aware. Planned rest/active-recovery/flexible/moved-away/away days are not missed workouts when enough planned days remain.
+- Goal-driven daily Training quests are suppressed on configured non-Training days; if the day's plan changes after creation, an active quest expires without XP.
+- New gamified weekly goal missions are limited to genuine goal-attention states instead of every active goal.
+- Today gains a separate compact Goal overview resource/card; `/api/today` is not expanded with another heavy evidence load.
+- Weekly Coach responses include the same Goal Control decision and suppress the older independent Focus section; AI intro/focus wording is hidden when deterministic Goal Control is present.
+- Added owner-only `GET /api/intelligence/goal-control`.
+- Focused I6 domain, routing/source-contract, UI, and Weekly Coach compatibility tests are staged. Full TypeScript/lint/test/build validation remains deferred until the dormant stack is exposed to one branch.
+- I7 remains responsible for observed maintenance, plateau classification, and candidate intake interventions.
+
+
 ## 2026-10-06 I5 prepared — shared Health Intelligence + Ask Health context
 
 - I5 is prepared as a dormant batch on top of dormant I4; no branch ref is moved while the Vercel deployment-rate window remains active.

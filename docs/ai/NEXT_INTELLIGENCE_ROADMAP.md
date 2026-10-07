@@ -3349,6 +3349,24 @@ Today Goal Overview, Coach, What Changed, Patterns, Weekly Coach, Ask Health, an
 
 ## Phase I6 — Goal Control / Weekly Decision Engine
 
+### Prepared implementation note — 2026-10-06
+
+The first I6 batch establishes `goal-control-v1` without adding a new persisted authority:
+
+- deterministic `act` / `maintain` / `insufficient_evidence` state;
+- Weekly Coach focus reused as the single primary opportunity;
+- explicit no-change recommendation;
+- active-Goal weekly status and I5 confidence/limitations;
+- four-day logged/reliable Nutrition evidence floor;
+- flexible Training Plan/rest-aware adherence;
+- mature goal-relevant personal relationships only;
+- compact Today Goal overview loaded independently from the main Today payload;
+- Weekly Coach consumes the same decision and suppresses its older Focus authority;
+- goal-driven Coach daily Training quests respect plan intent and expire without XP if a same-day plan change makes them inapplicable;
+- new gamified weekly goal missions require genuine Goal attention.
+
+I6 does not estimate maintenance or prescribe calorie changes; those remain I7 responsibilities.
+
 ### Deliver
 - cross-domain deterministic goal-control state;
 - compact Today Goal Overview / tip card;

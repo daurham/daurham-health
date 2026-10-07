@@ -436,3 +436,27 @@ Observed from the current code and product docs. Where the original rationale is
 **Reason:** Paired personal observations can reveal useful associations while still being confounded by unmeasured context.  
 **Implications:** I5 uses a curated relationship registry, deterministic minimum sample gates, optional lag alignment, and Spearman rank association. Ask Health may explain supplied relationships but must label them observational. Change Ledger before/after comparisons are context only and never proof of intervention effect.
 
+## Decision: Goal Control is the primary weekly decision authority
+
+**Status:** Active  
+**Reason:** Weekly Coach, Today, and the gamified Coach can each surface useful evidence, but they should not independently decide what the owner's primary weekly recommendation is.  
+**Implications:** `goal-control-v1` selects one deterministic state from Weekly Coach focus candidates plus I5 evidence context. Today and Weekly Coach render that shared decision. The gamified Coach remains a mission/reward system; new weekly goal missions require genuine attention and should not be interpreted as a second strategic recommendation engine.
+
+## Decision: No change recommended is a valid positive result
+
+**Status:** Active  
+**Reason:** A decision system that must always produce an action will overreact to noise and undermine the evidence-quality work in I4/I5.  
+**Implications:** I6 explicitly emits `maintain` when evidence is sufficient and no focus is justified. The UI says to stay the course. `insufficient_evidence` remains distinct so lack of evidence is never mislabeled as success.
+
+## Decision: Training adherence follows the flexible Training Plan, not calendar guilt
+
+**Status:** Active  
+**Reason:** Preferred days are intentionally flexible and owner-declared rest/active-recovery/away intent is canonical context.  
+**Implications:** I6 does not treat a configured non-Training day as a missed workout. Goal-driven daily Training quests are only offered on planned Training days (or when no plan exists). A previously created active Training quest expires without reward if the same date is later changed to non-Training intent.
+
+## Decision: Nutrition evidence must clear a floor before intake-change reasoning
+
+**Status:** Active  
+**Reason:** Sparse, estimate-heavy, or unknown-source logging can make mathematically neat intake conclusions practically unreliable.  
+**Implications:** I6 requires at least four logged and four sufficiently reliable completed Nutrition days for intake evidence to be decision-ready. Failing the floor becomes an explicit limitation. I6 does not mutate intake targets; I7 owns observed-maintenance and plateau intervention logic.
+

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import type { GoalControlState } from '@/domain/goal-control'
 import {
   WEEKLY_COACH_INSUFFICIENT_COPY,
   type WeeklyCandidate,
@@ -37,6 +38,7 @@ export function WeeklyCoachView({
   brief,
   commentary,
   notice,
+  decision,
   exampleLabel,
   generating = false,
   onGenerate,
@@ -44,6 +46,7 @@ export function WeeklyCoachView({
   brief: WeeklyCoachBrief
   commentary: WeeklyCoachCommentary | null
   notice: string | null
+  decision?: GoalControlState | null
   exampleLabel?: string
   generating?: boolean
   onGenerate?: () => void
@@ -64,9 +67,10 @@ export function WeeklyCoachView({
         </p>
         {exampleLabel ? <p className="text-sm text-zinc-600">{exampleLabel}</p> : null}
       </header>
-      {brief.state === 'insufficient_evidence' ? <p className="text-sm text-zinc-700">{WEEKLY_COACH_INSUFFICIENT_COPY}</p> : null}
+      {decision ? <WeeklyDecisionCard decision={decision} prefix={prefix} /> : null}
+      {brief.state === 'insufficient_evidence' && !decision ? <p className="text-sm text-zinc-700">{WEEKLY_COACH_INSUFFICIENT_COPY}</p> : null}
       {notice ? <p className="text-sm text-zinc-600">{notice}</p> : null}
-      {commentary?.intro ? <p className="text-sm text-zinc-500">{commentary.intro}</p> : null}
+      {commentary?.intro && !decision ? <p className="text-sm text-zinc-500">{commentary.intro}</p> : null}
       <section className="space-y-2">
         <h2 className="text-xs font-medium uppercase tracking-wide text-zinc-500">Weekly evidence</h2>
         <ul className="space-y-2">
@@ -79,7 +83,7 @@ export function WeeklyCoachView({
       </section>
       <CandidateSection title="What went well" items={wentWell} comments={commentary?.comments ?? {}} prefix={prefix} />
       <CandidateSection title="Worth watching" items={watching} comments={commentary?.comments ?? {}} prefix={prefix} />
-      {focus ? (
+      {!decision && focus ? (
         <CandidateSection title="Focus this week" items={[focus]} comments={commentary?.comments ?? {}} prefix={prefix} showAction />
       ) : null}
       {onGenerate && brief.canGenerate && !commentary ? (
@@ -88,6 +92,71 @@ export function WeeklyCoachView({
         </button>
       ) : null}
     </div>
+  )
+}
+
+function WeeklyDecisionCard({ decision, prefix }: { decision: GoalControlState; prefix: string }) {
+  const opportunity = decision.primaryOpportunity
+  const activeGoals = decision.goals.filter((goal) => goal.lifecycle === 'active')
+  const meeting = activeGoals.filter((goal) => goal.state === 'meeting' || goal.state === 'on_track').length
+  const attention = activeGoals.filter((goal) => goal.state === 'needs_attention').length
+  const unknown = activeGoals.filter((goal) => goal.state === 'unknown').length
+  return (
+    <section className="rounded-lg border border-zinc-200 bg-white p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Weekly decision</p>
+          <h2 className="mt-1 text-lg font-semibold tracking-tight text-zinc-900">{decision.headline}</h2>
+          <p className="mt-1 text-sm text-zinc-600">{decision.summary}</p>
+        </div>
+        <span className="rounded-full bg-zinc-100 px-2 py-1 text-xs font-medium text-zinc-600">
+          {decision.confidence} confidence
+        </span>
+      </div>
+      {activeGoals.length > 0 ? (
+        <p className="mt-3 text-xs text-zinc-500">
+          Active goals · {meeting} meeting/on track · {attention} need attention{unknown > 0 ? ` · ${unknown} need more evidence` : ''}
+        </p>
+      ) : null}
+      {opportunity ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Link to={prefixedPath(prefix, opportunity.detailPath)} className={quietButtonClass}>
+            {opportunity.actionText}
+          </Link>
+          <Link
+            to={prefixedPath(prefix, `/ask-health?${askSearch(opportunity.title)}`)}
+            className={quietButtonClass}
+          >
+            Ask Health
+          </Link>
+        </div>
+      ) : null}
+      <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+        <div className="rounded-md bg-zinc-50 px-3 py-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Training</p>
+          <p className="mt-1 text-zinc-700">{decision.trainingAdherence.detail}</p>
+        </div>
+        <div className="rounded-md bg-zinc-50 px-3 py-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Nutrition evidence</p>
+          <p className="mt-1 text-zinc-700">{decision.nutritionQuality.detail}</p>
+        </div>
+      </div>
+      {(decision.relationships.length > 0 || decision.limitations.length > 0) ? (
+        <details className="mt-3 rounded-md border border-zinc-200 px-3 py-2">
+          <summary className="cursor-pointer text-sm font-medium text-zinc-700">Why this decision?</summary>
+          {decision.relationships.length > 0 ? (
+            <ul className="mt-2 space-y-1 text-sm text-zinc-600">
+              {decision.relationships.map((item) => <li key={item.id}>{item.summary}</li>)}
+            </ul>
+          ) : null}
+          {decision.limitations.length > 0 ? (
+            <ul className="mt-2 space-y-1 text-xs text-zinc-500">
+              {decision.limitations.map((item) => <li key={item.code}>{item.text}</li>)}
+            </ul>
+          ) : null}
+        </details>
+      ) : null}
+    </section>
   )
 }
 
@@ -158,6 +227,7 @@ type WeeklyCoachResponse = {
   brief: WeeklyCoachBrief
   commentary: WeeklyCoachCommentary | null
   notice: string | null
+  decision: GoalControlState
 }
 
 export function WeeklyCoachPage() {
@@ -216,6 +286,7 @@ export function WeeklyCoachPage() {
         brief={payload.brief}
         commentary={payload.commentary}
         notice={payload.notice}
+        decision={payload.decision}
         generating={generating}
         onGenerate={() => {
           void generate()

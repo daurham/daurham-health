@@ -21,6 +21,7 @@ import {
   type RecentCoachRule,
 } from '../../src/domain/coach.js'
 import { bodyReminderCopy, measureHref, selectTodayBodyReminder } from '../../src/domain/body-cadence.js'
+import { dailyTrainingQuestAllowed, goalNeedsWeeklyAttention } from '../../src/domain/goal-control.js'
 import { addCalendarDays } from '../../src/domain/progress/dates.js'
 import {
   STRETCH_CONFIG,
@@ -48,6 +49,7 @@ import { HttpError } from '../http.js'
 import { currentHealthDate, healthTimeContext } from '../health-time.js'
 import { reconcileCoachAwards } from '../rewards/service.js'
 import { ensureOwnerExercise, getExerciseDefinition } from '../training/owner-exercises.js'
+import { getTrainingPlan } from '../training/plan-service.js'
 import {
   buildSessionInsertQueries,
   parseManualWorkoutRequest,
@@ -424,17 +426,20 @@ function goalTarget(goal: {
 }
 
 async function candidateInputs(date: string) {
-  const [goalResult, cadence, context] = await Promise.all([
+  const [goalResult, cadence, context, trainingPlan] = await Promise.all([
     listGoals(),
     loadCadenceEvidence(),
     getDailyContext(date),
+    getTrainingPlan(date),
   ])
-  return { goals: goalResult.goals, cadence, context }
+  return { goals: goalResult.goals, cadence, context, trainingPlan }
 }
 
-async function weeklyCandidates(date: string): Promise<CoachCandidate[]> {
+type CoachCandidateInputs = Awaited<ReturnType<typeof candidateInputs>>
+
+async function weeklyCandidates(date: string, input: CoachCandidateInputs): Promise<CoachCandidate[]> {
   const { start, end } = coachWeek(date)
-  const { goals, cadence } = await candidateInputs(date)
+  const { goals, cadence } = input
   const due = selectTodayBodyReminder(cadence.configs, cadence.observations, date)
   const candidates: CoachCandidate[] = []
 
@@ -442,6 +447,7 @@ async function weeklyCandidates(date: string): Promise<CoachCandidate[]> {
     if (goal.status !== 'active') continue
     const target = goalTarget(goal)
     if (target == null || target <= 0) continue
+    if (!goalNeedsWeeklyAttention(goal.goalStatus.deadlineState)) continue
 
     if (goal.goalKind === 'training_frequency') {
       candidates.push({
@@ -552,8 +558,8 @@ async function weeklyCandidates(date: string): Promise<CoachCandidate[]> {
   return candidates
 }
 
-async function dailyCandidates(date: string): Promise<CoachCandidate[]> {
-  const { goals, cadence, context } = await candidateInputs(date)
+async function dailyCandidates(date: string, input: CoachCandidateInputs): Promise<CoachCandidate[]> {
+  const { goals, cadence, context, trainingPlan } = input
   const due = selectTodayBodyReminder(cadence.configs, cadence.observations, date)
   const candidates: CoachCandidate[] = []
 
@@ -563,7 +569,13 @@ async function dailyCandidates(date: string): Promise<CoachCandidate[]> {
     if (target == null || target <= 0) continue
     const urgent = goal.goalStatus.deadlineState === 'due_today' || goal.goalStatus.deadlineState === 'passed_unmet'
 
-    if (goal.goalKind === 'training_frequency') {
+    if (
+      goal.goalKind === 'training_frequency' &&
+      dailyTrainingQuestAllowed({
+        configured: trainingPlan.configured,
+        todayIntent: trainingPlan.today?.effectiveIntent ?? null,
+      })
+    ) {
       candidates.push({
         taskKind: 'daily_quest',
         ruleKey: `goal:training-session:${goal.id}`,
@@ -1242,6 +1254,25 @@ async function expireTask(sql: Sql, row: CoachTaskRow) {
   })
 }
 
+async function expireInapplicableDailyTrainingTask(
+  sql: Sql,
+  date: string,
+  candidates: readonly CoachCandidate[],
+): Promise<void> {
+  const existing = await loadTaskForPeriod(sql, 'daily_quest', date)
+  if (
+    !existing ||
+    existing.status !== 'active' ||
+    !existing.rule_key.startsWith('goal:training-session:')
+  ) {
+    return
+  }
+  if (candidates.some((candidate) => candidate.ruleKey === existing.rule_key)) {
+    return
+  }
+  await expireTask(sql, existing)
+}
+
 async function reconcile(sql: Sql, today: string, now: Date, timezone: string) {
   const rows = (await sql.query(
     `SELECT ${TASK_COLUMNS}
@@ -1384,8 +1415,10 @@ export async function ensureCoach(now = new Date()): Promise<CoachState> {
   const [{ date, timezone }, sql] = await Promise.all([healthTimeContext(now), getSql()])
   const week = coachWeek(date)
   await reconcile(sql, date, now, timezone)
-  const recent = await recentRules(sql, date)
-  const [weekly, daily] = await Promise.all([weeklyCandidates(date), dailyCandidates(date)])
+  const [recent, candidateInput] = await Promise.all([recentRules(sql, date), candidateInputs(date)])
+  const weekly = await weeklyCandidates(date, candidateInput)
+  const daily = await dailyCandidates(date, candidateInput)
+  await expireInapplicableDailyTrainingTask(sql, date, daily)
   await ensurePeriodTask(sql, 'weekly_focus', week.start, weekly, [], date)
   await ensurePeriodTask(sql, 'daily_quest', date, daily, recent, date)
   await ensureStretch(sql, date, now)

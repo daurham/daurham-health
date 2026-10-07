@@ -41,6 +41,44 @@ vi.mock('../server/weekly-coach/load.ts', () => ({
   }),
 }))
 
+vi.mock('../server/intelligence/goal-control.ts', () => ({
+  loadGoalControlState: vi.fn(async (asOf: string) => ({
+    version: 'goal-control-v1',
+    asOf,
+    period: { start: asOf, end: asOf },
+    state: 'maintain',
+    headline: 'Stay the course',
+    summary: 'No change recommended this week.',
+    noChangeRecommended: true,
+    confidence: 'moderate',
+    primaryOpportunity: null,
+    goals: [],
+    nutritionQuality: {
+      state: 'unknown',
+      period: { start: asOf, end: asOf },
+      loggedDays: 0,
+      reliableDays: 0,
+      estimateHeavyDays: 0,
+      unknownQualityDays: 0,
+      requiredLoggedDays: 4,
+      requiredReliableDays: 4,
+      detail: 'No completed Nutrition days are available for intake-based decisions this week.',
+    },
+    trainingAdherence: {
+      configured: false,
+      completedProgrammedSessions: 0,
+      weeklyFrequencyTarget: null,
+      remainingSessions: null,
+      todayIntent: null,
+      futureTrainingDates: [],
+      state: 'unconfigured',
+      detail: 'No flexible Training Plan is configured.',
+    },
+    relationships: [],
+    limitations: [],
+  })),
+}))
+
 const ownerConfig: HealthOwnerConfig = {
   authBaseUrl: 'https://auth.example',
   cookieSecret: 'x'.repeat(32),

@@ -4,6 +4,7 @@ import type { BodyObservation } from '../progress/types.js'
 import type { NutritionEntry, NutritionTarget } from '../nutrition/types.js'
 import type { SleepSummaryNight } from '../sleep/analytics.js'
 import type { TodaySupplementInput } from '../supplements/types.js'
+import type { TrainingDayIntent } from '../training-plan.js'
 import type { WEEKLY_COACH_PACKET_VERSION } from './config.js'
 
 export type WeeklyPeriod = { start: string; end: string }
@@ -65,6 +66,15 @@ export type WeeklySleepBaseline = {
   priorNights: number
 }
 
+export type WeeklyTrainingPlanSnapshot = {
+  configured: boolean
+  completedProgrammedSessions: number
+  weeklyFrequencyTarget: number | null
+  todayIntent: TrainingDayIntent | null
+  todayRoutineName: string | null
+  futureTrainingDates: string[]
+}
+
 export type WeeklyCoachInput = {
   asOf: string
   timezone?: string
@@ -85,6 +95,7 @@ export type WeeklyCoachInput = {
   insights: readonly ProactiveInsight[]
   sleepBaseline: WeeklySleepBaseline | null
   activeBodyGoal: boolean
+  trainingPlan?: WeeklyTrainingPlanSnapshot | null
 }
 
 export type WeeklyCandidate = {

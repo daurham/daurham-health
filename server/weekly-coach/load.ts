@@ -14,11 +14,12 @@ import { loadProgressCanonicalRows } from '../progress/queries.js'
 import { listSleepNightlySummaries } from '../sleep/queries.js'
 import { listSupplementRangeInputs } from '../supplements/queries.js'
 import { healthCalendarTimeZone } from '../health-time.js'
+import { getTrainingPlan } from '../training/plan-service.js'
 
 export async function loadWeeklyCoachInput(asOf: string): Promise<WeeklyCoachInput> {
   const timezone = await healthCalendarTimeZone()
   const { period } = weeklyCoachPeriods(asOf)
-  const [rows, activityDays, sleepNights, supplements, goals, insights, retests, cadence, experiments, benchmarks, captures] =
+  const [rows, activityDays, sleepNights, supplements, goals, insights, retests, cadence, experiments, benchmarks, captures, trainingPlan] =
     await Promise.all([
       loadProgressCanonicalRows(),
       listActivityDailySummaries(timezone),
@@ -31,6 +32,7 @@ export async function loadWeeklyCoachInput(asOf: string): Promise<WeeklyCoachInp
       listWeeklyExperiments(asOf, period.start, period.end, timezone),
       listWeeklyBenchmarks(asOf, period.start, period.end, timezone),
       listReviewCaptures(period.end, timezone),
+      getTrainingPlan(asOf),
     ])
   const visibleSets = rows.sets.filter((set) => set.sessionDate <= period.end)
   const performanceBests = rows.exercises.flatMap((exercise) =>
@@ -112,6 +114,16 @@ export async function loadWeeklyCoachInput(asOf: string): Promise<WeeklyCoachInp
           }
         : null,
     activeBodyGoal: goals.some((goal) => goal.lifecycle === 'active' && goal.kind === 'body_metric'),
+    trainingPlan: {
+      configured: trainingPlan.configured,
+      completedProgrammedSessions: trainingPlan.completedProgrammedSessions,
+      weeklyFrequencyTarget: trainingPlan.weeklyFrequencyTarget,
+      todayIntent: trainingPlan.today?.effectiveIntent ?? null,
+      todayRoutineName: trainingPlan.nextSession?.name ?? null,
+      futureTrainingDates: trainingPlan.week
+        .filter((day) => day.date >= asOf && ['training_preferred', 'training_moved_here'].includes(day.effectiveIntent))
+        .map((day) => day.date),
+    },
   }
 }
 

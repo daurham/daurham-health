@@ -39,9 +39,12 @@ import { useActiveTrendGoals } from '@/features/goals/useActiveTrendGoals'
 import { useTrendPreferences } from '@/lib/use-trend-preferences'
 import { ensureCoach } from '@/features/coach/api'
 import type { CoachState } from '@/domain/coach'
+import type { GoalControlState } from '@/domain/goal-control'
 import { todayShouldReloadAfterNutrition, type TodayNutritionOutcome } from './nutrition-refresh'
 import { notifyHealthDataChanged, subscribeHealthDataChanges } from '@/lib/health-changes'
 import { addHydrationEvent } from '@/features/daily-signals'
+import { fetchGoalControl } from '@/features/goal-control/api'
+import { GoalControlCard } from '@/features/goal-control/GoalControlCard'
 
 function formatCount(value: number): string {
   return Math.round(value).toLocaleString('en-US')
@@ -56,10 +59,14 @@ export function TodayPage() {
   const [coach, setCoach] = useState<CoachState | null>(null)
   const [coachPending, setCoachPending] = useState(false)
   const [coachError, setCoachError] = useState<string | null>(null)
+  const [goalControl, setGoalControl] = useState<GoalControlState | null>(null)
+  const [goalControlPending, setGoalControlPending] = useState(false)
+  const [goalControlError, setGoalControlError] = useState<string | null>(null)
   const load = useCallback((_key: string, signal: AbortSignal) => fetchToday(signal), [])
   const resource = useAtomicKeyedResource({ requestedKey: 'today', load })
   const view = resource.data
   const coachRequests = useRef({ generation: 0 })
+  const goalControlRequests = useRef({ generation: 0 })
   const retryToday = useRef(resource.retry)
   retryToday.current = resource.retry
 
@@ -80,24 +87,45 @@ export function TodayPage() {
     }
   }, [readOnly])
 
+  const loadGoalControl = useCallback(async () => {
+    if (readOnly) return
+    const generation = ++goalControlRequests.current.generation
+    setGoalControlPending(true)
+    setGoalControlError(null)
+    try {
+      const next = await fetchGoalControl()
+      if (generation === goalControlRequests.current.generation) setGoalControl(next)
+    } catch (caught) {
+      if (generation === goalControlRequests.current.generation) {
+        setGoalControlError(caught instanceof Error ? caught.message : 'Goal overview is unavailable.')
+      }
+    } finally {
+      if (generation === goalControlRequests.current.generation) setGoalControlPending(false)
+    }
+  }, [readOnly])
+
   useEffect(() => {
     if (readOnly) return
-    const requests = coachRequests.current
+    const coach = coachRequests.current
+    const goals = goalControlRequests.current
     const unsubscribe = subscribeHealthDataChanges(() => {
       retryToday.current()
       void loadCoach()
+      void loadGoalControl()
     })
     return () => {
       unsubscribe()
-      ++requests.generation
+      ++coach.generation
+      ++goals.generation
     }
-  }, [readOnly, loadCoach])
+  }, [readOnly, loadCoach, loadGoalControl])
 
   useEffect(() => {
     if (!readOnly) {
       void loadCoach()
+      void loadGoalControl()
     }
-  }, [readOnly, loadCoach])
+  }, [readOnly, loadCoach, loadGoalControl])
 
   return (
     <section className="min-w-0">
@@ -115,6 +143,7 @@ export function TodayPage() {
             onClick={() => {
               resource.retry()
               void loadCoach()
+              void loadGoalControl()
             }}
             className="motion-interactive inline-flex min-h-11 shrink-0 items-center text-sm font-medium text-zinc-600 hover:text-zinc-900"
           >
@@ -132,6 +161,9 @@ export function TodayPage() {
               coach={coach}
               coachPending={coachPending}
               coachError={coachError}
+              goalControl={goalControl}
+              goalControlPending={goalControlPending}
+              goalControlError={goalControlError}
               onCoachState={(next) => {
                 ++coachRequests.current.generation
                 setCoach(next)
@@ -164,6 +196,9 @@ export function TodayBoard({
   coach,
   coachPending,
   coachError,
+  goalControl,
+  goalControlPending,
+  goalControlError,
   onCoachState,
 }: {
   view: TodayViewModel
@@ -172,6 +207,9 @@ export function TodayBoard({
   coach?: CoachState | null
   coachPending?: boolean
   coachError?: string | null
+  goalControl?: GoalControlState | null
+  goalControlPending?: boolean
+  goalControlError?: string | null
   onCoachState?: (state: CoachState) => void
 }) {
   const prefix = useAppPathPrefix()
@@ -202,6 +240,14 @@ export function TodayBoard({
           <TrainingCard view={view} />
         </div>
       </div>
+
+      {goalControl || goalControlPending || goalControlError ? (
+        <GoalControlCard
+          state={goalControl ?? null}
+          pending={goalControlPending}
+          error={goalControlError}
+        />
+      ) : null}
 
       <DailyCheckInCard view={view} />
 
