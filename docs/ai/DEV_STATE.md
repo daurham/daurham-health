@@ -1,5 +1,22 @@
 # Dev state
 
+## 2026-10-06 I9 prepared — Coach Intelligence / Next Best Actions + Deep Health Review
+
+- I9 is prepared as a dormant batch on top of I8; no branch ref is moved while the Vercel deployment-rate window remains active.
+- Schema head advances to `0048_coach_intelligence_recommendations.sql`.
+- Added durable, portable Coach recommendation memory and owner response/outcome state.
+- Next Best Actions are derived from the existing Goal Control, observed-maintenance, Training progression, and evidence-limitation engines rather than a new score.
+- Coach emits at most three actions; planned rest remains rest and a deterministic maintain state emits no invented action.
+- `not_now` suppresses a recommendation for one week; `not_relevant` and Personal Lab handoffs prevent repetitive resurfacing.
+- Accepted recommendations can be followed up with owner-observed outcomes without pretending that the outcome proves causality.
+- Adaptive follow-up questions are limited to one per three-day window and are only eligible when Goal Control is evidence-limited.
+- The existing Coach card loads intelligence separately from missions to avoid making the established `/api/coach` workflow heavier.
+- Weekly Coach prompt v2 adds a cautious deeper review using the structured evidence + deterministic intelligence packet, with competing explanations and “what would improve this conclusion?” guidance.
+- Weekly AI remains wording/synthesis only: no hidden target mutation, diagnosis, medication/supplement prescription, or override of deterministic no-change/rest state.
+- Backup inventory includes `coach_recommendations` as portable owner data.
+- Focused I9 tests are staged; full stack validation remains deferred until the dormant stack is exposed once.
+- I10 is next: Passive Recovery + Clinical Context Expansion.
+
 ## 2026-10-06 I8 prepared — Training Progression / Preservation Goals
 
 - I8 is prepared as a dormant batch on top of dormant I7; no branch ref is moved while the Vercel deployment-rate window remains active.

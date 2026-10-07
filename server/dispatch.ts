@@ -63,6 +63,7 @@ import healthIntelligenceHandler from './handlers/health-intelligence.js'
 import goalControlHandler from './handlers/goal-control.js'
 import maintenanceHandler from './handlers/maintenance.js'
 import trainingProgressionHandler from './handlers/training-progression.js'
+import coachIntelligenceHandler from './handlers/coach-intelligence.js'
 
 export type HealthApiRoute =
   | 'health'
@@ -129,6 +130,7 @@ export type HealthApiRoute =
   | 'goal-control'
   | 'maintenance'
   | 'training-progression'
+  | 'coach-intelligence'
 
 type HealthApiHandler = (req: ApiRequest, res: ApiResponse) => unknown | Promise<unknown>
 
@@ -197,6 +199,7 @@ const HANDLERS: Record<HealthApiRoute, HealthApiHandler> = {
   'goal-control': goalControlHandler,
   maintenance: maintenanceHandler,
   'training-progression': trainingProgressionHandler,
+  'coach-intelligence': coachIntelligenceHandler,
 }
 
 function isSingleSegmentAfter(pathname: string, prefix: string): boolean {
@@ -227,6 +230,8 @@ export function matchHealthApiRoute(pathname: string): HealthApiRoute | null {
       return 'maintenance'
     case '/api/intelligence/training-progression':
       return 'training-progression'
+    case '/api/intelligence/coach':
+      return 'coach-intelligence'
     case '/api/data-quality':
     case '/api/data-quality/reviews':
       return 'data-quality'
@@ -342,6 +347,9 @@ export function matchHealthApiRoute(pathname: string): HealthApiRoute | null {
   }
   if (pathname.startsWith('/api/intelligence/changes/')) {
     return 'change-ledger'
+  }
+  if (pathname.startsWith('/api/intelligence/coach/recommendations/')) {
+    return 'coach-intelligence'
   }
   if (pathname === '/api/body/inbox' || pathname.startsWith('/api/body/inbox/')) {
     return 'body-inbox'

@@ -141,10 +141,18 @@ export type WeeklyCoachBrief = {
   candidates: WeeklyCandidate[]
 }
 
+export type WeeklyCoachDeepReview = {
+  summary: string
+  competingExplanations: string[]
+  whatWouldImprove: string[]
+  experimentIdea: { title: string; why: string } | null
+}
+
 export type WeeklyCoachCommentary = {
   intro: string | null
   comments: Record<string, string>
   wentWellIds: string[]
   worthWatchingIds: string[]
   focusId: string | null
+  deepReview: WeeklyCoachDeepReview | null
 }

@@ -589,7 +589,7 @@ describe('weekly coach generation', () => {
     expect(gateSource).toContain("requestType: WEEKLY_COACH_REQUEST_TYPE")
     expect(gateSource).toContain('monthlyBudgetUsd')
     expect(readFileSync('server/ai-usage/config.ts', 'utf8')).not.toContain('WEEKLY_COACH_MONTHLY')
-    expect(WEEKLY_COACH_PROMPT_VERSION).toBe('weekly-coach-v1')
+    expect(WEEKLY_COACH_PROMPT_VERSION).toBe('weekly-coach-v2')
   })
 })
 

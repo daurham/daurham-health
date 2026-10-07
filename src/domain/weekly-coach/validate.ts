@@ -1,5 +1,6 @@
 import { WEEKLY_COACH_PACKET_CHAR_LIMIT, WEEKLY_COACH_WATCH_CAP, WEEKLY_COACH_WENT_WELL_CAP } from './config.js'
-import type { WeeklyCandidate, WeeklyCoachBrief, WeeklyCoachCommentary } from './types.js'
+import type { GoalControlState } from '../goal-control.js'
+import type { WeeklyCandidate, WeeklyCoachBrief, WeeklyCoachCommentary, WeeklyCoachDeepReview } from './types.js'
 
 const NUMBER = /\d/
 const PROHIBITED =
@@ -18,6 +19,45 @@ export function coachPacketText(brief: WeeklyCoachBrief): string {
     return full
   }
   return JSON.stringify(core)
+}
+
+export function coachDeepReviewPacketText(brief: WeeklyCoachBrief, decision: GoalControlState): string {
+  const weekly = JSON.parse(coachPacketText(brief)) as Record<string, unknown>
+  const intelligence = {
+    state: decision.state,
+    confidence: decision.confidence,
+    headline: decision.headline,
+    summary: decision.summary,
+    noChangeRecommended: decision.noChangeRecommended,
+    trainingAdherence: decision.trainingAdherence,
+    nutritionQuality: decision.nutritionQuality,
+    limitations: decision.limitations.slice(0, 4),
+    maintenance: decision.maintenance == null ? null : {
+      estimateState: decision.maintenance.estimate.state,
+      confidence: decision.maintenance.estimate.confidence,
+      plateau: decision.maintenance.plateau,
+      interventions: decision.maintenance.interventions.slice(0, 3),
+    },
+    trainingProgression: decision.trainingProgression == null ? null : {
+      summary: decision.trainingProgression.summary,
+      series: decision.trainingProgression.series.slice(0, 6).map((item) => ({
+        exerciseName: item.exerciseName,
+        state: item.state,
+        confidence: item.confidence,
+        explanation: item.explanation,
+        limitationKinds: item.limitationKinds,
+      })),
+    },
+  }
+  const full = JSON.stringify({ ...weekly, intelligence })
+  if (full.length <= WEEKLY_COACH_PACKET_CHAR_LIMIT) return full
+  return JSON.stringify({
+    period: brief.period,
+    previousPeriod: brief.previousPeriod,
+    coverage: brief.coverage,
+    candidates: brief.candidates.map(candidatePacket),
+    intelligence,
+  })
 }
 
 export function validateWeeklyCoachModel(text: string, brief: WeeklyCoachBrief): WeeklyCoachCommentary | null {
@@ -49,12 +89,15 @@ export function validateWeeklyCoachModel(text: string, brief: WeeklyCoachBrief):
   if (intro && (NUMBER.test(intro) || intro.length > 280 || PROHIBITED.test(intro))) {
     return null
   }
+  const deepReview = parseDeepReview(parsed.deep_review)
+  if (deepReview === undefined) return null
   return {
     intro: intro || null,
     comments,
     wentWellIds: wentWell.slice(0, WEEKLY_COACH_WENT_WELL_CAP).map((item) => item.candidate_ref),
     worthWatchingIds: worthWatching.slice(0, WEEKLY_COACH_WATCH_CAP).map((item) => item.candidate_ref),
     focusId: focus?.candidate_ref ?? null,
+    deepReview,
   }
 }
 
@@ -127,6 +170,39 @@ function cleanComment(comment: string): boolean {
   return text.length > 0 && text.length <= 180 && !NUMBER.test(text) && !PROHIBITED.test(text)
 }
 
+const DEEP_PROHIBITED =
+  /\b(diagnos(?:e|is|tic)?|disease|treatment|medication|dose|apnea|metabolic|hormonal|overtraining)\b|\b(increase|decrease|raise|lower|cut|change|start|stop)\b[^.]{0,60}\b(calorie|supplement|medication|dose)\b/i
+
+function cleanDeepText(value: unknown, max = 320): string | null {
+  if (typeof value !== 'string') return null
+  const text = value.trim()
+  return text.length > 0 && text.length <= max && !DEEP_PROHIBITED.test(text) ? text : null
+}
+
+function deepList(value: unknown): string[] | null {
+  if (!Array.isArray(value) || value.length > 3) return null
+  const items = value.map((item) => cleanDeepText(item, 240))
+  return items.every((item): item is string => item != null) ? items : null
+}
+
+function parseDeepReview(value: ModelShape['deep_review']): WeeklyCoachDeepReview | null | undefined {
+  if (value == null) return null
+  if (typeof value !== 'object') return undefined
+  const summary = cleanDeepText(value.summary)
+  const competingExplanations = deepList(value.competing_explanations)
+  const whatWouldImprove = deepList(value.what_would_improve)
+  if (!summary || !competingExplanations || !whatWouldImprove) return undefined
+  let experimentIdea: WeeklyCoachDeepReview['experimentIdea'] = null
+  if (value.experiment_idea != null) {
+    if (typeof value.experiment_idea !== 'object') return undefined
+    const title = cleanDeepText(value.experiment_idea.title, 120)
+    const why = cleanDeepText(value.experiment_idea.why, 240)
+    if (!title || !why) return undefined
+    experimentIdea = { title, why }
+  }
+  return { summary, competingExplanations, whatWouldImprove, experimentIdea }
+}
+
 type ModelItem = { candidate_ref: string; comment: string }
 
 type ModelShape = {
@@ -134,4 +210,10 @@ type ModelShape = {
   went_well?: ModelItem[]
   worth_watching?: ModelItem[]
   focus?: ModelItem | null
+  deep_review?: {
+    summary?: unknown
+    competing_explanations?: unknown
+    what_would_improve?: unknown
+    experiment_idea?: { title?: unknown; why?: unknown } | null
+  } | null
 }

@@ -1,16 +1,16 @@
 # Current task
 
-## I8 — Training Progression / Preservation Goals
+## I9 — Coach Intelligence / Next Best Actions + Deep Health Review
 
 ### Status
 
-Implementation prepared as a dormant batched Git commit on top of dormant I7 commit `af588c6c93531c60424a433eb0f7a9f3ad6b0fbf`.
+Implementation prepared as a dormant batched Git commit on top of I8 commit `0f3ab2407f5e613daad288661b6a54771377a066`.
 
 Do not move a feature branch ref while the Vercel rolling deployment limit remains active.
 
-No schema migration is added. Schema head remains:
+Schema head advances to:
 
-`0047_maintenance_calibration_experiment_origin.sql`
+`0048_coach_intelligence_recommendations.sql`
 
 Master program:
 
@@ -18,23 +18,26 @@ Master program:
 
 ## Delivered
 
-- Derived `training-progression-v1` exact-exercise progression states: insufficient evidence, progressing, stable, stalled, declining, and confounded.
-- Loaded-rep performance uses an exact-exercise e1RM estimate; bodyweight-relative strength is descriptive context only.
-- Explicit RIR/RPE/failure evidence determines hard-set proximity where available.
-- A lower performance exposure is not called a true decline when recent effort became materially harder or the session records fatigue, pain, illness, time, equipment, or other limitation context.
-- Recent movement-pattern and muscle exposure are derived from canonical working sets without rewriting Training history.
-- Exercise relationships distinguish the same exercise, a comparable substitute, and merely the same primary muscle group.
-- Substitute exercises never merge into the original exercise strength/performance series.
-- Active exercise-linked Goals receive a preservation view. Comparable substitutes can support preservation context, but they do not count as exact-goal progression.
-- I8 feeds I6 Goal Control as a lower-priority deterministic opportunity and appears inside the existing Weekly Decision Training context.
-- Added owner-only `GET /api/intelligence/training-progression`.
+- A separate `coach-intelligence-v1` payload keeps the existing Coach mission endpoint responsive.
+- Coach derives at most three Next Best Actions from Goal Control, maintenance, Training progression, and evidence limitations.
+- Training recommendations respect planned rest days and never create extra work simply to satisfy Coach.
+- The maintain state is explicit: no recommendation is generated when current evidence supports staying the course.
+- Recommendation memory is durable and portable: `do_this`, `not_now`, `not_relevant`, and `turn_into_experiment`.
+- `not_now` is suppressed for a week; `not_relevant` and experiment handoffs stop the same recommendation from resurfacing.
+- Accepted recommendations receive a later outcome check with helped / no change / worse / unclear.
+- Uncertainty-driven follow-up questions are limited to one question per three-day budget window.
+- The existing Coach card renders compact Next Best Actions without replacing Daily Quest, Stretch, weekly focus, or Lab.
+- Weekly Coach prompt v2 receives the structured deterministic intelligence packet and can return a deeper review with competing explanations, evidence-improvement guidance, and an optional Personal Lab handoff.
+- AI synthesis cannot mutate targets, prescribe medication/supplements, diagnose, or override deterministic no-change/rest logic.
+- Added owner-only `GET /api/intelligence/coach` plus response/outcome POST endpoints.
+- Full backup/portable backup inventory includes owner recommendation memory.
 
 ## Validation
 
-Focused deterministic I8 tests are staged.
+Focused I9 deterministic, routing, and deep-review validation tests are staged.
 
-Full TypeScript, ESLint, Vitest, migration execution, and production build remain deferred until the dormant I0–I8 stack is exposed to one validation branch.
+Full TypeScript, ESLint, Vitest, migration execution, backup round-trip, and production build remain deferred until the dormant I0–I9 stack is exposed to one validation branch.
 
 ## Next slice
 
-**I9 — Coach Intelligence / Next Best Actions + Deep Health Review**
+**I10 — Passive Recovery + Clinical Context Expansion**

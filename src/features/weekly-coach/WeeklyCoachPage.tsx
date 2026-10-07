@@ -6,6 +6,7 @@ import {
   type WeeklyCandidate,
   type WeeklyCoachBrief,
   type WeeklyCoachCommentary,
+  type WeeklyCoachDeepReview,
 } from '@/domain/weekly-coach'
 import { healthFetch, quietButtonClass, readApiError } from '@/lib'
 import { prefixedPath, useAppPathPrefix } from '@/lib/app-prefix'
@@ -68,6 +69,7 @@ export function WeeklyCoachView({
         {exampleLabel ? <p className="text-sm text-zinc-600">{exampleLabel}</p> : null}
       </header>
       {decision ? <WeeklyDecisionCard decision={decision} prefix={prefix} /> : null}
+      {commentary?.deepReview ? <WeeklyDeepReview review={commentary.deepReview} prefix={prefix} /> : null}
       {brief.state === 'insufficient_evidence' && !decision ? <p className="text-sm text-zinc-700">{WEEKLY_COACH_INSUFFICIENT_COPY}</p> : null}
       {notice ? <p className="text-sm text-zinc-600">{notice}</p> : null}
       {commentary?.intro && !decision ? <p className="text-sm text-zinc-500">{commentary.intro}</p> : null}
@@ -92,6 +94,40 @@ export function WeeklyCoachView({
         </button>
       ) : null}
     </div>
+  )
+}
+
+function WeeklyDeepReview({ review, prefix }: { review: WeeklyCoachDeepReview; prefix: string }) {
+  return (
+    <section className="rounded-lg border border-zinc-200 bg-white p-4">
+      <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Deeper review</p>
+      <p className="mt-2 text-sm text-zinc-700">{review.summary}</p>
+      {review.competingExplanations.length > 0 ? (
+        <div className="mt-4">
+          <h3 className="text-sm font-semibold text-zinc-900">Competing explanations</h3>
+          <ul className="mt-2 space-y-1 text-sm text-zinc-600">
+            {review.competingExplanations.map((item) => <li key={item}>• {item}</li>)}
+          </ul>
+        </div>
+      ) : null}
+      {review.whatWouldImprove.length > 0 ? (
+        <div className="mt-4">
+          <h3 className="text-sm font-semibold text-zinc-900">What would improve this conclusion?</h3>
+          <ul className="mt-2 space-y-1 text-sm text-zinc-600">
+            {review.whatWouldImprove.map((item) => <li key={item}>• {item}</li>)}
+          </ul>
+        </div>
+      ) : null}
+      {review.experimentIdea ? (
+        <div className="mt-4 rounded-md bg-zinc-50 p-3">
+          <p className="text-sm font-semibold text-zinc-900">{review.experimentIdea.title}</p>
+          <p className="mt-1 text-sm text-zinc-600">{review.experimentIdea.why}</p>
+          <Link to={prefixedPath(prefix, '/lab')} className={`${quietButtonClass} mt-3 inline-flex`}>
+            Turn this into an experiment
+          </Link>
+        </div>
+      ) : null}
+    </section>
   )
 }
 

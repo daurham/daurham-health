@@ -1,6 +1,6 @@
 export const BACKUP_FORMAT = 'daurham-health-backup'
 export const BACKUP_FORMAT_VERSION = 1
-export const LATEST_SCHEMA_MIGRATION = '0047_maintenance_calibration_experiment_origin.sql'
+export const LATEST_SCHEMA_MIGRATION = '0048_coach_intelligence_recommendations.sql'
 export const PORTABLE_EXPORT_BYTE_LIMIT = 3_500_000
 
 export type ColumnKind = 'uuid' | 'text' | 'date' | 'timestamptz' | 'numeric' | 'int' | 'bool' | 'json' | 'bytea'
@@ -1152,6 +1152,37 @@ export const BACKUP_TABLES: readonly BackupTable[] = [
       col('source_key', 'text'),
       col('source_fingerprint', 'text'),
       col('snoozed_until', 'date'),
+      col('created_at', 'timestamptz'),
+      col('updated_at', 'timestamptz'),
+    ],
+  }),
+  table({
+    name: 'coach_recommendations',
+    backupClass: 'canonical',
+    primaryKey: ['id'],
+    seeded: false,
+    portable: true,
+    references: [],
+    columns: [
+      col('id', 'uuid'),
+      col('fingerprint', 'text'),
+      col('recommendation_kind', 'text'),
+      col('domain', 'text'),
+      col('title', 'text'),
+      col('detail', 'text'),
+      col('action_text', 'text'),
+      col('detail_path', 'text'),
+      col('confidence', 'text'),
+      col('evidence_refs', 'json'),
+      col('response_state', 'text'),
+      col('surfaced_on', 'date'),
+      col('last_surfaced_on', 'date'),
+      col('suppress_until', 'date'),
+      col('follow_up_on', 'date'),
+      col('outcome_state', 'text'),
+      col('response_at', 'timestamptz'),
+      col('outcome_at', 'timestamptz'),
+      col('metadata', 'json'),
       col('created_at', 'timestamptz'),
       col('updated_at', 'timestamptz'),
     ],

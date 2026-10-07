@@ -3441,6 +3441,8 @@ Do not merge substitute exercises into one historical strength series.
 
 ## Phase I9 — Coach Intelligence / Next Best Actions + Deep Health Review
 
+**Status:** Prepared as dormant implementation on 2026-10-06; full branch validation deferred.
+
 ### Deliver
 - insightful Coach tips grounded in the shared intelligence state;
 - a few prioritized Next Best Actions inside the existing Coach card;

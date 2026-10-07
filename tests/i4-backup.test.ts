@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { LATEST_SCHEMA_MIGRATION, backupTable } from '../server/backup/inventory.ts'
 
 describe('I4 evidence semantics backup', () => {
-  it('moves the schema head to I4', () => {
-    expect(LATEST_SCHEMA_MIGRATION).toBe('0047_maintenance_calibration_experiment_origin.sql')
+  it('keeps evidence semantics compatible with the current schema head', () => {
+    expect(LATEST_SCHEMA_MIGRATION).toBe('0048_coach_intelligence_recommendations.sql')
   })
 
   it('backs up durable evidence semantics and owner review state', () => {

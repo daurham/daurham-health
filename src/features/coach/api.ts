@@ -1,4 +1,9 @@
 import type { CoachState } from '@/domain/coach'
+import type {
+  CoachIntelligenceState,
+  CoachRecommendationOutcome,
+  CoachRecommendationResponse,
+} from '@/domain/coach-intelligence'
 import type { CoachLabItem } from '@/domain/coach-lab'
 import { healthFetch, readApiError } from '@/lib'
 import { notifyRewardStateChanged } from '@/lib/reward-events'
@@ -78,4 +83,42 @@ export function snoozeCoachLabItem(item: Pick<CoachLabItem, 'kind' | 'sourceKey'
     sourceKey: item.sourceKey,
     sourceFingerprint: item.sourceFingerprint,
   })
+}
+
+async function sendCoachIntelligence(path: string, method: 'GET' | 'POST', body?: unknown): Promise<CoachIntelligenceState> {
+  const response = await healthFetch(path, {
+    method,
+    headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+  if (!response.ok) {
+    throw new CoachApiError(await readApiError(response), response.status)
+  }
+  return (await response.json()) as CoachIntelligenceState
+}
+
+export function fetchCoachIntelligence(): Promise<CoachIntelligenceState> {
+  return sendCoachIntelligence('/api/intelligence/coach', 'GET')
+}
+
+export function respondCoachRecommendation(
+  recommendationId: string,
+  response: CoachRecommendationResponse,
+): Promise<CoachIntelligenceState> {
+  return sendCoachIntelligence(
+    `/api/intelligence/coach/recommendations/${recommendationId}/respond`,
+    'POST',
+    { response },
+  )
+}
+
+export function recordCoachRecommendationOutcome(
+  recommendationId: string,
+  outcome: CoachRecommendationOutcome,
+): Promise<CoachIntelligenceState> {
+  return sendCoachIntelligence(
+    `/api/intelligence/coach/recommendations/${recommendationId}/outcome`,
+    'POST',
+    { outcome },
+  )
 }

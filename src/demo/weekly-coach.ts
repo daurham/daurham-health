@@ -26,6 +26,7 @@ export function demoWeeklyCoach(): { brief: WeeklyCoachBrief; commentary: Weekly
       wentWellIds: brief.wentWell.map((item) => item.id),
       worthWatchingIds: brief.worthWatching.map((item) => item.id),
       focusId: brief.focus?.id ?? null,
+      deepReview: null,
     },
     label: 'Example coach brief — not generated live',
   }

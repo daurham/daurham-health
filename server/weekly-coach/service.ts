@@ -8,7 +8,7 @@ import {
   WEEKLY_COACH_REQUEST_TYPE,
   WEEKLY_COACH_SYSTEM_PROMPT,
   buildWeeklyCoachBrief,
-  coachPacketText,
+  coachDeepReviewPacketText,
   validateWeeklyCoachModel,
   weeklyCoachUserPrompt,
   type WeeklyCoachBrief,
@@ -85,7 +85,7 @@ export async function generateWeeklyCoach(input: {
   }
   const model = input.model ?? weeklyCoachModel()
   const gate = input.gate ?? getWeeklyCoachGate()
-  const packet = coachPacketText(brief)
+  const packet = coachDeepReviewPacketText(brief, goalControl)
   const key = weeklyCoachCacheKey(packet, WEEKLY_COACH_PROMPT_VERSION, model)
   const now = input.now ?? Date.now()
   const decision = await gate.take(key, now, model)

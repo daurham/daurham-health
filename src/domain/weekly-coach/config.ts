@@ -1,5 +1,5 @@
 export const WEEKLY_COACH_PACKET_VERSION = 'weekly-coach-evidence-v1' as const
-export const WEEKLY_COACH_PROMPT_VERSION = 'weekly-coach-v1' as const
+export const WEEKLY_COACH_PROMPT_VERSION = 'weekly-coach-v2' as const
 export const WEEKLY_COACH_REQUEST_TYPE = 'weekly_coach' as const
 
 export const WEEKLY_COACH_MIN_SUBSTANTIVE_DOMAINS = 2

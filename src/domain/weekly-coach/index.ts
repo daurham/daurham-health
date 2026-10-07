@@ -7,10 +7,11 @@ export {
 } from './config.js'
 export { buildWeeklyCoachBrief as buildWeeklyCoachEvidence, buildWeeklyCoachBrief, weeklyCoachPeriods } from './build.js'
 export { WEEKLY_COACH_SYSTEM_PROMPT, weeklyCoachUserPrompt } from './prompt.js'
-export { coachPacketText, validateWeeklyCoachModel } from './validate.js'
+export { coachDeepReviewPacketText, coachPacketText, validateWeeklyCoachModel } from './validate.js'
 export type {
   WeeklyCoachBrief,
   WeeklyCoachCommentary,
+  WeeklyCoachDeepReview,
   WeeklyCoachInput,
   WeeklyCandidate,
   WeeklyTrainingPlanSnapshot,

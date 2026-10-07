@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import type { CoachState, CoachTaskView } from '@/domain/coach'
+import type {
+  CoachIntelligenceState,
+  CoachRecommendationOutcome,
+  CoachRecommendationResponse,
+  CoachRecommendationView,
+} from '@/domain/coach-intelligence'
 import type { CoachLabItem } from '@/domain/coach-lab'
 import { XpAmount } from '@/components/XpAmount'
 import { primaryButtonClass, quietButtonClass } from '@/lib'
@@ -8,7 +14,19 @@ import { prefixedPath, useAppPathPrefix } from '@/lib/app-prefix'
 import { metersToMiles } from '@/domain/units'
 import { xpForRewardBand } from '@/domain/rewards'
 import { CoachDialog } from './CoachDialog'
-import { acceptCoachTask, CoachApiError, endCoachTask, fetchCoach, logCoachSelfReport, logCoachTraining, passCoachTask, snoozeCoachLabItem } from './api'
+import {
+  acceptCoachTask,
+  CoachApiError,
+  endCoachTask,
+  fetchCoach,
+  fetchCoachIntelligence,
+  logCoachSelfReport,
+  logCoachTraining,
+  passCoachTask,
+  recordCoachRecommendationOutcome,
+  respondCoachRecommendation,
+  snoozeCoachLabItem,
+} from './api'
 import { coachDateLabel, formatStretchValue, isCurrentResolvedCoachTask, pendingStretchAcknowledgement } from './presentation'
 
 function progressText(task: CoachTaskView): string | null {
@@ -75,6 +93,8 @@ export function CoachCard({ state, pending, error, onState }: {
   onState: (state: CoachState) => void
 }) {
   const location = useLocation()
+  const navigate = useNavigate()
+  const prefix = useAppPathPrefix()
   const [inboxOpen, setInboxOpen] = useState(false)
   const [detailTask, setDetailTask] = useState<CoachTaskView | null>(null)
   const [logTask, setLogTask] = useState<CoachTaskView | null>(null)
@@ -84,6 +104,8 @@ export function CoachCard({ state, pending, error, onState }: {
   const [actionPending, setActionPending] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const [xpNotice, setXpNotice] = useState<number | null>(null)
+  const [intelligence, setIntelligence] = useState<CoachIntelligenceState | null>(null)
+  const [intelligenceError, setIntelligenceError] = useState<string | null>(null)
   const celebrationTimerRef = useRef<number | null>(null)
   const previousTaskStatusesRef = useRef<Map<string, CoachTaskView['status']> | null>(null)
   const returnFocusRef = useRef<HTMLElement | null>(null)
@@ -98,6 +120,25 @@ export function CoachCard({ state, pending, error, onState }: {
   useEffect(() => () => {
     if (celebrationTimerRef.current != null) window.clearTimeout(celebrationTimerRef.current)
   }, [])
+
+  useEffect(() => {
+    if (!state) {
+      setIntelligence(null)
+      return
+    }
+    let cancelled = false
+    setIntelligenceError(null)
+    fetchCoachIntelligence()
+      .then((next) => {
+        if (!cancelled) setIntelligence(next)
+      })
+      .catch((caught: unknown) => {
+        if (!cancelled) setIntelligenceError(caught instanceof Error ? caught.message : 'Coach intelligence is unavailable.')
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [state?.date])
 
   useEffect(() => {
     if (!state) {
@@ -170,8 +211,8 @@ export function CoachCard({ state, pending, error, onState }: {
   const pendingAck = pendingStretchAcknowledgement(state, acknowledgedStretchId)
   const visibleStretch = stretch && (stretch.status === 'active' || stretch.status === 'offered' || isCurrentResolvedCoachTask(stretch, state.date)) ? stretch : null
   const missions = [daily, visibleStretch, weekly].filter((task): task is CoachTaskView => task != null)
-  const visibleCount = missions.length + labItems.length + labOverflow
-  if (visibleCount === 0 && !notice && !actionError) return null
+  const visibleCount = missions.length + labItems.length + labOverflow + (intelligence ? 1 : 0)
+  if (visibleCount === 0 && !notice && !actionError && !intelligenceError) return null
 
   function celebrateIfCompleted(task: CoachTaskView, next: CoachState) {
     const resolved = [next.dailyQuest, next.stretchQuest, next.weeklyFocus].find((item) => item?.id === task.id) ?? null
@@ -223,6 +264,42 @@ export function CoachCard({ state, pending, error, onState }: {
       } else {
         setActionError(caught instanceof Error ? caught.message : 'Could not update Coach')
       }
+    } finally {
+      setActionPending(false)
+    }
+  }
+
+  async function respondToRecommendation(item: CoachRecommendationView, response: CoachRecommendationResponse) {
+    setActionPending(true)
+    setActionError(null)
+    setNotice(null)
+    try {
+      const next = await respondCoachRecommendation(item.id, response)
+      setIntelligence(next)
+      if (response === 'do_this') {
+        navigate(prefixedPath(prefix, item.detailPath))
+      } else if (response === 'turn_into_experiment') {
+        navigate(prefixedPath(prefix, '/lab'))
+      } else if (response === 'not_now') {
+        setNotice('Coach will hold this recommendation for a week.')
+      } else {
+        setNotice('Coach will stop surfacing this recommendation.')
+      }
+    } catch (caught) {
+      setActionError(caught instanceof Error ? caught.message : 'Could not update this Coach recommendation')
+    } finally {
+      setActionPending(false)
+    }
+  }
+
+  async function recordRecommendationOutcome(id: string, outcome: CoachRecommendationOutcome) {
+    setActionPending(true)
+    setActionError(null)
+    try {
+      setIntelligence(await recordCoachRecommendationOutcome(id, outcome))
+      setNotice('Outcome saved. Coach will use that feedback as recommendation memory.')
+    } catch (caught) {
+      setActionError(caught instanceof Error ? caught.message : 'Could not save the recommendation outcome')
     } finally {
       setActionPending(false)
     }
@@ -295,6 +372,17 @@ export function CoachCard({ state, pending, error, onState }: {
           ))}
         </div>
 
+        {intelligence ? (
+          <CoachIntelligencePanel
+            state={intelligence}
+            pending={actionPending}
+            onResponse={(item, response) => void respondToRecommendation(item, response)}
+            onOutcome={(id, outcome) => void recordRecommendationOutcome(id, outcome)}
+          />
+        ) : intelligenceError ? (
+          <p className="border-t border-zinc-100 px-3 py-2 text-xs text-zinc-500">{intelligenceError}</p>
+        ) : null}
+
         {notice ? (
           <div className="motion-notice-enter mx-3 my-2 flex items-start gap-3 border-t border-zinc-100 pt-2 text-xs text-zinc-600" role="status">
             <p className="min-w-0 flex-1">{notice}</p>
@@ -322,6 +410,80 @@ export function CoachCard({ state, pending, error, onState }: {
       {endTask ? <CoachDialog title="End Stretch Quest" onClose={() => setEndTask(null)} returnFocusTo={returnFocusRef.current}><p className="mt-3 text-sm text-zinc-600">This challenge will close without a reward. Any Training PR you achieved stays in your Training history. There is no penalty.</p>{actionError ? <p className="mt-3 text-sm text-red-700" role="alert">{actionError}</p> : null}<div className="mt-4 flex flex-wrap gap-3"><button type="button" className={primaryButtonClass} disabled={actionPending} onClick={() => void update(endTask, endCoachTask)}>{actionPending ? 'Ending…' : 'End quest'}</button><button type="button" data-coach-initial-focus className={quietButtonClass} disabled={actionPending} onClick={() => setEndTask(null)}>Keep going</button></div></CoachDialog> : null}
       {logTask ? <CoachLogSheet task={logTask} onClose={() => setLogTask(null)} returnFocusTo={returnFocusRef.current} onSaved={next => { celebrateIfCompleted(logTask, next); setLogTask(null); onState(next) }} /> : null}
     </>
+  )
+}
+
+function CoachIntelligencePanel({
+  state,
+  pending,
+  onResponse,
+  onOutcome,
+}: {
+  state: CoachIntelligenceState
+  pending: boolean
+  onResponse: (item: CoachRecommendationView, response: CoachRecommendationResponse) => void
+  onOutcome: (id: string, outcome: CoachRecommendationOutcome) => void
+}) {
+  const prefix = useAppPathPrefix()
+  return (
+    <section className="border-t border-zinc-100 px-3 py-3" aria-label="Coach next best actions">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Next best</p>
+          <p className="mt-0.5 text-sm font-semibold text-zinc-900">{state.headline}</p>
+        </div>
+        {state.noChangeRecommended ? <span className="rounded-full bg-zinc-100 px-2 py-1 text-[11px] font-medium text-zinc-600">No change</span> : null}
+      </div>
+      {state.nextBestActions.length === 0 ? (
+        <p className="mt-1 text-xs leading-relaxed text-zinc-600">{state.summary}</p>
+      ) : (
+        <div className="mt-2 space-y-2">
+          {state.nextBestActions.map((item) => (
+            <article key={item.id} className="rounded-lg bg-zinc-50 p-2.5">
+              <p className="text-sm font-semibold text-zinc-900">{item.title}</p>
+              <p className="mt-1 text-xs leading-relaxed text-zinc-600">{item.detail}</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button type="button" className={primaryButtonClass} disabled={pending} onClick={() => onResponse(item, 'do_this')}>
+                  {item.actionText}
+                </button>
+                <button type="button" className={quietButtonClass} disabled={pending} onClick={() => onResponse(item, 'not_now')}>Not now</button>
+                <button type="button" className={quietButtonClass} disabled={pending} onClick={() => onResponse(item, 'not_relevant')}>Not relevant</button>
+                {item.experimentEligible ? (
+                  <button type="button" className={quietButtonClass} disabled={pending} onClick={() => onResponse(item, 'turn_into_experiment')}>
+                    Experiment
+                  </button>
+                ) : null}
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+      {state.followUps.length > 0 ? (
+        <div className="mt-3 space-y-2 border-t border-zinc-100 pt-3">
+          {state.followUps.map((item) => (
+            <div key={item.id}>
+              <p className="text-xs font-semibold text-zinc-900">How did this go? · {item.title}</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button type="button" className={quietButtonClass} disabled={pending} onClick={() => onOutcome(item.id, 'helped')}>Helped</button>
+                <button type="button" className={quietButtonClass} disabled={pending} onClick={() => onOutcome(item.id, 'no_change')}>No change</button>
+                <button type="button" className={quietButtonClass} disabled={pending} onClick={() => onOutcome(item.id, 'made_worse')}>Worse</button>
+                <button type="button" className={quietButtonClass} disabled={pending} onClick={() => onOutcome(item.id, 'unclear')}>Unclear</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
+      {state.question ? (
+        <div className="mt-3 border-t border-zinc-100 pt-3">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">One useful question</p>
+          <p className="mt-1 text-sm font-medium text-zinc-900">{state.question.title}</p>
+          <p className="mt-1 text-xs leading-relaxed text-zinc-600">{state.question.detail}</p>
+          <Link to={prefixedPath(prefix, state.question.detailPath)} className={`${quietButtonClass} mt-2 inline-flex`}>
+            {state.question.actionText}
+          </Link>
+        </div>
+      ) : null}
+    </section>
   )
 }
 
