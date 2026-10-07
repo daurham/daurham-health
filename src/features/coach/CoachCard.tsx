@@ -8,6 +8,7 @@ import type {
   CoachRecommendationView,
 } from '@/domain/coach-intelligence'
 import type { CoachLabItem } from '@/domain/coach-lab'
+import { labExperimentHandoffPath } from '@/domain/lab-handoff'
 import { XpAmount } from '@/components/XpAmount'
 import { primaryButtonClass, quietButtonClass } from '@/lib'
 import { prefixedPath, useAppPathPrefix } from '@/lib/app-prefix'
@@ -279,7 +280,11 @@ export function CoachCard({ state, pending, error, onState }: {
       if (response === 'do_this') {
         navigate(prefixedPath(prefix, item.detailPath))
       } else if (response === 'turn_into_experiment') {
-        navigate(prefixedPath(prefix, '/lab'))
+        navigate(prefixedPath(prefix, labExperimentHandoffPath({
+          title: item.title,
+          rationale: item.detail,
+          source: 'coach',
+        })))
       } else if (response === 'not_now') {
         setNotice('Coach will hold this recommendation for a week.')
       } else {

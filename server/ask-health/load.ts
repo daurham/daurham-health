@@ -1,4 +1,5 @@
 import { buildActivityProgressView } from '../../src/domain/activity/index.js'
+import { askClinicalProfileForDate } from '../../src/domain/ask-health/clinical-profile.js'
 import type { AskBenchmarkInput, AskContextInput, AskExperimentInput, AskHealthPacketInput } from '../../src/domain/ask-health/index.js'
 import { buildProgressOverview } from '../../src/domain/progress/index.js'
 import type { ProgressRange } from '../../src/domain/progress/types.js'
@@ -15,6 +16,7 @@ import { listSupplementRangeInputs } from '../supplements/queries.js'
 import { healthTimeContext } from '../health-time.js'
 import { routeHealthIntelligence } from '../../src/domain/intelligence/shared.js'
 import { loadHealthIntelligenceSnapshot } from '../intelligence/snapshot.js'
+import { getHealthProfile } from '../profile/service.js'
 
 export async function loadAskHealthPacketInput(input: {
   lens: AskHealthPacketInput['lens']
@@ -36,7 +38,7 @@ export async function loadAskHealthPacketInput(input: {
     nutritionTargets: rows.nutritionTargets,
   })
   const period = { start: overview.period.start, end: overview.period.end }
-  const [activityRows, sleepNights, goals, supplements, experiments, benchmarks, contexts, intelligenceSnapshot] = await Promise.all([
+  const [activityRows, sleepNights, goals, supplements, experiments, benchmarks, contexts, intelligenceSnapshot, profile] = await Promise.all([
     listActivityDailySummaries(timezone),
     listSleepNightlySummaries(timezone),
     listGoalAskSnapshots(input.asOf),
@@ -45,6 +47,7 @@ export async function loadAskHealthPacketInput(input: {
     loadBenchmarks(period.start, period.end, input.asOf),
     listDailyContexts(period.start, period.end),
     loadHealthIntelligenceSnapshot({ range: input.range, asOf: input.asOf }),
+    getHealthProfile(),
   ])
   const activity = buildActivityProgressView(
     activityRows.filter((row) => row.date <= input.asOf),
@@ -75,6 +78,7 @@ export async function loadAskHealthPacketInput(input: {
     supplements,
     context: contextSnapshot(contexts),
     patterns,
+    profile: askClinicalProfileForDate(profile, input.asOf, today),
     intelligence,
   }
 }

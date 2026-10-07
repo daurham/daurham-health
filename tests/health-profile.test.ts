@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   ageYearsOnDate,
   centimetersToInches,
+  healthProfileInputSchema,
   inchesToCentimeters,
 } from '../src/domain/health-profile.ts'
 
@@ -19,5 +20,20 @@ describe('Health Profile domain', () => {
     const cm = inchesToCentimeters(70)
     expect(cm).toBeCloseTo(177.8, 5)
     expect(centimetersToInches(cm)).toBeCloseTo(70, 5)
+  })
+
+  it('distinguishes omitted clinical arrays from an explicit clear', () => {
+    const omitted = healthProfileInputSchema.parse({})
+    const cleared = healthProfileInputSchema.parse({
+      clinicalConditions: [],
+      clinicalAllergies: [],
+      clinicalMedications: [],
+    })
+    expect(omitted.clinicalConditions).toBeUndefined()
+    expect(omitted.clinicalAllergies).toBeUndefined()
+    expect(omitted.clinicalMedications).toBeUndefined()
+    expect(cleared.clinicalConditions).toEqual([])
+    expect(cleared.clinicalAllergies).toEqual([])
+    expect(cleared.clinicalMedications).toEqual([])
   })
 })

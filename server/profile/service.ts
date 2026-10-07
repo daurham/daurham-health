@@ -10,6 +10,9 @@ type ProfileRow = {
   training_limitations: string | null
   dietary_context: string | null
   body_measurement_protocol: string | null
+  clinical_conditions: unknown
+  clinical_allergies: unknown
+  clinical_medications: unknown
   updated_at: string | Date | null
 }
 
@@ -33,6 +36,9 @@ function emptyProfile() {
     trainingLimitations: null,
     dietaryContext: null,
     bodyMeasurementProtocol: null,
+    clinicalConditions: [],
+    clinicalAllergies: [],
+    clinicalMedications: [],
     updatedAt: null,
   })
 }
@@ -46,6 +52,9 @@ export async function getHealthProfile() {
             training_limitations,
             dietary_context,
             body_measurement_protocol,
+            clinical_conditions,
+            clinical_allergies,
+            clinical_medications,
             updated_at
        FROM health_profile
       WHERE singleton_id = 1
@@ -60,6 +69,9 @@ export async function getHealthProfile() {
     trainingLimitations: row.training_limitations,
     dietaryContext: row.dietary_context,
     bodyMeasurementProtocol: row.body_measurement_protocol,
+    clinicalConditions: row.clinical_conditions ?? [],
+    clinicalAllergies: row.clinical_allergies ?? [],
+    clinicalMedications: row.clinical_medications ?? [],
     updatedAt: isoInstant(row.updated_at),
   })
 }
@@ -86,6 +98,10 @@ export async function putHealthProfile(body: unknown) {
     }
   }
 
+  const current = await getHealthProfile()
+  const clinicalConditions = input.clinicalConditions ?? current.clinicalConditions
+  const clinicalAllergies = input.clinicalAllergies ?? current.clinicalAllergies
+  const clinicalMedications = input.clinicalMedications ?? current.clinicalMedications
   const sql = await getSql()
   await sql.query(
     `INSERT INTO health_profile (
@@ -96,10 +112,13 @@ export async function putHealthProfile(body: unknown) {
        training_limitations,
        dietary_context,
        body_measurement_protocol,
+       clinical_conditions,
+       clinical_allergies,
+       clinical_medications,
        created_at,
        updated_at
      ) VALUES (
-       1, $1::date, $2::numeric, $3, $4, $5, $6, now(), now()
+       1, $1::date, $2::numeric, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9::jsonb, now(), now()
      )
      ON CONFLICT (singleton_id) DO UPDATE SET
        date_of_birth = EXCLUDED.date_of_birth,
@@ -108,6 +127,9 @@ export async function putHealthProfile(body: unknown) {
        training_limitations = EXCLUDED.training_limitations,
        dietary_context = EXCLUDED.dietary_context,
        body_measurement_protocol = EXCLUDED.body_measurement_protocol,
+       clinical_conditions = EXCLUDED.clinical_conditions,
+       clinical_allergies = EXCLUDED.clinical_allergies,
+       clinical_medications = EXCLUDED.clinical_medications,
        updated_at = now()`,
     [
       input.dateOfBirth,
@@ -116,6 +138,9 @@ export async function putHealthProfile(body: unknown) {
       input.trainingLimitations,
       input.dietaryContext,
       input.bodyMeasurementProtocol,
+      JSON.stringify(clinicalConditions),
+      JSON.stringify(clinicalAllergies),
+      JSON.stringify(clinicalMedications),
     ],
   )
   return getHealthProfile()

@@ -15,6 +15,7 @@ import {
   type WeeklyCoachCommentary,
 } from '../../src/domain/weekly-coach/index.js'
 import type { GoalControlState } from '../../src/domain/goal-control.js'
+import { buildCoachRecommendationDrafts } from '../../src/domain/coach-intelligence.js'
 import { boundedProviderCostUsd } from '../ai-usage/cost.js'
 import { readAiUsageConfig } from '../ai-usage/config.js'
 import { HttpError } from '../http.js'
@@ -105,7 +106,18 @@ export async function generateWeeklyCoach(input: {
       user: weeklyCoachUserPrompt(packet),
       model,
     })
-    const commentary = validateWeeklyCoachModel(generated.text, brief)
+    const experimentDraft = buildCoachRecommendationDrafts(goalControl).find((item) =>
+      item.experimentEligible &&
+      !(item.domain === 'training' && goalControl.trainingAdherence.state === 'rest_day_on_track')
+    )
+    const commentary = validateWeeklyCoachModel(generated.text, brief, {
+      experimentIdea: experimentDraft
+        ? {
+            title: experimentDraft.title,
+            why: 'This deterministic Coach opportunity can be converted into an owner-reviewed Personal Lab protocol before any intervention is applied.',
+          }
+        : null,
+    })
     const reserved = readAiUsageConfig().weeklyCoachMaxRequestCostUsd
     const cost = boundedProviderCostUsd(generated.inputTokens, generated.outputTokens, reserved)
     await gate.complete(usageId, cost, generated.inputTokens, generated.outputTokens, now)

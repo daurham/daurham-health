@@ -37,9 +37,30 @@ describe('I9 weekly deep review', () => {
         what_would_improve: ['More comparable observations under the usual routine.', 'A brief recovery check-in during the same window.'],
         experiment_idea: { title: 'Compare a stable training block', why: 'A controlled Personal Lab window could reduce routine-related ambiguity.' },
       },
-    }), brief)
+    }), brief, {
+      experimentIdea: {
+        title: 'Review the deterministic training opportunity',
+        why: 'This handoff came from server-side Coach logic.',
+      },
+    })
     expect(result?.deepReview?.competingExplanations).toHaveLength(2)
-    expect(result?.deepReview?.experimentIdea?.title).toContain('stable training')
+    expect(result?.deepReview?.experimentIdea?.title).toContain('deterministic training')
+  })
+
+  it('ignores a model-authored experiment idea when the server did not authorize one', () => {
+    const result = validateWeeklyCoachModel(JSON.stringify({
+      intro: { text: '' },
+      went_well: [],
+      worth_watching: [],
+      focus: null,
+      deep_review: {
+        summary: 'The pattern is worth watching, but the evidence does not establish a cause.',
+        competing_explanations: [],
+        what_would_improve: ['More comparable observations would reduce uncertainty.'],
+        experiment_idea: { title: 'Invented intervention', why: 'The model made this up.' },
+      },
+    }), brief)
+    expect(result?.deepReview?.experimentIdea).toBeNull()
   })
 
   it('rejects hidden medical or target-changing advice in the deep review', () => {

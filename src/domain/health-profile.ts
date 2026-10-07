@@ -10,6 +10,31 @@ const boundedOptionalText = (max: number) =>
       return trimmed === '' ? null : trimmed
     })
 
+export const clinicalConditionSchema = z.object({
+  name: z.string().trim().min(1).max(160),
+  status: z.enum(['active', 'resolved', 'unknown']).default('active'),
+})
+export type ClinicalCondition = z.infer<typeof clinicalConditionSchema>
+
+export const clinicalAllergySchema = z.object({
+  substance: z.string().trim().min(1).max(160),
+  reaction: boundedOptionalText(240),
+  severity: z.enum(['unknown', 'mild', 'moderate', 'severe']).default('unknown'),
+})
+export type ClinicalAllergy = z.infer<typeof clinicalAllergySchema>
+
+export const clinicalMedicationSchema = z.object({
+  name: z.string().trim().min(1).max(160),
+  dose: boundedOptionalText(120),
+  frequency: boundedOptionalText(120),
+  status: z.enum(['active', 'paused', 'discontinued']).default('active'),
+})
+export type ClinicalMedication = z.infer<typeof clinicalMedicationSchema>
+
+const clinicalConditionsSchema = z.array(clinicalConditionSchema).max(50)
+const clinicalAllergiesSchema = z.array(clinicalAllergySchema).max(50)
+const clinicalMedicationsSchema = z.array(clinicalMedicationSchema).max(100)
+
 export const healthProfileSchema = z.object({
   dateOfBirth: isoDateSchema.nullable(),
   heightCm: z.number().min(50).max(250).nullable(),
@@ -17,6 +42,9 @@ export const healthProfileSchema = z.object({
   trainingLimitations: z.string().nullable(),
   dietaryContext: z.string().nullable(),
   bodyMeasurementProtocol: z.string().nullable(),
+  clinicalConditions: clinicalConditionsSchema.default([]),
+  clinicalAllergies: clinicalAllergiesSchema.default([]),
+  clinicalMedications: clinicalMedicationsSchema.default([]),
   updatedAt: z.string().nullable(),
 })
 export type HealthProfile = z.infer<typeof healthProfileSchema>
@@ -28,6 +56,9 @@ export const healthProfileInputSchema = z.object({
   trainingLimitations: boundedOptionalText(2000),
   dietaryContext: boundedOptionalText(2000),
   bodyMeasurementProtocol: boundedOptionalText(1000),
+  clinicalConditions: clinicalConditionsSchema.optional(),
+  clinicalAllergies: clinicalAllergiesSchema.optional(),
+  clinicalMedications: clinicalMedicationsSchema.optional(),
 })
 export type HealthProfileInput = z.infer<typeof healthProfileInputSchema>
 

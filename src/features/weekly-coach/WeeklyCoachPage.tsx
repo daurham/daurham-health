@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { GoalControlState } from '@/domain/goal-control'
+import { labExperimentHandoffPath } from '@/domain/lab-handoff'
 import {
   WEEKLY_COACH_INSUFFICIENT_COPY,
   type WeeklyCandidate,
@@ -9,7 +10,7 @@ import {
   type WeeklyCoachDeepReview,
 } from '@/domain/weekly-coach'
 import { healthFetch, quietButtonClass, readApiError } from '@/lib'
-import { prefixedPath, useAppPathPrefix } from '@/lib/app-prefix'
+import { prefixedPath, useAppPathPrefix, useDemoReadOnly } from '@/lib/app-prefix'
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
@@ -98,6 +99,7 @@ export function WeeklyCoachView({
 }
 
 function WeeklyDeepReview({ review, prefix }: { review: WeeklyCoachDeepReview; prefix: string }) {
+  const readOnly = useDemoReadOnly()
   return (
     <section className="rounded-lg border border-zinc-200 bg-white p-4">
       <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Deeper review</p>
@@ -122,8 +124,20 @@ function WeeklyDeepReview({ review, prefix }: { review: WeeklyCoachDeepReview; p
         <div className="mt-4 rounded-md bg-zinc-50 p-3">
           <p className="text-sm font-semibold text-zinc-900">{review.experimentIdea.title}</p>
           <p className="mt-1 text-sm text-zinc-600">{review.experimentIdea.why}</p>
-          <Link to={prefixedPath(prefix, '/lab')} className={`${quietButtonClass} mt-3 inline-flex`}>
-            Turn this into an experiment
+          <Link
+            to={prefixedPath(
+              prefix,
+              readOnly
+                ? '/lab'
+                : labExperimentHandoffPath({
+                    title: review.experimentIdea.title,
+                    rationale: review.experimentIdea.why,
+                    source: 'weekly_coach',
+                  }),
+            )}
+            className={`${quietButtonClass} mt-3 inline-flex`}
+          >
+            {readOnly ? 'Explore Personal Lab' : 'Turn this into an experiment'}
           </Link>
         </div>
       ) : null}

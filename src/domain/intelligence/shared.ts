@@ -9,6 +9,7 @@ export const INTELLIGENCE_SIGNAL_KEYS = [
   'activity.steps',
   'activity.active_energy_kcal',
   'activity.exercise_minutes',
+  'activity.resting_heart_rate_bpm',
   'sleep.total_minutes',
   'nutrition.calories',
   'nutrition.protein_g',
@@ -44,6 +45,7 @@ export const INTELLIGENCE_SIGNAL_REGISTRY: Record<IntelligenceSignalKey, Intelli
   'activity.steps': { key: 'activity.steps', label: 'Steps', domain: 'activity', unit: 'steps', requiresCompleteDay: true, detailPath: '/progress/activity' },
   'activity.active_energy_kcal': { key: 'activity.active_energy_kcal', label: 'Active energy', domain: 'activity', unit: 'kcal', requiresCompleteDay: true, detailPath: '/progress/activity' },
   'activity.exercise_minutes': { key: 'activity.exercise_minutes', label: 'Exercise minutes', domain: 'activity', unit: 'min', requiresCompleteDay: true, detailPath: '/progress/activity' },
+  'activity.resting_heart_rate_bpm': { key: 'activity.resting_heart_rate_bpm', label: 'Resting heart rate', domain: 'recovery', unit: 'bpm', requiresCompleteDay: true, detailPath: '/progress/activity' },
   'sleep.total_minutes': { key: 'sleep.total_minutes', label: 'Sleep duration', domain: 'sleep', unit: 'min', requiresCompleteDay: false, detailPath: '/progress/sleep' },
   'nutrition.calories': { key: 'nutrition.calories', label: 'Calories', domain: 'nutrition', unit: 'kcal', requiresCompleteDay: true, detailPath: '/nutrition' },
   'nutrition.protein_g': { key: 'nutrition.protein_g', label: 'Protein', domain: 'nutrition', unit: 'g', requiresCompleteDay: true, detailPath: '/nutrition' },
@@ -533,7 +535,8 @@ const TERM_GROUPS: Array<{ pattern: RegExp; keys: IntelligenceSignalKey[] }> = [
   { pattern: /water|hydration|drink/i, keys: ['hydration.ml', 'bowel.count', 'wellness.energy'] },
   { pattern: /bowel|stool|constipat|bristol/i, keys: ['bowel.count', 'hydration.ml', 'nutrition.fiber_g'] },
   { pattern: /fiber/i, keys: ['nutrition.fiber_g', 'bowel.count', 'hydration.ml'] },
-  { pattern: /sleep|tired|fatigue|recovery/i, keys: ['sleep.total_minutes', 'wellness.energy', 'wellness.soreness', 'wellness.hunger', 'training.effort'] },
+  { pattern: /sleep|tired|fatigue|recovery/i, keys: ['sleep.total_minutes', 'activity.resting_heart_rate_bpm', 'wellness.energy', 'wellness.soreness', 'wellness.hunger', 'training.effort'] },
+  { pattern: /resting heart|heart rate|pulse|\brhr\b/i, keys: ['activity.resting_heart_rate_bpm', 'sleep.total_minutes', 'training.effort', 'wellness.energy', 'wellness.stress'] },
   { pattern: /hunger|appetite/i, keys: ['wellness.hunger', 'nutrition.calories', 'sleep.total_minutes'] },
   { pattern: /sore|soreness/i, keys: ['wellness.soreness', 'training.effort', 'nutrition.protein_g', 'sleep.total_minutes'] },
   { pattern: /weight|scale|body fat|waist|plateau/i, keys: ['body.weight_kg', 'nutrition.calories', 'nutrition.carbs_g', 'nutrition.sodium_mg', 'activity.steps', 'hydration.ml', 'bowel.count'] },
@@ -541,15 +544,15 @@ const TERM_GROUPS: Array<{ pattern: RegExp; keys: IntelligenceSignalKey[] }> = [
   { pattern: /sodium|salt/i, keys: ['nutrition.sodium_mg', 'body.weight_kg', 'hydration.ml'] },
   { pattern: /calorie|protein|macro|nutrition|diet/i, keys: ['nutrition.calories', 'nutrition.protein_g', 'nutrition.carbs_g', 'nutrition.fiber_g', 'nutrition.sodium_mg', 'body.weight_kg'] },
   { pattern: /train|workout|strength|lift|gym/i, keys: ['training.sessions', 'training.effort', 'sleep.total_minutes', 'nutrition.protein_g', 'wellness.soreness'] },
-  { pattern: /step|walk|activity|cardio/i, keys: ['activity.steps', 'activity.exercise_minutes', 'activity.active_energy_kcal', 'sleep.total_minutes'] },
+  { pattern: /step|walk|activity|cardio/i, keys: ['activity.steps', 'activity.exercise_minutes', 'activity.active_energy_kcal', 'activity.resting_heart_rate_bpm', 'sleep.total_minutes'] },
 ]
 
 function lensDefaults(lens: string): IntelligenceSignalKey[] {
   if (lens === 'training') return ['training.sessions', 'training.effort', 'sleep.total_minutes', 'nutrition.protein_g', 'wellness.soreness']
   if (lens === 'nutrition') return ['nutrition.calories', 'nutrition.protein_g', 'nutrition.carbs_g', 'nutrition.fiber_g', 'nutrition.sodium_mg', 'body.weight_kg', 'wellness.hunger']
-  if (lens === 'recovery') return ['sleep.total_minutes', 'wellness.energy', 'wellness.soreness', 'wellness.stress', 'training.effort']
+  if (lens === 'recovery') return ['sleep.total_minutes', 'activity.resting_heart_rate_bpm', 'wellness.energy', 'wellness.soreness', 'wellness.stress', 'training.effort']
   if (lens === 'experiments') return ['body.weight_kg', 'nutrition.calories', 'activity.steps', 'sleep.total_minutes', 'training.sessions']
-  return ['body.weight_kg', 'nutrition.calories', 'activity.steps', 'sleep.total_minutes', 'training.sessions', 'hydration.ml', 'wellness.energy']
+  return ['body.weight_kg', 'nutrition.calories', 'activity.steps', 'activity.resting_heart_rate_bpm', 'sleep.total_minutes', 'training.sessions', 'hydration.ml', 'wellness.energy']
 }
 
 export function routeHealthIntelligence(

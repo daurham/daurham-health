@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { formatCalendarRange } from '@/domain/calendar-format'
+import { labExperimentHandoffLabel, readLabExperimentHandoff } from '@/domain/lab-handoff'
 import { dangerButtonClass, LoadErrorNotice, primaryButtonClass, quietButtonClass, secondaryButtonClass } from '@/lib'
 import {
   abandonExperiment,
@@ -21,11 +22,13 @@ import { draftsFromVersion, fieldClass, newRequirementDraft, requirementPayload,
 
 export function NewExperimentPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const handoff = readLabExperimentHandoff(searchParams)
   const catalogs = useLabCatalogs()
-  const [title, setTitle] = useState('')
+  const [title, setTitle] = useState(() => handoff?.title ?? '')
   const [question, setQuestion] = useState('')
   const [hypothesis, setHypothesis] = useState('')
-  const [rationale, setRationale] = useState('')
+  const [rationale, setRationale] = useState(() => handoff?.rationale ?? '')
   const [instructions, setInstructions] = useState('')
   const [requirements, setRequirements] = useState<RequirementDraft[]>(() => [newRequirementDraft()])
   const [contextTags, setContextTags] = useState<string[]>([])
@@ -69,6 +72,11 @@ export function NewExperimentPage() {
       </p>
       <h1 className="text-2xl font-semibold tracking-tight">New experiment</h1>
       <p className="text-sm text-zinc-600">Saving records an accepted experiment. Schedule it when the observation window is known.</p>
+      {handoff ? (
+        <p className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-700">
+          Prefilled from {labExperimentHandoffLabel(handoff.source)}. Review the rationale, write the experiment question, and define the protocol before saving.
+        </p>
+      ) : null}
       {error ? <LoadErrorNotice message={error} /> : null}
       <label className="block text-sm font-medium text-zinc-800">
         Title

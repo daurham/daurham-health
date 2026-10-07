@@ -3465,6 +3465,8 @@ This is the main synthesis layer, not a standalone chatbot feature.
 
 ## Phase I10 — Passive Recovery + Clinical Context Expansion
 
+**Status:** Prepared as dormant implementation on 2026-10-06 with only trustworthy sources enabled; full branch validation deferred.
+
 Implement only when the source data and use cases are trustworthy.
 
 ### Candidates

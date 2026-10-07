@@ -29,6 +29,16 @@ export function coachDeepReviewPacketText(brief: WeeklyCoachBrief, decision: Goa
     headline: decision.headline,
     summary: decision.summary,
     noChangeRecommended: decision.noChangeRecommended,
+    primaryOpportunity: decision.primaryOpportunity == null ? null : {
+      id: decision.primaryOpportunity.id,
+      kind: decision.primaryOpportunity.kind,
+      domain: decision.primaryOpportunity.domain,
+      title: decision.primaryOpportunity.title,
+      detail: decision.primaryOpportunity.detail,
+      actionText: decision.primaryOpportunity.actionText,
+      detailPath: decision.primaryOpportunity.detailPath,
+      evidenceRefs: decision.primaryOpportunity.evidenceRefs,
+    },
     trainingAdherence: decision.trainingAdherence,
     nutritionQuality: decision.nutritionQuality,
     limitations: decision.limitations.slice(0, 4),
@@ -60,7 +70,11 @@ export function coachDeepReviewPacketText(brief: WeeklyCoachBrief, decision: Goa
   })
 }
 
-export function validateWeeklyCoachModel(text: string, brief: WeeklyCoachBrief): WeeklyCoachCommentary | null {
+export function validateWeeklyCoachModel(
+  text: string,
+  brief: WeeklyCoachBrief,
+  options: { experimentIdea?: WeeklyCoachDeepReview['experimentIdea'] } = {},
+): WeeklyCoachCommentary | null {
   const parsed = parseModel(text)
   if (!parsed) {
     return null
@@ -89,7 +103,7 @@ export function validateWeeklyCoachModel(text: string, brief: WeeklyCoachBrief):
   if (intro && (NUMBER.test(intro) || intro.length > 280 || PROHIBITED.test(intro))) {
     return null
   }
-  const deepReview = parseDeepReview(parsed.deep_review)
+  const deepReview = parseDeepReview(parsed.deep_review, options.experimentIdea ?? null)
   if (deepReview === undefined) return null
   return {
     intro: intro || null,
@@ -185,21 +199,16 @@ function deepList(value: unknown): string[] | null {
   return items.every((item): item is string => item != null) ? items : null
 }
 
-function parseDeepReview(value: ModelShape['deep_review']): WeeklyCoachDeepReview | null | undefined {
+function parseDeepReview(
+  value: ModelShape['deep_review'],
+  experimentIdea: WeeklyCoachDeepReview['experimentIdea'],
+): WeeklyCoachDeepReview | null | undefined {
   if (value == null) return null
   if (typeof value !== 'object') return undefined
   const summary = cleanDeepText(value.summary)
   const competingExplanations = deepList(value.competing_explanations)
   const whatWouldImprove = deepList(value.what_would_improve)
   if (!summary || !competingExplanations || !whatWouldImprove) return undefined
-  let experimentIdea: WeeklyCoachDeepReview['experimentIdea'] = null
-  if (value.experiment_idea != null) {
-    if (typeof value.experiment_idea !== 'object') return undefined
-    const title = cleanDeepText(value.experiment_idea.title, 120)
-    const why = cleanDeepText(value.experiment_idea.why, 240)
-    if (!title || !why) return undefined
-    experimentIdea = { title, why }
-  }
   return { summary, competingExplanations, whatWouldImprove, experimentIdea }
 }
 

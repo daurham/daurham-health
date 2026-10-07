@@ -13,7 +13,7 @@ Rules:
 - deep_review.summary may synthesize only facts and derived intelligence present in the packet. It must clearly preserve uncertainty.
 - deep_review.competing_explanations contains at most 3 short plausible explanations already supported by packet context; do not claim causality.
 - deep_review.what_would_improve contains at most 3 short evidence or context gaps that would make the conclusion stronger. It must not prescribe treatment.
-- deep_review.experiment_idea is null unless the packet supports a safe, owner-reviewed Personal Lab handoff. If present, include only {"title":"","why":""}; never prescribe medication, supplements, unsafe restriction, or a hidden target change.
+- Always return deep_review.experiment_idea as null. The server, not the model, decides whether a safe owner-reviewed Personal Lab handoff is available.
 - Prefer "no change" when the deterministic decision says maintain. Rest days are not misses.`
 
 export function weeklyCoachUserPrompt(packet: string): string {

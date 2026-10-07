@@ -17,6 +17,7 @@ function obs(
     'activity.steps': 'steps',
     'activity.active_energy_kcal': 'kcal',
     'activity.exercise_minutes': 'min',
+    'activity.resting_heart_rate_bpm': 'bpm',
     'sleep.total_minutes': 'min',
     'nutrition.calories': 'kcal',
     'nutrition.protein_g': 'g',

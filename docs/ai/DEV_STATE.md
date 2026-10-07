@@ -1,5 +1,20 @@
 # Dev state
 
+## 2026-10-06 I10 prepared — Passive Recovery + Clinical Context Expansion
+
+- I10 is prepared as a dormant batch on top of I9; no branch ref is moved while the Vercel deployment-rate window remains active.
+- Schema head advances to `0049_passive_recovery_clinical_context.sql`.
+- Canonical completed-day resting heart rate now participates in the shared intelligence frame with coverage, confidence, personal baseline, historical-as-of handling, and question/lens routing.
+- No readiness/recovery score is added.
+- Health Profile now stores structured owner-entered conditions, allergies, and medications and exposes them to Ask Health as user-authored evidence only for the current Health date. Historical `asOf` requests omit the current profile until clinical history is date-versioned.
+- Ask Health still forbids starting/stopping/changing medication or supplement doses and treats owner-entered profile text as data rather than instructions.
+- Full/portable backup inventory includes the new clinical profile JSON fields using the existing serialized-JSON backup representation.
+- The existing sleep-vital registry remains fully disabled because HAE HRV/respiratory/SpO2/wrist-temperature payload semantics have not been validated in production.
+- Heart-rate recovery/cardio-fitness observations, clinical lab results, and standardized progress photos are intentionally deferred until a trustworthy source/workflow exists.
+- A dormant Ask Health prompt syntax defect (two missing separators) was fixed during the compatibility sweep.
+- Focused I10 tests are staged. Full stack validation remains deferred until the dormant I0–I10 stack is exposed once.
+- I10 completes the numbered intelligence roadmap; the next operation is integrated validation and rollout.
+
 ## 2026-10-06 I9 prepared — Coach Intelligence / Next Best Actions + Deep Health Review
 
 - I9 is prepared as a dormant batch on top of I8; no branch ref is moved while the Vercel deployment-rate window remains active.
@@ -11,8 +26,9 @@
 - Accepted recommendations can be followed up with owner-observed outcomes without pretending that the outcome proves causality.
 - Adaptive follow-up questions are limited to one per three-day window and are only eligible when Goal Control is evidence-limited.
 - The existing Coach card loads intelligence separately from missions to avoid making the established `/api/coach` workflow heavier.
-- Weekly Coach prompt v2 adds a cautious deeper review using the structured evidence + deterministic intelligence packet, with competing explanations and “what would improve this conclusion?” guidance.
+- Weekly Coach prompt v3 adds a cautious deeper review using the structured evidence + deterministic intelligence packet, with competing explanations and “what would improve this conclusion?” guidance.
 - Weekly AI remains wording/synthesis only: no hidden target mutation, diagnosis, medication/supplement prescription, or override of deterministic no-change/rest state.
+- Post-I10 integration audit makes Personal Lab handoff server-owned: model-authored experiment ideas are ignored. Deterministic Coach logic may offer a handoff, which opens New Experiment with only title/rationale prefilled; the owner must still write/review the question and protocol before saving.
 - Backup inventory includes `coach_recommendations` as portable owner data.
 - Focused I9 tests are staged; full stack validation remains deferred until the dormant stack is exposed once.
 - I10 is next: Passive Recovery + Clinical Context Expansion.

@@ -2,6 +2,7 @@ import { resolveScheduleRange } from '../supplements/resolve.js'
 import type { OccurrenceState } from '../supplements/types.js'
 import { ASK_HEALTH_PACKET_VERSION, ASK_PACKET_MAX_CHARS, type AskLens } from './config.js'
 import type {
+  AskClinicalProfileInput,
   AskContextInput,
   AskEvidence,
   AskGoalInput,
@@ -78,6 +79,7 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
   if (wants.patterns) {
     addPatterns(input.patterns, push)
   }
+  addClinicalProfile(input.profile ?? null, push)
   if (input.intelligence) {
     addSharedIntelligence(input.intelligence, push, limitations)
   }
@@ -842,6 +844,78 @@ function addContext(context: AskContextInput | null, push: (item: PushItem) => v
       priority: 5,
     })
   }
+}
+
+function addClinicalProfile(profile: AskClinicalProfileInput | null, push: (item: PushItem) => void) {
+  if (!profile) return
+  const addText = (id: string, label: string, text: string | null, priority: number) => {
+    if (!text?.trim()) return
+    push({
+      id,
+      domain: 'clinical_context',
+      label,
+      value: null,
+      unit: null,
+      text: clip(text),
+      coverage: null,
+      detailPath: '/settings#health-profile',
+      userEntered: true,
+      substantive: true,
+      priority,
+    })
+  }
+
+  addText('clinical.persistent_context', 'Persistent health context', profile.persistentHealthContext, 1)
+  addText('clinical.training_limitations', 'Training limitations', profile.trainingLimitations, 2)
+  addText('clinical.dietary_context', 'Dietary context', profile.dietaryContext, 2)
+
+  profile.conditions.slice(0, 12).forEach((item, index) => {
+    push({
+      id: `clinical.condition.${index}`,
+      domain: 'clinical_context',
+      label: item.name,
+      value: item.status,
+      unit: null,
+      text: `Owner-entered condition: ${item.name}. Status: ${item.status}.`,
+      coverage: { status: item.status },
+      detailPath: '/settings#health-profile',
+      userEntered: true,
+      substantive: true,
+      priority: item.status === 'active' ? 1 : 4,
+    })
+  })
+
+  profile.allergies.slice(0, 12).forEach((item, index) => {
+    push({
+      id: `clinical.allergy.${index}`,
+      domain: 'clinical_context',
+      label: `Allergy · ${item.substance}`,
+      value: item.severity,
+      unit: null,
+      text: `Owner-entered allergy: ${item.substance}. Severity: ${item.severity}.${item.reaction ? ` Reaction: ${clip(item.reaction)}` : ''}`,
+      coverage: { severity: item.severity },
+      detailPath: '/settings#health-profile',
+      userEntered: true,
+      substantive: true,
+      priority: 1,
+    })
+  })
+
+  profile.medications.slice(0, 16).forEach((item, index) => {
+    push({
+      id: `clinical.medication.${index}`,
+      domain: 'clinical_context',
+      label: `Medication · ${item.name}`,
+      value: item.status,
+      unit: null,
+      text: `Owner-entered medication: ${item.name}. Status: ${item.status}.${item.dose ? ` Dose: ${item.dose}.` : ''}${item.frequency ? ` Frequency: ${item.frequency}.` : ''}`,
+      coverage: { status: item.status },
+      detailPath: '/settings#health-profile',
+      userEntered: true,
+      substantive: true,
+      priority: item.status === 'active' ? 1 : 4,
+    })
+  })
 }
 
 function addPatterns(patterns: readonly AskPatternInput[], push: (item: PushItem) => void) {

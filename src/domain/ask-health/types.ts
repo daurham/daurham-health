@@ -80,6 +80,15 @@ export type AskPatternInput = {
   text: string
 }
 
+export type AskClinicalProfileInput = {
+  persistentHealthContext: string | null
+  trainingLimitations: string | null
+  dietaryContext: string | null
+  conditions: Array<{ name: string; status: 'active' | 'resolved' | 'unknown' }>
+  allergies: Array<{ substance: string; reaction: string | null; severity: 'unknown' | 'mild' | 'moderate' | 'severe' }>
+  medications: Array<{ name: string; dose: string | null; frequency: string | null; status: 'active' | 'paused' | 'discontinued' }>
+}
+
 export type AskHealthPacketInput = {
   lens: AskLens
   range: ProgressRange
@@ -96,6 +105,7 @@ export type AskHealthPacketInput = {
   supplements: readonly TodaySupplementInput[]
   context: AskContextInput | null
   patterns: readonly AskPatternInput[]
+  profile?: AskClinicalProfileInput | null
   intelligence?: RoutedHealthIntelligence | null
   maxChars?: number
 }

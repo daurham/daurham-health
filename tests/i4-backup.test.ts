@@ -3,7 +3,7 @@ import { LATEST_SCHEMA_MIGRATION, backupTable } from '../server/backup/inventory
 
 describe('I4 evidence semantics backup', () => {
   it('keeps evidence semantics compatible with the current schema head', () => {
-    expect(LATEST_SCHEMA_MIGRATION).toBe('0048_coach_intelligence_recommendations.sql')
+    expect(LATEST_SCHEMA_MIGRATION).toBe('0049_passive_recovery_clinical_context.sql')
   })
 
   it('backs up durable evidence semantics and owner review state', () => {

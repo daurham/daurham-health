@@ -127,7 +127,7 @@ export async function loadHealthIntelligenceSnapshot(input: {
       "SELECT entity_kind, entity_id, issue_snapshot FROM data_quality_reviews WHERE review_status = 'excluded_from_analysis'",
     ),
     sql.query(
-      "SELECT summary_date::text AS date, steps_count, active_energy_kcal, exercise_minutes FROM activity_daily_summaries WHERE timezone = $1 AND summary_date <= $2::date ORDER BY summary_date",
+      "SELECT summary_date::text AS date, steps_count, active_energy_kcal, exercise_minutes, resting_heart_rate_bpm FROM activity_daily_summaries WHERE timezone = $1 AND summary_date <= $2::date ORDER BY summary_date",
       [time.timezone, input.asOf],
     ),
     sql.query(
@@ -175,6 +175,7 @@ export async function loadHealthIntelligenceSnapshot(input: {
       ['activity.steps', row.steps_count, 'steps'],
       ['activity.active_energy_kcal', row.active_energy_kcal, 'kcal'],
       ['activity.exercise_minutes', row.exercise_minutes, 'min'],
+      ['activity.resting_heart_rate_bpm', row.resting_heart_rate_bpm, 'bpm'],
     ]
     for (const [key, raw, unit] of metrics) {
       const value = numberOrNull(raw)

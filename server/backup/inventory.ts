@@ -1,6 +1,6 @@
 export const BACKUP_FORMAT = 'daurham-health-backup'
 export const BACKUP_FORMAT_VERSION = 1
-export const LATEST_SCHEMA_MIGRATION = '0048_coach_intelligence_recommendations.sql'
+export const LATEST_SCHEMA_MIGRATION = '0049_passive_recovery_clinical_context.sql'
 export const PORTABLE_EXPORT_BYTE_LIMIT = 3_500_000
 
 export type ColumnKind = 'uuid' | 'text' | 'date' | 'timestamptz' | 'numeric' | 'int' | 'bool' | 'json' | 'bytea'
@@ -83,6 +83,9 @@ export const BACKUP_TABLES: readonly BackupTable[] = [
       col('training_limitations', 'text'),
       col('dietary_context', 'text'),
       col('body_measurement_protocol', 'text'),
+      col('clinical_conditions', 'json'),
+      col('clinical_allergies', 'json'),
+      col('clinical_medications', 'json'),
       col('created_at', 'timestamptz'),
       col('updated_at', 'timestamptz'),
     ],
