@@ -24,6 +24,7 @@ export function StartWorkoutPage() {
   const experimentWorkout = params.get('type') === 'experiment'
   const experimentId = params.get('experimentId')
   const benchmarkProtocolVersionId = params.get('benchmarkProtocolVersionId')
+  const requestedTemplateId = params.get('template')
   const [templates, setTemplates] = useState<WorkoutTemplate[]>([])
   const [catalog, setCatalog] = useState<ExerciseDefinition[]>([])
   const [lastSessions, setLastSessions] = useState<Record<string, ExerciseLibraryItem['lastSession']>>({})
@@ -71,6 +72,10 @@ export function StartWorkoutPage() {
         if (!cancelled) {
           setTemplates(nextTemplates)
           applyLibrary(items)
+          if (requestedTemplateId) {
+            const requested = nextTemplates.find((template) => template.id === requestedTemplateId)
+            if (requested) setDraft(draftFromTemplate(requested, new Date(), timezone))
+          }
         }
       })
       .catch((caught: unknown) => {
@@ -86,7 +91,7 @@ export function StartWorkoutPage() {
     return () => {
       cancelled = true
     }
-  }, [adHoc, experimentWorkout])
+  }, [adHoc, experimentWorkout, requestedTemplateId, timezone])
 
   async function onSave() {
     if (!draft) {

@@ -1,5 +1,21 @@
 # Dev state
 
+## 2026-10-06 I1 prepared — Health Profile + Flexible Training Intent
+
+- I1 is prepared as one dormant batched Git commit on top of current `main`; no feature-branch ref has been moved while the Vercel deployment-rate window remains active.
+- Proposed schema head is `0043_health_profile_training_plan.sql`.
+- Added canonical singleton Health Profile: DOB, height, bounded persistent health context, Training limitations, and dietary context.
+- Age remains derived as-of a Health calendar date; biological sex is intentionally not collected because I1 has no supported calculation that requires it.
+- Added versioned Training Plan baseline with weekly target, ordered routine-code sequence, preferred weekdays, default non-training intent, and optional note.
+- Added current-week dated overrides including explicit paired move semantics. Daily Context `rest_day` remains retrospective and is not schedule authority.
+- Sequence advancement replays canonical programmed sessions; an out-of-order programmed workout cannot silently skip the currently expected routine.
+- Training page gets a compact Plan summary and direct start of the next planned session when appropriate. Training → Plan owns baseline editing and current-week adjustments.
+- Health Profile is the first substantive Settings card.
+- Profile and plan tables are added to full and portable backups.
+- `docs/SINGLE_OWNER_DEPLOYMENT.md` now includes Health Profile and Training Plan first-use setup.
+- Domain, migration, and backup regression coverage is included in the prepared commit.
+- Full TypeScript/lint/test/build validation remains intentionally deferred until the dormant commit is published to one branch.
+
 ## 2026-10-06 I0C complete — fresh-instance bootstrap + seed separation
 
 - Proposed schema head is now `0042_instance_seed_scope.sql`.

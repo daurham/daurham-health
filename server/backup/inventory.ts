@@ -1,6 +1,6 @@
 export const BACKUP_FORMAT = 'daurham-health-backup'
 export const BACKUP_FORMAT_VERSION = 1
-export const LATEST_SCHEMA_MIGRATION = '0041_exercise_library_calisthenics.sql'
+export const LATEST_SCHEMA_MIGRATION = '0043_health_profile_training_plan.sql'
 export const PORTABLE_EXPORT_BYTE_LIMIT = 3_500_000
 
 export type ColumnKind = 'uuid' | 'text' | 'date' | 'timestamptz' | 'numeric' | 'int' | 'bool' | 'json' | 'bytea'
@@ -66,6 +66,87 @@ export const BACKUP_TABLES: readonly BackupTable[] = [
       col('display_name', 'text'),
       col('source_kind', 'text'),
       col('created_at', 'timestamptz'),
+    ],
+  }),
+  table({
+    name: 'health_profile',
+    backupClass: 'canonical',
+    primaryKey: ['singleton_id'],
+    seeded: false,
+    portable: true,
+    references: [],
+    columns: [
+      col('singleton_id', 'int'),
+      col('date_of_birth', 'date'),
+      col('height_cm', 'numeric'),
+      col('persistent_health_context', 'text'),
+      col('training_limitations', 'text'),
+      col('dietary_context', 'text'),
+      col('created_at', 'timestamptz'),
+      col('updated_at', 'timestamptz'),
+    ],
+  }),
+  table({
+    name: 'training_plan_versions',
+    backupClass: 'canonical',
+    primaryKey: ['id'],
+    seeded: false,
+    portable: true,
+    references: [],
+    columns: [
+      col('id', 'uuid'),
+      col('version', 'int'),
+      col('effective_from', 'date'),
+      col('weekly_frequency_target', 'int'),
+      col('sequence_start_routine_code', 'text'),
+      col('default_non_training_intent', 'text'),
+      col('note', 'text'),
+      col('is_current', 'bool'),
+      col('created_at', 'timestamptz'),
+    ],
+  }),
+  table({
+    name: 'training_plan_sequence_items',
+    backupClass: 'canonical',
+    primaryKey: ['plan_version_id', 'position'],
+    seeded: false,
+    portable: true,
+    references: [{ column: 'plan_version_id', table: 'training_plan_versions' }],
+    columns: [
+      col('plan_version_id', 'uuid'),
+      col('position', 'int'),
+      col('routine_code', 'text'),
+      col('created_at', 'timestamptz'),
+    ],
+  }),
+  table({
+    name: 'training_plan_preferred_weekdays',
+    backupClass: 'canonical',
+    primaryKey: ['plan_version_id', 'weekday'],
+    seeded: false,
+    portable: true,
+    references: [{ column: 'plan_version_id', table: 'training_plan_versions' }],
+    columns: [
+      col('plan_version_id', 'uuid'),
+      col('weekday', 'int'),
+      col('created_at', 'timestamptz'),
+    ],
+  }),
+  table({
+    name: 'training_plan_day_overrides',
+    backupClass: 'canonical',
+    primaryKey: ['id'],
+    seeded: false,
+    portable: true,
+    references: [],
+    columns: [
+      col('id', 'uuid'),
+      col('override_date', 'date'),
+      col('intent_kind', 'text'),
+      col('linked_date', 'date'),
+      col('note', 'text'),
+      col('created_at', 'timestamptz'),
+      col('updated_at', 'timestamptz'),
     ],
   }),
   table({

@@ -38,13 +38,11 @@ Also present from v1 and the import work: Nutrition, Training, Body, Progress, A
 
 ## Current work
 
-I0C — Fresh-Instance Bootstrap + Owner-Specific Seed Separation is complete. There is no active implementation task.
-
-The next accepted slice is I1 — Health Profile + Flexible Training Intent. Draft its contract in `CURRENT_TASK.md` before implementation.
+I1 — Health Profile + Flexible Training Intent is the active slice. The implementation is prepared as a dormant batched commit and must be validated on a branch before merge.
 
 ## Known planned work
 
-- I1 Health Profile + Flexible Training Intent: stable owner profile context, DOB-derived age, height, sequence-first training intent, preferred weekdays, flexible rest/training moves, and current-week overrides without punitive missed-day semantics.
+- I2 Daily Signals: hydration, bowel tracking, energy/hunger/soreness/stress, compact Daily Check-in, and historical signal surfaces without inventing another primary tab.
 
 
 Named by the current manual or blueprint, and not marked implemented:

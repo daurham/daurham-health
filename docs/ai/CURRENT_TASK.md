@@ -1,68 +1,194 @@
 # Current task
 
-## Status
+## I1 — Health Profile + Flexible Training Intent
 
-No active implementation task.
+### Status
 
-I0C — Fresh-Instance Bootstrap + Owner-Specific Seed Separation is complete and validated for merge.
+Implementation prepared as a batched dormant Git commit on top of current `main`.
 
-Repository schema head after I0C:
+Do not move a feature branch ref while the Vercel rolling deployment limit is still active.
 
-`0042_instance_seed_scope.sql`
+Repository schema head after I1:
+
+`0043_health_profile_training_plan.sql`
 
 Master program:
 
 `docs/ai/NEXT_INTELLIGENCE_ROADMAP.md`
 
-## Completed I0C outcome
+## Product intent
 
-- Historical A/B/C 1.3.1 templates are classified as `legacy_owner` seeds.
-- Beginner Calisthenics is explicitly classified as a `product_builtin`.
-- A fresh database automatically deactivates the original A/B/C family when no historical Training session references it.
-- An established database preserves the A/B/C family when canonical Training history references it.
-- Historical templates and sessions are never deleted or rewritten.
-- Owner-created routines remain untouched.
-- `npm run instance:check` reports migration currency, legacy-routine state, product built-ins, exercise-catalog availability, and active owner-routine count without printing secrets.
-- `docs/SINGLE_OWNER_DEPLOYMENT.md` documents the second-owner setup path: separate Neon/auth/database, separate Vercel project/env, optional providers, migration/validation, and first-use checks.
-- The repository now has one generic branch validation workflow instead of stale H4/H5/I0B branch-specific validation workflows.
+I1 gives Health two missing pieces of canonical context:
 
-## Validation
+1. stable owner facts that should not be re-asked or guessed; and
+2. future Training intent that is flexible enough to survive real life.
 
-GitHub Actions run `37545271735` passed:
+Observed workout sessions remain canonical Training evidence. The Training Plan describes intent, not compliance morality.
+
+## Health Profile contract
+
+Store one owner profile per deployment:
+
+- date of birth;
+- height in canonical centimeters;
+- bounded persistent health context;
+- bounded persistent Training limitations;
+- bounded durable dietary context.
+
+Rules:
+
+- store DOB, derive age as-of a Health calendar date;
+- reject future DOB and implausible >130-year age;
+- do not collect biological sex until a supported calculation actually requires it;
+- owner-written context is owner-reported, not diagnosis or measured evidence;
+- temporary pain/illness/travel/stress belongs in Daily Context, not persistent profile;
+- profile is portable canonical backup state.
+
+UI:
+
+- Health Profile is the first substantive Settings card;
+- owner-facing height uses feet/inches and converts at the boundary;
+- compact summary shows age/height when available.
+
+## Training Plan contract
+
+Baseline plan is versioned by effective date and contains:
+
+- weekly programmed-session target;
+- ordered routine-code sequence;
+- preferred weekdays;
+- default non-training intent: rest, active recovery, or flexible;
+- optional note.
+
+Routine codes, not template UUIDs, define sequence so Saved Routine version changes do not rewrite the plan.
+
+Historical reads select the latest plan version effective on/before the requested as-of date.
+
+### Current-week overrides
+
+One dated override may resolve a day to:
+
+- training preferred;
+- rest;
+- active recovery;
+- flexible;
+- away / paused;
+- training moved here;
+- training moved away.
+
+Moves write paired source/destination overrides with linked dates.
+
+Overrides are restricted to the current Monday–Sunday Health week.
+
+### Sequence semantics
+
+The next intended session is derived from the most recent canonical programmed Training session whose routine code is in the current sequence.
+
+Example:
+
+A → B → C
+
+If A is completed Monday and B moves Wednesday → Thursday:
+- Wednesday becomes `training_moved_away`;
+- Thursday becomes `training_moved_here`;
+- next intended session remains B until B is completed;
+- after B completes, next becomes C.
+
+Ad-hoc and Experiment workouts do not advance the sequence.
+
+If a routine is later archived:
+- keep its routine code in historical plan versions;
+- surface it as unavailable;
+- do not silently substitute another routine.
+
+### No punitive missed-day semantics
+
+I1 does not store:
+- missed;
+- failed;
+- late;
+- adherence failure for an exact weekday.
+
+Weekly completion is descriptive: completed programmed sessions versus weekly target.
+
+Preferred weekday != due date.
+
+Daily Context `rest_day` remains retrospective and does not become schedule authority.
+
+## UI
+
+Training page:
+- compact Training Plan card;
+- today intent;
+- completed/target count;
+- next session;
+- direct Start button when today is a Training day and the next routine is available;
+- Adjust link.
+
+Training → Plan:
+- edit versioned baseline;
+- reorder routine sequence;
+- choose preferred weekdays;
+- choose weekly target;
+- choose default non-training intent;
+- change current-week day intent;
+- reset an override;
+- move a planned Training day to another day in the current week.
+
+Existing Saved Routines remain the routine-construction surface.
+
+## APIs
+
+Owner-only:
+
+- `GET /api/profile`
+- `PUT /api/profile`
+- `GET /api/training/plan?asOf=YYYY-MM-DD`
+- `PUT /api/training/plan`
+- `PUT /api/training/plan/overrides/:date`
+- `DELETE /api/training/plan/overrides/:date`
+- `POST /api/training/plan/move`
+
+## Backup
+
+Add canonical portable/full backup inventory for:
+
+- `health_profile`
+- `training_plan_versions`
+- `training_plan_sequence_items`
+- `training_plan_preferred_weekdays`
+- `training_plan_day_overrides`
+
+## Explicit non-goals
+
+I1 does not:
+- add a universal readiness score;
+- infer diagnosis from profile text;
+- make Ask Health consume Profile/Plan yet (shared intelligence phase owns that);
+- make Coach calculate new plan-aware recommendations yet;
+- create daily hydration/bowel/wellness signals;
+- create exact-weekday failure semantics;
+- replace Saved Routines.
+
+## Validation before publication
+
+Once the dormant commit is exposed to a branch:
 
 - `npx tsc -b`
 - `npx eslint .`
 - `npm test`
 - `npm run build`
 
-The first I0C validation run caught one TypeScript-only initialization error in the new instance checker; that was fixed in a single corrective commit before the successful run above.
+Required regression coverage includes:
 
-## Deployment note
+- birthday boundaries;
+- height conversion;
+- Monday week boundaries;
+- sequence A→B→C wrap;
+- preferred day vs default rest/flexible;
+- singleton profile constraints;
+- plan/version/weekday constraints;
+- paired move override constraints;
+- portable backup round trip.
 
-Vercel Hobby deployment creation is currently rate-limited because earlier I0B work produced too many remote commits.
-
-I0C was therefore developed with the new batched workflow:
-- dormant Git objects first;
-- one feature branch;
-- minimal corrective commits;
-- generic GitHub Actions validation;
-- one merge.
-
-Production deployment may remain blocked until Vercel's rolling limit clears. The Git repository state is independent of that temporary deployment quota.
-
-## Next planning slice
-
-**I1 — Health Profile + Flexible Training Intent**
-
-Expected focus:
-
-- canonical Health Profile;
-- DOB-derived age;
-- height;
-- bounded persistent owner context;
-- baseline training frequency/sequence/preferences;
-- current-week overrides and movable rest/training days;
-- sequence-first programmed session intent;
-- no punitive missed-day semantics.
-
-Draft the I1 contract before implementation.
+Do not merge until the exact branch head is green.

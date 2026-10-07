@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { APPLE_HEALTH_COMMIT_BATCH } from '@/domain/apple-health/config'
 import type { NormalizedAppleHealthRecord } from '@/domain/apple-health/parse'
 import type { AppleHealthPreview } from '@/domain/apple-health/preview'
+import { healthProfileSchema, type HealthProfile, type HealthProfileInput } from '@/domain/health-profile'
 import { healthFetch, readApiError } from '@/lib'
 
 export const appleHealthStatusSchema = z.object({
@@ -138,4 +139,25 @@ export async function commitAppleHealthRecords(
     onProgress?.(Math.min(offset + batch.length, records.length), records.length)
   }
   return { jobId, insertedCount, matchedCount }
+}
+
+
+export async function fetchHealthProfile(): Promise<HealthProfile> {
+  const response = await healthFetch('/api/profile')
+  if (!response.ok) {
+    throw new Error(await readApiError(response))
+  }
+  return healthProfileSchema.parse((await response.json()).profile)
+}
+
+export async function saveHealthProfile(input: HealthProfileInput): Promise<HealthProfile> {
+  const response = await healthFetch('/api/profile', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+  if (!response.ok) {
+    throw new Error(await readApiError(response))
+  }
+  return healthProfileSchema.parse((await response.json()).profile)
 }

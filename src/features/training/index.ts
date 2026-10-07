@@ -6,3 +6,5 @@ export { WorkoutDetailPage } from './WorkoutDetailPage'
 export { RoutinesPage } from './RoutinesPage'
 
 export { ExerciseLibraryPage } from './ExerciseLibraryPage'
+
+export { TrainingPlanPage } from './TrainingPlanPage'

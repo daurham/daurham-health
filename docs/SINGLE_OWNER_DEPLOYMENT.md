@@ -217,16 +217,18 @@ A missing optional provider should not break ordinary Health usage. Capability-d
 After deployment:
 
 1. Sign in.
-2. Confirm Training opens normal manual workout entry.
-3. Confirm the original A/B/C owner routines are absent on a fresh database.
-4. Confirm Beginner Calisthenics/exercise library are available.
-5. Add an owner-created Saved Routine if desired.
-6. Test Nutrition search.
-7. Test Gemini only if configured.
-8. Configure Apple/Body ingest only if wanted.
-9. Create a backup after initial setup.
+2. Open Settings → Health Profile and add date of birth, height, and only durable context the owner wants Health to use.
+3. Confirm Training opens normal manual workout entry.
+4. Confirm the original A/B/C owner routines are absent on a fresh database.
+5. Confirm Beginner Calisthenics/exercise library are available.
+6. Add an owner-created Saved Routine if desired.
+7. Open Training → Plan and configure the owner's weekly target, preferred weekdays, and routine sequence.
+8. Test Nutrition search.
+9. Test Gemini only if configured.
+10. Configure Apple/Body ingest only if wanted.
+11. Create a backup after initial setup.
 
-Health Profile onboarding will become part of first-run setup when that roadmap phase lands.
+Health Profile and Training Plan are canonical owner state and are included in backups.
 
 ## 12. Development/deployment discipline
 

@@ -15,6 +15,12 @@ import {
   type WorkoutTemplate,
   workoutTemplateSchema,
 } from '@/domain/training'
+import type {
+  DayOverrideInput,
+  MoveTrainingDayInput,
+  TrainingPlanInput,
+  TrainingPlanView,
+} from '@/domain/training-plan'
 import {
   createTranscriptionJobResponseSchema,
   transcriptionJobListResponseSchema,
@@ -207,4 +213,55 @@ export async function commitImportedSession(
     throw new Error(await readApiError(response))
   }
   return createSessionResponseSchema.parse(await response.json()).session
+}
+
+
+export async function fetchTrainingPlan(asOf?: string): Promise<TrainingPlanView> {
+  const query = asOf ? `?asOf=${encodeURIComponent(asOf)}` : ''
+  const response = await healthFetch(`/api/training/plan${query}`)
+  if (!response.ok) throw new Error(await readApiError(response))
+  return (await response.json()).plan as TrainingPlanView
+}
+
+export async function saveTrainingPlan(input: TrainingPlanInput): Promise<TrainingPlanView> {
+  const response = await healthFetch('/api/training/plan', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+  if (!response.ok) throw new Error(await readApiError(response))
+  return (await response.json()).plan as TrainingPlanView
+}
+
+export async function setTrainingDayOverride(
+  date: string,
+  input: DayOverrideInput,
+): Promise<TrainingPlanView> {
+  const response = await healthFetch(`/api/training/plan/overrides/${date}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+  if (!response.ok) throw new Error(await readApiError(response))
+  return (await response.json()).plan as TrainingPlanView
+}
+
+export async function clearTrainingDayOverride(date: string): Promise<TrainingPlanView> {
+  const response = await healthFetch(`/api/training/plan/overrides/${date}`, {
+    method: 'DELETE',
+  })
+  if (!response.ok) throw new Error(await readApiError(response))
+  return (await response.json()).plan as TrainingPlanView
+}
+
+export async function movePlannedTrainingDay(
+  input: MoveTrainingDayInput,
+): Promise<TrainingPlanView> {
+  const response = await healthFetch('/api/training/plan/move', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+  if (!response.ok) throw new Error(await readApiError(response))
+  return (await response.json()).plan as TrainingPlanView
 }

@@ -31,6 +31,7 @@ const RecordBenchmarkResultPage = lazy(() => import('@/features/lab').then((modu
 const ReviewBenchmarkResultPage = lazy(() => import('@/features/lab').then((module) => ({ default: module.ReviewBenchmarkResultPage })))
 const BenchmarkResultDetailPage = lazy(() => import('@/features/lab').then((module) => ({ default: module.BenchmarkResultDetailPage })))
 const TrainingPage = lazy(() => import('@/features/training').then((module) => ({ default: module.TrainingPage })))
+const TrainingPlanPage = lazy(() => import('@/features/training').then((module) => ({ default: module.TrainingPlanPage })))
 const StartWorkoutPage = lazy(() => import('@/features/training').then((module) => ({ default: module.StartWorkoutPage })))
 const ImportWorkoutPage = lazy(() => import('@/features/training').then((module) => ({ default: module.ImportWorkoutPage })))
 const WorkoutDetailPage = lazy(() => import('@/features/training').then((module) => ({ default: module.WorkoutDetailPage })))
@@ -84,6 +85,7 @@ const router = createBrowserRouter([
       { path: 'nutrition/recipes/:recipeId/versions/:version', element: <RecipeVersionPage /> },
       { path: 'nutrition/recipes/:recipeId', element: <RecipeDetailPage /> },
       { path: 'training', element: <TrainingPage /> },
+      { path: 'training/plan', element: <TrainingPlanPage /> },
       { path: 'training/new', element: <StartWorkoutPage /> },
       { path: 'training/import', element: <ImportWorkoutPage /> },
       { path: 'training/exercises', element: <ExerciseLibraryPage /> },

@@ -7,11 +7,13 @@ import bodyCadencesHandler from './handlers/body-cadences.js'
 import fitProfileCommitHandler from './handlers/fit-profile-commit.js'
 import fitProfilePreviewHandler from './handlers/fit-profile-preview.js'
 import healthHandler from './handlers/health.js'
+import profileHandler from './handlers/profile.js'
 import sessionHandler from './handlers/session.js'
 import trainingExercisesHandler from './handlers/training-exercises.js'
 import trainingSessionDetailHandler from './handlers/training-session-detail.js'
 import trainingSessionsHandler from './handlers/training-sessions.js'
 import trainingTemplatesHandler from './handlers/training-templates.js'
+import trainingPlanHandler from './handlers/training-plan.js'
 import transcriptionCommitHandler from './handlers/transcription-commit.js'
 import transcriptionJobDetailHandler from './handlers/transcription-job-detail.js'
 import transcriptionJobsHandler from './handlers/transcription-jobs.js'
@@ -57,6 +59,7 @@ import rewardsHandler from './handlers/rewards.js'
 
 export type HealthApiRoute =
   | 'health'
+  | 'profile'
   | 'session'
   | 'auth'
   | 'body-measurements'
@@ -67,6 +70,7 @@ export type HealthApiRoute =
   | 'fit-profile-commit'
   | 'training-exercises'
   | 'training-templates'
+  | 'training-plan'
   | 'training-sessions'
   | 'training-session-detail'
   | 'transcription-jobs'
@@ -116,6 +120,7 @@ type HealthApiHandler = (req: ApiRequest, res: ApiResponse) => unknown | Promise
 
 const HANDLERS: Record<HealthApiRoute, HealthApiHandler> = {
   health: healthHandler,
+  profile: profileHandler,
   session: sessionHandler,
   auth: authHandler,
   'body-measurements': bodyMeasurementsHandler,
@@ -126,6 +131,7 @@ const HANDLERS: Record<HealthApiRoute, HealthApiHandler> = {
   'fit-profile-commit': fitProfileCommitHandler,
   'training-exercises': trainingExercisesHandler,
   'training-templates': trainingTemplatesHandler,
+  'training-plan': trainingPlanHandler,
   'training-sessions': trainingSessionsHandler,
   'training-session-detail': trainingSessionDetailHandler,
   'transcription-jobs': transcriptionJobsHandler,
@@ -184,6 +190,8 @@ export function matchHealthApiRoute(pathname: string): HealthApiRoute | null {
   switch (pathname) {
     case '/api/health':
       return 'health'
+    case '/api/profile':
+      return 'profile'
     case '/api/today':
       return 'today'
     case '/api/backup/export':
@@ -208,6 +216,9 @@ export function matchHealthApiRoute(pathname: string): HealthApiRoute | null {
       return 'training-exercises'
     case '/api/training/templates':
       return 'training-templates'
+    case '/api/training/plan':
+    case '/api/training/plan/move':
+      return 'training-plan'
     case '/api/training/sessions':
       return 'training-sessions'
     case '/api/training/transcription/jobs':
@@ -303,6 +314,9 @@ export function matchHealthApiRoute(pathname: string): HealthApiRoute | null {
   }
   if (pathname === '/api/auth' || pathname.startsWith('/api/auth/')) {
     return 'auth'
+  }
+  if (pathname.startsWith('/api/training/plan/overrides/')) {
+    return 'training-plan'
   }
   if (isSingleSegmentAfter(pathname, '/api/training/exercises/')) {
     return 'training-exercises'

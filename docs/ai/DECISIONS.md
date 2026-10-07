@@ -343,3 +343,22 @@ Observed from the current code and product docs. Where the original rationale is
 **Status:** Active  
 **Reason:** Whether the original A/B/C routine family belongs to an instance is a historical-data question, not deployment presentation/configuration. An env flag would be easy to forget, could silently change behavior after redeploy, and would mix owner history with infrastructure configuration.  
 **Implications:** Migration 0042 determines preservation from canonical Training references. New instances need no `HEALTH_LEGACY_*` setting. The deployment guide and `instance:check` verify the resulting state.
+
+## Decision: Health Profile stores stable owner-authored context
+
+**Status:** Active  
+**Reason:** Date of birth, height, and durable owner context materially affect future interpretation but should not be re-entered as daily observations. Temporary symptoms/events have a different meaning and already belong in Daily Context.  
+**Implications:** I1 stores one canonical profile per deployment. DOB is stored and age is derived as-of the requested Health date. Height is canonical centimeters with owner-facing unit conversion. Persistent health context, Training limitations, and dietary context are bounded owner-reported text, not diagnosis or measured evidence. Biological sex is not collected until a supported calculation explicitly requires it. Profile state is included in portable/full backup.
+
+## Decision: Training intent is sequence-first and versioned
+
+**Status:** Active  
+**Reason:** A reusable workout template says what a workout contains; it does not say when the owner intends to train or which routine should come next. Exact weekdays are too brittle to be the source of truth.  
+**Implications:** I1 adds a separate versioned Training Plan with ordered routine codes, weekly frequency target, preferred weekdays, and a default non-training intent. Historical reads resolve the version effective on the requested date. Routine codes survive Saved Routine version changes. Programmed session observations remain canonical Training facts.
+
+## Decision: Preferred Training weekdays are preferences, not failure deadlines
+
+**Status:** Active  
+**Reason:** Moving Wednesday Training to Thursday should not create a false adherence failure or advance past the intended routine.  
+**Implications:** Current-week changes live in dated overrides. Explicit moves create paired `training_moved_away` / `training_moved_here` records. I1 stores no missed/late/failure status for an exact weekday. Weekly completed-session counts are descriptive. Daily Context `rest_day` remains retrospective. Sequence advancement replays programmed sessions and advances only when the currently expected routine is completed; out-of-order sessions do not silently skip the expected routine.
+

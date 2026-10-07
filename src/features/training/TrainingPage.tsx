@@ -5,6 +5,7 @@ import type { PendingTranscriptionJob } from '@/domain/training-transcription'
 import { fetchPublicInstanceConfig, interactiveCardClass, ListPlaceholder, primaryButtonClass, secondaryButtonClass } from '@/lib'
 import { fetchSessions, fetchTranscriptionJobs } from './api'
 import { formatWorkoutDate } from './format'
+import { TrainingPlanCard } from './TrainingPlanCard'
 
 const POLL_MS = 4000
 
@@ -116,6 +117,8 @@ export function TrainingPage() {
           ) : null}
         </div>
       </div>
+
+      <TrainingPlanCard />
 
       {error ? (
         <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">

@@ -40,7 +40,7 @@ describe('H5 Exercise Library backup', () => {
   }
 
   it('includes the H5 presentation fields in canonical portable exercise authority', () => {
-    expect(LATEST_SCHEMA_MIGRATION).toBe('0041_exercise_library_calisthenics.sql')
+    expect(LATEST_SCHEMA_MIGRATION).toBe('0043_health_profile_training_plan.sql')
     const table = backupTable('exercise_definitions')
     expect(table).toMatchObject({ seeded: true, portable: true, backupClass: 'canonical' })
     expect(table?.columns.map((column) => column.name)).toEqual(expect.arrayContaining([

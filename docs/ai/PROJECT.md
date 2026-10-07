@@ -12,6 +12,8 @@ Primary navigation is Today, Nutrition, Training, Body, and Progress. Progress c
 
 Other owner surfaces, reached from pages rather than the primary tabs:
 
+- Health Profile in Settings: DOB, height, and bounded durable owner-authored context
+- Training Plan: versioned routine sequence, weekly target, preferred weekdays, and current-week overrides
 - Supplements and adherence
 - Daily Context
 - Personal Lab: experiments, benchmark protocols, benchmark results, retests, and derived experiment suggestions
@@ -53,7 +55,7 @@ The H3 reward wallet is durable owner state rather than a derived Health score. 
 
 - Today assembles the owner's current instance-calendar day from canonical domains. Activity for the current day can be provisional.
 - Nutrition logs foods, recipes, targets, barcode lookups, label photos, meal photos, and text descriptions. A meal capture can include one to three photos of the same meal. Gemini sees every view in one request. The meal prompt is `meal-photo-v3`. After a Gemini estimate, Health may show up to three optional clarification questions. Refine estimate reuses the same job and stored photos for one new `nutrition_meal_photo` attempt. Home-AI remains an explicit one-photo fallback and does not accept clarification answers. New Recipe can draft ingredients from pasted text. The owner resolves each line to a canonical food before save. Gemini does not calculate recipe nutrition or fetch recipe pages.
-- Training stores exercises, templates, and workout sessions. A workout photo becomes a Home-AI transcription job. The owner reviews it before it becomes a session.
+- Training stores exercises, templates, workout sessions, and a separate versioned Training Plan. The plan stores intent (weekly target, ordered routine codes, preferred weekdays, and dated overrides); workout sessions remain the observed facts. Daily Context rest tags remain retrospective and are not future schedule authority. A workout photo becomes a Home-AI transcription job. The owner reviews it before it becomes a session.
 - Body stores manual measurements, an XLSX fit-profile import, and optional measurement cadence. A Shortcut can stage a capture with `POST /api/ingest/body`. That row stays in `body_capture_inbox` until the owner reviews it and saves one ordinary manual measurement. Pending captures are not observations. Setup is `docs/body-shortcut.md`.
 - Apple Health history can be imported from export archives. Ongoing Activity, Sleep, and workout sync arrives as `POST /api/ingest/apple-health` with `APPLE_HEALTH_SYNC_TOKEN`. That token cannot read Health data or post a Body capture. Apple and Health Auto Export workouts stay in Activity. They are not Training sessions. Body intake uses a separate `BODY_CAPTURE_TOKEN` and cannot read or save measurements.
 - Progress, insights, and the weekly coach read canonical rows and run the existing analytics. They do not create a second copy of those formulas in React.
@@ -147,3 +149,5 @@ The authoritative placeholder inventory is `.env.example`. `npm run config:check
 - Apple Activity workouts stay outside canonical Training.
 - No readiness, recovery, or device-quality score exists.
 - Backup and export inventories must change only when a real table is added.
+- Health Profile stores stable owner-authored context. Temporary symptoms/events belong in Daily Context.
+- Training Plan sequence is authoritative; preferred weekdays are planning preferences, not failure deadlines.
