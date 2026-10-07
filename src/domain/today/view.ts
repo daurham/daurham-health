@@ -21,6 +21,7 @@ import {
   type TodayBodyReminder,
 } from '../body-cadence.js'
 import { todayContextFromRecord, type DailyContext, type TodayContextSnapshot } from '../context.js'
+import { todayDailySignalsFromDay, type DailySignalsDay, type TodayDailySignalsSnapshot } from '../daily-signals.js'
 import { selectTodayRetest, type BenchmarkRetestView } from '../lab-retests.js'
 import { DEFAULT_HEALTH_CALENDAR_TIME_ZONE, healthCalendarDateFromNow } from '../time.js'
 
@@ -72,6 +73,7 @@ export type TodaySources = {
   pendingJobs: readonly TodayPendingJob[]
   supplements?: readonly TodaySupplementInput[]
   context?: DailyContext | null
+  dailySignals?: DailySignalsDay | null
   goalAttention?: readonly GoalAttentionItem[]
   lab?: {
     experiments: readonly TodayLabExperiment[]
@@ -191,6 +193,7 @@ export type TodayViewModel = {
   patterns: Array<{ id: string; text: string; tone: 'positive' | 'negative' | 'neutral' }>
   supplements: TodaySupplementSection | null
   context: TodayContextSnapshot
+  dailySignals?: TodayDailySignalsSnapshot
   lab: {
     experiments: TodayLabExperiment[]
     retest: BenchmarkRetestView | null
@@ -443,6 +446,7 @@ export function buildTodayView(sources: TodaySources): TodayViewModel {
     },
     supplements: buildTodaySupplementSection(date, sources.supplements ?? []),
     context: todayContextFromRecord(sources.context ?? null),
+    dailySignals: todayDailySignalsFromDay(sources.dailySignals ?? null),
     lab: { ...lab, goalSupport: labGoalSupport },
     pendingItems: [
       ...sources.pendingJobs.flatMap((job) => {

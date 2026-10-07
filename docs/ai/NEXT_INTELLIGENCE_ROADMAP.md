@@ -3186,10 +3186,12 @@ These are foundational context authorities used by later intelligence.
 - bowel logging + explicit no-BM day state;
 - daily energy/hunger/soreness;
 - optional stress rating;
-- subjective sleep quality if accepted;
+- subjective sleep quality only if separately accepted;
 - backlog workflows;
-- Timeline/Ask Health integration;
 - missing-vs-zero semantics.
+
+### Intelligence boundary
+I2 owns canonical Daily Signals and their Today/backlog capture surfaces. It does not build one-off Timeline or Ask Health evidence plumbing. Daily Signals join Timeline, Ask Health, relationship analysis, coverage/provenance, and confidence semantics in I5 through the shared Health Intelligence evidence frame.
 
 ### UX requirement
 The mobile walkthrough has been incorporated into this roadmap. Implementation must preserve the post-video placement decisions and then perform focused owner visual QA.

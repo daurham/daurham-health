@@ -362,3 +362,15 @@ Observed from the current code and product docs. Where the original rationale is
 **Reason:** Moving Wednesday Training to Thursday should not create a false adherence failure or advance past the intended routine.  
 **Implications:** Current-week changes live in dated overrides. Explicit moves create paired `training_moved_away` / `training_moved_here` records. I1 stores no missed/late/failure status for an exact weekday. Weekly completed-session counts are descriptive. Daily Context `rest_day` remains retrospective. Sequence advancement replays programmed sessions and advances only when the currently expected routine is completed; out-of-order sessions do not silently skip the expected routine.
 
+
+## Decision: Daily Signals preserve missing-versus-zero semantics
+
+**Status:** Active  
+**Reason:** Water, bowel, and subjective state are useful only if sparse tracking is not silently converted into normal/zero observations. A missing record and an explicit zero can imply very different things.  
+**Implications:** Hydration is event-based and has no synthetic zero day. Bowel uses real Bristol events plus a separate explicit no-BM day state. Subjective wellness exists only when at least one rating was entered. Current-day and backlog UI must show unknown explicitly rather than filling defaults.
+
+## Decision: I2 captures facts now; shared intelligence consumes them later
+
+**Status:** Active  
+**Reason:** Adding Timeline/Ask Health integration before the shared evidence-frame phase would create another bespoke path with incomplete provenance/coverage semantics. The raw facts are useful immediately on Today without that duplication.  
+**Implications:** The first I2 batch owns canonical Daily Signals and the consolidated Today Check-in only. XP stays in I3. Cross-domain relationships, Timeline signal integration, Ask Health evidence routing, and confidence/coverage interpretation move to I5. No readiness score is introduced.

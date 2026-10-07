@@ -38,11 +38,17 @@ Also present from v1 and the import work: Nutrition, Training, Body, Progress, A
 
 ## Current work
 
-I1 — Health Profile + Flexible Training Intent is the active slice. The implementation is prepared as a dormant batched commit and must be validated on a branch before merge.
+I2 — Daily Signals Foundation + Today Check-in is the active slice. I1 is preserved as dormant parent commit `48ac3d7bd1ce6094ca61297c3f0bc5f517c482a6`.
+
+The first I2 batch is intentionally limited to canonical hydration, bowel/no-BM, one-per-day subjective wellness, backlog logging, and the consolidated Today Daily Check-in. It does not move a branch ref while the Vercel rolling deployment limit is active.
+
+The broader master-roadmap language that mentions Timeline/Ask Health integration is now assigned to I5 so those consumers receive the same shared evidence-frame, coverage, provenance, and confidence semantics instead of one-off I2 plumbing.
 
 ## Known planned work
 
-- I2 Daily Signals: hydration, bowel tracking, energy/hunger/soreness/stress, compact Daily Check-in, and historical signal surfaces without inventing another primary tab.
+- I3 XP Participation Expansion + Theme Runway: bounded/idempotent participation XP and additional end-of-progression theme packs.
+- I4 Evidence Semantics, Effort, and Change Ledger.
+- I5 Shared Health Intelligence Engine + Ask Health Context, including Daily Signals Timeline/Ask Health integration.
 
 
 Named by the current manual or blueprint, and not marked implemented:

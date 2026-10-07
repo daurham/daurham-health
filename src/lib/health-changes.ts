@@ -10,7 +10,7 @@ export function isCoachRelevantMutation(url: string, method: string): boolean {
     return false
   }
   if (/\/(preview|draft)$/.test(path)) return false
-  if (/^\/api\/(lab|goals|context|supplements)(\/|$)/.test(path)) return true
+  if (/^\/api\/(lab|goals|context|supplements|hydration|bowel|check-in)(\/|$)/.test(path)) return true
   if (/^\/api\/training\/(sessions|exercises|templates)(\/|$)/.test(path)) return true
   if (path === '/api/training/transcription/commit') return true
   if (/^\/api\/nutrition\/(entries|recipe-entries|targets)(\/|$)/.test(path)) return true

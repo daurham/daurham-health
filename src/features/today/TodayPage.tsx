@@ -7,6 +7,7 @@ import { NUTRITION_CONFIG, type NutritionDayTotals, type NutritionFood } from '@
 import { formatWeekdayCalendarDate, formatCalendarRange } from '@/domain/calendar-format'
 import { sessionIntentLabel } from '@/domain/training'
 import { dailyContextTagLabel } from '@/domain/context'
+import { todayDailySignalsFromDay } from '@/domain/daily-signals'
 import type { TodayViewModel } from '@/domain/today'
 import {
   LoadErrorNotice,
@@ -40,6 +41,7 @@ import { ensureCoach } from '@/features/coach/api'
 import type { CoachState } from '@/domain/coach'
 import { todayShouldReloadAfterNutrition, type TodayNutritionOutcome } from './nutrition-refresh'
 import { notifyHealthDataChanged, subscribeHealthDataChanges } from '@/lib/health-changes'
+import { addHydrationEvent } from '@/features/daily-signals'
 
 function formatCount(value: number): string {
   return Math.round(value).toLocaleString('en-US')
@@ -201,6 +203,8 @@ export function TodayBoard({
         </div>
       </div>
 
+      <DailyCheckInCard view={view} />
+
       {view.pendingItems.length > 0 || view.goalAttention.length > 0 ? (
         <section className="rounded-lg border border-warning/30 bg-amber-50 px-3 py-2.5">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -229,7 +233,6 @@ export function TodayBoard({
         <SleepCard view={view} />
         <BodyCard view={view} />
       </div>
-      <ContextCard view={view} />
       <LabCard view={view} />
       {view.changedItems.length > 0 ? (
         <section className="rounded-lg border border-zinc-200 bg-white p-4">
@@ -326,39 +329,81 @@ function LabCard({ view }: { view: TodayViewModel }) {
   )
 }
 
-function ContextCard({ view }: { view: TodayViewModel }) {
+function DailyCheckInCard({ view }: { view: TodayViewModel }) {
   const readOnly = useDemoReadOnly()
   const prefix = useAppPathPrefix()
-  if (readOnly && !view.context.recorded) {
+  const signals = view.dailySignals ?? todayDailySignalsFromDay(null)
+  const [busyAmount, setBusyAmount] = useState<number | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const empty = !signals.hydration.tracked && !signals.bowel.tracked && !signals.wellness.recorded && !view.context.recorded
+  const checkInHref = prefixedPath(prefix, `/check-in?date=${view.date}`)
+  const contextHref = prefixedPath(prefix, `/context?date=${view.date}&from=check-in`)
+
+  if (readOnly && empty) {
     return null
   }
-  const href = prefixedPath(prefix, `/context?date=${view.date}&from=today`)
+
+  const bowelText = signals.bowel.noMovement
+    ? 'None'
+    : signals.bowel.eventCount == null
+      ? '—'
+      : signals.bowel.eventCount === 1
+        ? `1 · type ${signals.bowel.latestBristolType ?? '—'}`
+        : String(signals.bowel.eventCount)
+
+  async function quickWater(amountOz: number) {
+    setBusyAmount(amountOz)
+    setError(null)
+    try {
+      await addHydrationEvent(view.date, amountOz)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not log water.')
+    } finally {
+      setBusyAmount(null)
+    }
+  }
+
   return (
     <section className="rounded-lg border border-zinc-200 bg-white p-4">
-      <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Context</h2>
-      {view.context.recorded ? (
-        <div className="mt-3 space-y-2">
-          {view.context.tags.length > 0 ? (
-            <ul className="flex flex-wrap gap-2">
-              {view.context.tags.map((tag) => (
-                <li key={tag} className="rounded-full bg-zinc-100 px-3 py-1 text-sm text-zinc-800">
-                  {dailyContextTagLabel(tag)}
-                </li>
-              ))}
-            </ul>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Daily check-in</h2>
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-zinc-700">
+            <span>Water {signals.hydration.tracked && signals.hydration.totalOz != null ? `${Math.round(signals.hydration.totalOz)} oz` : '—'}</span>
+            <span>Bowel {bowelText}</span>
+            <span>Energy {signals.wellness.energy ?? '—'}{signals.wellness.energy != null ? '/5' : ''}</span>
+            <span>Hunger {signals.wellness.hunger ?? '—'}{signals.wellness.hunger != null ? '/5' : ''}</span>
+            <span>Soreness {signals.wellness.soreness ?? '—'}{signals.wellness.soreness != null ? '/5' : ''}</span>
+          </div>
+          {view.context.recorded ? (
+            <p className="mt-2 text-sm text-zinc-600">
+              Context: {view.context.tags.length > 0 ? view.context.tags.map(dailyContextTagLabel).join(' · ') : view.context.note ?? 'Recorded'}
+            </p>
           ) : null}
-          {view.context.note ? <p className="text-sm text-zinc-700">{view.context.note}</p> : null}
-          {readOnly ? null : (
-            <Link to={href} className={quietButtonClass}>
-              Edit
-            </Link>
-          )}
         </div>
-      ) : (
-        <Link to={href} className={`${quietButtonClass} mt-2`}>
-          + Add context
-        </Link>
+        {readOnly ? null : <Link to={checkInHref} className={quietButtonClass}>Open</Link>}
+      </div>
+      {readOnly ? null : (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {[8, 16, 24].map((amount) => (
+            <button
+              key={amount}
+              type="button"
+              disabled={busyAmount != null}
+              className={quietButtonClass}
+              onClick={() => void quickWater(amount)}
+            >
+              {busyAmount === amount ? 'Logging…' : `+${amount} oz`}
+            </button>
+          ))}
+          <Link to={checkInHref} className={quietButtonClass}>Bowel / ratings</Link>
+          <Link to={contextHref} className={quietButtonClass}>{view.context.recorded ? 'Edit context' : 'Add context'}</Link>
+        </div>
       )}
+      {error ? <p className="mt-2 text-sm text-red-700">{error}</p> : null}
+      {empty ? (
+        <p className="mt-2 text-xs text-zinc-500">Nothing tracked yet. Missing is not treated as zero.</p>
+      ) : null}
     </section>
   )
 }

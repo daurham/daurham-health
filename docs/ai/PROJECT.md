@@ -15,6 +15,7 @@ Other owner surfaces, reached from pages rather than the primary tabs:
 - Health Profile in Settings: DOB, height, and bounded durable owner-authored context
 - Training Plan: versioned routine sequence, weekly target, preferred weekdays, and current-week overrides
 - Supplements and adherence
+- Daily Check-in: hydration, bowel/no-BM, subjective wellness, plus access to Daily Context
 - Daily Context
 - Personal Lab: experiments, benchmark protocols, benchmark results, retests, and derived experiment suggestions
 - Goals and deterministic projections
@@ -53,7 +54,7 @@ The H3 reward wallet is durable owner state rather than a derived Health score. 
 
 ## Important flows
 
-- Today assembles the owner's current instance-calendar day from canonical domains. Activity for the current day can be provisional.
+- Today assembles the owner's current instance-calendar day from canonical domains. Activity for the current day can be provisional. Daily Check-in consolidates hydration, bowel, subjective wellness, and Daily Context presentation; missing daily signals remain unknown rather than synthetic zeroes.
 - Nutrition logs foods, recipes, targets, barcode lookups, label photos, meal photos, and text descriptions. A meal capture can include one to three photos of the same meal. Gemini sees every view in one request. The meal prompt is `meal-photo-v3`. After a Gemini estimate, Health may show up to three optional clarification questions. Refine estimate reuses the same job and stored photos for one new `nutrition_meal_photo` attempt. Home-AI remains an explicit one-photo fallback and does not accept clarification answers. New Recipe can draft ingredients from pasted text. The owner resolves each line to a canonical food before save. Gemini does not calculate recipe nutrition or fetch recipe pages.
 - Training stores exercises, templates, workout sessions, and a separate versioned Training Plan. The plan stores intent (weekly target, ordered routine codes, preferred weekdays, and dated overrides); workout sessions remain the observed facts. Daily Context rest tags remain retrospective and are not future schedule authority. A workout photo becomes a Home-AI transcription job. The owner reviews it before it becomes a session.
 - Body stores manual measurements, an XLSX fit-profile import, and optional measurement cadence. A Shortcut can stage a capture with `POST /api/ingest/body`. That row stays in `body_capture_inbox` until the owner reviews it and saves one ordinary manual measurement. Pending captures are not observations. Setup is `docs/body-shortcut.md`.
@@ -151,3 +152,4 @@ The authoritative placeholder inventory is `.env.example`. `npm run config:check
 - Backup and export inventories must change only when a real table is added.
 - Health Profile stores stable owner-authored context. Temporary symptoms/events belong in Daily Context.
 - Training Plan sequence is authoritative; preferred weekdays are planning preferences, not failure deadlines.
+- Daily Signals preserve missing-versus-zero semantics. Hydration is event-based, explicit no-BM is separate from missing bowel evidence, and subjective wellness exists only when entered.

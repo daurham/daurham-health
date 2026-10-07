@@ -49,6 +49,7 @@ import appleHealthSyncHandler from './handlers/apple-health-sync.js'
 import todayHandler from './handlers/today.js'
 import supplementsHandler from './handlers/supplements.js'
 import contextHandler from './handlers/context.js'
+import dailySignalsHandler from './handlers/daily-signals.js'
 import labHandler from './handlers/lab.js'
 import goalsHandler from './handlers/goals.js'
 import askHealthHandler from './handlers/ask-health.js'
@@ -108,6 +109,7 @@ export type HealthApiRoute =
   | 'today'
   | 'supplements'
   | 'context'
+  | 'daily-signals'
   | 'lab'
   | 'goals'
   | 'ask-health'
@@ -169,6 +171,7 @@ const HANDLERS: Record<HealthApiRoute, HealthApiHandler> = {
   today: todayHandler,
   supplements: supplementsHandler,
   context: contextHandler,
+  'daily-signals': dailySignalsHandler,
   lab: labHandler,
   goals: goalsHandler,
   'ask-health': askHealthHandler,
@@ -290,6 +293,9 @@ export function matchHealthApiRoute(pathname: string): HealthApiRoute | null {
   }
   if (pathname === '/api/context/days' || pathname.startsWith('/api/context/days/')) {
     return 'context'
+  }
+  if (pathname.startsWith('/api/hydration/') || pathname.startsWith('/api/bowel/') || pathname.startsWith('/api/check-in/')) {
+    return 'daily-signals'
   }
   if (pathname === '/api/lab' || pathname.startsWith('/api/lab/')) {
     return 'lab'

@@ -18,6 +18,7 @@ const BodyInboxPage = lazy(() => import('@/features/body').then((module) => ({ d
 const SettingsPage = lazy(() => import('@/features/settings').then((module) => ({ default: module.SettingsPage })))
 const SupplementsPage = lazy(() => import('@/features/supplements').then((module) => ({ default: module.SupplementsPage })))
 const ContextPage = lazy(() => import('@/features/context').then((module) => ({ default: module.ContextPage })))
+const DailyCheckInPage = lazy(() => import('@/features/daily-signals').then((module) => ({ default: module.DailyCheckInPage })))
 const LabPage = lazy(() => import('@/features/lab').then((module) => ({ default: module.LabPage })))
 const SuggestionReviewPage = lazy(() => import('@/features/lab').then((module) => ({ default: module.SuggestionReviewPage })))
 const DemoLabPage = lazy(() => import('@/features/demo/DemoLabPage').then((module) => ({ default: module.DemoLabPage })))
@@ -96,6 +97,7 @@ const router = createBrowserRouter([
       { path: 'settings', element: <SettingsPage /> },
       { path: 'supplements', element: <SupplementsPage /> },
       { path: 'context', element: <ContextPage /> },
+      { path: 'check-in', element: <DailyCheckInPage /> },
       { path: 'lab', element: <LabPage /> },
       { path: 'lab/suggestions/*', element: <SuggestionReviewPage /> },
       { path: 'goals', element: <GoalsPage /> },

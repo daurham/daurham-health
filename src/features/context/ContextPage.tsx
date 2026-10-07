@@ -25,7 +25,8 @@ export function ContextPage() {
   const requested = search.get('date')?.trim() ?? ''
   const date = requested.length > 0 ? requested : today
   const dateError = contextDateError(date, today)
-  const backTo = search.get('from') === 'timeline' ? '/progress/timeline' : '/'
+  const from = search.get('from')
+  const backTo = from === 'timeline' ? '/progress/timeline' : from === 'check-in' ? `/check-in?date=${date}` : '/'
   const [editor, setEditor] = useState<EditorState>({ recordedId: null, tags: [], note: '' })
   const [loading, setLoading] = useState(dateError == null)
   const [saving, setSaving] = useState(false)

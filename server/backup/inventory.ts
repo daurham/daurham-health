@@ -1,6 +1,6 @@
 export const BACKUP_FORMAT = 'daurham-health-backup'
 export const BACKUP_FORMAT_VERSION = 1
-export const LATEST_SCHEMA_MIGRATION = '0043_health_profile_training_plan.sql'
+export const LATEST_SCHEMA_MIGRATION = '0044_daily_signals.sql'
 export const PORTABLE_EXPORT_BYTE_LIMIT = 3_500_000
 
 export type ColumnKind = 'uuid' | 'text' | 'date' | 'timestamptz' | 'numeric' | 'int' | 'bool' | 'json' | 'bytea'
@@ -1442,6 +1442,78 @@ export const BACKUP_TABLES: readonly BackupTable[] = [
       col('evidence_snapshot', 'json'),
       col('observation_date', 'date'),
       col('created_at', 'timestamptz'),
+    ],
+  }),
+  table({
+    name: 'hydration_events',
+    backupClass: 'canonical',
+    primaryKey: ['id'],
+    seeded: false,
+    portable: true,
+    references: [{ column: 'source_id', table: 'data_sources' }],
+    columns: [
+      col('id', 'uuid'),
+      col('hydration_date', 'date'),
+      col('occurred_at', 'timestamptz'),
+      col('amount_ml', 'numeric'),
+      col('source_id', 'uuid'),
+      col('note', 'text'),
+      col('request_id', 'uuid'),
+      col('created_at', 'timestamptz'),
+    ],
+  }),
+  table({
+    name: 'bowel_events',
+    backupClass: 'canonical',
+    primaryKey: ['id'],
+    seeded: false,
+    portable: true,
+    references: [{ column: 'source_id', table: 'data_sources' }],
+    columns: [
+      col('id', 'uuid'),
+      col('bowel_date', 'date'),
+      col('occurred_at', 'timestamptz'),
+      col('bristol_type', 'int'),
+      col('straining', 'bool'),
+      col('urgency', 'text'),
+      col('incomplete_feeling', 'bool'),
+      col('source_id', 'uuid'),
+      col('note', 'text'),
+      col('request_id', 'uuid'),
+      col('created_at', 'timestamptz'),
+    ],
+  }),
+  table({
+    name: 'bowel_day_states',
+    backupClass: 'canonical',
+    primaryKey: ['bowel_date'],
+    seeded: false,
+    portable: true,
+    references: [{ column: 'source_id', table: 'data_sources' }],
+    columns: [
+      col('bowel_date', 'date'),
+      col('state', 'text'),
+      col('source_id', 'uuid'),
+      col('created_at', 'timestamptz'),
+      col('updated_at', 'timestamptz'),
+    ],
+  }),
+  table({
+    name: 'daily_wellness',
+    backupClass: 'canonical',
+    primaryKey: ['wellness_date'],
+    seeded: false,
+    portable: true,
+    references: [{ column: 'source_id', table: 'data_sources' }],
+    columns: [
+      col('wellness_date', 'date'),
+      col('energy_rating', 'int'),
+      col('hunger_rating', 'int'),
+      col('soreness_rating', 'int'),
+      col('stress_rating', 'int'),
+      col('source_id', 'uuid'),
+      col('created_at', 'timestamptz'),
+      col('updated_at', 'timestamptz'),
     ],
   }),
   table({

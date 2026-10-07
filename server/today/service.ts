@@ -8,6 +8,7 @@ import { listAllTargets, listEntriesBetween } from '../nutrition/queries.js'
 import { listOutstandingTranscriptionJobs } from '../training/job-store.js'
 import { listTodaySupplementInputs } from '../supplements/queries.js'
 import { getDailyContext } from '../context/service.js'
+import { getDailySignalsDay } from '../daily-signals/service.js'
 import { benchmarkIdsWithActionableExperiment } from '../../src/domain/lab-retests.js'
 import { listTodayLabExperiments } from '../lab/service.js'
 import { listBenchmarkRetests, listRetestExperimentLinks } from '../lab/retests.js'
@@ -29,7 +30,7 @@ export async function getTodayView(now = new Date()): Promise<TodayViewModel> {
   const timezone = instance.calendarTimeZone
   const date = healthCalendarDateFromNow(now, timezone)
   const period = trailingPeriod(TODAY_PATTERN_RANGE, date)
-  const [activityDays, activityWorkouts, sleepNights, latestCompleteSleep, trainingToday, trainingSessions, nutritionEntries, nutritionTargets, bodyWeights, workoutJobs, labelJobs, mealJobs, supplements, bodyCadence, context, labExperiments, retests, retestLinks] =
+  const [activityDays, activityWorkouts, sleepNights, latestCompleteSleep, trainingToday, trainingSessions, nutritionEntries, nutritionTargets, bodyWeights, workoutJobs, labelJobs, mealJobs, supplements, bodyCadence, context, dailySignals, labExperiments, retests, retestLinks] =
     await Promise.all([
       listActivityDaysBetween(period.start, date, timezone),
       listTodayActivityWorkouts(date, timezone),
@@ -74,6 +75,7 @@ export async function getTodayView(now = new Date()): Promise<TodayViewModel> {
     pendingJobs,
     supplements,
     context,
+    dailySignals,
     goalAttention,
     lab: {
       experiments: labExperiments,

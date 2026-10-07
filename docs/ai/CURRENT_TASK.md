@@ -1,16 +1,16 @@
 # Current task
 
-## I1 — Health Profile + Flexible Training Intent
+## I2 — Daily Signals Foundation + Today Check-in
 
 ### Status
 
-Implementation prepared as a batched dormant Git commit on top of current `main`.
+Implementation prepared as a batched dormant Git commit on top of dormant I1 commit `48ac3d7bd1ce6094ca61297c3f0bc5f517c482a6`.
 
 Do not move a feature branch ref while the Vercel rolling deployment limit is still active.
 
-Repository schema head after I1:
+Repository schema head after this I2 batch:
 
-`0043_health_profile_training_plan.sql`
+`0044_daily_signals.sql`
 
 Master program:
 
@@ -18,161 +18,138 @@ Master program:
 
 ## Product intent
 
-I1 gives Health two missing pieces of canonical context:
+This first I2 batch adds a small set of high-value owner-entered daily facts without turning Today into a wall of trackers.
 
-1. stable owner facts that should not be re-asked or guessed; and
-2. future Training intent that is flexible enough to survive real life.
+The batch deliberately separates:
 
-Observed workout sessions remain canonical Training evidence. The Training Plan describes intent, not compliance morality.
+- canonical facts recorded by the owner;
+- derived daily summaries;
+- later intelligence/relationship analysis.
 
-## Health Profile contract
+Missing evidence remains missing. No water entry is not 0 oz. No bowel entry is not an explicit zero-BM day. No wellness row is not a normal rating.
 
-Store one owner profile per deployment:
+## Canonical data
 
-- date of birth;
-- height in canonical centimeters;
-- bounded persistent health context;
-- bounded persistent Training limitations;
-- bounded durable dietary context.
+### Hydration
+
+`hydration_events` stores event-based water evidence:
+
+- Health calendar date;
+- optional observed timestamp;
+- canonical milliliters;
+- manual source;
+- optional note;
+- optional request UUID for idempotent retries.
+
+Current-day quick logging receives the current instant when no timestamp is supplied. Backlogged date-only entries keep `occurred_at = NULL` rather than inventing a time.
+
+No hydration target or tracking-complete state is introduced in this batch.
+
+### Bowel
+
+`bowel_events` stores:
+
+- Health calendar date;
+- optional observed timestamp;
+- required Bristol type 1–7;
+- optional straining;
+- optional urgency;
+- optional incomplete feeling;
+- optional note;
+- manual source;
+- optional request UUID.
+
+`bowel_day_states` stores the explicit `no_bowel_movement` state.
 
 Rules:
 
-- store DOB, derive age as-of a Health calendar date;
-- reject future DOB and implausible >130-year age;
-- do not collect biological sex until a supported calculation actually requires it;
-- owner-written context is owner-reported, not diagnosis or measured evidence;
-- temporary pain/illness/travel/stress belongs in Daily Context, not persistent profile;
-- profile is portable canonical backup state.
+- absence of both event and state means unknown;
+- explicit no-BM is a tracked zero day;
+- adding a bowel event clears the no-BM state;
+- setting no-BM is rejected while an event exists;
+- Bristol type 0 does not exist.
 
-UI:
+### Subjective daily check-in
 
-- Health Profile is the first substantive Settings card;
-- owner-facing height uses feet/inches and converts at the boundary;
-- compact summary shows age/height when available.
+`daily_wellness` stores at most one row per Health date:
 
-## Training Plan contract
+- energy 1–5;
+- hunger 1–5;
+- soreness 1–5;
+- optional stress 1–5.
 
-Baseline plan is versioned by effective date and contains:
+At least one rating is required.
 
-- weekly programmed-session target;
-- ordered routine-code sequence;
-- preferred weekdays;
-- default non-training intent: rest, active recovery, or flexible;
-- optional note.
+Subjective sleep quality is not added in this batch because objective Sleep already exists and the optional subjective field has not been accepted as necessary.
 
-Routine codes, not template UUIDs, define sequence so Saved Routine version changes do not rewrite the plan.
+## Today / UX
 
-Historical reads select the latest plan version effective on/before the requested as-of date.
+Today gets one **Daily check-in** card immediately after the Training area and before Supplements.
 
-### Current-week overrides
+It replaces the previous standalone Today Context card.
 
-One dated override may resolve a day to:
+The compact card shows:
 
-- training preferred;
-- rest;
-- active recovery;
-- flexible;
-- away / paused;
-- training moved here;
-- training moved away.
+- tracked water total or —;
+- bowel count / explicit none / —;
+- energy;
+- hunger;
+- soreness;
+- existing Daily Context summary.
 
-Moves write paired source/destination overrides with linked dates.
+Owner actions:
 
-Overrides are restricted to the current Monday–Sunday Health week.
+- quick-log common water amounts directly from Today;
+- open `/check-in?date=YYYY-MM-DD` for water history/custom amount, Bristol logging, explicit no-BM, and wellness ratings;
+- open the existing Daily Context editor from the same consolidated surface.
 
-### Sequence semantics
+The full check-in page supports prior Health dates. Exact event times are not invented for date-only backlog.
 
-The next intended session is derived from the most recent canonical programmed Training session whose routine code is in the current sequence.
-
-Example:
-
-A → B → C
-
-If A is completed Monday and B moves Wednesday → Thursday:
-- Wednesday becomes `training_moved_away`;
-- Thursday becomes `training_moved_here`;
-- next intended session remains B until B is completed;
-- after B completes, next becomes C.
-
-Ad-hoc and Experiment workouts do not advance the sequence.
-
-If a routine is later archived:
-- keep its routine code in historical plan versions;
-- surface it as unavailable;
-- do not silently substitute another routine.
-
-### No punitive missed-day semantics
-
-I1 does not store:
-- missed;
-- failed;
-- late;
-- adherence failure for an exact weekday.
-
-Weekly completion is descriptive: completed programmed sessions versus weekly target.
-
-Preferred weekday != due date.
-
-Daily Context `rest_day` remains retrospective and does not become schedule authority.
-
-## UI
-
-Training page:
-- compact Training Plan card;
-- today intent;
-- completed/target count;
-- next session;
-- direct Start button when today is a Training day and the next routine is available;
-- Adjust link.
-
-Training → Plan:
-- edit versioned baseline;
-- reorder routine sequence;
-- choose preferred weekdays;
-- choose weekly target;
-- choose default non-training intent;
-- change current-week day intent;
-- reset an override;
-- move a planned Training day to another day in the current week.
-
-Existing Saved Routines remain the routine-construction surface.
+Daily Context remains its own canonical authority and table; only its Today presentation is consolidated.
 
 ## APIs
 
-Owner-only:
+Owner-only routes handled by the Daily Signals handler:
 
-- `GET /api/profile`
-- `PUT /api/profile`
-- `GET /api/training/plan?asOf=YYYY-MM-DD`
-- `PUT /api/training/plan`
-- `PUT /api/training/plan/overrides/:date`
-- `DELETE /api/training/plan/overrides/:date`
-- `POST /api/training/plan/move`
+- `GET /api/check-in/days/:date`
+- `PUT /api/check-in/days/:date`
+- `DELETE /api/check-in/days/:date`
+- `POST /api/hydration/events`
+- `DELETE /api/hydration/events/:id`
+- `POST /api/bowel/events`
+- `DELETE /api/bowel/events/:id`
+- `PUT /api/bowel/days/:date/no-movement`
+- `DELETE /api/bowel/days/:date/no-movement`
+
+Canonical mutations participate in the existing Health-data-change refresh path.
 
 ## Backup
 
-Add canonical portable/full backup inventory for:
+Portable/full backup inventory includes:
 
-- `health_profile`
-- `training_plan_versions`
-- `training_plan_sequence_items`
-- `training_plan_preferred_weekdays`
-- `training_plan_day_overrides`
+- `hydration_events`;
+- `bowel_events`;
+- `bowel_day_states`;
+- `daily_wellness`.
 
-## Explicit non-goals
+## Explicit deferrals
 
-I1 does not:
-- add a universal readiness score;
-- infer diagnosis from profile text;
-- make Ask Health consume Profile/Plan yet (shared intelligence phase owns that);
-- make Coach calculate new plan-aware recommendations yet;
-- create daily hydration/bowel/wellness signals;
-- create exact-weekday failure semantics;
-- replace Saved Routines.
+This first dormant I2 batch does **not** add:
+
+- XP for daily logging — I3 owns participation rewards;
+- personal correlations or relationship claims;
+- a readiness/recovery score;
+- hydration prescriptions;
+- bowel diagnoses;
+- a new Progress tab;
+- Timeline daily-signal lanes;
+- Ask Health daily-signal evidence.
+
+Timeline and Ask Health integration from the broader master-roadmap I2 description are intentionally deferred to I5, where the shared evidence frame, provenance, coverage, and confidence semantics are built once and reused everywhere.
 
 ## Validation before publication
 
-Once the dormant commit is exposed to a branch:
+Once the dormant commit is exposed to one branch:
 
 - `npx tsc -b`
 - `npx eslint .`
@@ -181,14 +158,11 @@ Once the dormant commit is exposed to a branch:
 
 Required regression coverage includes:
 
-- birthday boundaries;
-- height conversion;
-- Monday week boundaries;
-- sequence A→B→C wrap;
-- preferred day vs default rest/flexible;
-- singleton profile constraints;
-- plan/version/weekday constraints;
-- paired move override constraints;
-- portable backup round trip.
+- ounce ↔ milliliter conversion;
+- missing versus explicit zero-BM semantics;
+- Bristol/rating bounds;
+- migration constraints;
+- canonical portable backup inventory;
+- Today/check-in placement and refresh behavior.
 
 Do not merge until the exact branch head is green.

@@ -8,7 +8,7 @@ const PLAN = '11111111-1111-4111-8111-111111111111'
 describe('I1 profile and plan backup', () => {
   it('includes canonical profile and Training Plan tables in portable backup', () => {
     const names = tablesForProfile('portable').map((table) => table.name)
-    expect(LATEST_SCHEMA_MIGRATION).toBe('0043_health_profile_training_plan.sql')
+    expect(LATEST_SCHEMA_MIGRATION).toBe('0044_daily_signals.sql')
     expect(names).toEqual(expect.arrayContaining([
       'health_profile',
       'training_plan_versions',

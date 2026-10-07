@@ -1,5 +1,19 @@
 # Dev state
 
+## 2026-10-06 I2 prepared — Daily Signals foundation + Today check-in
+
+- I2 raw-signal work is prepared on top of dormant I1 without moving a feature branch ref during the Vercel deployment-rate window.
+- Proposed schema head is `0044_daily_signals.sql`.
+- Added canonical water events in milliliters with Health-date semantics and optional observed timestamps; date-only backlog does not invent event times.
+- Added canonical bowel events with Bristol type 1–7 plus an explicit no-BM day state. Missing bowel evidence remains unknown.
+- Added one-per-day subjective wellness rows for energy, hunger, soreness, and optional stress.
+- Added a consolidated Today Daily Check-in after Training and before Supplements; it absorbs the old standalone Today Context presentation while preserving Daily Context as its own authority.
+- Added quick water logging plus a dedicated `/check-in` backlog/detail route for water, bowel, wellness, and contextual navigation.
+- New Daily Signals mutations use the existing Health-data-change invalidation path so Today refreshes after successful owner writes.
+- Added canonical portable backup inventory for all four new tables.
+- XP, correlations, readiness scoring, Timeline signal lanes, and Ask Health signal packets are intentionally not part of this first batch. Timeline/Ask Health signal integration moves to the shared-intelligence I5 work.
+- Full TypeScript/lint/test/build validation remains deferred until this dormant commit is exposed to one branch.
+
 ## 2026-10-06 I1 prepared — Health Profile + Flexible Training Intent
 
 - I1 is prepared as one dormant batched Git commit on top of current `main`; no feature-branch ref has been moved while the Vercel deployment-rate window remains active.
