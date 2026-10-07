@@ -124,6 +124,7 @@ export function AskHealthPage() {
               {turn.text}
             </p>
           ))}
+        {latest ? <AskHealthContextSummary context={latest.meta.context} /> : null}
         {latest ? <AskHealthAnswerView answer={latest.answer} evidence={latest.evidence} /> : null}
         {latest && asked ? <ExternalResearch question={asked} /> : null}
       </div>
@@ -160,5 +161,54 @@ export function AskHealthPage() {
         </button>
       </form>
     </section>
+  )
+}
+
+
+function AskHealthContextSummary({
+  context,
+}: {
+  context: Awaited<ReturnType<typeof askHealth>>['meta']['context']
+}) {
+  if (context.knows.length === 0 && context.missing.length === 0) return null
+  return (
+    <details className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+      <summary className="cursor-pointer text-sm font-medium text-zinc-800">
+        Health context · {context.knows.length} known · {context.missing.length} missing
+      </summary>
+      <div className="mt-3 grid gap-4 md:grid-cols-2">
+        <div>
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">What Health knows</h2>
+          {context.knows.length === 0 ? (
+            <p className="mt-2 text-sm text-zinc-600">No mature evidence is available for this question yet.</p>
+          ) : (
+            <ul className="mt-2 space-y-2">
+              {context.knows.map((item) => (
+                <li key={item.key} className="text-sm text-zinc-700">
+                  <span className="font-medium text-zinc-900">{item.label}</span>
+                  <span className="text-zinc-500"> · {item.confidence} confidence</span>
+                  <p className="mt-0.5">{item.detail}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <div>
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Missing context that matters</h2>
+          {context.missing.length === 0 ? (
+            <p className="mt-2 text-sm text-zinc-600">No major missing signal was identified for this question.</p>
+          ) : (
+            <ul className="mt-2 space-y-2">
+              {context.missing.map((item) => (
+                <li key={item.key} className="text-sm text-zinc-700">
+                  <span className="font-medium text-zinc-900">{item.label}</span>
+                  <p className="mt-0.5">{item.detail}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    </details>
   )
 }

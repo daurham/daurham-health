@@ -6,6 +6,7 @@ import type { ProgressOverview } from '../progress/overview.js'
 import type { ProgressRange } from '../progress/types.js'
 import type { SleepProgressView } from '../sleep/progress-view.js'
 import type { TodaySupplementInput } from '../supplements/types.js'
+import type { IntelligenceContextItem, RoutedHealthIntelligence } from '../intelligence/shared.js'
 import type { AskLens } from './config.js'
 
 export type AskEvidenceCoverage = Record<string, number | string | null>
@@ -22,6 +23,9 @@ export type AskEvidence = {
   detailPath: string | null
   userEntered: boolean
   substantive: boolean
+  confidence?: string
+  provenance?: string
+  evidenceDates?: string[]
 }
 
 export type AskLimitation = {
@@ -92,11 +96,12 @@ export type AskHealthPacketInput = {
   supplements: readonly TodaySupplementInput[]
   context: AskContextInput | null
   patterns: readonly AskPatternInput[]
+  intelligence?: RoutedHealthIntelligence | null
   maxChars?: number
 }
 
 export type AskHealthPacket = {
-  packetVersion: 'ask-health-evidence-v1'
+  packetVersion: 'ask-health-evidence-v2'
   lens: AskLens
   range: ProgressRange
   rangeStart: string
@@ -105,6 +110,10 @@ export type AskHealthPacket = {
   generatedAt: string
   evidence: AskEvidence[]
   limitations: AskLimitation[]
+  contextSummary: {
+    knows: IntelligenceContextItem[]
+    missing: IntelligenceContextItem[]
+  }
   clarification: string | null
 }
 

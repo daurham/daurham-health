@@ -412,3 +412,27 @@ Observed from the current code and product docs. Where the original rationale is
 **Reason:** Suspicious data may be valid, and canonical provenance must remain auditable. Silent correction would destroy evidence and create a second source of truth.  
 **Implications:** The watchdog produces review flags. The owner may confirm a record as valid or exclude it from future intelligence. The source record remains unchanged. I5's shared evidence frame is responsible for honoring exclusions; I4 does not patch every existing Progress formula independently.
 
+## Decision: Shared Health Intelligence is a derived analysis boundary
+
+**Status:** Active  
+**Reason:** Ask Health, Coach, Progress, Today, and Personal Lab should not each build their own interpretation of the same Health history.  
+**Implications:** `health-intelligence-v1` aligns canonical evidence by Health date and exposes coverage, baselines, curated relationships, intervention context, and evidence provenance. It is derived on read and is not a second canonical Health store. New intelligence consumers should route from this shared layer where its registry supports the question instead of duplicating relationship logic.
+
+## Decision: Data Quality exclusions apply before shared intelligence
+
+**Status:** Active  
+**Reason:** An owner decision to exclude a suspicious observation from future intelligence should have one deterministic effect rather than bespoke filtering in each consumer.  
+**Implications:** I5 removes I4 `excluded_from_analysis` Body/Nutrition evidence at the shared-loader boundary and reports the exclusion in coverage. The source row remains canonical and auditable. Existing legacy Progress formulas are not silently rewritten; consumers adopting the shared snapshot inherit the exclusion semantics.
+
+## Decision: Missing daily evidence remains sparse in intelligence
+
+**Status:** Active  
+**Reason:** A missing water log, bowel log, wellness rating, Nutrition day, or Body measurement does not prove zero.  
+**Implications:** The shared frame stores only observed values. Explicit no-BM is a real bowel count of zero. Completed-day Training session count may synthesize zero because absence of a canonical Training session is itself meaningful for that date. Complete-day metrics treat the current Health-calendar day as provisional.
+
+## Decision: Personal relationships are observational evidence, not causal conclusions
+
+**Status:** Active  
+**Reason:** Paired personal observations can reveal useful associations while still being confounded by unmeasured context.  
+**Implications:** I5 uses a curated relationship registry, deterministic minimum sample gates, optional lag alignment, and Spearman rank association. Ask Health may explain supplied relationships but must label them observational. Change Ledger before/after comparisons are context only and never proof of intervention effect.
+

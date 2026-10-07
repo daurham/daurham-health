@@ -1,5 +1,23 @@
 # Dev state
 
+## 2026-10-06 I5 prepared — shared Health Intelligence + Ask Health context
+
+- I5 is prepared as a dormant batch on top of dormant I4; no branch ref is moved while the Vercel deployment-rate window remains active.
+- No schema migration is added; schema head remains `0046_evidence_semantics_change_watchdog.sql`.
+- Added `health-intelligence-v1`: a typed signal registry and sparse Health-date evidence frame spanning Activity, Sleep, Nutrition, Training, Body, hydration, bowel tracking, and subjective wellness.
+- Missing owner-tracked signals remain missing. Completed-day Training frequency is the one safe absence-to-zero semantic; current-day complete metrics remain provisional.
+- I4 `excluded_from_analysis` reviews are applied at the shared-loader boundary before baselines or relationships are calculated. Canonical rows remain untouched.
+- Snapshot coverage carries observed/eligible days, exclusion counts, provenance, and descriptive confidence rather than a universal quality/readiness score.
+- Added recent personal baselines, curated same-day and one-day-lag relationships, and bounded Change Ledger before/after comparisons with explicit non-causal wording.
+- Added question/lens-specific evidence routing and evidence-date/detail-path drill-down metadata.
+- Ask Health now uses `ask-health-evidence-v2` / `ask-health-v4` and consumes the shared snapshot for Daily Signals, relationships, confidence, exclusions, and change context.
+- Ask Health adds a compact What Health knows / Missing context that matters disclosure.
+- Progress Timeline now receives one day-level Daily check-in event instead of per-event Daily Signal noise.
+- Added owner-only `GET /api/intelligence/snapshot`.
+- Focused deterministic I5 tests are staged; full TypeScript/lint/test/build validation remains deferred until the dormant stack is exposed to one branch.
+- I6 is the planned point to migrate consequential Today/Coach goal-control decisions onto the shared evidence layer.
+
+
 ## 2026-10-06 I4 prepared — evidence semantics, effort, Change Ledger + data-quality watchdog
 
 - I4 is prepared as a dormant batch on top of dormant I3; no branch ref is moved while the Vercel deployment-rate window remains active.

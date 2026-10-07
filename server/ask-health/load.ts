@@ -1,7 +1,5 @@
 import { buildActivityProgressView } from '../../src/domain/activity/index.js'
 import type { AskBenchmarkInput, AskContextInput, AskExperimentInput, AskHealthPacketInput } from '../../src/domain/ask-health/index.js'
-import { findingCopy } from '../../src/domain/intelligence/copy.js'
-import { analyzeCrossDomain } from '../../src/domain/intelligence/analyze.js'
 import { buildProgressOverview } from '../../src/domain/progress/index.js'
 import type { ProgressRange } from '../../src/domain/progress/types.js'
 import { buildSleepProgressView } from '../../src/domain/sleep/index.js'
@@ -15,6 +13,8 @@ import { loadProgressCanonicalRows } from '../progress/queries.js'
 import { listSleepNightlySummaries } from '../sleep/queries.js'
 import { listSupplementRangeInputs } from '../supplements/queries.js'
 import { healthTimeContext } from '../health-time.js'
+import { routeHealthIntelligence } from '../../src/domain/intelligence/shared.js'
+import { loadHealthIntelligenceSnapshot } from '../intelligence/snapshot.js'
 
 export async function loadAskHealthPacketInput(input: {
   lens: AskHealthPacketInput['lens']
@@ -36,7 +36,7 @@ export async function loadAskHealthPacketInput(input: {
     nutritionTargets: rows.nutritionTargets,
   })
   const period = { start: overview.period.start, end: overview.period.end }
-  const [activityRows, sleepNights, goals, supplements, experiments, benchmarks, contexts] = await Promise.all([
+  const [activityRows, sleepNights, goals, supplements, experiments, benchmarks, contexts, intelligenceSnapshot] = await Promise.all([
     listActivityDailySummaries(timezone),
     listSleepNightlySummaries(timezone),
     listGoalAskSnapshots(input.asOf),
@@ -44,6 +44,7 @@ export async function loadAskHealthPacketInput(input: {
     loadExperiments(input.asOf),
     loadBenchmarks(period.start, period.end, input.asOf),
     listDailyContexts(period.start, period.end),
+    loadHealthIntelligenceSnapshot({ range: input.range, asOf: input.asOf }),
   ])
   const activity = buildActivityProgressView(
     activityRows.filter((row) => row.date <= input.asOf),
@@ -53,28 +54,11 @@ export async function loadAskHealthPacketInput(input: {
     sleepNights.filter((night) => night.sleepDate <= input.asOf),
     { range: input.range, asOf: input.asOf, timezone },
   )
-  const patterns = analyzeCrossDomain({
-    range: input.range,
-    asOf: input.asOf,
-    today: input.asOf === today ? today : null,
-    timezone,
-    activityDays: activityRows.filter((row) => row.date <= input.asOf),
-    sleepNights: sleepNights.filter((night) => night.sleepDate <= input.asOf),
-    nutritionDays: overview.nutrition.observations,
-    trainingSessions: overview.training.sessions.map((session) => ({
-      sessionId: session.sessionId,
-      sessionDate: session.sessionDate,
-      effort: session.effort ?? null,
-      painLevel: null,
-    })),
-    bodyWeights: overview.body.weight.observations.filter((item) => item.key === 'weight' && item.calendarDate <= input.asOf),
-  }).findings.flatMap((finding) => {
-    if (!finding.surfaced) {
-      return []
-    }
-    const text = findingCopy(finding)
-    return text ? [{ id: finding.id, text }] : []
+  const intelligence = routeHealthIntelligence(intelligenceSnapshot, {
+    question: input.question,
+    lens: input.lens,
   })
+  const patterns: AskHealthPacketInput['patterns'] = []
   return {
     lens: input.lens,
     range: input.range,
@@ -91,6 +75,7 @@ export async function loadAskHealthPacketInput(input: {
     supplements,
     context: contextSnapshot(contexts),
     patterns,
+    intelligence,
   }
 }
 

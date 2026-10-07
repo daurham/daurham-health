@@ -352,9 +352,11 @@ async function candidateRows(sql: Sql): Promise<CandidateRow[]> {
   )) as CandidateRow[]
 }
 
-export async function getChangeLedger(): Promise<ChangeLedgerResponse> {
+export async function getChangeLedger(options: { ensureCandidates?: boolean } = {}): Promise<ChangeLedgerResponse> {
   const [sql, today, timezone] = await Promise.all([getSql(), currentHealthDate(), healthCalendarTimeZone()])
-  await ensureBehaviorCandidates(sql, today, timezone)
+  if (options.ensureCandidates !== false) {
+    await ensureBehaviorCandidates(sql, today, timezone)
+  }
   const [explicit, candidates] = await Promise.all([explicitEntries(sql, timezone), candidateRows(sql)])
   const confirmed = candidates.filter((row) => row.status === 'confirmed').map(candidateEntry)
   return {

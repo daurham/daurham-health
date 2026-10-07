@@ -1,5 +1,5 @@
-export const ASK_HEALTH_PACKET_VERSION = 'ask-health-evidence-v1'
-export const ASK_HEALTH_PROMPT_VERSION = 'ask-health-v3'
+export const ASK_HEALTH_PACKET_VERSION = 'ask-health-evidence-v2'
+export const ASK_HEALTH_PROMPT_VERSION = 'ask-health-v4'
 export const ASK_HEALTH_REQUEST_TYPE = 'ask_health'
 
 export const ASK_LENSES = ['general', 'training', 'nutrition', 'recovery', 'experiments'] as const

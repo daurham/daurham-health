@@ -1,14 +1,14 @@
 # Current task
 
-## I4 — Evidence Semantics, Effort, and Change Ledger
+## I5 — Shared Health Intelligence Engine + Ask Health Context
 
 ### Status
 
-Implementation prepared as a dormant batched Git commit on top of dormant I3 commit `a615965bfa6a5547447be85e395f695d63050c7d`.
+Implementation prepared as a dormant batched Git commit on top of dormant I4 commit `09f305f51c7c4da945fe3a3f771a17f683ed7896`.
 
 Do not move a feature branch ref while the Vercel rolling deployment limit remains active.
 
-Repository schema head after I4:
+I5 is derived-only and adds no schema migration. Repository schema head remains:
 
 `0046_evidence_semantics_change_watchdog.sql`
 
@@ -18,146 +18,143 @@ Master program:
 
 ## Product intent
 
-I4 makes later Health intelligence safer by improving the meaning, provenance, effort context, and change context of existing Health evidence before I5 builds a shared intelligence frame.
+I5 creates one deterministic evidence layer that can increasingly become the common interpretation input for Ask Health, Progress, Coach, Today, and Personal Lab.
 
-Canonical Health facts remain authoritative. I4 may derive change candidates and data-quality flags, but it does not silently correct source records or invent missing observations.
+It does not replace canonical Health tables. It aligns existing observations by Health date, preserves missingness, applies owner Data Quality exclusions before analysis, calculates coverage/baselines/relationships/change context, and then routes only relevant evidence to a consumer.
 
-## Training evidence
+## Shared evidence frame
 
-- Existing session effort 1–5 and pain 0–3 remain the session-level subjective context.
-- Working sets may optionally record either RIR 0–10 or RPE 1–10. A set cannot record both.
-- Failure evidence is explicit: `reached_failure` or `failed_rep`. Ordinary hard effort is not inferred as failure.
-- Independent-side exercises may record left/right failure separately.
-- Exercise definitions gain `side_tracking_mode`: `shared`, `paired`, or `independent`.
-- Existing per-side measurement families remain valid. Selected dumbbell movements become independent prospectively without rewriting historical shared-rep sets.
-- Optional session limitation context records pain, fatigue, illness, time, equipment, or other constraints plus a bounded note.
+`health-intelligence-v1` defines a typed signal registry and sparse daily frame for:
 
-## Nutrition evidence quality
+- Activity: steps, active energy, exercise minutes;
+- Sleep: eligible nightly duration;
+- Nutrition: calories, protein, fiber, sodium;
+- Training: session count and perceived effort;
+- Body: canonical weight in kilograms;
+- Daily Signals: logged water, bowel count / explicit no-BM, energy, hunger, soreness, and stress.
 
-Each Nutrition entry carries a coarse evidence class:
+Missing owner-tracked signals remain missing. The only synthesized zero is completed-day Training session count, because no canonical Training session on a completed date is itself a real zero-session observation.
 
-- `measured_reference`;
-- `owner_entered`;
-- `ai_estimate`;
-- `legacy_unknown`.
+Current-day totals that require a complete day remain provisional and are excluded from complete-day coverage, baselines, relationships, and intervention comparisons.
 
-The classification describes how the nutrition values were obtained. It is not a food-health score.
+## Quality, provenance, and exclusions
 
-Nutrition day responses derive a calorie-weighted quality summary:
+The shared loader applies I4 `excluded_from_analysis` reviews before building daily evidence.
 
-- `high_confidence`;
-- `mixed`;
-- `estimate_heavy`;
-- `unknown`.
+The original Health row is never deleted or rewritten.
 
-Missing historical quality is treated as unknown, never as measured evidence.
+Coverage records include:
 
-## Body comparability
+- observed versus eligible days;
+- owner exclusions;
+- coarse provenance counts;
+- descriptive confidence.
 
-Manual Body measurement sessions may be marked:
+Nutrition keeps I4 provenance and unknown-nutrient semantics. Body keeps comparability context. No universal Health score, device score, readiness score, or recovery score exists.
 
-- `usual`;
-- `different_conditions`;
-- `unknown`.
+## Personal baselines and relationships
 
-Health Profile gains one optional owner-authored note describing usual body-measurement conditions. Different-condition measurements remain valid canonical observations; the marker exists for later interpretation.
+The snapshot derives recent personal baselines and a curated relationship catalog.
 
-## Event time vs entered time
+Initial relationship families include:
 
-I4 does not add redundant timestamps where the schema already represents both concepts.
+- Sleep ↔ energy/hunger/soreness;
+- Sleep ↔ steps;
+- hydration ↔ bowel tracking;
+- fiber ↔ bowel tracking;
+- protein ↔ next-day soreness;
+- steps ↔ next-night sleep.
 
-Observed/effective time continues to use domain fields such as `measured_at`, `consumed_at`, Health dates, and version effective dates. Database `created_at` remains entry/storage time. Later intelligence must preserve that distinction.
+Both same-day and selected one-day-lag relationships are supported.
 
-## Change Ledger
+Relationships require minimum paired observations and use deterministic Spearman rank association. They are observational only and never presented as causal findings.
 
-Progress → Timeline gains an owner-only **Changes & interventions** panel.
+## Change context
 
-The ledger is derived from existing canonical histories for:
+Confirmed/explicit I4 Change Ledger entries can be compared with surrounding Health evidence.
 
-- Nutrition target changes;
-- Training Plan versions;
-- Goal start/target/lifecycle changes;
-- supplement status events;
-- Experiment windows;
-- selected Daily Context intervention/context tags.
+I5 calculates bounded seven-day before/after summaries when each side has enough observations. These are context comparisons, not proof the intervention caused the difference.
 
-I4 also detects a small first set of behavioral candidates:
+## Question routing and drill-down
 
-- daily steps;
-- Training frequency;
-- logged-water pattern.
+The snapshot can route evidence by question/lens instead of sending every available signal to every consumer.
 
-Detection compares the most recent seven completed days with the prior fourteen days and requires minimum coverage plus a meaningful magnitude. Hydration compares tracked days only; missing water logs are not converted to zero.
+Structured evidence carries:
 
-A candidate is not canonical intent. The owner may confirm or dismiss it. Confirmation records the detected change in the derived ledger; neither action rewrites source data.
+- signal identity;
+- period;
+- coverage;
+- confidence;
+- provenance;
+- evidence dates;
+- detail destinations.
 
-## Data Quality watchdog
+This supplies the basis for consequential `Why?` drill-down without requiring model-generated provenance.
 
-Settings → Data Quality runs deterministic review rules over recent data for:
+## Ask Health
 
-- broadly implausible or unusual Body values;
-- unusually large Nutrition entries/serving multipliers;
-- possible duplicate Nutrition entries;
-- future Body/Nutrition timestamps;
-- substantially incomplete-looking Nutrition days, labeled as a possibility rather than assumed missing food;
-- missing one side on an independent-side Training set;
-- recent Body measurement source discontinuity.
+Ask Health packet version is now `ask-health-evidence-v2`; prompt version is `ask-health-v4`.
 
-Classification is conservative and review-oriented, including `needs_confirmation`, `plausible_but_unusual`, `possible_duplicate`, and `source_discontinuity`.
+Ask Health keeps its existing direct Goal/Body/Nutrition/etc evidence but consumes the shared I5 layer for:
 
-Owner review choices are:
+- Daily Signals;
+- personal baselines;
+- personal relationships;
+- intervention comparisons;
+- owner Data Quality exclusions;
+- question-specific context.
 
-- `confirmed_valid`;
-- `excluded_from_analysis`.
+The owner UI gains a collapsed **What Health knows / Missing context that matters** summary. Sparse relationships become explicit limitations rather than invented patterns.
 
-Review decisions are durable annotations. They do not delete or mutate the source Health row.
+Gemini still phrases/explains only after owner action. Deterministic evidence remains authoritative.
 
-## Intelligence boundary
+## Timeline
 
-I4 does **not** retrofit current Progress calculations to obey `excluded_from_analysis`. I5 owns the shared evidence frame and will consume these review annotations as part of provenance/coverage/confidence logic.
+The I2-deferred Daily Signals Timeline integration is included.
 
-This preserves one analysis authority instead of adding ad-hoc exclusion logic to existing screens.
+Timeline receives one **Daily check-in** event per Health date containing the day's water total, bowel state/count, and entered wellness ratings. It does not create one Timeline event per glass or bowel event.
 
-## Backup
+Explicit no-BM remains different from missing bowel evidence.
 
-Migration 0046 and backup inventory include:
+## Shared owner API
 
-- Training effort/failure/limitation fields;
-- exercise side-tracking mode;
-- Nutrition evidence quality;
-- Body comparability and Health Profile measurement protocol;
-- `change_candidates`;
-- `data_quality_reviews`.
+`GET /api/intelligence/snapshot?range=...&asOf=...` exposes the owner-authenticated derived snapshot.
 
-Owner review/confirmation state is portable.
+The endpoint does not create a second canonical Health store.
+
+## Consumer boundary
+
+I5 establishes the engine and converts Ask Health first.
+
+I6 Goal Control / Weekly Decision Engine is the next phase that should move consequential Today/Coach decision logic onto this shared layer rather than duplicating it inside I5.
 
 ## Explicit non-goals
 
-I4 does not:
+I5 does not:
 
-- calculate recovery/readiness scores;
-- infer causality from changes;
-- add correlations;
-- auto-adjust Nutrition or Training targets;
-- silently repair canonical rows;
-- delete excluded records;
-- treat missing water/Nutrition/Body evidence as zero;
-- require RIR/RPE on every set;
-- rewrite historical Training sets into new left/right semantics;
-- call Gemini or Home-AI for change/watchdog detection.
+- add a database table or migration;
+- mutate canonical observations;
+- infer missing hydration, bowel, Nutrition, Body, or wellness values as zero;
+- infer causality;
+- create a readiness/recovery/source-quality score;
+- automatically change goals, calories, macros, supplements, or Training;
+- make background AI calls;
+- replace existing deterministic Goal/Lab authorities.
 
 ## Validation before publication
 
 Once this dormant commit is exposed to one branch:
 
-1. apply migrations through 0046 to the branch test database;
+1. apply migrations through existing schema head 0046;
 2. run `npx tsc -b`;
 3. run `npx eslint .`;
 4. run `npm test`;
 5. run `npm run build`.
 
+Focused I5 regression coverage is staged for missing-vs-zero semantics, current-day provisional rules, lagged relationships, exclusion accounting, intervention comparisons, question routing, Ask Health context, Daily Signals Timeline integration, and API routing.
+
 Do not merge until the exact published branch head is green.
 
 ## Next roadmap slice
 
-I5 — Shared Health Intelligence Engine + Ask Health Context.
+I6 — Goal Control / Weekly Decision Engine.

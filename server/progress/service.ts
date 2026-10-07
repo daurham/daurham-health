@@ -32,6 +32,7 @@ import { getSql } from '../db.js'
 import { getInstanceConfig } from '../instance-config.js'
 import { listTimelineContexts } from '../context/service.js'
 import { listTimelineExperimentResults } from '../lab/experiment-results.js'
+import { listTimelineDailySignals } from '../daily-signals/timeline.js'
 import { listTimelineBenchmarkResults } from '../lab/results.js'
 import {
   DELETE_CHECKPOINT_SQL,
@@ -203,10 +204,11 @@ export async function getProgressTimeline(input: {
   const timezone = (await getInstanceConfig()).calendarTimeZone
   const query = parseProgressQuery({ ...input, timezone })
   const period = trailingPeriod(query.range, query.asOf)
-  const [rows, health, dailyContexts, benchmarkResults, experimentResults] = await Promise.all([
+  const [rows, health, dailyContexts, dailySignals, benchmarkResults, experimentResults] = await Promise.all([
     loadProgressCanonicalRows(),
     loadActivitySleepContext(timezone, input.now),
     listTimelineContexts(period.start, period.end, query.range === 'all'),
+    listTimelineDailySignals(query.range === 'all' ? '1900-01-01' : period.start, period.end),
     listTimelineBenchmarkResults(period.start, period.end, query.range === 'all'),
     listTimelineExperimentResults(period.start, period.end, query.range === 'all'),
   ])
@@ -221,6 +223,7 @@ export async function getProgressTimeline(input: {
     nutritionEntries: rows.nutritionEntries,
     nutritionTargets: rows.nutritionTargets,
     dailyContexts,
+    dailySignals,
     benchmarkResults,
     activityTimezone: timezone,
     experimentResults: experimentResults.map((item) => ({

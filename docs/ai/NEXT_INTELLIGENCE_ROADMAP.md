@@ -3311,6 +3311,20 @@ When owner confirmation is needed, provide a small repair flow and preserve the 
 
 ## Phase I5 — Shared Health Intelligence Engine + Ask Health Context
 
+### Prepared implementation note — 2026-10-06
+
+The first I5 batch establishes `health-intelligence-v1` as a derived-only shared evidence layer:
+
+- sparse Health-date signal frame and registry;
+- owner Data Quality exclusions applied before analysis;
+- coverage, provenance, descriptive confidence, and recent personal baselines;
+- curated same-day/lagged relationships and Change Ledger before/after context;
+- question-specific evidence routing and evidence-date/detail-path drill-down;
+- Ask Health v2 evidence packets with What Health knows / Missing context;
+- day-level Daily Signals Timeline events.
+
+No I5 migration is required. Ask Health is the first full intelligence consumer. I6 owns the next consequential step: shared goal-control / Today / Coach decision authority.
+
 ### Deliver
 - shared Health Intelligence Snapshot;
 - date-aligned daily evidence frame;

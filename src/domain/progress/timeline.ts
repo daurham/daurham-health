@@ -23,6 +23,7 @@ export type TimelineDomain = (typeof TIMELINE_DOMAINS)[number]
 
 export const TIMELINE_EVENT_KINDS = [
   'daily_context',
+  'daily_signals',
   'benchmark_result',
   'experiment_result',
   'training_session',
@@ -187,6 +188,24 @@ export type TimelineSleepNightEvent = TimelineEventBase & {
   data: TimelineSleepNightData
 }
 
+export type TimelineDailySignalsDay = {
+  date: string
+  waterMl: number | null
+  bowelCount: number | null
+  explicitNoBowelMovement: boolean
+  energy: number | null
+  hunger: number | null
+  soreness: number | null
+  stress: number | null
+}
+
+export type TimelineDailySignalsEvent = TimelineEventBase & {
+  domain: 'annotation'
+  kind: 'daily_signals'
+  timePrecision: 'date'
+  data: TimelineDailySignalsDay
+}
+
 export type TimelineDailyContextEvent = TimelineEventBase & {
   domain: 'annotation'
   kind: 'daily_context'
@@ -231,6 +250,7 @@ export type TimelineEvent =
   | TimelineActivityDayEvent
   | TimelineActivityWorkoutEvent
   | TimelineSleepNightEvent
+  | TimelineDailySignalsEvent
   | TimelineDailyContextEvent
   | TimelineBenchmarkResultEvent
   | TimelineExperimentResultEvent
@@ -339,16 +359,17 @@ function compareEvents(left: TimelineEvent, right: TimelineEvent): number {
   }
   const kindRank: Record<TimelineEventKind, number> = {
     daily_context: 0,
-    benchmark_result: 9,
+    daily_signals: 1,
+    benchmark_result: 10,
     experiment_result: 10,
-    checkpoint: 1,
-    body_measurement: 2,
-    nutrition_day: 3,
-    sleep_night: 4,
-    activity_day: 5,
-    activity_workout: 6,
-    training_session: 7,
-    performance_best: 8,
+    checkpoint: 2,
+    body_measurement: 3,
+    nutrition_day: 4,
+    sleep_night: 5,
+    activity_day: 6,
+    activity_workout: 7,
+    training_session: 8,
+    performance_best: 9,
   }
   if (kindRank[left.kind] !== kindRank[right.kind]) {
     return kindRank[left.kind] - kindRank[right.kind]
@@ -364,6 +385,7 @@ export function buildProgressTimeline(
   input: ProgressCanonicalInput & {
     checkpoints?: readonly ProgressCheckpoint[]
     dailyContexts?: readonly DailyContext[]
+    dailySignals?: readonly TimelineDailySignalsDay[]
     benchmarkResults?: ReadonlyArray<{
       id: string
       resultDate: string
@@ -611,6 +633,28 @@ export function buildProgressTimeline(
     },
   }))
 
+  const dailySignalEvents: TimelineDailySignalsEvent[] = (input.dailySignals ?? [])
+    .filter((item) => (input.range === 'all' ? item.date <= period.end : inPeriod(item.date)))
+    .filter((item) =>
+      item.waterMl != null ||
+      item.bowelCount != null ||
+      item.explicitNoBowelMovement ||
+      item.energy != null ||
+      item.hunger != null ||
+      item.soreness != null ||
+      item.stress != null
+    )
+    .map((item) => ({
+      id: `daily_signals:${item.date}`,
+      domain: 'annotation',
+      kind: 'daily_signals',
+      date: item.date,
+      timePrecision: 'date',
+      title: 'Daily check-in',
+      evidence: [],
+      data: item,
+    }))
+
   const contextEvents: TimelineDailyContextEvent[] = (input.dailyContexts ?? [])
     .filter((item) => {
       if (item.contextDate > period.end) {
@@ -676,6 +720,7 @@ export function buildProgressTimeline(
 
   const events = [
     ...contextEvents,
+    ...dailySignalEvents,
     ...benchmarkEvents,
     ...experimentEvents,
     ...trainingEvents,
@@ -747,7 +792,7 @@ export function timelineEventsForFocus(timeline: ProgressTimeline, focus: Timeli
     return timeline.events.filter((event) => event.kind === 'sleep_night')
   }
   if (focus === 'context') {
-    return timeline.events.filter((event) => event.kind === 'daily_context')
+    return timeline.events.filter((event) => event.kind === 'daily_context' || event.kind === 'daily_signals')
   }
   return timeline.events.filter((event) => {
     if (event.kind === 'performance_best') {

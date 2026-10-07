@@ -1,6 +1,7 @@
 import type { AskLens } from '@/domain/ask-health'
 import type { AskEvidence, AskHealthAnswer } from '@/domain/ask-health'
 import type { ProgressRange } from '@/domain/progress'
+import type { IntelligenceContextItem } from '@/domain/intelligence'
 import { healthFetch, readApiError } from '@/lib'
 
 export type AskHealthResponse = {
@@ -16,6 +17,10 @@ export type AskHealthResponse = {
     lens: AskLens
     range: ProgressRange
     requestType: string
+    context: {
+      knows: IntelligenceContextItem[]
+      missing: IntelligenceContextItem[]
+    }
   }
 }
 

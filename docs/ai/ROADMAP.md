@@ -38,15 +38,15 @@ Also present from v1 and the import work: Nutrition, Training, Body, Progress, A
 
 ## Current work
 
-I4 — Evidence Semantics, Effort, and Change Ledger is prepared as a dormant batch on top of dormant I3 commit `a615965bfa6a5547447be85e395f695d63050c7d`.
+I5 — Shared Health Intelligence Engine + Ask Health Context is prepared as a dormant batch on top of dormant I4 commit `09f305f51c7c4da945fe3a3f771a17f683ed7896`.
 
-I4 adds optional Training effort/failure/limitation evidence, independent-side exercise semantics, Nutrition evidence quality, Body measurement comparability, a derived owner-confirmed Change Ledger, and a deterministic Data Quality review inbox. Canonical Health rows are never silently corrected.
+I5 adds a derived Health-date evidence frame, signal registry, coverage/provenance/confidence states, personal baselines, curated lagged relationships, Change Ledger comparisons, question-specific evidence routing, I4 Data Quality exclusion semantics, Ask Health shared context, and the deferred Daily Signals Timeline integration.
 
-No branch ref is moved while the Vercel rolling deployment limit remains active. Migration `0046_evidence_semantics_change_watchdog.sql` must be applied before I4 server code is exposed.
+No branch ref is moved while the Vercel rolling deployment limit remains active. I5 adds no migration; schema head remains `0046_evidence_semantics_change_watchdog.sql`.
 
 ## Known planned work
 
-- I5 Shared Health Intelligence Engine + Ask Health Context, including Daily Signals Timeline/Ask Health integration and Data Quality exclusion semantics.
+- I6 Goal Control / Weekly Decision Engine, including migration of consequential Today/Coach decision logic onto the shared evidence layer.
 
 
 Named by the current manual or blueprint, and not marked implemented:

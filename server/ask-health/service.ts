@@ -48,6 +48,7 @@ export type AskHealthResponse = {
     lens: string
     range: string
     requestType: typeof ASK_HEALTH_REQUEST_TYPE
+    context: AskHealthPacket['contextSummary']
   }
 }
 
@@ -268,6 +269,7 @@ function metaFor(
     lens: input.packet.lens,
     range: input.packet.range,
     requestType: ASK_HEALTH_REQUEST_TYPE,
+    context: input.packet.contextSummary,
   }
 }
 

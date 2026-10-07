@@ -78,6 +78,9 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
   if (wants.patterns) {
     addPatterns(input.patterns, push)
   }
+  if (input.intelligence) {
+    addSharedIntelligence(input.intelligence, push, limitations)
+  }
 
   const evidence = trimEvidence(drafts, input.maxChars ?? ASK_PACKET_MAX_CHARS)
   const clarification = exerciseClarification(input)
@@ -91,6 +94,10 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
     generatedAt: input.generatedAt,
     evidence,
     limitations: limitations.filter((item) => evidence.some((fact) => fact.id === item.evidenceId)),
+    contextSummary: {
+      knows: input.intelligence?.knows ?? [],
+      missing: input.intelligence?.missing ?? [],
+    },
     clarification,
   }
 }
@@ -128,8 +135,12 @@ export function packetFingerprintMaterial(packet: AskHealthPacket): string {
       unit: item.unit,
       text: item.text,
       coverage: item.coverage,
+      confidence: item.confidence ?? null,
+      provenance: item.provenance ?? null,
+      evidenceDates: item.evidenceDates ?? null,
     })),
     limitations: packet.limitations,
+    contextSummary: packet.contextSummary,
   })
 }
 
@@ -851,6 +862,153 @@ function addPatterns(patterns: readonly AskPatternInput[], push: (item: PushItem
   }
 }
 
+
+function addSharedIntelligence(
+  intelligence: NonNullable<AskHealthPacketInput['intelligence']>,
+  push: (item: PushItem) => void,
+  limitations: AskLimitation[],
+) {
+  for (const item of intelligence.coverage) {
+    push({
+      id: `intelligence.coverage.${item.key}`,
+      domain: 'intelligence',
+      label: `${item.label} coverage`,
+      value: item.coveragePct,
+      unit: 'percent',
+      text: `${item.observedDays} observed day${item.observedDays === 1 ? '' : 's'} of ${item.eligibleDays} eligible days. ${item.excludedObservations > 0 ? `${item.excludedObservations} reviewed observation${item.excludedObservations === 1 ? '' : 's'} excluded from intelligence. ` : ''}Confidence: ${item.confidence}.`,
+      coverage: {
+        observedDays: item.observedDays,
+        eligibleDays: item.eligibleDays,
+        coveragePct: item.coveragePct,
+        excludedObservations: item.excludedObservations,
+      },
+      detailPath: item.detailPath,
+      userEntered: false,
+      substantive: item.observedDays > 0,
+      confidence: item.confidence,
+      provenance: Object.entries(item.provenance).map(([kind, count]) => `${kind}:${count}`).join(', '),
+      priority: 2,
+    })
+  }
+
+  for (const baseline of intelligence.baselines) {
+    if (baseline.state !== 'available' || baseline.mean == null) continue
+    push({
+      id: `intelligence.baseline.${baseline.key}`,
+      domain: 'intelligence',
+      label: `${baseline.label} personal baseline`,
+      value: baseline.mean,
+      unit: baseline.unit,
+      text: `Recent personal baseline from ${baseline.observations} observations (${baseline.start} through ${baseline.end}). Mean ${roundEvidence(baseline.mean)} ${baseline.unit}; median ${baseline.median == null ? 'unknown' : roundEvidence(baseline.median)} ${baseline.unit}.`,
+      coverage: { observations: baseline.observations, startDate: baseline.start, endDate: baseline.end },
+      detailPath: intelligence.coverage.find((item) => item.key === baseline.key)?.detailPath ?? null,
+      userEntered: false,
+      substantive: true,
+      confidence: baseline.confidence,
+      priority: 2,
+    })
+  }
+
+  for (const relationship of intelligence.relationships) {
+    const id = `intelligence.relationship.${relationship.id}`
+    if (relationship.state === 'available' && relationship.rho != null) {
+      push({
+        id,
+        domain: 'intelligence',
+        label: 'Personal relationship',
+        value: relationship.rho,
+        unit: 'Spearman rho',
+        text: relationship.summary,
+        coverage: {
+          pairedObservations: relationship.sampleSize,
+          requiredObservations: relationship.requiredSampleSize,
+          lagDays: relationship.lagDays,
+        },
+        detailPath: relationship.detailPaths[0] ?? '/progress',
+        userEntered: false,
+        substantive: true,
+        confidence: relationship.confidence,
+        evidenceDates: [...new Set(relationship.evidenceDates.flatMap((pair) => [pair.xDate, pair.yDate]))],
+        priority: 1,
+      })
+    } else if (relationship.state === 'insufficient_data') {
+      push({
+        id,
+        domain: 'intelligence',
+        label: 'Relationship evidence',
+        value: relationship.sampleSize,
+        unit: 'paired observations',
+        text: relationship.summary,
+        coverage: {
+          pairedObservations: relationship.sampleSize,
+          requiredObservations: relationship.requiredSampleSize,
+          lagDays: relationship.lagDays,
+        },
+        detailPath: relationship.detailPaths[0] ?? '/progress',
+        userEntered: false,
+        substantive: false,
+        confidence: relationship.confidence,
+        priority: 1,
+      })
+      limitations.push({
+        code: `relationship_${relationship.id}_insufficient`,
+        text: relationship.summary,
+        evidenceId: id,
+      })
+    }
+  }
+
+  for (const comparison of intelligence.interventions.slice(0, 5)) {
+    push({
+      id: `intelligence.change.${comparison.id}`,
+      domain: 'intelligence',
+      label: `Before/after · ${comparison.signalLabel}`,
+      value: comparison.delta,
+      unit: comparison.unit,
+      text: comparison.summary,
+      coverage: {
+        beforeObservations: comparison.beforeN,
+        afterObservations: comparison.afterN,
+        changeDate: comparison.changeDate,
+      },
+      detailPath: '/progress/timeline',
+      userEntered: false,
+      substantive: true,
+      confidence: comparison.confidence,
+      evidenceDates: [...comparison.evidenceDates.before, ...comparison.evidenceDates.after],
+      priority: 2,
+    })
+  }
+
+  for (const missing of intelligence.missing) {
+    const id = `intelligence.missing.${missing.key}`
+    push({
+      id,
+      domain: 'intelligence',
+      label: `${missing.label} context missing`,
+      value: null,
+      unit: null,
+      text: missing.detail,
+      coverage: null,
+      detailPath: missing.detailPath,
+      userEntered: false,
+      substantive: false,
+      confidence: 'unknown',
+      priority: 1,
+    })
+    limitations.push({
+      code: `missing_${missing.key}`,
+      text: `${missing.label}: ${missing.detail}`,
+      evidenceId: id,
+    })
+  }
+}
+
+function roundEvidence(value: number): string {
+  const rounded = Math.round(value * 10) / 10
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1)
+}
+
 function matchingExercises(
   question: string,
   exercises: NonNullable<AskHealthPacketInput['overview']>['exercises'],
@@ -908,6 +1066,9 @@ function strip(item: Draft): AskEvidence {
     detailPath: item.detailPath,
     userEntered: item.userEntered,
     substantive: item.substantive,
+    confidence: item.confidence,
+    provenance: item.provenance,
+    evidenceDates: item.evidenceDates,
   }
 }
 

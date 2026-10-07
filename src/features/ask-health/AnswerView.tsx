@@ -98,6 +98,12 @@ function evidenceSummary(item: AskEvidence): string {
   } else if (typeof item.value === 'string' && item.value.length > 0) {
     parts.push(item.value)
   }
+  if (item.confidence) {
+    parts.push(`${item.confidence} confidence`)
+  }
+  if (item.provenance) {
+    parts.push(`source: ${item.provenance}`)
+  }
   if (item.text && parts.length === 0) {
     parts.push(item.text)
   }

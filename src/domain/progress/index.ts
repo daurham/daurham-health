@@ -98,6 +98,8 @@ export {
   type TimelineActivityDayEvent,
   type TimelineActivityWorkoutEvent,
   type TimelineSleepNightEvent,
+  type TimelineDailySignalsDay,
+  type TimelineDailySignalsEvent,
   type TimelineDailyContextEvent,
   type TimelineBenchmarkResultEvent,
   type TimelineExperimentResultEvent,

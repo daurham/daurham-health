@@ -29,3 +29,25 @@ export type {
   SampleTier,
   SurfacingResult,
 } from './types.js'
+export {
+  HEALTH_INTELLIGENCE_VERSION,
+  INTELLIGENCE_SIGNAL_KEYS,
+  INTELLIGENCE_SIGNAL_REGISTRY,
+  buildHealthIntelligenceSnapshot,
+  routeHealthIntelligence,
+  type BuildHealthIntelligenceInput,
+  type HealthIntelligenceSnapshot,
+  type IntelligenceBaseline,
+  type IntelligenceConfidence,
+  type IntelligenceContextItem,
+  type IntelligenceCoverage,
+  type IntelligenceFrameDay,
+  type IntelligenceInterventionComparison,
+  type IntelligenceObservation,
+  type IntelligenceProvenance,
+  type IntelligenceRelationship,
+  type IntelligenceSignalDefinition,
+  type IntelligenceSignalKey,
+  type RoutedHealthIntelligence,
+} from './shared.js'
+

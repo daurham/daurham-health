@@ -18,6 +18,7 @@ import {
   type TimelinePerformanceBestEvent,
   type TimelineSleepNightEvent,
   type TimelineTrainingSessionEvent,
+  type TimelineDailySignalsEvent,
   type TimelineDailyContextEvent,
   type TimelineBenchmarkResultEvent,
   type TimelineExperimentResultEvent,
@@ -85,7 +86,7 @@ export function TimelineSection({
       <div>
         <h2 className="text-lg font-semibold tracking-tight">Timeline</h2>
         <p className="mt-1 text-sm text-zinc-600">
-          Recorded training, body, nutrition, activity, sleep, and performance bests in chronological order.
+          Recorded training, body, nutrition, activity, sleep, daily check-ins, and performance bests in chronological order.
         </p>
       </div>
 
@@ -182,6 +183,9 @@ function TimelineEventCard({
   }
   if (event.kind === 'sleep_night') {
     return <SleepNightCard event={event} />
+  }
+  if (event.kind === 'daily_signals') {
+    return <DailySignalsEventCard event={event} />
   }
   if (event.kind === 'daily_context') {
     return <ContextEventCard event={event} />
@@ -477,6 +481,43 @@ function SleepNightCard({ event }: { event: TimelineSleepNightEvent }) {
             View night
           </Link>
         </div>
+      </div>
+    </article>
+  )
+}
+
+function DailySignalsEventCard({ event }: { event: TimelineDailySignalsEvent }) {
+  const prefix = useAppPathPrefix()
+  const parts: string[] = []
+  if (event.data.waterMl != null) {
+    const ounces = Math.round((event.data.waterMl / 29.5735295625) * 10) / 10
+    parts.push(`Water ${Number.isInteger(ounces) ? ounces.toFixed(0) : ounces.toFixed(1)} oz`)
+  }
+  if (event.data.bowelCount != null) {
+    parts.push(event.data.explicitNoBowelMovement ? 'No bowel movement' : `Bowel ${event.data.bowelCount}`)
+  }
+  if (event.data.energy != null) parts.push(`Energy ${event.data.energy}/5`)
+  if (event.data.hunger != null) parts.push(`Hunger ${event.data.hunger}/5`)
+  if (event.data.soreness != null) parts.push(`Soreness ${event.data.soreness}/5`)
+  if (event.data.stress != null) parts.push(`Stress ${event.data.stress}/5`)
+  return (
+    <article
+      id={event.id}
+      tabIndex={-1}
+      className="rounded-lg border border-zinc-200 bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-zinc-400 md:grid md:grid-cols-[7.5rem_minmax(0,1fr)_auto] md:items-start md:gap-4 md:px-4"
+    >
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Daily check-in</p>
+      <div>
+        <p className="font-medium tracking-tight">{parts.join(' · ') || 'Tracked daily context'}</p>
+        <p className="mt-0.5 text-sm text-zinc-600">Missing signals are not treated as zero.</p>
+      </div>
+      <div className="mt-3 md:mt-0 md:text-right">
+        <Link
+          to={prefixedPath(prefix, `/check-in?date=${event.date}`)}
+          className="inline-flex min-h-10 items-center rounded-md px-3 text-sm font-medium underline md:min-h-9"
+        >
+          Open check-in
+        </Link>
       </div>
     </article>
   )
