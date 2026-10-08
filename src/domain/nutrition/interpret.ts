@@ -14,10 +14,10 @@ export const GEMINI_MEAL_MODEL_DEFAULT = 'gemini-3.5-flash'
 export const GEMINI_LABEL_MODEL_DEFAULT = 'gemini-3.5-flash'
 export const GEMINI_RECIPE_TIMEOUT_MS = 20_000
 export const GEMINI_RECIPE_MAX_OUTPUT_TOKENS = 2048
-export const GEMINI_DESCRIPTION_TIMEOUT_MS = 10_000
+export const GEMINI_DESCRIPTION_TIMEOUT_MS = 20_000
 export const GEMINI_MEAL_TIMEOUT_MS = 20_000
 export const GEMINI_LABEL_TIMEOUT_MS = 20_000
-export const GEMINI_DESCRIPTION_MAX_OUTPUT_TOKENS = 1024
+export const GEMINI_DESCRIPTION_MAX_OUTPUT_TOKENS = 4096
 export const GEMINI_MEAL_MAX_OUTPUT_TOKENS = 1024
 export const GEMINI_LABEL_MAX_OUTPUT_TOKENS = 1024
 export const NUTRITION_PROVIDERS = ['gemini', 'home_ai'] as const
@@ -185,7 +185,7 @@ export const GEMINI_DESCRIPTION_RESPONSE_SCHEMA = {
       type: 'array',
       items: {
         type: 'object',
-        required: ['name', 'quantity', 'unit', 'calories', 'proteinGrams', 'carbsGrams', 'fatGrams'],
+        required: ['name', 'calories', 'proteinGrams', 'carbsGrams', 'fatGrams'],
         properties: {
           name: { type: 'string' },
           quantity: { type: 'number' },
@@ -196,7 +196,7 @@ export const GEMINI_DESCRIPTION_RESPONSE_SCHEMA = {
           carbsGrams: { type: 'number' },
           fatGrams: { type: 'number' },
           fiberGrams: { type: 'number' },
-    sodiumMg: { type: 'number' },
+          sodiumMg: { type: 'number' },
           assumption: { type: 'string' },
         },
       },
@@ -297,20 +297,23 @@ export function mealPhotoPrompt(userContext: string | null, imageCount = 1): str
 
 export function foodDescriptionPrompt(text: string): string {
   return [
-    'Interpret the food description into useful consumed foods and estimate nutrition for each.',
-    'Output JSON only. Do not wrap the JSON in markdown.',
+    'Interpret the food description into consumed foods and estimate nutrition for the entire meal.',
+    'Output compact JSON only. Include every food and condiment the user named. Never silently omit ingredients.',
     'Keep recognizable composite foods intact. "2 slices supreme pizza" is one component, not crust, sauce, cheese, and toppings.',
     'Decompose only when the user named distinct foods. "2 slices supreme pizza with a side salad and ranch" is pizza, salad, and ranch.',
-    'Preserve the user\'s natural units. Do not require grams. estimatedGrams is optional supporting evidence.',
-    'Estimate calories, protein, carbs, fat, fiber, and sodium for each useful component.',
-    'Health will sum those component estimates. Do not invent a separate authoritative meal total.',
-    'Include major assumptions that materially affect the estimate. Do not pretend estimates are exact.',
-    'Use this shape: {"name":"Wagyu beef with onion and broccoli","items":[{"name":"ground wagyu beef","quantity":0.5,"unit":"lb","estimatedGrams":227,"calories":650,"proteinGrams":45,"carbsGrams":0,"fatGrams":50,"fiberGrams":0,"sodiumMg":180,"assumption":null}],"assumptions":[]}',
-    'quantity and macros must be JSON numbers. Use null for quantity only when unknown. Use null for fiber or sodium when it cannot be estimated.',
+    'For a weighed mixture (e.g. 340 g rice mixed with beans), treat the weight as the entire mixture, not 340 g of each ingredient. Give one mixture item with a reasonable composition assumption unless separate weights are specified.',
+    'When the serving size, cooking method, or mixture ratio is uncertain, make a reasonable everyday assumption and explain it briefly. Do not ask questions before estimating.',
+    'Preserve natural units. estimatedGrams is optional supporting evidence. Omit quantity or estimatedGrams if genuinely unknown; never substitute an invented precise measurement.',
+    'Estimate calories, protein, carbs, fat, fiber, and sodium for each useful component. If fiber or sodium cannot be estimated, omit that field rather than using 0.',
+    'Every included item must have nonnegative numerical calories, proteinGrams, carbsGrams, and fatGrams. A missing nutrient is not the same as zero.',
+    'Health will sum component estimates. Do not invent a separate authoritative meal total.',
+    'Keep assumptions concise (one sentence each); estimates are approximate.',
+    'Use this shape: {"name":"Salmon rice bowl","items":[{"name":"rice and beans mixture","quantity":340,"unit":"g","estimatedGrams":340,"calories":430,"proteinGrams":14,"carbsGrams":82,"fatGrams":4,"fiberGrams":8,"sodiumMg":60,"assumption":"Estimated a mostly rice mixture"}],"assumptions":[]}',
+    'Use JSON numbers, not strings, for quantities and nutrients.',
     '',
     'Food description:',
     text,
-  ].join('\n')
+  ].join('\\n')
 }
 
 export function nutritionLabelPrompt(userContext: string | null): string {
@@ -687,9 +690,22 @@ export function interpretFoodDescriptionResponse(text: string, original: string)
   const raw = parseGeminiJson(text)
   let candidate: DescriptionEstimateCandidate
   try {
-    candidate = sanitizeDescriptionEstimate(normalizeGeminiDescriptionRaw(raw, original), { original })
+    const normalized = normalizeGeminiDescriptionRaw(raw, original)
+    const items = asRecord(normalized).items
+    // A missing core nutrient must not silently become zero and undercount a large meal.
+    if (!Array.isArray(items) || items.length === 0 || items.some((item) => {
+      const row = asRecord(item)
+      return !firstString(row, ['name']) ||
+        ['calories', 'proteinGrams', 'carbsGrams', 'fatGrams'].some((key) => {
+          const value = parseSafeNumber(row[key])
+          return value == null || value < 0
+        })
+    })) {
+      throw new Error('Incomplete description components')
+    }
+    candidate = sanitizeDescriptionEstimate(normalized, { original })
   } catch {
-    throw new NutritionInterpretError('GEMINI_SCHEMA', descriptionFailureMessage('GEMINI_SEMANTIC'))
+    throw new NutritionInterpretError('GEMINI_SCHEMA', descriptionFailureMessage('GEMINI_SCHEMA'))
   }
   if (candidate.items.length === 0 || candidate.calories <= 0) {
     throw new NutritionInterpretError('GEMINI_SEMANTIC', descriptionFailureMessage('GEMINI_SEMANTIC'))

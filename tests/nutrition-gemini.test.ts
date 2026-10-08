@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
   GEMINI_DESCRIPTION_RESPONSE_SCHEMA,
+  GEMINI_DESCRIPTION_MAX_OUTPUT_TOKENS,
   GEMINI_LABEL_RESPONSE_SCHEMA,
   GEMINI_MEAL_RESPONSE_SCHEMA,
   GEMINI_NUTRITION_MODEL_DEFAULT,
@@ -165,6 +166,7 @@ describe('Gemini nutrition interpretation', () => {
     expect(mealPhotoPrompt('cauliflower rice with eggs')).toContain('cauliflower rice with eggs')
     expect(mealPhotoPrompt(null)).toContain('estimate total calories')
     expect(foodDescriptionPrompt('a cup of broccoli')).toContain('Keep recognizable composite foods intact')
+    expect(foodDescriptionPrompt('340 g rice mixed with beans')).toContain('weighed mixture')
     expect(foodDescriptionPrompt('2 slices supreme pizza')).toContain('not crust, sauce, cheese, and toppings')
     expect(nutritionLabelPrompt('12 oz package')).toContain('Do not infer missing numeric nutrients.')
     const client = readFileSync('server/integrations/gemini/client.ts', 'utf8')
@@ -258,6 +260,9 @@ describe('Gemini nutrition interpretation', () => {
     expect(label.fields.fiberGrams.value).toBeNull()
     const encoded = JSON.stringify(GEMINI_DESCRIPTION_RESPONSE_SCHEMA)
     expect(encoded).not.toContain('null')
+    expect(GEMINI_DESCRIPTION_RESPONSE_SCHEMA.properties.items.items.required).toContain('fatGrams')
+    expect(GEMINI_DESCRIPTION_RESPONSE_SCHEMA.properties.items.items.properties).toHaveProperty('fiberGrams')
+    expect(GEMINI_DESCRIPTION_RESPONSE_SCHEMA.properties.items.items.properties).toHaveProperty('sodiumMg')
     expect(JSON.stringify(GEMINI_MEAL_RESPONSE_SCHEMA)).toContain('foodsSeen')
     expect(JSON.stringify(GEMINI_MEAL_RESPONSE_SCHEMA)).toContain('calories')
     const jobs = readFileSync('server/nutrition/gemini-jobs.ts', 'utf8')
@@ -323,7 +328,57 @@ describe('Gemini nutrition interpretation', () => {
     await interpreter.interpretFoodDescription({ text: 'a cup of broccoli' })
     await interpreter.interpretMealPhoto({ image: Uint8Array.from([1]), mimeType: 'image/jpeg', userContext: null })
     await interpreter.interpretNutritionLabel({ image: Uint8Array.from([1]), mimeType: 'image/jpeg', userContext: null })
-    expect(seen).toEqual(['gemini-3.5-flash-lite:10000', 'gemini-3.5-flash:20000', 'gemini-3.5-flash:20000'])
+    expect(seen).toEqual(['gemini-3.5-flash-lite:20000', 'gemini-3.5-flash:20000', 'gemini-3.5-flash:20000'])
+  })
+
+  it('supports a long natural-language mixed meal with ingredient assumptions and summed totals', () => {
+    const userText = '340g of white rice mixed with pinto beans, black beans and lentils, 6 eggs, 2 Kirkland wild sockeye salmon fillets, 1tbsp Kewpie mayo, a snack pack of dried seaweed, half tbsp gochujang, 1 tbsp oyster sauce and 1 tbsp sesame oil'
+    const names = ['rice and bean mixture', 'eggs', 'sockeye salmon fillets', 'Kewpie mayo', 'dried seaweed', 'gochujang', 'oyster sauce', 'sesame oil']
+    const calories = [480, 420, 300, 100, 25, 18, 15, 120]
+    const candidate = interpretFoodDescriptionResponse(JSON.stringify({
+      name: 'Salmon rice bowl with eggs and sauces',
+      items: names.map((name, index) => ({
+        name, quantity: index === 0 ? 340 : index === 1 ? 6 : 1,
+        unit: index === 0 ? 'g' : index === 1 ? 'eggs' : 'serving',
+        calories: calories[index], proteinGrams: 2, carbsGrams: 4, fatGrams: 1,
+        fiberGrams: index === 0 ? 8 : 0, sodiumMg: 20,
+        assumption: index === 0 ? 'Assumed 60% cooked rice and 40% legumes' : null,
+      })),
+      assumptions: ['Assumed typical salmon fillets by weight'],
+      calories: 99999,
+    }), userText)
+    expect(candidate.items).toHaveLength(8)
+    expect(candidate.items[0]?.quantity).toBe(340)
+    expect(candidate.items[0]?.assumption).toContain('60%')
+    expect(candidate.assumptions).toContain('Assumed typical salmon fillets by weight')
+    expect(candidate.calories).toBe(calories.reduce((sum, value) => sum + value, 0))
+    expect(candidate.calories).not.toBe(99999)
+  })
+
+  it('rejects an ingredient missing a core nutrient instead of silently logging a zero', () => {
+    expect(() => interpretFoodDescriptionResponse(JSON.stringify({
+      name: 'Egg and rice',
+      items: [{ name: 'rice', quantity: 1, unit: 'cup', calories: 200, proteinGrams: 4, carbsGrams: 42 }],
+    }), 'one cup rice')).toThrow(/couldn't confidently interpret/i)
+  })
+
+  it('requests a structured, sufficiently large response for long food descriptions', async () => {
+    let seen = false
+    const interpreter = new GeminiNutritionInterpreter({
+      model: 'gemini-3.5-flash-lite',
+      generate: async (request) => {
+        seen = true
+        expect(request.responseJsonSchema).toEqual(GEMINI_DESCRIPTION_RESPONSE_SCHEMA)
+        expect(request.maxOutputTokens).toBe(GEMINI_DESCRIPTION_MAX_OUTPUT_TOKENS)
+        expect(request.maxOutputTokens).toBeGreaterThan(1024)
+        expect(request.timeoutMs).toBe(20_000)
+        return fakeGenerate(JSON.stringify({
+          name: 'Rice', items: [{ name: 'rice', quantity: 1, unit: 'cup', calories: 200, proteinGrams: 4, carbsGrams: 42, fatGrams: 0 }],
+        }))(request)
+      },
+    })
+    await interpreter.interpretFoodDescription({ text: 'one cup rice' })
+    expect(seen).toBe(true)
   })
 
   it('summarizes token usage from capture metadata without model prices', () => {

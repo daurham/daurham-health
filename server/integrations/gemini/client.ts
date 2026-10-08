@@ -1,6 +1,7 @@
 import { GoogleGenAI, MediaResolution, ThinkingLevel } from '@google/genai'
 import {
   GEMINI_DESCRIPTION_MAX_OUTPUT_TOKENS,
+  GEMINI_DESCRIPTION_RESPONSE_SCHEMA,
   GEMINI_DESCRIPTION_TIMEOUT_MS,
   GEMINI_LABEL_MAX_OUTPUT_TOKENS,
   GEMINI_LABEL_TIMEOUT_MS,
@@ -145,6 +146,7 @@ export class GeminiNutritionInterpreter {
       timeoutMs: GEMINI_DESCRIPTION_TIMEOUT_MS,
       maxOutputTokens: GEMINI_DESCRIPTION_MAX_OUTPUT_TOKENS,
       usageKind: 'description',
+      responseJsonSchema: GEMINI_DESCRIPTION_RESPONSE_SCHEMA,
     })
     return {
       candidate: interpretFoodDescriptionResponse(result.text, input.text.trim()),
