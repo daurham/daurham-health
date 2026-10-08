@@ -5,7 +5,9 @@ import {
   dayOverrideInputSchema,
   moveTrainingDayInputSchema,
   nextRoutineCode,
-  sequenceFromStart,
+  nextRoutineIndex,
+  repeatProgressAtPosition,
+  sequenceFromPosition,
   trainingPlanInputSchema,
   weekStartMonday,
   isoWeekday,
@@ -26,6 +28,7 @@ type PlanRow = {
   effective_from: string | Date
   weekly_frequency_target: number | string
   sequence_start_routine_code: string
+  sequence_start_position: number | string
   default_non_training_intent: 'rest' | 'active_recovery' | 'flexible'
   note: string | null
 }
@@ -77,6 +80,7 @@ async function loadPlanVersion(asOf: string): Promise<PlanRow | null> {
             effective_from::text AS effective_from,
             weekly_frequency_target,
             sequence_start_routine_code,
+            sequence_start_position,
             default_non_training_intent,
             note
        FROM training_plan_versions
@@ -176,6 +180,7 @@ export async function getTrainingPlan(asOfInput?: string): Promise<TrainingPlanV
       configured: false,
       baseline: null,
       nextSession: null,
+      nextRepeatProgress: null,
       today: null,
       week: [],
       completedProgrammedSessions: 0,
@@ -222,8 +227,12 @@ export async function getTrainingPlan(asOfInput?: string): Promise<TrainingPlanV
   const sequence = sequenceCodes.map((routineCode) =>
     templates.get(routineCode) ?? unavailableRoutine(routineCode),
   )
-  const progressionSequence = sequenceFromStart(sequenceCodes, plan.sequence_start_routine_code)
+  const startPosition = Math.max(1, Math.min(sequenceCodes.length, Number(plan.sequence_start_position) || 1))
+  const progressionSequence = sequenceFromPosition(sequenceCodes, startPosition)
+  const nextRelativeIndex = nextRoutineIndex(progressionSequence, completedCodes)
   const nextCode = nextRoutineCode(progressionSequence, completedCodes)
+  const absoluteNextIndex = nextRelativeIndex < 0 ? -1 : ((startPosition - 1 + nextRelativeIndex) % sequenceCodes.length)
+  const nextRepeatProgress = repeatProgressAtPosition(sequenceCodes, absoluteNextIndex)
   const nextSession =
     nextCode == null
       ? null
@@ -242,6 +251,7 @@ export async function getTrainingPlan(asOfInput?: string): Promise<TrainingPlanV
       note: plan.note,
     },
     nextSession,
+    nextRepeatProgress,
     today: week.find((day) => day.date === asOf) ?? null,
     week,
     completedProgrammedSessions: completed,
@@ -264,11 +274,13 @@ export async function putTrainingPlan(body: unknown): Promise<TrainingPlanView> 
 
   const today = await currentHealthDate()
   const previous = await getTrainingPlan(today)
-  const sequenceStart =
-    previous.nextSession?.routineCode &&
-    input.sequenceRoutineCodes.includes(previous.nextSession.routineCode)
-      ? previous.nextSession.routineCode
-      : input.sequenceRoutineCodes[0]!
+  const previousNextCode = previous.nextSession?.routineCode
+  const firstNewIndex = previousNextCode == null ? -1 : input.sequenceRoutineCodes.indexOf(previousNextCode)
+  const oldBlockOffset = previous.nextRepeatProgress?.session ?? 1
+  const newBlockLength = firstNewIndex < 0 ? 0 : input.sequenceRoutineCodes.slice(firstNewIndex).findIndex((code) => code !== previousNextCode)
+  const newBlockCount = newBlockLength < 0 ? input.sequenceRoutineCodes.length - firstNewIndex : newBlockLength
+  const sequenceStartPosition = firstNewIndex < 0 ? 1 : firstNewIndex + Math.min(oldBlockOffset, newBlockCount)
+  const sequenceStart = input.sequenceRoutineCodes[sequenceStartPosition - 1]!
   const sql = await getSql()
   const versionRows = (await sql.query(
     'SELECT COALESCE(MAX(version), 0)::int AS version FROM training_plan_versions',
@@ -282,10 +294,10 @@ export async function putTrainingPlan(body: unknown): Promise<TrainingPlanView> 
     sql.query(
       `INSERT INTO training_plan_versions (
          id, version, effective_from, weekly_frequency_target,
-         sequence_start_routine_code, default_non_training_intent,
+         sequence_start_routine_code, sequence_start_position, default_non_training_intent,
          note, is_current, created_at
        ) VALUES (
-         $1::uuid, $2::int, $3::date, $4::int, $5, $6, $7, true, now()
+         $1::uuid, $2::int, $3::date, $4::int, $5, $6::int, $7, $8, true, now()
        )`,
       [
         id,
@@ -293,6 +305,7 @@ export async function putTrainingPlan(body: unknown): Promise<TrainingPlanView> 
         today,
         input.weeklyFrequencyTarget,
         sequenceStart,
+        sequenceStartPosition,
         input.defaultNonTrainingIntent,
         input.note,
       ],

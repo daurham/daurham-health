@@ -7,6 +7,9 @@ import {
   baselineIntentForDate,
   isoWeekday,
   nextRoutineCode,
+  nextRoutineIndex,
+  repeatProgressAtPosition,
+  sequenceFromPosition,
   sequenceFromStart,
   weekStartMonday,
 } from '../src/domain/training-plan.ts'
@@ -45,6 +48,19 @@ describe('Training Plan domain', () => {
     expect(nextRoutineCode(expanded, [...Array(6).fill('A'), ...Array(6).fill('B')])).toBe('C')
     expect(nextRoutineCode(expanded, expanded)).toBe('A')
     expect(trainingPlanInputSchema.safeParse({ ...input, sequenceRoutineCodes: ['A', 'B', 'A'] }).success).toBe(false)
+  })
+
+  it('preserves the repeated-slot offset across mid-block plan edits', () => {
+    const codes = expandRoutineBlocks([
+      { routineCode: 'A', count: 6 }, { routineCode: 'B', count: 6 }, { routineCode: 'C', count: 6 },
+    ])
+    const ordered = sequenceFromPosition(codes, 4)
+    expect(ordered[0]).toBe('A')
+    expect(nextRoutineIndex(ordered, [])).toBe(0)
+    expect(repeatProgressAtPosition(codes, 3)).toEqual({ session: 4, total: 6 })
+    expect(nextRoutineCode(ordered, ['A', 'A'])).toBe('A')
+    expect(nextRoutineCode(ordered, ['A', 'A', 'A'])).toBe('B')
+    expect(repeatProgressAtPosition(codes, 6)).toEqual({ session: 1, total: 6 })
   })
 
   it('does not let an out-of-order programmed session silently skip the next routine', () => {
