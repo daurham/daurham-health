@@ -138,6 +138,7 @@ function DescriptionEstimateSheet({
   const [needsRecalc, setNeedsRecalc] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [showDetails, setShowDetails] = useState(false)
 
   function applyScale(next: MealPortionScale) {
     setScale(next)
@@ -222,19 +223,8 @@ function DescriptionEstimateSheet({
     setBusy(true)
     setError(null)
     try {
-      let reusable: NutritionFood | null = null
-      try {
-        reusable = (await saveAiReusableFood(reusableFoodInput())).food
-      } catch (caught) {
-        const duplicate = caught instanceof Error && /already exists/i.test(caught.message)
-        if (!log || !duplicate) {
-          throw caught
-        }
-      }
       if (!log) {
-        if (!reusable) {
-          throw new Error('Could not save this AI food to Pantry.')
-        }
+        const reusable = (await saveAiReusableFood(reusableFoodInput())).food
         onSavedFood?.(reusable)
         return
       }
@@ -268,6 +258,40 @@ function DescriptionEstimateSheet({
         <span className={labelClass}>Meal name</span>
         <input className={inputClass} value={name} onChange={(event) => setName(event.target.value)} />
       </label>
+      <div className="mt-4 rounded-lg border border-zinc-200 p-3">
+        <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Estimated whole meal</p>
+        <p className="mt-2 text-xl font-semibold text-zinc-900">{Math.round(values.calories)} kcal · {Math.round(values.proteinGrams)} g protein</p>
+        <p className="mt-1 text-sm text-zinc-600">{Math.round(values.carbsGrams)} g carbs · {Math.round(values.fatGrams)} g fat · {items.length} components</p>
+        <p className="mt-1 text-sm text-zinc-600">Fiber: {values.fiberGrams == null ? 'unknown' : Math.round(values.fiberGrams * 10) / 10 + ' g'} · Sodium: {values.sodiumMg == null ? 'unknown' : Math.round(values.sodiumMg) + ' mg'}</p>
+        <p className="mt-2 text-xs text-zinc-500">Approximate; unknown weights and mixture ratios are assumptions, not measured facts.</p>
+        {current.assumptions[0] || items.some((item) => item.assumption) ? (
+          <p className="mt-1 text-xs text-zinc-500">Assuming: {current.assumptions[0] ?? items.find((item) => item.assumption)?.assumption}</p>
+        ) : null}
+      </div>
+      <label className="mt-4 block">
+        <span className={labelClass}>Meal</span>
+        <select className={inputClass} value={meal} onChange={(event) => setMeal(event.target.value as typeof meal)}>
+          <option value="">Unset</option>
+          {NUTRITION_MEALS.map((item) => (
+            <option key={item} value={item}>
+              {mealLabel(item)}
+            </option>
+          ))}
+        </select>
+      </label>
+      <button type="button" className={primaryClass + ' mt-4'} disabled={busy} onClick={() => void save(true)}>
+        {busy ? 'Saving…' : 'Log estimated meal'}
+      </button>
+      <button
+        type="button"
+        className={secondaryClass + ' mt-3 w-full'}
+        onClick={() => setShowDetails((shown) => !shown)}
+        aria-expanded={showDetails}
+      >
+        {showDetails ? 'Hide detailed review' : 'Review ingredients, assumptions, and macros'}
+      </button>
+      {showDetails ? (
+        <>
       {items.length > 0 ? (
         <div className="mt-4">
           <p className="text-sm font-medium text-zinc-700">What AI understood</p>
@@ -327,17 +351,8 @@ function DescriptionEstimateSheet({
           onChange={(sodiumMg) => setValues((currentValues) => ({ ...currentValues, sodiumMg }))}
         />
       </div>
-      <label className="mt-4 block">
-        <span className={labelClass}>Meal</span>
-        <select className={inputClass} value={meal} onChange={(event) => setMeal(event.target.value as typeof meal)}>
-          <option value="">Unset</option>
-          {NUTRITION_MEALS.map((item) => (
-            <option key={item} value={item}>
-              {mealLabel(item)}
-            </option>
-          ))}
-        </select>
-      </label>
+        </>
+      ) : null}
       {error ? <p className="mt-3 text-sm text-red-700">{error}</p> : null}
       <div className="mt-4">
         <CatalogCommitFooter

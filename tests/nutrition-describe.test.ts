@@ -86,6 +86,18 @@ describe('food description detection', () => {
   })
 })
 
+describe('quick described-meal UX', () => {
+  it('logs a one-off estimate without automatically saving a Pantry food', () => {
+    const ui = readFileSync('src/features/nutrition/DescribeFood.tsx', 'utf8')
+    const save = ui.slice(ui.indexOf('  async function save(log: boolean)'), ui.indexOf('  return (', ui.indexOf('  async function save(log: boolean)')))
+    expect(save).toContain('if (!log)')
+    expect(save.indexOf('saveAiReusableFood(reusableFoodInput())')).toBeLessThan(save.indexOf('commitFoodDescription({'))
+    expect(ui).toContain('Log estimated meal')
+    expect(ui).toContain('Review ingredients, assumptions, and macros')
+    expect(ui).toContain('aria-expanded={showDetails}')
+  })
+})
+
 describe('food description parsing and totals', () => {
   it('extracts the reviewed example and leaves a fractional onion unresolved', () => {
     const parsed = parseFoodDescription('half a lb of wagyu beef, a quarter of diced onion and a cup of broccoli')
