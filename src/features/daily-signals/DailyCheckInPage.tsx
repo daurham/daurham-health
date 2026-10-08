@@ -104,13 +104,15 @@ export function DailyCheckInPage() {
 
       <label className="block rounded-lg border border-zinc-200 bg-white p-4 text-sm font-medium text-zinc-700">
         Health date
-        <input
-          type="date"
-          value={date}
-          max={today}
-          onChange={(event) => setSearch({ date: event.target.value })}
-          className="mt-1 block min-h-11 min-w-0 w-full max-w-full rounded-md border border-zinc-300 px-3 text-base"
-        />
+        <div className="mt-1 w-full min-w-0 max-w-full overflow-hidden rounded-md border border-zinc-300 px-3 focus-within:ring-2 focus-within:ring-accent">
+          <input
+            type="date"
+            value={date}
+            max={today}
+            onChange={(event) => setSearch({ date: event.target.value })}
+            className="daily-checkin-date-input block min-h-11 min-w-0 w-full max-w-full box-border appearance-none border-0 bg-transparent p-0 text-left text-base"
+          />
+        </div>
       </label>
 
       {dateError ? <p className="rounded-md bg-red-50 p-3 text-sm text-red-800">{dateError}</p> : null}

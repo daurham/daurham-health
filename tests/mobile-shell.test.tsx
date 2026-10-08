@@ -72,4 +72,17 @@ describe('mobile application shell', () => {
     expect(editor).not.toContain('fixed inset-x-0 bottom-0')
     expect(sheet).toContain('var(--shell-safe-bottom)')
   })
+
+  it('keeps the Daily Check-in date control inside its card on iOS Safari', () => {
+    const page = readFileSync(join(process.cwd(), 'src/features/daily-signals/DailyCheckInPage.tsx'), 'utf8')
+    const css = readFileSync(join(process.cwd(), 'src/index.css'), 'utf8')
+    expect(page).toContain('min-w-0 max-w-full overflow-hidden rounded-md border')
+    expect(page).toContain('daily-checkin-date-input')
+    expect(page).toContain('appearance-none border-0 bg-transparent p-0')
+    expect(css).toContain('.daily-checkin-date-input {')
+    expect(css).toContain('-webkit-appearance: none;')
+    expect(css).toContain('box-sizing: border-box;')
+    expect(css).toContain('.daily-checkin-date-input::-webkit-date-and-time-value')
+  })
+
 })
