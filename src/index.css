@@ -1069,6 +1069,23 @@ html.dark[data-health-palette='cosmic-instinct'] {
 }
 
 /* iOS Safari zooms focused controls under 16px. Keep pinch-zoom available. */
+/* iOS WebKit (301648) forces padded native date inputs to content-box sizing.
+   Let the wrapper own the border/padding and suppress the native geometry. */
+.daily-checkin-date-input {
+  -webkit-appearance: none;
+  appearance: none;
+  box-sizing: border-box;
+  inline-size: 100%;
+  min-inline-size: 0;
+  max-inline-size: 100%;
+}
+
+.daily-checkin-date-input::-webkit-date-and-time-value {
+  margin: 0;
+  min-height: 1.2em;
+  text-align: left;
+}
+
 @media (max-width: 767px) {
   input:not([type='checkbox']):not([type='radio']):not([type='file']):not([type='hidden']):not([type='button']):not([type='submit']):not([type='reset']),
   select,
