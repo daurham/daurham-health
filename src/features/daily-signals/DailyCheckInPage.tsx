@@ -110,7 +110,7 @@ export function DailyCheckInPage() {
             value={date}
             max={today}
             onChange={(event) => setSearch({ date: event.target.value })}
-            className="daily-checkin-date-input block min-h-11 min-w-0 w-full max-w-full box-border appearance-none border-0 bg-transparent p-0 text-left text-base"
+            className="daily-checkin-date-input flex min-h-11 min-w-0 w-full max-w-full box-border items-center appearance-none border-0 bg-transparent p-0 text-left text-base"
           />
         </div>
       </label>
