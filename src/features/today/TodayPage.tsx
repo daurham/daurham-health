@@ -16,7 +16,7 @@ import {
   quietButtonClass,
   useAtomicKeyedResource,
 } from '@/lib'
-import { AddFoodSheet } from '@/features/nutrition/panels'
+import { AddFoodSheet, FoodEditorSheet } from '@/features/nutrition/panels'
 import { createNutritionEntry, fetchNutritionDay } from '@/features/nutrition/api'
 import { formatSleepDuration } from '@/features/progress/activity-sleep-copy'
 import { formatCalendarDate, formatClockTime } from '@/features/progress/format'
@@ -43,6 +43,7 @@ import type { GoalControlState } from '@/domain/goal-control'
 import { todayShouldReloadAfterNutrition, type TodayNutritionOutcome } from './nutrition-refresh'
 import { notifyHealthDataChanged, subscribeHealthDataChanges } from '@/lib/health-changes'
 import { addHydrationEvent } from '@/features/daily-signals'
+import { DAILY_PARTICIPATION_XP } from '@/domain/rewards'
 import { fetchGoalControl } from '@/features/goal-control/api'
 import { GoalControlCard } from '@/features/goal-control/GoalControlCard'
 
@@ -513,7 +514,7 @@ function SupplementsCard({ view, onChanged }: { view: TodayViewModel; onChanged?
   return (
     <section className="min-w-0 rounded-lg border border-zinc-200 bg-white p-4">
       <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Supplements</h2>
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Supplements <span className="ml-1 text-reward">+{DAILY_PARTICIPATION_XP.supplements} XP/day</span></h2>
         <div className="flex items-center gap-2">
           <p className="text-sm text-zinc-600">{summary.kind === 'complete' ? `✓ ${summaryText}` : summaryText}</p>
           {resolved ? (
@@ -681,6 +682,8 @@ function NutritionCard({
 
 function TodayAddFoodAction({ date, onChanged }: { date: string; onChanged?: () => void }) {
   const [open, setOpen] = useState(false)
+  const [editingFood, setEditingFood] = useState<NutritionFood | null>(null)
+  const [sheetVersion, setSheetVersion] = useState(0)
   const [quickAdd, setQuickAdd] = useState<{
     recents: NutritionFood[]
     staples: NutritionFood[]
@@ -699,6 +702,7 @@ function TodayAddFoodAction({ date, onChanged }: { date: string; onChanged?: () 
 
   function closeSheet() {
     setOpen(false)
+    setEditingFood(null)
   }
 
   function finish(outcome: TodayNutritionOutcome) {
@@ -713,8 +717,19 @@ function TodayAddFoodAction({ date, onChanged }: { date: string; onChanged?: () 
       <button type="button" className={primaryButtonClass} onClick={() => void openSheet()}>
         Add food
       </button>
-      {open ? (
+      {open && editingFood ? (
+        <FoodEditorSheet
+          food={editingFood}
+          onClose={() => setEditingFood(null)}
+          onSaved={() => {
+            setEditingFood(null)
+            setSheetVersion((value) => value + 1)
+            void fetchNutritionDay(date).then((day) => setQuickAdd(day.quickAdd)).catch(() => undefined)
+          }}
+        />
+      ) : open ? (
         <AddFoodSheet
+          key={sheetVersion}
           date={date}
           quickAdd={quickAdd}
           onClose={closeSheet}
@@ -731,7 +746,7 @@ function TodayAddFoodAction({ date, onChanged }: { date: string; onChanged?: () 
               .then(() => finish('consumed'))
               .catch(() => undefined)
           }}
-          onOpenFood={() => undefined}
+          onOpenFood={setEditingFood}
         />
       ) : null}
     </>

@@ -5,6 +5,9 @@ import type { NutritionFood, NutritionFoodManagement } from '@/domain/nutrition'
 import { primaryButtonClass, quietButtonClass, secondaryButtonClass } from '@/lib'
 import { createNutritionFood, fetchPantryFoods, patchNutritionFood } from './api'
 import { FoodEditorSheet } from './panels'
+import { RecipeIngredientSheet } from './RecipeIngredientSheet'
+import { LabelCaptureSheet } from './LabelCapture'
+import { useHealthCalendarDate } from '@/lib'
 import { NutritionSheet } from './Sheet'
 
 type PantryFilter = 'all' | 'ingredient' | 'packaged' | 'custom' | 'staple'
@@ -91,6 +94,9 @@ export function PantryPage() {
   const [sort, setSort] = useState<PantrySort>('recent')
   const [editing, setEditing] = useState<NutritionFood | null>(null)
   const [adding, setAdding] = useState(false)
+  const [sourceFlow, setSourceFlow] = useState(false)
+  const [labelFlow, setLabelFlow] = useState(false)
+  const date = useHealthCalendarDate()
   const [busyId, setBusyId] = useState<string | null>(null)
 
   async function reload() {
@@ -153,9 +159,10 @@ export function PantryPage() {
             Manage reusable foods. Editing a definition affects future logs only; old Nutrition entries stay as recorded.
           </p>
         </div>
-        <button type="button" className={primaryButtonClass} onClick={() => setAdding(true)}>
+        <button type="button" className={primaryButtonClass} onClick={() => setSourceFlow(true)}>
           Add food
         </button>
+        <button type="button" className={secondaryButtonClass} onClick={() => setAdding(true)}>Advanced manual</button>
       </div>
 
       {error ? <p role="alert" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p> : null}
@@ -258,6 +265,24 @@ export function PantryPage() {
         />
       ) : null}
 
+      {sourceFlow ? (
+        <RecipeIngredientSheet
+          initialStep="choose"
+          onClose={() => setSourceFlow(false)}
+          onFood={() => { setSourceFlow(false); void reload() }}
+          onLabel={() => { setSourceFlow(false); setLabelFlow(true) }}
+        />
+      ) : null}
+      {labelFlow ? (
+        <LabelCaptureSheet
+          date={date}
+          purpose="recipe"
+          onClose={() => setLabelFlow(false)}
+          onBack={() => { setLabelFlow(false); setSourceFlow(true) }}
+          onLogged={() => { setLabelFlow(false); void reload() }}
+          onSavedFood={() => { setLabelFlow(false); void reload() }}
+        />
+      ) : null}
       {adding ? (
         <NewPantryFoodSheet
           foods={foods}

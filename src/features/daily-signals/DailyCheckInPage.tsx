@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { dailySignalDateError, type DailySignalsDay } from '@/domain/daily-signals'
 import { formatWeekdayCalendarDate } from '@/domain/calendar-format'
+import { DAILY_PARTICIPATION_XP, participationDateEligible } from '@/domain/rewards'
+import { BristolReferenceChart } from './BristolReferenceChart'
 import { primaryButtonClass, quietButtonClass, useHealthCalendarDate } from '@/lib'
 import { prefixedPath, useAppPathPrefix } from '@/lib/app-prefix'
 import {
@@ -41,6 +43,7 @@ export function DailyCheckInPage() {
   const [customWater, setCustomWater] = useState('')
   const [loading, setLoading] = useState(dateError == null)
   const [busy, setBusy] = useState(false)
+  const [showBristol, setShowBristol] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   async function load(signal?: AbortSignal) {
@@ -85,6 +88,7 @@ export function DailyCheckInPage() {
     }
   }
 
+  const xpEligible = participationDateEligible(date, today)
   const totalWater = day?.hydrationEvents.reduce((sum, event) => sum + event.amountOz, 0) ?? 0
 
   return (
@@ -116,7 +120,7 @@ export function DailyCheckInPage() {
       {!loading && !dateError ? (
         <>
           <section className="rounded-lg border border-zinc-200 bg-white p-4">
-            <h2 className="font-semibold">Water</h2>
+            <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">Water</h2>{xpEligible ? <span className="text-xs font-semibold text-reward">+{DAILY_PARTICIPATION_XP.hydration} XP · first log</span> : null}</div>
             <p className="mt-1 text-sm text-zinc-600">
               {day?.hydrationEvents.length ? `${Math.round(totalWater)} oz logged` : 'No water tracking recorded for this day.'}
             </p>
@@ -163,7 +167,7 @@ export function DailyCheckInPage() {
           </section>
 
           <section className="rounded-lg border border-zinc-200 bg-white p-4">
-            <h2 className="font-semibold">Bowel</h2>
+            <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">Bowel</h2>{xpEligible ? <span className="text-xs font-semibold text-reward">+{DAILY_PARTICIPATION_XP.bowel} XP · one/day</span> : null}</div>
             <p className="mt-1 text-sm text-zinc-600">
               {day?.noBowelMovement
                 ? 'Explicitly recorded: no bowel movement.'
@@ -171,10 +175,13 @@ export function DailyCheckInPage() {
                   ? `${day.bowelEvents.length} bowel movement${day.bowelEvents.length === 1 ? '' : 's'} logged.`
                   : 'No bowel data recorded. This is unknown, not zero.'}
             </p>
-            <p className="mt-3 text-sm font-medium text-zinc-700">Log Bristol type</p>
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm font-medium text-zinc-700">Log Bristol type</p>
+              <button type="button" className="min-h-11 rounded-md border border-accent px-3 text-sm font-medium text-accent" onClick={() => setShowBristol(true)}>Bristol chart</button>
+            </div>
             <div className="mt-2 grid grid-cols-7 gap-1.5">
               {BRISTOL_TYPES.map((type) => (
-                <button key={type} type="button" disabled={busy} className={quietButtonClass} onClick={() => void mutate(() => addBowelEvent(date, type))}>
+                <button key={type} type="button" disabled={busy} aria-label={`Log Bristol type ${type}`} className="flex min-h-11 min-w-0 items-center justify-center rounded-md border border-zinc-300 text-sm font-medium hover:bg-accent-muted" onClick={() => void mutate(() => addBowelEvent(date, type))}>
                   {type}
                 </button>
               ))}
@@ -199,18 +206,20 @@ export function DailyCheckInPage() {
           </section>
 
           <section className="rounded-lg border border-zinc-200 bg-white p-4">
-            <h2 className="font-semibold">How do you feel?</h2>
+            <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">How do you feel?</h2>{xpEligible ? <span className="text-xs font-semibold text-reward">+{DAILY_PARTICIPATION_XP.wellness} XP · one/day</span> : null}</div>
             <p className="mt-1 text-sm text-zinc-600">1 is low / mild; 5 is high / strong. Stress is optional.</p>
             <div className="mt-4 space-y-4">
               {(['energy', 'hunger', 'soreness', 'stress'] as const).map((key) => (
                 <div key={key}>
                   <p className="text-sm font-medium capitalize text-zinc-700">{key}</p>
-                  <div className="mt-1 flex gap-1.5">
+                  <div className="mt-1 grid max-w-sm grid-cols-5 gap-2">
                     {RATINGS.map((value) => (
                       <button
                         key={value}
                         type="button"
-                        className={wellness[key] === value ? primaryButtonClass : quietButtonClass}
+                        aria-pressed={wellness[key] === value}
+                        aria-label={`${key} ${value} out of 5`}
+                        className={`flex min-h-11 min-w-0 items-center justify-center rounded-md border text-sm font-semibold ${wellness[key] === value ? 'border-accent bg-accent text-accent-fg' : 'border-zinc-300 bg-white text-zinc-700 hover:bg-accent-muted'}`}
                         onClick={() => setWellness((current) => ({ ...current, [key]: current[key] === value ? null : value }))}
                       >
                         {value}
@@ -249,6 +258,7 @@ export function DailyCheckInPage() {
           </section>
         </>
       ) : null}
+      {showBristol ? <BristolReferenceChart onClose={() => setShowBristol(false)} /> : null}
     </section>
   )
 }
