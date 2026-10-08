@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
   addCalendarDays,
@@ -25,6 +26,12 @@ describe('Training Plan domain', () => {
     expect(baselineIntentForDate('2026-10-05', [1, 3, 5], 'rest')).toBe('training_preferred')
     expect(baselineIntentForDate('2026-10-06', [1, 3, 5], 'rest')).toBe('rest')
     expect(baselineIntentForDate('2026-10-06', [1, 3, 5], 'flexible')).toBe('flexible')
+  })
+
+  it('lets the owner start the next workout on any weekday', () => {
+    const card = readFileSync('src/features/training/TrainingPlanCard.tsx', 'utf8')
+    expect(card).not.toContain('next && todayTraining')
+    expect(card).toContain('next && next.available && next.templateId')
   })
 
   it('keeps routine sequence authoritative', () => {

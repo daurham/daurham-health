@@ -77,10 +77,6 @@ export function TrainingPlanCard() {
   }
 
   const next = plan.nextSession
-  const todayTraining =
-    plan.today != null &&
-    ['training_preferred', 'training_moved_here'].includes(plan.today.effectiveIntent)
-
   return (
     <section className="space-y-3 rounded-lg border border-zinc-200 bg-white p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -108,9 +104,9 @@ export function TrainingPlanCard() {
         </div>
       </div>
 
-      {next && todayTraining && next.available && next.templateId ? (
+      {next && next.available && next.templateId ? (
         <Link to={'/training/new?template=' + encodeURIComponent(next.templateId)} className={primaryButtonClass}>
-          Start {next.name}
+          Start {next.name} now
         </Link>
       ) : next && !next.available ? (
         <p className="text-xs text-amber-700">
