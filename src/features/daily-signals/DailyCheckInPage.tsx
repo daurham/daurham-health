@@ -109,7 +109,7 @@ export function DailyCheckInPage() {
           value={date}
           max={today}
           onChange={(event) => setSearch({ date: event.target.value })}
-          className="mt-1 block min-h-11 w-full rounded-md border border-zinc-300 px-3 text-base"
+          className="mt-1 block min-h-11 min-w-0 w-full max-w-full rounded-md border border-zinc-300 px-3 text-base"
         />
       </label>
 
