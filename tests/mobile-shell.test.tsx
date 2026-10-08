@@ -83,7 +83,7 @@ describe('mobile application shell', () => {
     expect(css).toContain('.daily-checkin-date-input {')
     expect(css).toContain('-webkit-appearance: none;')
     expect(css).toContain('box-sizing: border-box;')
-    expect(css).toContain('display: flex;\\n  align-items: center;')
+    expect(css).toMatch(/\.daily-checkin-date-input\s*\{[^}]*display: flex;[^}]*align-items: center;/)
     expect(css).toContain('height: 1lh;')
   })
 
