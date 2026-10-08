@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import type { TrainingDayIntent, TrainingPlanView } from '@/domain/training-plan'
+import { compactRoutineSequence, expandRoutineBlocks, type TrainingDayIntent, type TrainingPlanView } from '@/domain/training-plan'
 import type { WorkoutTemplate } from '@/domain/training'
 import { primaryButtonClass, quietButtonClass, secondaryButtonClass } from '@/lib'
 import {
@@ -95,6 +95,7 @@ export function TrainingPlanPage() {
     () => new Map(templates.map((template) => [template.routineCode, template] as const)),
     [templates],
   )
+  const blocks = compactRoutineSequence(sequence)
   const addable = templates.filter((template) => !sequence.includes(template.routineCode))
   const movableSources = plan?.week.filter((day) =>
     ['training_preferred', 'training_moved_here'].includes(day.effectiveIntent),
@@ -110,13 +111,13 @@ export function TrainingPlanPage() {
 
   function moveSequence(index: number, offset: -1 | 1) {
     setSequence((current) => {
+      const next = compactRoutineSequence(current)
       const target = index + offset
-      if (target < 0 || target >= current.length) return current
-      const next = [...current]
+      if (target < 0 || target >= next.length) return current
       const [item] = next.splice(index, 1)
       if (!item) return current
       next.splice(target, 0, item)
-      return next
+      return expandRoutineBlocks(next)
     })
   }
 
@@ -193,7 +194,7 @@ export function TrainingPlanPage() {
         </p>
         <h1 className="mt-2 text-2xl font-semibold tracking-tight">Training Plan</h1>
         <p className="mt-1 max-w-2xl text-sm text-zinc-600">
-          Choose your routine rotation and the days you usually train. All other days are open, not prescribed recovery or rest days.
+          Set your routine rotation and the days you prefer to train. Other days are open, not compulsory rest or recovery days.
         </p>
       </div>
 
@@ -237,20 +238,28 @@ export function TrainingPlanPage() {
           </div>
         </fieldset>
 
-        <p className="text-sm text-zinc-600">Non-training days are open by default. Rest, walks, and recovery are recorded if and when they happen.</p>
+        <p className="text-sm text-zinc-600">Non-training days are open by default. Rest and recovery are tracked when they happen.</p>
 
         <div>
-          <p className="text-sm font-medium text-zinc-700">Routine sequence</p>
+          <p className="text-sm font-medium text-zinc-700">Routine rotation</p>
+          <p className="mt-1 text-xs text-zinc-500">Set how many times to complete each routine before switching. For six A, six B, six C, choose 6 for each.</p>
           <div className="mt-2 space-y-2">
-            {sequence.map((routineCode, index) => {
+            {blocks.map(({ routineCode, count }, index) => {
               const template = templateByRoutine.get(routineCode)
               const label = template?.name ?? routineCode + ' (inactive)'
               return (
                 <div key={routineCode} className="flex items-center gap-2 rounded-md border border-zinc-200 px-3 py-2">
                   <span className="w-6 text-xs font-semibold text-zinc-500">{index + 1}</span>
                   <span className="min-w-0 flex-1 truncate text-sm font-medium">{label}</span>
+                  <label className="flex shrink-0 items-center gap-1 text-xs text-zinc-600">
+                    Times
+                    <input type="number" min={1} max={12} value={count} aria-label={`Sessions of ${label}`} className="min-h-11 w-14 rounded-md border border-zinc-300 bg-white px-2 text-center text-base" onChange={(event) => {
+                      const count = Math.max(1, Math.min(12, Math.floor(Number(event.target.value) || 1)))
+                      setSequence((current) => expandRoutineBlocks(compactRoutineSequence(current).map((block, i) => i === index ? { ...block, count } : block)))
+                    }} />
+                  </label>
                   <button type="button" className={quietButtonClass} disabled={index === 0} onClick={() => moveSequence(index, -1)}>↑</button>
-                  <button type="button" className={quietButtonClass} disabled={index === sequence.length - 1} onClick={() => moveSequence(index, 1)}>↓</button>
+                  <button type="button" className={quietButtonClass} disabled={index === blocks.length - 1} onClick={() => moveSequence(index, 1)}>↓</button>
                   <button type="button" className={quietButtonClass} onClick={() => setSequence((current) => current.filter((item) => item !== routineCode))}>Remove</button>
                 </div>
               )
@@ -364,7 +373,7 @@ export function TrainingPlanPage() {
       ) : null}
 
       <p className="text-xs leading-5 text-zinc-500">
-        Daily Context records what actually happened. Your training plan expresses preferences, not obligations.
+        Daily Context records what happened, while this plan only captures your preferences and routine rotation.
       </p>
     </section>
   )

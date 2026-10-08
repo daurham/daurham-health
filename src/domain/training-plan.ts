@@ -22,8 +22,12 @@ export const trainingPlanInputSchema = z.object({
   defaultNonTrainingIntent: nonTrainingIntentSchema,
   preferredWeekdays: z.array(z.number().int().min(1).max(7)).min(1).max(7)
     .refine((items) => new Set(items).size === items.length, 'Preferred weekdays must be unique'),
-  sequenceRoutineCodes: z.array(z.string().trim().min(1).max(200)).min(1).max(14)
-    .refine((items) => new Set(items).size === items.length, 'Routine sequence must be unique'),
+  sequenceRoutineCodes: z.array(z.string().trim().min(1).max(200)).min(1).max(84)
+    .refine((items) => {
+      const blocks = compactRoutineSequence(items)
+      return blocks.length <= 14 && blocks.every((block) => block.count <= 12) &&
+        new Set(blocks.map((block) => block.routineCode)).size === blocks.length
+    }, 'Each routine must occur in one consecutive block of 1–12 sessions'),
   note: z.union([z.string().max(500), z.null(), z.undefined()]).transform((value) => {
     if (value == null) return null
     const trimmed = value.trim()
@@ -31,6 +35,24 @@ export const trainingPlanInputSchema = z.object({
   }),
 })
 export type TrainingPlanInput = z.infer<typeof trainingPlanInputSchema>
+
+export type TrainingRoutineBlock = { routineCode: string; count: number }
+
+/** Convert consecutive session slots into a compact, editable block list. */
+export function compactRoutineSequence(sequence: readonly string[]): TrainingRoutineBlock[] {
+  const result: TrainingRoutineBlock[] = []
+  for (const routineCode of sequence) {
+    const last = result[result.length - 1]
+    if (last?.routineCode === routineCode) last.count += 1
+    else result.push({ routineCode, count: 1 })
+  }
+  return result
+}
+
+export function expandRoutineBlocks(blocks: readonly TrainingRoutineBlock[]): string[] {
+  return blocks.flatMap((block) => Array.from({ length: block.count }, () => block.routineCode))
+}
+
 
 export const dayOverrideInputSchema = z.object({
   intentKind: z.enum(['training_preferred', 'rest', 'active_recovery', 'flexible', 'paused_or_away']),
@@ -80,6 +102,7 @@ export type TrainingPlanView = {
   configured: boolean
   baseline: TrainingPlanBaseline | null
   nextSession: TrainingPlanTemplate | null
+  nextRepeatProgress: { session: number; total: number } | null
   today: TrainingPlanDay | null
   week: TrainingPlanDay[]
   completedProgrammedSessions: number
@@ -120,21 +143,40 @@ export function sequenceFromStart(
   sequence: readonly string[],
   startRoutineCode: string,
 ): string[] {
-  const index = sequence.indexOf(startRoutineCode)
-  if (index < 0) return [...sequence]
+  return sequenceFromPosition(sequence, sequence.indexOf(startRoutineCode) + 1)
+}
+
+/** 1-based storage position, preserving the offset inside a repeated block. */
+export function sequenceFromPosition(sequence: readonly string[], position: number): string[] {
+  if (sequence.length === 0) return []
+  const index = Math.max(0, Math.min(sequence.length - 1, Math.floor(position) - 1 || 0))
   return [...sequence.slice(index), ...sequence.slice(0, index)]
+}
+
+export function repeatProgressAtPosition(sequence: readonly string[], zeroBasedIndex: number): { session: number; total: number } | null {
+  if (!sequence.length || zeroBasedIndex < 0 || zeroBasedIndex >= sequence.length) return null
+  const routineCode = sequence[zeroBasedIndex]!
+  let first = zeroBasedIndex
+  let last = zeroBasedIndex
+  while (first > 0 && sequence[first - 1] === routineCode) first--
+  while (last < sequence.length - 1 && sequence[last + 1] === routineCode) last++
+  return { session: zeroBasedIndex - first + 1, total: last - first + 1 }
+}
+
+
+export function nextRoutineIndex(sequence: readonly string[], completedRoutineCodes: readonly string[]): number {
+  if (sequence.length === 0) return -1
+  let expected = 0
+  for (const routineCode of completedRoutineCodes) {
+    if (routineCode === sequence[expected]) expected = (expected + 1) % sequence.length
+  }
+  return expected
 }
 
 export function nextRoutineCode(
   sequence: readonly string[],
   completedRoutineCodes: readonly string[],
 ): string | null {
-  if (sequence.length === 0) return null
-  let expected = 0
-  for (const routineCode of completedRoutineCodes) {
-    if (routineCode === sequence[expected]) {
-      expected = (expected + 1) % sequence.length
-    }
-  }
-  return sequence[expected] ?? null
+  const nextIndex = nextRoutineIndex(sequence, completedRoutineCodes)
+  return nextIndex < 0 ? null : sequence[nextIndex] ?? null
 }

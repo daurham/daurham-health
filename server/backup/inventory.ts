@@ -1,6 +1,6 @@
 export const BACKUP_FORMAT = 'daurham-health-backup'
 export const BACKUP_FORMAT_VERSION = 1
-export const LATEST_SCHEMA_MIGRATION = '0049_passive_recovery_clinical_context.sql'
+export const LATEST_SCHEMA_MIGRATION = '0050_training_plan_repeat_blocks.sql'
 export const PORTABLE_EXPORT_BYTE_LIMIT = 3_500_000
 
 export type ColumnKind = 'uuid' | 'text' | 'date' | 'timestamptz' | 'numeric' | 'int' | 'bool' | 'json' | 'bytea'
@@ -103,6 +103,7 @@ export const BACKUP_TABLES: readonly BackupTable[] = [
       col('effective_from', 'date'),
       col('weekly_frequency_target', 'int'),
       col('sequence_start_routine_code', 'text'),
+      col('sequence_start_position', 'int'),
       col('default_non_training_intent', 'text'),
       col('note', 'text'),
       col('is_current', 'bool'),

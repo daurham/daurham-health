@@ -13,13 +13,13 @@ function intentLabel(intent: string): string {
     case 'training_moved_away':
       return 'Training moved away'
     case 'active_recovery':
-      return 'Active recovery'
+      return 'Open day'
     case 'flexible':
-      return 'Flexible'
+      return 'Open day'
     case 'paused_or_away':
       return 'Away / paused'
     default:
-      return 'Rest'
+      return 'Open day'
   }
 }
 
@@ -67,7 +67,7 @@ export function TrainingPlanCard() {
       <section className="rounded-lg border border-zinc-200 bg-white p-4">
         <h2 className="font-semibold">Training Plan</h2>
         <p className="mt-1 text-sm text-zinc-600">
-          Add a flexible weekly target, preferred days, and routine sequence. Preferred days are not hard deadlines.
+          Choose days you prefer to work out and how many times each routine repeats. Other days stay open.
         </p>
         <Link to="/training/plan" className={'mt-3 ' + primaryButtonClass}>
           Set up plan
@@ -77,10 +77,6 @@ export function TrainingPlanCard() {
   }
 
   const next = plan.nextSession
-  const todayTraining =
-    plan.today != null &&
-    ['training_preferred', 'training_moved_here'].includes(plan.today.effectiveIntent)
-
   return (
     <section className="space-y-3 rounded-lg border border-zinc-200 bg-white p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -104,13 +100,13 @@ export function TrainingPlanCard() {
         </div>
         <div className="rounded-md bg-zinc-50 px-3 py-2">
           <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Next session</p>
-          <p className="mt-0.5 font-medium text-zinc-900">{next?.name ?? '—'}</p>
+          <p className="mt-0.5 font-medium text-zinc-900">{next?.name ?? '—'}{plan.nextRepeatProgress && plan.nextRepeatProgress.total > 1 ? ` · ${plan.nextRepeatProgress.session}/${plan.nextRepeatProgress.total}` : ''}</p>
         </div>
       </div>
 
-      {next && todayTraining && next.available && next.templateId ? (
+      {next && next.available && next.templateId ? (
         <Link to={'/training/new?template=' + encodeURIComponent(next.templateId)} className={primaryButtonClass}>
-          Start {next.name}
+          Start {next.name} now
         </Link>
       ) : next && !next.available ? (
         <p className="text-xs text-amber-700">
