@@ -29,6 +29,7 @@ type PlanRow = {
   weekly_frequency_target: number | string
   sequence_start_routine_code: string
   sequence_start_position: number | string
+  created_at: string
   default_non_training_intent: 'rest' | 'active_recovery' | 'flexible'
   note: string | null
 }
@@ -81,6 +82,7 @@ async function loadPlanVersion(asOf: string): Promise<PlanRow | null> {
             weekly_frequency_target,
             sequence_start_routine_code,
             sequence_start_position,
+            created_at::text AS created_at,
             default_non_training_intent,
             note
        FROM training_plan_versions
@@ -134,6 +136,7 @@ async function completedRoutineCodes(
   sequence: readonly string[],
   start: string,
   asOf: string,
+  planCreatedAt: string,
 ): Promise<string[]> {
   if (sequence.length === 0) return []
   const sql = await getSql()
@@ -143,8 +146,9 @@ async function completedRoutineCodes(
       WHERE session_type = 'programmed'
         AND workout_date BETWEEN $1::date AND $2::date
         AND routine_code = ANY($3::text[])
+        AND created_at > $4::timestamptz
       ORDER BY workout_date ASC, created_at ASC`,
-    [start, asOf, sequence],
+    [start, asOf, sequence, planCreatedAt],
   )) as Array<{ routine_code: string | null }>
   return rows.flatMap((row) => row.routine_code == null ? [] : [row.routine_code])
 }
@@ -199,7 +203,7 @@ export async function getTrainingPlan(asOfInput?: string): Promise<TrainingPlanV
   const applicableStart = effectiveFrom > start ? effectiveFrom : start
   const [overrides, completedCodes, completed] = await Promise.all([
     loadOverrides(applicableStart, end),
-    completedRoutineCodes(sequenceCodes, effectiveFrom, asOf),
+    completedRoutineCodes(sequenceCodes, effectiveFrom, asOf, plan.created_at),
     completedProgrammedSessions(sequenceCodes, applicableStart, end),
   ])
 

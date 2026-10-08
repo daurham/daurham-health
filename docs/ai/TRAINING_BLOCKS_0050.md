@@ -16,3 +16,6 @@ Editing an active version carries the next routine and repeat-slot offset into t
 
 ## Nightly sleep source issue
 The separate Circular 6h43 vs 7h23 problem is not addressed. Need the exact sleep date, raw intervals/stages from HAE or database, and Circular’s own definition of total sleep. Aggregate sync counts do not reveal 40 minutes of stage time.
+
+## Same-day editing
+Only completed programmed sessions created **after** the active plan version's creation time advance that version's sequence. An earlier session on the same calendar day does not advance the newly anchored slot again.
