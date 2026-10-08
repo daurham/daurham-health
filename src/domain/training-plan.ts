@@ -22,8 +22,12 @@ export const trainingPlanInputSchema = z.object({
   defaultNonTrainingIntent: nonTrainingIntentSchema,
   preferredWeekdays: z.array(z.number().int().min(1).max(7)).min(1).max(7)
     .refine((items) => new Set(items).size === items.length, 'Preferred weekdays must be unique'),
-  sequenceRoutineCodes: z.array(z.string().trim().min(1).max(200)).min(1).max(14)
-    .refine((items) => new Set(items).size === items.length, 'Routine sequence must be unique'),
+  sequenceRoutineCodes: z.array(z.string().trim().min(1).max(200)).min(1).max(84)
+    .refine((items) => {
+      const blocks = compactRoutineSequence(items)
+      return blocks.length <= 14 && blocks.every((block) => block.count <= 12) &&
+        new Set(blocks.map((block) => block.routineCode)).size === blocks.length
+    }, 'Each routine must occur in one consecutive block of 1–12 sessions'),
   note: z.union([z.string().max(500), z.null(), z.undefined()]).transform((value) => {
     if (value == null) return null
     const trimmed = value.trim()
@@ -31,6 +35,24 @@ export const trainingPlanInputSchema = z.object({
   }),
 })
 export type TrainingPlanInput = z.infer<typeof trainingPlanInputSchema>
+
+export type TrainingRoutineBlock = { routineCode: string; count: number }
+
+/** Convert consecutive session slots into a compact, editable block list. */
+export function compactRoutineSequence(sequence: readonly string[]): TrainingRoutineBlock[] {
+  const result: TrainingRoutineBlock[] = []
+  for (const routineCode of sequence) {
+    const last = result[result.length - 1]
+    if (last?.routineCode === routineCode) last.count += 1
+    else result.push({ routineCode, count: 1 })
+  }
+  return result
+}
+
+export function expandRoutineBlocks(blocks: readonly TrainingRoutineBlock[]): string[] {
+  return blocks.flatMap((block) => Array.from({ length: block.count }, () => block.routineCode))
+}
+
 
 export const dayOverrideInputSchema = z.object({
   intentKind: z.enum(['training_preferred', 'rest', 'active_recovery', 'flexible', 'paused_or_away']),

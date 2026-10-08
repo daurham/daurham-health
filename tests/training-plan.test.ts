@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   addCalendarDays,
+  compactRoutineSequence,
+  expandRoutineBlocks,
+  trainingPlanInputSchema,
   baselineIntentForDate,
   isoWeekday,
   nextRoutineCode,
@@ -27,6 +30,21 @@ describe('Training Plan domain', () => {
     expect(nextRoutineCode(sequence, ['A'])).toBe('B')
     expect(nextRoutineCode(sequence, ['A', 'B'])).toBe('C')
     expect(nextRoutineCode(sequence, ['A', 'B', 'C'])).toBe('A')
+  })
+
+  it('supports six-session A, B, C blocks and loops after eighteen sessions', () => {
+    const blocks = [{ routineCode: 'A', count: 6 }, { routineCode: 'B', count: 6 }, { routineCode: 'C', count: 6 }]
+    const expanded = expandRoutineBlocks(blocks)
+    expect(expanded).toHaveLength(18)
+    expect(compactRoutineSequence(expanded)).toEqual(blocks)
+    const input = { weeklyFrequencyTarget: 3, defaultNonTrainingIntent: 'flexible',
+      preferredWeekdays: [1, 3, 5], sequenceRoutineCodes: expanded, note: null }
+    expect(trainingPlanInputSchema.safeParse(input).success).toBe(true)
+    expect(nextRoutineCode(expanded, Array(5).fill('A'))).toBe('A')
+    expect(nextRoutineCode(expanded, Array(6).fill('A'))).toBe('B')
+    expect(nextRoutineCode(expanded, [...Array(6).fill('A'), ...Array(6).fill('B')])).toBe('C')
+    expect(nextRoutineCode(expanded, expanded)).toBe('A')
+    expect(trainingPlanInputSchema.safeParse({ ...input, sequenceRoutineCodes: ['A', 'B', 'A'] }).success).toBe(false)
   })
 
   it('does not let an out-of-order programmed session silently skip the next routine', () => {
