@@ -39,6 +39,7 @@ describe('I1 profile and plan backup', () => {
         effective_from: '2026-10-06',
         weekly_frequency_target: '3',
         sequence_start_routine_code: 'A',
+        sequence_start_position: 1,
         default_non_training_intent: 'rest',
         note: null,
         is_current: true,

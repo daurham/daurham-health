@@ -269,7 +269,7 @@ describe('body capture migration and routes', () => {
   const migration = readFileSync('migrations/0032_body_capture_inbox.sql', 'utf8')
 
   it('adds a staging table and body_shortcut source without a user id', () => {
-    expect(LATEST_SCHEMA_MIGRATION).toBe('0049_passive_recovery_clinical_context.sql')
+    expect(LATEST_SCHEMA_MIGRATION).toBe('0050_training_plan_repeat_blocks.sql')
     expect(migration).toContain("VALUES ('body_shortcut', 'Body Shortcut', 'shortcut')")
     expect(migration).toContain('CREATE TABLE body_capture_inbox')
     expect(migration).toContain('ON DELETE SET NULL')

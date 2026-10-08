@@ -399,7 +399,7 @@ describe('experiment suggestions', () => {
   })
 
   it('round-trips origin fields in backup inventory and portable labels', () => {
-    expect(LATEST_SCHEMA_MIGRATION).toBe('0049_passive_recovery_clinical_context.sql')
+    expect(LATEST_SCHEMA_MIGRATION).toBe('0050_training_plan_repeat_blocks.sql')
     const experiments = tablesForProfile('full').find((table) => table.name === 'experiments')
     expect(experiments?.columns.map((column) => column.name)).toEqual(
       expect.arrayContaining(['origin_kind', 'origin_trigger', 'origin_fingerprint', 'origin_evidence']),
