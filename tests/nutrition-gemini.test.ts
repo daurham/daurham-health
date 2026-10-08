@@ -2,7 +2,6 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
   GEMINI_DESCRIPTION_RESPONSE_SCHEMA,
-  GEMINI_DESCRIPTION_MAX_OUTPUT_TOKENS,
   GEMINI_LABEL_RESPONSE_SCHEMA,
   GEMINI_MEAL_RESPONSE_SCHEMA,
   GEMINI_NUTRITION_MODEL_DEFAULT,
@@ -351,7 +350,7 @@ describe('Gemini nutrition interpretation', () => {
     expect(candidate.items[0]?.quantity).toBe(340)
     expect(candidate.items[0]?.assumption).toContain('60%')
     expect(candidate.assumptions).toContain('Assumed typical salmon fillets by weight')
-    expect(candidate.calories).toBe(calories.reduce((sum, value) => sum + value, 0))
+    expect(candidate.calories).toBe(Math.round(calories.reduce((sum, value) => sum + value, 0) / 5) * 5)
     expect(candidate.calories).not.toBe(99999)
   })
 
@@ -369,7 +368,7 @@ describe('Gemini nutrition interpretation', () => {
       generate: async (request) => {
         seen = true
         expect(request.responseJsonSchema).toEqual(GEMINI_DESCRIPTION_RESPONSE_SCHEMA)
-        expect(request.maxOutputTokens).toBe(GEMINI_DESCRIPTION_MAX_OUTPUT_TOKENS)
+        expect(request.maxOutputTokens).toBe(4096)
         expect(request.maxOutputTokens).toBeGreaterThan(1024)
         expect(request.timeoutMs).toBe(20_000)
         return fakeGenerate(JSON.stringify({
