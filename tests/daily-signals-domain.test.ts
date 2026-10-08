@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
   dailySignalDateError,
@@ -54,9 +55,8 @@ describe('I2 Daily Signals domain', () => {
 
 describe('check-in mobile controls', () => {
   it('uses bounded rating buttons and a click-to-view Bristol reference', () => {
-    const fs = require('node:fs') as typeof import('node:fs')
-    const source = fs.readFileSync('src/features/daily-signals/DailyCheckInPage.tsx', 'utf8')
-    const guide = fs.readFileSync('src/features/daily-signals/BristolReferenceChart.tsx', 'utf8')
+    const source = readFileSync('src/features/daily-signals/DailyCheckInPage.tsx', 'utf8')
+    const guide = readFileSync('src/features/daily-signals/BristolReferenceChart.tsx', 'utf8')
     expect(source).toContain('grid-cols-5 gap-2')
     expect(source).toContain('aria-pressed={wellness[key] === value}')
     expect(source).toContain('BristolReferenceChart')
