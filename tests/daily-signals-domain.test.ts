@@ -50,3 +50,16 @@ describe('I2 Daily Signals domain', () => {
     expect(dailySignalDateError('2026-10-07', '2026-10-06')).toMatch(/today or an earlier/)
   })
 })
+
+
+describe('check-in mobile controls', () => {
+  it('uses bounded rating buttons and a click-to-view Bristol reference', () => {
+    const fs = require('node:fs') as typeof import('node:fs')
+    const source = fs.readFileSync('src/features/daily-signals/DailyCheckInPage.tsx', 'utf8')
+    const guide = fs.readFileSync('src/features/daily-signals/BristolReferenceChart.tsx', 'utf8')
+    expect(source).toContain('grid-cols-5 gap-2')
+    expect(source).toContain('aria-pressed={wellness[key] === value}')
+    expect(source).toContain('BristolReferenceChart')
+    expect(guide).toContain('Watery')
+  })
+})

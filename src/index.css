@@ -4,6 +4,7 @@
   --color-accent: var(--health-accent);
   --color-accent-muted: var(--health-accent-muted);
   --color-accent-fg: var(--health-accent-fg);
+  --color-accent-secondary: var(--health-accent-secondary);
   --color-reward: var(--health-reward);
   --color-reward-muted: var(--health-reward-muted);
   --color-toward: var(--health-toward);
@@ -1225,6 +1226,20 @@ html.dark[data-health-palette='cosmic-instinct'] {
   .motion-card:hover:active {
     transform: scale(0.99);
   }
+}
+
+/* Make progression themes clearly legible by showing both accent colors. */
+html:not([data-health-palette='classic']) .health-hero-surface {
+  border-top: 3px solid var(--health-accent-secondary);
+  background-image:
+    radial-gradient(circle at 98% 0%, color-mix(in srgb, var(--health-accent-secondary) 24%, transparent), transparent 46%),
+    var(--health-hero-gradient);
+}
+html:not([data-health-palette='classic']) .health-raised-surface {
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--health-accent-secondary) 65%, transparent);
+}
+html:not([data-health-palette='classic']) .xp-badge {
+  border-color: var(--health-accent-secondary);
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import type { NonTrainingIntent, TrainingDayIntent, TrainingPlanView } from '@/domain/training-plan'
+import type { TrainingDayIntent, TrainingPlanView } from '@/domain/training-plan'
 import type { WorkoutTemplate } from '@/domain/training'
 import { primaryButtonClass, quietButtonClass, secondaryButtonClass } from '@/lib'
 import {
@@ -29,15 +29,15 @@ function intentLabel(intent: TrainingDayIntent): string {
     case 'training_moved_here':
       return 'Training · moved here'
     case 'training_moved_away':
-      return 'Rest · training moved'
+      return 'Workout rescheduled'
     case 'active_recovery':
-      return 'Active recovery'
+      return 'Open day'
     case 'flexible':
-      return 'Flexible'
+      return 'Open day'
     case 'paused_or_away':
       return 'Away / paused'
     default:
-      return 'Rest'
+      return 'Open day'
   }
 }
 
@@ -53,7 +53,6 @@ export function TrainingPlanPage() {
   const [templates, setTemplates] = useState<WorkoutTemplate[]>([])
   const [plan, setPlan] = useState<TrainingPlanView | null>(null)
   const [frequency, setFrequency] = useState(3)
-  const [defaultIntent, setDefaultIntent] = useState<NonTrainingIntent>('rest')
   const [preferredWeekdays, setPreferredWeekdays] = useState<number[]>([1, 3, 5])
   const [sequence, setSequence] = useState<string[]>([])
   const [note, setNote] = useState('')
@@ -67,7 +66,6 @@ export function TrainingPlanPage() {
     setPlan(next)
     if (next.baseline) {
       setFrequency(next.baseline.weeklyFrequencyTarget)
-      setDefaultIntent(next.baseline.defaultNonTrainingIntent)
       setPreferredWeekdays(next.baseline.preferredWeekdays)
       setSequence(next.baseline.sequence.map((item) => item.routineCode))
       setNote(next.baseline.note ?? '')
@@ -130,7 +128,7 @@ export function TrainingPlanPage() {
       if (preferredWeekdays.length === 0) throw new Error('Choose at least one preferred Training day.')
       const next = await saveTrainingPlan({
         weeklyFrequencyTarget: frequency,
-        defaultNonTrainingIntent: defaultIntent,
+        defaultNonTrainingIntent: 'flexible',
         preferredWeekdays,
         sequenceRoutineCodes: sequence,
         note,
@@ -195,7 +193,7 @@ export function TrainingPlanPage() {
         </p>
         <h1 className="mt-2 text-2xl font-semibold tracking-tight">Training Plan</h1>
         <p className="mt-1 max-w-2xl text-sm text-zinc-600">
-          Sequence comes first. Preferred weekdays help Health understand intent, but moving a session is a plan change—not a missed-day failure.
+          Choose your routine rotation and the days you usually train. All other days are open, not prescribed recovery or rest days.
         </p>
       </div>
 
@@ -229,7 +227,7 @@ export function TrainingPlanPage() {
                   key={day.value}
                   type="button"
                   aria-pressed={selected}
-                  className={selected ? primaryButtonClass : secondaryButtonClass}
+                  className={`${selected ? primaryButtonClass : secondaryButtonClass} !w-auto min-w-12 flex-none px-3`}
                   onClick={() => toggleWeekday(day.value)}
                 >
                   {day.label}
@@ -239,18 +237,7 @@ export function TrainingPlanPage() {
           </div>
         </fieldset>
 
-        <label className="block text-sm font-medium text-zinc-700">
-          Default non-training day
-          <select
-            value={defaultIntent}
-            onChange={(event) => setDefaultIntent(event.target.value as NonTrainingIntent)}
-            className="mt-1 min-h-11 rounded-md border border-zinc-300 bg-white px-3 text-base"
-          >
-            <option value="rest">Rest</option>
-            <option value="active_recovery">Active recovery</option>
-            <option value="flexible">Flexible</option>
-          </select>
-        </label>
+        <p className="text-sm text-zinc-600">Non-training days are open by default. Rest, walks, and recovery are recorded if and when they happen.</p>
 
         <div>
           <p className="text-sm font-medium text-zinc-700">Routine sequence</p>
@@ -330,13 +317,11 @@ export function TrainingPlanPage() {
                     <p className="text-sm text-zinc-600">{intentLabel(day.effectiveIntent)}</p>
                     {day.linkedDate ? <p className="text-xs text-zinc-500">Linked with {displayDate(day.linkedDate)}</p> : null}
                   </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    <button type="button" className={quietButtonClass} disabled={busy} onClick={() => void override(day.date, 'training_preferred')}>Train</button>
-                    <button type="button" className={quietButtonClass} disabled={busy} onClick={() => void override(day.date, 'rest')}>Rest</button>
-                    <button type="button" className={quietButtonClass} disabled={busy} onClick={() => void override(day.date, 'active_recovery')}>Recovery</button>
-                    <button type="button" className={quietButtonClass} disabled={busy} onClick={() => void override(day.date, 'flexible')}>Flexible</button>
-                    <button type="button" className={quietButtonClass} disabled={busy} onClick={() => void override(day.date, 'paused_or_away')}>Away</button>
-                    {day.overrideIntent ? <button type="button" className={quietButtonClass} disabled={busy} onClick={() => void resetOverride(day.date)}>Reset</button> : null}
+                  <div className="flex max-w-full flex-wrap items-center gap-2">
+                    <button type="button" className={`${secondaryButtonClass} !w-auto px-3`} disabled={busy} onClick={() => void override(day.date, 'training_preferred')}>Plan workout</button>
+                    <button type="button" className={`${secondaryButtonClass} !w-auto px-3`} disabled={busy} onClick={() => void override(day.date, 'flexible')}>Keep open</button>
+                    <button type="button" className={`${secondaryButtonClass} !w-auto px-3`} disabled={busy} onClick={() => void override(day.date, 'paused_or_away')}>Away</button>
+                    {day.overrideIntent ? <button type="button" className={`${secondaryButtonClass} !w-auto px-3`} disabled={busy} onClick={() => void resetOverride(day.date)}>Reset</button> : null}
                   </div>
                 </div>
               </article>
@@ -379,7 +364,7 @@ export function TrainingPlanPage() {
       ) : null}
 
       <p className="text-xs leading-5 text-zinc-500">
-        Daily Context “rest day” remains retrospective. This Training Plan is the authority for future intent.
+        Daily Context records what actually happened. Your training plan expresses preferences, not obligations.
       </p>
     </section>
   )
