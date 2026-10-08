@@ -31,3 +31,12 @@ describe('today nutrition refresh', () => {
     expect(page).not.toContain('nutritionDayTotals')
   })
 })
+
+
+describe('Today editing from add food', () => {
+  it('opens food editor rather than ignoring edit', () => {
+    const source = readFileSync('src/features/today/TodayPage.tsx', 'utf8')
+    expect(source).toContain('onOpenFood={setEditingFood}')
+    expect(source).toContain('<FoodEditorSheet')
+  })
+})

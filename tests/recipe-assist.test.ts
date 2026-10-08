@@ -367,7 +367,10 @@ describe('recipe text draft assistant', () => {
     expect(sheet).toContain('Search My Foods')
     expect(sheet).toContain('Search USDA')
     expect(sheet).toContain('describeFoodText')
-    expect(sheet).not.toMatch(/useEffect\([\s\S]*searchNutritionFoods/)
+    // Pantry ingredient search now runs as the owner types; recipe draft AI remains owner-triggered.
+    expect(sheet).toContain("step !== 'foods'")
+    expect(sheet).toContain('searchNutritionFoods(needle, controller.signal)')
+    expect(sheet).toContain('controller.abort()')
     expect(edit).not.toContain('Draft from recipe text')
     expect(edit).not.toContain('draftRecipeFromText')
     expect(recipes).toContain('calculationVersion')

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import {
   COMPOSITE_FOOD_GUIDANCE,
   looksLikeCompositeFoodDescription,
@@ -72,6 +72,7 @@ export function RecipeIngredientSheet({
   const saving = useRef(false)
   const [query, setQuery] = useState(boundedQuery)
   const [foods, setFoods] = useState<NutritionFood[]>([])
+  const [searchingFoods, setSearchingFoods] = useState(false)
   const [usdaQuery, setUsdaQuery] = useState(boundedQuery)
   const [usdaFoods, setUsdaFoods] = useState<UsdaFoodChoice[]>([])
   const [usdaChoice, setUsdaChoice] = useState<UsdaFoodChoice | null>(null)
@@ -128,12 +129,24 @@ export function RecipeIngredientSheet({
     }
   }
 
-  async function searchFoods() {
-    const matches = await run(() => searchNutritionFoods(query))
-    if (matches) {
-      setFoods(matches)
+  useEffect(() => {
+    if (step !== 'foods') return
+    const needle = query.trim()
+    if (!needle) {
+      setFoods([])
+      setSearchingFoods(false)
+      return
     }
-  }
+    const controller = new AbortController()
+    setSearchingFoods(true)
+    const timer = window.setTimeout(() => {
+      searchNutritionFoods(needle, controller.signal)
+        .then((matches) => { if (!controller.signal.aborted) setFoods(matches) })
+        .catch(() => { if (!controller.signal.aborted) setFoods([]) })
+        .finally(() => { if (!controller.signal.aborted) setSearchingFoods(false) })
+    }, 150)
+    return () => { controller.abort(); window.clearTimeout(timer) }
+  }, [query, step])
 
   async function searchUsda() {
     const matches = await run(() => searchUsdaFoods(usdaQuery))
@@ -337,9 +350,7 @@ export function RecipeIngredientSheet({
               Search My Foods
               <input className={fieldClass} value={query} onChange={(event) => setQuery(event.target.value)} />
             </label>
-            <button type="button" className={primaryButtonClass} disabled={busy} onClick={() => void searchFoods()}>
-              Search
-            </button>
+            {searchingFoods ? <p className="text-xs text-zinc-500" role="status">Searching Pantry…</p> : null}
             <ul className="space-y-1">
               {foods.map((food) => (
                 <li key={food.id}>
