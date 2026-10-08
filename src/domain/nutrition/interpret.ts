@@ -313,7 +313,7 @@ export function foodDescriptionPrompt(text: string): string {
     '',
     'Food description:',
     text,
-  ].join('\\n')
+  ].join('\n')
 }
 
 export function nutritionLabelPrompt(userContext: string | null): string {
