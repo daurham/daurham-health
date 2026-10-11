@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Link, useLocation, useSearchParams } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { Link, useBlocker, useLocation, useSearchParams } from 'react-router-dom'
 import { dailySignalDateError, type DailySignalsDay } from '@/domain/daily-signals'
 import { formatWeekdayCalendarDate } from '@/domain/calendar-format'
 import { DAILY_PARTICIPATION_XP, participationDateEligible } from '@/domain/rewards'
@@ -57,6 +57,27 @@ export function DailyCheckInPage() {
     wellness.stress !== (day.wellness?.stress ?? null)
   )
   const hasUnsavedChanges = contextDirty || wellnessDirty
+  const blocker = useBlocker(({ currentLocation, nextLocation }) =>
+    hasUnsavedChanges && (
+      currentLocation.pathname !== nextLocation.pathname ||
+      currentLocation.search !== nextLocation.search
+    ))
+  const handledBlockedNavigation = useRef(false)
+
+  useEffect(() => {
+    if (blocker.state !== 'blocked') {
+      handledBlockedNavigation.current = false
+      return
+    }
+    if (handledBlockedNavigation.current) return
+    handledBlockedNavigation.current = true
+    if (window.confirm('Discard unsaved Daily Log changes and leave this page?')) {
+      blocker.proceed()
+    } else {
+      blocker.reset()
+    }
+  }, [blocker])
+
   useEffect(() => {
     if (!hasUnsavedChanges) return
     const warn = (event: BeforeUnloadEvent) => {
@@ -131,15 +152,7 @@ export function DailyCheckInPage() {
           <h1 className="text-2xl font-semibold tracking-tight">{formatWeekdayCalendarDate(date)}</h1>
           <p className="mt-1 text-sm text-zinc-600">Missing stays unknown. Record only what you actually tracked.</p>
         </div>
-        <Link
-          to={prefixedPath(prefix, '/')}
-          className={quietButtonClass}
-          onClick={(event) => {
-            if (hasUnsavedChanges && !window.confirm('Leave with unsaved Daily Log changes?')) {
-              event.preventDefault()
-            }
-          }}
-        >Today</Link>
+        <Link to={prefixedPath(prefix, '/')} className={quietButtonClass}>Today</Link>
       </div>
 
       <div className="min-w-0 rounded-xl border border-zinc-200 bg-white p-4">
@@ -149,11 +162,7 @@ export function DailyCheckInPage() {
           showNavigation
           disabled={busy}
           onDateChange={(next) => {
-            if (next === date) return
-            if (hasUnsavedChanges &&
-                !window.confirm('Discard unsaved Daily Log changes and switch dates?')) return
-            setContextDirty(false)
-            setSearch({ date: next })
+            if (next !== date) setSearch({ date: next })
           }}
         />
       </div>

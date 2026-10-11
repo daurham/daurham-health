@@ -107,3 +107,9 @@
 - Training Plan routine editing now stacks cleanly on narrow devices. Long routine names wrap, move/remove buttons have accessible names, and the add-routine selector no longer sets an overflowing 14rem minimum width.
 - Weekly training strip includes a small legend differentiating qualified, today and optional preferred days.
 - Theme matrix is 24 palettes each with light/dark definitions. Automated coverage checks and responsive source-level checks are in the new UI tests, but **visual Safari/device screenshots are still an owner QA gate**, not yet completed.
+
+## Final internal navigation guard
+- Added one React Router Data Router blocker for all internal route/query navigation whenever Context or wellness has unsaved edits, including mobile bottom navigation and browser back/forward.
+- Removed duplicate manual Today/date confirmations in favor of the central guard; browser reload keeps a separate beforeunload warning.
+- This is code-level coverage; manual iPhone back/forward/navigation testing remains in the release QA matrix.
+- Vercel project metadata and preview ERROR statuses are visible, but inspecting failed build logs still returns a **403 forbidden team-scope authorization error**. Do not describe the build as quota-related without real log evidence.

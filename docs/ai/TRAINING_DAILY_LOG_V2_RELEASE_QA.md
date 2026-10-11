@@ -31,7 +31,7 @@ Design contract: \`docs/ai/TRAINING_DAILY_LOG_V2_DESIGN.md\`.
 - [ ] Water, bowel and wellness quick actions update the correct section without a full-page loading skeleton.
 - [ ] Water and bowel delete actions update only the selected Health date.
 - [ ] Historical supplement taken/skipped/clear only changes selected date; missing remains **unknown**.
-- [ ] Unsaved Context/wellness warns when navigating date, returning to Today, or reloading.
+- [ ] Unsaved Context/wellness warns when navigating date, returning to Today, using app bottom/side navigation, browser back/forward, or reloading.
 - [ ] Failed save preserves the draft; don't award XP on a failed mutation.
 - [ ] Date change while another quick action saves is disabled, to avoid cross-day UI writes.
 - [ ] Existing /context and /check-in deep links continue working.
