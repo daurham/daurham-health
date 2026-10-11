@@ -4,6 +4,8 @@ import { dailySignalDateError, type DailySignalsDay } from '@/domain/daily-signa
 import { formatWeekdayCalendarDate } from '@/domain/calendar-format'
 import { DAILY_PARTICIPATION_XP, participationDateEligible } from '@/domain/rewards'
 import { BristolReferenceChart } from './BristolReferenceChart'
+import { HealthDateField } from '@/components/HealthDateField'
+import { DailyContextSection } from '@/features/context/DailyContextSection'
 import { DailySupplementsSection } from './DailySupplementsSection'
 import { primaryButtonClass, quietButtonClass, useHealthCalendarDate } from '@/lib'
 import { prefixedPath, useAppPathPrefix } from '@/lib/app-prefix'
@@ -46,6 +48,7 @@ export function DailyCheckInPage() {
   const [busy, setBusy] = useState(false)
   const [showBristol, setShowBristol] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [contextDirty, setContextDirty] = useState(false)
 
   async function load(signal?: AbortSignal) {
     if (dateError) return
@@ -102,25 +105,41 @@ export function DailyCheckInPage() {
     <section className="mx-auto max-w-3xl space-y-4 pb-8">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm text-zinc-500">Daily check-in</p>
+          <p className="text-sm text-accent">Daily Log</p>
           <h1 className="text-2xl font-semibold tracking-tight">{formatWeekdayCalendarDate(date)}</h1>
           <p className="mt-1 text-sm text-zinc-600">Missing stays unknown. Record only what you actually tracked.</p>
         </div>
-        <Link to={prefixedPath(prefix, '/')} className={quietButtonClass}>Today</Link>
+        <Link
+          to={prefixedPath(prefix, '/')}
+          className={quietButtonClass}
+          onClick={(event) => {
+            if (contextDirty && !window.confirm('Leave with unsaved context changes?')) {
+              event.preventDefault()
+            }
+          }}
+        >Today</Link>
       </div>
 
-      <label className="block rounded-lg border border-zinc-200 bg-white p-4 text-sm font-medium text-zinc-700">
-        Health date
-        <div className="mt-1 w-full min-w-0 max-w-full overflow-hidden rounded-md border border-zinc-300 px-3 focus-within:ring-2 focus-within:ring-accent">
-          <input
-            type="date"
-            value={date}
-            max={today}
-            onChange={(event) => setSearch({ date: event.target.value })}
-            className="daily-checkin-date-input flex min-h-11 min-w-0 w-full max-w-full box-border items-center appearance-none border-0 bg-transparent p-0 text-left text-base"
-          />
-        </div>
-      </label>
+      <div className="min-w-0 rounded-xl border border-zinc-200 bg-white p-4">
+        <HealthDateField
+          date={date}
+          max={today}
+          showNavigation
+          onDateChange={(next) => {
+            if (next === date) return
+            const wellnessDirty = day != null && (
+              wellness.energy !== (day.wellness?.energy ?? null) ||
+              wellness.hunger !== (day.wellness?.hunger ?? null) ||
+              wellness.soreness !== (day.wellness?.soreness ?? null) ||
+              wellness.stress !== (day.wellness?.stress ?? null)
+            )
+            if ((contextDirty || wellnessDirty) &&
+                !window.confirm('Discard unsaved Daily Log changes and switch dates?')) return
+            setContextDirty(false)
+            setSearch({ date: next })
+          }}
+        />
+      </div>
 
       {dateError ? <p className="rounded-md bg-red-50 p-3 text-sm text-red-800">{dateError}</p> : null}
       {error ? <p className="rounded-md bg-red-50 p-3 text-sm text-red-800">{error}</p> : null}
@@ -128,8 +147,8 @@ export function DailyCheckInPage() {
 
       {!loading && !dateError ? (
         <>
-          <section className="rounded-lg border border-zinc-200 bg-white p-4">
-            <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">Water</h2>{xpEligible ? <span className="text-xs font-semibold text-reward">+{DAILY_PARTICIPATION_XP.hydration} XP · first log</span> : null}</div>
+          <section className="rounded-xl border border-info/25 bg-white p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold text-info">Water</h2>{xpEligible ? <span className="text-xs font-semibold text-reward">+{DAILY_PARTICIPATION_XP.hydration} XP · first log</span> : null}</div>
             <p className="mt-1 text-sm text-zinc-600">
               {day?.hydrationEvents.length ? `${Math.round(totalWater)} oz logged` : 'No water tracking recorded for this day.'}
             </p>
@@ -188,8 +207,8 @@ export function DailyCheckInPage() {
             ) : null}
           </section>
 
-          <section className="rounded-lg border border-zinc-200 bg-white p-4">
-            <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">Bowel</h2>{xpEligible ? <span className="text-xs font-semibold text-reward">+{DAILY_PARTICIPATION_XP.bowel} XP · one/day</span> : null}</div>
+          <section className="rounded-xl border border-accent-secondary/25 bg-white p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold text-accent-secondary">Bowel</h2>{xpEligible ? <span className="text-xs font-semibold text-reward">+{DAILY_PARTICIPATION_XP.bowel} XP · one/day</span> : null}</div>
             <p className="mt-1 text-sm text-zinc-600">
               {day?.noBowelMovement
                 ? 'Explicitly recorded: no bowel movement.'
@@ -242,8 +261,8 @@ export function DailyCheckInPage() {
             ) : null}
           </section>
 
-          <section className="rounded-lg border border-zinc-200 bg-white p-4">
-            <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">How do you feel?</h2>{xpEligible ? <span className="text-xs font-semibold text-reward">+{DAILY_PARTICIPATION_XP.wellness} XP · one/day</span> : null}</div>
+          <section className="rounded-xl border border-accent/25 bg-white p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold text-accent">How do you feel?</h2>{xpEligible ? <span className="text-xs font-semibold text-reward">+{DAILY_PARTICIPATION_XP.wellness} XP · one/day</span> : null}</div>
             <p className="mt-1 text-sm text-zinc-600">1 is low / mild; 5 is high / strong. Stress is optional.</p>
             <div className="mt-4 space-y-4">
               {(['energy', 'hunger', 'soreness', 'stress'] as const).map((key) => (
@@ -294,13 +313,7 @@ export function DailyCheckInPage() {
 
           <DailySupplementsSection date={date} />
 
-          <section className="rounded-lg border border-zinc-200 bg-white p-4">
-            <h2 className="font-semibold">Context</h2>
-            <p className="mt-1 text-sm text-zinc-600">Travel, illness, unusual stress, pain, rest-day context, and notes stay in the existing Daily Context authority.</p>
-            <Link to={prefixedPath(prefix, `/context?date=${date}&from=check-in`)} className={`${quietButtonClass} mt-3`}>
-              Add or edit context
-            </Link>
-          </section>
+          <DailyContextSection key={date} date={date} onDirtyChange={setContextDirty} />
         </>
       ) : null}
       {showBristol ? <BristolReferenceChart onClose={() => setShowBristol(false)} /> : null}
