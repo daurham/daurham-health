@@ -120,3 +120,8 @@
 - Existing append-only XP wallet database suite extended with sixteen concurrent same-day award attempts, edit/re-log retries, eligible yesterday, and expired-backlog denial. Assert exactly one durable ledger entry per source/day and no duplicate spendable XP.
 - This is a release QA improvement, not a new way to earn XP: training replay never issues participation XP and no XP is minted solely because of a routine progress recalculation.
 - Preview Neon Auth INVALID_ORIGIN is tracked as a **preview configuration blocker**, intentionally deferred until consolidated owner QA; no production auth/database changes.
+
+## Release compatibility prior to main merge (2026-10-11)
+- The confirmed-rotation read is optional only when PostgreSQL specifically reports a missing 0051 rotation table (`42P01` and the expected table name). All other database errors remain visible.
+- Training Plan edits copy anchor and early-close decisions only if the prior plan has a confirmed anchor. An unmigrated database can therefore still read/edit the existing Training Plan using provisional rotation, while advanced historical controls require migration 0051.
+- No schema mutation or production data write was performed in this compatibility patch; continue to treat 0051 migration and real device QA as outstanding work.

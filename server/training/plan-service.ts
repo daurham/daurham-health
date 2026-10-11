@@ -138,15 +138,31 @@ async function loadOverrides(start: string, end: string): Promise<Map<string, Ov
 type RotationAnchorRow = { anchor_date: string | Date; current_routine_code: string; completed_at_anchor: number | string }
 type RotationEndRow = { ended_on: string | Date; routine_code: string; generation: number | string; reason: string | null }
 
+/** 0051 is a forward migration: older installations must still load their
+ * existing Training Plan while the owner completes the migration. */
+export function isMissingRotationSchema(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false
+  const value = error as { code?: unknown; message?: unknown }
+  return value.code === '42P01' &&
+    typeof value.message === 'string' &&
+    (value.message.includes('training_plan_rotation_anchors') ||
+      value.message.includes('training_plan_block_ends'))
+}
+
 async function loadRotationAnchor(planId: string): Promise<RotationAnchorRow | null> {
   const sql = await getSql()
-  const rows = await sql.query(
-    `SELECT anchor_date::text AS anchor_date, current_routine_code, completed_at_anchor
-       FROM training_plan_rotation_anchors
-      WHERE plan_version_id = $1::uuid`,
-    [planId],
-  ) as RotationAnchorRow[]
-  return rows[0] ?? null
+  try {
+    const rows = await sql.query(
+      `SELECT anchor_date::text AS anchor_date, current_routine_code, completed_at_anchor
+         FROM training_plan_rotation_anchors
+        WHERE plan_version_id = $1::uuid`,
+      [planId],
+    ) as RotationAnchorRow[]
+    return rows[0] ?? null
+  } catch (error) {
+    if (isMissingRotationSchema(error)) return null
+    throw error
+  }
 }
 
 async function loadRotationEnds(planId: string, asOf: string): Promise<RoutineBlockClosure[]> {
@@ -458,9 +474,11 @@ export async function putTrainingPlan(body: unknown): Promise<TrainingPlanView> 
   // the owner's confirmed historical anchor or early-ended block decisions.
   const preserveRotationDecisions = previousVersion != null &&
     rotationSequenceUnchanged(previousSequence, input.sequenceRoutineCodes)
+  // Copy rotation rows only if a confirmed anchor actually exists. This also
+  // keeps pre-0051 production plans editable until the additive migration runs.
+  const priorRotationAnchor = previousVersion ? await loadRotationAnchor(previousVersion.id) : null
   if (previousVersion && !preserveRotationDecisions) {
-    const anchor = await loadRotationAnchor(previousVersion.id)
-    if (anchor && input.confirmRotationReset !== true) {
+    if (priorRotationAnchor && input.confirmRotationReset !== true) {
       throw new HttpError(
         409,
         'Changing the routine order or session targets requires confirmation. Your old rotation remains in history, but the new sequence needs a new starting point.',
@@ -519,7 +537,7 @@ export async function putTrainingPlan(body: unknown): Promise<TrainingPlanView> 
         [id, weekday],
       ),
     ),
-    ...(preserveRotationDecisions && previousVersion ? [
+    ...(preserveRotationDecisions && previousVersion && priorRotationAnchor ? [
       sql.query(
         `INSERT INTO training_plan_rotation_anchors
            (plan_version_id, anchor_date, current_routine_code, completed_at_anchor,
