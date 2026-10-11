@@ -34,10 +34,18 @@ export type RoutineBlockState = {
   activeBlock: RoutineBlock
   blocks: RoutineBlock[]
 }
+export type RoutineReplayConflict = {
+  routineCode: string
+  generation: number
+  date: string
+  reason: 'already_completed' | 'block_not_found'
+}
+
 export type RoutineRotationState = {
   currentRoutineCode: string
   cycle: number
   routines: RoutineBlockState[]
+  conflicts: RoutineReplayConflict[]
 }
 
 type MutableRoutine = { routineCode: string; target: number; blocks: RoutineBlock[] }
@@ -124,6 +132,7 @@ export function deriveRoutineRotation(
   ].filter((event) => !asOf || event.date <= asOf)
     .sort((a, b) => a.date.localeCompare(b.date) || a.sort - b.sort)
   const creditedDays = new Set<string>()
+  const conflicts: RoutineReplayConflict[] = []
 
   for (const event of events) {
     if ('credit' in event && event.credit) {
@@ -146,6 +155,15 @@ export function deriveRoutineRotation(
       if (block?.status === 'active') {
         block.status = 'ended_early'
         block.closedDate = closure.date
+      } else {
+        // A later workout edit/backdate may have changed the inferred block.
+        // Keep the owner's explicit decision visible for reconciliation.
+        conflicts.push({
+          routineCode: closure.routineCode,
+          generation: closure.generation,
+          date: closure.date,
+          reason: block ? 'already_completed' : 'block_not_found',
+        })
       }
     }
     advancePointer()
@@ -154,6 +172,7 @@ export function deriveRoutineRotation(
   return {
     currentRoutineCode: states[pointerIndex]!.routineCode,
     cycle,
+    conflicts,
     routines: states.map((state) => ({
       routineCode: state.routineCode,
       target: state.target,

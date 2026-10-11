@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { compactRoutineSequence, expandRoutineBlocks, type TrainingDayIntent, type TrainingPlanView } from '@/domain/training-plan'
+import { rotationSequenceUnchanged } from '@/domain/training-blocks'
 import type { WorkoutTemplate } from '@/domain/training'
 import { TrainingRotationPreview } from './TrainingRotationPreview'
 import { TrainingRotationSettings } from './TrainingRotationSettings'
@@ -129,11 +130,20 @@ export function TrainingPlanPage() {
     try {
       if (sequence.length === 0) throw new Error('Add at least one routine to the sequence.')
       if (preferredWeekdays.length === 0) throw new Error('Choose at least one preferred Training day.')
+      const changesConfirmedRotation = Boolean(plan?.rotation) &&
+        !rotationSequenceUnchanged(
+          plan?.baseline?.sequence.map((item) => item.routineCode) ?? [],
+          sequence,
+        )
+      if (changesConfirmedRotation && !window.confirm(
+        'Changing the routine order or block lengths will require confirming a new rotation starting point. Your previous workout history and old rotation version will remain saved. Continue?',
+      )) return
       const next = await saveTrainingPlan({
         weeklyFrequencyTarget: frequency,
         defaultNonTrainingIntent: 'flexible',
         preferredWeekdays,
         sequenceRoutineCodes: sequence,
+        confirmRotationReset: changesConfirmedRotation,
         note,
       })
       applyPlan(next, templates)

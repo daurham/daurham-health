@@ -71,6 +71,7 @@ export function TrainingRotationSettings({
   const current = state?.routines.find((item) => item.routineCode === state.currentRoutineCode)
   const canEnd = current?.activeBlock.status === 'active' &&
     creditedSessions(current.activeBlock) < current.activeBlock.target
+  const conflicts = state?.conflicts ?? []
   const ended = state?.routines.flatMap((item) =>
     item.blocks.filter((block) => block.status === 'ended_early')
       .map((block) => ({ routine: item.routineCode, generation: block.generation,
@@ -167,10 +168,33 @@ export function TrainingRotationSettings({
             }}>Finish block early</button>
         </div>
       ) : null}
+      {conflicts.length ? (
+        <div className="space-y-2 rounded-lg border border-warning/40 bg-warning/10 p-3"
+          role="status" aria-label="Rotation corrections need review">
+          <p className="text-sm font-semibold text-warning">Rotation history needs review</p>
+          <p className="text-xs text-zinc-700">
+            A workout was corrected after an early-ending decision. The original decision is
+            preserved but cannot be replayed as written. Review the workout or clear the outdated ending.
+          </p>
+          {conflicts.map((item) => (
+            <div key={item.routineCode + item.generation + item.date}
+              className="flex flex-wrap items-center justify-between gap-2 text-sm">
+              <span>{item.routineCode} · block {item.generation} · {item.date} · {
+                item.reason === 'already_completed' ? 'Already completed' : 'Block no longer matches'
+              }</span>
+              <button type="button" className={quietButtonClass}
+                disabled={saving || busy || readOnly}
+                onClick={() => void submit(() => reopenRotationBlock(item.routineCode, item.generation))}>
+                Clear outdated ending
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : null}
       {ended.map((block) => (
         <div key={block.routine + '-' + block.generation} className="flex flex-wrap items-center justify-between gap-2 text-sm">
           <span>{block.routine}: ended early at {block.count}/{block.target}</span>
-          <button type="button" className={quietButtonClass} disabled={saving || busy}
+          <button type="button" className={quietButtonClass} disabled={saving || busy || readOnly}
             onClick={() => void submit(() => reopenRotationBlock(block.routine, block.generation))}>
             Reopen block
           </button>

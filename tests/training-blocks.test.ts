@@ -96,3 +96,32 @@ describe('version-to-version rotation continuity', () => {
     expect(rotationSequenceUnchanged(before, [...before.slice(0, 6), 'C', ...before.slice(7)])).toBe(false)
   })
 })
+
+describe('historical corrections preserve owner early-close decisions', () => {
+  it('surfaces a conflict if an old workout now completes a previously ended block', () => {
+    const state = deriveRoutineRotation(rotation,
+      { currentRoutineCode: 'B', alreadyCompletedInCurrent: 5 },
+      [credit('2026-10-07', 'B')],
+      [{ date: '2026-10-08', routineCode: 'B', generation: 1, kind: 'end_early' }],
+    )
+    expect(stateOf(state, 'B').blocks[0]?.status).toBe('completed')
+    expect(state.conflicts).toEqual([{
+      routineCode: 'B', generation: 1, date: '2026-10-08', reason: 'already_completed',
+    }])
+  })
+
+  it('shows no conflict if the early-ending decision still applies after a correction', () => {
+    const state = deriveRoutineRotation(rotation,
+      { currentRoutineCode: 'B', alreadyCompletedInCurrent: 4 }, [],
+      [{ date: '2026-10-08', routineCode: 'B', generation: 1, kind: 'end_early' }],
+    )
+    expect(state.conflicts).toEqual([])
+    expect(stateOf(state, 'B').blocks[0]?.status).toBe('ended_early')
+  })
+
+  it('marks a no-longer-existing generation as a conflict instead of hiding it', () => {
+    const state = deriveRoutineRotation(rotation, anchor, [],
+      [{ date: '2026-10-09', routineCode: 'B', generation: 2, kind: 'end_early' }])
+    expect(state.conflicts[0]).toMatchObject({ routineCode: 'B', generation: 2, reason: 'block_not_found' })
+  })
+})

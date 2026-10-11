@@ -106,3 +106,4 @@ describe('routine block attribution', () => {
     expect(buildTrainingWeekQualification(data, '2026-10-07').completedDays).toBe(1)
   })
 })
+

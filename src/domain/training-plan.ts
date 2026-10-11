@@ -21,6 +21,8 @@ export type NonTrainingIntent = z.infer<typeof nonTrainingIntentSchema>
 
 export const trainingPlanInputSchema = z.object({
   weeklyFrequencyTarget: z.number().int().min(1).max(7),
+  // Changing a confirmed rotation sequence requires explicit owner approval.
+  confirmRotationReset: z.boolean().optional(),
   defaultNonTrainingIntent: nonTrainingIntentSchema,
   preferredWeekdays: z.array(z.number().int().min(1).max(7)).min(1).max(7)
     .refine((items) => new Set(items).size === items.length, 'Preferred weekdays must be unique'),

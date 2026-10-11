@@ -83,3 +83,9 @@
 - Selecting “Use suggested starting point” fills the anchor fields, but **does not save** or invent sessions; owner must explicitly confirm.
 - Suggestion prefers the earliest routine with observed but incomplete progress; a fallback suggests the next routine after the last observed qualified routine. Multiple overlapping cycles remain ambiguous and require manual review.
 - Changing the plan version re-synchronizes anchor input state so old unconfirmed form values do not persist.
+
+## Rotation safety checkpoint (2026-10-11)
+- Routine sequence/target changes now require an explicit owner acknowledgment when a previously confirmed rotation exists. Weekly-target, weekday and note edits continue to preserve the confirmed rotation.
+- Historical edits that render a persisted early-ended block already completed (or remove its generation) are not silently ignored; the rotation view exposes an explicit reconciliation conflict with a clear-outdated-decision action.
+- Only actual performed working strength exercises qualify a Training day. Distance/distance-duration and standalone skill activities are excluded at the evidence query boundary, so hikes/runs do not accidentally advance a 3-exercise strength day.
+- Added schema, UI boundary, conflict and strength-evidence regression tests. Migration 0051 is still production-unapplied.

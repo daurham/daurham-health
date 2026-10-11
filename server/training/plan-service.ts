@@ -199,8 +199,14 @@ async function performedExerciseEvidence(start: string, asOf: string, createdAft
        FROM workout_sessions sessions
        JOIN workout_session_exercises session_exercises
          ON session_exercises.workout_session_id = sessions.id
+       JOIN exercise_definitions definitions
+         ON definitions.id = session_exercises.exercise_definition_id
       WHERE sessions.workout_date BETWEEN $1::date AND $2::date
         AND sessions.session_type IN ('programmed', 'ad_hoc', 'experiment')
+        -- Non-strength distance and standalone skill activities cannot be
+        -- mistaken for one of the three distinct strength exercises.
+        AND definitions.measurement_kind NOT IN ('distance', 'distance_duration')
+        AND definitions.performance_type NOT IN ('distance', 'skill')
         AND ($3::timestamptz IS NULL OR sessions.created_at > $3::timestamptz)
         AND EXISTS (
           SELECT 1 FROM workout_sets sets
@@ -448,6 +454,15 @@ export async function putTrainingPlan(body: unknown): Promise<TrainingPlanView> 
   // the owner's confirmed historical anchor or early-ended block decisions.
   const preserveRotationDecisions = previousVersion != null &&
     rotationSequenceUnchanged(previousSequence, input.sequenceRoutineCodes)
+  if (previousVersion && !preserveRotationDecisions) {
+    const anchor = await loadRotationAnchor(previousVersion.id)
+    if (anchor && input.confirmRotationReset !== true) {
+      throw new HttpError(
+        409,
+        'Changing the routine order or session targets requires confirmation. Your old rotation remains in history, but the new sequence needs a new starting point.',
+      )
+    }
+  }
   const previousNextCode = previous.nextSession?.routineCode
   const firstNewIndex = previousNextCode == null ? -1 : input.sequenceRoutineCodes.indexOf(previousNextCode)
   const oldBlockOffset = previous.nextRepeatProgress?.session ?? 1
