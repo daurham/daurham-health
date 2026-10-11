@@ -18,7 +18,7 @@ import {
 } from '../../src/domain/training-plan.js'
 import { isoDateSchema } from '../../src/domain/training.js'
 import { buildTrainingWeekQualification, buildTrainingRoutineCredits, type PerformedExerciseEvidence } from '../../src/domain/training-qualification.js'
-import { creditedSessions, deriveRoutineRotation, type RoutineBlockClosure } from '../../src/domain/training-blocks.js'
+import { creditedSessions, deriveRoutineRotation, rotationSequenceUnchanged, type RoutineBlockClosure } from '../../src/domain/training-blocks.js'
 import { compactRoutineSequence } from '../../src/domain/training-plan.js'
 import { getSql } from '../db.js'
 import { currentHealthDate } from '../health-time.js'
@@ -340,6 +340,8 @@ export async function getTrainingPlan(asOfInput?: string): Promise<TrainingPlanV
     ? {
         source: 'confirmed' as const,
         anchorDate: dateText(rotationAnchor.anchor_date),
+        currentRoutineAtAnchor: rotationAnchor.current_routine_code,
+        completedAtAnchor: Number(rotationAnchor.completed_at_anchor),
         state: deriveRoutineRotation(
           specs,
           { currentRoutineCode: rotationAnchor.current_routine_code,
@@ -401,7 +403,13 @@ export async function putTrainingPlan(body: unknown): Promise<TrainingPlanView> 
   }
 
   const today = await currentHealthDate()
+  const previousVersion = await loadPlanVersion(today)
+  const previousSequence = previousVersion ? await loadSequence(previousVersion.id) : []
   const previous = await getTrainingPlan(today)
+  // Editing the weekly target, preferred weekdays or note should not erase
+  // the owner's confirmed historical anchor or early-ended block decisions.
+  const preserveRotationDecisions = previousVersion != null &&
+    rotationSequenceUnchanged(previousSequence, input.sequenceRoutineCodes)
   const previousNextCode = previous.nextSession?.routineCode
   const firstNewIndex = previousNextCode == null ? -1 : input.sequenceRoutineCodes.indexOf(previousNextCode)
   const oldBlockOffset = previous.nextRepeatProgress?.session ?? 1
@@ -454,6 +462,27 @@ export async function putTrainingPlan(body: unknown): Promise<TrainingPlanView> 
         [id, weekday],
       ),
     ),
+    ...(preserveRotationDecisions && previousVersion ? [
+      sql.query(
+        `INSERT INTO training_plan_rotation_anchors
+           (plan_version_id, anchor_date, current_routine_code, completed_at_anchor,
+            confirmed_at, note)
+         SELECT $1::uuid, anchor_date, current_routine_code, completed_at_anchor,
+                confirmed_at, note
+           FROM training_plan_rotation_anchors
+          WHERE plan_version_id = $2::uuid`,
+        [id, previousVersion.id],
+      ),
+      sql.query(
+        `INSERT INTO training_plan_block_ends
+           (id, plan_version_id, routine_code, generation, ended_on, reason, created_at)
+         SELECT gen_random_uuid(), $1::uuid, routine_code, generation, ended_on,
+                reason, created_at
+           FROM training_plan_block_ends
+          WHERE plan_version_id = $2::uuid`,
+        [id, previousVersion.id],
+      ),
+    ] : []),
   ]
   await sql.transaction(statements)
   return getTrainingPlan(today)

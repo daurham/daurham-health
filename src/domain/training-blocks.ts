@@ -162,3 +162,16 @@ export function deriveRoutineRotation(
     })),
   }
 }
+
+/**
+ * Weekly target, note and preferred-day edits must not reset a confirmed
+ * rotation. Only reuse a confirmed anchor/early-close ledger if the entire
+ * routine order AND each repeat target remain unchanged.
+ */
+export function rotationSequenceUnchanged(
+  previous: readonly string[],
+  next: readonly string[],
+): boolean {
+  return previous.length === next.length &&
+    previous.every((routine, index) => routine === next[index])
+}

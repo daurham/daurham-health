@@ -16,10 +16,11 @@ export function TrainingRotationSettings({
 }) {
   const readOnly = useDemoReadOnly()
   const specs = compactRoutineSequence(plan.baseline?.sequence.map((s) => s.routineCode) ?? [])
-  const [anchorDate, setAnchorDate] = useState(plan.baseline?.effectiveFrom ?? plan.asOf)
-  const [routine, setRoutine] = useState(plan.rotation?.state.currentRoutineCode ??
+  const [anchorDate, setAnchorDate] = useState(plan.rotation?.anchorDate ??
+    plan.baseline?.effectiveFrom ?? plan.asOf)
+  const [routine, setRoutine] = useState(plan.rotation?.currentRoutineAtAnchor ??
     plan.rotationPreview?.state.currentRoutineCode ?? specs[0]?.routineCode ?? '')
-  const [completed, setCompleted] = useState(0)
+  const [completed, setCompleted] = useState(plan.rotation?.completedAtAnchor ?? 0)
   const [reason, setReason] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -34,6 +35,11 @@ export function TrainingRotationSettings({
     try {
       const next = await action()
       onChanged(next)
+      if (next.rotation) {
+        setAnchorDate(next.rotation.anchorDate)
+        setRoutine(next.rotation.currentRoutineAtAnchor)
+        setCompleted(next.rotation.completedAtAnchor)
+      }
       setMessage('Rotation updated from canonical workout history.')
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not update rotation.')

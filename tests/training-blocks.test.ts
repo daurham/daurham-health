@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  creditedSessions, deriveRoutineRotation,
+  creditedSessions, deriveRoutineRotation, rotationSequenceUnchanged,
   type RoutineDayCredit, type RoutineBlockAnchor,
 } from '../src/domain/training-blocks.ts'
 
@@ -83,5 +83,16 @@ describe('independent routine block replay', () => {
       [], '2026-10-08')
     expect(state.currentRoutineCode).toBe('B')
     expect(stateOf(state, 'B').blocks[0]?.status).toBe('active')
+  })
+})
+
+// Weekly frequency, chosen days, and notes are not part of rotation identity.
+describe('version-to-version rotation continuity', () => {
+  it('preserves confirmed rotation decisions only when codes and session targets stay identical', () => {
+    const before = [...Array(6).fill('A'), ...Array(6).fill('B'), ...Array(6).fill('C')]
+    expect(rotationSequenceUnchanged(before, [...before])).toBe(true)
+    expect(rotationSequenceUnchanged(before, before.slice(0, -1))).toBe(false)
+    expect(rotationSequenceUnchanged(before, ['B', ...before.slice(1)])).toBe(false)
+    expect(rotationSequenceUnchanged(before, [...before.slice(0, 6), 'C', ...before.slice(7)])).toBe(false)
   })
 })

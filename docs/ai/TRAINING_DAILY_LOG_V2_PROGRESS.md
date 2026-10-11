@@ -71,3 +71,9 @@
 - Registered 0051 as the schema head and listed both owner-decision tables in full and portable backup inventory in dependency order.
 - Moved the seven-day optional manual scheduler into a collapsed advanced section; the weekly goal now names *qualifying training days* instead of programmed sessions.
 - No live data migration or deployment has been performed. CI, migration fixture compatibility, history preview and owner validation are mandatory gates.
+
+## Rotation continuity and confirmation UX — October 11
+- Carry forward confirmed rotation anchor and early-ended block history in the same SQL transaction when a new plan version changes only weekly frequency, preferred weekdays or notes. Do not copy rotation decisions if routine order or per-block repeat targets change.
+- Populate historical rotation confirmation form from the saved starting routine, starting date and already-completed count; re-synchronize the fields after successful owner confirmation.
+- Add a domain test for unchanged vs changed routine-sequence identity.
+- Still gated: historical suggestions, full migration/backup roundtrip, conflicting retrospective edits, mobile QA, and production approval.
