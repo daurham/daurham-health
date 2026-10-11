@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useBlocker, useLocation, useSearchParams } from 'react-router-dom'
 import { dailySignalDateError, type DailySignalsDay } from '@/domain/daily-signals'
+import { shouldBlockDailyLogNavigation } from '@/domain/daily-log-navigation'
 import { formatWeekdayCalendarDate } from '@/domain/calendar-format'
 import { DAILY_PARTICIPATION_XP, participationDateEligible } from '@/domain/rewards'
 import { BristolReferenceChart } from './BristolReferenceChart'
@@ -58,10 +59,7 @@ export function DailyCheckInPage() {
   )
   const hasUnsavedChanges = contextDirty || wellnessDirty
   const blocker = useBlocker(({ currentLocation, nextLocation }) =>
-    hasUnsavedChanges && (
-      currentLocation.pathname !== nextLocation.pathname ||
-      currentLocation.search !== nextLocation.search
-    ))
+    shouldBlockDailyLogNavigation(hasUnsavedChanges, currentLocation, nextLocation))
   const handledBlockedNavigation = useRef(false)
 
   useEffect(() => {
