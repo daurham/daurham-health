@@ -4,6 +4,8 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { Pool } from 'pg'
+import { buildTrainingRoutineCredits } from '../src/domain/training-qualification.ts'
+import { creditedSessions, deriveRoutineRotation } from '../src/domain/training-blocks.ts'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 
 const BIN = '/usr/lib/postgresql/14/bin'
@@ -220,6 +222,39 @@ describe.sequential.skipIf(!existsSync(`${BIN}/initdb`))('Reward wallet producti
       { idempotency_key: 'award:daily:wellness:2026-10-10', n: 1 },
     ])
     expect((await readRewards()).balances).toEqual({ lifetimeXp: 30, spendableXp: 30 })
+  })
+
+  it('keeps wallet balances fixed when historical Training block evidence is replayed or corrected', async () => {
+    await reset()
+    const sql = database.sql as never
+    await awardDailyParticipation(sql, {
+      kind: 'hydration', healthDate: '2026-10-11', today: '2026-10-11',
+      awardedAt: new Date('2026-10-11T20:00:00.000Z'),
+    })
+    const before = await readRewards()
+    const specs = [
+      { routineCode: 'A', target: 6 },
+      { routineCode: 'B', target: 6 },
+      { routineCode: 'C', target: 6 },
+    ]
+    const evidence = ['push', 'pull', 'squat'].map((exerciseId) => ({
+      date: '2026-10-10', exerciseId, routineCode: 'B',
+    }))
+    const full = deriveRoutineRotation(specs,
+      { currentRoutineCode: 'B', alreadyCompletedInCurrent: 5 },
+      buildTrainingRoutineCredits(evidence))
+    const corrected = deriveRoutineRotation(specs,
+      { currentRoutineCode: 'B', alreadyCompletedInCurrent: 5 },
+      buildTrainingRoutineCredits(evidence.slice(0, 2)))
+    expect(full.currentRoutineCode).toBe('C')
+    expect(corrected.currentRoutineCode).toBe('B')
+    expect(creditedSessions(corrected.routines[1]!.activeBlock)).toBe(5)
+    // Read-only replay must not award daily XP, undo a past award, or change
+    // the immutable accounting snapshot when historical evidence is edited.
+    const after = await readRewards()
+    expect(after.balances).toEqual(before.balances)
+    expect(after.activity.map((row) => row.id)).toEqual(before.activity.map((row) => row.id))
+    expect((await pool.query('SELECT count(*)::int AS n FROM xp_ledger')).rows[0].n).toBe(1)
   })
 
   it('freezes reward purchase snapshots and refunds spendable XP without changing lifetime XP', async () => {
