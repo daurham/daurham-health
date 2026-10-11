@@ -96,3 +96,7 @@
 - Today quick links now open the unified Daily Log with a Context anchor rather than splitting context entry into its old separate editor.
 - The Daily Log protects unsaved Context and wellness against date changes, Today navigation and browser reload; date navigation is disabled during pending quick-action writes.
 - Clearing already saved Context now confirms first if doing so would also discard unsaved edits.
+
+## Today's route contract validation
+- Updated two stale Today tests to require the user-facing 'Daily Log' label and the unified /check-in?date=...#daily-context route, matching the new UI; no backward-incompatible server route removal.
+- The preceding CI run confirmed the new archive -> verification -> PostgreSQL restore test passed. Only the two Today label/link assertions required adjustment.

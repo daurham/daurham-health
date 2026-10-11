@@ -30,7 +30,7 @@ describe('I2 Today Daily Check-in', () => {
     })
   })
 
-  it('renders one consolidated Daily check-in before Supplements content', () => {
+  it('renders one consolidated Daily Log before Supplements content', () => {
     const view = buildTodayView({
       ...baseSources(),
       dailySignals: {
@@ -72,7 +72,7 @@ describe('I2 Today Daily Check-in', () => {
         <TodayBoard view={view} />
       </MemoryRouter>,
     )
-    expect((html.match(/Daily check-in/g) ?? []).length).toBe(1)
+    expect((html.match(/Daily Log/g) ?? []).length).toBe(1)
     expect(html).toContain('Water 16 oz')
     expect(html).toContain('Bowel 1 · type 4')
     expect(html).toContain('Energy 3/5')
