@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { compactRoutineSequence, expandRoutineBlocks, type TrainingDayIntent, type TrainingPlanView } from '@/domain/training-plan'
 import type { WorkoutTemplate } from '@/domain/training'
 import { TrainingRotationPreview } from './TrainingRotationPreview'
+import { TrainingRotationSettings } from './TrainingRotationSettings'
 import { primaryButtonClass, quietButtonClass, secondaryButtonClass } from '@/lib'
 import {
   clearTrainingDayOverride,
@@ -310,6 +311,9 @@ export function TrainingPlanPage() {
       </section>
 
       {plan?.configured ? <TrainingRotationPreview plan={plan} /> : null}
+      {plan?.configured ? (
+        <TrainingRotationSettings plan={plan} busy={busy} onChanged={(next) => applyPlan(next, templates)} />
+      ) : null}
 
       {plan?.configured ? (
         <section className="space-y-4 rounded-lg border border-zinc-200 bg-white p-4">

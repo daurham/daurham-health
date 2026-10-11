@@ -257,6 +257,9 @@ export function matchHealthApiRoute(pathname: string): HealthApiRoute | null {
       return 'training-templates'
     case '/api/training/plan':
     case '/api/training/plan/move':
+    case '/api/training/plan/anchor':
+    case '/api/training/plan/blocks/end':
+    case '/api/training/plan/blocks/reopen':
       return 'training-plan'
     case '/api/training/sessions':
       return 'training-sessions'

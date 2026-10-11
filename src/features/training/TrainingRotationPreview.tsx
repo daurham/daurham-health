@@ -6,14 +6,14 @@ const HUES = ['var(--chart-ink)', 'var(--chart-secondary)', 'var(--chart-tertiar
 
 /** One theme-aware routine progress component for Today and Training. */
 export function TrainingRotationPreview({ plan }: { plan: TrainingPlanView }) {
-  const preview = plan.rotationPreview
-  if (!preview) return null
-  const rotation = preview.state
+  const progress = plan.rotation ?? plan.rotationPreview
+  if (!progress) return null
+  const rotation = progress.state
   return (
     <section aria-label="Routine rotation progress" className="space-y-3 rounded-xl border border-zinc-200 bg-white p-3 sm:p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h3 className="text-sm font-semibold text-zinc-900">Routine rotation</h3>
-        <span className="rounded-full bg-accent-muted px-2 py-1 text-xs font-medium text-accent">Progress preview</span>
+        <span className="rounded-full bg-accent-muted px-2 py-1 text-xs font-medium text-accent">{plan.rotation ? 'History confirmed' : 'Progress preview'}</span>
       </div>
       <div className="space-y-3">
         {rotation.routines.map((routine, index) => {
@@ -59,8 +59,9 @@ export function TrainingRotationPreview({ plan }: { plan: TrainingPlanView }) {
         })}
       </div>
       <p className="text-xs leading-5 text-zinc-600">
-        Preliminary since {preview.firstTrackedDate}. Earlier history and early-ended blocks need reconciliation
-        before this becomes your official rotation progress.
+        {plan.rotation
+          ? `Tracking confirmed routine history starting ${plan.rotation.anchorDate}. Edit prior workouts to recalculate.`
+          : `Preliminary since ${plan.rotationPreview?.firstTrackedDate ?? 'plan setup'}. Earlier history and early-ended blocks need reconciliation before this becomes official.`}
       </p>
     </section>
   )

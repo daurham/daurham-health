@@ -58,3 +58,11 @@
 - A reusable theme-aware A/B/C segmented bar is wired into TrainingPlanCard and TrainingPlanPage. The server exposes a read-only `rotationPreview` from performed evidence saved after the version's creation.
 - **Provisional only:** this is not yet a historical owner-approved starting anchor, does not persist early-end actions, and does not replace the authoritative next-session planner. Do not present as full rotation completion until migration/anchor/reconciliation are done.
 - The iOS Safari date-field source assertion is updated to verify the new shared control rather than stale inline markup.
+
+## Confirmed rotation persistence: staged, not migrated to production
+
+- Added schema migration 0051 with versioned owner-reviewed starting anchors and explicit early block close events.
+- Added authenticated POST plan routes for confirming historical starting point, ending the current unfinished block, and reopening an early-ended block.
+- Confirmed rotations replay performed evidence from anchor date rather than guessing mutable counters, and guide the next routine; unconfirmed plans continue to show an explicit preview.
+- Training Plan UI now has a historical anchor confirmation form, “Finish block early” and “Reopen block.”
+- **Deployment gate:** 0051 is NOT applied to production. This code requires migration and full DB/backup QA before release. Historical starting-point suggestions and version-to-version continuity still need additional work.

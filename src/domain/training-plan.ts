@@ -110,6 +110,7 @@ export type TrainingPlanView = {
   completedProgrammedSessions: number // Legacy counter, not the weekly qualification target.
   weekTraining?: TrainingWeekQualification | null
   rotationPreview?: { source: 'provisional'; firstTrackedDate: string; state: RoutineRotationState } | null
+  rotation?: { source: 'confirmed'; anchorDate: string; state: RoutineRotationState } | null
   weeklyFrequencyTarget: number | null
 }
 
