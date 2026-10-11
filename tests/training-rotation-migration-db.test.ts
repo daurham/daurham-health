@@ -152,8 +152,7 @@ describe.skipIf(!existsSync(`${BIN}/initdb`))('migration 0051 on disposable Post
     // Only these three owner tables exist in this disposable test schema;
     // seed tables and unrelated full-app tables are intentionally omitted.
     const writes = restoreStatements(verified.tables).filter((statement) =>
-      /^INSERT INTO (training_plan_versions|training_plan_rotation_anchors|training_plan_block_ends) /.
-        test(statement.text))
+      /^INSERT INTO (training_plan_versions|training_plan_rotation_anchors|training_plan_block_ends) /.test(statement.text))
     expect(writes.map((statement) => statement.text.match(/^INSERT INTO (\w+)/)?.[1])).toEqual([
       'training_plan_versions', 'training_plan_rotation_anchors', 'training_plan_block_ends',
     ])

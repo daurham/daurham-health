@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import {
   DAILY_CONTEXT_NOTE_MAX,
   DAILY_CONTEXT_TAG_CATALOG,
@@ -21,10 +22,11 @@ export function DailyContextSection({
   onDirtyChange: (dirty: boolean) => void
 }) {
   const readOnly = useDemoReadOnly()
+  const location = useLocation()
   const [draft, setDraft] = useState<ContextDraft>(empty)
   const [saved, setSaved] = useState<ContextDraft>(empty)
   const [recorded, setRecorded] = useState(false)
-  const [expanded, setExpanded] = useState(false)
+  const [expanded, setExpanded] = useState(location.hash === '#daily-context')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)

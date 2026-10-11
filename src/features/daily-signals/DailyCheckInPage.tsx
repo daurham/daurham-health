@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { dailySignalDateError, type DailySignalsDay } from '@/domain/daily-signals'
 import { formatWeekdayCalendarDate } from '@/domain/calendar-format'
 import { DAILY_PARTICIPATION_XP, participationDateEligible } from '@/domain/rewards'
@@ -36,6 +36,7 @@ const EMPTY_WELLNESS: WellnessDraft = { energy: null, hunger: null, soreness: nu
 
 export function DailyCheckInPage() {
   const [search, setSearch] = useSearchParams()
+  const location = useLocation()
   const today = useHealthCalendarDate()
   const requested = search.get('date')?.trim() ?? ''
   const date = requested || today
@@ -94,6 +95,11 @@ export function DailyCheckInPage() {
     return () => controller.abort()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date, dateError])
+
+  useEffect(() => {
+    if (loading || dateError || location.hash !== '#daily-context') return
+    document.getElementById('daily-context')?.scrollIntoView({ block: 'start' })
+  }, [loading, date, dateError, location.hash])
 
   // Save just the affected domain; never replace the whole page with a loading
   // skeleton or allow a late response to update a different selected date.
