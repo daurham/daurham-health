@@ -193,6 +193,35 @@ describe.sequential.skipIf(!existsSync(`${BIN}/initdb`))('Reward wallet producti
     )).rows[0].n).toBe(2)
   })
 
+  it('handles concurrent first logs, edits and re-logs without duplicate XP or backlog abuse', async () => {
+    await reset()
+    const sql = database.sql as never
+    const award = (kind: 'hydration' | 'bowel' | 'wellness', healthDate: string, today = '2026-10-11') =>
+      awardDailyParticipation(sql, {
+        kind, healthDate, today, awardedAt: new Date('2026-10-11T20:00:00.000Z'),
+      })
+
+    const retries = await Promise.all(Array.from({ length: 16 }, () => award('hydration', '2026-10-11')))
+    expect(retries.filter(Boolean)).toHaveLength(1)
+    // Deleting and correcting the original Health observation never creates a
+    // second award for the same kind and day (and never mutates ledger history).
+    expect(await award('hydration', '2026-10-11')).toBe(false)
+    expect(await award('wellness', '2026-10-10')).toBe(true)
+    expect(await award('wellness', '2026-10-10')).toBe(false)
+    expect(await award('bowel', '2026-10-09')).toBe(false)
+    // A previously eligible date does not become eligible again after the window.
+    expect(await award('hydration', '2026-10-11', '2026-10-13')).toBe(false)
+
+    const ledger = await pool.query(
+      "SELECT idempotency_key, count(*)::int AS n FROM xp_ledger WHERE source_kind = 'daily_participation' GROUP BY idempotency_key ORDER BY idempotency_key",
+    )
+    expect(ledger.rows).toEqual([
+      { idempotency_key: 'award:daily:hydration:2026-10-11', n: 1 },
+      { idempotency_key: 'award:daily:wellness:2026-10-10', n: 1 },
+    ])
+    expect((await readRewards()).balances).toEqual({ lifetimeXp: 30, spendableXp: 30 })
+  })
+
   it('freezes reward purchase snapshots and refunds spendable XP without changing lifetime XP', async () => {
     await reset()
     await seedCompletedTask('weekly', 'Weekly focus')

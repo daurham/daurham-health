@@ -190,10 +190,9 @@ async function completedRoutineCodes(
  * calendar week, including workouts saved before the Training Plan existed.
  * Never derive a weekly completion from the number of session rows.
  */
-async function performedExerciseEvidence(start: string, asOf: string, createdAfter?: string): Promise<PerformedExerciseEvidence[]> {
-  const sql = await getSql()
-  const rows = (await sql.query(
-    `SELECT DISTINCT sessions.workout_date::text AS date,
+// One authoritative selection for qualified Training evidence. Export the
+// statement for PostgreSQL integration tests; UI and replay share its results.
+export const PERFORMED_STRENGTH_EXERCISES_SQL = `SELECT DISTINCT sessions.workout_date::text AS date,
             session_exercises.exercise_definition_id::text AS exercise_id,
             sessions.routine_code
        FROM workout_sessions sessions
@@ -222,7 +221,12 @@ async function performedExerciseEvidence(start: string, asOf: string, createdAft
                OR COALESCE(sets.distance_m, 0) > 0
                OR sets.completed = true
              )
-        )`,
+        )`
+
+async function performedExerciseEvidence(start: string, asOf: string, createdAfter?: string): Promise<PerformedExerciseEvidence[]> {
+  const sql = await getSql()
+  const rows = (await sql.query(
+    PERFORMED_STRENGTH_EXERCISES_SQL,
     [start, asOf, createdAfter ?? null],
   )) as Array<{ date: string; exercise_id: string; routine_code: string | null }>
   return rows.map((row) => ({

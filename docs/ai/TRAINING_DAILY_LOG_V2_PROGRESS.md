@@ -113,3 +113,10 @@
 - Removed duplicate manual Today/date confirmations in favor of the central guard; browser reload keeps a separate beforeunload warning.
 - This is code-level coverage; manual iPhone back/forward/navigation testing remains in the release QA matrix.
 - Vercel project metadata and preview ERROR statuses are visible, but inspecting failed build logs still returns a **403 forbidden team-scope authorization error**. Do not describe the build as quota-related without real log evidence.
+
+## XP and historical replay verification — 2026-10-11
+- Exposed the existing, authoritative performed-strength-evidence SQL constant for actual PostgreSQL replay tests; **no behavioral rewrite** to training qualification.
+- New disposable PostgreSQL tests: interrupted workouts on one Health date; a third ad-hoc exercise qualifies the weekly date without granting B credit; warmup/skill/distance/zero-value exclusions; deletion of actual work removes the qualification and one routine credit; redating a session recomputes historical as-of states.
+- Existing append-only XP wallet database suite extended with sixteen concurrent same-day award attempts, edit/re-log retries, eligible yesterday, and expired-backlog denial. Assert exactly one durable ledger entry per source/day and no duplicate spendable XP.
+- This is a release QA improvement, not a new way to earn XP: training replay never issues participation XP and no XP is minted solely because of a routine progress recalculation.
+- Preview Neon Auth INVALID_ORIGIN is tracked as a **preview configuration blocker**, intentionally deferred until consolidated owner QA; no production auth/database changes.
