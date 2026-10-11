@@ -3,7 +3,7 @@ import { LATEST_SCHEMA_MIGRATION, backupTable } from '../server/backup/inventory
 
 describe('I4 evidence semantics backup', () => {
   it('keeps evidence semantics compatible with the current schema head', () => {
-    expect(LATEST_SCHEMA_MIGRATION).toBe('0051_training_rotation_anchors.sql')
+    expect(LATEST_SCHEMA_MIGRATION).toBe('0052_hydration_daily_goal.sql')
   })
 
   it('backs up durable evidence semantics and owner review state', () => {

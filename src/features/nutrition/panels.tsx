@@ -947,6 +947,12 @@ export function EntryEditorSheet({
         optionalNumber(sodium) !== entry.sodium
       const saved = await patchNutritionEntry(entry.id, {
         servingQuantity: quantity,
+        // The nutrient snapshot is rescaled live in the editor. When sending
+        // explicit nutrient overrides, the server must also receive the
+        // corresponding updated weight; otherwise grams would stay stale.
+        ...(quantity !== entry.servingQuantity && entry.grams != null
+          ? { grams: Number((entry.grams * quantity / entry.servingQuantity).toFixed(6)) }
+          : {}),
         foodName: linked ? undefined : foodName.trim(),
         meal: meal === '' ? null : (meal as NutritionMeal),
         notes: notes.trim() || null,

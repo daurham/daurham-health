@@ -12,6 +12,7 @@ describe('nutrition quantity-sensitive previews and editable log snapshots', () 
     })
     const panelSource = readFileSync('src/features/nutrition/panels.tsx', 'utf8')
     expect(panelSource).toContain('sodium: food.sodium')
+    expect(panelSource).toContain('entry.grams * quantity / entry.servingQuantity')
     expect(panelSource).toContain('<ScaledPreview preview={preview} />')
   })
 
