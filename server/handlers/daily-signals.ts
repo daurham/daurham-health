@@ -1,6 +1,8 @@
 import {
   addBowelEvent,
   addHydrationEvent,
+  deleteHydrationGoal,
+  putHydrationGoal,
   clearNoBowelMovement,
   deleteBowelEvent,
   deleteDailyWellness,
@@ -36,6 +38,15 @@ async function handle(req: ApiRequest, res: ApiResponse): Promise<void> {
     if (req.method === 'PUT') return sendJson(res, 200, { wellness: await putDailyWellness(date, await readJsonBody(req)) })
     if (req.method === 'DELETE') return sendJson(res, 200, { deleted: await deleteDailyWellness(date) })
     return methodNotAllowed(res, 'GET, PUT, DELETE')
+  }
+
+  if (pathname === '/api/hydration/goal') {
+    if (req.method === 'PUT') return sendJson(res, 200, { goalOz: await putHydrationGoal(await readJsonBody(req)) })
+    if (req.method === 'DELETE') {
+      await deleteHydrationGoal()
+      return sendJson(res, 200, { goalOz: null })
+    }
+    return methodNotAllowed(res, 'PUT, DELETE')
   }
 
   if (pathname === '/api/hydration/events') {

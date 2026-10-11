@@ -1,6 +1,6 @@
 export const BACKUP_FORMAT = 'daurham-health-backup'
 export const BACKUP_FORMAT_VERSION = 1
-export const LATEST_SCHEMA_MIGRATION = '0051_training_rotation_anchors.sql'
+export const LATEST_SCHEMA_MIGRATION = '0052_hydration_daily_goal.sql'
 export const PORTABLE_EXPORT_BYTE_LIMIT = 3_500_000
 
 export type ColumnKind = 'uuid' | 'text' | 'date' | 'timestamptz' | 'numeric' | 'int' | 'bool' | 'json' | 'bytea'
@@ -1521,6 +1521,19 @@ export const BACKUP_TABLES: readonly BackupTable[] = [
       col('evidence_snapshot', 'json'),
       col('observation_date', 'date'),
       col('created_at', 'timestamptz'),
+    ],
+  }),
+  table({
+    name: 'hydration_goal_settings',
+    backupClass: 'canonical',
+    primaryKey: ['singleton'],
+    seeded: false,
+    portable: true,
+    references: [],
+    columns: [
+      col('singleton', 'int'),
+      col('daily_target_ml', 'numeric'),
+      col('updated_at', 'timestamptz'),
     ],
   }),
   table({
