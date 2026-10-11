@@ -11,6 +11,7 @@ import {
 import { formatWeekdayCalendarDate } from '@/domain/calendar-format'
 import { healthFetch, readApiError } from '@/lib/health-api'
 import { dangerButtonClass, primaryButtonClass, quietButtonClass, useHealthCalendarDate } from '@/lib'
+import { HealthDateField } from '@/components/HealthDateField'
 
 type EditorState = {
   recordedId: string | null
@@ -189,16 +190,7 @@ export function ContextEditor({
         <h1 className="mt-2 text-2xl font-semibold tracking-tight">Daily context</h1>
         <p className="mt-1 text-sm text-zinc-600">{heading}</p>
       </div>
-      <label className="block text-sm text-zinc-600">
-        Date
-        <input
-          type="date"
-          value={dateError ? '' : date}
-          max={today}
-          onChange={(event) => onDate(event.target.value)}
-          className="mt-1 block min-h-11 w-full rounded-md border border-zinc-300 px-3"
-        />
-      </label>
+      <HealthDateField date={dateError ? today : date} max={today} onDateChange={onDate} />
       {dateError ? <p className="text-sm text-zinc-700">{dateError}</p> : null}
       {error ? <p className="text-sm text-zinc-700">{error}</p> : null}
       {dateError || loading ? null : (

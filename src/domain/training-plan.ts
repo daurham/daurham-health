@@ -1,5 +1,7 @@
 import { z } from 'zod'
 import { isoDateSchema } from './training.js'
+import type { TrainingWeekQualification } from './training-qualification.js'
+import type { RoutineRotationState } from './training-blocks.js'
 
 export const TRAINING_DAY_INTENTS = [
   'training_preferred',
@@ -19,6 +21,8 @@ export type NonTrainingIntent = z.infer<typeof nonTrainingIntentSchema>
 
 export const trainingPlanInputSchema = z.object({
   weeklyFrequencyTarget: z.number().int().min(1).max(7),
+  // Changing a confirmed rotation sequence requires explicit owner approval.
+  confirmRotationReset: z.boolean().optional(),
   defaultNonTrainingIntent: nonTrainingIntentSchema,
   preferredWeekdays: z.array(z.number().int().min(1).max(7)).min(1).max(7)
     .refine((items) => new Set(items).size === items.length, 'Preferred weekdays must be unique'),
@@ -105,7 +109,21 @@ export type TrainingPlanView = {
   nextRepeatProgress: { session: number; total: number } | null
   today: TrainingPlanDay | null
   week: TrainingPlanDay[]
-  completedProgrammedSessions: number
+  completedProgrammedSessions: number // Legacy counter, not the weekly qualification target.
+  historyReview?: {
+    lookbackStart: string
+    eligibleDays: Array<{ date: string; routineCode: string }>
+    suggestion: { routineCode: string; completedAtAnchor: number; reason: string } | null
+  } | null
+  weekTraining?: TrainingWeekQualification | null
+  rotationPreview?: { source: 'provisional'; firstTrackedDate: string; state: RoutineRotationState } | null
+  rotation?: {
+    source: 'confirmed'
+    anchorDate: string
+    currentRoutineAtAnchor: string
+    completedAtAnchor: number
+    state: RoutineRotationState
+  } | null
   weeklyFrequencyTarget: number | null
 }
 

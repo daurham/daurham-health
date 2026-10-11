@@ -1,6 +1,6 @@
 export const BACKUP_FORMAT = 'daurham-health-backup'
 export const BACKUP_FORMAT_VERSION = 1
-export const LATEST_SCHEMA_MIGRATION = '0050_training_plan_repeat_blocks.sql'
+export const LATEST_SCHEMA_MIGRATION = '0051_training_rotation_anchors.sql'
 export const PORTABLE_EXPORT_BYTE_LIMIT = 3_500_000
 
 export type ColumnKind = 'uuid' | 'text' | 'date' | 'timestamptz' | 'numeric' | 'int' | 'bool' | 'json' | 'bytea'
@@ -134,6 +134,39 @@ export const BACKUP_TABLES: readonly BackupTable[] = [
     columns: [
       col('plan_version_id', 'uuid'),
       col('weekday', 'int'),
+      col('created_at', 'timestamptz'),
+    ],
+  }),
+  table({
+    name: 'training_plan_rotation_anchors',
+    backupClass: 'canonical',
+    primaryKey: ['plan_version_id'],
+    seeded: false,
+    portable: true,
+    references: [{ column: 'plan_version_id', table: 'training_plan_versions' }],
+    columns: [
+      col('plan_version_id', 'uuid'),
+      col('anchor_date', 'date'),
+      col('current_routine_code', 'text'),
+      col('completed_at_anchor', 'int'),
+      col('confirmed_at', 'timestamptz'),
+      col('note', 'text'),
+    ],
+  }),
+  table({
+    name: 'training_plan_block_ends',
+    backupClass: 'canonical',
+    primaryKey: ['id'],
+    seeded: false,
+    portable: true,
+    references: [{ column: 'plan_version_id', table: 'training_plan_versions' }],
+    columns: [
+      col('id', 'uuid'),
+      col('plan_version_id', 'uuid'),
+      col('routine_code', 'text'),
+      col('generation', 'int'),
+      col('ended_on', 'date'),
+      col('reason', 'text'),
       col('created_at', 'timestamptz'),
     ],
   }),

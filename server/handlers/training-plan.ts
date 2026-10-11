@@ -4,6 +4,9 @@ import {
   moveTrainingDay,
   putTrainingDayOverride,
   putTrainingPlan,
+  confirmTrainingRotationAnchor,
+  endTrainingRotationBlock,
+  reopenTrainingRotationBlock,
 } from '../training/plan-service.js'
 import { withOwnerAuth } from '../auth/with-owner.js'
 import {
@@ -32,6 +35,22 @@ async function handleTrainingPlan(req: ApiRequest, res: ApiResponse) {
     }
     res.setHeader('Allow', 'GET, PUT')
     sendJson(res, 405, { error: 'Method not allowed' })
+    return
+  }
+
+  if (pathname === '/api/training/plan/anchor' ||
+      pathname === '/api/training/plan/blocks/end' ||
+      pathname === '/api/training/plan/blocks/reopen') {
+    if (req.method !== 'POST') {
+      res.setHeader('Allow', 'POST')
+      sendJson(res, 405, { error: 'Method not allowed' })
+      return
+    }
+    const body = await readJsonBody(req)
+    const plan = pathname.endsWith('/anchor') ? await confirmTrainingRotationAnchor(body)
+      : pathname.endsWith('/reopen') ? await reopenTrainingRotationBlock(body)
+        : await endTrainingRotationBlock(body)
+    sendJson(res, 200, { plan })
     return
   }
 

@@ -17,6 +17,9 @@ import {
   type TrainingPlanView,
 } from '../../src/domain/training-plan.js'
 import { isoDateSchema } from '../../src/domain/training.js'
+import { buildTrainingWeekQualification, buildTrainingRoutineCredits, type PerformedExerciseEvidence } from '../../src/domain/training-qualification.js'
+import { creditedSessions, deriveRoutineRotation, rotationSequenceUnchanged, type RoutineBlockClosure } from '../../src/domain/training-blocks.js'
+import { compactRoutineSequence } from '../../src/domain/training-plan.js'
 import { getSql } from '../db.js'
 import { currentHealthDate } from '../health-time.js'
 import { HttpError } from '../http.js'
@@ -132,6 +135,51 @@ async function loadOverrides(start: string, end: string): Promise<Map<string, Ov
   return new Map(rows.map((row) => [dateText(row.override_date), row]))
 }
 
+type RotationAnchorRow = { anchor_date: string | Date; current_routine_code: string; completed_at_anchor: number | string }
+type RotationEndRow = { ended_on: string | Date; routine_code: string; generation: number | string; reason: string | null }
+
+/** 0051 is a forward migration: older installations must still load their
+ * existing Training Plan while the owner completes the migration. */
+export function isMissingRotationSchema(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false
+  const value = error as { code?: unknown; message?: unknown }
+  return value.code === '42P01' &&
+    typeof value.message === 'string' &&
+    (value.message.includes('training_plan_rotation_anchors') ||
+      value.message.includes('training_plan_block_ends'))
+}
+
+async function loadRotationAnchor(planId: string): Promise<RotationAnchorRow | null> {
+  const sql = await getSql()
+  try {
+    const rows = await sql.query(
+      `SELECT anchor_date::text AS anchor_date, current_routine_code, completed_at_anchor
+         FROM training_plan_rotation_anchors
+        WHERE plan_version_id = $1::uuid`,
+      [planId],
+    ) as RotationAnchorRow[]
+    return rows[0] ?? null
+  } catch (error) {
+    if (isMissingRotationSchema(error)) return null
+    throw error
+  }
+}
+
+async function loadRotationEnds(planId: string, asOf: string): Promise<RoutineBlockClosure[]> {
+  const sql = await getSql()
+  const rows = await sql.query(
+    `SELECT ended_on::text AS ended_on, routine_code, generation, reason
+       FROM training_plan_block_ends
+      WHERE plan_version_id = $1::uuid AND ended_on <= $2::date
+      ORDER BY ended_on ASC, created_at ASC, id ASC`,
+    [planId, asOf],
+  ) as RotationEndRow[]
+  return rows.map((row) => ({
+    date: dateText(row.ended_on), routineCode: row.routine_code,
+    generation: Number(row.generation), kind: 'end_early' as const, reason: row.reason,
+  }))
+}
+
 async function completedRoutineCodes(
   sequence: readonly string[],
   start: string,
@@ -151,6 +199,57 @@ async function completedRoutineCodes(
     [start, asOf, sequence, planCreatedAt],
   )) as Array<{ routine_code: string | null }>
   return rows.flatMap((row) => row.routine_code == null ? [] : [row.routine_code])
+}
+
+/**
+ * Read performed Training exercises across every session kind and the *whole*
+ * calendar week, including workouts saved before the Training Plan existed.
+ * Never derive a weekly completion from the number of session rows.
+ */
+// One authoritative selection for qualified Training evidence. Export the
+// statement for PostgreSQL integration tests; UI and replay share its results.
+export const PERFORMED_STRENGTH_EXERCISES_SQL = `SELECT DISTINCT sessions.workout_date::text AS date,
+            session_exercises.exercise_definition_id::text AS exercise_id,
+            sessions.routine_code
+       FROM workout_sessions sessions
+       JOIN workout_session_exercises session_exercises
+         ON session_exercises.workout_session_id = sessions.id
+       JOIN exercise_definitions definitions
+         ON definitions.id = session_exercises.exercise_definition_id
+      WHERE sessions.workout_date BETWEEN $1::date AND $2::date
+        AND sessions.session_type IN ('programmed', 'ad_hoc', 'experiment')
+        -- Non-strength distance and standalone skill activities cannot be
+        -- mistaken for one of the three distinct strength exercises.
+        AND definitions.measurement_kind NOT IN ('distance', 'distance_duration')
+        AND definitions.performance_type NOT IN ('distance', 'skill')
+        AND ($3::timestamptz IS NULL OR sessions.created_at > $3::timestamptz)
+        AND EXISTS (
+          SELECT 1 FROM workout_sets sets
+           WHERE sets.workout_session_exercise_id = session_exercises.id
+             AND sets.set_type <> 'warmup'
+             AND (
+               COALESCE(sets.reps, 0) > 0
+               OR COALESCE(sets.duration_sec, 0) > 0
+               OR COALESCE(sets.left_reps, 0) > 0
+               OR COALESCE(sets.right_reps, 0) > 0
+               OR COALESCE(sets.left_duration_sec, 0) > 0
+               OR COALESCE(sets.right_duration_sec, 0) > 0
+               OR COALESCE(sets.distance_m, 0) > 0
+               OR sets.completed = true
+             )
+        )`
+
+async function performedExerciseEvidence(start: string, asOf: string, createdAfter?: string): Promise<PerformedExerciseEvidence[]> {
+  const sql = await getSql()
+  const rows = (await sql.query(
+    PERFORMED_STRENGTH_EXERCISES_SQL,
+    [start, asOf, createdAfter ?? null],
+  )) as Array<{ date: string; exercise_id: string; routine_code: string | null }>
+  return rows.map((row) => ({
+    date: row.date,
+    exerciseId: row.exercise_id,
+    routineCode: row.routine_code,
+  }))
 }
 
 async function completedProgrammedSessions(
@@ -188,6 +287,10 @@ export async function getTrainingPlan(asOfInput?: string): Promise<TrainingPlanV
       today: null,
       week: [],
       completedProgrammedSessions: 0,
+      weekTraining: null,
+      historyReview: null,
+      rotationPreview: null,
+      rotation: null,
       weeklyFrequencyTarget: null,
     }
   }
@@ -197,15 +300,19 @@ export async function getTrainingPlan(asOfInput?: string): Promise<TrainingPlanV
     loadPreferredWeekdays(plan.id),
     activeTemplatesByRoutine(),
   ])
+  const rotationAnchor = await loadRotationAnchor(plan.id)
   const start = weekStartMonday(asOf)
   const end = addCalendarDays(start, 6)
   const effectiveFrom = dateText(plan.effective_from)
   const applicableStart = effectiveFrom > start ? effectiveFrom : start
-  const [overrides, completedCodes, completed] = await Promise.all([
+  const [overrides, completedCodes, completed, performedEvidence, routineEvidence] = await Promise.all([
     loadOverrides(applicableStart, end),
     completedRoutineCodes(sequenceCodes, effectiveFrom, asOf, plan.created_at),
     completedProgrammedSessions(sequenceCodes, applicableStart, end),
+    performedExerciseEvidence(start, asOf),
+    performedExerciseEvidence(effectiveFrom, asOf, plan.created_at),
   ])
+  const weekTraining = buildTrainingWeekQualification(performedEvidence, asOf)
 
   const week: TrainingPlanDay[] = Array.from({ length: 7 }, (_, index) => {
     const date = addCalendarDays(start, index)
@@ -236,11 +343,90 @@ export async function getTrainingPlan(asOfInput?: string): Promise<TrainingPlanV
   const nextRelativeIndex = nextRoutineIndex(progressionSequence, completedCodes)
   const nextCode = nextRoutineCode(progressionSequence, completedCodes)
   const absoluteNextIndex = nextRelativeIndex < 0 ? -1 : ((startPosition - 1 + nextRelativeIndex) % sequenceCodes.length)
-  const nextRepeatProgress = repeatProgressAtPosition(sequenceCodes, absoluteNextIndex)
-  const nextSession =
-    nextCode == null
-      ? null
-      : sequence.find((item) => item.routineCode === nextCode) ?? unavailableRoutine(nextCode)
+  // Provisional evidence after this plan version. The official current
+  // session keeps its prior pointer until historical reconciliation is stored.
+  const specs = compactRoutineSequence(sequenceCodes).map((block) => ({
+    routineCode: block.routineCode, target: block.count,
+  }))
+  // Only propose a starting point; never silently rewrite pre-plan history.
+  // The user confirms this in the Training Plan before any official replay.
+  const lookbackStart = addCalendarDays(effectiveFrom, -84)
+  const priorEvidence = rotationAnchor ? [] : await performedExerciseEvidence(
+    lookbackStart, addCalendarDays(effectiveFrom, -1),
+  )
+  const historicalCredits = buildTrainingRoutineCredits(priorEvidence)
+  const eligibleDays = historicalCredits.map((item) => ({
+    date: item.date, routineCode: item.routineCode,
+  }))
+  const historyCounts = specs.map((spec) => ({
+    ...spec,
+    observed: historicalCredits.filter((item) => item.routineCode === spec.routineCode).length,
+  }))
+  // Earliest observed unfinished block is an informed starting suggestion.
+  // Recorded partial future routines do not force the current pointer ahead.
+  const incomplete = historyCounts.find((item) => item.observed > 0 && item.observed < item.target)
+  const lastCode = historicalCredits[historicalCredits.length - 1]?.routineCode
+  const lastIndex = historyCounts.findIndex((item) => item.routineCode === lastCode)
+  const fallback = lastIndex >= 0
+    ? historyCounts[(lastIndex + 1) % historyCounts.length]
+    : null
+  const suggestion = incomplete
+    ? {
+        routineCode: incomplete.routineCode,
+        completedAtAnchor: incomplete.observed,
+        reason: 'Based on logged, qualifying work in this routine. Review other routines before confirming.',
+      }
+    : fallback ? {
+        routineCode: fallback.routineCode,
+        completedAtAnchor: 0,
+        reason: 'Suggested following your most recently logged routine. Verify this against your training history.',
+      } : null
+  const historyReview = rotationAnchor
+    ? null
+    : { lookbackStart, eligibleDays: eligibleDays.slice(-24).reverse(), suggestion }
+  const startProgress = repeatProgressAtPosition(sequenceCodes, startPosition - 1)
+  const rotationPreview = specs.length
+    ? {
+        source: 'provisional' as const,
+        firstTrackedDate: effectiveFrom,
+        state: deriveRoutineRotation(
+          specs,
+          { currentRoutineCode: progressionSequence[0]!,
+            alreadyCompletedInCurrent: (startProgress?.session ?? 1) - 1 },
+          buildTrainingRoutineCredits(routineEvidence),
+          [],
+          asOf,
+        ),
+      }
+    : null
+  const rotation = rotationAnchor && dateText(rotationAnchor.anchor_date) <= asOf
+    ? {
+        source: 'confirmed' as const,
+        anchorDate: dateText(rotationAnchor.anchor_date),
+        currentRoutineAtAnchor: rotationAnchor.current_routine_code,
+        completedAtAnchor: Number(rotationAnchor.completed_at_anchor),
+        state: deriveRoutineRotation(
+          specs,
+          { currentRoutineCode: rotationAnchor.current_routine_code,
+            alreadyCompletedInCurrent: Number(rotationAnchor.completed_at_anchor) },
+          buildTrainingRoutineCredits(
+            await performedExerciseEvidence(dateText(rotationAnchor.anchor_date), asOf),
+          ),
+          await loadRotationEnds(plan.id, asOf),
+          asOf,
+        ),
+      }
+    : null
+  const currentCode = rotation?.state.currentRoutineCode ?? nextCode
+  const currentState = rotation?.state.routines.find((item) => item.routineCode === currentCode)
+  const confirmedBlock = currentState?.activeBlock
+  const nextRepeatProgress = confirmedBlock && confirmedBlock.status === 'active'
+    ? { session: Math.min(confirmedBlock.target, creditedSessions(confirmedBlock) + 1),
+        total: confirmedBlock.target }
+    : rotation ? null : repeatProgressAtPosition(sequenceCodes, absoluteNextIndex)
+  const nextSession = currentCode == null
+    ? null
+    : sequence.find((item) => item.routineCode === currentCode) ?? unavailableRoutine(currentCode)
 
   return {
     asOf,
@@ -259,6 +445,10 @@ export async function getTrainingPlan(asOfInput?: string): Promise<TrainingPlanV
     today: week.find((day) => day.date === asOf) ?? null,
     week,
     completedProgrammedSessions: completed,
+    weekTraining,
+    historyReview,
+    rotationPreview,
+    rotation,
     weeklyFrequencyTarget: Number(plan.weekly_frequency_target),
   }
 }
@@ -277,7 +467,24 @@ export async function putTrainingPlan(body: unknown): Promise<TrainingPlanView> 
   }
 
   const today = await currentHealthDate()
+  const previousVersion = await loadPlanVersion(today)
+  const previousSequence = previousVersion ? await loadSequence(previousVersion.id) : []
   const previous = await getTrainingPlan(today)
+  // Editing the weekly target, preferred weekdays or note should not erase
+  // the owner's confirmed historical anchor or early-ended block decisions.
+  const preserveRotationDecisions = previousVersion != null &&
+    rotationSequenceUnchanged(previousSequence, input.sequenceRoutineCodes)
+  // Copy rotation rows only if a confirmed anchor actually exists. This also
+  // keeps pre-0051 production plans editable until the additive migration runs.
+  const priorRotationAnchor = previousVersion ? await loadRotationAnchor(previousVersion.id) : null
+  if (previousVersion && !preserveRotationDecisions) {
+    if (priorRotationAnchor && input.confirmRotationReset !== true) {
+      throw new HttpError(
+        409,
+        'Changing the routine order or session targets requires confirmation. Your old rotation remains in history, but the new sequence needs a new starting point.',
+      )
+    }
+  }
   const previousNextCode = previous.nextSession?.routineCode
   const firstNewIndex = previousNextCode == null ? -1 : input.sequenceRoutineCodes.indexOf(previousNextCode)
   const oldBlockOffset = previous.nextRepeatProgress?.session ?? 1
@@ -330,6 +537,27 @@ export async function putTrainingPlan(body: unknown): Promise<TrainingPlanView> 
         [id, weekday],
       ),
     ),
+    ...(preserveRotationDecisions && previousVersion && priorRotationAnchor ? [
+      sql.query(
+        `INSERT INTO training_plan_rotation_anchors
+           (plan_version_id, anchor_date, current_routine_code, completed_at_anchor,
+            confirmed_at, note)
+         SELECT $1::uuid, anchor_date, current_routine_code, completed_at_anchor,
+                confirmed_at, note
+           FROM training_plan_rotation_anchors
+          WHERE plan_version_id = $2::uuid`,
+        [id, previousVersion.id],
+      ),
+      sql.query(
+        `INSERT INTO training_plan_block_ends
+           (id, plan_version_id, routine_code, generation, ended_on, reason, created_at)
+         SELECT gen_random_uuid(), $1::uuid, routine_code, generation, ended_on,
+                reason, created_at
+           FROM training_plan_block_ends
+          WHERE plan_version_id = $2::uuid`,
+        [id, previousVersion.id],
+      ),
+    ] : []),
   ]
   await sql.transaction(statements)
   return getTrainingPlan(today)
@@ -504,3 +732,87 @@ export async function moveTrainingDay(body: unknown): Promise<TrainingPlanView> 
   return getTrainingPlan(today)
 }
 
+
+/**
+ * The anchor represents progress at the START of anchorDate; canonical
+ * routine-qualified workouts on that date and later are replayed from evidence.
+ */
+export async function confirmTrainingRotationAnchor(body: unknown): Promise<TrainingPlanView> {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) throw new HttpError(400, 'Invalid anchor')
+  const input = body as { anchorDate?: unknown; currentRoutineCode?: unknown; completedAtAnchor?: unknown; note?: unknown }
+  const today = await currentHealthDate()
+  const plan = await loadPlanVersion(today)
+  if (!plan) throw new HttpError(409, 'Set up a Training Plan first')
+  const sequence = await loadSequence(plan.id)
+  const specs = compactRoutineSequence(sequence)
+  const selected = specs.find((item) => item.routineCode === input.currentRoutineCode)
+  if (!selected) throw new HttpError(400, 'Choose a routine in your current plan')
+  if (typeof input.anchorDate !== 'string' || !isoDateSchema.safeParse(input.anchorDate).success ||
+      input.anchorDate > today || input.anchorDate > dateText(plan.effective_from)) {
+    throw new HttpError(400, 'Start date must be valid and no later than the plan start date')
+  }
+  if (!Number.isInteger(input.completedAtAnchor) || Number(input.completedAtAnchor) < 0 ||
+      Number(input.completedAtAnchor) >= selected.count) {
+    throw new HttpError(400, 'Starting progress must be below that routine target')
+  }
+  const note = input.note == null ? null : String(input.note).trim()
+  if (note && note.length > 500) throw new HttpError(400, 'Note must be 500 characters or fewer')
+  const sql = await getSql()
+  const ends = await sql.query(
+    'SELECT id FROM training_plan_block_ends WHERE plan_version_id = $1::uuid LIMIT 1',
+    [plan.id],
+  )
+  if (ends.length) throw new HttpError(409, 'Reopen existing early-ended blocks before changing the anchor')
+  await sql.query(
+    `INSERT INTO training_plan_rotation_anchors
+       (plan_version_id, anchor_date, current_routine_code, completed_at_anchor, note)
+     VALUES ($1::uuid, $2::date, $3, $4::int, $5)
+     ON CONFLICT (plan_version_id) DO UPDATE SET
+       anchor_date = EXCLUDED.anchor_date,
+       current_routine_code = EXCLUDED.current_routine_code,
+       completed_at_anchor = EXCLUDED.completed_at_anchor,
+       note = EXCLUDED.note, confirmed_at = now()`,
+    [plan.id, input.anchorDate, selected.routineCode, input.completedAtAnchor, note],
+  )
+  return getTrainingPlan(today)
+}
+
+export async function endTrainingRotationBlock(body: unknown): Promise<TrainingPlanView> {
+  const today = await currentHealthDate()
+  const plan = await loadPlanVersion(today)
+  const view = await getTrainingPlan(today)
+  if (!plan || !view.rotation) throw new HttpError(409, 'Confirm your routine history before ending a block')
+  const state = view.rotation.state
+  const current = state.routines.find((r) => r.routineCode === state.currentRoutineCode)
+  if (!current || current.activeBlock.status !== 'active') throw new HttpError(409, 'No current block to end')
+  const reasonInput = body != null && typeof body === 'object' && !Array.isArray(body)
+    ? (body as { reason?: unknown }).reason : null
+  if (reasonInput != null && typeof reasonInput !== 'string') throw new HttpError(400, 'Invalid reason')
+  const reason = typeof reasonInput === 'string' ? reasonInput.trim() : null
+  if (reason && reason.length > 200) throw new HttpError(400, 'Reason must be 200 characters or fewer')
+  const sql = await getSql()
+  await sql.query(
+    `INSERT INTO training_plan_block_ends (plan_version_id, routine_code, generation, ended_on, reason)
+       VALUES ($1::uuid, $2, $3::int, $4::date, $5)
+       ON CONFLICT (plan_version_id, routine_code, generation) DO NOTHING`,
+    [plan.id, current.routineCode, current.activeBlock.generation, today, reason],
+  )
+  return getTrainingPlan(today)
+}
+
+export async function reopenTrainingRotationBlock(body: unknown): Promise<TrainingPlanView> {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) throw new HttpError(400, 'Invalid block')
+  const input = body as { routineCode?: unknown; generation?: unknown }
+  if (typeof input.routineCode !== 'string' || !Number.isInteger(input.generation) ||
+      Number(input.generation) < 1) throw new HttpError(400, 'Invalid block')
+  const today = await currentHealthDate()
+  const plan = await loadPlanVersion(today)
+  if (!plan) throw new HttpError(409, 'No Training Plan configured')
+  const sql = await getSql()
+  await sql.query(
+    `DELETE FROM training_plan_block_ends
+      WHERE plan_version_id = $1::uuid AND routine_code = $2 AND generation = $3::int`,
+    [plan.id, input.routineCode, input.generation],
+  )
+  return getTrainingPlan(today)
+}

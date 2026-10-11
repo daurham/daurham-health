@@ -1,9 +1,13 @@
-import { useEffect, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { Link, useBlocker, useLocation, useSearchParams } from 'react-router-dom'
 import { dailySignalDateError, type DailySignalsDay } from '@/domain/daily-signals'
+import { shouldBlockDailyLogNavigation } from '@/domain/daily-log-navigation'
 import { formatWeekdayCalendarDate } from '@/domain/calendar-format'
 import { DAILY_PARTICIPATION_XP, participationDateEligible } from '@/domain/rewards'
 import { BristolReferenceChart } from './BristolReferenceChart'
+import { HealthDateField } from '@/components/HealthDateField'
+import { DailyContextSection } from '@/features/context/DailyContextSection'
+import { DailySupplementsSection } from './DailySupplementsSection'
 import { primaryButtonClass, quietButtonClass, useHealthCalendarDate } from '@/lib'
 import { prefixedPath, useAppPathPrefix } from '@/lib/app-prefix'
 import {
@@ -33,6 +37,7 @@ const EMPTY_WELLNESS: WellnessDraft = { energy: null, hunger: null, soreness: nu
 
 export function DailyCheckInPage() {
   const [search, setSearch] = useSearchParams()
+  const location = useLocation()
   const today = useHealthCalendarDate()
   const requested = search.get('date')?.trim() ?? ''
   const date = requested || today
@@ -45,6 +50,41 @@ export function DailyCheckInPage() {
   const [busy, setBusy] = useState(false)
   const [showBristol, setShowBristol] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [contextDirty, setContextDirty] = useState(false)
+  const wellnessDirty = day != null && (
+    wellness.energy !== (day.wellness?.energy ?? null) ||
+    wellness.hunger !== (day.wellness?.hunger ?? null) ||
+    wellness.soreness !== (day.wellness?.soreness ?? null) ||
+    wellness.stress !== (day.wellness?.stress ?? null)
+  )
+  const hasUnsavedChanges = contextDirty || wellnessDirty
+  const blocker = useBlocker(({ currentLocation, nextLocation }) =>
+    shouldBlockDailyLogNavigation(hasUnsavedChanges, currentLocation, nextLocation))
+  const handledBlockedNavigation = useRef(false)
+
+  useEffect(() => {
+    if (blocker.state !== 'blocked') {
+      handledBlockedNavigation.current = false
+      return
+    }
+    if (handledBlockedNavigation.current) return
+    handledBlockedNavigation.current = true
+    if (window.confirm('Discard unsaved Daily Log changes and leave this page?')) {
+      blocker.proceed()
+    } else {
+      blocker.reset()
+    }
+  }, [blocker])
+
+  useEffect(() => {
+    if (!hasUnsavedChanges) return
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [hasUnsavedChanges])
 
   async function load(signal?: AbortSignal) {
     if (dateError) return
@@ -75,12 +115,23 @@ export function DailyCheckInPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date, dateError])
 
-  async function mutate(action: () => Promise<unknown>) {
+  useEffect(() => {
+    if (loading || dateError || location.hash !== '#daily-context') return
+    document.getElementById('daily-context')?.scrollIntoView({ block: 'start' })
+  }, [loading, date, dateError, location.hash])
+
+  // Save just the affected domain; never replace the whole page with a loading
+  // skeleton or allow a late response to update a different selected date.
+  async function mutate<T>(
+    action: () => Promise<T>,
+    apply: (current: DailySignalsDay, value: T) => DailySignalsDay,
+  ) {
+    const actionDate = date
     setBusy(true)
     setError(null)
     try {
-      await action()
-      await load()
+      const value = await action()
+      setDay((current) => current?.date === actionDate ? apply(current, value) : current)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not save daily check-in.')
     } finally {
@@ -95,25 +146,24 @@ export function DailyCheckInPage() {
     <section className="mx-auto max-w-3xl space-y-4 pb-8">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm text-zinc-500">Daily check-in</p>
+          <p className="text-sm text-accent">Daily Log</p>
           <h1 className="text-2xl font-semibold tracking-tight">{formatWeekdayCalendarDate(date)}</h1>
           <p className="mt-1 text-sm text-zinc-600">Missing stays unknown. Record only what you actually tracked.</p>
         </div>
         <Link to={prefixedPath(prefix, '/')} className={quietButtonClass}>Today</Link>
       </div>
 
-      <label className="block rounded-lg border border-zinc-200 bg-white p-4 text-sm font-medium text-zinc-700">
-        Health date
-        <div className="mt-1 w-full min-w-0 max-w-full overflow-hidden rounded-md border border-zinc-300 px-3 focus-within:ring-2 focus-within:ring-accent">
-          <input
-            type="date"
-            value={date}
-            max={today}
-            onChange={(event) => setSearch({ date: event.target.value })}
-            className="daily-checkin-date-input flex min-h-11 min-w-0 w-full max-w-full box-border items-center appearance-none border-0 bg-transparent p-0 text-left text-base"
-          />
-        </div>
-      </label>
+      <div className="min-w-0 rounded-xl border border-zinc-200 bg-white p-4">
+        <HealthDateField
+          date={date}
+          max={today}
+          showNavigation
+          disabled={busy}
+          onDateChange={(next) => {
+            if (next !== date) setSearch({ date: next })
+          }}
+        />
+      </div>
 
       {dateError ? <p className="rounded-md bg-red-50 p-3 text-sm text-red-800">{dateError}</p> : null}
       {error ? <p className="rounded-md bg-red-50 p-3 text-sm text-red-800">{error}</p> : null}
@@ -121,14 +171,17 @@ export function DailyCheckInPage() {
 
       {!loading && !dateError ? (
         <>
-          <section className="rounded-lg border border-zinc-200 bg-white p-4">
-            <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">Water</h2>{xpEligible ? <span className="text-xs font-semibold text-reward">+{DAILY_PARTICIPATION_XP.hydration} XP · first log</span> : null}</div>
+          <section className="rounded-xl border border-info/25 bg-white p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold text-info">Water</h2>{xpEligible ? <span className="text-xs font-semibold text-reward">+{DAILY_PARTICIPATION_XP.hydration} XP · first log</span> : null}</div>
             <p className="mt-1 text-sm text-zinc-600">
               {day?.hydrationEvents.length ? `${Math.round(totalWater)} oz logged` : 'No water tracking recorded for this day.'}
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
               {WATER_AMOUNTS.map((amount) => (
-                <button key={amount} type="button" disabled={busy} className={quietButtonClass} onClick={() => void mutate(() => addHydrationEvent(date, amount))}>
+                <button key={amount} type="button" disabled={busy} className={quietButtonClass} onClick={() => void mutate(
+                  () => addHydrationEvent(date, amount),
+                  (current, event) => ({ ...current, hydrationEvents: [...current.hydrationEvents, event] }),
+                )}>
                   +{amount} oz
                 </button>
               ))}
@@ -147,10 +200,14 @@ export function DailyCheckInPage() {
                 disabled={busy || !(Number(customWater) > 0)}
                 onClick={() => {
                   const amount = Number(customWater)
-                  void mutate(async () => {
-                    await addHydrationEvent(date, amount)
-                    setCustomWater('')
-                  })
+                  void mutate(
+                    async () => {
+                      const event = await addHydrationEvent(date, amount)
+                      setCustomWater('')
+                      return event
+                    },
+                    (current, event) => ({ ...current, hydrationEvents: [...current.hydrationEvents, event] }),
+                  )
                 }}
               >
                 Add
@@ -161,15 +218,21 @@ export function DailyCheckInPage() {
                 {day.hydrationEvents.map((event) => (
                   <li key={event.id} className="flex items-center justify-between gap-3 rounded-md bg-zinc-50 px-3 py-2">
                     <span>{Math.round(event.amountOz * 10) / 10} oz</span>
-                    <button type="button" disabled={busy} className="min-h-11 text-zinc-600 hover:underline" onClick={() => void mutate(() => deleteHydrationEvent(event.id))}>Remove</button>
+                    <button type="button" disabled={busy} className="min-h-11 text-zinc-600 hover:underline" onClick={() => void mutate(
+                      async () => { await deleteHydrationEvent(event.id); return event.id },
+                      (current, id) => ({
+                        ...current,
+                        hydrationEvents: current.hydrationEvents.filter((entry) => entry.id !== id),
+                      }),
+                    )}>Remove</button>
                   </li>
                 ))}
               </ul>
             ) : null}
           </section>
 
-          <section className="rounded-lg border border-zinc-200 bg-white p-4">
-            <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">Bowel</h2>{xpEligible ? <span className="text-xs font-semibold text-reward">+{DAILY_PARTICIPATION_XP.bowel} XP · one/day</span> : null}</div>
+          <section className="rounded-xl border border-accent-secondary/25 bg-white p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold text-accent-secondary">Bowel</h2>{xpEligible ? <span className="text-xs font-semibold text-reward">+{DAILY_PARTICIPATION_XP.bowel} XP · one/day</span> : null}</div>
             <p className="mt-1 text-sm text-zinc-600">
               {day?.noBowelMovement
                 ? 'Explicitly recorded: no bowel movement.'
@@ -183,16 +246,25 @@ export function DailyCheckInPage() {
             </div>
             <div className="mt-2 grid grid-cols-7 gap-1.5">
               {BRISTOL_TYPES.map((type) => (
-                <button key={type} type="button" disabled={busy} aria-label={`Log Bristol type ${type}`} className="flex min-h-11 min-w-0 items-center justify-center rounded-md border border-zinc-300 text-sm font-medium hover:bg-accent-muted" onClick={() => void mutate(() => addBowelEvent(date, type))}>
+                <button key={type} type="button" disabled={busy} aria-label={`Log Bristol type ${type}`} className="flex min-h-11 min-w-0 items-center justify-center rounded-md border border-zinc-300 text-sm font-medium hover:bg-accent-muted" onClick={() => void mutate(
+                  () => addBowelEvent(date, type),
+                  (current, event) => ({ ...current, noBowelMovement: false, bowelEvents: [...current.bowelEvents, event] }),
+                )}>
                   {type}
                 </button>
               ))}
             </div>
             <div className="mt-3">
               {day?.noBowelMovement ? (
-                <button type="button" disabled={busy} className={quietButtonClass} onClick={() => void mutate(() => clearNoBowelMovement(date))}>Clear no-BM state</button>
+                <button type="button" disabled={busy} className={quietButtonClass} onClick={() => void mutate(
+                  () => clearNoBowelMovement(date),
+                  (current) => ({ ...current, noBowelMovement: false }),
+                )}>Clear no-BM state</button>
               ) : (
-                <button type="button" disabled={busy || Boolean(day?.bowelEvents.length)} className={quietButtonClass} onClick={() => void mutate(() => setNoBowelMovement(date))}>No bowel movement this day</button>
+                <button type="button" disabled={busy || Boolean(day?.bowelEvents.length)} className={quietButtonClass} onClick={() => void mutate(
+                  () => setNoBowelMovement(date),
+                  (current) => ({ ...current, noBowelMovement: true }),
+                )}>No bowel movement this day</button>
               )}
             </div>
             {day?.bowelEvents.length ? (
@@ -200,15 +272,21 @@ export function DailyCheckInPage() {
                 {day.bowelEvents.map((event) => (
                   <li key={event.id} className="flex items-center justify-between gap-3 rounded-md bg-zinc-50 px-3 py-2">
                     <span>Bristol type {event.bristolType}</span>
-                    <button type="button" disabled={busy} className="min-h-11 text-zinc-600 hover:underline" onClick={() => void mutate(() => deleteBowelEvent(event.id))}>Remove</button>
+                    <button type="button" disabled={busy} className="min-h-11 text-zinc-600 hover:underline" onClick={() => void mutate(
+                      async () => { await deleteBowelEvent(event.id); return event.id },
+                      (current, id) => ({
+                        ...current,
+                        bowelEvents: current.bowelEvents.filter((entry) => entry.id !== id),
+                      }),
+                    )}>Remove</button>
                   </li>
                 ))}
               </ul>
             ) : null}
           </section>
 
-          <section className="rounded-lg border border-zinc-200 bg-white p-4">
-            <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">How do you feel?</h2>{xpEligible ? <span className="text-xs font-semibold text-reward">+{DAILY_PARTICIPATION_XP.wellness} XP · one/day</span> : null}</div>
+          <section className="rounded-xl border border-accent/25 bg-white p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold text-accent">How do you feel?</h2>{xpEligible ? <span className="text-xs font-semibold text-reward">+{DAILY_PARTICIPATION_XP.wellness} XP · one/day</span> : null}</div>
             <p className="mt-1 text-sm text-zinc-600">1 is low / mild; 5 is high / strong. Stress is optional.</p>
             <div className="mt-4 space-y-4">
               {(['energy', 'hunger', 'soreness', 'stress'] as const).map((key) => (
@@ -235,7 +313,10 @@ export function DailyCheckInPage() {
               type="button"
               className={`${primaryButtonClass} mt-4`}
               disabled={busy || Object.values(wellness).every((value) => value == null)}
-              onClick={() => void mutate(() => saveDailyWellness(date, wellness))}
+              onClick={() => void mutate(
+                () => saveDailyWellness(date, wellness),
+                (current, saved) => ({ ...current, wellness: saved }),
+              )}
             >
               Save check-in
             </button>
@@ -244,20 +325,21 @@ export function DailyCheckInPage() {
                 type="button"
                 className={`${quietButtonClass} ml-2 mt-4`}
                 disabled={busy}
-                onClick={() => void mutate(() => clearDailyWellness(date))}
+                onClick={() => void mutate(
+                  async () => { await clearDailyWellness(date); setWellness(EMPTY_WELLNESS) },
+                  (current) => ({ ...current, wellness: null }),
+                )}
               >
                 Clear ratings
               </button>
             ) : null}
           </section>
 
-          <section className="rounded-lg border border-zinc-200 bg-white p-4">
-            <h2 className="font-semibold">Context</h2>
-            <p className="mt-1 text-sm text-zinc-600">Travel, illness, unusual stress, pain, rest-day context, and notes stay in the existing Daily Context authority.</p>
-            <Link to={prefixedPath(prefix, `/context?date=${date}&from=check-in`)} className={`${quietButtonClass} mt-3`}>
-              Add or edit context
-            </Link>
-          </section>
+          <DailySupplementsSection date={date} />
+
+          <div id="daily-context" className="scroll-mt-24">
+            <DailyContextSection key={date} date={date} onDirtyChange={setContextDirty} />
+          </div>
         </>
       ) : null}
       {showBristol ? <BristolReferenceChart onClose={() => setShowBristol(false)} /> : null}

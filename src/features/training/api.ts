@@ -265,3 +265,30 @@ export async function movePlannedTrainingDay(
   if (!response.ok) throw new Error(await readApiError(response))
   return (await response.json()).plan as TrainingPlanView
 }
+
+export async function confirmRotationAnchor(input: {
+  anchorDate: string; currentRoutineCode: string; completedAtAnchor: number; note?: string | null
+}): Promise<TrainingPlanView> {
+  const response = await healthFetch('/api/training/plan/anchor', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+  })
+  if (!response.ok) throw new Error(await readApiError(response))
+  return (await response.json()).plan as TrainingPlanView
+}
+
+export async function endRotationBlock(reason: string | null): Promise<TrainingPlanView> {
+  const response = await healthFetch('/api/training/plan/blocks/end', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason }),
+  })
+  if (!response.ok) throw new Error(await readApiError(response))
+  return (await response.json()).plan as TrainingPlanView
+}
+
+export async function reopenRotationBlock(routineCode: string, generation: number): Promise<TrainingPlanView> {
+  const response = await healthFetch('/api/training/plan/blocks/reopen', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ routineCode, generation }),
+  })
+  if (!response.ok) throw new Error(await readApiError(response))
+  return (await response.json()).plan as TrainingPlanView
+}

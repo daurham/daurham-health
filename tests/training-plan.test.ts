@@ -83,3 +83,20 @@ describe('Training Plan domain', () => {
     expect(nextRoutineCode(sequence, ['B'])).toBe('C')
   })
 })
+
+describe('confirmed rotation reset guard', () => {
+  it('has an explicitly opt-in reset flag, never a default confirmation', () => {
+    const input = {
+      weeklyFrequencyTarget: 3,
+      defaultNonTrainingIntent: 'flexible',
+      preferredWeekdays: [1, 3, 5],
+      sequenceRoutineCodes: ['A', 'B', 'C'],
+      note: null,
+    }
+    expect(trainingPlanInputSchema.parse(input).confirmRotationReset).toBeUndefined()
+    expect(trainingPlanInputSchema.parse({ ...input, confirmRotationReset: true }).confirmRotationReset).toBe(true)
+    expect(trainingPlanInputSchema.safeParse({ ...input, confirmRotationReset: 'true' }).success).toBe(false)
+    const service = readFileSync('server/training/plan-service.ts', 'utf8')
+    expect(service).toContain('input.confirmRotationReset !== true')
+  })
+})
