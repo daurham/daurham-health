@@ -17,6 +17,7 @@ import {
   type TrainingPlanView,
 } from '../../src/domain/training-plan.js'
 import { isoDateSchema } from '../../src/domain/training.js'
+import { buildTrainingWeekQualification, type PerformedExerciseEvidence } from '../../src/domain/training-qualification.js'
 import { getSql } from '../db.js'
 import { currentHealthDate } from '../health-time.js'
 import { HttpError } from '../http.js'
@@ -153,6 +154,46 @@ async function completedRoutineCodes(
   return rows.flatMap((row) => row.routine_code == null ? [] : [row.routine_code])
 }
 
+/**
+ * Read performed Training exercises across every session kind and the *whole*
+ * calendar week, including workouts saved before the Training Plan existed.
+ * Never derive a weekly completion from the number of session rows.
+ */
+async function performedExerciseEvidence(start: string, asOf: string): Promise<PerformedExerciseEvidence[]> {
+  const sql = await getSql()
+  const rows = (await sql.query(
+    `SELECT DISTINCT sessions.workout_date::text AS date,
+            session_exercises.exercise_definition_id::text AS exercise_id,
+            sessions.routine_code
+       FROM workout_sessions sessions
+       JOIN workout_session_exercises session_exercises
+         ON session_exercises.workout_session_id = sessions.id
+      WHERE sessions.workout_date BETWEEN $1::date AND $2::date
+        AND sessions.session_type IN ('programmed', 'ad_hoc', 'experiment')
+        AND EXISTS (
+          SELECT 1 FROM workout_sets sets
+           WHERE sets.workout_session_exercise_id = session_exercises.id
+             AND sets.set_type <> 'warmup'
+             AND (
+               COALESCE(sets.reps, 0) > 0
+               OR COALESCE(sets.duration_sec, 0) > 0
+               OR COALESCE(sets.left_reps, 0) > 0
+               OR COALESCE(sets.right_reps, 0) > 0
+               OR COALESCE(sets.left_duration_sec, 0) > 0
+               OR COALESCE(sets.right_duration_sec, 0) > 0
+               OR COALESCE(sets.distance_m, 0) > 0
+               OR sets.completed = true
+             )
+        )`,
+    [start, asOf],
+  )) as Array<{ date: string; exercise_id: string; routine_code: string | null }>
+  return rows.map((row) => ({
+    date: row.date,
+    exerciseId: row.exercise_id,
+    routineCode: row.routine_code,
+  }))
+}
+
 async function completedProgrammedSessions(
   sequence: readonly string[],
   start: string,
@@ -188,6 +229,7 @@ export async function getTrainingPlan(asOfInput?: string): Promise<TrainingPlanV
       today: null,
       week: [],
       completedProgrammedSessions: 0,
+      weekTraining: null,
       weeklyFrequencyTarget: null,
     }
   }
@@ -201,11 +243,13 @@ export async function getTrainingPlan(asOfInput?: string): Promise<TrainingPlanV
   const end = addCalendarDays(start, 6)
   const effectiveFrom = dateText(plan.effective_from)
   const applicableStart = effectiveFrom > start ? effectiveFrom : start
-  const [overrides, completedCodes, completed] = await Promise.all([
+  const [overrides, completedCodes, completed, performedEvidence] = await Promise.all([
     loadOverrides(applicableStart, end),
     completedRoutineCodes(sequenceCodes, effectiveFrom, asOf, plan.created_at),
     completedProgrammedSessions(sequenceCodes, applicableStart, end),
+    performedExerciseEvidence(start, asOf),
   ])
+  const weekTraining = buildTrainingWeekQualification(performedEvidence, asOf)
 
   const week: TrainingPlanDay[] = Array.from({ length: 7 }, (_, index) => {
     const date = addCalendarDays(start, index)
@@ -259,6 +303,7 @@ export async function getTrainingPlan(asOfInput?: string): Promise<TrainingPlanV
     today: week.find((day) => day.date === asOf) ?? null,
     week,
     completedProgrammedSessions: completed,
+    weekTraining,
     weeklyFrequencyTarget: Number(plan.weekly_frequency_target),
   }
 }
