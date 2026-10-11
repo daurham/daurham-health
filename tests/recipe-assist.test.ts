@@ -377,7 +377,7 @@ describe('recipe text draft assistant', () => {
     expect(recipes).not.toContain('recipe_assist')
     expect(handler).not.toContain('BODY_CAPTURE_TOKEN')
     expect(inventory).not.toContain('recipe_assist')
-    expect(LATEST_SCHEMA_MIGRATION).toBe('0050_training_plan_repeat_blocks.sql')
+    expect(LATEST_SCHEMA_MIGRATION).toBe('0051_training_rotation_anchors.sql')
     expect(readdirSync('migrations')).toContain('0035_coach_tasks.sql')
     expect(readFileSync('src/demo/dataset.ts', 'utf8')).not.toContain('healthFetch')
     expect(readFileSync('src/features/demo/DemoNutritionPage.tsx', 'utf8')).not.toContain('/api/nutrition/recipes/assist')

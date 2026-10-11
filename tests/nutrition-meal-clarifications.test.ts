@@ -328,7 +328,7 @@ describe('clarification reanalysis boundaries', () => {
     expect(commit).not.toContain('clarification')
     expect(commit).toContain("'photo_ai'")
     expect(readdirSync('migrations')).toContain('0035_coach_tasks.sql')
-    expect(LATEST_SCHEMA_MIGRATION).toBe('0050_training_plan_repeat_blocks.sql')
+    expect(LATEST_SCHEMA_MIGRATION).toBe('0051_training_rotation_anchors.sql')
     expect(BACKUP_TABLES.map((table) => table.name)).not.toContain('meal_clarifications')
     expect(BACKUP_TABLES.find((table) => table.name === 'nutrition_capture_jobs')).toMatchObject({
       backupClass: 'operational',
