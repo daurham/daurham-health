@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   buildTodaySupplementSection,
@@ -17,6 +17,7 @@ import { quietButtonClass } from '@/lib'
  */
 export function DailySupplementsSection({ date }: { date: string }) {
   const [records, setRecords] = useState<SupplementRecord[] | null>(null)
+  const requestGeneration = useRef(0)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const prefix = useAppPathPrefix()
@@ -24,6 +25,8 @@ export function DailySupplementsSection({ date }: { date: string }) {
 
   useEffect(() => {
     let cancelled = false
+    requestGeneration.current += 1
+    setBusyId(null)
     setRecords(null)
     setError(null)
     fetchSupplements()
@@ -37,6 +40,7 @@ export function DailySupplementsSection({ date }: { date: string }) {
   async function record(item: TodaySupplementItem, action: AdherenceAction) {
     if (readOnly || busyId) return
     const itemKey = item.scheduleId
+    const generation = ++requestGeneration.current
     setBusyId(itemKey)
     setError(null)
     try {
@@ -49,11 +53,13 @@ export function DailySupplementsSection({ date }: { date: string }) {
       // Refresh only this supplement section; preserve the surrounding
       // hydration, bowel, wellness, context and selected-date UI.
       const refreshed = await fetchSupplements()
-      setRecords(refreshed.supplements)
+      if (requestGeneration.current === generation) setRecords(refreshed.supplements)
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not record supplement dose.')
+      if (requestGeneration.current === generation) {
+        setError(cause instanceof Error ? cause.message : 'Could not record supplement dose.')
+      }
     } finally {
-      setBusyId(null)
+      if (requestGeneration.current === generation) setBusyId(null)
     }
   }
 
