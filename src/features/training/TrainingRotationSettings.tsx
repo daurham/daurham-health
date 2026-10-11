@@ -3,6 +3,7 @@ import type { TrainingPlanView } from '@/domain/training-plan'
 import { compactRoutineSequence } from '@/domain/training-plan'
 import { creditedSessions } from '@/domain/training-blocks'
 import { primaryButtonClass, quietButtonClass } from '@/lib'
+import { useDemoReadOnly } from '@/lib/app-prefix'
 import { HealthDateField } from '@/components/HealthDateField'
 import { confirmRotationAnchor, endRotationBlock, reopenRotationBlock } from './api'
 
@@ -13,6 +14,7 @@ export function TrainingRotationSettings({
   onChanged: (next: TrainingPlanView) => void
   busy: boolean
 }) {
+  const readOnly = useDemoReadOnly()
   const specs = compactRoutineSequence(plan.baseline?.sequence.map((s) => s.routineCode) ?? [])
   const [anchorDate, setAnchorDate] = useState(plan.baseline?.effectiveFrom ?? plan.asOf)
   const [routine, setRoutine] = useState(plan.rotation?.state.currentRoutineCode ??
@@ -25,7 +27,7 @@ export function TrainingRotationSettings({
   const maxCount = Math.max(0, (specs.find((spec) => spec.routineCode === routine)?.count ?? 1) - 1)
 
   async function submit(action: () => Promise<TrainingPlanView>) {
-    if (saving || busy) return
+    if (saving || busy || readOnly) return
     setSaving(true)
     setError(null)
     setMessage(null)
@@ -82,7 +84,7 @@ export function TrainingRotationSettings({
               onChange={(e) => setCompleted(Math.max(0, Math.min(maxCount, Number(e.target.value) || 0)))}
               className="mt-1 block min-h-11 w-24 rounded-lg border border-zinc-300 bg-white px-3 text-base" />
           </label>
-          <button type="button" className={primaryButtonClass} disabled={busy || saving}
+          <button type="button" className={primaryButtonClass} disabled={busy || saving || readOnly}
             onClick={() => void submit(() => confirmRotationAnchor({
               anchorDate, currentRoutineCode: routine, completedAtAnchor: completed,
             }))}>
@@ -98,7 +100,7 @@ export function TrainingRotationSettings({
           <p className="text-xs text-zinc-600">This closes the block without creating missing workouts.</p>
           <input value={reason} maxLength={200} onChange={(e) => setReason(e.target.value)}
             placeholder="Reason (optional)" className="min-h-11 w-full rounded-lg border border-zinc-300 bg-white px-3 text-base" />
-          <button type="button" className={quietButtonClass} disabled={saving || busy}
+          <button type="button" className={quietButtonClass} disabled={saving || busy || readOnly}
             onClick={() => {
               if (window.confirm('End this routine block early without adding workouts?')) {
                 void submit(() => endRotationBlock(reason.trim() || null))

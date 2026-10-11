@@ -66,3 +66,8 @@
 - Confirmed rotations replay performed evidence from anchor date rather than guessing mutable counters, and guide the next routine; unconfirmed plans continue to show an explicit preview.
 - Training Plan UI now has a historical anchor confirmation form, “Finish block early” and “Reopen block.”
 - **Deployment gate:** 0051 is NOT applied to production. This code requires migration and full DB/backup QA before release. Historical starting-point suggestions and version-to-version continuity still need additional work.
+
+## Backup and UI scope (staged)
+- Registered 0051 as the schema head and listed both owner-decision tables in full and portable backup inventory in dependency order.
+- Moved the seven-day optional manual scheduler into a collapsed advanced section; the weekly goal now names *qualifying training days* instead of programmed sessions.
+- No live data migration or deployment has been performed. CI, migration fixture compatibility, history preview and owner validation are mandatory gates.

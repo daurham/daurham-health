@@ -209,7 +209,7 @@ export function TrainingPlanPage() {
         </div>
 
         <label className="block text-sm font-medium text-zinc-700">
-          Weekly programmed-session target
+          Qualifying training days per week
           <input
             type="number"
             min="1"
@@ -316,7 +316,11 @@ export function TrainingPlanPage() {
       ) : null}
 
       {plan?.configured ? (
-        <section className="space-y-4 rounded-lg border border-zinc-200 bg-white p-4">
+        <details className="rounded-lg border border-zinc-200 bg-white">
+          <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-accent">
+            Advanced weekly planning (optional)
+          </summary>
+          <section className="space-y-4 border-t border-zinc-200 p-4">
           <div>
             <h2 className="font-semibold">Adjust this week</h2>
             <p className="mt-1 text-sm text-zinc-500">
@@ -376,7 +380,8 @@ export function TrainingPlanPage() {
               </button>
             </div>
           </div>
-        </section>
+          </section>
+        </details>
       ) : null}
 
       <p className="text-xs leading-5 text-zinc-500">
