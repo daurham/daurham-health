@@ -77,3 +77,9 @@
 - Populate historical rotation confirmation form from the saved starting routine, starting date and already-completed count; re-synchronize the fields after successful owner confirmation.
 - Add a domain test for unchanged vs changed routine-sequence identity.
 - Still gated: historical suggestions, full migration/backup roundtrip, conflicting retrospective edits, mobile QA, and production approval.
+
+## Historical starting-point reconciliation (owner approval)
+- The Training Plan now offers a **read-only list of qualifying routine days** from the 12 weeks before plan setup and a deliberately tentative starting-point suggestion.
+- Selecting “Use suggested starting point” fills the anchor fields, but **does not save** or invent sessions; owner must explicitly confirm.
+- Suggestion prefers the earliest routine with observed but incomplete progress; a fallback suggests the next routine after the last observed qualified routine. Multiple overlapping cycles remain ambiguous and require manual review.
+- Changing the plan version re-synchronizes anchor input state so old unconfirmed form values do not persist.

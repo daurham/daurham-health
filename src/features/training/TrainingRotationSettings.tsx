@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { TrainingPlanView } from '@/domain/training-plan'
 import { compactRoutineSequence } from '@/domain/training-plan'
 import { creditedSessions } from '@/domain/training-blocks'
@@ -26,6 +26,25 @@ export function TrainingRotationSettings({
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const maxCount = Math.max(0, (specs.find((spec) => spec.routineCode === routine)?.count ?? 1) - 1)
+  const review = plan.historyReview
+
+  useEffect(() => {
+    setAnchorDate(plan.rotation?.anchorDate ?? plan.baseline?.effectiveFrom ?? plan.asOf)
+    setRoutine(plan.rotation?.currentRoutineAtAnchor ??
+      plan.rotationPreview?.state.currentRoutineCode ?? specs[0]?.routineCode ?? '')
+    setCompleted(plan.rotation?.completedAtAnchor ?? 0)
+  }, [
+    plan.baseline?.version, plan.rotation?.anchorDate,
+    plan.rotation?.currentRoutineAtAnchor, plan.rotation?.completedAtAnchor,
+  ])
+
+  function applySuggestedHistory() {
+    if (!review?.suggestion) return
+    setAnchorDate(plan.baseline?.effectiveFrom ?? plan.asOf)
+    setRoutine(review.suggestion.routineCode)
+    setCompleted(review.suggestion.completedAtAnchor)
+    setMessage('Suggestion filled in. Review the logged dates and confirm when it looks correct.')
+  }
 
   async function submit(action: () => Promise<TrainingPlanView>) {
     if (saving || busy || readOnly) return
@@ -71,6 +90,40 @@ export function TrainingRotationSettings({
           {plan.rotation ? 'Review or adjust starting history' : 'Confirm starting history'}
         </summary>
         <div className="mt-3 space-y-3">
+          {review?.eligibleDays.length ? (
+            <div className="space-y-2 rounded-lg border border-accent-secondary/25 bg-white p-3">
+              <p className="text-sm font-semibold text-zinc-800">Recent qualifying routine days</p>
+              <p className="text-xs text-zinc-600">
+                Evidence from the 12 weeks before plan setup. Dates are grouped from actual performed exercises,
+                not invented workouts.
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {review.eligibleDays.map((day) => (
+                  <span key={day.date + day.routineCode}
+                    className="rounded-md bg-accent-muted px-2 py-1 text-xs font-medium text-accent">
+                    {day.date} · {day.routineCode}
+                  </span>
+                ))}
+              </div>
+              {review.suggestion ? (
+                <div className="space-y-1.5">
+                  <p className="text-xs text-zinc-600">
+                    Suggested start: {review.suggestion.routineCode} {review.suggestion.completedAtAnchor}/
+                    {specs.find((s) => s.routineCode === review.suggestion?.routineCode)?.count ?? '?'}.
+                    {' '}{review.suggestion.reason}
+                  </p>
+                  <button type="button" className={quietButtonClass}
+                    disabled={readOnly || saving} onClick={applySuggestedHistory}>
+                    Use suggested starting point
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          ) : !plan.rotation ? (
+            <p className="text-xs text-zinc-600">
+              No qualifying routine days found in the 12 weeks before this plan. Choose a starting point manually.
+            </p>
+          ) : null}
           <p className="text-xs text-zinc-600">
             Starting credits means how many sessions you had finished BEFORE the selected date.
             Qualifying recorded routine days on and after that date are added automatically.

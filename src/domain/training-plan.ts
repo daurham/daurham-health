@@ -108,6 +108,11 @@ export type TrainingPlanView = {
   today: TrainingPlanDay | null
   week: TrainingPlanDay[]
   completedProgrammedSessions: number // Legacy counter, not the weekly qualification target.
+  historyReview?: {
+    lookbackStart: string
+    eligibleDays: Array<{ date: string; routineCode: string }>
+    suggestion: { routineCode: string; completedAtAnchor: number; reason: string } | null
+  } | null
   weekTraining?: TrainingWeekQualification | null
   rotationPreview?: { source: 'provisional'; firstTrackedDate: string; state: RoutineRotationState } | null
   rotation?: {

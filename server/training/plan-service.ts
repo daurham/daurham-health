@@ -262,6 +262,7 @@ export async function getTrainingPlan(asOfInput?: string): Promise<TrainingPlanV
       week: [],
       completedProgrammedSessions: 0,
       weekTraining: null,
+      historyReview: null,
       rotationPreview: null,
       rotation: null,
       weeklyFrequencyTarget: null,
@@ -321,6 +322,42 @@ export async function getTrainingPlan(asOfInput?: string): Promise<TrainingPlanV
   const specs = compactRoutineSequence(sequenceCodes).map((block) => ({
     routineCode: block.routineCode, target: block.count,
   }))
+  // Only propose a starting point; never silently rewrite pre-plan history.
+  // The user confirms this in the Training Plan before any official replay.
+  const lookbackStart = addCalendarDays(effectiveFrom, -84)
+  const priorEvidence = rotationAnchor ? [] : await performedExerciseEvidence(
+    lookbackStart, addCalendarDays(effectiveFrom, -1),
+  )
+  const historicalCredits = buildTrainingRoutineCredits(priorEvidence)
+  const eligibleDays = historicalCredits.map((item) => ({
+    date: item.date, routineCode: item.routineCode,
+  }))
+  const historyCounts = specs.map((spec) => ({
+    ...spec,
+    observed: historicalCredits.filter((item) => item.routineCode === spec.routineCode).length,
+  }))
+  // Earliest observed unfinished block is an informed starting suggestion.
+  // Recorded partial future routines do not force the current pointer ahead.
+  const incomplete = historyCounts.find((item) => item.observed > 0 && item.observed < item.target)
+  const lastCode = historicalCredits[historicalCredits.length - 1]?.routineCode
+  const lastIndex = historyCounts.findIndex((item) => item.routineCode === lastCode)
+  const fallback = lastIndex >= 0
+    ? historyCounts[(lastIndex + 1) % historyCounts.length]
+    : null
+  const suggestion = incomplete
+    ? {
+        routineCode: incomplete.routineCode,
+        completedAtAnchor: incomplete.observed,
+        reason: 'Based on logged, qualifying work in this routine. Review other routines before confirming.',
+      }
+    : fallback ? {
+        routineCode: fallback.routineCode,
+        completedAtAnchor: 0,
+        reason: 'Suggested following your most recently logged routine. Verify this against your training history.',
+      } : null
+  const historyReview = rotationAnchor
+    ? null
+    : { lookbackStart, eligibleDays: eligibleDays.slice(-24).reverse(), suggestion }
   const startProgress = repeatProgressAtPosition(sequenceCodes, startPosition - 1)
   const rotationPreview = specs.length
     ? {
@@ -383,6 +420,7 @@ export async function getTrainingPlan(asOfInput?: string): Promise<TrainingPlanV
     week,
     completedProgrammedSessions: completed,
     weekTraining,
+    historyReview,
     rotationPreview,
     rotation,
     weeklyFrequencyTarget: Number(plan.weekly_frequency_target),
