@@ -49,6 +49,22 @@ export function DailyCheckInPage() {
   const [showBristol, setShowBristol] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [contextDirty, setContextDirty] = useState(false)
+  const wellnessDirty = day != null && (
+    wellness.energy !== (day.wellness?.energy ?? null) ||
+    wellness.hunger !== (day.wellness?.hunger ?? null) ||
+    wellness.soreness !== (day.wellness?.soreness ?? null) ||
+    wellness.stress !== (day.wellness?.stress ?? null)
+  )
+  const hasUnsavedChanges = contextDirty || wellnessDirty
+  useEffect(() => {
+    if (!hasUnsavedChanges) return
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [hasUnsavedChanges])
 
   async function load(signal?: AbortSignal) {
     if (dateError) return
@@ -113,7 +129,7 @@ export function DailyCheckInPage() {
           to={prefixedPath(prefix, '/')}
           className={quietButtonClass}
           onClick={(event) => {
-            if (contextDirty && !window.confirm('Leave with unsaved context changes?')) {
+            if (hasUnsavedChanges && !window.confirm('Leave with unsaved Daily Log changes?')) {
               event.preventDefault()
             }
           }}
@@ -125,15 +141,10 @@ export function DailyCheckInPage() {
           date={date}
           max={today}
           showNavigation
+          disabled={busy}
           onDateChange={(next) => {
             if (next === date) return
-            const wellnessDirty = day != null && (
-              wellness.energy !== (day.wellness?.energy ?? null) ||
-              wellness.hunger !== (day.wellness?.hunger ?? null) ||
-              wellness.soreness !== (day.wellness?.soreness ?? null) ||
-              wellness.stress !== (day.wellness?.stress ?? null)
-            )
-            if ((contextDirty || wellnessDirty) &&
+            if (hasUnsavedChanges &&
                 !window.confirm('Discard unsaved Daily Log changes and switch dates?')) return
             setContextDirty(false)
             setSearch({ date: next })
@@ -313,7 +324,9 @@ export function DailyCheckInPage() {
 
           <DailySupplementsSection date={date} />
 
-          <DailyContextSection key={date} date={date} onDirtyChange={setContextDirty} />
+          <div id="daily-context" className="scroll-mt-24">
+            <DailyContextSection key={date} date={date} onDirtyChange={setContextDirty} />
+          </div>
         </>
       ) : null}
       {showBristol ? <BristolReferenceChart onClose={() => setShowBristol(false)} /> : null}

@@ -4,7 +4,8 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { Pool } from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { backupTable, tablesForProfile } from '../server/backup/inventory.ts'
+import { BACKUP_TABLES, LATEST_SCHEMA_MIGRATION, backupTable, tablesForProfile } from '../server/backup/inventory.ts'
+import { buildBackupArchive, planRestore, restoreStatements, verifyBackupArchive } from '../server/backup/format.ts'
 
 const BIN = '/usr/lib/postgresql/14/bin'
 const PORT = 55446
@@ -105,4 +106,71 @@ describe.skipIf(!existsSync(`${BIN}/initdb`))('migration 0051 on disposable Post
     expect(anchor.rows[0].n).toBe(0)
     expect(ends.rows[0].n).toBe(0)
   })
+  it('round-trips confirmed anchors and early endings through archive verification and SQL restore', async () => {
+    const endedId = '22222222-2222-4222-8222-222222222222'
+    const rowsByTable = {
+      training_plan_versions: [{
+        id: planId, version: '2', effective_from: '2026-10-06',
+        weekly_frequency_target: '3', sequence_start_routine_code: 'B',
+        sequence_start_position: '1', default_non_training_intent: 'flexible',
+        note: null, is_current: true, created_at: '2026-10-06T12:00:00.000Z',
+      }],
+      training_plan_rotation_anchors: [{
+        plan_version_id: planId, anchor_date: '2026-10-01',
+        current_routine_code: 'B', completed_at_anchor: '4',
+        confirmed_at: '2026-10-09T14:00:00.000Z', note: 'Starting after a break',
+      }],
+      training_plan_block_ends: [{
+        id: endedId, plan_version_id: planId, routine_code: 'B', generation: '1',
+        ended_on: '2026-10-09', reason: 'recovery', created_at: '2026-10-09T15:00:00.000Z',
+      }],
+    }
+    const archive = buildBackupArchive({
+      profile: 'full',
+      createdAt: '2026-10-11T12:00:00.000Z',
+      schemaMigration: LATEST_SCHEMA_MIGRATION,
+      appVersionOrCommit: 'training-rotation-test',
+      rowsByTable,
+    })
+    const verified = verifyBackupArchive(archive)
+    expect(verified.errors).toEqual([])
+    expect(verified.tables.training_plan_rotation_anchors).toEqual(rowsByTable.training_plan_rotation_anchors)
+    expect(verified.tables.training_plan_block_ends).toEqual(rowsByTable.training_plan_block_ends)
+
+    const destinationCounts = Object.fromEntries(BACKUP_TABLES.map((table) => [table.name, 0]))
+    const plan = planRestore({
+      verified, destinationSchema: LATEST_SCHEMA_MIGRATION, destinationCounts,
+    })
+    expect(plan.blocked).toBe(false)
+    expect(plan.rows.training_plan_block_ends).toBe(1)
+    expect(planRestore({
+      verified, destinationSchema: LATEST_SCHEMA_MIGRATION,
+      destinationCounts: { ...destinationCounts, training_plan_rotation_anchors: 1 },
+    }).blocked).toBe(true)
+
+    // The real backup planner emits inserts in foreign-key-safe table order.
+    // Only these three owner tables exist in this disposable test schema;
+    // seed tables and unrelated full-app tables are intentionally omitted.
+    const writes = restoreStatements(verified.tables).filter((statement) =>
+      /^INSERT INTO (training_plan_versions|training_plan_rotation_anchors|training_plan_block_ends) /.
+        test(statement.text))
+    expect(writes.map((statement) => statement.text.match(/^INSERT INTO (\w+)/)?.[1])).toEqual([
+      'training_plan_versions', 'training_plan_rotation_anchors', 'training_plan_block_ends',
+    ])
+    for (const statement of writes) {
+      await pool.query(statement.text, statement.params)
+    }
+    const restored = await pool.query(
+      `SELECT a.current_routine_code, a.completed_at_anchor,
+              e.generation, e.reason, e.ended_on::text AS ended_on
+         FROM training_plan_rotation_anchors a
+         JOIN training_plan_block_ends e ON e.plan_version_id = a.plan_version_id
+        WHERE a.plan_version_id = $1::uuid`, [planId],
+    )
+    expect(restored.rows[0]).toMatchObject({
+      current_routine_code: 'B', completed_at_anchor: 4,
+      generation: 1, reason: 'recovery', ended_on: '2026-10-09',
+    })
+  })
+
 })

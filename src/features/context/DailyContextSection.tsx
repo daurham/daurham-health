@@ -94,6 +94,7 @@ export function DailyContextSection({
 
   async function clear() {
     if (readOnly || saving || !recorded) return
+    if (dirty && !window.confirm('Clear saved context and discard unsaved edits?')) return
     setSaving(true)
     setError(null)
     try {

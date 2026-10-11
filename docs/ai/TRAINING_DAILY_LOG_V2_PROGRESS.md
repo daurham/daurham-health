@@ -89,3 +89,10 @@
 - Historical edits that render a persisted early-ended block already completed (or remove its generation) are not silently ignored; the rotation view exposes an explicit reconciliation conflict with a clear-outdated-decision action.
 - Only actual performed working strength exercises qualify a Training day. Distance/distance-duration and standalone skill activities are excluded at the evidence query boundary, so hikes/runs do not accidentally advance a 3-exercise strength day.
 - Added schema, UI boundary, conflict and strength-evidence regression tests. Migration 0051 is still production-unapplied.
+
+## Backup and Today/Daily Log QA increment
+- Confirmed CI actually runs migration 0051 tests on disposable PostgreSQL rather than skipping them.
+- Added an actual archive -> verify -> restore planner -> PostgreSQL replay regression test for owner rotation anchors and early-ended blocks (plus nonempty-destination guard).
+- Today quick links now open the unified Daily Log with a Context anchor rather than splitting context entry into its old separate editor.
+- The Daily Log protects unsaved Context and wellness against date changes, Today navigation and browser reload; date navigation is disabled during pending quick-action writes.
+- Clearing already saved Context now confirms first if doing so would also discard unsaved edits.

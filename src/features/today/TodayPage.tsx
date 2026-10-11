@@ -384,7 +384,7 @@ function DailyCheckInCard({ view }: { view: TodayViewModel }) {
   const [error, setError] = useState<string | null>(null)
   const empty = !signals.hydration.tracked && !signals.bowel.tracked && !signals.wellness.recorded && !view.context.recorded
   const checkInHref = prefixedPath(prefix, `/check-in?date=${view.date}`)
-  const contextHref = prefixedPath(prefix, `/context?date=${view.date}&from=check-in`)
+  const contextHref = `${checkInHref}#daily-context`
 
   if (readOnly && empty) {
     return null
@@ -414,7 +414,7 @@ function DailyCheckInCard({ view }: { view: TodayViewModel }) {
     <section className="rounded-lg border border-zinc-200 bg-white p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Daily check-in</h2>
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-info">Daily Log</h2>
           <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-zinc-700">
             <span>Water {signals.hydration.tracked && signals.hydration.totalOz != null ? `${Math.round(signals.hydration.totalOz)} oz` : '—'}</span>
             <span>Bowel {bowelText}</span>
@@ -443,7 +443,7 @@ function DailyCheckInCard({ view }: { view: TodayViewModel }) {
               {busyAmount === amount ? 'Logging…' : `+${amount} oz`}
             </button>
           ))}
-          <Link to={checkInHref} className={quietButtonClass}>Bowel / ratings</Link>
+          <Link to={checkInHref} className={quietButtonClass}>Bowel / wellness</Link>
           <Link to={contextHref} className={quietButtonClass}>{view.context.recorded ? 'Edit context' : 'Add context'}</Link>
         </div>
       )}
