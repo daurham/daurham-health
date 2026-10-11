@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { isoDateSchema } from './training.js'
+import type { TrainingWeekQualification } from './training-qualification.js'
 
 export const TRAINING_DAY_INTENTS = [
   'training_preferred',
@@ -105,7 +106,8 @@ export type TrainingPlanView = {
   nextRepeatProgress: { session: number; total: number } | null
   today: TrainingPlanDay | null
   week: TrainingPlanDay[]
-  completedProgrammedSessions: number
+  completedProgrammedSessions: number // Legacy counter, not the weekly qualification target.
+  weekTraining?: TrainingWeekQualification | null
   weeklyFrequencyTarget: number | null
 }
 
