@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest'
 import {
   dailySignalDateError,
   millilitersToOunces,
+  hydrationGoalProgress,
+  normalizeHydrationGoalWrite,
   normalizeBowelWrite,
   normalizeHydrationWrite,
   normalizeWellnessWrite,
@@ -61,5 +63,31 @@ describe('check-in mobile controls', () => {
     expect(source).toContain('aria-pressed={wellness[key] === value}')
     expect(source).toContain('BristolReferenceChart')
     expect(guide).toContain('Watery')
+  })
+})
+
+describe('daily water goal preference', () => {
+  it('validates configurable ounces with a bounded value and canonical ml storage', () => {
+    expect(normalizeHydrationGoalWrite({ goalOz: 80 })).toEqual({
+      targetMl: Math.round(ouncesToMilliliters(80) * 100) / 100,
+    })
+    for (const goalOz of [0, -2, NaN, Infinity, 400, '80']) {
+      expect(normalizeHydrationGoalWrite({ goalOz })).toHaveProperty('error')
+    }
+  })
+
+  it('keeps missing/unconfigured data distinct from tracked intake and supports over-goal progress', () => {
+    expect(hydrationGoalProgress(null, 80)).toBeNull()
+    expect(hydrationGoalProgress(20, null)).toBeNull()
+    expect(hydrationGoalProgress(40, 80)).toEqual({
+      progressPercent: 50, remainingOz: 40, overGoalOz: 0,
+    })
+    expect(hydrationGoalProgress(96, 80)).toEqual({
+      progressPercent: 120, remainingOz: 0, overGoalOz: 16,
+    })
+    expect(todayDailySignalsFromDay({
+      date: '2026-10-11', hydrationEvents: [], hydrationGoalOz: 80,
+      bowelEvents: [], noBowelMovement: false, wellness: null,
+    }).hydration).toEqual({ tracked: false, totalOz: null, goalOz: 80, eventCount: 0 })
   })
 })

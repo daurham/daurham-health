@@ -11,6 +11,20 @@ export async function fetchDailySignalsDay(date: string, signal?: AbortSignal): 
   return ((await response.json()) as { day: DailySignalsDay }).day
 }
 
+export async function saveHydrationGoal(goalOz: number): Promise<number> {
+  const response = await healthFetch('/api/hydration/goal', {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ goalOz }),
+  })
+  if (!response.ok) throw new Error(await readApiError(response))
+  return ((await response.json()) as { goalOz: number }).goalOz
+}
+
+export async function clearHydrationGoal(): Promise<void> {
+  const response = await healthFetch('/api/hydration/goal', { method: 'DELETE' })
+  if (!response.ok) throw new Error(await readApiError(response))
+}
+
 export async function addHydrationEvent(date: string, amountOz: number): Promise<HydrationEvent> {
   const response = await healthFetch('/api/hydration/events', {
     method: 'POST',

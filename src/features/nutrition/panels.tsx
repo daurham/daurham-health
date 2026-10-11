@@ -40,6 +40,7 @@ import { catalogKindLabel, formatGrams, formatKcal, formatNumber, formatQuantity
 import { NutritionSheet } from './Sheet'
 import { RecipePortionSheet } from './RecipePortionSheet'
 import { RecipeIngredientSheet } from './RecipeIngredientSheet'
+import { scaleEditableNutrients } from './quantity-scaling'
 
 const BarcodeScanner = lazy(() => import('./BarcodeScanner').then((module) => ({ default: module.BarcodeScanner })))
 
@@ -644,6 +645,7 @@ export function QuantitySheet({ date, food, sourceKind = 'manual', onClose, onBa
           carbs: food.carbs,
           fat: food.fat,
           fiber: food.fiber,
+          sodium: food.sodium,
           servingGrams: food.servingGrams,
         },
         { quantity },
@@ -945,6 +947,12 @@ export function EntryEditorSheet({
         optionalNumber(sodium) !== entry.sodium
       const saved = await patchNutritionEntry(entry.id, {
         servingQuantity: quantity,
+        // The nutrient snapshot is rescaled live in the editor. When sending
+        // explicit nutrient overrides, the server must also receive the
+        // corresponding updated weight; otherwise grams would stay stale.
+        ...(quantity !== entry.servingQuantity && entry.grams != null
+          ? { grams: Number((entry.grams * quantity / entry.servingQuantity).toFixed(6)) }
+          : {}),
         foodName: linked ? undefined : foodName.trim(),
         meal: meal === '' ? null : (meal as NutritionMeal),
         notes: notes.trim() || null,
@@ -1045,7 +1053,18 @@ export function EntryEditorSheet({
             <p className="mt-2 text-xs text-zinc-500">Copies this saved serving amount and nutrition snapshot to today.</p>
           </div>
         ) : null}
-        <QuantityControls quantity={quantity} unit={entry.servingUnit} onChange={setQuantity} />
+        <QuantityControls quantity={quantity} unit={entry.servingUnit} onChange={(next) => {
+          const scaled = scaleEditableNutrients(
+            { calories, protein, carbs, fat, fiber, sodium }, quantity, next,
+          )
+          setCalories(scaled.calories)
+          setProtein(scaled.protein)
+          setCarbs(scaled.carbs)
+          setFat(scaled.fat)
+          setFiber(scaled.fiber)
+          setSodium(scaled.sodium)
+          setQuantity(next)
+        }} />
         <Field label="Calories" htmlFor="entry-kcal">
           <input
             id="entry-kcal"

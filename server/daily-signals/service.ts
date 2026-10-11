@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import {
   dailySignalDateError,
   millilitersToOunces,
+  normalizeHydrationGoalWrite,
   normalizeBowelWrite,
   normalizeHydrationWrite,
   normalizeWellnessWrite,
@@ -113,10 +114,46 @@ async function validateOccurredAt(date: string, occurredAt: string | null, timez
   if (occurredDate !== date) throw new HttpError(400, 'occurredAt must fall on the selected Health date.')
 }
 
+type HydrationGoalRow = { daily_target_ml: number | string }
+
+async function readHydrationGoal(sql: Sql): Promise<number | null> {
+  try {
+    const rows = (await sql.query(
+      'SELECT daily_target_ml FROM hydration_goal_settings WHERE singleton = 1',
+    )) as HydrationGoalRow[]
+    return rows[0] ? Math.round(millilitersToOunces(Number(rows[0].daily_target_ml)) * 10) / 10 : null
+  } catch (error) {
+    // During rollout, older schema 0051 must keep Today and Daily Log usable.
+    if (error && typeof error === 'object' && 'code' in error && error.code === '42P01' &&
+        'message' in error && typeof error.message === 'string' &&
+        error.message.includes('hydration_goal_settings')) return null
+    throw error
+  }
+}
+
+export async function putHydrationGoal(body: unknown): Promise<number> {
+  const parsed = normalizeHydrationGoalWrite(body)
+  if ('error' in parsed) throw new HttpError(400, parsed.error)
+  const sql = await getSql()
+  const rows = await sql.query(
+    `INSERT INTO hydration_goal_settings (singleton, daily_target_ml)
+     VALUES (1, $1)
+     ON CONFLICT (singleton) DO UPDATE SET daily_target_ml = EXCLUDED.daily_target_ml, updated_at = now()
+     RETURNING daily_target_ml`,
+    [parsed.targetMl],
+  ) as HydrationGoalRow[]
+  return Math.round(millilitersToOunces(Number(rows[0]!.daily_target_ml)) * 10) / 10
+}
+
+export async function deleteHydrationGoal(): Promise<void> {
+  const sql = await getSql()
+  await sql.query('DELETE FROM hydration_goal_settings WHERE singleton = 1')
+}
+
 export async function getDailySignalsDay(date: string, now = new Date()): Promise<DailySignalsDay> {
   await validatedDate(date, now)
   const sql = await getSql()
-  const [hydrationRows, bowelRows, bowelStateRows, wellnessRows] = await Promise.all([
+  const [hydrationRows, bowelRows, bowelStateRows, wellnessRows, hydrationGoalOz] = await Promise.all([
     sql.query(
       `SELECT id::text AS id, hydration_date::text AS hydration_date, occurred_at, amount_ml, note, created_at
        FROM hydration_events WHERE hydration_date = $1::date
@@ -137,10 +174,12 @@ export async function getDailySignalsDay(date: string, now = new Date()): Promis
        FROM daily_wellness WHERE wellness_date = $1::date`,
       [date],
     ),
+    readHydrationGoal(sql),
   ])
   return {
     date,
     hydrationEvents: (hydrationRows as HydrationRow[]).map(mapHydration),
+    hydrationGoalOz,
     bowelEvents: (bowelRows as BowelRow[]).map(mapBowel),
     noBowelMovement: (bowelStateRows as Array<{ state: string }>)[0]?.state === 'no_bowel_movement',
     wellness: (wellnessRows as WellnessRow[])[0] ? mapWellness((wellnessRows as WellnessRow[])[0]!) : null,

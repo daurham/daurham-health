@@ -7,7 +7,7 @@ import { NUTRITION_CONFIG, type NutritionDayTotals, type NutritionFood } from '@
 import { formatWeekdayCalendarDate, formatCalendarRange } from '@/domain/calendar-format'
 import { sessionIntentLabel } from '@/domain/training'
 import { dailyContextTagLabel } from '@/domain/context'
-import { todayDailySignalsFromDay } from '@/domain/daily-signals'
+import { hydrationGoalProgress, todayDailySignalsFromDay } from '@/domain/daily-signals'
 import type { TodayViewModel } from '@/domain/today'
 import {
   LoadErrorNotice,
@@ -382,6 +382,7 @@ function DailyCheckInCard({ view }: { view: TodayViewModel }) {
   const signals = view.dailySignals ?? todayDailySignalsFromDay(null)
   const [busyAmount, setBusyAmount] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const waterProgress = hydrationGoalProgress(signals.hydration.totalOz, signals.hydration.goalOz)
   const empty = !signals.hydration.tracked && !signals.bowel.tracked && !signals.wellness.recorded && !view.context.recorded
   const checkInHref = prefixedPath(prefix, `/check-in?date=${view.date}`)
   const contextHref = `${checkInHref}#daily-context`
@@ -416,12 +417,26 @@ function DailyCheckInCard({ view }: { view: TodayViewModel }) {
         <div>
           <h2 className="text-xs font-semibold uppercase tracking-wide text-info">Daily Log</h2>
           <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-zinc-700">
-            <span>Water {signals.hydration.tracked && signals.hydration.totalOz != null ? `${Math.round(signals.hydration.totalOz)} oz` : '—'}</span>
+            <span>Water {signals.hydration.tracked && signals.hydration.totalOz != null
+              ? `${Math.round(signals.hydration.totalOz)}`
+              : '—'}{signals.hydration.goalOz != null ? ` / ${signals.hydration.goalOz} oz` : ' oz'}</span>
             <span>Bowel {bowelText}</span>
             <span>Energy {signals.wellness.energy ?? '—'}{signals.wellness.energy != null ? '/5' : ''}</span>
             <span>Hunger {signals.wellness.hunger ?? '—'}{signals.wellness.hunger != null ? '/5' : ''}</span>
             <span>Soreness {signals.wellness.soreness ?? '—'}{signals.wellness.soreness != null ? '/5' : ''}</span>
           </div>
+          {waterProgress ? (
+            <div className="mt-2" role="progressbar" aria-label="Today's water goal progress"
+              aria-valuemin={0} aria-valuemax={100}
+              aria-valuenow={Math.min(100, waterProgress.progressPercent)}>
+              <div className="h-2 overflow-hidden rounded-full bg-zinc-200">
+                <div className="h-full rounded-full bg-info" style={{
+                  width: `${Math.min(100, waterProgress.progressPercent)}%`,
+                }} />
+              </div>
+              <p className="mt-1 text-xs text-zinc-600">{waterProgress.progressPercent}% of daily water goal</p>
+            </div>
+          ) : null}
           {view.context.recorded ? (
             <p className="mt-2 text-sm text-zinc-600">
               Context: {view.context.tags.length > 0 ? view.context.tags.map(dailyContextTagLabel).join(' · ') : view.context.note ?? 'Recorded'}

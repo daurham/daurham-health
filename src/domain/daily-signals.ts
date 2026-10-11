@@ -42,6 +42,8 @@ export type DailyWellness = {
 export type DailySignalsDay = {
   date: string
   hydrationEvents: HydrationEvent[]
+  /** Configured daily target (ounces), or null when not set. */
+  hydrationGoalOz?: number | null
   bowelEvents: BowelEvent[]
   noBowelMovement: boolean
   wellness: DailyWellness | null
@@ -51,6 +53,7 @@ export type TodayDailySignalsSnapshot = {
   hydration: {
     tracked: boolean
     totalOz: number | null
+    goalOz: number | null
     eventCount: number
   }
   bowel: {
@@ -105,6 +108,28 @@ function optionalUuid(value: unknown): string | null | { error: string } {
     return { error: 'requestId must be a UUID.' }
   }
   return value
+}
+
+/** A user-configured target is a preference, not an observation or an XP award. */
+export function normalizeHydrationGoalWrite(body: unknown):
+  | { targetMl: number }
+  | { error: string } {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return { error: 'Daily water goal is required.' }
+  const goalOz = (body as Record<string, unknown>).goalOz
+  if (typeof goalOz !== 'number' || !Number.isFinite(goalOz) || goalOz < 1 || goalOz > 338) {
+    return { error: 'Daily water goal must be between 1 and 338 oz.' }
+  }
+  return { targetMl: Math.round(ouncesToMilliliters(goalOz) * 100) / 100 }
+}
+
+export function hydrationGoalProgress(totalOz: number | null, goalOz: number | null | undefined):
+  { progressPercent: number; remainingOz: number; overGoalOz: number } | null {
+  if (totalOz == null || goalOz == null || goalOz <= 0) return null
+  return {
+    progressPercent: Math.round((totalOz / goalOz) * 100),
+    remainingOz: Math.max(0, goalOz - totalOz),
+    overGoalOz: Math.max(0, totalOz - goalOz),
+  }
 }
 
 export function normalizeHydrationWrite(body: unknown):
@@ -205,7 +230,7 @@ export function normalizeWellnessWrite(body: unknown):
 export function todayDailySignalsFromDay(day: DailySignalsDay | null | undefined): TodayDailySignalsSnapshot {
   if (!day) {
     return {
-      hydration: { tracked: false, totalOz: null, eventCount: 0 },
+      hydration: { tracked: false, totalOz: null, goalOz: null, eventCount: 0 },
       bowel: { tracked: false, eventCount: null, noMovement: false, latestBristolType: null },
       wellness: { recorded: false, energy: null, hunger: null, soreness: null, stress: null },
     }
@@ -217,6 +242,7 @@ export function todayDailySignalsFromDay(day: DailySignalsDay | null | undefined
     hydration: {
       tracked: day.hydrationEvents.length > 0,
       totalOz: day.hydrationEvents.length > 0 ? millilitersToOunces(hydrationTotalMl) : null,
+      goalOz: day.hydrationGoalOz ?? null,
       eventCount: day.hydrationEvents.length,
     },
     bowel: {

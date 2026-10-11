@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useBlocker, useLocation, useSearchParams } from 'react-router-dom'
-import { dailySignalDateError, type DailySignalsDay } from '@/domain/daily-signals'
+import { dailySignalDateError, hydrationGoalProgress, type DailySignalsDay } from '@/domain/daily-signals'
 import { shouldBlockDailyLogNavigation } from '@/domain/daily-log-navigation'
 import { formatWeekdayCalendarDate } from '@/domain/calendar-format'
 import { DAILY_PARTICIPATION_XP, participationDateEligible } from '@/domain/rewards'
@@ -13,6 +13,8 @@ import { prefixedPath, useAppPathPrefix } from '@/lib/app-prefix'
 import {
   addBowelEvent,
   addHydrationEvent,
+  saveHydrationGoal,
+  clearHydrationGoal,
   clearNoBowelMovement,
   clearDailyWellness,
   deleteBowelEvent,
@@ -46,6 +48,8 @@ export function DailyCheckInPage() {
   const [day, setDay] = useState<DailySignalsDay | null>(null)
   const [wellness, setWellness] = useState<WellnessDraft>(EMPTY_WELLNESS)
   const [customWater, setCustomWater] = useState('')
+  const [editingWaterGoal, setEditingWaterGoal] = useState(false)
+  const [waterGoalText, setWaterGoalText] = useState('')
   const [loading, setLoading] = useState(dateError == null)
   const [busy, setBusy] = useState(false)
   const [showBristol, setShowBristol] = useState(false)
@@ -94,6 +98,8 @@ export function DailyCheckInPage() {
       const next = await fetchDailySignalsDay(date, signal)
       if (signal?.aborted) return
       setDay(next)
+      setEditingWaterGoal(false)
+      setWaterGoalText('')
       setWellness({
         energy: next.wellness?.energy ?? null,
         hunger: next.wellness?.hunger ?? null,
@@ -141,6 +147,8 @@ export function DailyCheckInPage() {
 
   const xpEligible = participationDateEligible(date, today)
   const totalWater = day?.hydrationEvents.reduce((sum, event) => sum + event.amountOz, 0) ?? 0
+  const waterGoal = day?.hydrationGoalOz ?? null
+  const waterProgress = hydrationGoalProgress(day?.hydrationEvents.length ? totalWater : null, waterGoal)
 
   return (
     <section className="mx-auto max-w-3xl space-y-4 pb-8">
@@ -176,6 +184,61 @@ export function DailyCheckInPage() {
             <p className="mt-1 text-sm text-zinc-600">
               {day?.hydrationEvents.length ? `${Math.round(totalWater)} oz logged` : 'No water tracking recorded for this day.'}
             </p>
+            <div className="mt-3 rounded-lg border border-info/20 bg-white p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm font-medium text-zinc-700">
+                  {waterGoal == null ? 'No daily water goal set' : `Daily goal: ${waterGoal} oz`}
+                </p>
+                <button type="button" className={quietButtonClass} disabled={busy}
+                  onClick={() => {
+                    setWaterGoalText(waterGoal == null ? '' : String(waterGoal))
+                    setEditingWaterGoal((current) => !current)
+                  }}>{editingWaterGoal ? 'Cancel' : waterGoal == null ? 'Set goal' : 'Edit goal'}</button>
+              </div>
+              {waterProgress ? (
+                <>
+                  <div role="progressbar" aria-label="Water intake versus daily goal"
+                    aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(100, waterProgress.progressPercent)}
+                    className="mt-2 h-2.5 overflow-hidden rounded-full bg-zinc-200">
+                    <div className="h-full rounded-full bg-info transition-[width]"
+                      style={{ width: `${Math.min(100, waterProgress.progressPercent)}%` }} />
+                  </div>
+                  <p className="mt-1 text-xs text-zinc-600">
+                    {waterProgress.overGoalOz > 0
+                      ? `${Math.round(waterProgress.progressPercent)}% of goal · ${Math.round(waterProgress.overGoalOz)} oz above goal`
+                      : `${waterProgress.progressPercent}% of goal · ${Math.round(waterProgress.remainingOz)} oz remaining`}
+                  </p>
+                </>
+              ) : waterGoal != null ? (
+                <p className="mt-1 text-xs text-zinc-600">No intake recorded for this day yet.</p>
+              ) : null}
+              {editingWaterGoal ? (
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <label htmlFor="water-goal-oz" className="text-sm text-zinc-700">Goal (oz)</label>
+                  <input id="water-goal-oz" inputMode="decimal" type="number" min="1" max="338" step="any"
+                    className="min-h-11 min-w-0 w-24 rounded-md border border-zinc-300 px-2 text-base"
+                    value={waterGoalText} onChange={(event) => setWaterGoalText(event.target.value)} />
+                  <button type="button" className={quietButtonClass}
+                    disabled={busy || waterGoalText.trim() === '' || !Number.isFinite(Number(waterGoalText)) ||
+                      Number(waterGoalText) < 1 || Number(waterGoalText) > 338}
+                    onClick={() => void mutate(
+                      () => saveHydrationGoal(Number(waterGoalText)),
+                      (current, goalOz) => {
+                        setEditingWaterGoal(false)
+                        return { ...current, hydrationGoalOz: goalOz }
+                      },
+                    )}>Save</button>
+                  {waterGoal != null ? <button type="button" className={quietButtonClass} disabled={busy}
+                    onClick={() => void mutate(
+                      clearHydrationGoal,
+                      (current) => {
+                        setEditingWaterGoal(false)
+                        return { ...current, hydrationGoalOz: null }
+                      },
+                    )}>Remove goal</button> : null}
+                </div>
+              ) : null}
+            </div>
             <div className="mt-3 flex flex-wrap gap-2">
               {WATER_AMOUNTS.map((amount) => (
                 <button key={amount} type="button" disabled={busy} className={quietButtonClass} onClick={() => void mutate(
