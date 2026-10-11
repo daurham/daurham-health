@@ -260,29 +260,39 @@ export function TrainingPlanPage() {
               const template = templateByRoutine.get(routineCode)
               const label = template?.name ?? routineCode + ' (inactive)'
               return (
-                <div key={routineCode} className="flex items-center gap-2 rounded-md border border-zinc-200 px-3 py-2">
-                  <span className="w-6 text-xs font-semibold text-zinc-500">{index + 1}</span>
-                  <span className="min-w-0 flex-1 truncate text-sm font-medium">{label}</span>
-                  <label className="flex shrink-0 items-center gap-1 text-xs text-zinc-600">
-                    Times
-                    <input type="number" min={1} max={12} value={count} aria-label={`Sessions of ${label}`} className="min-h-11 w-14 rounded-md border border-zinc-300 bg-white px-2 text-center text-base" onChange={(event) => {
-                      const count = Math.max(1, Math.min(12, Math.floor(Number(event.target.value) || 1)))
-                      setSequence((current) => expandRoutineBlocks(compactRoutineSequence(current).map((block, i) => i === index ? { ...block, count } : block)))
-                    }} />
-                  </label>
-                  <button type="button" className={quietButtonClass} disabled={index === 0} onClick={() => moveSequence(index, -1)}>↑</button>
-                  <button type="button" className={quietButtonClass} disabled={index === blocks.length - 1} onClick={() => moveSequence(index, 1)}>↓</button>
-                  <button type="button" className={quietButtonClass} onClick={() => setSequence((current) => current.filter((item) => item !== routineCode))}>Remove</button>
+                <div key={routineCode} className="min-w-0 space-y-2 rounded-lg border border-zinc-200 px-3 py-2.5 sm:flex sm:items-center sm:gap-3 sm:space-y-0">
+                  <div className="flex min-w-0 items-center gap-2 sm:flex-1">
+                    <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-accent-muted text-xs font-bold text-accent">{index + 1}</span>
+                    <span className="min-w-0 flex-1 break-words text-sm font-medium text-zinc-900">{label}</span>
+                  </div>
+                  <div className="flex min-w-0 flex-wrap items-center gap-1 sm:justify-end">
+                    <label className="flex shrink-0 items-center gap-1 text-xs text-zinc-600">
+                      Times
+                      <input type="number" min={1} max={12} value={count} aria-label={`Sessions of ${label}`}
+                        className="min-h-11 w-[4.5rem] rounded-md border border-zinc-300 bg-white px-2 text-center text-base"
+                        onChange={(event) => {
+                          const count = Math.max(1, Math.min(12, Math.floor(Number(event.target.value) || 1)))
+                          setSequence((current) => expandRoutineBlocks(compactRoutineSequence(current).map((block, i) => i === index ? { ...block, count } : block)))
+                        }} />
+                    </label>
+                    <button type="button" className={`${quietButtonClass} !w-auto px-3`} aria-label={`Move ${label} up`}
+                      disabled={index === 0} onClick={() => moveSequence(index, -1)}>↑</button>
+                    <button type="button" className={`${quietButtonClass} !w-auto px-3`} aria-label={`Move ${label} down`}
+                      disabled={index === blocks.length - 1} onClick={() => moveSequence(index, 1)}>↓</button>
+                    <button type="button" className={`${quietButtonClass} !w-auto px-2`} aria-label={`Remove ${label}`}
+                      onClick={() => setSequence((current) => current.filter((item) => item !== routineCode))}>Remove</button>
+                  </div>
                 </div>
               )
             })}
           </div>
           {addable.length > 0 ? (
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="mt-3 flex min-w-0 flex-wrap gap-2">
               <select
+                aria-label="Choose a routine to add"
                 value={addRoutineCode}
                 onChange={(event) => setAddRoutineCode(event.target.value)}
-                className="min-h-11 min-w-56 rounded-md border border-zinc-300 bg-white px-3 text-base"
+                className="min-h-11 min-w-0 w-full flex-1 rounded-md border border-zinc-300 bg-white px-3 text-base sm:max-w-sm"
               >
                 <option value="">Choose routine…</option>
                 {addable.map((template) => (

@@ -106,8 +106,13 @@ export function TrainingPlanCard() {
             )
           })}
         </div>
-        <p className="mt-3 text-xs leading-5 text-zinc-600">
-          Three distinct performed exercises count as one training day, even across multiple workout logs.
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-zinc-600">
+          <span><span className="font-bold text-success">✓</span> Qualified day</span>
+          <span><span className="font-bold text-accent">•</span> Today</span>
+          <span><span className="font-bold text-zinc-700">○</span> Preferred (optional)</span>
+        </div>
+        <p className="mt-2 text-xs leading-5 text-zinc-600">
+          Three distinct performed strength exercises count as one day, even across separate workout logs.
         </p>
       </div>
 

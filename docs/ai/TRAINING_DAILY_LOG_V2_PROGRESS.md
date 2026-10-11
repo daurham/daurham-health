@@ -100,3 +100,10 @@
 ## Today's route contract validation
 - Updated two stale Today tests to require the user-facing 'Daily Log' label and the unified /check-in?date=...#daily-context route, matching the new UI; no backward-incompatible server route removal.
 - The preceding CI run confirmed the new archive -> verification -> PostgreSQL restore test passed. Only the two Today label/link assertions required adjustment.
+
+## Theme and phone layout QA batch (2026-10-11)
+- Redesigned compact A/B/C segmented block rows with persistent per-routine palette accents. Current, working-ahead, prior completed block, and next-generation labels are explicit; a completed B 6/6 remains visible when the next B generation begins.
+- Added theme-neutral, high-contrast count text, status words, informative progressbar labels and a visible warning when historical early-close decisions conflict with workout edits.
+- Training Plan routine editing now stacks cleanly on narrow devices. Long routine names wrap, move/remove buttons have accessible names, and the add-routine selector no longer sets an overflowing 14rem minimum width.
+- Weekly training strip includes a small legend differentiating qualified, today and optional preferred days.
+- Theme matrix is 24 palettes each with light/dark definitions. Automated coverage checks and responsive source-level checks are in the new UI tests, but **visual Safari/device screenshots are still an owner QA gate**, not yet completed.
