@@ -74,3 +74,26 @@ export function buildTrainingWeekQualification(
   })
   return { completedDays: days.filter((day) => day.qualifies).length, days }
 }
+
+/**
+ * A routine progresses at most once per date when three different actually
+ * performed exercises carry that routine's explicit saved attribution.
+ */
+export function buildTrainingRoutineCredits(
+  evidence: readonly PerformedExerciseEvidence[],
+): import('./training-blocks.js').RoutineDayCredit[] {
+  const counts = new Map<string, Set<string>>()
+  for (const row of evidence) {
+    if (!row.exerciseId || !row.routineCode) continue
+    const key = JSON.stringify([row.date, row.routineCode])
+    const exercises = counts.get(key) ?? new Set<string>()
+    exercises.add(row.exerciseId)
+    counts.set(key, exercises)
+  }
+  return [...counts].filter(([, exercises]) => exercises.size >= MIN_EXERCISES_PER_TRAINING_DAY)
+    .map(([key]): import('./training-blocks.js').RoutineDayCredit => {
+      const [date, routineCode] = JSON.parse(key) as [string, string]
+      return { date, routineCode, evidenceId: key }
+    })
+    .sort((a, b) => a.date.localeCompare(b.date) || a.routineCode.localeCompare(b.routineCode))
+}

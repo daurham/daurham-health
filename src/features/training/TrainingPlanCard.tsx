@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import type { TrainingPlanView } from '@/domain/training-plan'
 import { primaryButtonClass, quietButtonClass } from '@/lib'
 import { fetchTrainingPlan } from './api'
+import { TrainingRotationPreview } from './TrainingRotationPreview'
 
 const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'] as const
 
@@ -109,6 +110,8 @@ export function TrainingPlanCard() {
           Three distinct performed exercises count as one training day, even across multiple workout logs.
         </p>
       </div>
+
+      <TrainingRotationPreview plan={plan} />
 
       <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
         <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Next suggested routine</p>

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { compactRoutineSequence, expandRoutineBlocks, type TrainingDayIntent, type TrainingPlanView } from '@/domain/training-plan'
 import type { WorkoutTemplate } from '@/domain/training'
+import { TrainingRotationPreview } from './TrainingRotationPreview'
 import { primaryButtonClass, quietButtonClass, secondaryButtonClass } from '@/lib'
 import {
   clearTrainingDayOverride,
@@ -307,6 +308,8 @@ export function TrainingPlanPage() {
           {busy ? 'Saving…' : plan?.configured ? 'Save new plan version' : 'Save plan'}
         </button>
       </section>
+
+      {plan?.configured ? <TrainingRotationPreview plan={plan} /> : null}
 
       {plan?.configured ? (
         <section className="space-y-4 rounded-lg border border-zinc-200 bg-white p-4">

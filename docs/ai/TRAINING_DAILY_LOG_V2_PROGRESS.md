@@ -52,3 +52,9 @@
 - Unknown supplement adherence stays unknown, never automatically skipped.
 - Preserve XP and owner-data audit semantics.
 - Keep `main` and production schema untouched until migration/readiness, CI and owner QA are approved.
+
+## Training rotation visual bridge (2026-10-11)
+- Canonical Training evidence for *performed* attributed exercises now produces independent, per-routine day credits; unclassified ad-hoc exercise work can qualify a week but will not silently advance A/B/C.
+- A reusable theme-aware A/B/C segmented bar is wired into TrainingPlanCard and TrainingPlanPage. The server exposes a read-only `rotationPreview` from performed evidence saved after the version's creation.
+- **Provisional only:** this is not yet a historical owner-approved starting anchor, does not persist early-end actions, and does not replace the authoritative next-session planner. Do not present as full rotation completion until migration/anchor/reconciliation are done.
+- The iOS Safari date-field source assertion is updated to verify the new shared control rather than stale inline markup.

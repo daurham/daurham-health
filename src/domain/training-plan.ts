@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { isoDateSchema } from './training.js'
 import type { TrainingWeekQualification } from './training-qualification.js'
+import type { RoutineRotationState } from './training-blocks.js'
 
 export const TRAINING_DAY_INTENTS = [
   'training_preferred',
@@ -108,6 +109,7 @@ export type TrainingPlanView = {
   week: TrainingPlanDay[]
   completedProgrammedSessions: number // Legacy counter, not the weekly qualification target.
   weekTraining?: TrainingWeekQualification | null
+  rotationPreview?: { source: 'provisional'; firstTrackedDate: string; state: RoutineRotationState } | null
   weeklyFrequencyTarget: number | null
 }
 

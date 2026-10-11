@@ -17,7 +17,9 @@ import {
   type TrainingPlanView,
 } from '../../src/domain/training-plan.js'
 import { isoDateSchema } from '../../src/domain/training.js'
-import { buildTrainingWeekQualification, type PerformedExerciseEvidence } from '../../src/domain/training-qualification.js'
+import { buildTrainingWeekQualification, buildTrainingRoutineCredits, type PerformedExerciseEvidence } from '../../src/domain/training-qualification.js'
+import { deriveRoutineRotation } from '../../src/domain/training-blocks.js'
+import { compactRoutineSequence } from '../../src/domain/training-plan.js'
 import { getSql } from '../db.js'
 import { currentHealthDate } from '../health-time.js'
 import { HttpError } from '../http.js'
@@ -159,7 +161,7 @@ async function completedRoutineCodes(
  * calendar week, including workouts saved before the Training Plan existed.
  * Never derive a weekly completion from the number of session rows.
  */
-async function performedExerciseEvidence(start: string, asOf: string): Promise<PerformedExerciseEvidence[]> {
+async function performedExerciseEvidence(start: string, asOf: string, createdAfter?: string): Promise<PerformedExerciseEvidence[]> {
   const sql = await getSql()
   const rows = (await sql.query(
     `SELECT DISTINCT sessions.workout_date::text AS date,
@@ -170,6 +172,7 @@ async function performedExerciseEvidence(start: string, asOf: string): Promise<P
          ON session_exercises.workout_session_id = sessions.id
       WHERE sessions.workout_date BETWEEN $1::date AND $2::date
         AND sessions.session_type IN ('programmed', 'ad_hoc', 'experiment')
+        AND ($3::timestamptz IS NULL OR sessions.created_at > $3::timestamptz)
         AND EXISTS (
           SELECT 1 FROM workout_sets sets
            WHERE sets.workout_session_exercise_id = session_exercises.id
@@ -185,7 +188,7 @@ async function performedExerciseEvidence(start: string, asOf: string): Promise<P
                OR sets.completed = true
              )
         )`,
-    [start, asOf],
+    [start, asOf, createdAfter ?? null],
   )) as Array<{ date: string; exercise_id: string; routine_code: string | null }>
   return rows.map((row) => ({
     date: row.date,
@@ -230,6 +233,7 @@ export async function getTrainingPlan(asOfInput?: string): Promise<TrainingPlanV
       week: [],
       completedProgrammedSessions: 0,
       weekTraining: null,
+      rotationPreview: null,
       weeklyFrequencyTarget: null,
     }
   }
@@ -243,11 +247,12 @@ export async function getTrainingPlan(asOfInput?: string): Promise<TrainingPlanV
   const end = addCalendarDays(start, 6)
   const effectiveFrom = dateText(plan.effective_from)
   const applicableStart = effectiveFrom > start ? effectiveFrom : start
-  const [overrides, completedCodes, completed, performedEvidence] = await Promise.all([
+  const [overrides, completedCodes, completed, performedEvidence, routineEvidence] = await Promise.all([
     loadOverrides(applicableStart, end),
     completedRoutineCodes(sequenceCodes, effectiveFrom, asOf, plan.created_at),
     completedProgrammedSessions(sequenceCodes, applicableStart, end),
     performedExerciseEvidence(start, asOf),
+    performedExerciseEvidence(effectiveFrom, asOf, plan.created_at),
   ])
   const weekTraining = buildTrainingWeekQualification(performedEvidence, asOf)
 
@@ -281,6 +286,26 @@ export async function getTrainingPlan(asOfInput?: string): Promise<TrainingPlanV
   const nextCode = nextRoutineCode(progressionSequence, completedCodes)
   const absoluteNextIndex = nextRelativeIndex < 0 ? -1 : ((startPosition - 1 + nextRelativeIndex) % sequenceCodes.length)
   const nextRepeatProgress = repeatProgressAtPosition(sequenceCodes, absoluteNextIndex)
+  // Provisional evidence after this plan version. The official current
+  // session keeps its prior pointer until historical reconciliation is stored.
+  const specs = compactRoutineSequence(sequenceCodes).map((block) => ({
+    routineCode: block.routineCode, target: block.count,
+  }))
+  const startProgress = repeatProgressAtPosition(sequenceCodes, startPosition - 1)
+  const rotationPreview = specs.length
+    ? {
+        source: 'provisional' as const,
+        firstTrackedDate: effectiveFrom,
+        state: deriveRoutineRotation(
+          specs,
+          { currentRoutineCode: progressionSequence[0]!,
+            alreadyCompletedInCurrent: (startProgress?.session ?? 1) - 1 },
+          buildTrainingRoutineCredits(routineEvidence),
+          [],
+          asOf,
+        ),
+      }
+    : null
   const nextSession =
     nextCode == null
       ? null
@@ -304,6 +329,7 @@ export async function getTrainingPlan(asOfInput?: string): Promise<TrainingPlanV
     week,
     completedProgrammedSessions: completed,
     weekTraining,
+    rotationPreview,
     weeklyFrequencyTarget: Number(plan.weekly_frequency_target),
   }
 }

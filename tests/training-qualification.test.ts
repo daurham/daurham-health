@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildTrainingWeekQualification,
+  buildTrainingRoutineCredits,
   MIN_EXERCISES_PER_TRAINING_DAY,
   type PerformedExerciseEvidence,
 } from '../src/domain/training-qualification.ts'
@@ -78,5 +79,30 @@ describe('qualifying Training days', () => {
     expect(buildTrainingWeekQualification(original, '2026-10-07').completedDays).toBe(1)
     expect(buildTrainingWeekQualification(original.slice(0, 2), '2026-10-07').completedDays).toBe(0)
     expect(original).toHaveLength(3)
+  })
+})
+
+describe('routine block attribution', () => {
+  it('does not advance B on two B exercises plus a qualifying ad-hoc third', () => {
+    const data = [entry('2026-10-07', 'pushup', 'B'), entry('2026-10-07', 'crunch', 'B'),
+      entry('2026-10-07', 'squat')]
+    expect(buildTrainingWeekQualification(data, '2026-10-07').completedDays).toBe(1)
+    expect(buildTrainingRoutineCredits(data)).toEqual([])
+  })
+
+  it('deduplicates routine exercises for an interrupted session', () => {
+    const credit = buildTrainingRoutineCredits([
+      entry('2026-10-07', 'pushup', 'B'), entry('2026-10-07', 'crunch', 'B'),
+      entry('2026-10-07', 'squat', 'B'), entry('2026-10-07', 'pushup', 'B'),
+      entry('2026-10-08', 'squat', 'C')])
+    expect(credit).toHaveLength(1)
+    expect(credit[0]).toMatchObject({ date: '2026-10-07', routineCode: 'B' })
+  })
+
+  it('can credit two routines on a single qualifying weekly date', () => {
+    const data = ['A', 'B'].flatMap((routine) =>
+      ['one', 'two', 'three'].map((exercise) => entry('2026-10-07', exercise + routine, routine)))
+    expect(buildTrainingRoutineCredits(data)).toHaveLength(2)
+    expect(buildTrainingWeekQualification(data, '2026-10-07').completedDays).toBe(1)
   })
 })
