@@ -313,7 +313,7 @@ export function TrainingPlanPage() {
           <div>
             <h2 className="font-semibold">Adjust this week</h2>
             <p className="mt-1 text-sm text-zinc-500">
-              {plan.completedProgrammedSessions}/{plan.weeklyFrequencyTarget} programmed sessions completed. Overrides do not rewrite the baseline plan.
+              {plan.weekTraining?.completedDays ?? 0}/{plan.weeklyFrequencyTarget} qualifying training days this week, including workouts before plan setup. Overrides do not rewrite workout history.
             </p>
           </div>
 
