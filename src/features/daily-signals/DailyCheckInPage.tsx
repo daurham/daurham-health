@@ -4,6 +4,7 @@ import { dailySignalDateError, type DailySignalsDay } from '@/domain/daily-signa
 import { formatWeekdayCalendarDate } from '@/domain/calendar-format'
 import { DAILY_PARTICIPATION_XP, participationDateEligible } from '@/domain/rewards'
 import { BristolReferenceChart } from './BristolReferenceChart'
+import { DailySupplementsSection } from './DailySupplementsSection'
 import { primaryButtonClass, quietButtonClass, useHealthCalendarDate } from '@/lib'
 import { prefixedPath, useAppPathPrefix } from '@/lib/app-prefix'
 import {
@@ -290,6 +291,8 @@ export function DailyCheckInPage() {
               </button>
             ) : null}
           </section>
+
+          <DailySupplementsSection date={date} />
 
           <section className="rounded-lg border border-zinc-200 bg-white p-4">
             <h2 className="font-semibold">Context</h2>
