@@ -119,7 +119,7 @@ export async function generateWeeklyCoach(input: {
         : null,
     })
     const reserved = readAiUsageConfig().weeklyCoachMaxRequestCostUsd
-    const cost = boundedProviderCostUsd(generated.inputTokens, generated.outputTokens, reserved)
+    const cost = boundedProviderCostUsd(generated.inputTokens, generated.outputTokens, reserved, generated.model)
     await gate.complete(usageId, cost, generated.inputTokens, generated.outputTokens, now)
     if (!commentary) {
       return response(brief, goalControl, null, WEEKLY_COACH_FALLBACK_COPY, generated.model, false)
