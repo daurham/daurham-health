@@ -58,9 +58,17 @@ function positiveInt(value: number | null): number | null {
   return value
 }
 
-/** Strength reps: bilateral `reps`, or min(left, right) when both sides are present. Never sum sides. */
+/**
+ * Historical shared-rep exercises can also have newer independently logged sets.
+ * The canonical set's measurement family wins when it records sides rather than `reps`;
+ * strength always uses the weaker side and never sums left + right.
+ */
+function hasIndependentRepMeasurement(set: CanonicalSetRecord): boolean {
+  return set.reps == null && (set.leftReps != null || set.rightReps != null)
+}
+
 export function strengthRepsForSet(set: CanonicalSetRecord, exercise: ProgressExerciseDefinition): number | null {
-  if (isPerSideExercise(exercise)) {
+  if (isPerSideExercise(exercise) || hasIndependentRepMeasurement(set)) {
     const left = positiveInt(set.leftReps)
     const right = positiveInt(set.rightReps)
     if (left == null || right == null) {
@@ -77,7 +85,7 @@ export function strengthRepsForSet(set: CanonicalSetRecord, exercise: ProgressEx
  * strength), because each logged side is independently completed work.
  */
 export function volumeRepsForSet(set: CanonicalSetRecord, exercise: ProgressExerciseDefinition): number | null {
-  if (isPerSideExercise(exercise)) {
+  if (isPerSideExercise(exercise) || hasIndependentRepMeasurement(set)) {
     const left = positiveInt(set.leftReps)
     const right = positiveInt(set.rightReps)
     if (left == null && right == null) {
@@ -88,12 +96,14 @@ export function volumeRepsForSet(set: CanonicalSetRecord, exercise: ProgressExer
   return positiveInt(set.reps)
 }
 
-/** Timed duration: `durationSec`, or min(left, right) duration when both sides are present. */
+/** Timed duration: `durationSec`, or the weaker side for independently logged sets. */
 export function timedDurationSecForSet(
   set: CanonicalSetRecord,
   exercise: ProgressExerciseDefinition,
 ): number | null {
-  if (isPerSideExercise(exercise)) {
+  const independentDuration = set.durationSec == null &&
+    (set.leftDurationSec != null || set.rightDurationSec != null)
+  if (isPerSideExercise(exercise) || independentDuration) {
     const left = positiveInt(set.leftDurationSec)
     const right = positiveInt(set.rightDurationSec)
     if (left == null || right == null) {

@@ -102,6 +102,27 @@ describe('e1RM', () => {
     expect(estimate?.sourceSet.setId).toBe('s1')
   })
 
+  it('uses the weaker side of a newer independent-side set under a legacy standard-rep definition', () => {
+    const exercise = loadedRepExercise()
+    const set = setRecord({
+      setId: 'curl-left-right', sessionId: 'curl', sessionDate: '2026-10-12',
+      weightKg: 42.5, reps: null, leftReps: 1, rightReps: 3,
+    })
+    expect(strengthRepsForSet(set, exercise)).toBe(1)
+    expect(volumeRepsForSet(set, exercise)).toBe(4)
+    const strength = estimatedStrengthForSet(set, exercise)
+    expect(strength?.value).toBeCloseTo(42.5 * (1 + 1 / 30))
+    expect(strength?.confidence).toBe('high')
+    expect(strength?.sourceSet.reps).toBe(1)
+
+    const incomplete = { ...set, rightReps: null }
+    expect(strengthRepsForSet(incomplete, exercise)).toBeNull()
+    expect(estimatedStrengthForSet(incomplete, exercise)).toBeNull()
+
+    const historical = { ...set, reps: 8, leftReps: null, rightReps: null }
+    expect(strengthRepsForSet(historical, exercise)).toBe(8)
+  })
+
   it('excludes >15 reps from estimated-strength trends and PRs', () => {
     const highReps = setRecord({ setId: 's2', sessionId: 'w1', sessionDate: '2026-09-01', weightKg: 50, reps: 20 })
     expect(estimatedStrengthForSet(highReps, loadedRepExercise())).toBeNull()

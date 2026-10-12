@@ -235,6 +235,39 @@ describe('Stretch Coach canonical persistence lifecycle', () => {
     expect((await readCoach(AFTER)).stretchQuest?.progress?.current).toBeCloseTo(124.8)
   })
 
+  it('completes a legacy Dumbbell Curl stretch from independently recorded left/right reps', async () => {
+    // The seeded EX05 definition uses a standard rep analytics mode, but the
+    // Training editor can now write independent-side sets for that same exercise.
+    state.sets = [
+      { ...strengthSet('curl-prior', '2026-09-20', 32, 1), name: 'Dumbbell Curl', external_id: 'EX05' },
+      { ...strengthSet('curl-baseline', '2026-09-27', 32, 1), name: 'Dumbbell Curl', external_id: 'EX05' },
+    ]
+    const quest = await offer()
+    expect(quest).toMatchObject({ targetValue: 34, targetUnit: 'lb' })
+    await acceptCoachTask(quest.id, NOW)
+    state.sets.push({
+      ...strengthSet('curl-after-acceptance', '2026-09-29', 42.5, 1, '2026-09-29T20:00:00.123456Z'),
+      name: 'Dumbbell Curl',
+      external_id: 'EX05',
+      analytics_rep_mode: 'standard',
+      measurement_kind: 'reps',
+      reps: null,
+      left_reps: 1,
+      right_reps: 3,
+    })
+    const result = await readCoach(AFTER)
+    expect(result.stretchQuest).toMatchObject({
+      status: 'completed',
+      progress: { label: 'Verified by Training', target: 34 },
+    })
+    expect(result.stretchQuest?.progress?.current).toBeCloseTo(42.5 * (1 + 1 / 30))
+    expect(state.events.find((event) => event.event_kind === 'completed')).toMatchObject({
+      source_type: 'workout_set',
+      source_id: 'curl-after-acceptance',
+      evidence: { reps: null, leftReps: 1, rightReps: 3, strengthReps: 1, confidence: 'high' },
+    })
+  })
+
   it('surfaces a new canonical PR below the target without completing', async () => {
     const quest = await offer()
     await acceptCoachTask(quest.id, NOW)
