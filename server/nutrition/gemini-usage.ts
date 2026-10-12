@@ -115,7 +115,7 @@ export async function runNutritionGeminiAttempt(
   }
   try {
     const result = await deps.call(config, request)
-    await ledger.complete(reserved.id, actualCost(result, reservedCostUsd), result.inputTokens, result.outputTokens, deps.now?.() ?? Date.now())
+    await ledger.complete(reserved.id, actualCost(result, reservedCostUsd, request.model), result.inputTokens, result.outputTokens, deps.now?.() ?? Date.now())
     return result
   } catch (error) {
     if (isReturnedUnusable(error)) {
@@ -129,11 +129,11 @@ export async function runNutritionGeminiAttempt(
   }
 }
 
-function actualCost(result: NutritionGeminiResult, reservedCostUsd: number): number | null {
+function actualCost(result: NutritionGeminiResult, reservedCostUsd: number, model: string): number | null {
   if (result.inputTokens == null && result.outputTokens == null) {
     return null
   }
-  return boundedProviderCostUsd(result.inputTokens, result.outputTokens, reservedCostUsd)
+  return boundedProviderCostUsd(result.inputTokens, result.outputTokens, reservedCostUsd, model)
 }
 
 function isReturnedUnusable(error: unknown): boolean {
