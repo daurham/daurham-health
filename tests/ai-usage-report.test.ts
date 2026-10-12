@@ -10,6 +10,8 @@ describe('AI usage diagnostic report', () => {
     expect(boundedProviderCostUsd(0, 10_000, 0.05)).toBe(0.006)
     expect(boundedProviderCostUsd(10_000_000, 10_000_000, 0.05)).toBe(0.05)
     expect(boundedProviderCostUsd(null, null, 0.05)).toBe(0.05)
+    expect(boundedProviderCostUsd(400, 350, 0.05, 'gemini-3.5-flash')).toBe(0.00375)
+    expect(boundedProviderCostUsd(400, 350, 0.05, 'gemini-3.5-flash-lite')).toBe(0.000995)
   })
 
   it('separates ledger reservations from token-priced estimates without changing budget balances', () => {
