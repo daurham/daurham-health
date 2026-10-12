@@ -79,7 +79,7 @@ export async function searchLiterature(input: {
     return responseFor(parsed.query, records, null, LITERATURE_SYNTHESIS_FALLBACK)
   }
   const validated = validateLiteratureSynthesis(generated.text, new Set(records.map((record) => record.sourceRef)))
-  await settleComplete(gate, decision.usageId, generated, now)
+  await settleComplete(gate, decision.usageId, generated, now, generated.model)
   if (!validated.ok) {
     return responseFor(parsed.query, records, null, LITERATURE_SYNTHESIS_FALLBACK)
   }
@@ -109,6 +109,7 @@ async function settleComplete(
   usageId: string | null,
   generated: { inputTokens: number | null; outputTokens: number | null },
   now: number,
+  model: string,
 ): Promise<void> {
   if (!usageId) {
     return
@@ -116,7 +117,7 @@ async function settleComplete(
   const actual =
     generated.inputTokens == null && generated.outputTokens == null
       ? null
-      : boundedProviderCostUsd(generated.inputTokens, generated.outputTokens, Number.MAX_SAFE_INTEGER)
+      : boundedProviderCostUsd(generated.inputTokens, generated.outputTokens, Number.MAX_SAFE_INTEGER, model)
   try {
     await gate.complete(usageId, actual, generated.inputTokens, generated.outputTokens, now)
   } catch {
