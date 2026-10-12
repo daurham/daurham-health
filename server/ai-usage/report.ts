@@ -5,6 +5,7 @@ import { getSql } from '../db.js'
 export type AiUsageGroup = {
   requestType: string
   status: string
+  model: string
   requests: number
   budgetConsumedUsd: number
   tokenEstimateUsd: number
@@ -32,6 +33,7 @@ export type AiUsageReport = {
 export type AiUsageRow = {
   request_type: string
   status: string
+  model?: string
   requests: number | string
   recorded_usd: number | string
   token_input: number | string
@@ -57,10 +59,11 @@ export function buildAiUsageReport(rows: AiUsageRow[], config: AiUsageConfig, no
     return {
       requestType: row.request_type,
       status: row.status,
+      model: row.model ?? 'unknown',
       requests: number(row.requests),
       budgetConsumedUsd: usd(number(row.recorded_usd)),
       tokenEstimateUsd: row.status === 'completed'
-        ? usd(boundedProviderCostUsd(inputTokens, outputTokens, Number.MAX_SAFE_INTEGER))
+        ? usd(boundedProviderCostUsd(inputTokens, outputTokens, Number.MAX_SAFE_INTEGER, row.model))
         : 0,
       inputTokens,
       outputTokens,
@@ -97,7 +100,7 @@ export async function getAiUsageReport(now = Date.now()): Promise<AiUsageReport>
   const window = utcMonthWindow(now)
   const sql = await getSql()
   const rows = (await sql.query(
-    `SELECT request_type, status, COUNT(*)::int AS requests,
+    `SELECT request_type, status, model, COUNT(*)::int AS requests,
       COALESCE(SUM(CASE
         WHEN status = 'completed' THEN actual_cost_usd
         WHEN status IN ('reserved', 'uncertain') THEN reserved_cost_usd
@@ -107,7 +110,7 @@ export async function getAiUsageReport(now = Date.now()): Promise<AiUsageReport>
       COUNT(*) FILTER (WHERE status = 'completed' AND input_tokens IS NULL AND output_tokens IS NULL)::int AS missing_tokens
     FROM ai_usage
     WHERE created_at >= $1::timestamptz AND created_at < $2::timestamptz
-    GROUP BY request_type, status`,
+    GROUP BY request_type, status, model`,
     [window.start, window.end],
   )) as AiUsageRow[]
   return buildAiUsageReport(rows, readAiUsageConfig(), now)
