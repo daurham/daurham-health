@@ -37,7 +37,7 @@ const LABELS: Record<string, string> = {
 }
 
 function label(key: string): string {
-  return LABELS[key] ?? key.replaceAll('_', ' ')
+  return LABELS[key] ?? key.replace(/_/g, ' ')
 }
 
 function dollar(amount: number, precise = false): string {
