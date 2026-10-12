@@ -11,6 +11,12 @@ export function providerPricesPerMillion(model?: string): { input: number; outpu
   return { input: LEGACY_INPUT_USD_PER_MILLION, output: LEGACY_OUTPUT_USD_PER_MILLION }
 }
 
+/** Gemini exposes candidate and thinking output tokens separately; both are billable. */
+export function billableOutputTokens(candidateTokens: number | null | undefined, thinkingTokens: number | null | undefined): number | null {
+  if (candidateTokens == null && thinkingTokens == null) return null
+  return (candidateTokens ?? 0) + (thinkingTokens ?? 0)
+}
+
 /** Token cost in USD, clamped so finalization cannot exceed the request reservation. */
 export function boundedProviderCostUsd(
   inputTokens: number | null,

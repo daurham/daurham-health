@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { boundedProviderCostUsd } from '../server/ai-usage/cost.ts'
+import { billableOutputTokens, boundedProviderCostUsd } from '../server/ai-usage/cost.ts'
 import { readAiUsageConfig } from '../server/ai-usage/config.ts'
 import { buildAiUsageReport, type AiUsageRow } from '../server/ai-usage/report.ts'
 
@@ -12,6 +12,9 @@ describe('AI usage diagnostic report', () => {
     expect(boundedProviderCostUsd(null, null, 0.05)).toBe(0.05)
     expect(boundedProviderCostUsd(400, 350, 0.05, 'gemini-3.5-flash')).toBe(0.00375)
     expect(boundedProviderCostUsd(400, 350, 0.05, 'gemini-3.5-flash-lite')).toBe(0.000995)
+    expect(billableOutputTokens(300, 50)).toBe(350)
+    expect(billableOutputTokens(null, 50)).toBe(50)
+    expect(billableOutputTokens(null, null)).toBeNull()
   })
 
   it('separates ledger reservations from token-priced estimates without changing budget balances', () => {

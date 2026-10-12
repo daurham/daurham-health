@@ -12,6 +12,7 @@ export async function askHealthGemini(input: { system: string; user: string; mod
   model: string
   inputTokens: number | null
   outputTokens: number | null
+  thinkingTokens?: number | null
 }> {
   const config = await getGeminiConfig()
   const request = {
@@ -39,6 +40,7 @@ export async function askHealthGemini(input: { system: string; user: string; mod
     model: result.model,
     inputTokens: result.inputTokens,
     outputTokens: result.outputTokens,
+    thinkingTokens: result.thinkingTokens,
   }
 }
 

@@ -11,6 +11,7 @@ export async function literatureGemini(input: { system: string; user: string; mo
   model: string
   inputTokens: number | null
   outputTokens: number | null
+  thinkingTokens?: number | null
 }> {
   const config = await getGeminiConfig()
   const result = await generateWithGemini(config, {
@@ -24,5 +25,6 @@ export async function literatureGemini(input: { system: string; user: string; mo
     model: result.model,
     inputTokens: result.inputTokens,
     outputTokens: result.outputTokens,
+    thinkingTokens: result.thinkingTokens,
   }
 }
