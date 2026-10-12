@@ -4,6 +4,7 @@ import { healthFetch, readApiError, quietButtonClass } from '@/lib'
 type UsageGroup = {
   requestType: string
   status: string
+  model: string
   requests: number
   budgetConsumedUsd: number
   tokenEstimateUsd: number
@@ -130,10 +131,10 @@ export function AiUsageSection() {
             {report.groups.length === 0 ? <p className="text-sm text-zinc-500">No AI attempts this month.</p> : (
               <ul className="divide-y divide-zinc-100">
                 {report.groups.map((group) => (
-                  <li key={group.requestType + ':' + group.status} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
+                  <li key={group.requestType + ':' + group.status + ':' + group.model} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
                     <div>
                       <p className="font-medium text-zinc-900">{label(group.requestType)}</p>
-                      <p className="text-xs text-zinc-500">{group.status} · {group.requests} calls · {(group.inputTokens + group.outputTokens).toLocaleString('en-US')} reported tokens</p>
+                      <p className="text-xs text-zinc-500">{group.status} · {group.model} · {group.requests} calls · {(group.inputTokens + group.outputTokens).toLocaleString('en-US')} reported tokens</p>
                     </div>
                     <div className="text-right">
                       <p className="font-medium tabular-nums">{dollar(group.budgetConsumedUsd)}</p>
