@@ -12,6 +12,6 @@ export function boundedProviderCostUsd(
   }
   const input = inputTokens ?? 0
   const output = outputTokens ?? 0
-  const micro = Math.round((input * INPUT_USD_PER_MILLION + output * OUTPUT_USD_PER_MILLION) * 1_000_000) / 1_000_000
+  const micro = Math.round(input * INPUT_USD_PER_MILLION + output * OUTPUT_USD_PER_MILLION) / 1_000_000
   return Math.min(reservedUsd, Math.max(0, micro))
 }
