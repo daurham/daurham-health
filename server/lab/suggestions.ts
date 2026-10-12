@@ -282,7 +282,7 @@ export async function draftExperimentSuggestion(
     })
     const draft = validateSuggestionModel(generated.text, candidate)
     const reserved = readAiUsageConfig().experimentSuggestionMaxRequestCostUsd
-    const cost = boundedProviderCostUsd(generated.inputTokens, generated.outputTokens, reserved)
+    const cost = boundedProviderCostUsd(generated.inputTokens, generated.outputTokens, reserved, generated.model)
     await gate.complete(usageId, cost, generated.inputTokens, generated.outputTokens, now)
     if (!draft) {
       return draftResponse(candidate, null, SUGGESTION_AI_FALLBACK_COPY, generated.model)
