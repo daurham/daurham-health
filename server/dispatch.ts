@@ -1,3 +1,4 @@
+import aiUsageHandler from './handlers/ai-usage.js'
 import { handleApiError, requestApiPathname, sendJson, type ApiRequest, type ApiResponse } from './http.js'
 import authHandler from './handlers/auth.js'
 import bodyMeasurementsHandler from './handlers/body-measurements.js'
@@ -67,6 +68,7 @@ import coachIntelligenceHandler from './handlers/coach-intelligence.js'
 
 export type HealthApiRoute =
   | 'health'
+  | 'ai-usage'
   | 'profile'
   | 'session'
   | 'auth'
@@ -136,6 +138,7 @@ type HealthApiHandler = (req: ApiRequest, res: ApiResponse) => unknown | Promise
 
 const HANDLERS: Record<HealthApiRoute, HealthApiHandler> = {
   health: healthHandler,
+  'ai-usage': aiUsageHandler,
   profile: profileHandler,
   session: sessionHandler,
   auth: authHandler,
@@ -212,6 +215,8 @@ function isSingleSegmentAfter(pathname: string, prefix: string): boolean {
 
 export function matchHealthApiRoute(pathname: string): HealthApiRoute | null {
   switch (pathname) {
+    case '/api/ai/usage':
+      return 'ai-usage'
     case '/api/health':
       return 'health'
     case '/api/profile':
