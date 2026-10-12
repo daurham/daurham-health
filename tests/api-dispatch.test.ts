@@ -96,6 +96,7 @@ describe('Vercel nested API routing', () => {
     expect(matchHealthApiRoute('/api/body/import/fit-profile/preview')).toBe('fit-profile-preview')
     expect(matchHealthApiRoute(`/api/training/sessions/${SESSION_ID}`)).toBe('training-session-detail')
     expect(matchHealthApiRoute('/api/training/transcription/jobs')).toBe('transcription-jobs')
+    expect(matchHealthApiRoute('/api/ai/usage')).toBe('ai-usage')
     expect(matchHealthApiRoute('/api/progress/overview')).toBe('progress-overview')
     expect(matchHealthApiRoute('/api/today')).toBe('today')
     expect(matchHealthApiRoute('/api/intelligence/coach')).toBe('coach-intelligence')

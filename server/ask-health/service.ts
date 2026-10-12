@@ -16,7 +16,7 @@ import {
 import { validateAskHealthAnswer } from '../../src/domain/ask-health/validate.js'
 import type { AskEvidence } from '../../src/domain/ask-health/types.js'
 import { NutritionInterpretError } from '../../src/domain/nutrition/interpret.js'
-import { boundedProviderCostUsd } from '../ai-usage/cost.js'
+import { billableOutputTokens, boundedProviderCostUsd } from '../ai-usage/cost.js'
 import { HttpError } from '../http.js'
 import { askHealthCacheKey, getAskHealthGate, type AskHealthGate } from './gate.js'
 import { loadAskHealthPacketInput } from './load.js'
@@ -33,6 +33,7 @@ export type AskHealthProvider = (input: { system: string; user: string; model: s
   model: string
   inputTokens: number | null
   outputTokens: number | null
+  thinkingTokens?: number | null
 }>
 
 export type AskHealthResponse = {
@@ -179,6 +180,7 @@ export async function explainAskHealth(input: {
         ...repaired,
         inputTokens: addTokenCounts(generated.inputTokens, repaired.inputTokens),
         outputTokens: addTokenCounts(generated.outputTokens, repaired.outputTokens),
+        thinkingTokens: addTokenCounts(generated.thinkingTokens, repaired.thinkingTokens),
       }
       validated = validateAskHealthAnswer(repaired.text, input.packet.evidence)
     } catch (error) {
@@ -188,7 +190,7 @@ export async function explainAskHealth(input: {
       throw new HttpError(502, FAILURE, undefined, `ASK_HEALTH_${code}`)
     }
   }
-  await settleComplete(input.gate, decision.usageId, generated, now)
+  await settleComplete(input.gate, decision.usageId, generated, now, generated.model)
   if (!validated.ok) {
     console.error(`ask-health failure stage=validation reason=${validated.error} model=${generated.model}`)
     throw new HttpError(502, FAILURE, undefined, 'ASK_HEALTH_INVALID_RESPONSE')
@@ -202,7 +204,7 @@ export async function explainAskHealth(input: {
   })
 }
 
-function addTokenCounts(left: number | null, right: number | null): number | null {
+function addTokenCounts(left: number | null | undefined, right: number | null | undefined): number | null {
   if (left == null && right == null) {
     return null
   }
@@ -212,18 +214,20 @@ function addTokenCounts(left: number | null, right: number | null): number | nul
 async function settleComplete(
   gate: AskHealthGate,
   usageId: string | null,
-  generated: { inputTokens: number | null; outputTokens: number | null },
+  generated: { inputTokens: number | null; outputTokens: number | null; thinkingTokens?: number | null },
   now: number,
+  model: string,
 ): Promise<void> {
   if (!usageId) {
     return
   }
+  const billedOutput = billableOutputTokens(generated.outputTokens, generated.thinkingTokens)
   const actual =
-    generated.inputTokens == null && generated.outputTokens == null
+    generated.inputTokens == null && billedOutput == null
       ? null
-      : boundedProviderCostUsd(generated.inputTokens, generated.outputTokens, Number.MAX_SAFE_INTEGER)
+      : boundedProviderCostUsd(generated.inputTokens, billedOutput, Number.MAX_SAFE_INTEGER, model)
   try {
-    await gate.complete(usageId, actual, generated.inputTokens, generated.outputTokens, now)
+    await gate.complete(usageId, actual, generated.inputTokens, billedOutput, now)
   } catch {
     // The reservation stays reserved and still counts toward the ceiling.
   }

@@ -19,7 +19,7 @@ import {
   type SuggestionInput,
   type SuggestionProtocolFact,
 } from '../../src/domain/experiment-suggestions/index.js'
-import { boundedProviderCostUsd } from '../ai-usage/cost.js'
+import { billableOutputTokens, boundedProviderCostUsd } from '../ai-usage/cost.js'
 import { readAiUsageConfig } from '../ai-usage/config.js'
 import { getSql } from '../db.js'
 import { HttpError } from '../http.js'
@@ -35,6 +35,7 @@ export type SuggestionProvider = (input: { system: string; user: string; model: 
   model: string
   inputTokens: number | null
   outputTokens: number | null
+  thinkingTokens?: number | null
 }>
 
 export type SuggestionCommit = (plan: CompiledExperiment) => Promise<{ experimentId: string } | { conflict: true }>
@@ -282,8 +283,9 @@ export async function draftExperimentSuggestion(
     })
     const draft = validateSuggestionModel(generated.text, candidate)
     const reserved = readAiUsageConfig().experimentSuggestionMaxRequestCostUsd
-    const cost = boundedProviderCostUsd(generated.inputTokens, generated.outputTokens, reserved)
-    await gate.complete(usageId, cost, generated.inputTokens, generated.outputTokens, now)
+    const billedOutput = billableOutputTokens(generated.outputTokens, generated.thinkingTokens)
+    const cost = boundedProviderCostUsd(generated.inputTokens, billedOutput, reserved, generated.model)
+    await gate.complete(usageId, cost, generated.inputTokens, billedOutput, now)
     if (!draft) {
       return draftResponse(candidate, null, SUGGESTION_AI_FALLBACK_COPY, generated.model)
     }

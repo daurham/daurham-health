@@ -16,7 +16,7 @@ import {
 } from '../../src/domain/weekly-coach/index.js'
 import type { GoalControlState } from '../../src/domain/goal-control.js'
 import { buildCoachRecommendationDrafts } from '../../src/domain/coach-intelligence.js'
-import { boundedProviderCostUsd } from '../ai-usage/cost.js'
+import { billableOutputTokens, boundedProviderCostUsd } from '../ai-usage/cost.js'
 import { readAiUsageConfig } from '../ai-usage/config.js'
 import { HttpError } from '../http.js'
 import { getWeeklyCoachGate, weeklyCoachCacheKey, type WeeklyCoachGate } from './gate.js'
@@ -32,6 +32,7 @@ export type WeeklyCoachProvider = (input: { system: string; user: string; model:
   model: string
   inputTokens: number | null
   outputTokens: number | null
+  thinkingTokens?: number | null
 }>
 
 export type WeeklyCoachResponse = {
@@ -119,8 +120,9 @@ export async function generateWeeklyCoach(input: {
         : null,
     })
     const reserved = readAiUsageConfig().weeklyCoachMaxRequestCostUsd
-    const cost = boundedProviderCostUsd(generated.inputTokens, generated.outputTokens, reserved)
-    await gate.complete(usageId, cost, generated.inputTokens, generated.outputTokens, now)
+    const billedOutput = billableOutputTokens(generated.outputTokens, generated.thinkingTokens)
+    const cost = boundedProviderCostUsd(generated.inputTokens, billedOutput, reserved, generated.model)
+    await gate.complete(usageId, cost, generated.inputTokens, billedOutput, now)
     if (!commentary) {
       return response(brief, goalControl, null, WEEKLY_COACH_FALLBACK_COPY, generated.model, false)
     }

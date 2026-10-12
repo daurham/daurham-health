@@ -34,6 +34,7 @@ import {
 } from '@/lib'
 import type { AppleHealthPreview } from '@/domain/apple-health/preview'
 import { HealthProfileSection } from './HealthProfileSection'
+import { AiUsageSection } from './AiUsageSection'
 import {
   commitAppleHealthRecords,
   fetchAppleHealthStatus,
@@ -457,6 +458,7 @@ export function SettingsPage() {
       </div>
 
       <HealthProfileSection />
+      <AiUsageSection />
       <AppearanceSection />
       <TrendColorsSection />
 

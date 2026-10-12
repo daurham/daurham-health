@@ -9,7 +9,7 @@ import {
   type NutritionGeminiUsageKind,
 } from '../../src/domain/nutrition/interpret.js'
 import { readAiUsageConfig, type AiUsageConfig } from '../ai-usage/config.js'
-import { boundedProviderCostUsd } from '../ai-usage/cost.js'
+import { billableOutputTokens, boundedProviderCostUsd } from '../ai-usage/cost.js'
 import { createSqlAiUsageLedger, neonAiUsageSession, type AiUsageLedger } from '../ai-usage/ledger.js'
 import type { GeminiConfig } from '../integrations/gemini/config.js'
 
@@ -115,7 +115,8 @@ export async function runNutritionGeminiAttempt(
   }
   try {
     const result = await deps.call(config, request)
-    await ledger.complete(reserved.id, actualCost(result, reservedCostUsd), result.inputTokens, result.outputTokens, deps.now?.() ?? Date.now())
+    const billedOutput = billableOutputTokens(result.outputTokens, result.thinkingTokens)
+    await ledger.complete(reserved.id, actualCost(result.inputTokens, billedOutput, reservedCostUsd, request.model), result.inputTokens, billedOutput, deps.now?.() ?? Date.now())
     return result
   } catch (error) {
     if (isReturnedUnusable(error)) {
@@ -129,11 +130,9 @@ export async function runNutritionGeminiAttempt(
   }
 }
 
-function actualCost(result: NutritionGeminiResult, reservedCostUsd: number): number | null {
-  if (result.inputTokens == null && result.outputTokens == null) {
-    return null
-  }
-  return boundedProviderCostUsd(result.inputTokens, result.outputTokens, reservedCostUsd)
+function actualCost(inputTokens: number | null, billedOutput: number | null, reservedCostUsd: number, model: string): number | null {
+  if (inputTokens == null && billedOutput == null) return null
+  return boundedProviderCostUsd(inputTokens, billedOutput, reservedCostUsd, model)
 }
 
 function isReturnedUnusable(error: unknown): boolean {

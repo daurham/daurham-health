@@ -16,6 +16,7 @@ export async function weeklyCoachGemini(input: { system: string; user: string; m
   model: string
   inputTokens: number | null
   outputTokens: number | null
+  thinkingTokens?: number | null
 }> {
   const config = await getGeminiConfig()
   const result = await generateWithGemini(config, {
@@ -29,5 +30,6 @@ export async function weeklyCoachGemini(input: { system: string; user: string; m
     model: result.model,
     inputTokens: result.inputTokens,
     outputTokens: result.outputTokens,
+    thinkingTokens: result.thinkingTokens,
   }
 }

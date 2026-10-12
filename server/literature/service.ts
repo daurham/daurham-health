@@ -16,7 +16,7 @@ import {
   type LiteratureSynthesisBlock,
 } from '../../src/domain/literature/index.js'
 import { NutritionInterpretError } from '../../src/domain/nutrition/interpret.js'
-import { boundedProviderCostUsd } from '../ai-usage/cost.js'
+import { billableOutputTokens, boundedProviderCostUsd } from '../ai-usage/cost.js'
 import { HttpError } from '../http.js'
 import { fetchEuropePmc } from './europe-pmc.js'
 import { getLiteratureGate, literatureCacheKey, type LiteratureGate } from './gate.js'
@@ -27,6 +27,7 @@ export type LiteratureGemini = (input: { system: string; user: string; model: st
   model: string
   inputTokens: number | null
   outputTokens: number | null
+  thinkingTokens?: number | null
 }>
 
 export async function searchLiterature(input: {
@@ -79,7 +80,7 @@ export async function searchLiterature(input: {
     return responseFor(parsed.query, records, null, LITERATURE_SYNTHESIS_FALLBACK)
   }
   const validated = validateLiteratureSynthesis(generated.text, new Set(records.map((record) => record.sourceRef)))
-  await settleComplete(gate, decision.usageId, generated, now)
+  await settleComplete(gate, decision.usageId, generated, now, generated.model)
   if (!validated.ok) {
     return responseFor(parsed.query, records, null, LITERATURE_SYNTHESIS_FALLBACK)
   }
@@ -107,18 +108,20 @@ function responseFor(
 async function settleComplete(
   gate: LiteratureGate,
   usageId: string | null,
-  generated: { inputTokens: number | null; outputTokens: number | null },
+  generated: { inputTokens: number | null; outputTokens: number | null; thinkingTokens?: number | null },
   now: number,
+  model: string,
 ): Promise<void> {
   if (!usageId) {
     return
   }
+  const billedOutput = billableOutputTokens(generated.outputTokens, generated.thinkingTokens)
   const actual =
-    generated.inputTokens == null && generated.outputTokens == null
+    generated.inputTokens == null && billedOutput == null
       ? null
-      : boundedProviderCostUsd(generated.inputTokens, generated.outputTokens, Number.MAX_SAFE_INTEGER)
+      : boundedProviderCostUsd(generated.inputTokens, billedOutput, Number.MAX_SAFE_INTEGER, model)
   try {
-    await gate.complete(usageId, actual, generated.inputTokens, generated.outputTokens, now)
+    await gate.complete(usageId, actual, generated.inputTokens, billedOutput, now)
   } catch {
     // The reservation stays reserved and still counts toward the ceiling.
   }
