@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { healthFetch, readApiError, quietButtonClass } from '@/lib'
 
 type UsageGroup = {
@@ -54,7 +54,7 @@ export function AiUsageSection() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  async function load(signal?: AbortSignal) {
+  const load = useCallback(async (signal?: AbortSignal) => {
     setLoading(true)
     setError(null)
     try {
@@ -67,13 +67,13 @@ export function AiUsageSection() {
     } finally {
       if (!signal?.aborted) setLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
     const controller = new AbortController()
     void load(controller.signal)
     return () => controller.abort()
-  }, [])
+  }, [load])
 
   const fraction = report && report.budgetUsd > 0
     ? Math.min(100, (report.budgetConsumedUsd / report.budgetUsd) * 100)
