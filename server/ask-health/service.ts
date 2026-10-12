@@ -188,7 +188,7 @@ export async function explainAskHealth(input: {
       throw new HttpError(502, FAILURE, undefined, `ASK_HEALTH_${code}`)
     }
   }
-  await settleComplete(input.gate, decision.usageId, generated, now)
+  await settleComplete(input.gate, decision.usageId, generated, now, generated.model)
   if (!validated.ok) {
     console.error(`ask-health failure stage=validation reason=${validated.error} model=${generated.model}`)
     throw new HttpError(502, FAILURE, undefined, 'ASK_HEALTH_INVALID_RESPONSE')
@@ -214,6 +214,7 @@ async function settleComplete(
   usageId: string | null,
   generated: { inputTokens: number | null; outputTokens: number | null },
   now: number,
+  model: string,
 ): Promise<void> {
   if (!usageId) {
     return
@@ -221,7 +222,7 @@ async function settleComplete(
   const actual =
     generated.inputTokens == null && generated.outputTokens == null
       ? null
-      : boundedProviderCostUsd(generated.inputTokens, generated.outputTokens, Number.MAX_SAFE_INTEGER)
+      : boundedProviderCostUsd(generated.inputTokens, generated.outputTokens, Number.MAX_SAFE_INTEGER, model)
   try {
     await gate.complete(usageId, actual, generated.inputTokens, generated.outputTokens, now)
   } catch {
