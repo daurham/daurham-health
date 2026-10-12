@@ -1,8 +1,17 @@
 import { describe, expect, it } from 'vitest'
+import { boundedProviderCostUsd } from '../server/ai-usage/cost.ts'
 import { readAiUsageConfig } from '../server/ai-usage/config.ts'
 import { buildAiUsageReport, type AiUsageRow } from '../server/ai-usage/report.ts'
 
 describe('AI usage diagnostic report', () => {
+  it('charges fractional cents for ordinary token volumes instead of clamping every request at five cents', () => {
+    expect(boundedProviderCostUsd(12912, 13436, 0.05)).toBe(0.009998)
+    expect(boundedProviderCostUsd(400, 350, 0.05)).toBe(0.00027)
+    expect(boundedProviderCostUsd(0, 10_000, 0.05)).toBe(0.006)
+    expect(boundedProviderCostUsd(10_000_000, 10_000_000, 0.05)).toBe(0.05)
+    expect(boundedProviderCostUsd(null, null, 0.05)).toBe(0.05)
+  })
+
   it('separates ledger reservations from token-priced estimates without changing budget balances', () => {
     const rows: AiUsageRow[] = [
       { request_type: 'nutrition_description', status: 'completed', requests: 37, recorded_usd: '1.8500', token_input: '12912', token_output: '13436', missing_tokens: 0 },
