@@ -12,9 +12,12 @@ export async function loadGoalControlState(
   const weeklyInput = preloaded?.weeklyInput ?? await loadWeeklyCoachInput(asOf)
   const brief = preloaded?.brief ?? buildWeeklyCoachBrief(weeklyInput)
   const intelligence = await loadHealthIntelligenceSnapshot({ range: '30d', asOf })
+  // One canonical training evaluation serves both Coach and the independent
+  // maintenance calorie-safety gate. Do not issue duplicate progression reads.
+  const trainingProgressionPromise = loadTrainingProgressionState(asOf)
   const [maintenance, trainingProgression] = await Promise.all([
-    loadMaintenanceState({ asOf, snapshot: intelligence }),
-    loadTrainingProgressionState(asOf),
+    loadMaintenanceState({ asOf, snapshot: intelligence, trainingProgressionPromise }),
+    trainingProgressionPromise,
   ])
   return buildGoalControlState({
     asOf,
