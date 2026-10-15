@@ -10,6 +10,7 @@ import { calendarDaysBetween } from './progress/dates.js'
 import { theilSenSlopePerDay } from './progress/statistics.js'
 import { addCalendarDays } from './training-plan.js'
 import type { MaintenancePerformanceSafety } from './maintenance-performance.js'
+import type { DecisionRevisionStatus } from './maintenance-revision.js'
 
 export const MAINTENANCE_ENGINE_VERSION = 'maintenance-engine-v1' as const
 export const KCAL_PER_KG_BODY_MASS_CHANGE = 7700
@@ -131,6 +132,9 @@ export type MaintenanceAdjustmentContext = {
   currentCalorieTarget: number | null
   /** Active or imminently scheduled owner experiments. */
   activeExperimentCount: number
+  /** Optimistic revision of current target, goals and experiments from one SQL view. */
+  decisionRevision?: string | null
+  revisionStatus?: DecisionRevisionStatus
   /** Canonical exact-exercise trends and active goal urgency, separately verified. */
   performance?: MaintenancePerformanceSafety | null
   /** Any failed read is unknown, not equivalent to zero experiments. */
@@ -147,6 +151,8 @@ export type MaintenanceState = {
   interventions: MaintenanceIntervention[]
   calibration: MaintenanceCalibrationSuggestion
   calorieAdjustmentSafety: CalorieAdjustmentSafety
+  /** Valid only for a confirmed current-settings snapshot; never grants permission itself. */
+  decisionRevision?: string | null
 }
 
 export type BuildMaintenanceInput = {
@@ -812,6 +818,9 @@ export function calorieAdjustmentSafety(
   const recentCheckinDays = wellness.filter((day) =>
     ['wellness.hunger', 'wellness.energy', 'wellness.soreness'].some((key) =>
       day.signals[key as IntelligenceSignalKey] != null)).length
+  if (context?.revisionStatus !== 'consistent' || !context.decisionRevision) {
+    reasons.push('Current calorie target or goal versions could not be confirmed unchanged during evidence loading; review current settings before a calorie change.')
+  }
   if (context?.status !== 'available') {
     reasons.push('Current target and experiment checks are unavailable; review context before changing intake.')
   } else {
@@ -1016,5 +1025,7 @@ export function buildMaintenanceState(input: BuildMaintenanceInput): Maintenance
     interventions: interventionsFor(estimate, plateau, safety),
     calibration: calibrationFor(estimate, plateau, input.weightGoal),
     calorieAdjustmentSafety: safety,
+    decisionRevision: input.adjustmentContext?.revisionStatus === 'consistent'
+      ? input.adjustmentContext.decisionRevision ?? null : null,
   }
 }
