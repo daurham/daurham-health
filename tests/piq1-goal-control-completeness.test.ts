@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildCoachRecommendationDrafts } from '../src/domain/coach-intelligence.js'
+import { buildCoachRecommendationDrafts, keepVisibleCoachDependencies, recommendationIsSuppressed } from '../src/domain/coach-intelligence.js'
 import { buildGoalControlState } from '../src/domain/goal-control.js'
 import {
   buildHealthIntelligenceSnapshot,
@@ -152,4 +152,21 @@ describe('PIQ-1.2 Goal Control and Coach day-completeness gate', () => {
     expect(drafts.some((item) => item.kind === 'review_intake_adjustment')).toBe(false)
     expect(drafts.some((item) => item.kind === 'review_activity_adjustment')).toBe(false)
   })
+  it('never shows a dangling activity alternative when owner suppresses the calorie recommendation', () => {
+    const { goalControl } = control(new Set(dates))
+    const drafts = buildCoachRecommendationDrafts(goalControl)
+    const intake = drafts.find((item) => item.kind === 'review_intake_adjustment')!
+    const memory = {
+      id: 'synthetic-memory', fingerprint: intake.fingerprint,
+      recommendationKind: intake.kind, responseState: 'not_relevant' as const,
+      suppressUntil: null, followUpOn: null, outcomeState: null,
+      lastSurfacedOn: AS_OF,
+    }
+    const filtered = drafts.filter((draft) =>
+      !recommendationIsSuppressed(draft.fingerprint === intake.fingerprint ? memory : undefined, AS_OF))
+    expect(filtered.some((item) => item.kind === 'review_activity_adjustment')).toBe(true)
+    expect(keepVisibleCoachDependencies(filtered).some((item) => item.kind === 'review_activity_adjustment')).toBe(false)
+    expect(keepVisibleCoachDependencies(drafts).some((item) => item.kind === 'review_activity_adjustment')).toBe(true)
+  })
+
 })
