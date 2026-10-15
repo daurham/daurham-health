@@ -393,6 +393,64 @@ No lane may overwrite canonical owner data or apply production schema change wit
 
 ---
 
+# 6A. Adversarial preflight — explicit edge-case and constraint contract
+
+> **Added 2026-10-14 after the owner's preimplementation audit.** These gates strengthen **existing PIQ-0 through PIQ-7**, not a new phase, more trackers, or permission to defer the North Star. Implement each safeguard only when the relevant existing task is reached. Add T36–T50 to the mandatory regression suite in §17. Verified observations below are code facts as of the audit date, not eternal truths.
+
+## 6A.1 Missing is not automatically zero — especially *before reliable tracking started*
+
+**Observed:** `src/domain/intelligence/shared.ts` marks `training.sessions` `absenceMeansZero: true`. `frameFor()` fills historical absent session observations with zero. This may represent a legitimate rest day **within a reliably observed period**, but can falsely label pre-onboarding, broken-sync or paused-source days as inactive. More generally, absence of manual food, hydration or stool entry is not evidence of zero consumption or zero bowel movement.
+
+**Contract:** Define stream-specific *eligible observation windows*, including source commencement, known coverage/sync gaps, provenance and observed-vs-explicit-zero semantics. Preserve `unknown/not_yet_tracking/source_unavailable` when needed. Don't invent past inactivity to enlarge samples or boost relationship confidence. Distinguish event time, ingestion time, local health date and sleep-night attribution; test mobile offline and DST-enabled other-owner deployments. **Phases:** PIQ-0 inventory, PIQ-1 coverage, PIQ-4 relationships. **Tests:** T36, T37, T50.
+
+## 6A.2 One actual event reported by several sources; one anomalous value
+
+**Risk:** The same weight observation, workout or food is entered manually and imported later, or retried uploads are duplicated. Wrong units and multiplied food servings can create plausible-looking but extreme observations.
+
+**Contract:** Map canonical source identity per stream and dedupe/replay rules. Distinguish true multiple events from source duplicates; do not dedupe merely because two rows share a day. Use owner review when uncertain. Preserve raw provenance and a correction path. Flag extreme/outlier values for high-stakes decisions *without silently deleting genuine unusual measurements*. Do not let one serving/unit mistake trigger a calorie reduction. Recompute caches and recommendations after correction. **Phases:** PIQ-0, PIQ-1, PIQ-7. **Tests:** T37, T38.
+
+## 6A.3 Two different meanings of “back then”
+
+**Risk:** A new import corrects last month's exercise history. "What happened on September 1?" (currently reconstructed records) differs from "What did Health know on September 1?" (point-in-time knowledge).
+
+**Contract:** Prefer a labeled historical truth mode; use event/effective time and recorded/ingested time when available. Do not claim the app knew an observation before it arrived. If an as-known-then record is not reconstructable from the audit history, explicitly say so. Do **not** introduce an elaborate bitemporal database unless a real requirement justifies it. **Phases:** PIQ-1/2/3. **Test:** T39.
+
+## 6A.4 Clinical safety must survive Gemini outage or exhausted budget
+
+**Risk:** A clear urgent symptom question arrives with a provider outage, JSON schema failure, insufficient packet or exceeded monthly cap. A safety response cannot rely entirely on successful generative output.
+
+**Contract:** Introduce a narrow, deterministic *pre-provider safety triage* for well-defined concerning symptom patterns, with versioned, clinically reviewed fallback language and appropriate escalation. Avoid broad disease prediction. Avoid pure keyword triggers: handle negation ("no chest pain"), past tense, quoted hypotheticals, other people's symptoms, and ambiguous situations proportionately. Never turn a routine question into a false personal emergency. Safety holds override motivational quests and calorie/training suggestions. **Phases:** PIQ-0/3/5/7. **Tests:** T40, T41.
+
+## 6A.5 Multi-tab concurrency and responses becoming stale mid-flight
+
+**Risk:** Tab A records today's workout, while a slower Coach request from tab B returns last and overwrites the now-correct state. Two simultaneous Ask Health calls may also double-charge a provider.
+
+**Contract:** Attach a source/evidence revision (or reliable fingerprint), as-of scope and request identifier to derived results. Reject or visibly label older responses; preserve the distinction between a time-qualified historical answer and an active present recommendation. Handle backdated edits, offline reconnects and background imports. Coalesce simultaneous identical provider requests/reservations where supported, bound retries after uncertain provider billing, invalidate cache on prompt/model/knowledge/clinical safety change, and avoid raw sensitive query logging. **Phases:** PIQ-1/3/7. **Tests:** T42, T43.
+
+## 6A.6 Recommendations can change the *quality of recording*, not just physiology
+
+**Risk:** The owner logs water more carefully after Coach recommends it. Recorded water doubles even when actual consumption is unchanged. Several simultaneous changes (water, fiber, calories, training load) further confound interpretation.
+
+**Contract:** Freeze intended experiment outcome and assessment window, distinguish acceptance, implementation, exposure/adherence and logging completeness, and evaluate before/after changes with concurrent interventions documented. Allow `not_evaluable/inconclusive/suggestive/contradictory` outcomes; never imply causality because a logging metric rose. A dismissed recommendation may reappear if the evidence and owner context materially change, but not as a nagging duplicate. **Phases:** PIQ-1/4/5/6. **Tests:** T44, T45.
+
+## 6A.7 Question phrasing and untrusted evidence
+
+**Risk:** "I stopped creatine," "I didn't train," "my wife has...", "could this cause...?", "Bristol one," and "pellet-like stools" can change the meaning of a query while a keyword router still matches it. User notes, OCR and research abstracts might contain embedded adversarial instructions.
+
+**Contract:** Test semantic polarity, person/reference, tense, question-vs-record contradictions, colloquial terms, misspellings and paraphrase stability. Question text is not proof that a personal fact occurred. Treat OCR, user-authored notes, food descriptions and literature text as untrusted data; citations are not proof of truth and may never authorize changing app instructions. Do not claim an external paper was fetched unless it actually was. **Phases:** PIQ-0/3/7. **Tests:** T41, T46, T47.
+
+## 6A.8 Profile corrections, private deletions and fresh-instance portability
+
+**Risk:** The owner edits/deletes a profile fact but a previously cached answer still contains it; or the original owner's configured male sex becomes a default in a second owner's independent deployment.
+
+**Contract:** Invalidate/recalculate app-owned derived records, advice and caches when underpinning facts are removed or corrected. Clearly distinguish app-controlled erasure from external AI provider retention; never promise deletion outside the app's control. The original owner's physiological sex is `male` as a **private owner field**, but fresh other-owner deployments begin `unknown` until set. Enforce private export/restore, access controls and public demo isolation. Historical medications and other time-varying facts must be as-of valid. **Phases:** PIQ-2/3/7. **Tests:** T48, T49.
+
+## 6A.9 PIQ-0 preflight completion gate (bounded scope)
+
+Before declaring PIQ-0 complete, record in `PIQ_PROGRESS.md`: verified production app/schema commit; stream-specific tracking commencement and source coverage; replay/duplicate policy; safety fallback behavior; cache/revision behavior; historical-known-vs-reconstructed limitations; privacy/deletion scope; test coverage T36–T50 with *synthetic* fixtures; and any owner-only runtime evidence still needed. **No new dashboard, diagnosis engine, universal data ontology or extra tracking questionnaire is authorized by this audit.** Escalate only confirmed critical correctness/safety issues. Existing work remains the priority.
+
+---
+
 # 7. PIQ-0 — Establish verified baseline and an intelligence evaluation harness
 
 **Objective:** Make it impossible to get lost in the phase, misattribute a bug, or mistake a better-looking answer for a better answer.
@@ -1200,6 +1258,8 @@ Insufficiency is a **description of personal evidentiary strength**, not a reaso
 
 These should exist as unit/integration/E2E fixtures as feasible. Avoid hardcoding owner-identifying data in fixtures. Use synthetic, plausible records and specific expected outcomes.
 
+T36–T50 extend this suite with the adversarial conditions in §6A. Run them for the affected PIQ task; do not block unrelated work on irrelevant scenarios.
+
 ## T01. General question with zero personal records
 
 **Question:** “What does creatine monohydrate do?”  
@@ -1412,6 +1472,96 @@ These should exist as unit/integration/E2E fixtures as feasible. Avoid hardcodin
 **Must NOT:** Duplicate data, delete committed history, or mark an unsuccessful save as committed.
 
 
+## T36. Pre-onboarding training is not a zero
+
+**Given:** Training history starts June; earlier days lack coverage.  
+**Must:** Earlier absence remains not-yet-tracking/unknown; no false months of inactivity or inflated sample counts.  
+**Must NOT:** invent owner facts, conceal uncertainty or permit unsafe advice.
+
+## T37. Outage, replay and overlapping import
+
+**Given:** Device sync is down, then catches up; manual record overlaps one imported observation.  
+**Must:** Source gaps are visible, replay is idempotent, ambiguous duplicates reviewed; one event is not counted twice.  
+**Must NOT:** invent owner facts, conceal uncertainty or permit unsafe advice.
+
+## T38. Unit/serving anomaly
+
+**Given:** One food entry is 10x servings or one weight is in the wrong units.  
+**Must:** Flags or quarantines for high-impact reasoning until review; never confident intake or plateau advice from the anomaly.  
+**Must NOT:** invent owner facts, conceal uncertainty or permit unsafe advice.
+
+## T39. Corrected past versus app knowledge at that time
+
+**Given:** Workout from last month imported today.  
+**Must:** Differentiates corrected historical record from as-known-then; no claim of past knowledge without audit trail.  
+**Must NOT:** invent owner facts, conceal uncertainty or permit unsafe advice.
+
+## T40. Urgent symptom with AI cap reached
+
+**Given:** Synthetic urgent symptom request; Gemini unavailable or monthly budget exhausted.  
+**Must:** Safe, proportionate deterministic escalation survives; not just budget-error or insufficient-data boilerplate.  
+**Must NOT:** invent owner facts, conceal uncertainty or permit unsafe advice.
+
+## T41. No current owner symptom in negated/quoted/third-party question
+
+**Given:** "No chest pain" or "my wife had" or hypothetical.  
+**Must:** Person, tense and polarity correct; no false personal emergency diagnosis.  
+**Must NOT:** invent owner facts, conceal uncertainty or permit unsafe advice.
+
+## T42. Stale cross-tab response
+
+**Given:** Workout saved after slow Coach/Ask request begins but before it returns.  
+**Must:** Old reply rejected or clearly historical; current training and advice remain correct.  
+**Must NOT:** invent owner facts, conceal uncertainty or permit unsafe advice.
+
+## T43. Concurrent duplicate provider calls
+
+**Given:** Same question triggered simultaneously from two tabs; billing finalization uncertain.  
+**Must:** Avoid surprise double billing and unbounded retry; preserve accurate usage uncertainty.  
+**Must NOT:** invent owner facts, conceal uncertainty or permit unsafe advice.
+
+## T44. Improved logging mistaken for better hydration/food behavior
+
+**Given:** After recommendation, more complete tracking raises daily logged totals.  
+**Must:** Separates measurement behavior from physiology; cannot claim causal benefit.  
+**Must NOT:** invent owner facts, conceal uncertainty or permit unsafe advice.
+
+## T45. Simultaneous interventions and plan change
+
+**Given:** Fiber, water, calories, and goal priority all change in one week.  
+**Must:** Marks confounding; may report inconclusive; supersedes now irrelevant advice.  
+**Must NOT:** invent owner facts, conceal uncertainty or permit unsafe advice.
+
+## T46. Slang, negation, and date-sensitive supplement history
+
+**Given:** "rabbit poop", "Bristol one", "I stopped creatine" and "last month".  
+**Must:** Correct evidence routing and historical status; avoids converting question into canonical fact.  
+**Must NOT:** invent owner facts, conceal uncertainty or permit unsafe advice.
+
+## T47. Prompt injection inside evidence or literature
+
+**Given:** Stored note/OCR/research abstract directs LLM to break instructions.  
+**Must:** Treats contents as untrusted data, validates sourced claims and ignores injected commands.  
+**Must NOT:** invent owner facts, conceal uncertainty or permit unsafe advice.
+
+## T48. Deleted/corrected sensitive fact and old cache
+
+**Given:** Owner removes a clinical profile note after model has used it.  
+**Must:** Future results and app caches do not reuse withdrawn fact; precise account of any external provider retention.  
+**Must NOT:** invent owner facts, conceal uncertainty or permit unsafe advice.
+
+## T49. Fresh other-owner profile is not original owner
+
+**Given:** Second independent deployment with unset sex/conditions.  
+**Must:** No inherited male default or profile leak; unknown stays unknown.  
+**Must NOT:** invent owner facts, conceal uncertainty or permit unsafe advice.
+
+## T50. Midnight and alternate timezone/daylight-saving
+
+**Given:** Workout across midnight; late imports; sleep nights; DST-enabled instance.  
+**Must:** Event-date/ingest-date and sleep-date semantics remain consistent with configured instance timezone.  
+**Must NOT:** invent owner facts, conceal uncertainty or permit unsafe advice.
+
 ### 17.1 Required test layers
 
 | Layer | Minimum responsibility |
@@ -1563,6 +1713,18 @@ Unanswered questions block approval of feature scope, not ordinary bug fixes.
 | Docs drift / assistant gets lost | Cross-session work, long roadmap, branches | High | Startup protocol, task IDs, progress handoff, verified state, small change batches |
 | Test green but user dissatisfied | Structural correctness not meaningful utility | High | Owner-golden questions and rubric, real-world mobile UAT |
 | Creatine incorrectly identified as dehydration cause | Common misleading health interpretation | High | Explicit GI scenario, physiology review, careful wording |
+
+| Pre-tracking gaps counted as zero activity | `training.sessions` auto-fills past-day zero | High | §6A.1 stream eligibility; T36–T37 |
+| Duplicate, replayed or extreme source rows | Can distort small personal samples | Critical | §6A.2 anomaly/dedup checks; T37–T38 |
+| Urgent symptom while AI provider unavailable | Safety routed too late | Critical | §6A.4 deterministic fallback; T40–T41 |
+| Slower response overwrites newer fact | Cross-tab and late network result | High | §6A.5 revision-aware state; T42 |
+| Duplicate concurrent model billing | In-flight same-question requests | High | §6A.5 atomic request gate; T43 |
+| More logging mistaken for physiologic improvement | Advice changes capture behavior | High | §6A.6 outcome quality; T44–T45 |
+| Negated or third-party symptom mistaken for owner's | Naive phrase matching | High | §6A.7 semantic parsing; T41/T46 |
+| Prompt injection through notes/OCR/research | Untrusted data resembles instructions | High | §6A.7 prompt boundary; T47 |
+| Removed health facts persist in cache | Derived copies survive source correction | Critical | §6A.8 invalidation; T48 |
+| First owner's sex leaks into second deployment | Shared default/seed or hardcode | High | §6A.8 owner-only profile; T49 |
+| Late records retroactively "known" | History time vs ingestion time | High | §6A.3 historical semantics; T39/T50 |
 
 **Risk escalation rule:** A new critical regression blocks the next phase until addressed or explicitly rolled back. Do not hide it behind future work.
 
