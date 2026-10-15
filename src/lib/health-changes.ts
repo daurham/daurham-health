@@ -1,4 +1,4 @@
-/** Canonical owner changes invalidate Today/Coach. Drafts and Coach ensures do not. */
+/** Canonical successful owner mutations invalidate Training, Today and Coach; drafts/ensures do not. */
 export const HEALTH_DATA_CHANGED = 'health:data-changed'
 
 export function isCoachRelevantMutation(url: string, method: string): boolean {
@@ -11,7 +11,7 @@ export function isCoachRelevantMutation(url: string, method: string): boolean {
   }
   if (/\/(preview|draft)$/.test(path)) return false
   if (/^\/api\/(lab|goals|context|supplements|hydration|bowel|check-in)(\/|$)/.test(path)) return true
-  if (/^\/api\/training\/(sessions|exercises|templates)(\/|$)/.test(path)) return true
+  if (/^\/api\/training\/(sessions|exercises|templates|plan)(\/|$)/.test(path)) return true
   if (path === '/api/training/transcription/commit') return true
   if (/^\/api\/nutrition\/(entries|recipe-entries|targets)(\/|$)/.test(path)) return true
   if (/^\/api\/nutrition\/(meal|describe)\/commit$/.test(path)) return true
@@ -20,13 +20,47 @@ export function isCoachRelevantMutation(url: string, method: string): boolean {
   return path === '/api/body/import/fit-profile/commit' || path === '/api/apple-health/import/commit'
 }
 
-export function notifyHealthDataChanged(): void {
-  if (typeof window !== 'undefined') window.dispatchEvent(new Event(HEALTH_DATA_CHANGED))
+/**
+ * Ephemeral same-origin cross-tab invalidation. Messages never contain health
+ * records, dates, identifiers, or account data; they are only refresh hints.
+ * No localStorage persistence or polling, and remote hints are not echoed.
+ */
+export const HEALTH_CHANGE_CHANNEL = 'health:canonical-changes-v1'
+let changeChannel: BroadcastChannel | null = null
+
+function openChangeChannel(): BroadcastChannel | null {
+  if (typeof window === 'undefined' || typeof window.BroadcastChannel !== 'function') return null
+  if (changeChannel) return changeChannel
+  try {
+    const channel = new window.BroadcastChannel(HEALTH_CHANGE_CHANNEL)
+    channel.addEventListener('message', (event: MessageEvent<unknown>) => {
+      if (event.data === HEALTH_DATA_CHANGED) {
+        window.dispatchEvent(new Event(HEALTH_DATA_CHANGED))
+      }
+    })
+    changeChannel = channel
+  } catch {
+    // Private mode or unsupported browsers still use local events and focus.
+    return null
+  }
+  return changeChannel
 }
 
-/** Coalesce a successful mutation and its UI callback; no polling or stored state. */
-export function subscribeHealthDataChanges(refresh: () => void): () => void {
+export function notifyHealthDataChanged(): void {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new Event(HEALTH_DATA_CHANGED))
+  openChangeChannel()?.postMessage(HEALTH_DATA_CHANGED)
+}
+
+/** Coalesce successful mutations, cross-tab notifications and optional
+ * focus/visibility revalidation. Unsubscribing cancels pending notifications.
+ */
+export function subscribeHealthDataChanges(
+  refresh: () => void,
+  options: { revalidateOnFocus?: boolean } = {},
+): () => void {
   if (typeof window === 'undefined') return () => undefined
+  openChangeChannel()
   let timer: ReturnType<typeof setTimeout> | null = null
   const changed = () => {
     if (timer != null) return
@@ -35,9 +69,22 @@ export function subscribeHealthDataChanges(refresh: () => void): () => void {
       refresh()
     }, 0)
   }
+  const onVisibility = () => {
+    if (typeof document !== 'undefined' && document.visibilityState === 'visible') changed()
+  }
   window.addEventListener(HEALTH_DATA_CHANGED, changed)
+  if (options.revalidateOnFocus) {
+    window.addEventListener('focus', changed)
+    window.addEventListener('pageshow', changed)
+    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', onVisibility)
+  }
   return () => {
     window.removeEventListener(HEALTH_DATA_CHANGED, changed)
+    if (options.revalidateOnFocus) {
+      window.removeEventListener('focus', changed)
+      window.removeEventListener('pageshow', changed)
+      if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVisibility)
+    }
     if (timer != null) clearTimeout(timer)
   }
 }
