@@ -56,7 +56,8 @@ async function handleCoachIntelligence(req: ApiRequest, res: ApiResponse) {
       sendJson(res, 400, { error: 'Invalid Coach recommendation response' })
       return
     }
-    sendJson(res, 200, await respondCoachRecommendation(route.id, response, date, body.ownerStarted === true))
+    sendJson(res, 200, await respondCoachRecommendation(route.id, response, date, body.ownerStarted === true,
+      Object.prototype.hasOwnProperty.call(body, 'expectedResponseAt') ? body.expectedResponseAt as string | null : undefined))
     return
   }
   const outcome = typeof body.outcome === 'string' ? body.outcome as CoachRecommendationOutcome : null

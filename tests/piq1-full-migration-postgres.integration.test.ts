@@ -294,6 +294,52 @@ describe.skipIf(!url)('PIQ-1.1 full 0001–0053 migration-chain and backup on is
     }
   })
 
+
+  it('PIQ-1.5: PostgreSQL response CAS preserves the first owner decision and started provenance across reads', async () => {
+    await client.query('BEGIN')
+    try {
+      const draft = {
+        fingerprint: 'coach:piq:cas:' + randomUUID(), sourceId: 'training:check:cas',
+        kind: 'training_progression', domain: 'training', title: 'Review lift',
+        detail: 'Check progress.', actionText: 'Review', detailPath: '/training',
+        confidence: 'moderate' as const, evidenceRefs: ['training:strength'],
+        priority: 80, experimentEligible: true,
+      }
+      const initial = await surfaceDraft(adapter, draft, today, null)
+      expect(initial.response_at).toBeNull()
+      await writeCoachRecommendationResponse(
+        adapter, initial.id, 'do_this', today, async () => undefined, true, initial.response_at,
+      )
+      const first = await client.query(
+        'SELECT response_state, metadata, response_at::text AS response_at FROM coach_recommendations WHERE id = $1::uuid',
+        [initial.id],
+      )
+      expect(first.rows[0].response_state).toBe('do_this')
+      expect(first.rows[0].metadata.ownerStarted).toBe(true)
+      await expect(writeCoachRecommendationResponse(
+        adapter, initial.id, 'not_relevant', today, async () => undefined, false, initial.response_at,
+      )).rejects.toMatchObject({ statusCode: 409 })
+      const after = await client.query(
+        'SELECT response_state, metadata, response_at::text AS response_at FROM coach_recommendations WHERE id = $1::uuid',
+        [initial.id],
+      )
+      expect(after.rows[0]).toEqual(first.rows[0])
+      const resurfaced = await surfaceDraft(adapter, { ...draft, detail: 'Updated context' }, today, null)
+      expect(resurfaced.response_at).toBe(first.rows[0].response_at)
+      expect(resurfaced.metadata?.ownerStarted).toBe(true)
+      await writeCoachRecommendationResponse(
+        adapter, initial.id, 'not_relevant', today, async () => undefined, false, resurfaced.response_at,
+      )
+      const dismissed = await client.query(
+        'SELECT response_state, metadata FROM coach_recommendations WHERE id = $1::uuid', [initial.id],
+      )
+      expect(dismissed.rows[0].response_state).toBe('not_relevant')
+      expect(dismissed.rows[0].metadata.ownerStarted).toBeUndefined()
+    } finally {
+      await client.query('ROLLBACK')
+    }
+  })
+
   it('PIQ-1.2: saved-id action rechecks live SQL target changes and refuses a stale or legacy ID', async () => {
     await client.query('BEGIN')
     try {
@@ -333,6 +379,7 @@ describe.skipIf(!url)('PIQ-1.1 full 0001–0053 migration-chain and backup on is
       await writeCoachRecommendationResponse(
         adapter, saved.id, 'do_this', today,
         (persisted) => requireCurrentCalorieRecommendation(persisted, today, makeControl(initial.revision), checkRevision),
+        true, saved.response_at == null ? null : String(saved.response_at),
       )
       const accepted = await client.query(
         'SELECT response_state, follow_up_on FROM coach_recommendations WHERE id = $1::uuid', [saved.id],
@@ -348,6 +395,7 @@ describe.skipIf(!url)('PIQ-1.1 full 0001–0053 migration-chain and backup on is
       await expect(writeCoachRecommendationResponse(
         adapter, saved.id, 'do_this', today,
         (persisted) => requireCurrentCalorieRecommendation(persisted, today, makeControl(initial.revision), checkRevision),
+        true, saved.response_at == null ? null : String(saved.response_at),
       )).rejects.toThrow('no longer current')
       await expect(requireCurrentCalorieRecommendation(saved, today, makeControl(updated.revision!), checkRevision))
         .rejects.toThrow('no longer current')
@@ -358,6 +406,7 @@ describe.skipIf(!url)('PIQ-1.1 full 0001–0053 migration-chain and backup on is
       await expect(writeCoachRecommendationResponse(
         adapter, saved.id, 'do_this', today,
         (persisted) => requireCurrentCalorieRecommendation(persisted, today, makeControl(updated.revision!), checkRevision),
+        true, saved.response_at == null ? null : String(saved.response_at),
       )).rejects.toThrow('no longer current')
       const historic = await client.query(
         'SELECT response_state, outcome_state, metadata FROM coach_recommendations WHERE id = $1::uuid', [saved.id],

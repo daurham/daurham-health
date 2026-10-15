@@ -14,7 +14,7 @@ function recommendation(overrides: Partial<CoachRecommendationView> = {}): Coach
     id: ID, fingerprint: 'coach:i9:training', kind: 'training_progression', domain: 'training',
     title: 'Check strength progression', detail: 'Review the latest lifting records.',
     actionText: 'Review training', detailPath: '/training', confidence: 'moderate',
-    evidenceRefs: ['training:bench'], responseState: null, experimentEligible: true,
+    evidenceRefs: ['training:bench'], responseState: null, responseAt: null, experimentEligible: true,
     ...overrides,
   }
 }
@@ -58,7 +58,7 @@ describe('PIQ-1.5 viewing advice is not an intervention', () => {
     const sql = { query } as unknown as Sql
     const assertCurrent = vi.fn()
     await expect(writeCoachRecommendationResponse(
-      sql, ID, 'do_this', '2026-10-15', assertCurrent, true,
+      sql, ID, 'do_this', '2026-10-15', assertCurrent, true, null,
     )).rejects.toMatchObject({ statusCode: 409 })
     expect(assertCurrent).not.toHaveBeenCalled()
     expect(query).toHaveBeenCalledTimes(1)
@@ -67,10 +67,10 @@ describe('PIQ-1.5 viewing advice is not an intervention', () => {
   it('only a deliberate start acknowledgement schedules the seven-day follow-up', async () => {
     for (const response of ['not_now', 'do_this'] as const) {
       const query = vi.fn().mockResolvedValueOnce([{ recommendation_kind: 'training_progression' }])
-        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ id: ID }])
       const assertCurrent = vi.fn().mockResolvedValue(undefined)
       await writeCoachRecommendationResponse(
-        { query } as unknown as Sql, ID, response, '2026-10-15', assertCurrent, response === 'do_this',
+        { query } as unknown as Sql, ID, response, '2026-10-15', assertCurrent, response === 'do_this', null,
       )
       expect(assertCurrent).toHaveBeenCalledTimes(1)
       expect(query).toHaveBeenCalledTimes(2)
@@ -82,20 +82,22 @@ describe('PIQ-1.5 viewing advice is not an intervention', () => {
   it('fails closed for legacy do_this callers without a started acknowledgement', async () => {
     const query = vi.fn()
     await expect(writeCoachRecommendationResponse(
-      { query } as unknown as Sql, ID, 'do_this', '2026-10-15', async () => undefined,
+      { query } as unknown as Sql, ID, 'do_this', '2026-10-15', async () => undefined, false, null,
     )).rejects.toMatchObject({ statusCode: 400 })
     expect(query).not.toHaveBeenCalled()
   })
 
   it('records started provenance and clears the marker on other owner decisions', async () => {
     for (const response of ['do_this', 'not_now', 'not_relevant'] as const) {
-      const query = vi.fn().mockResolvedValueOnce([{ recommendation_kind: 'training_progression' }]).mockResolvedValueOnce([])
+      const query = vi.fn().mockResolvedValueOnce([{ recommendation_kind: 'training_progression' }]).mockResolvedValueOnce([{ id: ID }])
       await writeCoachRecommendationResponse(
-        { query } as unknown as Sql, ID, response, '2026-10-15', async () => undefined, response === 'do_this',
+        { query } as unknown as Sql, ID, response, '2026-10-15', async () => undefined, response === 'do_this', null,
       )
       const [sql, params] = query.mock.calls[1] as [string, unknown[]]
       expect(sql).toContain("jsonb_set(COALESCE(metadata, '{}'::jsonb), '{ownerStarted}', 'true'::jsonb, true)")
       expect(sql).toContain("COALESCE(metadata, '{}'::jsonb) - 'ownerStarted'")
+      expect(sql).toContain('response_at::text IS NOT DISTINCT FROM $5::text')
+      expect(sql).toContain('RETURNING id::text AS id')
       expect(params[3]).toBe(response === 'do_this' ? '2026-10-22' : null)
     }
   })
@@ -112,15 +114,44 @@ describe('PIQ-1.5 viewing advice is not an intervention', () => {
   it('the client only sends ownerStarted for an explicit start', () => {
     const api = readFileSync('src/features/coach/api.ts', 'utf8')
     const handler = readFileSync('server/handlers/coach-intelligence.ts', 'utf8')
-    expect(api).toContain("response === 'do_this' ? { response, ownerStarted: true } : { response }")
+    expect(api).toContain("{ response, ownerStarted: true, expectedResponseAt }")
+    expect(api).toContain("{ response, expectedResponseAt }")
     expect(handler).toContain("response, date, body.ownerStarted === true")
+    expect(handler).toContain("hasOwnProperty.call(body, 'expectedResponseAt')")
   })
 
   it('rejects legacy experiment-preview responses before SQL writes', async () => {
     const query = vi.fn()
     await expect(writeCoachRecommendationResponse(
-      { query } as unknown as Sql, ID, 'turn_into_experiment', '2026-10-15', async () => undefined,
+      { query } as unknown as Sql, ID, 'turn_into_experiment', '2026-10-15', async () => undefined, false, null,
     )).rejects.toMatchObject({ statusCode: 409 })
     expect(query).not.toHaveBeenCalled()
+  })
+
+  it('rejects missing response preconditions before reading or writing decisions', async () => {
+    for (const token of [undefined, '', 'x'.repeat(81)]) {
+      const query = vi.fn()
+      await expect(writeCoachRecommendationResponse(
+        { query } as unknown as Sql, ID, 'not_now', '2026-10-15', async () => undefined, false, token,
+      )).rejects.toMatchObject({ statusCode: 428 })
+      expect(query).not.toHaveBeenCalled()
+    }
+  })
+
+  it('reports a changed response rather than overwriting another device', async () => {
+    const query = vi.fn().mockResolvedValueOnce([{ recommendation_kind: 'training_progression' }])
+      .mockResolvedValueOnce([])
+    await expect(writeCoachRecommendationResponse(
+      { query } as unknown as Sql, ID, 'not_relevant', '2026-10-15', async () => undefined, false, null,
+    )).rejects.toMatchObject({ statusCode: 409 })
+    expect(query).toHaveBeenCalledTimes(2)
+    expect(query.mock.calls[1][1][4]).toBeNull()
+  })
+
+  it('the surfacing upsert preserves owner-started history on non-calorie rows', () => {
+    const source = readFileSync('server/intelligence/coach-intelligence.ts', 'utf8')
+    expect(source).toContain("coach_recommendations.metadata ->> 'ownerStarted' = 'true'")
+    expect(source).toContain('response_at::text AS response_at')
+    expect(source).toContain('responseAt: row.response_at == null ? null : String(row.response_at)')
   })
 })

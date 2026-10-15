@@ -340,3 +340,8 @@ Owner "I started this" now sends `ownerStarted: true`, which is stored in existi
 ## 2026-10-15 PIQ-1.5 legacy suppression requalification — branch only
 
 Read-only Coach memory now requires stored `ownerStarted` provenance to suppress via `do_this`, while old `turn_into_experiment` previews no longer suppress and direct legacy conversion writes are rejected. Current safety, quality and recommendation revision gates still apply before resurfacing. Explicit not-now/not-relevant remain intact. No migration, legacy data repair, owner data changes or main promotion. CI and owner QA status tracked in PIQ_PROGRESS.
+
+
+## 2026-10-15 PIQ-1.5 response-version CAS — branch only
+
+Coach response mutation now requires the server-rendered `expectedResponseAt` and atomically compares it to the saved PostgreSQL response timestamp before updating. Stale or missing client versions fail closed. Coach resurfacing preserves confirmed owner-started provenance for non-calorie advice. Added isolated regression and real-disposable-PostgreSQL tests. No migrations or production promotion; CI and owner QA in `PIQ_PROGRESS.md`.

@@ -104,11 +104,14 @@ export function fetchCoachIntelligence(): Promise<CoachIntelligenceState> {
 export function respondCoachRecommendation(
   recommendationId: string,
   response: CoachRecommendationResponse,
+  expectedResponseAt: string | null,
 ): Promise<CoachIntelligenceState> {
   return sendCoachIntelligence(
     `/api/intelligence/coach/recommendations/${recommendationId}/respond`,
     'POST',
-    response === 'do_this' ? { response, ownerStarted: true } : { response },
+    response === 'do_this'
+      ? { response, ownerStarted: true, expectedResponseAt }
+      : { response, expectedResponseAt },
   )
 }
 

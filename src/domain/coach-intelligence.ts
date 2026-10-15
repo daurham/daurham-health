@@ -63,6 +63,8 @@ export type CoachRecommendationView = {
   evidenceExplanation?: MaintenanceEvidenceExplanation
   evidenceRefs: string[]
   responseState: CoachRecommendationResponse | null
+  /** Opaque exact DB response timestamp; null means never responded. */
+  responseAt: string | null
   experimentEligible: boolean
 }
 

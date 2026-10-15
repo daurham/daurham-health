@@ -64,7 +64,7 @@ const ROW_COLUMNS = `
   suppress_until::text AS suppress_until,
   follow_up_on::text AS follow_up_on,
   outcome_state,
-  response_at,
+  response_at::text AS response_at,
   outcome_at,
   metadata
 `
@@ -115,7 +115,9 @@ export async function surfaceDraft(sql: Sql, draft: CoachRecommendationDraft, as
          WHEN coach_recommendations.response_state = 'do_this'
               AND coach_recommendations.recommendation_kind IN ('review_intake_adjustment', 'review_activity_adjustment')
            THEN coach_recommendations.metadata
-         ELSE EXCLUDED.metadata
+         ELSE EXCLUDED.metadata ||
+           CASE WHEN coach_recommendations.metadata ->> 'ownerStarted' = 'true'
+             THEN '{"ownerStarted":true}'::jsonb ELSE '{}'::jsonb END
        END,
        updated_at = now()
      RETURNING ${ROW_COLUMNS}`,
@@ -196,6 +198,7 @@ function recommendationView(row: RecommendationRow, draft: CoachRecommendationDr
     ...(draft.evidenceExplanation ? { evidenceExplanation: draft.evidenceExplanation } : {}),
     evidenceRefs: [...draft.evidenceRefs],
     responseState,
+    responseAt: row.response_at == null ? null : String(row.response_at),
     experimentEligible: draft.experimentEligible,
   }
 }
@@ -393,7 +396,12 @@ export async function writeCoachRecommendationResponse(
   asOf: string,
   assertCurrent: (row: RecommendationRow) => Promise<void>,
   ownerStarted = false,
+  expectedResponseAt?: string | null,
 ): Promise<void> {
+  if (expectedResponseAt === undefined || (expectedResponseAt !== null &&
+      (typeof expectedResponseAt !== 'string' || expectedResponseAt.length === 0 || expectedResponseAt.length > 80))) {
+    throw new HttpError(428, 'This Coach card needs a fresh response version. Reload Coach before deciding.')
+  }
   if (response === 'do_this' && !ownerStarted) {
     throw new HttpError(400, 'Starting Coach advice requires explicit acknowledgement. Refresh Coach and try again.')
   }
@@ -426,9 +434,15 @@ export async function writeCoachRecommendationResponse(
             outcome_state = NULL,
             outcome_at = NULL,
             updated_at = now()
-      WHERE id = $1::uuid`,
-    [id, response, suppressUntil, followUpOn],
-  )
+      WHERE id = $1::uuid
+        AND response_at::text IS NOT DISTINCT FROM $5::text
+      RETURNING id::text AS id`,
+    [id, response, suppressUntil, followUpOn, expectedResponseAt],
+  ).then((changed) => {
+    if (changed.length !== 1) {
+      throw new HttpError(409, 'This Coach decision changed in another tab. Reopen Coach to review its latest state.')
+    }
+  })
 }
 
 export async function respondCoachRecommendation(
@@ -436,12 +450,14 @@ export async function respondCoachRecommendation(
   response: CoachRecommendationResponse,
   asOf: string,
   ownerStarted = false,
+  expectedResponseAt?: string | null,
 ): Promise<CoachIntelligenceState> {
   const sql = await getSql()
   await writeCoachRecommendationResponse(
     sql, id, response, asOf,
     (row) => requireCurrentCalorieRecommendation(row, asOf),
     ownerStarted,
+    expectedResponseAt,
   )
   return loadCoachIntelligenceState(asOf)
 }

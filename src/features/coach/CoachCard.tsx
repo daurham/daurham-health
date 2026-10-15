@@ -273,7 +273,7 @@ export function CoachCard({ state, pending, error, onState }: {
     setActionError(null)
     setNotice(null)
     try {
-      const next = await respondCoachRecommendation(item.id, response)
+      const next = await respondCoachRecommendation(item.id, response, item.responseAt)
       setIntelligence(next)
       if (response === 'do_this') {
         setNotice('Marked as started. Coach will ask how it went after seven days.')
@@ -283,7 +283,14 @@ export function CoachCard({ state, pending, error, onState }: {
         setNotice('Coach will stop surfacing this recommendation.')
       }
     } catch (caught) {
-      setActionError(caught instanceof Error ? caught.message : 'Could not update this Coach recommendation')
+      if (caught instanceof CoachApiError && (caught.status === 409 || caught.status === 428)) {
+        try {
+          setIntelligence(await fetchCoachIntelligence())
+          setNotice('Coach changed in another tab. Review the updated recommendation before deciding.')
+        } catch {
+          setActionError('Could not refresh Coach. Reopen the page before responding.')
+        }
+      } else setActionError(caught instanceof Error ? caught.message : 'Could not update this Coach recommendation')
     } finally {
       setActionPending(false)
     }
