@@ -495,3 +495,9 @@ Observed from the current code and product docs. Where the original rationale is
 **Status:** Branch-validated; production release gated.  
 **Reason:** Precise individual food entries do not prove complete-day consumption. Shared-intelligence baselines, correlations, trend confidence and intervention comparisons must not inflate certainty from unknown or partial days.  
 **Implications:** Server reads existing revision-bound, reliable confirmed-day eligibility; failed reads withhold full-day inference while preserving raw logged values. Health AI clearly labels logged versus verified coverage and distinguishes verification failure from zero confirmations. General explanations and exact logged-food questions remain possible. Does not alter calorie goals, run extra Gemini calls or backfill historical confirmations. Owner mobile QA and applied Neon schema verification remain mandatory.
+
+## Decision: Ask Health multi-day calorie-target comparisons require four corroborated complete-day logs (PIQ-1.1, 2026-10-15)
+
+**Status:** Branch-validated; release gated.  
+**Why:** Comparing a meal log with a daily calorie target produces a numeric gap but cannot establish daily energy intake, expenditure, a physiological deficit or the need to cut calories. Bare caveat wording is not enough if the model gets a confident numeric gap.  
+**Policy:** Preserve the actual logged amounts as descriptive personal facts; only emit a multi-day numeric target comparison when at least four dates are owner-confirmed complete and independently source-ID/calorie/revision crosschecked against the shared intelligence snapshot. Existing loaded data is reused; stale edits, provisional today, schema outages and older synthetic callers fail closed. Otherwise emit a specific nonnumeric limitation. Prompt v5 bars reconstruction. No silent target edit or new paid AI requests. Owner data and full production schema QA still required to release.
