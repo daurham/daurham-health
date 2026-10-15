@@ -11,6 +11,9 @@ import { compareMaintenanceDecisionRevisions } from '../../src/domain/maintenanc
 import { assessMaintenancePerformanceSafety } from '../../src/domain/maintenance-performance.js'
 import { loadTrainingProgressionState } from './training-progression.js'
 import type { TrainingProgressionState } from '../../src/domain/training-progression.js'
+import { getHealthProfile } from '../profile/service.js'
+import { ageYearsOnDate } from '../../src/domain/health-profile.js'
+import type { MaintenancePhysiologyScreen } from '../../src/domain/maintenance.js'
 
 type GoalList = Awaited<ReturnType<typeof listGoals>>['goals']
 
@@ -62,6 +65,30 @@ export async function loadMaintenanceAdjustmentContext(asOf: string): Promise<Ma
   }
 }
 
+/** Health Profile has no historical versions. Never apply today's profile to a
+ * backdated recommendation, and never interpret a failed read as no conditions.
+ */
+export async function loadMaintenancePhysiology(asOf: string, today: string): Promise<MaintenancePhysiologyScreen> {
+  const missing: MaintenancePhysiologyScreen = {
+    status: 'unavailable', asOf, ageYears: null, heightCm: null,
+    activeOrUncertainConditionCount: 0,
+  }
+  if (asOf !== today) return missing
+  try {
+    const profile = await getHealthProfile()
+    const ageYears = profile.dateOfBirth ? ageYearsOnDate(profile.dateOfBirth, asOf) : null
+    const conditions = profile.clinicalConditions.filter((item) => item.status !== 'resolved')
+    return {
+      status: 'available', asOf,
+      ageYears: ageYears != null && ageYears >= 0 && ageYears <= 130 ? ageYears : null,
+      heightCm: profile.heightCm,
+      activeOrUncertainConditionCount: conditions.length,
+    }
+  } catch {
+    return missing
+  }
+}
+
 export async function loadMaintenanceState(input: {
   asOf: string
   snapshot?: HealthIntelligenceSnapshot
@@ -75,7 +102,7 @@ export async function loadMaintenanceState(input: {
   // Bracket the independent Goal Control/Training/Nutrition reads with
   // decision-setting revisions; a concurrent edit must fail closed.
   const adjustmentContext = await loadMaintenanceAdjustmentContext(input.asOf)
-  const [contexts, listedGoals, training, eligibleNutritionDates] = await Promise.all([
+  const [contexts, listedGoals, training, eligibleNutritionDates, physiology] = await Promise.all([
     listDailyContexts(contextStart, input.asOf),
     input.listedGoals
       ? Promise.resolve(input.listedGoals)
@@ -83,6 +110,7 @@ export async function loadMaintenanceState(input: {
     (input.trainingProgressionPromise ?? loadTrainingProgressionState(input.asOf)).catch(() => null),
     // Database/source failures fail CLOSED, never to pre-PIQ source-quality-only behavior.
     loadVerifiedNutritionDays({ snapshot, asOf: input.asOf, today }).catch(() => new Set<string>()),
+    loadMaintenancePhysiology(input.asOf, today),
   ])
   const fresh = await readMaintenanceDecisionSnapshot(input.asOf)
   const revisionStatus = compareMaintenanceDecisionRevisions(adjustmentContext.decisionRevision, fresh.revision)
@@ -102,6 +130,6 @@ export async function loadMaintenanceState(input: {
     contexts,
     weightGoal,
     eligibleNutritionDates,
-    adjustmentContext: { ...adjustmentContext, performance, revisionStatus },
+    adjustmentContext: { ...adjustmentContext, performance, physiology, revisionStatus },
   })
 }
