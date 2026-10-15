@@ -837,3 +837,21 @@ Stop expanding test counts for their own sake. Next, pursue runtime verification
 **Next bounded work:** PIQ-1.3 authenticated training-plan read/invalidation on real endpoint/SQL scenario and PIQ-1.4 UI freshness after logging/editing/deleting a workout, with source revision and background/multitab revalidation. Keep full-phase release hold until owner mobile QA and deployed schema reconciliation; do not merge to `main` without explicit release authorization.
 
 **Continuation:** Repo `daurham/daurham-health`, branch `piq/00-baseline-20261014`, validated code `1c19a5d`; **0/9 phases accepted**.
+
+## PIQ-1.3 — Training and Coach rest-aware follow-up, final combined validation (2026-10-15)
+
+**State:** Branch-validated follow-up to the qualified-strength-day vs programmed-session checkpoints; **not deployed or owner-accepted**. Overall **0/9 PIQ phases fully accepted**.
+
+**Fixes after initial training reconciliation:**
+- The original `tests/weekly-coach.test.ts` had two failures from assertions coupled to now-renamed session-count copy. Replaced those assertions with checks against the stable `fact:training:sessions` ID, retaining the historical-`asOf` exclusion and demo-data semantics.
+- `src/domain/coach-intelligence.ts:restAware()` previously treated `rest_day_on_track` as *necessarily* a planned non-Training day. Under the shared qualification model, this state can also mean a **preferred day already qualified**. Such a day is now described as **already counted** with no second-workout requirement. A `flexible_week`/rest day gets optional-date wording, not an attendance penalty. Unrelated Training recommendations are preserved.
+- `tests/i9-coach-intelligence.test.ts` now verifies (1) rest is not a missed-session penalty, (2) an already-qualified preferred day is not mislabeled rest and does not prompt extra work, and (3) sparse preferences/flexible week remain nonpunitive. These tests complement the existing twelve synthetic truth-table cases for distinct qualified days, ad-hoc aggregation, routine/session separation, rest/reschedule, backfill and future-evidence rejection.
+- The earlier branch development commits (already documented) also validated canonical performed-exercise day qualification and routine credit via disposable PostgreSQL, with tests excluding future rows from historical `asOf` counts. The previous PIQ-1.3 docs and SQL integration remain intact.
+
+**Final combined validation:** Code SHA **`647c0d0a5b2489743039c24695778c32918baa54`**. [GitHub Actions branch validation 38774301680](https://github.com/daurham/daurham-health/actions/runs/38774301680) **SUCCESS**: npm ci; TypeScript; ESLint; full Vitest **1,792 passed, 20 skipped** (231 test files passed, 2 skipped); production build. [Earlier isolated PostgreSQL training/schema integration 38770932709](https://github.com/daurham/daurham-health/actions/runs/38770932709) **SUCCESS** on previous integration code head; the final code only changes Coach copy/tests, and this latest branch run validates those together.
+
+**Boundary/remaining work:** The test suite does **not** prove current multi-device/client UI invalidation after a workout is logged, edited or deleted. Training plan and Goal Control snapshots may remain cached until explicit refetch; this is PIQ-1.4 freshness. Owner mobile acceptance and authenticated live endpoint cases remain. “Qualified strength day” is a product rule of >=3 distinct performed strength exercises, not a clinical exercise-dose measure. Programmed session-row counts are not interchangeable with qualified calendar days. Do not turn preferred weekdays or rest into compulsory attendance or claim phase acceptance.
+
+**Release:** `main` remains **`dbc3fcb68324d75d30a96132b725456ec7e45d49`**, no production deploy, migration, owner workout modification, or paid-model use. Next PIQ bounded task: PIQ-1.4 source/cache invalidation after logging, editing, deleting or backdating Training evidence and screen navigation/re-focus; favor deterministic cache keys, revalidation, and stale-result guards, preserving read-only owner production scope.
+
+**Continuation:** Repo `daurham/daurham-health`, branch `piq/00-baseline-20261014`, validated code `647c0d0`; **0/9 full phases accepted**.
