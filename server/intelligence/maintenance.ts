@@ -5,6 +5,7 @@ import { listDailyContexts } from '../context/service.js'
 import { currentHealthDate } from '../health-time.js'
 import { listGoals } from '../goals/service.js'
 import { loadHealthIntelligenceSnapshot } from './snapshot.js'
+import { loadVerifiedNutritionDays } from '../nutrition/maintenance-eligibility.js'
 
 type GoalList = Awaited<ReturnType<typeof listGoals>>['goals']
 
@@ -53,9 +54,11 @@ export async function loadMaintenanceState(input: {
   const today = await currentHealthDate()
   const snapshot = input.snapshot ?? await loadHealthIntelligenceSnapshot({ range: '30d', asOf: input.asOf })
   const contextStart = addCalendarDays(input.asOf, -29)
-  const [contexts, weightGoal] = await Promise.all([
+  const [contexts, weightGoal, eligibleNutritionDates] = await Promise.all([
     listDailyContexts(contextStart, input.asOf),
     currentWeightGoal(input.asOf, today, input.listedGoals),
+    // Database/source failures fail CLOSED, never to pre-PIQ source-quality-only behavior.
+    loadVerifiedNutritionDays({ snapshot, asOf: input.asOf, today }).catch(() => new Set<string>()),
   ])
   return buildMaintenanceState({
     asOf: input.asOf,
@@ -63,5 +66,6 @@ export async function loadMaintenanceState(input: {
     intelligence: snapshot,
     contexts,
     weightGoal,
+    eligibleNutritionDates,
   })
 }

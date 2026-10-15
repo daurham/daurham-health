@@ -21,7 +21,7 @@ function series(kcal: number, weightDelta: number): IntelligenceObservation[] {
   }
   return records
 }
-function state(observations: IntelligenceObservation[]) {
+function state(observations: IntelligenceObservation[], eligibleNutritionDates?: ReadonlySet<string>) {
   return buildMaintenanceState({
     asOf: AS_OF, today: AS_OF,
     intelligence: buildHealthIntelligenceSnapshot({
@@ -29,6 +29,7 @@ function state(observations: IntelligenceObservation[]) {
       timezone: 'America/Phoenix', today: AS_OF, observations,
     }),
     contexts: [],
+    eligibleNutritionDates,
     weightGoal: {
       goalId: 'synthetic-goal', goalVersionId: 'synthetic-version',
       label: 'Weight', targetState: 'unmet', direction: 'lose',
@@ -48,6 +49,29 @@ function safeFixtureFilter(items: IntelligenceObservation[], confirmations: Read
 }
 
 describe('PIQ-1.1 baseline: demonstrate existing maintenance hazard and future eligibility protection', () => {
+  it('REAL engine gate: a 28-day single-meal log cannot calibrate or recommend calorie cuts with zero confirmations', () => {
+    const missing = state(series(1400, 0), new Set())
+    expect(missing.estimate.state).toBe('insufficient_evidence')
+    expect(missing.estimate.observedMaintenanceKcal).toBeNull()
+    expect(missing.interventions.some((x) => x.kind === 'review_intake_adjustment')).toBe(false)
+  })
+
+  it('REAL engine gate: only independently confirmed dates enter the maintenance window', () => {
+    const all = series(1900, -0.05)
+    const completeDates = new Set(all.filter((x) => x.key === 'nutrition.calories' && x.date < AS_OF).map((x) => x.date))
+    expect(state(all, completeDates).estimate.state).toBe('available')
+    const partial = new Set([...completeDates].slice(0, 6))
+    expect(state(all, partial).estimate.state).toBe('insufficient_evidence')
+  })
+
+  it('REAL engine gate: high-quality source rows on unconfirmed dates cannot inflate the observed count', () => {
+    const data = series(600, -0.075)
+    const exactlyTwo = new Set([addCalendarDays('2026-09-10', 0), addCalendarDays('2026-09-10', 1)])
+    const decision = state(data, exactlyTwo)
+    expect(decision.estimate.quality.nutrition.observedDays).toBeLessThanOrEqual(2)
+    expect(decision.estimate.state).toBe('insufficient_evidence')
+  })
+
   it('T03 KNOWN GAP: 28 precisely sourced SINGLE-600-kcal-meal days can yield a maintenance estimate', () => {
     const prior = state(series(600, -0.075))
     expect(prior.estimate.state).toBe('available')

@@ -133,6 +133,9 @@ export type BuildMaintenanceInput = {
   intelligence: HealthIntelligenceSnapshot
   contexts: readonly DailyContext[]
   weightGoal?: MaintenanceWeightGoal | null
+  /** An explicit, read-time verified whitelist. Undefined preserves legacy fixture semantics;
+   * the server must ALWAYS provide a Set, including the empty set on missing/mismatched DB data. */
+  eligibleNutritionDates?: ReadonlySet<string>
 }
 
 type WindowEvidence = {
@@ -191,9 +194,11 @@ function windowEvidence(
   frame: readonly IntelligenceFrameDay[],
   completeThrough: string,
   days: number,
+  eligibleNutritionDates?: ReadonlySet<string>,
 ): WindowEvidence {
   const start = addCalendarDays(completeThrough, -(days - 1))
   const calorieAll = signal(frame, 'nutrition.calories', start, completeThrough)
+    .filter((item) => eligibleNutritionDates === undefined || eligibleNutritionDates.has(item.date))
   const calories = calorieAll.filter(reliableNutrition)
   const weights = signal(frame, 'body.weight_kg', start, completeThrough)
   const usualWeights = weights.filter((item) => weightQuality(item) === 'usual')
@@ -339,14 +344,14 @@ function estimateRange(value: number, confidence: IntelligenceConfidence): { low
 function buildEstimate(input: BuildMaintenanceInput, completeThrough: string): MaintenanceEstimate {
   let chosen: WindowEvidence | null = null
   for (const days of MAINTENANCE_WINDOWS) {
-    const candidate = windowEvidence(input.intelligence.frame, completeThrough, days)
+    const candidate = windowEvidence(input.intelligence.frame, completeThrough, days, input.eligibleNutritionDates)
     if (usableWindow(candidate)) {
       chosen = candidate
       break
     }
   }
   if (!chosen) {
-    const fallback = windowEvidence(input.intelligence.frame, completeThrough, 28)
+    const fallback = windowEvidence(input.intelligence.frame, completeThrough, 28, input.eligibleNutritionDates)
     return {
       state: 'insufficient_evidence',
       period: null,
