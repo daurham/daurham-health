@@ -26,5 +26,7 @@ jobs:
       - run: npm ci
       - run: npx tsc -b
       - run: npx eslint .
-      - run: npm test
+      # Bound concurrent Vitest processes: several legacy suites start isolated PostgreSQL
+      # servers and can exhaust the shared CI runner when they boot together.
+      - run: npm test -- --maxWorkers=2
       - run: npm run build
