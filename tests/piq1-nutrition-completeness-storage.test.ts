@@ -172,6 +172,7 @@ describe('PIQ-1.1 authenticated persistence repository and optimistic conflict c
     const result = await getNutritionDayCompleteness('2026-10-13', db.sql, '2026-10-14')
     expect(result).toMatchObject({
       quality: { entryCount: 1, kind: 'high_confidence' },
+      recordedEntryCount: 2,
       assessment: { state: 'confirmed_complete', eligibleForMaintenance: false,
         maintenanceExclusion: 'excluded_from_analysis' },
     })

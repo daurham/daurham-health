@@ -136,6 +136,22 @@ describe('PIQ-1.1 nutrition completeness is separate from source quality', () =>
     })
   })
 
+  it('does not confuse an excluded recorded meal with a no-food day or a confirmed fast', () => {
+    const result = assessNutritionDayCompleteness({
+      date: '2026-10-13', today: '2026-10-14', entryRevision: 'v1',
+      quality: nutritionDayQuality([]),
+      recordedEntryCount: 1,
+      confirmation: { state: 'complete', entryRevision: 'v1' },
+      excludedFromAnalysis: true,
+    })
+    expect(result).toMatchObject({
+      state: 'confirmed_complete',
+      isExplicitZeroIntakeFast: false,
+      eligibleForMaintenance: false,
+      maintenanceExclusion: 'excluded_from_analysis',
+    })
+  })
+
   it('source accuracy remains high following an edit, but owner completeness must be renewed', () => {
     const revised = assess({
       entries: [{ calories: 750, evidenceQuality: 'measured_reference' }],

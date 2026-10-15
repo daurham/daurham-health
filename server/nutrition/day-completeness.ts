@@ -122,6 +122,8 @@ type DayCompletenessRead = {
   version: number
   ownerReport: 'complete' | 'partial' | 'unknown' | null
   quality: ReturnType<typeof nutritionDayQuality>
+  /** Entries physically logged, whether or not excluded from analysis. */
+  recordedEntryCount: number
   assessment: ReturnType<typeof assessNutritionDayCompleteness>
 }
 
@@ -164,6 +166,7 @@ export async function getNutritionDayCompleteness(
     const quality = sourceQuality(entries)
     const assessment = assessNutritionDayCompleteness({
       date, today, entryRevision, quality,
+      recordedEntryCount: entries.length,
       confirmation: report?.owner_report && report.entry_revision
         ? { state: report.owner_report, entryRevision: report.entry_revision,
           zeroIntakeFast: report.zero_intake_fast === true }
@@ -171,7 +174,8 @@ export async function getNutritionDayCompleteness(
       excludedFromAnalysis: exclusions[0]?.excluded === true || entries.some((row) => row.excluded === true),
     })
     return { date, today, entryRevision, version,
-      ownerReport: report?.owner_report ?? null, quality, assessment }
+      ownerReport: report?.owner_report ?? null, quality,
+      recordedEntryCount: entries.length, assessment }
   })
 }
 
@@ -188,10 +192,10 @@ export async function saveNutritionDayCompleteness(
   const fast = value.zeroIntakeFast ?? false
   if (fast && value.ownerReport !== 'complete') throw new HttpError(400, 'Only a complete day can be fasted')
   const existing = await getNutritionDayCompleteness(date, sqlOverride, today)
-  if (value.ownerReport === 'complete' && existing.quality.entryCount === 0 && !fast) {
+  if (value.ownerReport === 'complete' && existing.recordedEntryCount === 0 && !fast) {
     throw new HttpError(400, 'An empty food day requires explicit fasting confirmation')
   }
-  if (fast && existing.quality.entryCount > 0) throw new HttpError(400, 'Fasting requires an empty food log')
+  if (fast && existing.recordedEntryCount > 0) throw new HttpError(400, 'Fasting requires an empty food log')
   return protectDb(async () => {
     const sql = sqlOverride ?? await getSql()
     const rows = await sql.query(WRITE_NUTRITION_DAY_CONFIRMATION_SQL, [

@@ -23,6 +23,8 @@ export type NutritionDayCompletenessInput = {
   today: string | null
   entryRevision: string
   quality: NutritionDayQuality
+  /** Raw diary row count, including records excluded from analysis. */
+  recordedEntryCount?: number
   confirmation: NutritionDayConfirmation | null
   excludedFromAnalysis?: boolean
 }
@@ -50,9 +52,10 @@ export function assessNutritionDayCompleteness(
   const currentDayProvisional = input.today != null && input.date >= input.today
   const confirmationStale = input.confirmation != null &&
     (!input.entryRevision.trim() || input.confirmation.entryRevision !== input.entryRevision)
+  const recordedEntryCount = input.recordedEntryCount ?? input.quality.entryCount
   const fast = input.confirmation?.state === 'complete' &&
     input.confirmation.zeroIntakeFast === true &&
-    input.quality.entryCount === 0
+    recordedEntryCount === 0
   let state: NutritionDayCompletenessState = 'unknown'
   let reason: NutritionDayCompletenessAssessment['reason'] = 'no_confirmation'
   if (confirmationStale) {
@@ -63,7 +66,7 @@ export function assessNutritionDayCompleteness(
   } else if (input.confirmation?.state === 'unknown') {
     reason = 'reported_unknown'
   } else if (input.confirmation?.state === 'complete') {
-    if (input.quality.entryCount === 0 && !fast) {
+    if (recordedEntryCount === 0 && !fast) {
       reason = 'empty_day_requires_fast_confirmation'
     } else {
       state = 'confirmed_complete'
