@@ -118,10 +118,11 @@ export function respondCoachRecommendation(
 export function recordCoachRecommendationOutcome(
   recommendationId: string,
   outcome: CoachRecommendationOutcome,
+  expectedResponseAt: string,
 ): Promise<CoachIntelligenceState> {
   return sendCoachIntelligence(
     `/api/intelligence/coach/recommendations/${recommendationId}/outcome`,
     'POST',
-    { outcome },
+    { outcome, expectedResponseAt },
   )
 }

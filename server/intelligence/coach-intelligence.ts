@@ -218,6 +218,7 @@ export async function dueFollowUps(
       WHERE response_state = 'do_this'
         AND metadata ->> 'ownerStarted' = 'true'
         AND outcome_state IS NULL
+        AND response_at IS NOT NULL
         AND follow_up_on IS NOT NULL
         AND follow_up_on <= $1::date
         AND (
@@ -317,7 +318,7 @@ export async function loadCoachIntelligenceState(asOf: string): Promise<CoachInt
   const followUps: CoachRecommendationFollowUp[] = keepCurrentCoachFollowUps(
     dueRows, validFingerprints, control.maintenance?.decisionRevision, acceptedRevisionCurrent,
   ).map((row) => ({
-      id: row.id, title: row.title, detail: row.detail, detailPath: row.detail_path,
+      id: row.id, responseAt: String(row.response_at), title: row.title, detail: row.detail, detailPath: row.detail_path,
       acceptedOn: row.response_at == null
         ? null
         : (row.response_at instanceof Date ? row.response_at.toISOString() : new Date(row.response_at).toISOString()),
@@ -462,23 +463,48 @@ export async function respondCoachRecommendation(
   return loadCoachIntelligenceState(asOf)
 }
 
-export async function recordCoachRecommendationOutcome(
+/** Atomic outcome CAS: two tabs cannot reinterpret or overwrite feedback about
+ * another response. Eligibility, provenance and elapsed review window must all
+ * still be true inside the UPDATE, not only in a preceding read.
+ */
+export async function writeCoachRecommendationOutcome(
+  sql: Sql,
   id: string,
   outcome: CoachRecommendationOutcome,
   asOf: string,
-): Promise<CoachIntelligenceState> {
-  const sql = await getSql()
-  const row = await recommendationById(sql, id)
-  if (row.response_state !== 'do_this' || row.metadata?.ownerStarted !== true) {
-    throw new HttpError(409, 'An outcome requires an explicitly started action, not a historical review')
+  expectedResponseAt?: string,
+): Promise<void> {
+  if (typeof expectedResponseAt !== 'string' || expectedResponseAt.length === 0 ||
+      expectedResponseAt.length > 80) {
+    throw new HttpError(428, 'Refresh Coach before recording an outcome for this action.')
   }
-  await sql.query(
+  const rows = await sql.query(
     `UPDATE coach_recommendations
         SET outcome_state = $2,
             outcome_at = now(),
             updated_at = now()
-      WHERE id = $1::uuid`,
-    [id, outcome],
+      WHERE id = $1::uuid
+        AND response_state = 'do_this'
+        AND metadata ->> 'ownerStarted' = 'true'
+        AND outcome_state IS NULL
+        AND follow_up_on IS NOT NULL
+        AND follow_up_on <= $3::date
+        AND response_at::text = $4::text
+      RETURNING id::text AS id`,
+    [id, outcome, asOf, expectedResponseAt],
   )
+  if (rows.length !== 1) {
+    throw new HttpError(409, 'This Coach outcome is no longer pending for the saved action. Review the latest Coach state.')
+  }
+}
+
+export async function recordCoachRecommendationOutcome(
+  id: string,
+  outcome: CoachRecommendationOutcome,
+  asOf: string,
+  expectedResponseAt?: string,
+): Promise<CoachIntelligenceState> {
+  const sql = await getSql()
+  await writeCoachRecommendationOutcome(sql, id, outcome, asOf, expectedResponseAt)
   return loadCoachIntelligenceState(asOf)
 }

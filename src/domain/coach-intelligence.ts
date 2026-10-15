@@ -70,6 +70,8 @@ export type CoachRecommendationView = {
 
 export type CoachRecommendationFollowUp = {
   id: string
+  /** Opaque saved owner-start revision, unlike human-readable acceptedOn. */
+  responseAt: string
   title: string
   detail: string
   detailPath: string

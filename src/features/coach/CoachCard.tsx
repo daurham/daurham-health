@@ -5,6 +5,7 @@ import type {
   CoachIntelligenceState,
   CoachRecommendationOutcome,
   CoachRecommendationResponse,
+  CoachRecommendationFollowUp,
   CoachRecommendationView,
 } from '@/domain/coach-intelligence'
 import type { CoachLabItem } from '@/domain/coach-lab'
@@ -296,14 +297,22 @@ export function CoachCard({ state, pending, error, onState }: {
     }
   }
 
-  async function recordRecommendationOutcome(id: string, outcome: CoachRecommendationOutcome) {
+  async function recordRecommendationOutcome(item: CoachRecommendationFollowUp, outcome: CoachRecommendationOutcome) {
     setActionPending(true)
     setActionError(null)
+    setNotice(null)
     try {
-      setIntelligence(await recordCoachRecommendationOutcome(id, outcome))
+      setIntelligence(await recordCoachRecommendationOutcome(item.id, outcome, item.responseAt))
       setNotice('Outcome saved. Coach will use that feedback as recommendation memory.')
     } catch (caught) {
-      setActionError(caught instanceof Error ? caught.message : 'Could not save the recommendation outcome')
+      if (caught instanceof CoachApiError && (caught.status === 409 || caught.status === 428)) {
+        try {
+          setIntelligence(await fetchCoachIntelligence())
+          setNotice('The follow-up changed. Review the current Coach state before responding.')
+        } catch {
+          setActionError('Could not refresh Coach. Reopen the page before responding.')
+        }
+      } else setActionError(caught instanceof Error ? caught.message : 'Could not save the recommendation outcome')
     } finally {
       setActionPending(false)
     }
@@ -426,7 +435,7 @@ export function CoachIntelligencePanel({
   state: CoachIntelligenceState
   pending: boolean
   onResponse: (item: CoachRecommendationView, response: CoachRecommendationResponse) => void
-  onOutcome: (id: string, outcome: CoachRecommendationOutcome) => void
+  onOutcome: (item: CoachRecommendationFollowUp, outcome: CoachRecommendationOutcome) => void
 }) {
   const prefix = useAppPathPrefix()
   return (
@@ -505,10 +514,10 @@ export function CoachIntelligencePanel({
                 ? `You marked this as started on ${new Date(item.acceptedOn).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}.`
                 : 'You marked this as started.'}</p>
               <div className="mt-2 flex flex-wrap gap-2">
-                <button type="button" className={quietButtonClass} disabled={pending} onClick={() => onOutcome(item.id, 'helped')}>Helped</button>
-                <button type="button" className={quietButtonClass} disabled={pending} onClick={() => onOutcome(item.id, 'no_change')}>No change</button>
-                <button type="button" className={quietButtonClass} disabled={pending} onClick={() => onOutcome(item.id, 'made_worse')}>Worse</button>
-                <button type="button" className={quietButtonClass} disabled={pending} onClick={() => onOutcome(item.id, 'unclear')}>Unclear</button>
+                <button type="button" className={quietButtonClass} disabled={pending} onClick={() => onOutcome(item, 'helped')}>Helped</button>
+                <button type="button" className={quietButtonClass} disabled={pending} onClick={() => onOutcome(item, 'no_change')}>No change</button>
+                <button type="button" className={quietButtonClass} disabled={pending} onClick={() => onOutcome(item, 'made_worse')}>Worse</button>
+                <button type="button" className={quietButtonClass} disabled={pending} onClick={() => onOutcome(item, 'unclear')}>Unclear</button>
               </div>
             </div>
           ))}

@@ -6,7 +6,7 @@ import { LATEST_SCHEMA_MIGRATION, backupTable } from '../server/backup/inventory
 import { buildBackupArchive, restoreStatements, verifyBackupArchive, planRestore, type BackupRow } from '../server/backup/format.js'
 import { getNutritionDayCompleteness, saveNutritionDayCompleteness } from '../server/nutrition/day-completeness.js'
 import { readMaintenanceDecisionSnapshot, isMaintenanceDecisionRevisionCurrent } from '../server/intelligence/maintenance-revision.js'
-import { dueFollowUps, requireCurrentCalorieRecommendation, surfaceDraft, writeCoachRecommendationResponse } from '../server/intelligence/coach-intelligence.js'
+import { dueFollowUps, requireCurrentCalorieRecommendation, surfaceDraft, writeCoachRecommendationResponse, writeCoachRecommendationOutcome } from '../server/intelligence/coach-intelligence.js'
 import { randomUUID } from 'node:crypto'
 import { PERFORMED_STRENGTH_EXERCISES_SQL } from '../server/training/plan-service.js'
 import { buildTrainingWeekQualification, buildTrainingRoutineCredits, type PerformedExerciseEvidence } from '../src/domain/training-qualification.js'
@@ -335,6 +335,57 @@ describe.skipIf(!url)('PIQ-1.1 full 0001–0053 migration-chain and backup on is
       )
       expect(dismissed.rows[0].response_state).toBe('not_relevant')
       expect(dismissed.rows[0].metadata.ownerStarted).toBeUndefined()
+    } finally {
+      await client.query('ROLLBACK')
+    }
+  })
+
+  it('PIQ-1.5: PostgreSQL outcomes refuse stale tabs, early reviews, and duplicate feedback', async () => {
+    await client.query('BEGIN')
+    try {
+      const draft = {
+        fingerprint: 'coach:piq:outcome:' + randomUUID(), sourceId: 'training:outcome',
+        kind: 'training_progression', domain: 'training', title: 'Review progression',
+        detail: 'Consider adjusting form.', actionText: 'Review', detailPath: '/training',
+        confidence: 'moderate' as const, evidenceRefs: ['training:strength'],
+        priority: 80, experimentEligible: true,
+      }
+      const initial = await surfaceDraft(adapter, draft, today, null)
+      await writeCoachRecommendationResponse(
+        adapter, initial.id, 'do_this', today, async () => undefined, true, null,
+      )
+      const current = await client.query(
+        'SELECT response_at::text AS response_at FROM coach_recommendations WHERE id = $1::uuid',
+        [initial.id],
+      )
+      const oldRevision = String(current.rows[0].response_at)
+      await expect(writeCoachRecommendationOutcome(
+        adapter, initial.id, 'helped', today, oldRevision,
+      )).rejects.toMatchObject({ statusCode: 409 })
+      await client.query(
+        "UPDATE coach_recommendations SET response_at = response_at + interval '1 second' WHERE id = $1::uuid",
+        [initial.id],
+      )
+      await expect(writeCoachRecommendationOutcome(
+        adapter, initial.id, 'helped', '2026-10-23', oldRevision,
+      )).rejects.toMatchObject({ statusCode: 409 })
+      const newer = await client.query(
+        'SELECT response_at::text AS response_at FROM coach_recommendations WHERE id = $1::uuid',
+        [initial.id],
+      )
+      await writeCoachRecommendationOutcome(
+        adapter, initial.id, 'no_change', '2026-10-23', String(newer.rows[0].response_at),
+      )
+      await expect(writeCoachRecommendationOutcome(
+        adapter, initial.id, 'made_worse', '2026-10-23', String(newer.rows[0].response_at),
+      )).rejects.toMatchObject({ statusCode: 409 })
+      const saved = await client.query(
+        'SELECT response_state, outcome_state, metadata FROM coach_recommendations WHERE id = $1::uuid',
+        [initial.id],
+      )
+      expect(saved.rows[0].response_state).toBe('do_this')
+      expect(saved.rows[0].outcome_state).toBe('no_change')
+      expect(saved.rows[0].metadata.ownerStarted).toBe(true)
     } finally {
       await client.query('ROLLBACK')
     }

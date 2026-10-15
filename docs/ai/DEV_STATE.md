@@ -345,3 +345,8 @@ Read-only Coach memory now requires stored `ownerStarted` provenance to suppress
 ## 2026-10-15 PIQ-1.5 response-version CAS — branch only
 
 Coach response mutation now requires the server-rendered `expectedResponseAt` and atomically compares it to the saved PostgreSQL response timestamp before updating. Stale or missing client versions fail closed. Coach resurfacing preserves confirmed owner-started provenance for non-calorie advice. Added isolated regression and real-disposable-PostgreSQL tests. No migrations or production promotion; CI and owner QA in `PIQ_PROGRESS.md`.
+
+
+## 2026-10-15 PIQ-1.5 outcome concurrency guard — work branch
+
+Coach follow-ups now carry the original exact SQL response revision. Recording an outcome requires that revision, an explicitly owner-started recommendation, an elapsed review date, and no prior outcome in one conditional PostgreSQL UPDATE. Conflicts show a refreshed Coach state. No schema, provider or production changes. Automated and mobile acceptance gates tracked in `docs/ai/PIQ_PROGRESS.md`.

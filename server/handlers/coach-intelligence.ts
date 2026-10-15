@@ -65,7 +65,9 @@ async function handleCoachIntelligence(req: ApiRequest, res: ApiResponse) {
     sendJson(res, 400, { error: 'Invalid Coach recommendation outcome' })
     return
   }
-  sendJson(res, 200, await recordCoachRecommendationOutcome(route.id, outcome, date))
+  sendJson(res, 200, await recordCoachRecommendationOutcome(
+    route.id, outcome, date, typeof body.expectedResponseAt === 'string' ? body.expectedResponseAt : undefined,
+  ))
 }
 
 export default withOwnerAuth(handleCoachIntelligence)
