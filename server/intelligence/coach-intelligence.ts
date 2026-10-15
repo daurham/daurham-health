@@ -92,7 +92,7 @@ async function rowsForFingerprints(sql: Sql, fingerprints: readonly string[]): P
   )) as RecommendationRow[]
 }
 
-async function surfaceDraft(sql: Sql, draft: CoachRecommendationDraft, asOf: string, decisionRevision: string | null): Promise<RecommendationRow> {
+export async function surfaceDraft(sql: Sql, draft: CoachRecommendationDraft, asOf: string, decisionRevision: string | null): Promise<RecommendationRow> {
   const rows = (await sql.query(
     `INSERT INTO coach_recommendations (
        id, fingerprint, recommendation_kind, domain, title, detail, action_text, detail_path,
@@ -110,7 +110,12 @@ async function surfaceDraft(sql: Sql, draft: CoachRecommendationDraft, asOf: str
        confidence = EXCLUDED.confidence,
        evidence_refs = EXCLUDED.evidence_refs,
        last_surfaced_on = EXCLUDED.last_surfaced_on,
-       metadata = EXCLUDED.metadata,
+       metadata = CASE
+         WHEN coach_recommendations.response_state = 'do_this'
+              AND coach_recommendations.recommendation_kind IN ('review_intake_adjustment', 'review_activity_adjustment')
+           THEN coach_recommendations.metadata
+         ELSE EXCLUDED.metadata
+       END,
        updated_at = now()
      RETURNING ${ROW_COLUMNS}`,
     [
@@ -194,19 +199,33 @@ function recommendationView(row: RecommendationRow, draft: CoachRecommendationDr
   }
 }
 
-async function dueFollowUps(sql: Sql, asOf: string): Promise<RecommendationRow[]> {
-  const rows = (await sql.query(
+/** Qualify evidence-sensitive rows inside SQL BEFORE limiting the due queue.
+ * Stale numeric cards must not starve valid follow-ups further down a large queue.
+ */
+export async function dueFollowUps(
+  sql: Sql,
+  asOf: string,
+  decisionRevision: string | null,
+  eligibleFingerprints: readonly string[],
+): Promise<RecommendationRow[]> {
+  return await sql.query(
     `SELECT ${ROW_COLUMNS}
        FROM coach_recommendations
       WHERE response_state = 'do_this'
         AND outcome_state IS NULL
         AND follow_up_on IS NOT NULL
         AND follow_up_on <= $1::date
+        AND (
+          recommendation_kind NOT IN ('review_intake_adjustment', 'review_activity_adjustment')
+          OR (
+            metadata ->> 'decisionRevision' = $2::text
+            AND fingerprint = ANY($3::text[])
+          )
+        )
       ORDER BY follow_up_on, response_at, id
-      LIMIT 24`,
-    [asOf],
-  )) as RecommendationRow[]
-  return rows
+      LIMIT 3`,
+    [asOf, decisionRevision, eligibleFingerprints],
+  ) as RecommendationRow[]
 }
 
 async function recentQuestion(sql: Sql, asOf: string): Promise<RecommendationRow | null> {
@@ -277,14 +296,19 @@ export async function loadCoachIntelligenceState(asOf: string): Promise<CoachInt
     }
   }
 
-  const dueRows = await dueFollowUps(sql, asOf)
   const validFingerprints = new Set(drafts.map((draft) => draft.fingerprint))
+  let dueRows = await dueFollowUps(sql, asOf, control.maintenance?.decisionRevision ?? null, [...validFingerprints])
   const dueHasCalorieAdvice = dueRows.some((row) => isCalorieDecisionKind(row.recommendation_kind))
   // Previously accepted rows are not in the visible drafts (owner response
   // memory suppresses them), so they need independent live qualification.
   const acceptedRevisionCurrent = dueHasCalorieAdvice
     ? await isMaintenanceDecisionRevisionCurrent(asOf, control.maintenance?.decisionRevision)
     : true
+  if (!acceptedRevisionCurrent) {
+    // The settings changed after we read the queue. Requery non-calorie
+    // candidates to fill the visible three slots without stale numeric advice.
+    dueRows = await dueFollowUps(sql, asOf, null, [])
+  }
   const followUps: CoachRecommendationFollowUp[] = keepCurrentCoachFollowUps(
     dueRows, validFingerprints, control.maintenance?.decisionRevision, acceptedRevisionCurrent,
   ).map((row) => ({
@@ -341,12 +365,17 @@ async function recommendationById(sql: Sql, id: string): Promise<RecommendationR
 /** No stale or legacy numerical calorie advice may be accepted via a saved ID.
  * The full current quality/safety decision must still yield the same draft.
  */
-async function requireCurrentCalorieRecommendation(row: RecommendationRow, asOf: string): Promise<void> {
+export async function requireCurrentCalorieRecommendation(
+  row: RecommendationRow,
+  asOf: string,
+  controlOverride?: Awaited<ReturnType<typeof loadGoalControlState>>,
+  checkRevision: typeof isMaintenanceDecisionRevisionCurrent = isMaintenanceDecisionRevisionCurrent,
+): Promise<void> {
   if (!isCalorieDecisionKind(row.recommendation_kind)) return
-  const control = await loadGoalControlState(asOf)
+  const control = controlOverride ?? await loadGoalControlState(asOf)
   const eligible = new Set(buildCoachRecommendationDrafts(control).map((draft) => draft.fingerprint))
   if (!storedCoachRecommendationIsCurrent(row, eligible, control.maintenance?.decisionRevision) ||
-      !await isMaintenanceDecisionRevisionCurrent(asOf, control.maintenance?.decisionRevision)) {
+      !await checkRevision(asOf, control.maintenance?.decisionRevision)) {
     throw new HttpError(409, 'This calorie recommendation is no longer current. Reopen Coach and review the latest goals and evidence.')
   }
 }
