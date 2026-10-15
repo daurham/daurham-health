@@ -748,3 +748,8 @@ Citing valid paired dates with finite values is necessary but insufficient to su
 ## Decision: a verified relationship coefficient needs consistent interpretation labels (PIQ-1.6, 2026-10-15)
 
 Reproducing Spearman rho is necessary but does not validate independently stored strength and direction labels. Require agreement with the canonical magnitude thresholds and the original near-zero neutral-direction rule before treating a selected observational association as currently verified. Inconsistency withholds exact rho, strength and paired-date diagnostics rather than guessing which field is right, modifying recorded evidence or recommending a target change. Preserve its historical place in existing selection accounting; do not claim statistical significance, causality, or a new calibration.
+
+
+## Decision: aggregate coefficient verification must also recheck nutrition day eligibility (PIQ-1.6, 2026-10-15)
+
+An unchanged measured nutrient number can be ineligible for an association after the owner edits or withdraws the corresponding complete-day confirmation. Downstream Goal Overview evidence interpretation must fail closed for such cited X/Y nutrition dates, independent of whether Spearman rho still reproduces. Preserve historical counts and source inspection; withhold numeric interpretation and confidence. No fabricated zero days, new statistics, or upstream re-ranking.

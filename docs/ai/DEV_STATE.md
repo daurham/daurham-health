@@ -440,3 +440,8 @@ Added read-only rank-coefficient attestation for Goal Overview relationships usi
 ## 2026-10-15 PIQ-1.6 relationship label consistency — work branch
 
 Goal Overview checks that originally reported observational strength and direction agree with reproducible Spearman rho and original thresholds; inconsistencies withhold numerical interpretation, with synthetic/SSR tests. Branch only; pending CI, authenticated owner review and existing migration 0054 release gate.
+
+
+## 2026-10-15 PIQ-1.6 relationship nutrition eligibility recheck
+
+Bounded work-branch read-time validation for selected observed relationships: exact numeric coefficient and dates are insufficient if a cited nutrition day is no longer `verified_complete`. Withhold numeric interpretation without editing canonical history. Synthetic regression and UI disclosure added; CI and authenticated owner QA remain pending. Production/main unchanged.

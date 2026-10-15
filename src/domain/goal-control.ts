@@ -439,6 +439,22 @@ export function relationshipPairsBackedByFrame(
  * coefficient even when all matched dates still exist. This never rescales,
  * replaces, or re-ranks the upstream snapshot's original relationship.
  */
+/** Day-level nutrition evidence must remain explicitly complete. Matching numeric
+ * readings is not enough after an owner revokes a past-day confirmation.
+ */
+export function relationshipNutritionPairsRemainEligible(
+  frame: readonly HealthIntelligenceSnapshot['frame'][number][],
+  relation: Pick<HealthIntelligenceSnapshot['relationships'][number], 'xKey' | 'yKey' | 'evidenceDates'>,
+): boolean {
+  const byDate = new Map(frame.map((day) => [day.date, day]))
+  return relation.evidenceDates.every(({ xDate, yDate }) =>
+    (!relation.xKey.startsWith('nutrition.') ||
+      byDate.get(xDate)?.signals[relation.xKey]?.dayCompleteness === 'verified_complete') &&
+    (!relation.yKey.startsWith('nutrition.') ||
+      byDate.get(yDate)?.signals[relation.yKey]?.dayCompleteness === 'verified_complete')
+  )
+}
+
 export function relationshipCoefficientMatchesFrame(
   frame: readonly HealthIntelligenceSnapshot['frame'][number][],
   relation: Pick<HealthIntelligenceSnapshot['relationships'][number],
@@ -566,6 +582,7 @@ function relationshipsFor(
       )
       const coefficientVerified = !!calendarCoverage &&
         relationshipCoefficientMatchesFrame(snapshot.frame, item) &&
+        relationshipNutritionPairsRemainEligible(snapshot.frame, item) &&
         relationshipReportedLabelsMatchCoefficient(item)
       const pairCoverage = coefficientVerified ? calendarCoverage : null
       const sources: GoalControlEvidenceCoverage[] = [item.xKey, item.yKey].flatMap((key) => {
@@ -581,7 +598,7 @@ function relationshipsFor(
       return {
         id: item.id,
         summary: coefficientVerified ? item.summary
-          : 'Previously reported observational relationship; its coefficient or interpretation labels could not be verified against the current paired readings.',
+          : 'Previously reported observational relationship; its coefficient or interpretation labels could not be verified against the current paired readings, or cited nutrition days no longer qualify.',
         confidence: coefficientVerified ? item.confidence : 'unknown',
         sampleSize: item.sampleSize,
         detailPaths: [...item.detailPaths],

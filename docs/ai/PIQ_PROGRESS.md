@@ -1320,3 +1320,14 @@ HAVING COUNT(*) > 1;
 **Regression:** Valid synthetic observational relationship retains verified labels; metadata-forged strength or sign with an otherwise reproducible rho is withheld, SSR discloses the inconsistency, and invalid original coefficients fail closed. Existing changes to physical readings, dates, missingness, trend sensitivity and selection screening remain guarded.
 
 **Still open:** Upstream source-revision atomicity, empirical uncertainty / multiple testing / confounding, authenticated owner mobile QA, and separate release authorization for unapplied migration 0054. No `main` merge or production change.
+
+
+## PIQ-1.6 — Revalidate confirmed nutrition days before interpreting recorded relationships (2026-10-15)
+
+**State:** Bounded PIQ-1.6 work-branch correction, pending full CI and owner-authenticated QA. **0/9 phases owner-accepted.**
+
+**Failure:** An already-computed protein/fiber relationship could pass date and exact coefficient verification when an owner revoked whole-day nutrition completeness for one cited date, since the numerical reading and its timestamp were unchanged. A reproduced observational rho alone cannot requalify that day's inclusion.
+
+**Contract:** Before displaying any selected observational relationship's precise coefficient, strength, pairing window or sensitivity, verify every cited nutrition X/Y observation in the loaded frame still has `dayCompleteness='verified_complete'`. Missing or `unverified` confirmation invalidates only that relationship's present interpretation, not the original numeric snapshot or canonical food entries. Preserve its historical measured pair count and source links while marking present confidence unknown and withholding precision. No nutrition restrictions added to unrelated sleep, wellness, activity or Training pairs. Never convert an absent confirmation into zero intake, fabricate observations or infer cause.
+
+**Regression:** Synthetic 16-pair next-day protein/soreness association remains eligible with complete owner confirmations. Revoking a single source date's confirmation while leaving finite readings, timestamps, and the tie-aware Spearman rho unchanged withholds source-derived precision and clearly explains the eligibility failure. Unrelated non-nutrition pairs remain unaffected. No schema migration, owner record mutation, Gemini/provider request, or production merge. Next: green CI, then further work on source revision atomicity and confidence-calibration thresholds.
