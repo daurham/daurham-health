@@ -71,6 +71,8 @@ export type IntelligenceObservation = {
   provenance: IntelligenceProvenance
   sourceIds: string[]
   quality?: string | null
+  /** Whole-day eligibility is independent of food-entry/source accuracy. */
+  dayCompleteness?: 'verified_complete' | 'unverified'
 }
 
 export type IntelligenceFrameDay = {
@@ -84,6 +86,9 @@ export type IntelligenceCoverage = {
   observedDays: number
   eligibleDays: number
   coveragePct: number
+  /** Nutrition only: logged dates, including days excluded from full-day analyses. */
+  loggedDays?: number
+  completenessCheck?: 'available' | 'unavailable'
   excludedObservations: number
   provenance: Partial<Record<IntelligenceProvenance, number>>
   confidence: IntelligenceConfidence
@@ -174,6 +179,9 @@ export type BuildHealthIntelligenceInput = {
   timezone: string
   today: string | null
   observations: readonly IntelligenceObservation[]
+  /** Undefined retains synthetic/legacy caller semantics. Server loaders always pass a verified set. */
+  nutritionVerifiedCompleteDates?: ReadonlySet<string>
+  nutritionVerificationStatus?: 'available' | 'unavailable'
   excludedObservationCountByKey?: Partial<Record<IntelligenceSignalKey, number>>
   changes?: readonly ChangeLedgerEntry[]
 }
@@ -237,13 +245,19 @@ function confidenceFromSample(observations: number, coveragePct?: number): Intel
   return 'limited'
 }
 
+function isVerifiedForAnalysis(key: IntelligenceSignalKey, date: string, dates?: ReadonlySet<string>): boolean {
+  return !key.startsWith('nutrition.') || dates == null || dates.has(date)
+}
+
 function frameFor(input: BuildHealthIntelligenceInput): IntelligenceFrameDay[] {
   const map = new Map(calendarDates(input.start, input.end).map((date) => [date, { date, signals: {} } as IntelligenceFrameDay]))
   for (const observation of input.observations) {
     if (!finite(observation.value) || observation.date < input.start || observation.date > input.end) continue
     const day = map.get(observation.date)
     if (!day) continue
-    day.signals[observation.key] = observation
+    day.signals[observation.key] = observation.key.startsWith('nutrition.') && input.nutritionVerifiedCompleteDates != null
+      ? { ...observation, dayCompleteness: input.nutritionVerifiedCompleteDates.has(observation.date) ? 'verified_complete' : 'unverified' }
+      : observation
   }
   for (const day of map.values()) {
     for (const key of INTELLIGENCE_SIGNAL_KEYS) {
@@ -267,7 +281,8 @@ function coverageFor(input: BuildHealthIntelligenceInput, frame: readonly Intell
   return INTELLIGENCE_SIGNAL_KEYS.map((key) => {
     const definition = INTELLIGENCE_SIGNAL_REGISTRY[key]
     const eligible = frame.filter((day) => !(definition.requiresCompleteDay && input.today != null && day.date === input.today))
-    const observed = eligible.flatMap((day) => day.signals[key] ? [day.signals[key]!] : [])
+    const logged = eligible.flatMap((day) => day.signals[key] ? [day.signals[key]!] : [])
+    const observed = eligible.flatMap((day) => day.signals[key] && isVerifiedForAnalysis(key, day.date, input.nutritionVerifiedCompleteDates) ? [day.signals[key]!] : [])
     const provenance: Partial<Record<IntelligenceProvenance, number>> = {}
     for (const item of observed) provenance[item.provenance] = (provenance[item.provenance] ?? 0) + 1
     const coveragePct = eligible.length === 0 ? 0 : (observed.length / eligible.length) * 100
@@ -277,6 +292,9 @@ function coverageFor(input: BuildHealthIntelligenceInput, frame: readonly Intell
       observedDays: observed.length,
       eligibleDays: eligible.length,
       coveragePct,
+      ...(key.startsWith('nutrition.') && input.nutritionVerifiedCompleteDates != null
+        ? { loggedDays: logged.length, completenessCheck: input.nutritionVerificationStatus ?? 'available' } as const
+        : {}),
       excludedObservations: input.excludedObservationCountByKey?.[key] ?? 0,
       provenance,
       confidence: confidenceFromSample(observed.length, coveragePct),
@@ -294,7 +312,8 @@ function baselinesFor(
     const definition = INTELLIGENCE_SIGNAL_REGISTRY[key]
     const observations = frame
       .filter((day) => !(definition.requiresCompleteDay && input.today != null && day.date === input.today))
-      .flatMap((day) => day.signals[key] ? [{ date: day.date, value: day.signals[key]!.value }] : [])
+      .flatMap((day) => day.signals[key] && isVerifiedForAnalysis(key, day.date, input.nutritionVerifiedCompleteDates)
+        ? [{ date: day.date, value: day.signals[key]!.value }] : [])
       .slice(-28)
     const values = observations.map((item) => item.value)
     const average = mean(values)
@@ -338,7 +357,7 @@ function relationshipSummary(
   return `${x.label} and ${y.label} ${direction} ${timing} in ${n} paired observations (${strength} rank association). This is observational, not causal.`
 }
 
-function relationshipsFor(frame: readonly IntelligenceFrameDay[], today: string | null): IntelligenceRelationship[] {
+function relationshipsFor(frame: readonly IntelligenceFrameDay[], today: string | null, verifiedDates?: ReadonlySet<string>): IntelligenceRelationship[] {
   const byDate = new Map(frame.map((day) => [day.date, day]))
   return RELATIONSHIPS.map((spec) => {
     const pairs: Array<{ xDate: string; yDate: string; x: number; y: number }> = []
@@ -347,10 +366,10 @@ function relationshipsFor(frame: readonly IntelligenceFrameDay[], today: string 
       const yDefinition = INTELLIGENCE_SIGNAL_REGISTRY[spec.yKey]
       if (today != null && ((xDefinition.requiresCompleteDay && day.date === today) || (yDefinition.requiresCompleteDay && addCalendarDays(day.date, spec.lagDays) === today))) continue
       const x = day.signals[spec.xKey]
-      if (!x) continue
+      if (!x || !isVerifiedForAnalysis(spec.xKey, day.date, verifiedDates)) continue
       const yDate = addCalendarDays(day.date, spec.lagDays)
       const y = byDate.get(yDate)?.signals[spec.yKey]
-      if (!y) continue
+      if (!y || !isVerifiedForAnalysis(spec.yKey, yDate, verifiedDates)) continue
       pairs.push({ xDate: day.date, yDate, x: x.value, y: y.value })
     }
     const rho = pairs.length >= spec.minPairs ? spearmanRho(pairs.map((pair) => pair.x), pairs.map((pair) => pair.y)) : null
@@ -384,6 +403,7 @@ function valuesBetween(
   start: string,
   end: string,
   today: string | null,
+  verifiedDates?: ReadonlySet<string>,
 ): Array<{ date: string; value: number }> {
   const definition = INTELLIGENCE_SIGNAL_REGISTRY[key]
   return frame
@@ -391,6 +411,7 @@ function valuesBetween(
       day.date >= start &&
       day.date <= end &&
       day.signals[key] != null &&
+      isVerifiedForAnalysis(key, day.date, verifiedDates) &&
       !(definition.requiresCompleteDay && today != null && day.date === today)
     )
     .map((day) => ({ date: day.date, value: day.signals[key]!.value }))
@@ -401,6 +422,7 @@ function interventionComparisons(
   changes: readonly ChangeLedgerEntry[],
   asOf: string,
   today: string | null,
+  verifiedDates?: ReadonlySet<string>,
 ): IntelligenceInterventionComparison[] {
   const output: IntelligenceInterventionComparison[] = []
   for (const change of changes) {
@@ -410,8 +432,8 @@ function interventionComparisons(
     const afterStart = change.date
     const afterEnd = addCalendarDays(change.date, 6) > asOf ? asOf : addCalendarDays(change.date, 6)
     for (const key of INTERVENTION_KEYS) {
-      const before = valuesBetween(frame, key, beforeStart, beforeEnd, today)
-      const after = valuesBetween(frame, key, afterStart, afterEnd, today)
+      const before = valuesBetween(frame, key, beforeStart, beforeEnd, today, verifiedDates)
+      const after = valuesBetween(frame, key, afterStart, afterEnd, today, verifiedDates)
       if (before.length < 3 || after.length < 3) continue
       const beforeMean = mean(before.map((item) => item.value))!
       const afterMean = mean(after.map((item) => item.value))!
@@ -462,7 +484,7 @@ function contextSummary(
       knows.push({
         key: item.key,
         label: item.label,
-        detail: `${item.observedDays} observed day${item.observedDays === 1 ? '' : 's'} in this range${baseline?.state === 'available' ? '; a personal baseline is available' : ''}.`,
+        detail: `${item.observedDays} ${item.loggedDays == null ? 'observed' : 'verified complete, source-reliable'} day${item.observedDays === 1 ? '' : 's'} in this range${baseline?.state === 'available' ? '; a personal baseline is available' : ''}.`,
         confidence: item.confidence,
         detailPath: item.detailPath,
       })
@@ -471,7 +493,9 @@ function contextSummary(
         key: item.key,
         label: item.label,
         detail: item.observedDays === 0
-          ? 'No usable observations are available in this range.'
+          ? (item.loggedDays != null && item.loggedDays > 0
+            ? `${item.loggedDays} logged day(s), but no verified complete, source-reliable days for personal trends${item.completenessCheck === 'unavailable' ? ' (verification unavailable)' : ''}.`
+            : 'No usable observations are available in this range.')
           : `Only ${item.observedDays} of ${item.eligibleDays} eligible days are observed.`,
         confidence: 'unknown',
         detailPath: item.detailPath,
@@ -503,8 +527,8 @@ export function buildHealthIntelligenceSnapshot(input: BuildHealthIntelligenceIn
   const frame = frameFor(input)
   const coverage = coverageFor(input, frame)
   const baselines = baselinesFor(input, frame, coverage)
-  const relationships = relationshipsFor(frame, input.today)
-  const interventions = interventionComparisons(frame, input.changes ?? [], input.asOf, input.today)
+  const relationships = relationshipsFor(frame, input.today, input.nutritionVerifiedCompleteDates)
+  const interventions = interventionComparisons(frame, input.changes ?? [], input.asOf, input.today, input.nutritionVerifiedCompleteDates)
   return {
     version: HEALTH_INTELLIGENCE_VERSION,
     range: input.range,
