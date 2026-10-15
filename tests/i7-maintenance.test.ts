@@ -159,7 +159,8 @@ describe('I7 observed maintenance estimator', () => {
       weightGoal: loseGoal(),
       adjustmentContext: { status: 'available', currentCalorieTarget: 2200, activeExperimentCount: 0,
         revisionStatus: 'consistent', decisionRevision: 'test-current-revision',
-        performance: { status: 'available', asOf: AS_OF, decliningExercises: [], competingGoals: [] } },
+        performance: { status: 'available', asOf: AS_OF, decliningExercises: [], competingGoals: [] },
+        physiology: { status: 'available', asOf: AS_OF, ageYears: 31, heightCm: 178, activeOrUncertainConditionCount: 0 } },
     })
     expect(state.estimate.state).toBe('available')
     expect(state.estimate.observedMaintenanceKcal).toBe(2100)
