@@ -33,12 +33,14 @@ function decision(): GoalControlState {
     trainingAdherence: {
       configured: true,
       completedProgrammedSessions: 1,
+      qualifiedTrainingDays: 1,
+      remainingQualifiedDays: 2,
       weeklyFrequencyTarget: 3,
       remainingSessions: 2,
       todayIntent: 'rest',
       futureTrainingDates: ['2026-10-09', '2026-10-11'],
       state: 'rest_day_on_track',
-      detail: 'Today is not a planned Training day. 2 planned Training days remain for 2 sessions.',
+      detail: 'Today is an open day; 2 preferred days remain for 2 qualified strength days.',
     },
     relationships: [],
     limitations: [],
@@ -95,7 +97,7 @@ describe('I6 Goal Control presentation', () => {
     expect(html).toContain('No change recommended this week')
     expect(html).toContain('moderate confidence')
     expect(html).toContain('Rest-aware')
-    expect(html).toContain('Today is not a planned Training day')
+    expect(html).toContain('Today is an open day')
   })
 
   it('uses the shared Weekly Decision instead of rendering a competing legacy Focus section', () => {
