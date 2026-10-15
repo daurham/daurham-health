@@ -3,6 +3,7 @@ import type { HealthIntelligenceSnapshot, IntelligenceConfidence, IntelligenceSi
 import type { WeeklyCandidate, WeeklyCoachBrief, WeeklyGoalSnapshot, WeeklyTrainingPlanSnapshot } from './weekly-coach/types.js'
 import type { MaintenanceState } from './maintenance.js'
 import type { TrainingProgressionState } from './training-progression.js'
+import { buildTrainingProgressSummary } from './training-progress-summary.js'
 
 export const GOAL_CONTROL_VERSION = 'goal-control-v1' as const
 
@@ -35,12 +36,16 @@ export type GoalControlNutritionQuality = {
 
 export type GoalControlTrainingAdherence = {
   configured: boolean
+  /** Recorded programmed session rows are diagnostic, not weekly credit. */
   completedProgrammedSessions: number
+  qualifiedTrainingDays: number | null
   weeklyFrequencyTarget: number | null
+  remainingQualifiedDays: number | null
+  /** Legacy diagnostic field: do not show as remaining weekly training days. */
   remainingSessions: number | null
   todayIntent: TrainingDayIntent | null
   futureTrainingDates: string[]
-  state: 'unconfigured' | 'met' | 'training_day' | 'rest_day_on_track' | 'schedule_review'
+  state: 'unconfigured' | 'unavailable' | 'met' | 'training_day' | 'rest_day_on_track' | 'flexible_week' | 'schedule_review'
   detail: string
 }
 
@@ -190,65 +195,25 @@ function nutritionQuality(snapshot: HealthIntelligenceSnapshot, asOf: string): G
 }
 
 function trainingAdherence(plan?: WeeklyTrainingPlanSnapshot | null): GoalControlTrainingAdherence {
-  if (!plan?.configured || plan.weeklyFrequencyTarget == null) {
-    return {
-      configured: false,
-      completedProgrammedSessions: plan?.completedProgrammedSessions ?? 0,
-      weeklyFrequencyTarget: plan?.weeklyFrequencyTarget ?? null,
-      remainingSessions: null,
-      todayIntent: plan?.todayIntent ?? null,
-      futureTrainingDates: plan?.futureTrainingDates ?? [],
-      state: 'unconfigured',
-      detail: 'No flexible Training Plan is configured.',
-    }
-  }
-  const remaining = Math.max(0, plan.weeklyFrequencyTarget - plan.completedProgrammedSessions)
-  const todayIntent = plan.todayIntent
-  if (remaining === 0) {
-    return {
-      configured: true,
-      completedProgrammedSessions: plan.completedProgrammedSessions,
-      weeklyFrequencyTarget: plan.weeklyFrequencyTarget,
-      remainingSessions: 0,
-      todayIntent,
-      futureTrainingDates: plan.futureTrainingDates,
-      state: 'met',
-      detail: `Training Plan target met: ${plan.completedProgrammedSessions}/${plan.weeklyFrequencyTarget} programmed sessions this week.`,
-    }
-  }
-  if (todayIntent === 'training_preferred' || todayIntent === 'training_moved_here') {
-    return {
-      configured: true,
-      completedProgrammedSessions: plan.completedProgrammedSessions,
-      weeklyFrequencyTarget: plan.weeklyFrequencyTarget,
-      remainingSessions: remaining,
-      todayIntent,
-      futureTrainingDates: plan.futureTrainingDates,
-      state: 'training_day',
-      detail: `${remaining} programmed session${remaining === 1 ? '' : 's'} remain and today is a planned Training day.`,
-    }
-  }
-  if (plan.futureTrainingDates.length >= remaining) {
-    return {
-      configured: true,
-      completedProgrammedSessions: plan.completedProgrammedSessions,
-      weeklyFrequencyTarget: plan.weeklyFrequencyTarget,
-      remainingSessions: remaining,
-      todayIntent,
-      futureTrainingDates: plan.futureTrainingDates,
-      state: 'rest_day_on_track',
-      detail: `Today is not a planned Training day. ${plan.futureTrainingDates.length} planned Training day${plan.futureTrainingDates.length === 1 ? '' : 's'} remain for ${remaining} session${remaining === 1 ? '' : 's'}.`,
-    }
-  }
+  const progress = buildTrainingProgressSummary(plan)
+  const state: GoalControlTrainingAdherence['state'] =
+    progress.status === 'unconfigured' ? 'unconfigured' :
+      progress.status === 'unavailable' ? 'unavailable' :
+        progress.status === 'met' ? 'met' :
+          progress.status === 'preferred_today' ? 'training_day' :
+            progress.status === 'open_day' ? 'rest_day_on_track' : 'flexible_week'
   return {
-    configured: true,
-    completedProgrammedSessions: plan.completedProgrammedSessions,
-    weeklyFrequencyTarget: plan.weeklyFrequencyTarget,
-    remainingSessions: remaining,
-    todayIntent,
-    futureTrainingDates: plan.futureTrainingDates,
-    state: 'schedule_review',
-    detail: `${remaining} programmed session${remaining === 1 ? '' : 's'} remain but only ${plan.futureTrainingDates.length} planned Training day${plan.futureTrainingDates.length === 1 ? '' : 's'} remain. Review the plan instead of treating today as an automatic miss.`,
+    configured: progress.configured,
+    completedProgrammedSessions: progress.completedProgrammedSessions,
+    qualifiedTrainingDays: progress.qualifiedTrainingDays,
+    weeklyFrequencyTarget: progress.weeklyTargetDays,
+    remainingQualifiedDays: progress.remainingQualifiedDays,
+    remainingSessions: progress.weeklyTargetDays == null ? null
+      : Math.max(0, progress.weeklyTargetDays - progress.completedProgrammedSessions),
+    todayIntent: plan?.todayIntent ?? null,
+    futureTrainingDates: plan?.futureTrainingDates ?? [],
+    state,
+    detail: progress.detail,
   }
 }
 
