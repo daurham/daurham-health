@@ -14,7 +14,7 @@ import {
   quietButtonClass,
   secondaryButtonClass,
 } from '@/lib'
-import { createOwnerExercise, deleteSession, fetchExerciseLibrary, fetchSession, fetchTemplates, updateSession } from './api'
+import { createOwnerExercise, deleteSession, fetchExerciseLibrary, fetchSession, fetchTemplates, updateSession, WorkoutEditConflictError } from './api'
 import { subscribeHealthDataChanges } from '@/lib/health-changes'
 import {
   DraftValidationError,
@@ -45,7 +45,7 @@ export function WorkoutDetailPage() {
   const [errorFocusKey, setErrorFocusKey] = useState(0)
   const loadedId = useRef<string | null>(null)
   const refreshGeneration = useRef(0)
-  const draftOrigin = useRef<{ id: string; revision: string } | null>(null)
+  const draftOrigin = useRef<{ id: string; revision: string; editRevision: string | null } | null>(null)
   const [staleDraft, setStaleDraft] = useState(false)
 
   // Refresh a saved workout after another tab edits it, or when returning
@@ -144,7 +144,12 @@ export function WorkoutDetailPage() {
         setStaleDraft(true)
         return
       }
-      const next = await updateSession(sessionId, buildManualWorkoutPayload(draft))
+      const version = draftOrigin.current?.editRevision
+      if (!version) {
+        setStaleDraft(true)
+        return
+      }
+      const next = await updateSession(sessionId, buildManualWorkoutPayload(draft), version)
       refreshGeneration.current += 1
       setSession(next)
       setEditing(false)
@@ -152,6 +157,13 @@ export function WorkoutDetailPage() {
       draftOrigin.current = null
       setStaleDraft(false)
     } catch (caught) {
+      if (caught instanceof WorkoutEditConflictError) {
+        // A committed conflict is a server-owned, authoritative veto. Keep
+        // the entire in-progress draft until the owner explicitly reloads it.
+        setStaleDraft(true)
+        setError(null)
+        return
+      }
       if (caught instanceof DraftValidationError) {
         setFieldErrors(caught.fields)
         setErrorFocusKey((current) => current + 1)
@@ -178,7 +190,7 @@ export function WorkoutDetailPage() {
       setSession(fresh)
       setTemplate(currentTemplate)
       setDraft(draftFromSession(fresh, currentTemplate))
-      draftOrigin.current = { id: sessionId, revision: workoutEditRevision(fresh) }
+      draftOrigin.current = { id: sessionId, revision: workoutEditRevision(fresh), editRevision: fresh.editRevision ?? null }
       setStaleDraft(false)
       setFieldErrors([])
     } catch (caught) {
@@ -269,7 +281,7 @@ export function WorkoutDetailPage() {
         <SessionDetail
           session={session}
           onEdit={() => {
-            draftOrigin.current = { id: session.id, revision: workoutEditRevision(session) }
+            draftOrigin.current = { id: session.id, revision: workoutEditRevision(session), editRevision: session.editRevision ?? null }
             setStaleDraft(false)
             setDraft(draftFromSession(session, template))
             setEditing(true)
