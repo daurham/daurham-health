@@ -539,7 +539,7 @@ describe.skipIf(!url)('PIQ-1.1 full 0001–0053 migration-chain and backup on is
             setNumber: 1, setType: 'working', loadState: 'bodyweight', weightKg: null,
             reps: 12, durationSec: null, leftReps: null, rightReps: null,
             leftDurationSec: null, rightDurationSec: null, distanceM: null,
-            completed: null, rir: 2, rpe: 7, failureKind: null,
+            completed: null, rir: 2, rpe: null, failureKind: null,
             leftFailureKind: null, rightFailureKind: null, notes: null,
           }],
         }],
