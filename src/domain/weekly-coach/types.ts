@@ -68,7 +68,11 @@ export type WeeklySleepBaseline = {
 
 export type WeeklyTrainingPlanSnapshot = {
   configured: boolean
+  /** Number of saved programmed session rows; NOT the weekly target. */
   completedProgrammedSessions: number
+  /** Qualified strength calendar days from performed exercises, null if unreadable. */
+  qualifiedTrainingDays?: number | null
+  todayQualified?: boolean | null
   weeklyFrequencyTarget: number | null
   todayIntent: TrainingDayIntent | null
   todayRoutineName: string | null
