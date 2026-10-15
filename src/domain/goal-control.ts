@@ -94,6 +94,13 @@ export type GoalControlRelationship = {
     dateClustering: { distinctDates: number; contiguousRuns: number; longestRunDays: number } | null
     /** Descriptive first-difference Spearman on consecutive, verified matched dates only. */
     changeSensitivity: { adjacentTransitions: number; rho: number | null } | null
+    /** Selection accounting, not a family-wise error rate or statistical correction. */
+    screening: {
+      evaluatedPairs: number
+      evidenceQualifiedPairs: number
+      goalRelevantPairs: number
+      shownPairs: number
+    }
     strength: 'weak' | 'moderate' | 'strong' | null
     /** Raw signal coverage, not necessarily the subset of paired dates. */
     sources: GoalControlEvidenceCoverage[]
@@ -396,15 +403,26 @@ function relationshipsFor(
 ): GoalControlRelationship[] {
   const keys = activeGoalSignalKeys(goals)
   if (keys.size === 0) return []
-  return snapshot.relationships
-    .filter((item) =>
-      item.state === 'available' &&
-      (item.confidence === 'high' || item.confidence === 'moderate') &&
-      (keys.has(item.xKey) || keys.has(item.yKey))
-    )
+  // Count candidates before goal relevance and the three-card cap. Displaying
+  // only selected associations can conceal how many pairs were screened.
+  // Qualification is the existing display rule, never a significance test.
+  const evidenceQualified = snapshot.relationships.filter((item) =>
+    item.state === 'available' &&
+    (item.confidence === 'high' || item.confidence === 'moderate')
+  )
+  const goalRelevant = evidenceQualified.filter((item) =>
+    keys.has(item.xKey) || keys.has(item.yKey)
+  )
+  const selected = goalRelevant
     .sort((a, b) => confidenceRank(b.confidence) - confidenceRank(a.confidence) || b.sampleSize - a.sampleSize)
     .slice(0, 3)
-    .map((item) => {
+  const screening = {
+    evaluatedPairs: snapshot.relationships.length,
+    evidenceQualifiedPairs: evidenceQualified.length,
+    goalRelevantPairs: goalRelevant.length,
+    shownPairs: selected.length,
+  }
+  return selected.map((item) => {
       const dates = item.evidenceDates.flatMap((pair) => [pair.xDate, pair.yDate]).sort()
       const sourceWindow = { start: snapshot.period.start, end: snapshot.period.end }
       const sources: GoalControlEvidenceCoverage[] = [item.xKey, item.yKey].flatMap((key) => {
@@ -431,6 +449,7 @@ function relationshipsFor(
           rho: typeof item.rho === 'number' && Number.isFinite(item.rho) && Math.abs(item.rho) <= 1 ? item.rho : null,
           dateClustering: relationshipDateClustering(item.evidenceDates),
           changeSensitivity: relationshipDayToDaySensitivity(snapshot.frame, item),
+          screening,
           strength: item.strength,
           sources,
         },

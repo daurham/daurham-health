@@ -718,3 +718,8 @@ Keep a Spearman correlation's existing signed coefficient and matched-pair-count
 ## Decision: day-to-day sensitivity is descriptive, never an adjusted causal correlation (PIQ-1.6, 2026-10-15)
 
 Keep the existing observed relationship selection, original Spearman coefficient and pair-count grade unchanged. For already-eligible matched observations, compute a separate first-difference Spearman only on strictly consecutive tracked X anchor dates with their original lagged Y values. Exclude calendar gaps; fail closed for missing/invalid/duplicated paired evidence; show unavailable for fewer than six transitions or constant changes. Present the change coefficient with strong limitations, not as a p-value, independent trial count, effective sample size, time-trend removal, clinical interpretation or proof of causality. No canonical or owner data are changed. Further statistical calibration requires a separately reviewed plan and owner acceptance.
+
+
+## Decision: disclose correlation-screening selection, do not imply confirmation (PIQ-1.6, 2026-10-15)
+
+Present each Goal Overview observational shortlist alongside its actual candidate-definition count, existing data/display qualification count, active-goal relevance count and displayed count. A selected relationship chosen from multiple registered pairs is not independently replicated or statistically significant merely because its sample count or rho is high. Make the actual selection rule clear (matched-pair grade/sample size, not maximizing rho). Do not add p-values, autocorrelation adjustments, revised thresholds or interpretation beyond observed provenance without a separately reviewed statistical plan. No canonical, owner, or production data changes.

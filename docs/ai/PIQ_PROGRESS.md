@@ -1242,3 +1242,16 @@ HAVING COUNT(*) > 1;
 **Verification:** Synthetic co-trending signals with raw Spearman ρ near +1 but consecutive changes ρ near −1, gapped dates, small samples, constant increments, duplicate/malformed pairs, lagged Y dates and SSR explanation. No DB migration or writes to owner records, no Gemini/provider budget, `main` untouched. Previous schema migration `0054` remains **unapplied** and subject to separate owner-approved backup/duplicate preflight.
 
 **Still open:** Formal time-series uncertainty, changes driven by confounders/recording selection, multiple-testing correction, clinical calibration, canonical event-level freshness, authenticated owner review and PIQ phase acceptance. The optional sensitivity is a *qualitative warning*, not sufficient evidence to act or revise an intervention.
+
+
+## PIQ-1.6 — Selected-correlation screening denominator and selection-bias disclosure (2026-10-15)
+
+**State:** Bounded work-branch improvement pending CI and owner-authenticated mobile acceptance. **0/9 PIQ phases owner-accepted.**
+
+**Problem:** Even a clearly labeled non-causal, sample-grade observational association can mislead if the app shows only selected associations. There are multiple registered pair definitions, but the owner previously could not see how many were screened before the top-three goal-relevant shortlist appeared. An apparently strong correlation chosen from many candidate definitions is not independent replication or evidence of statistical significance.
+
+**Change:** Use the existing Health Intelligence relationship results *without running new searches, correlations, significance tests, or adjusting selection thresholds*. Record the actual number of definitions present in the snapshot, how many satisfied the pre-existing `available` plus moderate/high matched-pair-grade display filters, how many also related to active goal signal keys, and how many were actually shown after the three-card cap. Surface one concise disclosure in the Goal Overview's already-collapsed Observed Relationships panel; explain that sorting is by matched-pair grade and count (not correlation magnitude), selecting from several candidates can make patterns appear more convincing than they are, and these counts do not constitute multiple-comparisons correction, significance, independent replication or predictive validation. A missing panel or goal does not manufacture relationships. Original rho, day-to-day sensitivity, relationship summaries, confidence grades and source coverage remain unchanged.
+
+**Tests:** The 10-definition fictional snapshot with one qualifying goal-relevant relationship reports 10/1/1/1. A synthetic five-qualified/four-goal-relevant case displays three and discloses 10/5/4/3, while existing weak/evidence-insufficient relationship tests remain guarded. No migrations, AI/Gemini/provider calls, owner-record modifications, production deployment or merge to `main`.
+
+**Remaining:** Proper pre-reviewed statistical multiple-comparison uncertainty design, autocorrelation and trend controls, confounder-aware modeling and independent validation; source freshness and owner-mobile QA. Migration `0054` remains unapplied and requires separate owner-approved production preflight.

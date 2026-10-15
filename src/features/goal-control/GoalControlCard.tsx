@@ -109,6 +109,19 @@ export function GoalControlCard({
             These are associations in recorded data, not evidence that changing one factor will change another.
             Other factors, missing records, and day-to-day variation may explain the patterns.
           </p>
+          {state.relationships[0]?.evidence?.screening ? (
+            <p className="mt-1">
+              Selection context: {state.relationships[0].evidence.screening.evaluatedPairs} candidate relationship definitions examined;
+              {' '}{state.relationships[0].evidence.screening.evidenceQualifiedPairs} met the configured observation and association display rules;
+              {' '}{state.relationships[0].evidence.screening.goalRelevantPairs} also matched active goals;
+              {' '}{state.relationships[0].evidence.screening.shownPairs} displayed (maximum three).
+              Cards are ranked by matched-pair count grade and sample size, not by effect magnitude.
+              Looking at multiple possible relationships and displaying a selected subset can exaggerate apparent patterns.
+              This is not a multiple-comparisons adjustment, significance test, independent replication, or predictive validation.
+            </p>
+          ) : (
+            <p className="mt-1">Relationship screening counts are unavailable; selected patterns are not independently verified.</p>
+          )}
           <ol className="mt-2 space-y-3">
             {state.relationships.map((item) => (
               <li key={item.id} className="rounded-md border border-zinc-100 p-2">

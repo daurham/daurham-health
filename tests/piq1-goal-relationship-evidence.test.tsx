@@ -61,6 +61,7 @@ describe('PIQ-1.6 paired relationship evidence is observational', () => {
       sourceWindow,
       pairedWindow: { start: '2026-09-20', end: '2026-10-05' },
       lagDays: 0, requiredPairs: 10,
+      screening: { evaluatedPairs: 10, evidenceQualifiedPairs: 1, goalRelevantPairs: 1, shownPairs: 1 },
       dateClustering: { distinctDates: 16, contiguousRuns: 1, longestRunDays: 16 },
       changeSensitivity: { adjacentTransitions: 15, rho: null },
       sources: [
@@ -73,6 +74,11 @@ describe('PIQ-1.6 paired relationship evidence is observational', () => {
     expect(state.period).toEqual({ start: '2026-10-08', end: '2026-10-14' })
     const html = render(state)
     expect(html).toContain('Observed relationships (1) · not causal')
+    expect(html).toContain('Selection context:')
+    expect(html).toContain('10 candidate relationship definitions examined')
+    expect(html).toContain('met the configured observation and association display rules')
+    expect(html).toContain('not by effect magnitude')
+    expect(html).toContain('not a multiple-comparisons adjustment')
     expect(html).toContain('Matched-pair count grade: high · 16 matched date pairs')
     expect(html).toContain('This grade describes sample availability, not statistical certainty')
     expect(html).toContain('Spearman rank correlation (ρ): ')
@@ -96,6 +102,42 @@ describe('PIQ-1.6 paired relationship evidence is observational', () => {
     expect(html).toContain('not evidence that changing one factor will change another')
     expect(html).toContain('Review source 1')
     expect(html).not.toContain('proves that sleep')
+  })
+
+  it('discloses screening before choosing three cards rather than implying three independent discoveries', () => {
+    const source = inputs(16)
+    const seed = source.intelligence.relationships.find((item) => item.id === 'shared:sleep:energy')!
+    // Synthetic definitions: five meet the existing display filters, four
+    // match the active Sleep goal, and the visible list is capped at three.
+    const relationships = source.intelligence.relationships.map((item, index) => index < 5
+      ? {
+        ...item,
+        id: `synthetic:screen:${index}`,
+        xKey: index === 4 ? 'hydration.ml' as const : 'sleep.total_minutes' as const,
+        yKey: index === 4 ? 'bowel.count' as const : 'wellness.energy' as const,
+        state: 'available' as const,
+        confidence: 'high' as const,
+        rho: 0.6,
+        sampleSize: 16,
+        evidenceDates: [...seed.evidenceDates],
+      }
+      : item)
+    const state = buildGoalControlState({
+      asOf, ...source,
+      intelligence: { ...source.intelligence, relationships },
+    })
+    expect(state.relationships).toHaveLength(3)
+    expect(state.relationships.map((item) => item.evidence?.screening)).toEqual([
+      { evaluatedPairs: 10, evidenceQualifiedPairs: 5, goalRelevantPairs: 4, shownPairs: 3 },
+      { evaluatedPairs: 10, evidenceQualifiedPairs: 5, goalRelevantPairs: 4, shownPairs: 3 },
+      { evaluatedPairs: 10, evidenceQualifiedPairs: 5, goalRelevantPairs: 4, shownPairs: 3 },
+    ])
+    const html = render(state)
+    expect(html).toContain('10 candidate relationship definitions examined')
+    expect(html).toContain('4 also matched active goals')
+    expect(html).toContain('3 displayed (maximum three)')
+    expect(html).toContain('displaying a selected subset can exaggerate apparent patterns')
+    expect(html).not.toContain('statistically significant')
   })
 
   it('does not promote too few pairs into a displayed association', () => {

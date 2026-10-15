@@ -410,3 +410,8 @@ Goal Overview now distinguishes paired-date count grading from Spearman rank-ass
 ## 2026-10-15 PIQ-1.6 time-trend sensitivity — work branch
 
 Added an optional, derived day-to-day first-difference Spearman sensitivity beside the existing observed relationship coefficient. Uses strictly consecutive eligible X-side matched anchor dates and original Y lag; explicitly labels sparse/constant/bad data unavailable. Does not change relationship eligibility, confidence grade, Coach interventions, database schema or production data. Regression tests include a shared monotone trend with opposite short-term change correlation and lag/gap edge cases. Full CI, authenticated iOS QA and PIQ owner acceptance remain gates; migration 0054 still not applied.
+
+
+## 2026-10-15 PIQ-1.6 correlation screening disclosure — work branch
+
+Goal Overview derives candidate/evidence-qualified/goal-relevant/displayed relationship counts from its existing intelligence snapshot. The collapsed panel names selection bias and explicitly does not claim a multiple-testing correction, statistical significance, independent replication or causation. Synthetic 10/1/1/1 and top-three-cap 10/5/4/3 regressions added. No new model calls, schema, production writes or main promotion; CI and owner device gate still apply.
