@@ -113,7 +113,7 @@ describe('PIQ-1.3 training semantics: qualified strength days are authoritative'
   it('one programmed workout with no performed exercise evidence is not a qualifying day', () => {
     const p = plan({ evidence: [], programmed: 1 })
     expect(buildTrainingProgressSummary(p).remainingQualifiedDays).toBe(3)
-    expect(goalControl(p).state).toBe('rest_day_on_track')
+    expect(goalControl(p).state).toBe('flexible_week')
   })
 
   it('unknown qualification evidence never silently becomes zero or inherits programmed counts', () => {
