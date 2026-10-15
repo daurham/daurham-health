@@ -1281,3 +1281,16 @@ HAVING COUNT(*) > 1;
 **Regression:** Derive 16/28 same-day pairs and 16/27 lagged pairs from fictional dated observations; verify distinct unpaired counts, SSR non-zero/causality language, and failure-closed cases for mismatched counts, duplicates, impossible/future dates, incompatible lags and source windows. Does not query owner sources, change real logs, run a new statistic, invent complete days, consume Gemini/provider budget, add schema migration or deploy/merge to main.
 
 **Next:** CI and authenticated owner evidence-drilldown QA; PIQ-1 release still gated by owner acceptance and production schema 0054's backup/preflight. Broader longitudinal selection-bias correction, source event revisions, confounding and formal statistical inference require separately reviewed designs.
+
+
+## PIQ-1.6 — Verify paired dates against original observations (2026-10-15)
+
+**State:** Work-branch PIQ-1.6 bounded correction, awaiting automated CI and owner authenticated device review. **0/9 owner-accepted phases.**
+
+**Why:** Goal Overview's observational relationship evidence already verified date syntax, source-window alignment, lag, uniqueness and reported matched count, but could show an apparently verified pairing window even when a cited X or Y reading had disappeared, was misdated, duplicated or was nonfinite in the exact underlying Health Intelligence daily frame.
+
+**Change:** Before exposing pairing opportunity, matched window, date clustering or adjacent-day sensitivity, verify every cited pair against *both actual finite source signal observations* at their reported dates and exact keys. Reject malformed or duplicate frame dates. Unverifiable readings fail closed to unavailable observational date diagnostics; do not replace with zeros, assert skipped logs, invent complete days, or rerun correlations. Keep the original registered relationship, source coverage, count grade, screening order, coefficient and three-card limit unchanged, but visibly state the pairing provenance could not be verified.
+
+**Tests:** Canonical fictional observed pairs retain existing 16/28 availability. Missing Y value, a signal whose internal date conflicts with its frame date, nonfinite value, repeated frame date, empty/forged pair metadata all withhold precise pair diagnostics. Unrelated non-relationship evidence is unchanged. No owner records, migrations, main promotion or Gemini/provider calls. The separate unapplied migration `0054` still requires owner approval and live duplicate preflight.
+
+**Remaining:** Canonical event-revision validation for retrospective source changes, formal clinical/statistical calibration and owner device validation. This is a provenance check, not a statistical significance or causal inference upgrade.

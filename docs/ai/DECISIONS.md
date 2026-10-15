@@ -733,3 +733,8 @@ Keep the original rank association and adjacent-day first-difference correlation
 ## Decision: label paired-date opportunity separately from recorded completeness (PIQ-1.6, 2026-10-15)
 
 An observational correlation's 16 recorded pairs are not 16 complete owner days. Expose a calendar-based denominator for X/Y date offsets that both fall inside the original signal window. The difference between calendar-alignable slots and actually paired eligible observations is **unpaired**, not medically missing, physiologically zero, or owner-confirmed logging failure; the paired subset can be systematically selected. Fail closed on duplicate/impossible/out-of-range/inconsistent pair metadata; retain the original registered association/ranking rather than inferring a new effect. No target changes, new model calls, synthetic canonical fills or production schema edits.
+
+
+## Decision: relationship-date provenance requires real paired readings (PIQ-1.6, 2026-10-15)
+
+A derived relationship's listed date pairs are not sufficient to claim matched observations. Before showing precise pair opportunity, clustering or adjacent-day sensitivity, confirm that every X and Y date resolves to a finite, key-correct, date-consistent signal within a unique daily frame. When this check fails, display unavailable instead of invented paired-day metrics or missing intake. Original derived correlation, count grade and ranking remain untouched. No production migration or owner records change.

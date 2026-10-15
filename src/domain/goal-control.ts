@@ -409,6 +409,29 @@ export function relationshipPairDateCoverage(
   }
 }
 
+/** A plausible pair date is not proof of a measured X/Y pair. Only expose
+ * exact matched-date diagnostics when both source observations really exist
+ * in the already-loaded frame. Never substitute a missing reading with zero.
+ */
+export function relationshipPairsBackedByFrame(
+  frame: readonly HealthIntelligenceSnapshot['frame'][number][],
+  relation: Pick<HealthIntelligenceSnapshot['relationships'][number],
+    'xKey' | 'yKey' | 'evidenceDates'>,
+): boolean {
+  if (relation.evidenceDates.length === 0) return false
+  const byDate = new Map<string, HealthIntelligenceSnapshot['frame'][number]>()
+  for (const day of frame) {
+    if (!isCalendarDate(day.date) || byDate.has(day.date)) return false
+    byDate.set(day.date, day)
+  }
+  return relation.evidenceDates.every(({ xDate, yDate }) => {
+    const x = byDate.get(xDate)?.signals[relation.xKey]
+    const y = byDate.get(yDate)?.signals[relation.yKey]
+    return x?.key === relation.xKey && x.date === xDate && Number.isFinite(x.value) &&
+      y?.key === relation.yKey && y.date === yDate && Number.isFinite(y.value)
+  })
+}
+
 export function relationshipDateClustering(
   dates: readonly { xDate: string; yDate: string }[],
 ): { distinctDates: number; contiguousRuns: number; longestRunDays: number } | null {
@@ -498,9 +521,11 @@ function relationshipsFor(
   }
   return selected.map((item) => {
       const sourceWindow = { start: snapshot.period.start, end: snapshot.period.end }
-      const pairCoverage = relationshipPairDateCoverage(
+      const calendarCoverage = relationshipPairDateCoverage(
         item.evidenceDates, item.sampleSize, item.lagDays, sourceWindow,
       )
+      const pairCoverage = calendarCoverage && relationshipPairsBackedByFrame(snapshot.frame, item)
+        ? calendarCoverage : null
       const sources: GoalControlEvidenceCoverage[] = [item.xKey, item.yKey].flatMap((key) => {
         const coverage = snapshot.coverage.find((entry) => entry.key === key)
         return coverage ? [{

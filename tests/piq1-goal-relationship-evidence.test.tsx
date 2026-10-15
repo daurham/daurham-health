@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { addCalendarDays } from '../src/domain/training-plan.js'
 import { buildHealthIntelligenceSnapshot, type IntelligenceObservation, type IntelligenceFrameDay } from '../src/domain/intelligence/shared.js'
 import { spearmanRho } from '../src/domain/intelligence/spearman.js'
-import { buildGoalControlState, relationshipDateClustering, relationshipDayToDaySensitivity, relationshipDirectionContrast, relationshipPairDateCoverage, type GoalControlState } from '../src/domain/goal-control.js'
+import { buildGoalControlState, relationshipDateClustering, relationshipDayToDaySensitivity, relationshipDirectionContrast, relationshipPairDateCoverage, relationshipPairsBackedByFrame, type GoalControlState } from '../src/domain/goal-control.js'
 import type { WeeklyCoachBrief, WeeklyGoalSnapshot } from '../src/domain/weekly-coach/types.js'
 import { GoalControlCard } from '../src/features/goal-control/GoalControlCard.js'
 
@@ -318,6 +318,54 @@ describe('PIQ-1.6 paired relationship evidence is observational', () => {
     expect(html).toContain('Source observation counts are unavailable')
     expect(html).not.toContain('0/28 observed dates')
   })
+  it('never claims verified pair windows when the cited readings are absent, misdated, or duplicated in the frame', () => {
+    const baseline = inputs(16)
+    const reference = baseline.intelligence.relationships.find((item) => item.id === 'shared:sleep:energy')!
+    expect(relationshipPairsBackedByFrame(baseline.intelligence.frame, reference)).toBe(true)
+    const originalFrame = baseline.intelligence.frame
+    const missing = originalFrame.map((day) => day.date === '2026-09-26'
+      ? { ...day, signals: { ...day.signals, 'wellness.energy': undefined } }
+      : day)
+    const misdated = originalFrame.map((day) => day.date === '2026-09-26'
+      ? { ...day, signals: { ...day.signals,
+        'wellness.energy': { ...day.signals['wellness.energy']!, date: '2026-09-27' } } }
+      : day)
+    const nonfinite = originalFrame.map((day) => day.date === '2026-09-26'
+      ? { ...day, signals: { ...day.signals,
+        'wellness.energy': { ...day.signals['wellness.energy']!, value: Number.NaN } } }
+      : day)
+    const duplicate = [...originalFrame, originalFrame.find((day) => day.date === '2026-09-26')!]
+    for (const frame of [missing, misdated, nonfinite, duplicate]) {
+      expect(relationshipPairsBackedByFrame(frame, reference)).toBe(false)
+      const state = buildGoalControlState({
+        asOf, ...baseline,
+        intelligence: { ...baseline.intelligence, frame },
+      })
+      const rel = state.relationships.find((entry) => entry.id === reference.id)
+      expect(rel?.sampleSize).toBe(16)
+      expect(rel?.evidence?.pairCoverage).toBeNull()
+      expect(rel?.evidence?.pairedWindow).toBeNull()
+      expect(rel?.evidence?.dateClustering).toBeNull()
+      expect(rel?.evidence?.changeSensitivity).toBeNull()
+      const html = render(state)
+      expect(html).toContain('Pairing opportunity is unavailable')
+      expect(html).toContain('Matched dates: unavailable')
+      expect(html).not.toContain('Pairing opportunity: 16 of')
+    }
+  })
+
+  it('preserves observed lagged source dates, without treating gap days as readings', () => {
+    const data = inputs(16)
+    const source = data.intelligence.relationships.find((item) => item.id === 'shared:sleep:energy')!
+    expect(relationshipPairsBackedByFrame(data.intelligence.frame, source)).toBe(true)
+    expect(relationshipPairsBackedByFrame(data.intelligence.frame, {
+      ...source, evidenceDates: [{ xDate: '2026-09-20', yDate: '2026-10-14' }],
+    })).toBe(false)
+    expect(relationshipPairsBackedByFrame(data.intelligence.frame, {
+      ...source, evidenceDates: [],
+    })).toBe(false)
+  })
+
   it('counts calendar-alignable lagged anchors without calling unpaired dates missed logs', () => {
     const same = Array.from({ length: 16 }, (_, i) => {
       const date = addCalendarDays('2026-09-20', i)
