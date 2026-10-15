@@ -216,8 +216,10 @@ function alignmentForWindow(input: {
   const sortedWeights = [...input.usedWeights].sort((a, b) => a.date.localeCompare(b.date))
   const first = sortedCalories[0] && sortedWeights[0]
     ? Math.abs(calendarDaysBetween(sortedCalories[0].date, sortedWeights[0].date)) : null
-  const last = sortedCalories.at(-1) && sortedWeights.at(-1)
-    ? Math.abs(calendarDaysBetween(sortedCalories.at(-1)!.date, sortedWeights.at(-1)!.date)) : null
+  const lastCalorie = sortedCalories[sortedCalories.length - 1]
+  const lastWeight = sortedWeights[sortedWeights.length - 1]
+  const last = lastCalorie && lastWeight
+    ? Math.abs(calendarDaysBetween(lastCalorie.date, lastWeight.date)) : null
   const midpoint = addCalendarDays(input.start, Math.floor(input.days / 2))
   const earlyWeights = sortedWeights.filter((item) => item.date < midpoint).length
   const lateWeights = sortedWeights.filter((item) => item.date >= midpoint).length
