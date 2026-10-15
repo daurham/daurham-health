@@ -22,13 +22,14 @@ function fakeDb(input: {
   let version = input.version ?? 0
   let report = input.report ?? null
   let savedRevision = input.savedRevision ?? revision
+  let savedFast = false
   const entries = input.entries ?? [{ calories: 1800, evidence_quality: 'measured_reference' }]
   const calls: Array<{ sql: string; args: unknown[] }> = []
   const query = vi.fn(async (sql: string, args: unknown[] = []) => {
     calls.push({ sql, args })
     if (sql === SOURCE_REVISION_SQL) return [{ revision }]
     if (sql.includes('SELECT owner_report, zero_intake_fast, entry_revision, version')) {
-      return report ? [{ owner_report: report, zero_intake_fast: false, entry_revision: savedRevision, version }] : []
+      return report ? [{ owner_report: report, zero_intake_fast: savedFast, entry_revision: savedRevision, version }] : []
     }
     if (sql.includes('SELECT e.calories, e.evidence_quality')) return entries
     if (sql.includes('SELECT EXISTS (SELECT 1 FROM data_quality_reviews')) {
@@ -40,6 +41,7 @@ function fakeDb(input: {
       if (args[4] === 0 && version !== 0) return []
       report = args[2] as 'complete' | 'partial' | 'unknown'
       savedRevision = revision
+      savedFast = args[3] === true
       version += 1
       return [{ date: args[0] }]
     }

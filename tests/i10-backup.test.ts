@@ -3,7 +3,7 @@ import { LATEST_SCHEMA_MIGRATION, backupTable } from '../server/backup/inventory
 
 describe('I10 backup contract', () => {
   it('advances the schema head and keeps structured clinical profile context portable', () => {
-    expect(LATEST_SCHEMA_MIGRATION).toBe('0052_hydration_daily_goal.sql')
+    expect(LATEST_SCHEMA_MIGRATION).toBe('0053_nutrition_day_completeness.sql')
     const profile = backupTable('health_profile')
     expect(profile).toMatchObject({ backupClass: 'canonical', portable: true })
     expect(profile?.columns.map((column) => column.name)).toEqual(expect.arrayContaining([
