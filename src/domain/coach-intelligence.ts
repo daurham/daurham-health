@@ -50,6 +50,28 @@ function trainingEvidenceForOpportunity(control: GoalControlState, opportunityId
  */
 export type CoachNutritionEvidence = GoalControlNutritionQuality
 
+/** Data absence is a limitation, not confidence in a health decline. */
+export type CoachEvidenceGap = {
+  kind: 'missing_signal' | 'unresolved_goal' | 'limited_cross_domain'
+  limitationCode: string
+  period: { start: string; end: string }
+  explanation: string
+}
+
+function evidenceGapForLimitation(limitation: GoalControlLimitation, control: GoalControlState): CoachEvidenceGap {
+  const kind = limitation.code.startsWith('missing:') ? 'missing_signal'
+    : limitation.code.startsWith('goal_unknown:') ? 'unresolved_goal'
+      : 'limited_cross_domain'
+  return {
+    kind, limitationCode: limitation.code, period: { ...control.period },
+    explanation: kind === 'missing_signal'
+      ? 'The relevant signal is unavailable or incomplete. This does not prove worse sleep, recovery, or a negative change.'
+      : kind === 'unresolved_goal'
+        ? 'This goal cannot yet be evaluated from current evidence. Unknown does not mean failed or abandoned.'
+        : 'Available cross-domain evidence is too limited for a reliable change/no-change conclusion.',
+  }
+}
+
 function recentNutritionEvidence(control: GoalControlState): CoachNutritionEvidence {
   return { ...control.nutritionQuality, period: { ...control.nutritionQuality.period } }
 }
@@ -67,6 +89,7 @@ export type CoachRecommendationDraft = {
   evidenceExplanation?: MaintenanceEvidenceExplanation
   trainingEvidence?: CoachTrainingEvidence
   nutritionEvidence?: CoachNutritionEvidence
+  evidenceGap?: CoachEvidenceGap
   evidenceRefs: string[]
   priority: number
   experimentEligible: boolean
@@ -98,6 +121,7 @@ export type CoachRecommendationView = {
   evidenceExplanation?: MaintenanceEvidenceExplanation
   trainingEvidence?: CoachTrainingEvidence
   nutritionEvidence?: CoachNutritionEvidence
+  evidenceGap?: CoachEvidenceGap
   evidenceRefs: string[]
   responseState: CoachRecommendationResponse | null
   /** Opaque exact DB response timestamp; null means never responded. */
@@ -294,8 +318,10 @@ function limitationDraft(limitation: GoalControlLimitation, control: GoalControl
     detail: limitation.text,
     actionText: 'Add context',
     detailPath: limitation.detailPath,
-    confidence: nutrition ? (control.nutritionQuality.state === 'unknown' ? 'unknown' : 'limited') : control.confidence,
-    ...(nutrition ? { nutritionEvidence: recentNutritionEvidence(control) } : {}),
+    confidence: nutrition ? (control.nutritionQuality.state === 'unknown' ? 'unknown' : 'limited')
+      : limitation.code.startsWith('missing:') || goal ? 'unknown' : 'limited',
+    ...(nutrition ? { nutritionEvidence: recentNutritionEvidence(control) }
+      : { evidenceGap: evidenceGapForLimitation(limitation, control) }),
     evidenceRefs: [`limitation:${limitation.code}`],
     priority: 60,
     experimentEligible: false,

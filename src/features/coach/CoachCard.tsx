@@ -455,6 +455,18 @@ export function CoachIntelligencePanel({
             <article key={item.id} className="rounded-lg bg-zinc-50 p-2.5">
               <p className="text-sm font-semibold text-zinc-900">{item.title}</p>
               <p className="mt-1 text-xs leading-relaxed text-zinc-600">{item.detail}</p>
+              {item.evidenceGap ? (
+                <details className="mt-2 rounded-md border border-zinc-200 bg-white px-2.5 py-2">
+                  <summary className="cursor-pointer text-xs font-medium text-zinc-700">
+                    Why this context is needed · {item.confidence} confidence in available evidence
+                  </summary>
+                  <div className="mt-2 space-y-1 border-t border-zinc-100 pt-2 text-xs leading-relaxed text-zinc-600">
+                    <p>Goal Control assessment: {item.evidenceGap.period.start} to {item.evidenceGap.period.end}.</p>
+                    <p>{item.evidenceGap.explanation}</p>
+                    <p>This is a request to review missing context, not evidence that a health outcome occurred or a reason to change a target.</p>
+                  </div>
+                </details>
+              ) : null}
               {item.nutritionEvidence ? (
                 <details className="mt-2 rounded-md border border-zinc-200 bg-white px-2.5 py-2">
                   <summary className="cursor-pointer text-xs font-medium text-zinc-700">

@@ -1162,3 +1162,16 @@ HAVING COUNT(*) > 1;
 **Tests:** Synthetic high overall confidence vs limited/unknown nutrition, exact counts and no zero/complete inference in server-rendered Coach UI, presence on both qualified plateau levers without bypassing their safety floor, and context token invalidation as quality evidence changes. No migration, new owner medical facts, provider/model calls, edits to actual owner data, or main/prod changes.
 
 **Still open:** Clinical/statistical calibration of confidence, general source provenance and missingness explanation across other signals and Ask Health, canonical/raw-event revision guarantees, authenticated owner QA, and the owner-approved production preflight and unapplied migration `0054`.
+
+
+## PIQ-1.6 — Missing Recovery and Goal evidence is unknown, not high-confidence (2026-10-15)
+
+**State:** Bounded PIQ work-branch patch, awaiting full CI and authenticated owner/mobile acceptance. **0/9 phases owner-accepted.**
+
+**Failure:** Coach's `improve_evidence` cards were correctly scoped for missing nutrition but could still display globally high confidence for missing sleep, wellness/recovery and unresolved active goals. That misleadingly implied a well-supported finding from absent measurements.
+
+**Contract:** The absence of an eligible sleep or wellness signal, or the inability to evaluate a goal, now gives that evidence-gap card `unknown` confidence instead of borrowing aggregate Goal Control confidence. A generic limited cross-domain evidence warning is `limited`. Existing nutrition-specific reliable-day thresholds and display stay unchanged. Non-nutrition cards carry a bounded reason code, Goal Control assessment period and explicit data-absence explanation, shown behind a disclosure. Missing measurements do **not** imply worsened sleep, failed goals, completed actions, or a need to change targets. The evidence-gap explanation participates in non-calorie context revision hashing, so a materially changed explanation invalidates a stale owner response. No canon health profile change or invented source count.
+
+**Tests:** Synthetic high global confidence with missing sleep; unresolved goal not characterized as failed; generic limited cross-domain evidence; precise assessment period; no fabricated nutrition coverage; saved response context changes with evidence detail. No migration, Gemini call, owner-data modification, `main` merge or deployment.
+
+**Remaining PIQ-1.6:** Demonstrate calibration of confidence grades and source-window provenance for recovery and other comparative insights; attach real source event metadata when present rather than inventing it; authenticated mobile UX; canonical revision guarantee for raw edits. Existing migration `0054` remains unapplied and owner-gated.

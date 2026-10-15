@@ -385,3 +385,8 @@ Coach now attributes Training progression confidence to the exact matching exerc
 ## 2026-10-15 PIQ-1.6 Nutrition evidence scope — work branch
 
 Added Coach disclosure using bounded seven-completed-day nutrition-quality counts already computed by Goal Control. Evidence-gap cards no longer borrow global confidence; numerically gated plateau options expose the same coverage without changing gating. Context revisions include the displayed evidence. Tests cover high-versus-limited/unknown conflict, exact counts, no zero-intake inference, and stale-count invalidation. Branch only; no production migration, merge, provider call or owner-record change. Release gates: full CI, authenticated device validation, migration `0054` preflight.
+
+
+## 2026-10-15 PIQ-1.6 recovery/goal missingness confidence — work branch
+
+A missing Recovery sensor/check-in or unknown active Goal no longer inherits global high confidence on a Coach evidence-gap card. Coach displays a source-specific missingness explanation and derived assessment period, explicitly declining to interpret unknown as deterioration or failure. Non-calorie context tokens include the displayed explanation. Regression tests cover sleep, goal, generic weak evidence, and stale-context fingerprints. No schema/provider/owner/prod changes. Release gates remain in `docs/ai/PIQ_PROGRESS.md`.

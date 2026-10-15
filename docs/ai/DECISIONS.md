@@ -688,3 +688,8 @@ Use the matching primary Training progression series, identified by exact `train
 ## Decision: nutrition entry coverage is not day-completeness confidence (PIQ-1.6, 2026-10-15)
 
 For Coach nutrition-evidence advice, display source-window evidence from the existing Goal Control nutrition-quality gate: logged days, explicitly owner-confirmed complete/source-reliable days, estimate-heavy and unknown-quality days, and minimum thresholds. Classify an evidence-gap card as `limited` or `unknown` even when aggregate Goal confidence is high. Never convert a recorded entry, legacy import, missing day, or unverified day into proof of complete/zero intake. Explain the recent 7-day safety floor separately from the longer maintenance-estimation window. Keep advice observational and do not change canonical data or calorie-adjustment eligibility.
+
+
+## Decision: absence of Recovery/Goal evidence is not a high-confidence signal (PIQ-1.6, 2026-10-15)
+
+A request to fill a missing sleep, wellness or goal-evaluation gap cannot inherit global Goal Control `high` confidence. Mark missing-signal/unknown-goal evidence confidence as `unknown`, and generic cross-domain insufficiency as `limited`; show only the known limitation and actual Goal Control period. Do not infer a decline, failure, compliance, or need for new treatment from absent data. Preserve existing nutrition-quality confidence, independent Maintenance/Training attribution and all owner-start safeguards. Include displayed gap details in context revisions so old tabs cannot silently accept changed rationale.
