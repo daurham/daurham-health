@@ -103,6 +103,7 @@ function completeSeries(input: {
       quality: input.bodyQuality ?? 'usual',
       provenance: 'owner',
     }))
+    if (offset >= 21) observations.push(obs('wellness.energy', date, 4, { provenance: 'owner' }))
   }
   return observations
 }
@@ -156,6 +157,7 @@ describe('I7 observed maintenance estimator', () => {
       intelligence: snapshot(completeSeries({ intake: 2100, weightDeltaPerDay: 0 })),
       contexts: [],
       weightGoal: loseGoal(),
+      adjustmentContext: { status: 'available', currentCalorieTarget: 2200, activeExperimentCount: 0 },
     })
     expect(state.estimate.state).toBe('available')
     expect(state.estimate.observedMaintenanceKcal).toBe(2100)
@@ -166,6 +168,7 @@ describe('I7 observed maintenance estimator', () => {
     expect(Math.abs(intake?.suggestedDeltaKcal ?? 0)).toBeGreaterThanOrEqual(100)
     expect(Math.abs(intake?.suggestedDeltaKcal ?? 0)).toBeLessThanOrEqual(250)
     expect(intake?.detail).toContain('not an automatic target change')
+    expect(state.calorieAdjustmentSafety.status).toBe('review_possible')
   })
 
   it('treats the same flat evidence as stability when there is no unmet directional weight goal', () => {
