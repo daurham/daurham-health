@@ -12,6 +12,7 @@ const dates = Array.from({ length: 28 }, (_, i) => addCalendarDays('2026-09-17',
 const recent = dates.slice(-7)
 const target: MaintenanceAdjustmentContext = {
   status: 'available', currentCalorieTarget: 2400, activeExperimentCount: 0,
+  revisionStatus: 'consistent', decisionRevision: 'test-current-revision',
   performance: { status: 'available', asOf: TODAY, decliningExercises: [], competingGoals: [] },
 }
 function observation(
