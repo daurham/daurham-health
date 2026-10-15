@@ -255,12 +255,38 @@ Next bounded work: strengthen synthetic owner-question outcome assessments and t
 
 Stop expanding test counts for their own sake. Next, pursue runtime verification using authorized read-only deployment and schema access, gather limited owner-approved real-question scoring in a private process, and **prepare PIQ-1.1's nutrition day-completeness implementation contract in parallel**. Do not deploy changes, alter calorie targets, or mark PIQ-0 exited while the runtime and acceptance gates remain unknown. PIQ-8 stays deferred.
 
+## PIQ-1.1 preparation checkpoint — separated nutrition source quality from whole-day completeness (CI validated)
+
+**Implementation commit:** `f5abecc69c7ca8c10af84cb5db148e1729769089`  
+**Validation:** [GitHub Actions 38681257864](https://github.com/daurham/daurham-health/actions/runs/38681257864) — **PASSED** npm ci, TypeScript, ESLint, full Vitest and production build.
+
+**Scope:** PIQ-0 remains ACTIVE, with runtime/owner acceptance unverified. PIQ-1.1 has begun as **branch-only safe domain preparation**, not a completed PIQ-1 phase. No production deployment, migration, data mutation, AI charge or live calorie-target change.
+
+### Verified problem and code delivered
+
+- `src/domain/nutrition/quality.ts` previously labeled precise entries high confidence. `server/intelligence/snapshot.ts` propagated this to daily calorie signals, and `src/domain/maintenance.ts` did not distinguish whole-day completeness.
+- New pure `src/domain/nutrition/day-completeness.ts` separates owner-reported `confirmed_complete | partial | unknown` (with future `probably_complete` reserved but **never automatically inferred**) from existing source accuracy. Confirmation is bound to an opaque canonical entry revision; changed/missing revision makes it stale. Same local-day and future records stay provisional. Excluded/AI-heavy/unknown-source/zero-intake-fast days cannot silently feed a high-reliability maintenance-calorie estimate. No old day is auto-confirmed.
+- New `tests/piq1-nutrition-day-completeness.test.ts`: **15** synthetic cases for one-meal and multiple-meal logs, explicit confirmation/partial/unknown, edits, current day, fast, unknown source, exclusions, stale revision, and distinct coverage counters.
+- New `tests/piq1-maintenance-eligibility-baseline.test.ts`: **3** tests using the actual existing maintenance engine plus a **test-only strict filtering simulation**. Verified: 28 precise one-meal 600-kcal days may produce an observed maintenance estimate; flat-weight one-meal 1400-kcal days can trigger a recommended calorie-cut review. Supplying a strict owner-completeness gate in the fixture withholds these unsupported estimates and recommendation. This is a **confirmed current product risk**, not a deployed fix.
+- CI caught a distinction bug: legacy `unknown` source calories were initially flagged as zero intake. Corrected to classify using **total logged calories** before source-quality checks; final green CI verifies this.
+- New durable [PIQ-1.1 implementation contract](./PIQ_1_1_NUTRITION_COMPLETENESS_CONTRACT.md) specifies proposed owner-scoped day records, atomic revision checks, explicit fast reporting, historical unknown defaults, UI changes, and maintenance/Coach/Goal Control integration gates.
+
+### Still required for PIQ-1.1 implementation
+
+1. Verify production Neon schema and deployed version (PIQ-0 runtime blockers remain); test any migration with a safe branch before production.
+2. Implement persisted per-day owner confirmation, deterministic revision across nutrition CRUD plus analysis exclusions, authenticated API with stale-update 409, and a low-friction owner correction/undo UI.
+3. Wire the gate into the **actual** maintenance and downstream Coach/Goal Control computation only when canonical confirmation is read reliably. Test that no prior day silently counts as confirmed and a one-meal day can no longer cause unsupported calorie adjustment.
+4. Validate current-day/local timezone rollover, late imports, fast days, partial source coverage, edits, medical safety constraints, owner mobile QA and release gate.
+5. Do not change target calories automatically or deploy/merge to main while production readiness is unknown.
+
+**Phase scoreboard:** PIQ-0 ACTIVE / not exited. PIQ-1 PREPARATION STARTED / not implemented end-to-end. PIQ-2..7 not started. PIQ-8 deferred. **0 / 9 completed**.
+
 ## Release state / constraints
 
 - Branch-only preparation: **no production deployments, database migrations, schema changes, AI API calls, or owner data writes performed by this PIQ work**.
 - The Vercel connector's project discovery succeeding does not imply deployment inspection permission.
 - A future phase may use read-only owner-authorized database/project access; never apply migrations merely to satisfy a baseline document.
-- Branch CI for latest implementation: **success** — Actions run `38680233032` on `11bf5e0`, all standard checks passed. Documentation-only commits do not imply new code validation.
+- Branch CI for latest implementation: **success** — Actions run `38681257864` on `f5abecc`, all standard checks passed. Documentation-only commits do not imply new code validation.
 
 ## Continuation packet — NEXT SESSION
 
