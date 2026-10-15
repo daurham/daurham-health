@@ -145,7 +145,8 @@ export async function explainAskHealth(input: {
     throw new HttpError(503, FAILURE, undefined, 'ASK_HEALTH_USAGE_GATE')
   }
   if (!decision.ok) {
-    throw new HttpError(429, decision.reason === 'budget' ? BUDGET : RATE)
+    throw new HttpError(429, decision.reason === 'budget' ? BUDGET : RATE, undefined,
+      decision.reason === 'budget' ? 'ASK_HEALTH_BUDGET_EXCEEDED' : 'ASK_HEALTH_RATE_LIMIT')
   }
   if (decision.cached) {
     return {
