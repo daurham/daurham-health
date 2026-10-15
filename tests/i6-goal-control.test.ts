@@ -235,6 +235,8 @@ describe('I6 Goal Control authority', () => {
       trainingPlan: {
         configured: true,
         completedProgrammedSessions: 1,
+        qualifiedTrainingDays: 1,
+        todayQualified: false,
         weeklyFrequencyTarget: 3,
         todayIntent: 'rest',
         todayRoutineName: 'Routine B',
@@ -245,13 +247,13 @@ describe('I6 Goal Control authority', () => {
       state: 'rest_day_on_track',
       remainingSessions: 2,
     })
-    expect(state.trainingAdherence.detail).toContain('not a planned Training day')
+    expect(state.trainingAdherence.detail).toContain('Today is an open day')
     expect(dailyTrainingQuestAllowed({ configured: true, todayIntent: 'rest' })).toBe(false)
     expect(dailyTrainingQuestAllowed({ configured: true, todayIntent: 'active_recovery' })).toBe(false)
     expect(dailyTrainingQuestAllowed({ configured: true, todayIntent: 'training_moved_here' })).toBe(true)
   })
 
-  it('asks for a plan review when remaining programmed sessions no longer fit the planned week', () => {
+  it('describes a flexible week rather than missing required programmed sessions', () => {
     const state = buildGoalControlState({
       asOf: AS_OF,
       brief: brief(),
@@ -260,14 +262,16 @@ describe('I6 Goal Control authority', () => {
       trainingPlan: {
         configured: true,
         completedProgrammedSessions: 0,
+        qualifiedTrainingDays: 0,
+        todayQualified: false,
         weeklyFrequencyTarget: 3,
         todayIntent: 'rest',
         todayRoutineName: 'Routine A',
         futureTrainingDates: ['2026-10-10'],
       },
     })
-    expect(state.trainingAdherence.state).toBe('schedule_review')
-    expect(state.trainingAdherence.detail).toContain('Review the plan')
+    expect(state.trainingAdherence.state).toBe('flexible_week')
+    expect(state.trainingAdherence.detail).toContain('no workout is marked missed')
   })
 
   it('only surfaces sufficiently mature personal relationships relevant to active goals', () => {
@@ -324,6 +328,8 @@ describe('I6 Weekly Coach / Coach alignment rules', () => {
       trainingPlan: {
         configured: true,
         completedProgrammedSessions: 1,
+        qualifiedTrainingDays: 1,
+        todayQualified: false,
         weeklyFrequencyTarget: 3,
         todayIntent: 'rest',
         todayRoutineName: 'Routine B',
@@ -337,6 +343,8 @@ describe('I6 Weekly Coach / Coach alignment rules', () => {
       trainingPlan: {
         configured: true,
         completedProgrammedSessions: 1,
+        qualifiedTrainingDays: 1,
+        todayQualified: false,
         weeklyFrequencyTarget: 3,
         todayIntent: 'training_preferred',
         todayRoutineName: 'Routine B',
