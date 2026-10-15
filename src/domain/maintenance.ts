@@ -785,7 +785,7 @@ function roundTo25(value: number): number {
 /**
  * Screening BEFORE offering any downward-calorie change. This is a
  * conservative decision gate, not a diagnosis, metabolic minimum, or
- * instruction to update targets. Missing source/check-in data never
+ * instruction to change calorie targets. Missing source/check-in data never
  * establishes safety.
  */
 export function calorieAdjustmentSafety(
