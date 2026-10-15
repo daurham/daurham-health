@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   isCalorieDecisionKind,
+  keepNonCompetingCalorieDrafts,
+  POSSIBLE_PLATEAU_RESPONSE_GROUP,
   keepCurrentCoachFollowUps,
   storedCoachRecommendationIsCurrent,
   recommendationIsSuppressed,
@@ -120,5 +122,23 @@ describe('PIQ-1.2 stale Coach recommendation lifecycle, synthetic saved rows', (
     expect(recommendationIsSuppressed(memory, '2026-10-15')).toBe(false)
     expect(recommendationIsSuppressed({ ...memory, responseState: 'not_relevant' }, '2026-10-15')).toBe(true)
     expect(recommendationIsSuppressed({ ...memory, responseState: 'not_now', suppressUntil: '2026-10-22' }, '2026-10-15')).toBe(true)
+  })
+})
+
+describe('PIQ-1.5 plateau options are one pending decision group', () => {
+  const drafts = [
+    { kind: 'review_intake_adjustment', fingerprint: intake },
+    { kind: 'review_activity_adjustment', fingerprint: activity },
+    { kind: 'training_progression', fingerprint: 'coach:i9:training:bench' },
+    { kind: 'improve_evidence', fingerprint: 'coach:i9:evidence:fiber' },
+  ]
+  it('uses an explicit plateau group identifier, not a blanket domain-wide ban', () => {
+    expect(POSSIBLE_PLATEAU_RESPONSE_GROUP).toBe('possible_plateau_response')
+    expect(keepNonCompetingCalorieDrafts(drafts, false)).toEqual(drafts)
+  })
+  it('hides both calorie and activity levers while either is active, retaining unrelated tasks', () => {
+    expect(keepNonCompetingCalorieDrafts(drafts, true)).toEqual(drafts.slice(2))
+    expect(keepNonCompetingCalorieDrafts([{ kind: 'training_progression' }], true))
+      .toEqual([{ kind: 'training_progression' }])
   })
 })

@@ -9,6 +9,8 @@ import {
   isCalorieDecisionKind,
   storedCoachRecommendationIsCurrent,
   keepCurrentCoachFollowUps,
+  keepNonCompetingCalorieDrafts,
+  POSSIBLE_PLATEAU_RESPONSE_GROUP,
   recommendationIsSuppressed,
   type CoachFollowUpQuestion,
   type CoachIntelligenceState,
@@ -134,7 +136,9 @@ export async function surfaceDraft(sql: Sql, draft: CoachRecommendationDraft, as
       JSON.stringify(draft.evidenceRefs),
       asOf,
       JSON.stringify({ sourceId: draft.sourceId, experimentEligible: draft.experimentEligible,
-        ...(isCalorieDecisionKind(draft.kind) ? { decisionRevision: decisionRevision ?? null } : {}) }),
+        ...(isCalorieDecisionKind(draft.kind)
+          ? { decisionGroup: POSSIBLE_PLATEAU_RESPONSE_GROUP, decisionRevision: decisionRevision ?? null }
+          : {}) }),
     ],
   )) as RecommendationRow[]
   const row = rows[0]
@@ -234,6 +238,26 @@ export async function dueFollowUps(
   ) as RecommendationRow[]
 }
 
+/** One active (started, not yet evaluated) choice per current plateau
+ * decision revision. Old revisions or review-only legacy rows do not block a
+ * fresh, qualified decision; neither is reclassified or erased.
+ */
+export async function activeCalorieDecisionInRevision(sql: Sql, revision: string | null | undefined): Promise<boolean> {
+  if (!revision || !/^[a-f0-9]{32}$/.test(revision)) return false
+  const rows = await sql.query(
+    `SELECT id::text AS id
+       FROM coach_recommendations
+      WHERE recommendation_kind IN ('review_intake_adjustment', 'review_activity_adjustment')
+        AND response_state = 'do_this'
+        AND metadata ->> 'ownerStarted' = 'true'
+        AND metadata ->> 'decisionRevision' = $1::text
+        AND outcome_state IS NULL
+      LIMIT 1`,
+    [revision],
+  )
+  return rows.length > 0
+}
+
 async function recentQuestion(sql: Sql, asOf: string): Promise<RecommendationRow | null> {
   const since = addCalendarDays(asOf, -(COACH_QUESTION_BUDGET_DAYS - 1))
   const rows = (await sql.query(
@@ -281,8 +305,12 @@ export async function loadCoachIntelligenceState(asOf: string): Promise<CoachInt
     ? await isMaintenanceDecisionRevisionCurrent(asOf, control.maintenance?.decisionRevision)
     : true
   const currentDrafts = keepCurrentCalorieDecisionDrafts(visible, currentRevision)
+  const activePlateauDecision = currentRevision &&
+    currentDrafts.some((draft) => isCalorieDecisionKind(draft.kind)) &&
+    await activeCalorieDecisionInRevision(sql, control.maintenance?.decisionRevision)
+  const actionableDrafts = keepNonCompetingCalorieDrafts(currentDrafts, activePlateauDecision)
   const surfaced: CoachRecommendationView[] = []
-  for (const draft of currentDrafts) {
+  for (const draft of actionableDrafts) {
     const row = await surfaceDraft(sql, draft, asOf, control.maintenance?.decisionRevision ?? null)
     surfaced.push(recommendationView(row, draft, asOf))
   }
@@ -437,11 +465,25 @@ export async function writeCoachRecommendationResponse(
             updated_at = now()
       WHERE id = $1::uuid
         AND response_at::text IS NOT DISTINCT FROM $5::text
+        AND (
+          $2::text <> 'do_this'
+          OR coach_recommendations.recommendation_kind NOT IN ('review_intake_adjustment', 'review_activity_adjustment')
+          OR NOT EXISTS (
+            SELECT 1
+              FROM coach_recommendations AS competing
+             WHERE competing.id <> coach_recommendations.id
+               AND competing.recommendation_kind IN ('review_intake_adjustment', 'review_activity_adjustment')
+               AND competing.response_state = 'do_this'
+               AND competing.metadata ->> 'ownerStarted' = 'true'
+               AND competing.outcome_state IS NULL
+               AND competing.metadata ->> 'decisionRevision' = coach_recommendations.metadata ->> 'decisionRevision'
+          )
+        )
       RETURNING id::text AS id`,
     [id, response, suppressUntil, followUpOn, expectedResponseAt],
   ).then((changed) => {
     if (changed.length !== 1) {
-      throw new HttpError(409, 'This Coach decision changed in another tab. Reopen Coach to review its latest state.')
+      throw new HttpError(409, 'This Coach decision changed or a competing plateau option is already active. Reopen Coach to review the latest state.')
     }
   })
 }

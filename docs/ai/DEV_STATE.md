@@ -350,3 +350,8 @@ Coach response mutation now requires the server-rendered `expectedResponseAt` an
 ## 2026-10-15 PIQ-1.5 outcome concurrency guard — work branch
 
 Coach follow-ups now carry the original exact SQL response revision. Recording an outcome requires that revision, an explicitly owner-started recommendation, an elapsed review date, and no prior outcome in one conditional PostgreSQL UPDATE. Conflicts show a refreshed Coach state. No schema, provider or production changes. Automated and mobile acceptance gates tracked in `docs/ai/PIQ_PROGRESS.md`.
+
+
+## 2026-10-15 PIQ-1.5 plateau option grouping — work branch
+
+Intake and activity adjustments now share the named `possible_plateau_response` decision group. A same-revision, owner-started, unevaluated option prevents competing cards from surfacing and blocks sequential conflicting starts in the response SQL. Older revisions and legacy Review clicks do not count. Tests include disposable PostgreSQL rollback. Remaining strict concurrency, device and Neon validation gates: `docs/ai/PIQ_PROGRESS.md`. No promotion or migration.

@@ -296,8 +296,20 @@ export function keepCurrentCalorieDecisionDrafts<T extends { kind: string }>(
  * settings revision AND its complete contemporary evidence still qualify.
  * Legacy rows lack this metadata and are therefore never silently upgraded.
  */
+export const POSSIBLE_PLATEAU_RESPONSE_GROUP = 'possible_plateau_response' as const
+
 export function isCalorieDecisionKind(kind: string): boolean {
   return kind === 'review_intake_adjustment' || kind === 'review_activity_adjustment'
+}
+
+/** A started calorie lever and an activity lever belong to one decision,
+ * not two simultaneous prescriptions. Historical owner memory is untouched.
+ */
+export function keepNonCompetingCalorieDrafts<T extends { kind: string }>(
+  drafts: readonly T[],
+  activeGroup: boolean,
+): T[] {
+  return activeGroup ? drafts.filter((draft) => !isCalorieDecisionKind(draft.kind)) : [...drafts]
 }
 
 export function storedCoachRecommendationIsCurrent(

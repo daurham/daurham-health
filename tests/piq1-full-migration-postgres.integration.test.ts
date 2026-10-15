@@ -6,7 +6,7 @@ import { LATEST_SCHEMA_MIGRATION, backupTable } from '../server/backup/inventory
 import { buildBackupArchive, restoreStatements, verifyBackupArchive, planRestore, type BackupRow } from '../server/backup/format.js'
 import { getNutritionDayCompleteness, saveNutritionDayCompleteness } from '../server/nutrition/day-completeness.js'
 import { readMaintenanceDecisionSnapshot, isMaintenanceDecisionRevisionCurrent } from '../server/intelligence/maintenance-revision.js'
-import { dueFollowUps, requireCurrentCalorieRecommendation, surfaceDraft, writeCoachRecommendationResponse, writeCoachRecommendationOutcome } from '../server/intelligence/coach-intelligence.js'
+import { activeCalorieDecisionInRevision, dueFollowUps, requireCurrentCalorieRecommendation, surfaceDraft, writeCoachRecommendationResponse, writeCoachRecommendationOutcome } from '../server/intelligence/coach-intelligence.js'
 import { randomUUID } from 'node:crypto'
 import { PERFORMED_STRENGTH_EXERCISES_SQL } from '../server/training/plan-service.js'
 import { buildTrainingWeekQualification, buildTrainingRoutineCredits, type PerformedExerciseEvidence } from '../src/domain/training-qualification.js'
@@ -386,6 +386,50 @@ describe.skipIf(!url)('PIQ-1.1 full 0001–0053 migration-chain and backup on is
       expect(saved.rows[0].response_state).toBe('do_this')
       expect(saved.rows[0].outcome_state).toBe('no_change')
       expect(saved.rows[0].metadata.ownerStarted).toBe(true)
+    } finally {
+      await client.query('ROLLBACK')
+    }
+  })
+
+  it('PIQ-1.5: one active plateau option blocks a second start in the same decision revision', async () => {
+    await client.query('BEGIN')
+    try {
+      const revision = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+      const otherRevision = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
+      const makeDraft = (kind: 'review_intake_adjustment' | 'review_activity_adjustment') => ({
+        fingerprint: 'coach:piq:plateau:' + kind + ':' + randomUUID(),
+        sourceId: 'maintenance:' + kind,
+        kind, domain: 'nutrition',
+        title: kind === 'review_intake_adjustment' ? 'Review intake' : 'Review activity',
+        detail: 'Choose one lever.', actionText: 'Review', detailPath: '/nutrition',
+        confidence: 'moderate' as const, evidenceRefs: ['maintenance:estimate'],
+        priority: 80, experimentEligible: true,
+      })
+      const intake = await surfaceDraft(adapter, makeDraft('review_intake_adjustment'), today, revision)
+      const activity = await surfaceDraft(adapter, makeDraft('review_activity_adjustment'), today, revision)
+      expect(await activeCalorieDecisionInRevision(adapter, revision)).toBe(false)
+      await writeCoachRecommendationResponse(adapter, activity.id, 'do_this', today, async () => undefined, true, null)
+      expect(await activeCalorieDecisionInRevision(adapter, revision)).toBe(true)
+      expect(await activeCalorieDecisionInRevision(adapter, otherRevision)).toBe(false)
+      await expect(writeCoachRecommendationResponse(
+        adapter, intake.id, 'do_this', today, async () => undefined, true, null,
+      )).rejects.toMatchObject({ statusCode: 409 })
+      const rejected = await client.query(
+        'SELECT response_state, response_at FROM coach_recommendations WHERE id = $1::uuid',
+        [intake.id],
+      )
+      expect(rejected.rows[0]).toEqual({ response_state: null, response_at: null })
+      await client.query(
+        "UPDATE coach_recommendations SET outcome_state = 'helped' WHERE id = $1::uuid", [activity.id],
+      )
+      expect(await activeCalorieDecisionInRevision(adapter, revision)).toBe(false)
+      await writeCoachRecommendationResponse(adapter, intake.id, 'do_this', today, async () => undefined, true, null)
+      const accepted = await client.query(
+        'SELECT response_state, metadata FROM coach_recommendations WHERE id = $1::uuid', [intake.id],
+      )
+      expect(accepted.rows[0].response_state).toBe('do_this')
+      expect(accepted.rows[0].metadata.ownerStarted).toBe(true)
+      expect(accepted.rows[0].metadata.decisionGroup).toBe('possible_plateau_response')
     } finally {
       await client.query('ROLLBACK')
     }

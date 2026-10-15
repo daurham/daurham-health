@@ -653,3 +653,8 @@ An owner reviewing Coach advice in multiple tabs must not lose one decision to a
 ## Decision: outcome feedback belongs to one verified owner-started response version (PIQ-1.5, 2026-10-15)
 
 An outcome is not a mutable global label on a recommendation ID. It refers to one explicitly reported start and cannot survive a newer owner decision, a pending review window, a duplicate feedback submission, or a stale background view. Require an exact server response timestamp precondition and atomic SQL predicates `response_state='do_this'`, `metadata.ownerStarted=true`, `outcome_state IS NULL`, and due-date eligibility. A failed predicate is an HTTP 409 conflict, not implied success; missing precondition is HTTP 428. Preserve historical record unchanged until the owner makes a valid decision. CI and authenticated device/Neon QA remain mandatory prior to release.
+
+
+## Decision: one active plateau lever per decision revision (PIQ-1.5, 2026-10-15)
+
+Treat intake changes and activity changes in a plausible plateau as alternatives in the same `possible_plateau_response` group rather than independent action cards. Hide both while a genuine acknowledged start within the same current maintenance-decision revision is awaiting evaluation; allow unrelated training or evidence actions. Sequential competing starts must return 409 without altering saved responses. An old revision, legacy Review without `ownerStarted`, or assessed outcome does not constitute an active conflict. Keep all historical owner records; the surfacing operation remains advisory. The initial SQL anti-join does not guarantee mutual exclusion of simultaneous cross-row writes; a hard DB invariant is a separate release prerequisite.
