@@ -418,16 +418,43 @@ Stop expanding test counts for their own sake. Next, pursue runtime verification
 
 **Next bounded implementation:** audit direct weekly nutrition/Coach decisions for complete-day assumptions; propagate a conservative completeness coverage label where needed, not a guessed confirmation. Then run isolated full-migration and backup/restore checks before any promotion. Never automatically lower calorie targets from unknown/partial days.
 
+
+## PIQ-1.1 Weekly Coach confirmed-day intake comparisons (branch code validated, 2026-10-14)
+
+**Implementation:** 4bde2e70a7f7e03290d430e91fac79c096aab2b2.
+**Full application CI:** https://github.com/daurham/daurham-health/actions/runs/38692728349 — SUCCESS (npm ci, TypeScript, lint, full Vitest, production build).
+**Isolated PostgreSQL 16:** https://github.com/daurham/daurham-health/actions/runs/38692728356 — SUCCESS (representative migration replay and real SQL including new Weekly Coach correction scenario).
+
+### Verified improvements
+
+- Previously Weekly Coach compared calorie averages on *logged days* without knowing whether all food was recorded. Even 14 one-meal days could look like a real full-day intake trend.
+- Weekly Coach now labels the average as **logged intake, not necessarily all intake**, and only compares weeks when BOTH periods have enough **owner-confirmed, source-reliable, current-revision complete days**. Comparison values are recomputed solely from those dates; no adjustment to calories is recommended from the comparison itself.
+- The weekly loader reuses a single set-based verified-day SQL query and cross-checks exact sorted food IDs and calorie totals against the already loaded canonical Nutrition entries. Food edits, extra or missing entries, stale confirmations, missing schema, DB errors and missing owner-local today fail closed (no verified days; no intake comparison). This does not add AI calls or per-day database round trips.
+- The weekly input schema accepts optional verified day dates; absent input means unverified, preserving demo/test usage without promoting older partial logs.
+- Six synthetic tests in tests/piq1-weekly-completeness.test.ts cover unconfirmed one-meal weeks, one confirmed week only, two sufficiently confirmed weeks, insufficient confirmed days, mismatched calories/IDs and new or duplicate food entries.
+- A real PostgreSQL regression in tests/piq1-nutrition-postgres.integration.test.ts verifies an unconfirmed day is excluded, confirmation admits the date, edits invalidate it, reconfirmation does not validate stale preloaded logs, and today remains excluded.
+- Initial integration test failed due to a test-only split TypeScript assertion; repaired and the above two final workflows passed completely. No product source or SQL expectations were relaxed.
+
+### Remaining strict boundaries
+
+- An owner report does not independently prove actual total intake; the comparison is grounded in the reported and source-revision-verified logs, not measured energy consumption.
+- Weekly Coach now has explicit incomplete-intake semantics; independent Health AI, proactive insights and other non-Maintenance nutrition claims need separate audits.
+- **No main merge, live Vercel deployment, production Neon migration 0053, owner health data use, provider spend or calorie-target mutation by this work.** Branch-only.
+- Only representative isolated PostgreSQL migrations were replayed. Full migration-chain/backup-restore and Neon production identity/performance remain unverified.
+- **0/9 PIQ phases accepted.** PIQ-0 still open (production and real owner acceptance); PIQ-1.1 domain, owner-auth API/UI, Maintenance-derived Goal Control and Weekly Coach protection are code-validated on feature branch, not owner-live accepted.
+
+**Next bounded task:** verify full migration compatibility and backup/restore on isolated PostgreSQL, then preview mobile owner-confirmation flow when runtime access is authorized; audit independent Health AI/insight food-inference claims. Do not promote to main before actual production schema and release gates are confirmed.
+
 ## Release state / constraints
 
 - Branch-only preparation: **no production deployments, database migrations, schema changes, AI API calls, or owner data writes performed by this PIQ work**.
 - The Vercel connector's project discovery succeeding does not imply deployment inspection permission.
 - A future phase may use read-only owner-authorized database/project access; never apply migrations merely to satisfy a baseline document.
-- Latest implementation checks: isolated PostgreSQL [38691337101] SUCCESS and full branch CI [38691336913] SUCCESS on `ef4fbca`; documentation-only pushes do not imply new product validation.
+- Latest substantive implementation checks: isolated PostgreSQL run 38692728356 SUCCESS and full branch validation run 38692728349 SUCCESS on 4bde2e7; documentation-only commits do not imply a new code validation.
 
 ## Continuation packet — NEXT SESSION
 
-**Task:** PIQ-1.1 next action: use the verified isolated PostgreSQL foundation to implement a set-based read-time verified day-completeness eligibility manifest, then branch-only Maintenance/Coach/Goal Control gating with the 28-day single-meal T03 regression. Continue to verify full schema replay/backup and live production scope before any promotion or migration.
+**Task:** PIQ-1.1: validate isolated full migration-chain and backup/restore, owner preview/mobile confirmation flow, and remaining independent Health AI/insight nutrition assertions. Maintenance/Goal Control and Weekly Coach already have branch-tested fail-closed intake gates; do not merge or apply migration 0053 until production schema and owner release gates are verified.
 
 **First steps:** Read master §§0–6 + PIQ-0 + §§17–21; inspect this file; verify current main/feature branch, production status, CI and schema. Try authorized Vercel project scope and Neon lookup only if access exists. Reconcile `CURRENT_TASK.md` drift once the verified production state is available. Confirm the baseline contract is still aligned with owner's purpose.
 
