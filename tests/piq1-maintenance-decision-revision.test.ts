@@ -19,7 +19,7 @@ const checkedPerformance = {
   status: 'available' as const, asOf: AS_OF, decliningExercises: [], competingGoals: [],
 }
 const settings: MaintenanceAdjustmentContext = {
-  status: 'available', currentCalorieTarget: 2500, activeExperimentCount: 0,
+  status: 'available', currentCalorieTarget: 2450, activeExperimentCount: 0,
   revisionStatus: 'consistent', decisionRevision: REV_A, performance: checkedPerformance,
   physiology: { status: 'available', asOf: AS_OF, ageYears: 31, heightCm: 178, activeOrUncertainConditionCount: 0 },
 }
