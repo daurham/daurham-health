@@ -668,3 +668,8 @@ The response-level `NOT EXISTS` check is insufficient for two truly concurrent w
 ## Decision: non-calorie saved actions require live relevance, past starts remain historical (PIQ-1.5, 2026-10-15)
 
 A stale non-calorie recommendation ID does not authorize a new `do_this`, `not_now`, or `not_relevant` response once its matching current kind/fingerprint disappears. Recompute the bounded current draft set before the write and fail with 409 instead of inventing ongoing relevance. Do not retrospectively delete a genuine `ownerStarted` record: outcome reporting for an earlier owner-started action is distinct from current advice, so explicitly label a no-longer-current non-calorie follow-up as historical rather than recommending renewed action. Calorie revisions retain stricter exclusion. No new schema or production writes.
+
+
+## Decision: non-calorie recommendation ID is not its evidence version (PIQ-1.5, 2026-10-15)
+
+Do not accept owner decisions against a recommendation solely because its stable ID and kind are still present. For non-calorie advice, compute an opaque owner-facing context revision from the current Health day/period, visible draft and relevant derived evidence; require exact matching client context on any response. Missing context is 428; stale context is 409, with a fresh Coach read and no automatic acknowledgement. Unrelated domain data should not invalidate Training unnecessarily. Existing numerical calorie revision logic remains separate. This is an optimistic derived-state check, not a raw event-ledger revision or serializable evidence lock, and must not be called complete canonical source versioning. No migration or production release is authorized.

@@ -365,3 +365,8 @@ Prepared migration `0054_coach_plateau_active_unique.sql`, schema inventory and 
 ## 2026-10-15 PIQ-1.5 non-calorie stale advice and historical follow-ups
 
 Added a live saved-ID kind+fingerprint guard on non-calorie recommendation response writes and a historical-state marker on due non-calorie follow-ups whose original recommendation no longer qualifies today. Historical results stay reportable, not implicitly recommended or overwritten. Tests, build and owner QA remain release gates; no production mutation.
+
+
+## 2026-10-15 PIQ-1.5 non-calorie context tokens — branch only
+
+Non-calorie Coach cards now include `contextRevision`, a domain-bounded SHA-256 of the displayed advice plus current derived Goal Control evidence/date. The client carries it on response; the server recomputes current evidence and returns 428/409 on missing/stale tokens before accepting owner decisions. Numerical calorie decisions retain their existing safety and revision contract. No schema changes or production writes. Tests and limits: `docs/ai/PIQ_PROGRESS.md`.

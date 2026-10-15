@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import {
   COACH_INTELLIGENCE_VERSION,
   COACH_QUESTION_BUDGET_DAYS,
@@ -21,6 +21,7 @@ import {
   type CoachRecommendationResponse,
   type CoachRecommendationView,
 } from '../../src/domain/coach-intelligence.js'
+import type { GoalControlState } from '../../src/domain/goal-control.js'
 import { addCalendarDays } from '../../src/domain/training-plan.js'
 import { getSql, type Sql } from '../db.js'
 import { HttpError } from '../http.js'
@@ -70,6 +71,45 @@ const ROW_COLUMNS = `
   outcome_at,
   metadata
 `
+
+/** Hash the exact owner-facing card plus its relevant Goal Control evidence.
+ * This is an optimistic decision-context token, not a substitute for the
+ * canonical data revision, an owner acknowledgement or a serializable read.
+ * Keep unrelated domains out of the source context to reduce false staleness.
+ */
+export function coachRecommendationContextRevision(
+  draft: CoachRecommendationDraft,
+  control: GoalControlState,
+): string {
+  const evidence = draft.domain === 'training'
+    ? { progression: control.trainingProgression, adherence: control.trainingAdherence }
+    : draft.kind === 'improve_evidence'
+      ? {
+          nutritionQuality: control.nutritionQuality,
+          limitations: control.limitations.filter((item) => draft.evidenceRefs.includes(`limitation:${item.code}`)),
+        }
+      : draft.domain === 'goals'
+        ? { goals: control.goals, primaryOpportunity: control.primaryOpportunity }
+        : draft.domain === 'nutrition'
+          ? { nutritionQuality: control.nutritionQuality, maintenance: control.maintenance }
+          : { primaryOpportunity: control.primaryOpportunity, relationships: control.relationships, limitations: control.limitations }
+  return createHash('sha256').update(JSON.stringify({
+    version: 'coach-context-v1',
+    asOf: control.asOf,
+    period: control.period,
+    fingerprint: draft.fingerprint,
+    kind: draft.kind,
+    domain: draft.domain,
+    title: draft.title,
+    detail: draft.detail,
+    actionText: draft.actionText,
+    detailPath: draft.detailPath,
+    confidence: draft.confidence,
+    evidenceRefs: draft.evidenceRefs,
+    evidenceExplanation: draft.evidenceExplanation ?? null,
+    evidence,
+  })).digest('hex')
+}
 
 function recordMemory(row: RecommendationRow): CoachRecommendationMemory {
   return {
@@ -312,7 +352,12 @@ export async function loadCoachIntelligenceState(asOf: string): Promise<CoachInt
   const surfaced: CoachRecommendationView[] = []
   for (const draft of actionableDrafts) {
     const row = await surfaceDraft(sql, draft, asOf, control.maintenance?.decisionRevision ?? null)
-    surfaced.push(recommendationView(row, draft, asOf))
+    surfaced.push({
+      ...recommendationView(row, draft, asOf),
+      ...(!isCalorieDecisionKind(draft.kind)
+        ? { contextRevision: coachRecommendationContextRevision(draft, control) }
+        : {}),
+    })
   }
 
   let question: CoachFollowUpQuestion | null = null
@@ -427,12 +472,27 @@ export async function requireCurrentNonCalorieRecommendation(
   row: Pick<RecommendationRow, 'recommendation_kind' | 'fingerprint'>,
   asOf: string,
   currentDrafts?: readonly CoachRecommendationDraft[],
+  expectedContextRevision?: string,
+  controlOverride?: GoalControlState,
 ): Promise<void> {
   if (isCalorieDecisionKind(row.recommendation_kind)) return
-  const drafts = currentDrafts ?? buildCoachRecommendationDrafts(await loadGoalControlState(asOf))
-  if (!drafts.some((draft) =>
-    draft.fingerprint === row.fingerprint && draft.kind === row.recommendation_kind)) {
+  const control = controlOverride ?? (currentDrafts ? null : await loadGoalControlState(asOf))
+  const drafts = currentDrafts ?? buildCoachRecommendationDrafts(control!)
+  const current = drafts.find((draft) =>
+    draft.fingerprint === row.fingerprint && draft.kind === row.recommendation_kind)
+  if (!current) {
     throw new HttpError(409, 'This Coach recommendation is no longer supported by current evidence. Reopen Coach to review the latest assessment.')
+  }
+  // Existing isolated eligibility callers may omit this optional assertion;
+  // real response endpoints always request a current context token.
+  if (expectedContextRevision !== undefined) {
+    if (!/^[a-f0-9]{64}$/.test(expectedContextRevision)) {
+      throw new HttpError(428, 'This Coach card needs a current evidence revision. Reopen Coach and review the latest recommendation.')
+    }
+    const liveControl = control ?? controlOverride ?? await loadGoalControlState(asOf)
+    if (coachRecommendationContextRevision(current, liveControl) !== expectedContextRevision) {
+      throw new HttpError(409, 'The evidence behind this Coach recommendation has changed. Reopen Coach before deciding.')
+    }
   }
 }
 
@@ -532,13 +592,18 @@ export async function respondCoachRecommendation(
   asOf: string,
   ownerStarted = false,
   expectedResponseAt?: string | null,
+  expectedContextRevision?: string,
 ): Promise<CoachIntelligenceState> {
   const sql = await getSql()
   await writeCoachRecommendationResponse(
     sql, id, response, asOf,
     async (row) => {
       await requireCurrentCalorieRecommendation(row, asOf)
-      await requireCurrentNonCalorieRecommendation(row, asOf)
+      if (!isCalorieDecisionKind(row.recommendation_kind) &&
+          (typeof expectedContextRevision !== 'string' || !/^[a-f0-9]{64}$/.test(expectedContextRevision))) {
+        throw new HttpError(428, 'This Coach card needs a current evidence revision. Reopen Coach and review the latest recommendation.')
+      }
+      await requireCurrentNonCalorieRecommendation(row, asOf, undefined, expectedContextRevision)
     },
     ownerStarted,
     expectedResponseAt,

@@ -42,7 +42,7 @@ describe('PIQ-1.5 historical Coach context', () => {
     const server = readFileSync('server/intelligence/coach-intelligence.ts', 'utf8')
     const response = server.slice(server.indexOf('export async function respondCoachRecommendation('))
     expect(response).toContain('await requireCurrentCalorieRecommendation(row, asOf)')
-    expect(response).toContain('await requireCurrentNonCalorieRecommendation(row, asOf)')
+    expect(response).toContain('await requireCurrentNonCalorieRecommendation(row, asOf, undefined, expectedContextRevision)')
     expect(server).toContain('historical: !validFingerprints.has(row.fingerprint)')
   })
 

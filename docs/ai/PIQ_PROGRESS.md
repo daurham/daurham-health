@@ -1106,3 +1106,18 @@ HAVING COUNT(*) > 1;
 **Bounded contract:** At response time, all non-calorie saved IDs must still be present by **both exact fingerprint and kind** in the newly computed current `buildCoachRecommendationDrafts(loadGoalControlState(asOf))`; otherwise return 409 without writing owner memory. Calorie decisions retain their existing stronger live-revision guard. Historical `do_this` acknowledgments are never erased; a due non-calorie follow-up whose saved fingerprint no longer appears in today's drafts is marked `historical`. The UI clearly says the earlier suggestion is no longer in the current recommendations, and asks only about what actually happened—not to restart it. Current follow-ups remain unchanged. No schema migration, provider call, inferred adherence or production mutation.
 
 **Boundary:** An unchanged recommendation fingerprint does not currently identify every semantic change in source evidence; future context-versioned fingerprints and richer supersession are outstanding. A live eligibility check immediately before a saved-ID write is an optimistic guard, not a serializable lock on independent evidence imports. Owner mobile/Neon authenticated tests are mandatory before release.
+
+
+## PIQ-1.5 — Non-calorie evidence-context response revision (2026-10-15)
+
+**State:** Bounded PIQ work-branch implementation awaiting independent full CI and owner authenticated testing. **PIQ phases owner-accepted: 0/9.**
+
+**Failure covered:** An unchanged recommendation kind/fingerprint could survive new Training or Goal Control evidence even when its rationale or underlying progression changed. The previous saved-ID eligibility check verified the same *recommendation*, but an old open browser tab could still record "I started this" against a materially different evidence context.
+
+**Change:** Every displayed **non-calorie** Coach recommendation now carries opaque SHA-256 `contextRevision` derived from the current Health day/period, the exact owner-facing draft and a bounded, domain-relevant Goal Control evidence snapshot (Training progression/adherence, nutrition quality and matching evidence gap, relevant goals, or relationships). All non-calorie response POSTs send `expectedContextRevision`. The server recomputes fresh Goal Control, still verifies saved kind+fingerprint, then returns 428 for missing/malformed context or 409 for changed evidence **before the response SQL UPDATE**. The current client already handles 409/428 by re-reading Coach without claiming owner acknowledgement. Existing calorie advice keeps its stronger maintenance safety/evidence revision gate and its independent PostgreSQL response-time CAS. No DB migration, provider calls or live data mutation.
+
+**Tests:** Pure revision determinism; changed progression under identical recommendation ID/title; stale day; unrelated nutrition change not invalidating Training; exact kind/fingerprint qualification; client/server propagation. CI and authenticated two-tab/iOS behavior remain release gates.
+
+**Caveats:** This is a deterministic fingerprint of *currently derived Goal Control evidence*, **not** a canonical revision of every raw Training/Nutrition/Goal record. An underlying raw edit that does not change any included derived value may leave the token unchanged. Re-reading Goal Control before the update is optimistic rather than a lock over simultaneous external imports. Do not claim fully general evidence versioning or an implemented/adhered intervention. Next: assess owner-effectiveness and real canonical source invalidation evidence before closing PIQ-1.5.
+
+**No production changes:** Branch-only; migration `0054` remains unapplied and requires owner-approved preflight; no merge to `main`.

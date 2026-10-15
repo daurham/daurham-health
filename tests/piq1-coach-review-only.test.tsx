@@ -114,8 +114,8 @@ describe('PIQ-1.5 viewing advice is not an intervention', () => {
   it('the client only sends ownerStarted for an explicit start', () => {
     const api = readFileSync('src/features/coach/api.ts', 'utf8')
     const handler = readFileSync('server/handlers/coach-intelligence.ts', 'utf8')
-    expect(api).toContain("{ response, ownerStarted: true, expectedResponseAt }")
-    expect(api).toContain("{ response, expectedResponseAt }")
+    expect(api).toContain("{ response, ownerStarted: true, expectedResponseAt, expectedContextRevision }")
+    expect(api).toContain("{ response, expectedResponseAt, expectedContextRevision }")
     expect(handler).toContain("response, date, body.ownerStarted === true")
     expect(handler).toContain("hasOwnProperty.call(body, 'expectedResponseAt')")
   })

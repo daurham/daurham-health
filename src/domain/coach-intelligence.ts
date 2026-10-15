@@ -65,6 +65,8 @@ export type CoachRecommendationView = {
   responseState: CoachRecommendationResponse | null
   /** Opaque exact DB response timestamp; null means never responded. */
   responseAt: string | null
+  /** Opaque version of the non-calorie advice and relevant evidence. */
+  contextRevision?: string
   experimentEligible: boolean
 }
 

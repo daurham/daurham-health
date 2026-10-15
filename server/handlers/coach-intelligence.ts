@@ -57,7 +57,8 @@ async function handleCoachIntelligence(req: ApiRequest, res: ApiResponse) {
       return
     }
     sendJson(res, 200, await respondCoachRecommendation(route.id, response, date, body.ownerStarted === true,
-      Object.prototype.hasOwnProperty.call(body, 'expectedResponseAt') ? body.expectedResponseAt as string | null : undefined))
+      Object.prototype.hasOwnProperty.call(body, 'expectedResponseAt') ? body.expectedResponseAt as string | null : undefined,
+      typeof body.expectedContextRevision === 'string' ? body.expectedContextRevision : undefined))
     return
   }
   const outcome = typeof body.outcome === 'string' ? body.outcome as CoachRecommendationOutcome : null

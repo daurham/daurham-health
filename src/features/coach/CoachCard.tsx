@@ -274,7 +274,7 @@ export function CoachCard({ state, pending, error, onState }: {
     setActionError(null)
     setNotice(null)
     try {
-      const next = await respondCoachRecommendation(item.id, response, item.responseAt)
+      const next = await respondCoachRecommendation(item.id, response, item.responseAt, item.contextRevision)
       setIntelligence(next)
       if (response === 'do_this') {
         setNotice('Marked as started. Coach will ask how it went after seven days.')
