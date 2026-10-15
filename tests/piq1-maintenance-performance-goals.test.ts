@@ -187,8 +187,7 @@ describe('PIQ-1.2 calorie-cut safety honors canonical training and active goals'
 
   it('provisional dates cannot revive an otherwise stale training decline', () => {
     const performance = evidence({ dates: ['2026-09-01', '2026-09-08', '2026-09-15', AS_OF] })
-    expect(performance.decliningExercises).toEqual(['Bench Press'])
-    // The latest actual completed-day training record must be non-provisional;
-    // detection of a same-day event is not permission to use it in a prior-day decision.
+    expect(performance.decliningExercises).toEqual([])
+    // Same-day exercise is provisional for previous-completed-day cut advice.
   })
 })
