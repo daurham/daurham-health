@@ -1,6 +1,7 @@
 import { activityRangeSummary, type ActivityMetricSummary } from '../activity/analytics.js'
 import { goalNeedsWeeklyAttention } from '../goal-control.js'
 import { buildTrainingProgressSummary } from '../training-progress-summary.js'
+import { weekStartMonday } from '../training-plan.js'
 import { ACTIVITY_SHORT_TERM_MIN_OBSERVED, ACTIVITY_TIMEZONE } from '../activity/config.js'
 import { bodyWeightTrend } from '../progress/body-trend.js'
 import { addCalendarDays } from '../progress/dates.js'
@@ -282,15 +283,26 @@ function trainingFacts(input: WeeklyCoachInput, period: WeeklyPeriod): DomainBit
     counts.set(session.sessionType, (counts.get(session.sessionType) ?? 0) + 1)
   }
   const mix = [...counts.entries()].sort(([left], [right]) => left.localeCompare(right)).map(([type, count]) => `${count} ${type.replace('_', ' ')}`)
+  const progress = buildTrainingProgressSummary(input.trainingPlan)
+  const week = weekStartMonday(input.asOf)
+  const qualificationFact: WeeklyFactLine[] = progress.configured ? [{
+    id: 'fact:training:qualified-days',
+    domain: 'training',
+    text: progress.qualifiedTrainingDays == null
+      ? 'Current Training-week qualified-day evidence is unavailable; recorded session counts cannot substitute for it.'
+      : `Current Monday–Sunday Training target week (${week} through ${input.asOf}): ${progress.qualifiedTrainingDays}/${progress.weeklyTargetDays} qualified strength days. ${progress.completedProgrammedSessions} programmed session rows recorded separately; neither number means the same as the prior-seven-day session count.`,
+    detailPath: '/training/plan',
+  }] : []
   return {
-    substantive: sessions.length >= 1,
+    substantive: sessions.length >= 1 || (progress.qualifiedTrainingDays ?? 0) > 0,
     facts: [
       {
         id: 'fact:training:sessions',
         domain: 'training',
-        text: `${sessions.length} canonical Training ${sessions.length === 1 ? 'session' : 'sessions'}${mix.length ? ` (${mix.join(', ')})` : ''}.`,
+        text: `${sessions.length} recorded Training ${sessions.length === 1 ? 'session' : 'sessions'} in the previous seven completed days${mix.length ? ` (${mix.join(', ')})` : ''}. Session rows are not qualifying strength days.`,
         detailPath: '/training',
       },
+      ...qualificationFact,
     ],
   }
 }
