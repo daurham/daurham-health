@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { PIQ_GOLDEN_CASES } from './fixtures/piq/golden-cases.ts'
 
@@ -7,6 +8,7 @@ import { PIQ_GOLDEN_CASES } from './fixtures/piq/golden-cases.ts'
 describe('PIQ-0 golden evaluation registry integrity', () => {
   it('has unique stable case references to the master plan', () => {
     const ids = PIQ_GOLDEN_CASES.map((entry) => entry.id)
+    expect(ids).toHaveLength(50)
     expect(ids).toHaveLength(new Set(ids).size)
     expect(ids.every((id) => /^T\d{2}$/.test(id))).toBe(true)
   })
@@ -30,5 +32,21 @@ describe('PIQ-0 golden evaluation registry integrity', () => {
         expect(clause.trim().length).toBeGreaterThan(8)
       }
     }
+  })
+
+  it('keeps all 50 golden scenarios identical to the master contract', () => {
+    const source = readFileSync('docs/ai/HEALTH_INTELLIGENCE_QUALITY_MASTER_PLAN.md', 'utf8')
+    const segments = [...source.matchAll(/^## (T\\d{2})\\. ([^\\n]+)\\n([\\s\\S]*?)(?=^## T\\d{2}\\.|^### 17\\.1)/gm)]
+    expect(segments).toHaveLength(50)
+    for (const [, id, title, body] of segments) {
+      const found = PIQ_GOLDEN_CASES.find((item) => item.id === id)
+      const field = (key: string) => body!.match(new RegExp('^\\*\\*' + key + ':\\*\\* (.+), 'm'))?.[1]?.trim()
+      expect(found?.title, id).toBe(title)
+      expect(found?.trigger, id).toBe(field('Input') ?? field('Given'))
+      expect(found?.must, id).toEqual([field('Must')])
+      expect(found?.mustNot, id).toEqual([field('Must NOT')])
+    }
+    expect(PIQ_GOLDEN_CASES.find((x) => x.id === 'T45')?.title).toContain('Simultaneous interventions')
+    expect(PIQ_GOLDEN_CASES.find((x) => x.id === 'T50')?.title).toContain('Midnight')
   })
 })
