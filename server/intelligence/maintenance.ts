@@ -6,7 +6,8 @@ import { currentHealthDate } from '../health-time.js'
 import { listGoals } from '../goals/service.js'
 import { loadHealthIntelligenceSnapshot } from './snapshot.js'
 import { loadVerifiedNutritionDays } from '../nutrition/maintenance-eligibility.js'
-import { getSql } from '../db.js'
+import { readMaintenanceDecisionSnapshot } from './maintenance-revision.js'
+import { compareMaintenanceDecisionRevisions } from '../../src/domain/maintenance-revision.js'
 import { assessMaintenancePerformanceSafety } from '../../src/domain/maintenance-performance.js'
 import { loadTrainingProgressionState } from './training-progression.js'
 import type { TrainingProgressionState } from '../../src/domain/training-progression.js'
@@ -50,31 +51,14 @@ async function currentWeightGoal(
   }
 }
 
-/** One deterministic, read-only check. A failed query never means "no experiments". */
+/** The target/experiment payload shares the same single-statement goal revision. */
 export async function loadMaintenanceAdjustmentContext(asOf: string): Promise<MaintenanceAdjustmentContext> {
-  try {
-    const sql = await getSql()
-    const rows = await sql.query(
-      `SELECT
-         (SELECT calories_target FROM nutrition_targets
-           WHERE effective_from <= $1::date
-           ORDER BY effective_from DESC LIMIT 1) AS calorie_target,
-         (SELECT count(*)::int FROM experiments
-           WHERE status = 'active'
-              OR (status = 'scheduled' AND window_start <= $1::date + 14
-                  AND window_end >= $1::date)) AS experiment_count`,
-      [asOf],
-    ) as Array<{ calorie_target: number | string | null; experiment_count: number | string }>
-    const result = rows[0]
-    const experiments = Number(result?.experiment_count)
-    const current = result?.calorie_target == null ? null : Number(result.calorie_target)
-    if (!result || !Number.isSafeInteger(experiments) || experiments < 0 ||
-        (current != null && (!Number.isFinite(current) || current <= 0))) {
-      return { status: 'unavailable', currentCalorieTarget: null, activeExperimentCount: 0 }
-    }
-    return { status: 'available', currentCalorieTarget: current, activeExperimentCount: experiments }
-  } catch {
-    return { status: 'unavailable', currentCalorieTarget: null, activeExperimentCount: 0 }
+  const snapshot = await readMaintenanceDecisionSnapshot(asOf)
+  return {
+    status: snapshot.status,
+    currentCalorieTarget: snapshot.currentCalorieTarget,
+    activeExperimentCount: snapshot.activeExperimentCount,
+    decisionRevision: snapshot.revision,
   }
 }
 
@@ -88,7 +72,10 @@ export async function loadMaintenanceState(input: {
   const today = await currentHealthDate()
   const snapshot = input.snapshot ?? await loadHealthIntelligenceSnapshot({ range: '30d', asOf: input.asOf })
   const contextStart = addCalendarDays(input.asOf, -29)
-  const [contexts, listedGoals, training, eligibleNutritionDates, adjustmentContext] = await Promise.all([
+  // Bracket the independent Goal Control/Training/Nutrition reads with
+  // decision-setting revisions; a concurrent edit must fail closed.
+  const adjustmentContext = await loadMaintenanceAdjustmentContext(input.asOf)
+  const [contexts, listedGoals, training, eligibleNutritionDates] = await Promise.all([
     listDailyContexts(contextStart, input.asOf),
     input.listedGoals
       ? Promise.resolve(input.listedGoals)
@@ -96,8 +83,9 @@ export async function loadMaintenanceState(input: {
     (input.trainingProgressionPromise ?? loadTrainingProgressionState(input.asOf)).catch(() => null),
     // Database/source failures fail CLOSED, never to pre-PIQ source-quality-only behavior.
     loadVerifiedNutritionDays({ snapshot, asOf: input.asOf, today }).catch(() => new Set<string>()),
-    loadMaintenanceAdjustmentContext(input.asOf),
   ])
+  const fresh = await readMaintenanceDecisionSnapshot(input.asOf)
+  const revisionStatus = compareMaintenanceDecisionRevisions(adjustmentContext.decisionRevision, fresh.revision)
   const weightGoal = await currentWeightGoal(input.asOf, today, listedGoals)
   const performance = assessMaintenancePerformanceSafety({
     asOf: input.asOf,
@@ -114,6 +102,6 @@ export async function loadMaintenanceState(input: {
     contexts,
     weightGoal,
     eligibleNutritionDates,
-    adjustmentContext: { ...adjustmentContext, performance },
+    adjustmentContext: { ...adjustmentContext, performance, revisionStatus },
   })
 }
