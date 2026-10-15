@@ -30,11 +30,25 @@ export function dayCompletenessDisplay(day: NutritionCompletenessStatus) {
   return { label: 'Not reviewed', detail: 'Logged calories do not prove every meal was recorded.' }
 }
 
-function localEntriesKey(entries: readonly NutritionEntry[]): string {
-  return entries.map((entry) => [
-    entry.id, entry.updatedAt, entry.logDate, entry.servingQuantity,
-    entry.calories, entry.evidenceQuality,
-  ].join(':')).sort().join('|')
+/** Client-only invalidation key, not a canonical DB revision.
+ * Capture all nutrition fields whose edits can change the owner's day review.
+ * This key is never logged or sent to the server.
+ */
+export function localEntriesKey(entries: readonly NutritionEntry[]): string {
+  return JSON.stringify(entries.map((entry) => [
+    entry.id, entry.updatedAt, entry.logDate, entry.consumedAt,
+    entry.meal, entry.mealGroupId, entry.foodId, entry.foodName,
+    entry.brand, entry.servingQuantity, entry.servingUnit,
+    entry.grams, entry.calories, entry.protein, entry.carbs, entry.fat,
+    entry.fiber, entry.sodium, entry.evidenceQuality, entry.sourceKind,
+    entry.notes,
+  ]).sort((a, b) => String(a[0]).localeCompare(String(b[0]))))
+}
+
+export function isCurrentCompletenessView(
+  loadedForKey: string | null, currentKey: string,
+): boolean {
+  return loadedForKey != null && loadedForKey === currentKey
 }
 
 export function DayCompletenessCard({ date, today, entries }: {
@@ -43,7 +57,10 @@ export function DayCompletenessCard({ date, today, entries }: {
   entries: NutritionEntry[]
 }) {
   const entriesKey = useMemo(() => localEntriesKey(entries), [entries])
-  const [status, setStatus] = useState<NutritionCompletenessStatus | null>(null)
+  const [loadedStatus, setLoadedStatus] = useState<NutritionCompletenessStatus | null>(null)
+  const [loadedForKey, setLoadedForKey] = useState<string | null>(null)
+  const viewCurrent = isCurrentCompletenessView(loadedForKey, entriesKey)
+  const status = viewCurrent ? loadedStatus : null
   const [loading, setLoading] = useState(true)
   const [unavailable, setUnavailable] = useState(false)
   const [reviewOpen, setReviewOpen] = useState(false)
@@ -57,14 +74,18 @@ export function DayCompletenessCard({ date, today, entries }: {
   useEffect(() => {
     const request = ++requestVersion.current
     const abort = new AbortController()
-    setStatus(null)
+    setLoadedStatus(null)
+    setLoadedForKey(null)
     setLoading(true)
     setUnavailable(false)
     setSaving(false)
     setReviewOpen(false)
     void fetchNutritionDayCompleteness(date, abort.signal)
       .then((next) => {
-        if (requestVersion.current === request) setStatus(next)
+        if (requestVersion.current === request) {
+          setLoadedStatus(next)
+          setLoadedForKey(entriesKey)
+        }
       })
       .catch(() => {
         if (requestVersion.current === request && !abort.signal.aborted) setUnavailable(true)
@@ -86,7 +107,8 @@ export function DayCompletenessCard({ date, today, entries }: {
         expectedRevision: status.entryRevision, expectedVersion: status.version,
       })
       if (requestVersion.current !== request) return
-      setStatus(next)
+      setLoadedStatus(next)
+      setLoadedForKey(entriesKey)
       setReviewOpen(false)
       setNotice(null)
     } catch {
@@ -114,7 +136,9 @@ export function DayCompletenessCard({ date, today, entries }: {
             }}>{status.ownerReport ? 'Review' : 'Mark day'}</button>
           ) : null}
         </div>
-        {loading ? <p className="mt-2 text-xs text-zinc-500">Checking day review…</p> : null}
+        {loading || (!viewCurrent && !unavailable)
+          ? <p className="mt-2 text-xs text-zinc-500">Checking day review…</p>
+          : null}
         {!loading && unavailable ? (
           <div className="mt-2 flex items-center justify-between gap-2">
             <p className="text-xs text-zinc-600">Day review unavailable. Food logging still works.</p>
