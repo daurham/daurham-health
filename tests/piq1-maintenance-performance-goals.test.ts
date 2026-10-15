@@ -74,7 +74,8 @@ function maintenance(performance: ReturnType<typeof evidence>) {
   const state = buildMaintenanceState({
     asOf: AS_OF, today: AS_OF, intelligence, contexts: [], eligibleNutritionDates: new Set(dates),
     weightGoal: { goalId: 'weight', goalVersionId: 'weight-v1', label: 'Weight', targetState: 'unmet', direction: 'lose' },
-    adjustmentContext: { status: 'available', currentCalorieTarget: 2400, activeExperimentCount: 0, performance },
+    adjustmentContext: { status: 'available', currentCalorieTarget: 2400, activeExperimentCount: 0,
+      revisionStatus: 'consistent', decisionRevision: 'test-current-revision', performance },
   })
   return { intelligence, state }
 }
