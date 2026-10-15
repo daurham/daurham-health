@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
 import { addCalendarDays } from '../src/domain/training-plan.js'
 import { buildHealthIntelligenceSnapshot, type IntelligenceObservation } from '../src/domain/intelligence/shared.js'
-import { buildGoalControlState, type GoalControlState } from '../src/domain/goal-control.js'
+import { buildGoalControlState, relationshipDateClustering, type GoalControlState } from '../src/domain/goal-control.js'
 import type { WeeklyCoachBrief, WeeklyGoalSnapshot } from '../src/domain/weekly-coach/types.js'
 import { GoalControlCard } from '../src/features/goal-control/GoalControlCard.js'
 
@@ -60,6 +60,7 @@ describe('PIQ-1.6 paired relationship evidence is observational', () => {
       sourceWindow,
       pairedWindow: { start: '2026-09-20', end: '2026-10-05' },
       lagDays: 0, requiredPairs: 10,
+      dateClustering: { distinctDates: 16, contiguousRuns: 1, longestRunDays: 16 },
       sources: [
         { label: 'Sleep duration', observedDays: 16, eligibleDays: 28,
           provenance: { device: 16 }, confidence: 'moderate' },
@@ -76,6 +77,10 @@ describe('PIQ-1.6 paired relationship evidence is observational', () => {
     expect(html).toContain('reported strength: ')
     expect(html).toContain('statistical significance,')
     expect(html).toContain('a causal effect have not been established')
+    expect(html).toContain('Matched-date clustering: 16 distinct tracked dates')
+    expect(html).toContain('across 1 consecutive-day run')
+    expect(html).toContain('longest run 16 days')
+    expect(html).toContain('not independent trials')
     expect(html).toContain('screening minimum 10 pairs')
     expect(html).toContain('Source observation window: 2026-09-17 to 2026-10-14')
     expect(html).toContain('Matched dates: 2026-09-20 to 2026-10-05')
@@ -106,6 +111,36 @@ describe('PIQ-1.6 paired relationship evidence is observational', () => {
     expect(html).toContain('Spearman rank correlation (ρ): unavailable')
     expect(html).toContain('reported strength: unavailable')
     expect(html).not.toContain('NaN')
+  })
+
+  it('separates lagged pairs, repeated source dates and distant runs without claiming independent samples', () => {
+    const pairs = [
+      { xDate: '2026-09-20', yDate: '2026-09-21' },
+      { xDate: '2026-09-21', yDate: '2026-09-22' },
+      { xDate: '2026-09-21', yDate: '2026-09-22' },
+      { xDate: '2026-09-24', yDate: '2026-09-25' },
+      { xDate: '2026-09-26', yDate: '2026-09-27' },
+      { xDate: '2026-09-27', yDate: '2026-09-28' },
+    ]
+    expect(relationshipDateClustering(pairs)).toEqual({
+      distinctDates: 5, contiguousRuns: 3, longestRunDays: 2,
+    })
+    expect(relationshipDateClustering([])).toBeNull()
+    expect(relationshipDateClustering([{ xDate: 'not-a-date', yDate: '2026-09-22' }])).toBeNull()
+  })
+
+  it('keeps unavailable date-clustering evidence visibly unavailable, not zero or independent', () => {
+    const original = buildGoalControlState({ asOf, ...inputs(16) })
+    const updated: GoalControlState = {
+      ...original,
+      relationships: original.relationships.map((rel) => ({
+        ...rel, evidence: rel.evidence ? { ...rel.evidence, dateClustering: null } : undefined,
+      })),
+    }
+    const html = render(updated)
+    expect(html).toContain('Matched-date clustering is unavailable')
+    expect(html).not.toContain('0 distinct tracked dates')
+    expect(html).not.toContain('independent trials,')
   })
 
   it('reports unavailable provenance as unavailable, never invented zero-coverage evidence', () => {

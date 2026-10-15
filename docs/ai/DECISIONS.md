@@ -708,3 +708,8 @@ A high confidence grade computed from at least 14 paired dates is **not** high c
 ## Decision: count-based grade is not statistical confidence in a correlation (PIQ-1.6, 2026-10-15)
 
 Do not label the count-derived Health Intelligence relationship grade as general statistical certainty. Preserve the already-calculated original Spearman coefficient and magnitude separately from the count grade; disclose both next to source dates and matched-pair counts with explicit observational, significance and confounding limits. Missing or invalid coefficients are unavailable, not zero. No re-estimation, invented p-values, causal claims, or automatic owner action.
+
+
+## Decision: repeated daily pairs are not independent relationship trials (PIQ-1.6, 2026-10-15)
+
+Keep a Spearman correlation's existing signed coefficient and matched-pair-count grade explicitly separate from sampling independence or statistical confidence. For observational relationship explanations, disclose how original paired X-anchor dates cluster into contiguous calendar-day runs, using matched source dates without manufacturing missing observations. Deduplicate repeated anchors and do not count lagged target dates as new samples. Do not calculate or imply adjusted sample size, significance, causal impact or confidence improvement from these diagnostics. On missing/invalid dates, show unavailable. No changes to historical owner data, selection algorithm, canonical migrations or production.

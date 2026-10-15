@@ -89,6 +89,8 @@ export type GoalControlRelationship = {
     lagDays: number
     /** Original Spearman rank coefficient, separate from the count-based grade. */
     rho: number | null
+    /** Describes time clustering; not a statistical effective sample size. */
+    dateClustering: { distinctDates: number; contiguousRuns: number; longestRunDays: number } | null
     strength: 'weak' | 'moderate' | 'strong' | null
     /** Raw signal coverage, not necessarily the subset of paired dates. */
     sources: GoalControlEvidenceCoverage[]
@@ -316,6 +318,36 @@ function activeGoalSignalKeys(goals: readonly WeeklyGoalSnapshot[]): Set<Intelli
   return keys
 }
 
+/** Exact calendar-day grouping of the X-side dates for paired observations.
+ * A lagged Y date belongs to its matched X day, not an extra observation.
+ * Decline to report a pattern if any input date is malformed, rather than
+ * silently treating invalid dates as a measured gap. No inference of
+ * independence, significance or effective sample size is made here.
+ */
+export function relationshipDateClustering(
+  dates: readonly { xDate: string; yDate: string }[],
+): { distinctDates: number; contiguousRuns: number; longestRunDays: number } | null {
+  if (!dates.length || dates.some((item) =>
+    !/^\d{4}-\d{2}-\d{2}$/.test(item.xDate) ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(item.yDate))) return null
+  const uniqueDates = [...new Set(dates.map((item) => item.xDate))].sort()
+  let runs = 0
+  let currentRun = 0
+  let longest = 0
+  let previous: string | null = null
+  for (const date of uniqueDates) {
+    if (previous == null || addCalendarDays(previous, 1) !== date) {
+      runs += 1
+      currentRun = 1
+    } else {
+      currentRun += 1
+    }
+    longest = Math.max(longest, currentRun)
+    previous = date
+  }
+  return { distinctDates: uniqueDates.length, contiguousRuns: runs, longestRunDays: longest }
+}
+
 function relationshipsFor(
   snapshot: HealthIntelligenceSnapshot,
   goals: readonly WeeklyGoalSnapshot[],
@@ -355,6 +387,7 @@ function relationshipsFor(
           requiredPairs: item.requiredSampleSize,
           lagDays: item.lagDays,
           rho: typeof item.rho === 'number' && Number.isFinite(item.rho) && Math.abs(item.rho) <= 1 ? item.rho : null,
+          dateClustering: relationshipDateClustering(item.evidenceDates),
           strength: item.strength,
           sources,
         },

@@ -1216,3 +1216,16 @@ HAVING COUNT(*) > 1;
 **Verification:** Derived synthetic 16-pair evidence matches the original snapshot's coefficient/strength exactly; server-rendered UI shows the distinct count grade, signed rank coefficient and non-causality; missing coefficient renders unavailable; previously tested eight-pair nonqualification and missing provenance remain guarded. No new correlation algorithm, threshold/claim, health-record modification, Gemini/provider call, migration, `main` merge or production deployment.
 
 **Still open:** Formal statistical calibration and sensitivity to longitudinal trends, multiple comparisons/autocorrelation and incomplete observation, direct raw-source revision guarantees, owner iOS/mobile QA and release preflights. Migration `0054` remains unapplied and owner-gated.
+
+
+## PIQ-1.6 — Observed relationship date clustering and independence caveat (2026-10-15)
+
+**State:** Bounded, branch-only quality improvement; full GitHub CI and owner-authenticated mobile QA required. **0/9 phases owner-accepted.**
+
+**Gap:** An observational relationship with 16 daily paired records displayed a high matched-pair-count grade and a Spearman coefficient, but there was no indication that 16 adjacent days are part of one serially observed time series, not 16 independent experiments. A long contiguous sequence can share time trends or other correlated confounders.
+
+**Contract:** Keep the registered correlation calculation, selection thresholds, coefficient, strength, recorded source windows and confidence grade unchanged. Derive only a transparent date-spacing description from the original matched **X-side anchor dates**: count distinct dates, contiguous calendar-day runs and the longest run. Lagged Y-side dates do not create additional independent observations; repeated anchors count only once. No matched evidence or malformed dates return an unavailable pattern, not fabricated zero or a claim of independence. Goal Overview surfaces these numbers under the existing observational disclosure and states that serially recorded dates may be related, the pairs are not independent trials, and pair counts alone establish no statistical significance. This is not a p-value, effective sample size adjustment, trial result, causal analysis or evidence calibration.
+
+**Tests:** Derived 16-consecutive-date example preserves the original rho/strength and yields one contiguous run; synthetic gapped, duplicated and lagged anchor dates yield distinct run counts; malformed/missing date information is shown as unavailable. Rendering asserts the independent-trial caveat. No new schema, provider/Gemini calls, production writes, historical alterations or main merge.
+
+**Remaining:** Actually quantify temporal trend sensitivity/autocorrelation under a pre-reviewed statistical design; multiple-comparison selection bias, missingness-dependent observation selection, observed confounders and formal evidence calibration. Owner iOS QA and production schema/migration 0054 approval remain separate mandatory release gates.

@@ -125,6 +125,18 @@ export function GoalControlCard({
                       The coefficient describes recorded rank co-movement; statistical significance,
                       adjustment for confounders, and a causal effect have not been established.
                     </p>
+                    {item.evidence.dateClustering ? (
+                      <p className="mt-1">
+                        Matched-date clustering: {item.evidence.dateClustering.distinctDates} distinct tracked dates
+                        {' '}across {item.evidence.dateClustering.contiguousRuns} consecutive-day
+                        {' '}{item.evidence.dateClustering.contiguousRuns === 1 ? 'run' : 'runs'}
+                        {' '}(longest run {item.evidence.dateClustering.longestRunDays} days).
+                        Consecutive measurements may be serially related; these matched pairs are not
+                        independent trials, and the count does not establish statistical significance.
+                      </p>
+                    ) : (
+                      <p className="mt-1">Matched-date clustering is unavailable; independence cannot be inferred.</p>
+                    )}
                     <p className="mt-1">Source observation window: {item.evidence.sourceWindow.start} to {item.evidence.sourceWindow.end}.
                       {' '}Matched dates: {item.evidence.pairedWindow
                         ? `${item.evidence.pairedWindow.start} to ${item.evidence.pairedWindow.end}`
