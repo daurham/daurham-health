@@ -248,6 +248,18 @@ export function keepVisibleCoachDependencies(
   return drafts.filter((item) => item.kind !== 'review_activity_adjustment' || intakeParentVisible)
 }
 
+/** A stale settings revision never promotes a numerical calorie-change card.
+ * Keep unrelated coaching cards intact; strip the dependent activity alternative.
+ */
+export function keepCurrentCalorieDecisionDrafts<T extends { kind: string }>(
+  drafts: readonly T[],
+  revisionCurrent: boolean,
+): T[] {
+  if (revisionCurrent) return [...drafts]
+  return drafts.filter((item) =>
+    item.kind !== 'review_intake_adjustment' && item.kind !== 'review_activity_adjustment')
+}
+
 function questionForLimitation(limitation: GoalControlLimitation): Omit<CoachFollowUpQuestionDraft, 'fingerprint' | 'kind' | 'confidence' | 'evidenceRefs'> | null {
   if (!limitation.detailPath) return null
   if (limitation.code === 'nutrition_quality_floor') {
