@@ -1007,3 +1007,16 @@ The existing Data Quality reviewer loaded only once on mount. After a canonical 
 **Evidence:** SSR button/link tests and isolated SQL-service tests enforce review navigation, non-mutating experiment exploration, evidence-only rejection, and follow-up scheduling only for the actual started response. Full CI and human mobile/two-tab acceptance are separate gates. Legacy stored accepted rows are **not** silently relabeled as implemented; they remain pending provenance reconciliation.
 
 **Outstanding PIQ-1.5:** Formal recommendation state machine separating viewed/accepted/implemented, persisted dependency groups and supersession reasons, revisit idempotency/context fingerprints, historical follow-up copy and explicit owner outcome readiness; live state and owner QA. **Next:** green CI gate on this commit, then implement the next bounded persisted recommendation-lifecycle safeguard without moving `main`.
+
+
+## PIQ-1.5 — Explicit started provenance for follow-ups (2026-10-15)
+
+**State:** Implemented on dedicated work branch; full CI and owner QA pending. **0/9 PIQ phases owner-accepted.**
+
+**Problem:** Earlier "Review" button sent legacy `do_this`, scheduling a seven-day outcome question when the owner may have merely inspected advice. Changing the button alone would not fix already-saved rows or older cached clients.
+
+**Guard:** New owner action "I started this" sends explicit `ownerStarted: true`. The owner-authenticated service refuses unmarked `do_this` (400, no mutation). A successful marked start persists `metadata.ownerStarted=true` using the existing JSONB column; other responses clear that flag. The SQL due queue and outcome endpoint require the stored provenance; old `do_this` review-only records are *not* rewritten, do not qualify for follow-ups, and remain unverified. The follow-up says the owner **marked** action started, not that Health measured adherence. No migration, provider call, auto-edit, or production data touch.
+
+**Tests and evidence:** Added server mutation rejection, stored-marker SQL, due queue filter, and client/handler contract regressions in `tests/piq1-coach-review-only.test.tsx`. The preceding review/navigation fix is verified green in [CI 38787118162](https://github.com/daurham/daurham-health/actions/runs/38787118162). This provenance follow-up is in commit `ca1d6e707f50cd83f3c189b09f0c09fbe3d3e4e6` and requires independent CI and authenticated owner QA.
+
+**Still open:** Historical suppression rows might hide an otherwise-current recommendation even though provenance is unverified. Need a controlled reconciliation after deciding which past responses represent real starts, plus explicit accepted vs implemented semantics, versioned evidence context, dependency/supersession groups, idempotency/race checks, and real mobile/Neon release QA. Do not infer or fabricate old owner actions. **Next:** verify this commit's CI; assess read-only legacy suppression path and design a safe correction if tests support it.

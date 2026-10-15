@@ -330,3 +330,8 @@ The staged contract is in `docs/ai/H5_DRAFT.md` until promoted into `CURRENT_TAS
 ## 2026-10-15 PIQ-1.5 started vs reviewed guard (work branch)
 
 Read-only review of Coach advice and Lab experiment preview no longer create saved acceptance or seven-day follow-ups. Actionable recommendations expose a separately labeled "I started this" acknowledgement; evidence-only proposals cannot be started. Added server-side 409 guard for legacy/direct evidence-only `do_this` requests. No schema, provider, data or production changes; full CI / owner QA status is recorded in `PIQ_PROGRESS.md`. Branch `piq/00-baseline-20261014` remains isolated from `main`.
+
+
+## 2026-10-15 PIQ-1.5 explicit started provenance — branch only
+
+Owner "I started this" now sends `ownerStarted: true`, which is stored in existing Coach recommendation JSONB metadata. Old review-only `do_this` responses cannot trigger new follow-ups or outcomes, and older clients without the marker cannot create more. No schema/production/provider changes. Review-only navigation passed CI 38787118162; provenance commit `ca1d6e7` still has separate CI and mobile/browser acceptance gates. Continue from `docs/ai/PIQ_PROGRESS.md`.

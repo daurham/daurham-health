@@ -633,3 +633,8 @@ Stale request handling: every affected view must cancel/ignore older concurrent 
 ## Decision: Coach review is navigation; starting a change must be explicit (PIQ-1.5, 2026-10-15)
 
 A "Review" CTA must never call a response endpoint or schedule an owner outcome check. Its `actionText` navigates to evidence/settings; exploring the existing Lab handoff similarly does not assert an experiment was created. Only the separately labeled "I started this" acknowledgement sends existing `do_this` and schedules its seven-day follow-up. Evidence-only recommendations never qualify as started interventions, even through an old API client. This is an immediate false-commitment P0 fix, **not** the eventual formal viewed/accepted/implemented state machine; legacy response semantics and previously accepted records need review before full PIQ-1.5 acceptance. No new migration or automatic owner health change.
+
+
+## Decision: legacy Coach `do_this` is not proof an intervention began (PIQ-1.5, 2026-10-15)
+
+The former "Review" action set `response_state=do_this` without an actual owner intervention. Going forward, explicitly tapping "I started this" is the only client path supplying `ownerStarted: true`, and the service rejects unmarked `do_this` requests. The flag persists in existing JSONB metadata; only flagged responses qualify for due outcome prompts, which are phrased as owner-reported starts. Preserve legacy rows unchanged pending explicit safe reconciliation rather than backfilling claims of action or deleting owner response history. No migration or live data mutation; owner QA is required.
