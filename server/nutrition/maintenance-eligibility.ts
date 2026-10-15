@@ -80,12 +80,14 @@ export async function loadVerifiedNutritionDays(input: {
   snapshot: HealthIntelligenceSnapshot
   asOf: string
   today: string | null
+  /** Shared intelligence ranges can exceed Maintenance's trailing 30 days. */
+  startDate?: string
   sqlOverride?: Sql
 }): Promise<ReadonlySet<string>> {
   if (!input.today) return new Set<string>()
   const sql = input.sqlOverride ?? await getSql()
   const rows = await sql.query(VERIFIED_NUTRITION_DAYS_SQL, [
-    addCalendarDays(input.asOf, -29), input.asOf, input.today,
+    input.startDate ?? addCalendarDays(input.asOf, -29), input.asOf, input.today,
   ]) as Candidate[]
   return verifiedNutritionDaysFromRows(rows, input.snapshot)
 }
