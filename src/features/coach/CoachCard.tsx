@@ -459,7 +459,7 @@ export function CoachIntelligencePanel({
                     ] as const).map(([title, evidence]) => (
                       <div key={title}>
                         <dt className="text-xs font-semibold text-zinc-700">
-                          {title} · {evidence.status.replaceAll('_', ' ')}
+                          {title} · {evidence.status.replace(/_/g, ' ')}
                         </dt>
                         <dd className="mt-0.5 text-xs leading-relaxed text-zinc-600">{evidence.detail}</dd>
                       </div>
