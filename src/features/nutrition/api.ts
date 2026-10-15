@@ -47,6 +47,51 @@ export async function fetchNutritionDay(date: string, signal?: AbortSignal): Pro
   return parseOk(await healthFetch(`/api/nutrition/day?date=${encodeURIComponent(date)}`, { signal, cache: 'no-store' }))
 }
 
+export type NutritionCompletenessStatus = {
+  date: string
+  today: string
+  entryRevision: string
+  version: number
+  ownerReport: 'complete' | 'partial' | 'unknown' | null
+  quality: NutritionDayQuality
+  assessment: {
+    state: 'confirmed_complete' | 'probably_complete' | 'partial' | 'unknown'
+    eligibleForMaintenance: boolean
+    currentDayProvisional: boolean
+    confirmationStale: boolean
+    isExplicitZeroIntakeFast: boolean
+    reason: string
+    maintenanceExclusion: string | null
+  }
+}
+export type NutritionCompletenessReport = {
+  date: string
+  ownerReport: 'complete' | 'partial' | 'unknown'
+  zeroIntakeFast: boolean
+  expectedRevision: string
+  expectedVersion: number
+}
+export async function fetchNutritionDayCompleteness(
+  date: string, signal?: AbortSignal,
+): Promise<NutritionCompletenessStatus> {
+  const payload = await parseOk<{ day: NutritionCompletenessStatus }>(
+    await healthFetch('/api/nutrition/day/completeness?date=' + encodeURIComponent(date),
+      { cache: 'no-store', signal }),
+  )
+  return payload.day
+}
+export async function saveNutritionDayCompleteness(
+  input: NutritionCompletenessReport,
+): Promise<NutritionCompletenessStatus> {
+  const payload = await parseOk<{ day: NutritionCompletenessStatus }>(
+    await healthFetch('/api/nutrition/day/completeness', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    }),
+  )
+  return payload.day
+}
+
 export async function searchNutritionFoods(query: string, signal?: AbortSignal): Promise<NutritionFood[]> {
   const params = new URLSearchParams()
   if (query.trim().length > 0) {

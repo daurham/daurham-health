@@ -31,6 +31,7 @@ import {
   fetchPendingNutritionCaptures,
   type NutritionDayPayload,
 } from './api'
+import { DayCompletenessCard } from './DayCompletenessCard'
 import { LabelCaptureSheet } from './LabelCapture'
 import { MealCaptureSheet } from './MealCapture'
 import {
@@ -406,6 +407,7 @@ export function NutritionPage() {
           <div className="page-enter grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-[minmax(0,1fr)_22rem] md:items-start">
             <aside className="min-w-0 space-y-4 md:order-2 md:sticky md:top-4">
               <SummaryCard day={day} onSetTargets={() => setPanel({ kind: 'targets' })} />
+              <DayCompletenessCard key={date} date={date} today={today} entries={day.entries} />
               <QuickAddCard recents={day.quickAdd.recents} onAdd={() => setPanel({ kind: 'add' })} onQuickLog={(food) => void quickLog(food)} />
             </aside>
             <div className="min-w-0 space-y-4 md:order-1">
