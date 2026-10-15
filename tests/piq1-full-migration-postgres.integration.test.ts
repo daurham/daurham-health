@@ -307,4 +307,32 @@ describe.skipIf(!url)('PIQ-1.1 full 0001–0053 migration-chain and backup on is
     }
   })
 
+  it('PIQ-1.2: current physiological profile creation and correction invalidate numerical decision revision', async () => {
+    const before = await readMaintenanceDecisionSnapshot(today, adapter)
+    expect(before.status).toBe('available')
+    await client.query('BEGIN')
+    try {
+      await client.query(
+        `INSERT INTO health_profile (singleton_id, date_of_birth, height_cm)
+         VALUES (1, '1995-05-19'::date, 178)
+         ON CONFLICT (singleton_id) DO UPDATE SET
+         date_of_birth = EXCLUDED.date_of_birth, height_cm = EXCLUDED.height_cm, updated_at = now()`,
+      )
+      const created = await readMaintenanceDecisionSnapshot(today, adapter)
+      expect(created.status).toBe('available')
+      expect(created.revision).not.toBe(before.revision)
+      expect(await isMaintenanceDecisionRevisionCurrent(today, before.revision, adapter)).toBe(false)
+      await client.query(
+        'UPDATE health_profile SET height_cm = 174, updated_at = now() WHERE singleton_id = 1',
+      )
+      const corrected = await readMaintenanceDecisionSnapshot(today, adapter)
+      expect(corrected.revision).not.toBe(created.revision)
+      expect(await isMaintenanceDecisionRevisionCurrent(today, created.revision, adapter)).toBe(false)
+    } finally {
+      await client.query('ROLLBACK')
+    }
+    const restored = await readMaintenanceDecisionSnapshot(today, adapter)
+    expect(restored.revision).toBe(before.revision)
+  })
+
 })
