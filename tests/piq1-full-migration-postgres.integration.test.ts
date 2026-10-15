@@ -69,8 +69,10 @@ async function insertFictionalWorkout(input: {
 }
 
 async function actualTrainingEvidence(asOf: string): Promise<PerformedExerciseEvidence[]> {
-  const rows = await adapter.query(PERFORMED_STRENGTH_EXERCISES_SQL, ['2026-10-12', asOf, null])
-    as Array<{ date: string; exercise_id: string; routine_code: string | null }>
+  const rows = await adapter.query(
+    PERFORMED_STRENGTH_EXERCISES_SQL,
+    ['2026-10-12', asOf, null],
+  ) as Array<{ date: string; exercise_id: string; routine_code: string | null }>
   return rows.map((row) => ({
     date: row.date, exerciseId: row.exercise_id, routineCode: row.routine_code,
   }))
