@@ -118,6 +118,18 @@ export type MaintenanceCalibrationSuggestion = {
   evidenceRefs: string[]
 }
 
+export type MaintenanceEvidenceExplanationItem = {
+  status: 'well_sampled' | 'limited' | 'insufficient' | 'likely' | 'possible' | 'not_applicable' | 'review_only' | 'withheld'
+  detail: string
+}
+
+export type MaintenanceEvidenceExplanation = {
+  nutrition: MaintenanceEvidenceExplanationItem
+  weightTrend: MaintenanceEvidenceExplanationItem
+  plateau: MaintenanceEvidenceExplanationItem
+  calorieDecision: MaintenanceEvidenceExplanationItem
+}
+
 export type CalorieAdjustmentSafety = {
   status: 'review_possible' | 'blocked'
   reasons: string[]
@@ -151,6 +163,7 @@ export type MaintenanceState = {
   interventions: MaintenanceIntervention[]
   calibration: MaintenanceCalibrationSuggestion
   calorieAdjustmentSafety: CalorieAdjustmentSafety
+  evidenceExplanation: MaintenanceEvidenceExplanation
   /** Valid only for a confirmed current-settings snapshot; never grants permission itself. */
   decisionRevision?: string | null
 }
@@ -1007,6 +1020,62 @@ function calibrationFor(
   }
 }
 
+/**
+ * Explanatory quality dimensions are intentionally separate. Estimate
+ * confidence does not mean full-day intake was objectively witnessed,
+ * plateau confidence is not a probability, and a review gate is not
+ * clinical clearance to lower calories.
+ */
+export function explainMaintenanceEvidence(
+  estimate: MaintenanceEstimate,
+  plateau: PlateauAssessment,
+  safety: CalorieAdjustmentSafety,
+  noise: readonly ScaleNoiseFactor[],
+  ownerVerifiedNutrition: boolean,
+): MaintenanceEvidenceExplanation {
+  const { nutrition, body } = estimate.quality
+  const sampledDays = nutrition.calendarDays
+  const nutritionStatus = nutrition.state === 'sufficient' ? 'well_sampled'
+    : nutrition.state === 'limited' ? 'limited' : 'insufficient'
+  const nutritionDetail =
+    `${nutrition.reliableDays} of ${sampledDays} completed days had eligible calorie observations ` +
+    `(${nutrition.highConfidenceDays} high-source-quality, ${nutrition.estimateHeavyDays} estimate-heavy). ` +
+    (ownerVerifiedNutrition
+      ? 'Eligibility includes a matching owner full-day confirmation; that report does not prove every meal was captured.'
+      : 'The fixture or historical source did not supply a verified full-day whitelist; source quality alone cannot prove a complete day.')
+  const weightStatus = body.state === 'sufficient' ? 'well_sampled'
+    : body.state === 'limited' ? 'limited' : 'insufficient'
+  const weightDetail = `${body.usedMeasurements} comparable weight measurements across ${body.spanDays} days ` +
+    `(${body.usualMeasurements} recorded under usual conditions, ${body.unknownMeasurements} with unknown conditions). ` +
+    'A robust slope reduces individual-day influence but cannot remove water-weight, timing or scale variability.'
+  const plateauStatus =
+    plateau.state === 'plateau_likely' ? 'likely'
+    : plateau.state === 'possible_plateau' || plateau.state === 'noise_obscured' ? 'possible'
+      : plateau.state === 'insufficient_evidence' ? 'insufficient' : 'not_applicable'
+  const plateauDetail = estimate.period && estimate.weightSlopePctPerWeek != null
+    ? `${estimate.period.days}-day comparison (${estimate.period.start} through ${estimate.period.end}); ` +
+      `weight trend ${estimate.weightSlopePctPerWeek.toFixed(2)}% per week. ` +
+      `${plateau.headline}. ` +
+      (noise.length ? `${noise.length} possible short-term scale confounder(s) recorded; no cause is established.`
+        : 'No specific short-window confounder was identified in the available records; unrecorded factors remain possible.')
+    : `Plateau cannot be classified from this evidence. ${plateau.detail}`
+  const isCutDecision = plateau.state === 'plateau_likely' && plateau.goalDirection === 'lose'
+  const decisionStatus = !isCutDecision ? 'not_applicable'
+    : safety.status === 'blocked' ? 'withheld' : 'review_only'
+  const decisionDetail = !isCutDecision
+    ? 'No downward calorie adjustment is supported by this plateau/goal combination. This is separate from estimate quality.'
+    : safety.status === 'blocked'
+      ? `A calorie reduction is withheld: ${safety.reasons.join(' ')} Estimate confidence does not override these checks.`
+      : `Only a manual review is eligible; no target is changed. ${safety.recentCheckinDays} recent check-in days and current plan context were screened, ` +
+        'but the provisional intake threshold is not an individualized medical minimum or a safety certification.'
+  return {
+    nutrition: { status: nutritionStatus, detail: nutritionDetail },
+    weightTrend: { status: weightStatus, detail: weightDetail },
+    plateau: { status: plateauStatus, detail: plateauDetail },
+    calorieDecision: { status: decisionStatus, detail: decisionDetail },
+  }
+}
+
 export function buildMaintenanceState(input: BuildMaintenanceInput): MaintenanceState {
   const completeThrough = input.today != null && input.asOf === input.today
     ? addCalendarDays(input.asOf, -1)
@@ -1025,6 +1094,7 @@ export function buildMaintenanceState(input: BuildMaintenanceInput): Maintenance
     interventions: interventionsFor(estimate, plateau, safety),
     calibration: calibrationFor(estimate, plateau, input.weightGoal),
     calorieAdjustmentSafety: safety,
+    evidenceExplanation: explainMaintenanceEvidence(estimate, plateau, safety, noise, input.eligibleNutritionDates !== undefined),
     decisionRevision: input.adjustmentContext?.revisionStatus === 'consistent'
       ? input.adjustmentContext.decisionRevision ?? null : null,
   }
