@@ -418,7 +418,7 @@ export function CoachCard({ state, pending, error, onState }: {
   )
 }
 
-function CoachIntelligencePanel({
+export function CoachIntelligencePanel({
   state,
   pending,
   onResponse,
