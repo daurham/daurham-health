@@ -6,6 +6,7 @@ import type { WorkoutTemplate } from '@/domain/training'
 import { TrainingRotationPreview } from './TrainingRotationPreview'
 import { TrainingRotationSettings } from './TrainingRotationSettings'
 import { primaryButtonClass, quietButtonClass, secondaryButtonClass } from '@/lib'
+import { subscribeHealthDataChanges } from '@/lib/health-changes'
 import {
   clearTrainingDayOverride,
   fetchTemplates,
@@ -78,19 +79,40 @@ export function TrainingPlanPage() {
   }
 
   useEffect(() => {
-    let cancelled = false
-    Promise.all([fetchTemplates(), fetchTrainingPlan()])
-      .then(([nextTemplates, nextPlan]) => {
-        if (!cancelled) {
-          setTemplates(nextTemplates)
-          applyPlan(nextPlan, nextTemplates)
-        }
-      })
-      .catch((caught: unknown) => {
-        if (!cancelled) setError(caught instanceof Error ? caught.message : 'Could not load Training Plan')
-      })
+    let active = true
+    let generation = 0
+    let draftInitialized = false
+    // Load routine templates once. Subsequent progress refreshes must NOT
+    // overwrite in-progress owner edits to frequency, sequence, or note.
+    const templatesPromise = fetchTemplates().then((next) => {
+      if (active) setTemplates(next)
+      return next
+    })
+    const refresh = () => {
+      const request = ++generation
+      void Promise.all([templatesPromise, fetchTrainingPlan()])
+        .then(([nextTemplates, nextPlan]) => {
+          if (!active || request !== generation) return
+          if (!draftInitialized) {
+            applyPlan(nextPlan, nextTemplates)
+            draftInitialized = true
+          } else {
+            setPlan(nextPlan)
+          }
+          setError(null)
+        })
+        .catch((caught: unknown) => {
+          if (active && request === generation) {
+            setError(caught instanceof Error ? caught.message : 'Could not load Training Plan')
+          }
+        })
+    }
+    refresh()
+    const unsubscribe = subscribeHealthDataChanges(refresh, { revalidateOnFocus: true })
     return () => {
-      cancelled = true
+      active = false
+      generation += 1
+      unsubscribe()
     }
   }, [])
 
