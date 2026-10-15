@@ -152,6 +152,11 @@ type WindowEvidence = {
   differentWeights: IntelligenceObservation[]
   usedWeights: IntelligenceObservation[]
   weightSpanDays: number
+  /** A valid count alone does not establish temporal representativeness. */
+  aligned: boolean
+  alignmentReason: string | null
+  leastNutritionDaysPerWeek: number
+  firstLastGapDays: { first: number | null; last: number | null }
 }
 
 function finite(value: number | null | undefined): value is number {
@@ -190,6 +195,50 @@ function spanDays(items: readonly IntelligenceObservation[]): number {
   return calendarDaysBetween(ordered[0]!.date, ordered[ordered.length - 1]!.date)
 }
 
+function alignmentForWindow(input: {
+  start: string
+  end: string
+  days: number
+  calories: readonly IntelligenceObservation[]
+  usedWeights: readonly IntelligenceObservation[]
+}): Pick<WindowEvidence, 'aligned' | 'alignmentReason' | 'leastNutritionDaysPerWeek' | 'firstLastGapDays'> {
+  const calorieDates = new Set(input.calories.map((item) => item.date))
+  const blocks: number[] = []
+  for (let offset = 0; offset < input.days; offset += 7) {
+    let count = 0
+    for (let day = offset; day < Math.min(offset + 7, input.days); day += 1) {
+      if (calorieDates.has(addCalendarDays(input.start, day))) count++
+    }
+    blocks.push(count)
+  }
+  const leastNutritionDaysPerWeek = Math.min(...blocks)
+  const sortedCalories = [...input.calories].sort((a, b) => a.date.localeCompare(b.date))
+  const sortedWeights = [...input.usedWeights].sort((a, b) => a.date.localeCompare(b.date))
+  const first = sortedCalories[0] && sortedWeights[0]
+    ? Math.abs(calendarDaysBetween(sortedCalories[0].date, sortedWeights[0].date)) : null
+  const last = sortedCalories.at(-1) && sortedWeights.at(-1)
+    ? Math.abs(calendarDaysBetween(sortedCalories.at(-1)!.date, sortedWeights.at(-1)!.date)) : null
+  const midpoint = addCalendarDays(input.start, Math.floor(input.days / 2))
+  const earlyWeights = sortedWeights.filter((item) => item.date < midpoint).length
+  const lateWeights = sortedWeights.filter((item) => item.date >= midpoint).length
+  // A full 7-day block must contain >=3 verified days. Even a 65% aggregate
+  // can otherwise hide an entire omitted week; then the robust weight slope
+  // and the mean intake describe different time periods.
+  const alignmentReason = leastNutritionDaysPerWeek < 3
+    ? 'Verified calorie days are concentrated unevenly, with fewer than three reliable days in at least one seven-day block.'
+    : first == null || last == null || first > 4 || last > 4
+      ? 'The earliest or latest calorie and weight observations are more than four days apart, so their time windows are not comparable.'
+      : earlyWeights < 2 || lateWeights < 2
+        ? 'Comparable weight measurements are concentrated on one side of the intake window.'
+        : null
+  return {
+    aligned: alignmentReason == null,
+    alignmentReason,
+    leastNutritionDaysPerWeek,
+    firstLastGapDays: { first, last },
+  }
+}
+
 function windowEvidence(
   frame: readonly IntelligenceFrameDay[],
   completeThrough: string,
@@ -223,6 +272,7 @@ function windowEvidence(
     differentWeights,
     usedWeights,
     weightSpanDays: spanDays(usedWeights),
+    ...alignmentForWindow({ start, end: completeThrough, days, calories, usedWeights }),
   }
 }
 
@@ -231,7 +281,8 @@ function usableWindow(evidence: WindowEvidence): boolean {
   return (
     evidence.calories.length >= requiredCalories &&
     evidence.usedWeights.length >= 5 &&
-    evidence.weightSpanDays >= 12
+    evidence.weightSpanDays >= 12 &&
+    evidence.aligned
   )
 }
 
@@ -268,7 +319,10 @@ function confidenceFor(evidence: WindowEvidence): IntelligenceConfidence {
     highShare >= 0.7 &&
     evidence.usedWeights.length >= 7 &&
     evidence.weightSpanDays >= 18 &&
-    usualShare >= 0.7
+    usualShare >= 0.7 &&
+    evidence.leastNutritionDaysPerWeek >= 4 &&
+    evidence.firstLastGapDays.first != null && evidence.firstLastGapDays.first <= 2 &&
+    evidence.firstLastGapDays.last != null && evidence.firstLastGapDays.last <= 2
   ) return 'high'
   if (
     calorieCoverage >= 0.65 &&
@@ -343,8 +397,14 @@ function estimateRange(value: number, confidence: IntelligenceConfidence): { low
 
 function buildEstimate(input: BuildMaintenanceInput, completeThrough: string): MaintenanceEstimate {
   let chosen: WindowEvidence | null = null
+  let unalignedWithSufficientCounts: WindowEvidence | null = null
   for (const days of MAINTENANCE_WINDOWS) {
     const candidate = windowEvidence(input.intelligence.frame, completeThrough, days, input.eligibleNutritionDates)
+    const enoughCounts = candidate.calories.length >= Math.max(10, Math.ceil(candidate.days * 0.65)) &&
+      candidate.usedWeights.length >= 5 && candidate.weightSpanDays >= 12
+    if (enoughCounts && !candidate.aligned && !unalignedWithSufficientCounts) {
+      unalignedWithSufficientCounts = candidate
+    }
     if (usableWindow(candidate)) {
       chosen = candidate
       break
@@ -364,7 +424,9 @@ function buildEstimate(input: BuildMaintenanceInput, completeThrough: string): M
       latestWeightKg: fallback.weights[fallback.weights.length - 1]?.value ?? null,
       confidence: 'limited',
       quality: qualityFor(fallback, 28),
-      explanation: 'Observed maintenance needs at least about two weeks of sufficiently complete Nutrition logging plus five reasonably comparable weight measurements spanning roughly twelve days.',
+      explanation: unalignedWithSufficientCounts?.alignmentReason
+        ? `Observed maintenance withheld: ${unalignedWithSufficientCounts.alignmentReason} Review full-day logging and comparable weigh-in timing instead of adjusting calorie targets.`
+        : 'Observed maintenance needs at least about two weeks of sufficiently complete Nutrition logging plus five reasonably comparable weight measurements spanning roughly twelve days.',
     }
   }
   const intake = robustMean(chosen.calories.map((item) => item.value))
