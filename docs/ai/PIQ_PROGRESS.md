@@ -394,12 +394,36 @@ Stop expanding test counts for their own sake. Next, pursue runtime verification
 
 **Phase truth: 0/9 completed; PIQ-0 runtime/quality acceptance open; PIQ-1.1 code + representative real PostgreSQL SQL path validated, but not end-to-end production accepted.**
 
+## PIQ-1.1 — verified read-time maintenance eligibility (2026-10-14 owner local)
+
+**Validated implementation:** `ef4fbca5cc5c06fcb91e9ddb163230e9e0996e01` on `piq/00-baseline-20261014`.
+**GitHub Actions:** [isolated PostgreSQL 38691337101](https://github.com/daurham/daurham-health/actions/runs/38691337101) **SUCCESS** and [full application CI 38691336913](https://github.com/daurham/daurham-health/actions/runs/38691336913) **SUCCESS** (npm ci, TypeScript, ESLint, full Vitest, production build). The first full CI attempt used a mistaken test-only `observedDays` field; this was corrected to the actual `reliableDays` contract and both workflows passed.
+
+### Code integration delivered
+
+- `server/nutrition/maintenance-eligibility.ts`: **one set-based SQL read** of candidate confirmed nutrition days in the 30-day window. It recomputes each day's canonical SHA-256 source fingerprint from the same source-revision expression used by the confirmation API, and requires `owner_report = complete`, a matching stored revision, no fast, no analysis exclusion and only acceptable source evidence (measured reference or owner entered). Empty/missing confirmations cannot qualify.
+- The eligibility loader **cross-checks each candidate's calories and exact sorted source entry IDs against the preloaded intelligence snapshot**. If that snapshot disagrees with the current DB rows, the day is rejected instead of silently counted. The query returns internal data only; it does not add owner records or medical values to routine logs.
+- `server/intelligence/maintenance.ts` **always supplies** a verified-date Set to the actual Maintenance engine. An unavailable/missing table, query exception or other failed eligibility read falls back to an **empty Set**, never legacy source-quality-only estimates. Existing maintenance consumers in Goal Control and the related Coach intelligence path derive decisions from this gated result.
+- `src/domain/maintenance.ts` filters calorie observations for eligibility **before building the window estimate, body-response comparison, observed-day counts and recommendations**. The optional Set argument preserves older direct unit-fixture behavior; it is **not optional in the production server loader**.
+- The real-engine T03 regression proves 28 days of single accurately logged meals with no owner completion cannot produce an observed maintenance estimate or calorie-adjustment recommendation. A sufficient number of individually verified days can still support the existing estimator. Source quality alone no longer authorizes inclusion in the loader path.
+- Added **three real PostgreSQL integration cases**, covering unconfirmed-to-confirmed status, calorie correction / previously loaded stale snapshot, individual analysis exclusions, AI-estimated source disqualification, current day, and zero-intake fast. They ran against ephemeral PostgreSQL 16 and representative source schema + migration 0053, not the actual production Neon project.
+
+### Strict non-claims and remaining gates
+
+- **0/9 PIQ phases fully accepted.** PIQ-0's deployed-version/real-owner question-quality gates remain open. PIQ-1.1's branch implementation is materially advanced but **not live**.
+- No migration 0053 was applied to production; no merge to main, Vercel release, real owner record access, target calorie write or Gemini call. The new server query is **branch-only**.
+- An isolated PostgreSQL schema fixture does **not** certify the full migration chain, backup restore, live Neon performance, or concurrency with every existing food writer. SQL's MVCC read and a cross-checked snapshot reduce risk but cannot provide an impossible guarantee against later writes.
+- **Other nutrition-facing Coach/Weekly Coach and Health AI reasoning may still conflate logged totals with consumed totals.** Only the actual Maintenance-derived Goal Control/Coach path is newly gated. These downstream trust paths require separate PIQ checks.
+- Owner mobile confirmation QA, true Vercel serving SHA, Neon applied schema head and production cost/latency remain unverified.
+
+**Next bounded implementation:** audit direct weekly nutrition/Coach decisions for complete-day assumptions; propagate a conservative completeness coverage label where needed, not a guessed confirmation. Then run isolated full-migration and backup/restore checks before any promotion. Never automatically lower calorie targets from unknown/partial days.
+
 ## Release state / constraints
 
 - Branch-only preparation: **no production deployments, database migrations, schema changes, AI API calls, or owner data writes performed by this PIQ work**.
 - The Vercel connector's project discovery succeeding does not imply deployment inspection permission.
 - A future phase may use read-only owner-authorized database/project access; never apply migrations merely to satisfy a baseline document.
-- Latest implementation checks: isolated PostgreSQL [38690105448] successful and full branch validation [38690105524] successful on `2e0d2b3`. Subsequent documentation-only commits do not imply new code validation.
+- Latest implementation checks: isolated PostgreSQL [38691337101] SUCCESS and full branch CI [38691336913] SUCCESS on `ef4fbca`; documentation-only pushes do not imply new product validation.
 
 ## Continuation packet — NEXT SESSION
 

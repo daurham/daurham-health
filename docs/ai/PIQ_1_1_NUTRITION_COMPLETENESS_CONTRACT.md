@@ -75,3 +75,13 @@ No production changes were made in creating this contract.
 - `tests/piq1-nutrition-completeness-handler.test.ts` adds six synthetic authenticated route checks, including unauthorized GET/PUT and stale 409. `tests/piq1-nutrition-completeness-storage.test.ts` adds two source-consistency/excluded-food checks, bringing the mocked storage suite to 12 cases.
 - `migrations/0053_nutrition_day_completeness.sql` remains **unapplied**; no real database transaction or backup restore has run. Verified CI covers code, mocks and build, not deployment/migration. Next: stage migration safely, verify SQL against real schema, then implement UI and consumers.
 
+
+## Validated read-time Maintenance integration — branch-only
+
+Implementation `ef4fbca` passed isolated PostgreSQL [38691337101](https://github.com/daurham/daurham-health/actions/runs/38691337101) and full CI [38691336913](https://github.com/daurham/daurham-health/actions/runs/38691336913).
+
+- The optional owner day-review UI and API now feed a **set-based** server eligibility read that revalidates stored source revisions, excludes partial/unknown/fasted/weak-source/excluded days, and compares candidate calorie sums and food IDs with the intelligence snapshot. No per-day HTTP roundtrip or Gemini call is needed.
+- The server's `loadMaintenanceState()` passes the verified date Set into the actual maintenance estimator, which rejects all other daily calorie evidence. A failed DB read or missing migration **fails closed to zero eligible days**, withholding an observed maintenance estimate instead of trusting unreviewed diary entries.
+- Direct `buildMaintenanceState()` calls without the optional eligibility argument continue to support older unit-fixture semantics; **only the server loader is authoritative for live owner decisions**, and it always passes the Set.
+- The verified T03 synthetic integration demonstrates that 28 logged single-meal days without owner-confirmed completeness cannot generate a maintenance estimate or intake-cut suggestion in the gated path. A valid confirmed-day sample can still qualify.
+- Both Postgres (3 new cases) and full application CI passed. Migration 0053 **is not applied to live Neon**, and the new code is **not on main or production**. Full sequential migration replay, live owner UX, backup/restore, and other direct nutrition/Weekly Coach/Health AI decision surfaces remain for later acceptance.
