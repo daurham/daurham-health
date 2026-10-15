@@ -380,17 +380,22 @@ export async function requireCurrentCalorieRecommendation(
   }
 }
 
-export async function respondCoachRecommendation(
+/** The same guarded mutation used by the API; injectable only with a
+ * read-only verifier for isolated SQL integration. No mutation is attempted
+ * when the saved ID is stale, missing, or a non-action question.
+ */
+export async function writeCoachRecommendationResponse(
+  sql: Sql,
   id: string,
   response: CoachRecommendationResponse,
   asOf: string,
-): Promise<CoachIntelligenceState> {
-  const sql = await getSql()
+  assertCurrent: (row: RecommendationRow) => Promise<void>,
+): Promise<void> {
   const row = await recommendationById(sql, id)
   if (row.recommendation_kind === 'follow_up_question') {
     throw new HttpError(409, 'Follow-up questions do not use recommendation response states')
   }
-  await requireCurrentCalorieRecommendation(row, asOf)
+  await assertCurrent(row)
   const suppressUntil = response === 'not_now' ? addCalendarDays(asOf, 7) : null
   const followUpOn = response === 'do_this' ? addCalendarDays(asOf, 7) : null
   await sql.query(
@@ -404,6 +409,18 @@ export async function respondCoachRecommendation(
             updated_at = now()
       WHERE id = $1::uuid`,
     [id, response, suppressUntil, followUpOn],
+  )
+}
+
+export async function respondCoachRecommendation(
+  id: string,
+  response: CoachRecommendationResponse,
+  asOf: string,
+): Promise<CoachIntelligenceState> {
+  const sql = await getSql()
+  await writeCoachRecommendationResponse(
+    sql, id, response, asOf,
+    (row) => requireCurrentCalorieRecommendation(row, asOf),
   )
   return loadCoachIntelligenceState(asOf)
 }
