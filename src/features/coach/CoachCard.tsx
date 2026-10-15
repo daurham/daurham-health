@@ -509,7 +509,10 @@ export function CoachIntelligencePanel({
         <div className="mt-3 space-y-2 border-t border-zinc-100 pt-3">
           {state.followUps.map((item) => (
             <div key={item.id}>
-              <p className="text-xs font-semibold text-zinc-900">How did this go? · {item.title}</p>
+              <p className="text-xs font-semibold text-zinc-900">{item.historical ? 'Historical follow-up' : 'How did this go?'} · {item.title}</p>
+              {item.historical ? (
+                <p className="mt-1 text-xs text-amber-800">This earlier suggestion is not part of today's Coach recommendations. Share only what happened after you marked it as started; this is not advice to restart it.</p>
+              ) : null}
               <p className="mt-1 text-xs text-zinc-500">{item.acceptedOn
                 ? `You marked this as started on ${new Date(item.acceptedOn).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}.`
                 : 'You marked this as started.'}</p>

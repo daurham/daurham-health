@@ -351,6 +351,7 @@ export async function loadCoachIntelligenceState(asOf: string): Promise<CoachInt
         ? null
         : (row.response_at instanceof Date ? row.response_at.toISOString() : new Date(row.response_at).toISOString()),
       followUpOn: row.follow_up_on!,
+      historical: !validFingerprints.has(row.fingerprint),
     }))
   const staleAdviceWithheld = containsCalorieReview && !currentRevision
   const effectiveState = staleAdviceWithheld && surfaced.length === 0 && control.state === 'act'
@@ -418,6 +419,23 @@ export async function requireCurrentCalorieRecommendation(
  * partial unique index closes the distinct-row simultaneous-write race.
  * Translate precisely that index conflict into an owner-readable 409.
  */
+/** Saved recommendation IDs must remain eligible after edits or imports.
+ * This protects all non-calorie cards, not just numerical calorie advice.
+ * Past explicitly started actions retain their own feedback history.
+ */
+export async function requireCurrentNonCalorieRecommendation(
+  row: Pick<RecommendationRow, 'recommendation_kind' | 'fingerprint'>,
+  asOf: string,
+  currentDrafts?: readonly CoachRecommendationDraft[],
+): Promise<void> {
+  if (isCalorieDecisionKind(row.recommendation_kind)) return
+  const drafts = currentDrafts ?? buildCoachRecommendationDrafts(await loadGoalControlState(asOf))
+  if (!drafts.some((draft) =>
+    draft.fingerprint === row.fingerprint && draft.kind === row.recommendation_kind)) {
+    throw new HttpError(409, 'This Coach recommendation is no longer supported by current evidence. Reopen Coach to review the latest assessment.')
+  }
+}
+
 export function isActivePlateauUniquenessConflict(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false
   const candidate = error as { code?: unknown; constraint?: unknown; message?: unknown }
@@ -518,7 +536,10 @@ export async function respondCoachRecommendation(
   const sql = await getSql()
   await writeCoachRecommendationResponse(
     sql, id, response, asOf,
-    (row) => requireCurrentCalorieRecommendation(row, asOf),
+    async (row) => {
+      await requireCurrentCalorieRecommendation(row, asOf)
+      await requireCurrentNonCalorieRecommendation(row, asOf)
+    },
     ownerStarted,
     expectedResponseAt,
   )

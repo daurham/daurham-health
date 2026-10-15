@@ -1095,3 +1095,14 @@ HAVING COUNT(*) > 1;
 ```
 
 **Outstanding:** Owner authentic two-device/iOS testing, production migration approval, case where evidence changes within a non-calorie recommendation fingerprint, supersession text, broader same-domain intervention dependencies, and accepted-versus-implemented proof. No production writes, provider calls, or merge to `main`.
+
+
+## PIQ-1.5 — Non-calorie saved-ID eligibility and historical follow-up context (2026-10-15)
+
+**State:** Work branch only, pending full CI and owner device QA. **0/9 owner-accepted PIQ phases.**
+
+**Failure:** The saved recommendation response API guarded numerical calorie proposals against stale goal/evidence revisions, but let historical non-calorie recommendation IDs accept owner decisions unconditionally after a Training/Goals signal disappeared. At the same time, a real owner-started Training action could still need a seven-day outcome review even after the current Coach stopped recommending it; the UI did not make that historical status clear.
+
+**Bounded contract:** At response time, all non-calorie saved IDs must still be present by **both exact fingerprint and kind** in the newly computed current `buildCoachRecommendationDrafts(loadGoalControlState(asOf))`; otherwise return 409 without writing owner memory. Calorie decisions retain their existing stronger live-revision guard. Historical `do_this` acknowledgments are never erased; a due non-calorie follow-up whose saved fingerprint no longer appears in today's drafts is marked `historical`. The UI clearly says the earlier suggestion is no longer in the current recommendations, and asks only about what actually happened—not to restart it. Current follow-ups remain unchanged. No schema migration, provider call, inferred adherence or production mutation.
+
+**Boundary:** An unchanged recommendation fingerprint does not currently identify every semantic change in source evidence; future context-versioned fingerprints and richer supersession are outstanding. A live eligibility check immediately before a saved-ID write is an optimistic guard, not a serializable lock on independent evidence imports. Owner mobile/Neon authenticated tests are mandatory before release.

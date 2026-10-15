@@ -77,6 +77,8 @@ export type CoachRecommendationFollowUp = {
   detailPath: string
   acceptedOn: string | null
   followUpOn: string
+  /** A genuine past start whose original recommendation is not advised now. */
+  historical?: boolean
 }
 
 export type CoachFollowUpQuestionDraft = {

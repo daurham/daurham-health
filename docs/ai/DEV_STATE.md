@@ -360,3 +360,8 @@ Intake and activity adjustments now share the named `possible_plateau_response` 
 ## 2026-10-15 PIQ-1.5 database-backed plateau exclusivity — work branch
 
 Prepared migration `0054_coach_plateau_active_unique.sql`, schema inventory and isolated migration-chain update. A partial unique index guarantees distinct concurrent activity/intake starts cannot share one active plateau revision; one writer is rejected and Coach receives HTTP 409. Two-connection disposable PostgreSQL regression and precise error mapping tests added. No production migration or `main` merge. Release prerequisites documented in `PIQ_PROGRESS.md`.
+
+
+## 2026-10-15 PIQ-1.5 non-calorie stale advice and historical follow-ups
+
+Added a live saved-ID kind+fingerprint guard on non-calorie recommendation response writes and a historical-state marker on due non-calorie follow-ups whose original recommendation no longer qualifies today. Historical results stay reportable, not implicitly recommended or overwritten. Tests, build and owner QA remain release gates; no production mutation.

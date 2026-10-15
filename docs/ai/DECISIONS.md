@@ -663,3 +663,8 @@ Treat intake changes and activity changes in a plausible plateau as alternatives
 ## Decision: database uniqueness for mutually exclusive plateau starts (PIQ-1.5, 2026-10-15)
 
 The response-level `NOT EXISTS` check is insufficient for two truly concurrent writes to distinct rows. Enforce one active `possible_plateau_response` option per exact maintenance decision revision with a PostgreSQL partial unique index, not an advisory read-only race check. Only explicitly acknowledged, unevaluated owner starts qualify; preserve older decisions and unrelated advice. Turn the index-specific 23505 into a 409 requiring refreshed Coach context. Other database errors propagate. Migration 0054 is written but **must not be applied in production** without backup, duplicate preflight, schema verification and owner release approval. Existing collisions are an explicit stop gate, never auto-repaired.
+
+
+## Decision: non-calorie saved actions require live relevance, past starts remain historical (PIQ-1.5, 2026-10-15)
+
+A stale non-calorie recommendation ID does not authorize a new `do_this`, `not_now`, or `not_relevant` response once its matching current kind/fingerprint disappears. Recompute the bounded current draft set before the write and fail with 409 instead of inventing ongoing relevance. Do not retrospectively delete a genuine `ownerStarted` record: outcome reporting for an earlier owner-started action is distinct from current advice, so explicitly label a no-longer-current non-calorie follow-up as historical rather than recommending renewed action. Calorie revisions retain stricter exclusion. No new schema or production writes.
