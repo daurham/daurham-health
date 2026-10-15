@@ -94,7 +94,6 @@ export function CoachCard({ state, pending, error, onState }: {
   onState: (state: CoachState) => void
 }) {
   const location = useLocation()
-  const prefix = useAppPathPrefix()
   const [inboxOpen, setInboxOpen] = useState(false)
   const [detailTask, setDetailTask] = useState<CoachTaskView | null>(null)
   const [logTask, setLogTask] = useState<CoachTaskView | null>(null)
