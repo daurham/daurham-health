@@ -222,16 +222,49 @@ Expand question-intent checks to distinguish a true **data-load failure** from a
 
 Next bounded work: strengthen synthetic owner-question outcome assessments and triage the remaining PIQ-0 exit gates against what is technically testable without production access. If runtime scope remains blocked, preserve the blocker and the verified CI state rather than inventing deploy/schema facts. When PIQ-1 begins, prioritize source-completeness and training missing-vs-zero semantics; never automatically cut calories based on partial food days.
 
+## PIQ-0 checkpoint 7 — answer quality, grounding and critical-safety reviews (CI validated)
+
+**Validated implementation:** 11bf5e0a66100d89d2425e77964b7b22fa420e5e · **CI:** [GitHub Actions 38680233032](https://github.com/daurham/daurham-health/actions/runs/38680233032) — passed npm ci, TypeScript, lint, Vitest and production build, 2026-10-14 local.
+
+### Delivered
+- **tests/fixtures/piq/answer-quality.ts**: synthetic test-only evaluation adapter implementing the 12-axis 0–4/N-A review rubric, reviewed claims and evidence IDs, explicit safety-review state and a hard-failure veto. No automatic diagnosis or semantic safety detection is claimed.
+- **tests/piq0-answer-quality.test.ts**: 11 executable synthetic tests, including actual T01 insufficient-evidence service output, evidence-free useful general education, an uncited fabricated personal measurement, a cited source supporting the opposite conclusion, unsafe advice overriding a perfect score, negated symptom misunderstanding, unsafe calorie change, grounded synthetic personal Goal and missing/invalid reviews.
+- **docs/ai/PIQ_EVALUATION_GUIDE.md**: reviewed quality/scoring protocol and privacy rules. All tests use fictional records and provider stubs; no production owner questions or Gemini calls.
+- Current JSON validation does **not** establish factual or clinical trust: an owner-specific invented measurement without any citation can be structurally accepted; a valid evidence ref may contradict the prose claim. Human-reviewed grounding detects these in synthetic fixtures. PIQ-3 must prevent unsupported owner claims more robustly.
+- T01's actual insufficient-general-question behavior remains a **known product failure**. T40 deterministic pre-provider safety fallback is **not implemented**. A green scoring harness is not a clinically reviewed safety system.
+- Missing review of safety, an axis, or a response block cannot pass. Critical issues (unsafe advice, invented owner fact, missed emergency, unsafe calorie cut, etc.) override mean score. Fixture-level pass does NOT mean owner acceptance or production release.
+
+### PIQ-0 exit readiness and remaining blockers
+
+| Exit aspect | Status | Evidence / limitation |
+| --- | --- | --- |
+| Repository/test baseline and 50 scenario specifications | VERIFIED | GitHub CI and master-plan synchronized case registry |
+| Code-level dataflow/retrieval/trim and cache evaluations | VERIFIED for synthetic paths | Packet, source, response and retrieval fixture suites |
+| Privacy-safe diagnostics and error handling | VERIFIED on branch | Count-only diagnostics, stable reason codes, sanitized internal read errors |
+| Answer-quality scoring and critical-failure overrides | VERIFIED as test machinery | 11 fixture tests and reviewer instructions |
+| Owner-reviewed real Health AI useful-answer baseline | NOT VERIFIED | No owner live answer/evidence transcript scored |
+| Actual mobile/Coach owner acceptance | NOT VERIFIED | No current owner-device QA session |
+| Live Vercel production commit/deployment | UNKNOWN | Vercel deployment listing returned 403; GitHub main has successful Vercel commit status, which alone cannot prove active production |
+| Applied Neon production migration head | UNKNOWN | Connected Neon project list empty; repo contains source migrations through 0052, not evidence they were applied |
+| Real AI usage, token cost and latency baseline | UNKNOWN | Live ledger/provider data inaccessible |
+| Clinical safety handling of urgent questions | NOT VERIFIED | Reviewer veto tested; actual deterministic safety fallback remains later PIQ-3 work |
+
+**0/9 phases completed. PIQ-0 is ACTIVE, not accepted.** This is a real engineering milestone, not product-quality certification.
+
+### Scoped next steps
+
+Stop expanding test counts for their own sake. Next, pursue runtime verification using authorized read-only deployment and schema access, gather limited owner-approved real-question scoring in a private process, and **prepare PIQ-1.1's nutrition day-completeness implementation contract in parallel**. Do not deploy changes, alter calorie targets, or mark PIQ-0 exited while the runtime and acceptance gates remain unknown. PIQ-8 stays deferred.
+
 ## Release state / constraints
 
 - Branch-only preparation: **no production deployments, database migrations, schema changes, AI API calls, or owner data writes performed by this PIQ work**.
 - The Vercel connector's project discovery succeeding does not imply deployment inspection permission.
 - A future phase may use read-only owner-authorized database/project access; never apply migrations merely to satisfy a baseline document.
-- Branch CI for latest implementation: **success** — Actions run `38679378153` on `2eb657c`, all standard checks passed. Documentation-only commits do not imply new code validation.
+- Branch CI for latest implementation: **success** — Actions run `38680233032` on `11bf5e0`, all standard checks passed. Documentation-only commits do not imply new code validation.
 
 ## Continuation packet — NEXT SESSION
 
-**Task:** PIQ-0 finalization preparation: expand owner-question outcome safety scoring with synthetic fixtures, document current owner-runtime access blockers, and prepare the bounded PIQ-1 data-integrity contract. The read boundary and selected-source cache tests are now CI validated; the omitted-source correction hole remains open for PIQ-3.
+**Task:** PIQ-0 exit/readiness review plus scoped PIQ-1.1 day-completeness specification and acceptance fixtures. Do not mark PIQ-0 complete while live Vercel/Neon and owner acceptance remain unverified. No calorie-target change authorized.
 
 **First steps:** Read master §§0–6 + PIQ-0 + §§17–21; inspect this file; verify current main/feature branch, production status, CI and schema. Try authorized Vercel project scope and Neon lookup only if access exists. Reconcile `CURRENT_TASK.md` drift once the verified production state is available. Confirm the baseline contract is still aligned with owner's purpose.
 
