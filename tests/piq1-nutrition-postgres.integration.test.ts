@@ -222,8 +222,9 @@ describe.skipIf(!url)('PIQ-1.1 isolated PostgreSQL migration and real confirmati
 
   it('Weekly Coach uses real verified complete-day SQL and rejects a stale food-log snapshot', async () => {
     const id = await insertMeal(1650)
-    const source = (calories: number) => [{ id, logDate: date, calories }]
-      as unknown as import('../src/domain/nutrition/types.js').NutritionEntry[]
+    const source = (calories: number) => (
+      [{ id, logDate: date, calories }] as unknown as import('../src/domain/nutrition/types.js').NutritionEntry[]
+    )
     const allowed = (entries: import('../src/domain/nutrition/types.js').NutritionEntry[]) =>
       loadVerifiedWeeklyNutritionDates({ entries, asOf: today, today, sqlOverride: sql })
     expect((await allowed(source(1650))).size).toBe(0)
