@@ -1,9 +1,9 @@
 # Daurham Health — Personal Intelligence Quality Program
 
 > **MASTER IMPLEMENTATION CONTRACT · durable project memory · not an implementation report**  
-> **Created:** 2026-10-14 · **Status:** Proposed / not implemented  
+> **Created:** 2026-10-14 · **Updated:** 2026-10-14 (deferred polish addendum) · **Status:** Proposed / not implemented  
 > **Repository:** `daurham/daurham-health` · **Canonical proposed path:** `docs/ai/HEALTH_INTELLIGENCE_QUALITY_MASTER_PLAN.md`  
-> **Working title:** **PIQ** (Personal Intelligence Quality) · **Roadmap:** PIQ-0 through PIQ-7  
+> **Working title:** **PIQ** (Personal Intelligence Quality) · **Roadmap:** PIQ-0 through PIQ-7 (core) + PIQ-8 (deferred, non-gating polish)  
 > **Owner deployment:** single-owner Daurham Health; preserve multi-instance portability  
 > **Operating rule:** Read this contract at the start of **every** planning, implementation, debugging, QA, and release session touching this program.
 
@@ -17,7 +17,7 @@
 
 Before making any code change, the assistant or coding agent SHALL:
 
-1. Read **§1–§4** (mission, outcomes, constraints, inventory), **§5** (execution protocol), the relevant phase (§7–§14), and **§17–§21** (evaluation, safety, rollout, handoff).
+1. Read **§1–§4** (mission, outcomes, constraints, inventory), **§5** (execution protocol), the relevant core phase (§7–§14), deferred polish (§14A) only if in scope, and **§17–§21** (evaluation, safety, rollout, handoff).
 2. Read the **latest** `docs/ai/CURRENT_TASK.md`, `docs/ai/DEV_STATE.md`, `docs/ai/DECISIONS.md`, `docs/ai/PROJECT.md`, and `docs/ai/NEXT_INTELLIGENCE_ROADMAP.md`. This file does **not** automatically override newer facts recorded in the repository.
 3. Inspect the **current branch**, git status, base/main divergence, latest migrations, and relevant code. Do not treat the code references and observations captured on 2026-10-14 as permanently current.
 4. Check `docs/ai/PIQ_PROGRESS.md` if it exists; otherwise create it **only when implementation begins**. Progress is separate from this relatively stable master contract.
@@ -356,7 +356,7 @@ PIQ-0 Baseline & evaluation harness
                                           calibration, cost, owner acceptance
 ```
 
-PIQ-0 precedes feature work. PIQ-1 and PIQ-2 may be designed in parallel but do not ship unsafe decision recommendations while PIQ-1 is incomplete. PIQ-3 may build on PIQ-2 before all PIQ-4 relationships exist; retrieval can progressively acquire richer signals. PIQ-7 quality/cost telemetry starts during PIQ-0 and expands continuously.
+PIQ-0 precedes feature work. PIQ-1 and PIQ-2 may be designed in parallel but do not ship unsafe decision recommendations while PIQ-1 is incomplete. PIQ-3 may build on PIQ-2 before all PIQ-4 relationships exist; retrieval can progressively acquire richer signals. PIQ-7 quality/cost telemetry starts during PIQ-0 and expands continuously. **PIQ-8 is deliberately outside this dependency graph**: it begins only after core PIQ-7 owner acceptance unless the owner explicitly reprioritizes it. PIQ-8 cannot delay or redefine the core intelligence North Star. A confirmed import data-integrity defect, however, must be escalated to PIQ-1 immediately rather than misclassified as cosmetic.
 
 ## 6.2 Program scoreboard
 
@@ -1010,6 +1010,94 @@ Do not infer implementation from a navigation click, a positive chat comment, or
 
 ---
 
+# 14A. PIQ-8 — Deferred finishing polish (POST-CORE; NOT A RELEASE GATE)
+
+> **Owner addendum (2026-10-14):** Preserve these four low-distraction requests for the **end** of the personal intelligence program. None should interrupt PIQ-0–PIQ-7, be used to declare intelligence progress, or expand into broad UI refactoring. The improvements must remain small, isolated, and observable on mobile. **This phase is not implemented.**
+
+## PIQ-8 sequencing and anti-drift contract
+
+- Start PIQ-8 **only after core PIQ-7 is deployed and accepted**, except when the owner explicitly changes priorities. The canonical work tracker should mark PIQ-8 `deferred` until that point.
+- Prefer four discrete small work items (PIQ-8.1 through PIQ-8.4), with regression tests and separate review; no broad Settings/Body/Nutrition/Training rewrites.
+- Do not introduce new subscriptions, LLM usage, core health metrics, or expensive migrations for cosmetic/input convenience.
+- Preserve existing canonical measurement units, owner history, export/backup contracts, versioned progression/XP rules, and upload provenance.
+- A symptom that reveals **real data loss, repeated/duplicate insertion, cross-owner leakage, or incorrect approval persistence** is **not** just polish. Escalate that specific integrity fix into PIQ-1 immediately and keep the remaining PIQ-8 work deferred.
+- Finishing PIQ-8 must never be a dependency for declaring the **intelligence quality** program's North Star achieved. Track PIQ-8 owner acceptance separately.
+
+### PIQ-8.1 — Body measurements in cm or inches, with natural fractional-inch entry
+
+**Owner need:** When entering body dimensions/circumferences, choose **cm or in** directly. Inch entry should accept ordinary fraction syntax without forcing the owner to mentally convert to decimal.
+
+**Current code anchors, re-inspect before editing:** `src/features/body/MeasureForm.tsx` builds metric entries using `definition.manualInputUnits[0]`, and the field's mobile input mode is decimal. Check `src/domain/body-metrics.ts`, manual measurement validation/conversion, history edit paths, Body quick entry, and any other owner-facing circumference input using the same domain contract.
+
+**UX contract:**
+
+- Provide a clear per-field or consistent form-wide `cm / in` selector for **linear** body measurements (waist, hips, limbs, etc.), with displayed unit beside the input. Do not offer `cm/in` for kg/lb weight, percentages or unitless metrics.
+- Accept ordinary positive decimal input in either unit (`80.5` cm, `31.5` in). In **in** mode additionally accept whole + separated fraction (`31 1/2`), plain fraction (`1/2`), hyphenated mixed fraction (`31-1/2`), and common Unicode mixed fractions (`31½`, `31 ½`) where feasible. Normalize whitespace and fraction glyphs safely. Optional examples in placeholder/help: `31 1/2` or `31.5`.
+- For the same dimension: `31 1/2 in = 31.5 in = 80.01 cm`. Show the correct normalized result after submit or when editing. Keep typed fractional strings intact while the user is still editing; do not continuously overwrite the text with a decimal.
+- Parsing must be deterministic and **never use eval**, `Function`, or permissive partial numeric coercion. Reject zero denominators, malformed/multiple fractions, non-finite values, negative measurements, unsupported unit/metric pairs and out-of-range data with concise inline errors. Do not treat an empty field as zero.
+- Convert only at validation/save boundaries into the existing canonical quantity/units, respecting current per-metric limits and precision. Editing a saved value should not accumulate conversion drift. Preserve the original measured date, comparability semantics, audit/provenance and selected units where practical.
+- Mobile keyboards must permit typing space, `/` and fraction characters (pure `inputMode=decimal` might block those); use appropriate text input for inches. Ensure selection and validation also work on iPhone Safari.
+
+**Tests / acceptance:** `31 1/2`, `31.5`, `31½` produce equivalent canonical measurements; `80.01 cm` round-trips; switching cm/in never changes the *physical* dimension; malformed `31/0` and `31 1/2/3` are rejected; a 12-metric full-body form can be saved and edited on iPhone without forced decimal conversion; untouched weight and percentage fields behave identically. No migration unless source schema analysis proves it necessary.
+
+### PIQ-8.2 — A few flashy late-game XP themes
+
+**Owner need:** Add several exciting reward themes late in the XP progression, not another large feature system.
+
+**Current code anchors:** `src/domain/progression.ts` contains lifetime-XP theme unlocks through level **20**; `src/theme.ts` defines packs, tokens and previews; `src/features/settings/SettingsPage.tsx` renders Theme Studio; also inspect CSS variables/theme application and `tests/progression.test.ts`/`tests/theme.test.tsx`.
+
+**Small scope:** Propose **four** original high-level theme packs at levels **21–24**, for example:
+
+1. **Eclipse Ascendant** — near-black cosmic violet, solar-gold rims, electric-lavender highlights, subtle halo treatment.
+2. **Voidstorm** — midnight navy/obsidian, plasma blue and vibrant magenta, energetic aurora accents.
+3. **Celestial Forge** — forged graphite, molten copper/gold, ember and steel contrasts.
+4. **Prismatic Overdrive** — deep charcoal, iridescent teal/violet/pink, radiant reward accents.
+
+Names/palettes are **design proposals**, not commitments to trademarked game/franchise art. Honor the user's taste for dramatic, game/anime-inspired aesthetics while keeping the packs original. Make them visually distinct in **actual app surfaces**, not merely a swapped accent hex: tasteful gradients/glows, XP/reward highlights, cards and chart accents where existing tokens support them. Do not introduce high-cost animation frameworks, huge image assets, custom copyrighted graphics or an all-new theme engine. A lightweight local CSS embellishment is acceptable if needed.
+
+**Compatibility/safety:** Preserve all preexisting level thresholds and unlocked themes; add new unlocks monotonically; lifetime XP unlocks cannot be revoked by spending reward-wallet XP; themes never affect health data; support light/dark readability or explicitly define compatible mode; maintain WCAG-minded contrast/focus visibility and `prefers-reduced-motion`; no intrusive flashing, especially for a health app; theme loading and scrolling stay efficient on mobile.
+
+**Tests / acceptance:** Level-20 owner keeps their existing themes and sees a next unlock at 21; levels 21–24 unlock the correct packs without moving earlier thresholds; each preview matches applied palette; selected theme persists across reload/navigation and respects reduced motion; no chart illegibility, missing buttons, or low-contrast nutrition/training text in either supported mode. Limit to a few packs; don't prioritize more visual variety over PIQ's core work.
+
+### PIQ-8.3 — Settings as compact, collapsed-by-default sections
+
+**Owner need:** Settings currently requires a very long scroll through unrelated full-size subjects. Every top-level settings subject should start **collapsed**, and open only when the owner selects it.
+
+**Current anchors:** `src/features/settings/SettingsPage.tsx` renders `HealthProfileSection`, `AiUsageSection`, `AppearanceSection`/Theme Studio, `TrendColorsSection`, and numerous additional card sections in a single vertical column. Audit child sections and existing `#theme-studio`, `#trend-colors`, and `#health-profile` anchors before choosing an accordion pattern.
+
+**UX contract:**
+
+- Provide clear section headers with subject name, short 1-line description when useful, and visible expand/collapse affordance. **Default closed** for all top-level subjects on ordinary Settings navigation; avoid forcing the owner to scroll past dozens of fully expanded controls.
+- Open the tapped subject without expanding everything else. Accordion behavior may allow multiple user-opened sections; do **not** automatically collapse a different section mid-edit, reset form drafts, or undo unsaved settings.
+- A direct link like `/settings#health-profile` or `/settings#theme-studio` should **open the targeted section automatically** and scroll its heading into view, even though normal default is collapsed. Browser back/hash navigation and valid deep links must continue working.
+- Preserve all current controls, side effects, save/cancel semantics, owner auth guards, data quality and backup workflows, AI budget settings and accessibility labels. No whole-page reorganization or hiding of urgent warnings.
+- Use accessible disclosure semantics (`details/summary` where appropriate or button + `aria-expanded` + `aria-controls`), keyboard focus behavior, touch-friendly targets, readable mobile spacing, correct behavior in light/dark themes. Avoid unwanted re-opening across navigation if the owner expects fresh default-closed behavior.
+
+**Tests / acceptance:** Ordinary visit shows a concise table of collapsed subjects; any subject expands and functions; all others stay closed until selected; hash target opens even on initial load; browser back and menu navigation do not strand focus/scroll; saving profile and selecting themes still work; no long content flashing during loading and no lost edits. This should be primarily a front-end change.
+
+### PIQ-8.4 — Approved workout/meal photo imports automatically leave active queues
+
+**Owner need:** A photo analysis that has been **reviewed and approved** and whose results have actually been saved should **disappear from the active review/pending surfaces automatically**. No second manual **Dismiss** action should be needed in Today, Training, or Nutrition. Failed/unreviewed drafts still need normal recovery controls.
+
+**Current code anchors, not a confirmed diagnosis:** `src/features/training/ImportWorkoutPage.tsx`, `server/training/job-store.ts`, `server/training/transcription.ts`, `server/handlers/transcription-commit.ts`; nutrition meal-photo workflow in `server/nutrition/meal.ts`, `server/nutrition/label-jobs.ts`, and relevant review UIs/API handlers. Workout and nutrition job stores both recognize a persisted **`committed`** status; outstanding-job queries already exclude it. Meal commit currently contains a `recordLabelJobCommitted(...).catch(() => undefined)` path—inspect error handling, idempotency and post-commit notification rather than assuming the problem is only a stale React cache. Also audit label-photo jobs if they share the same queue lifecycle.
+
+**Canonical lifecycle contract:** `queued → processing → completed_awaiting_review → committing → committed`, or `failed/dismissed` as appropriate to existing schema. The conceptual label `completed_awaiting_review` may map to the existing DB status `completed`; **do not invent a new migration** unless existing states cannot represent the distinction. `committed` means verified canonical saved records exist, not merely that AI completed processing or a save button was clicked.
+
+**Critical behavior:**
+
+1. Approval validates the reviewed draft and persists canonical nutrition entries or workout session; it should be idempotent against repeated taps/retries/job replays.
+2. On **confirmed successful commit**, mark the source capture as `committed` durably; update invalidation for Today as well as the relevant Nutrition/Training page; remove the item from outstanding/active review lists without an extra dismiss click; and show a small one-time success confirmation or direct link to the resulting saved record.
+3. Preserve audit/source linkage and history; this is **auto-archive/queue removal**, not destructive deletion of the saved meal, workout, or ingestion provenance. A previously committed job must not be resurrected by late provider polling.
+4. On failed/partial DB save, do **not** claim success, hide a still-unsaved draft, or change status to `committed` without a real canonical result. Handle interrupted network after a successful commit via idempotent lookup and reconciliation; avoid duplicate meals/workouts.
+5. Explicit Dismiss remains appropriate for abandoned, rejected or failed pending analyses, with appropriate semantics. Rejected uploads must not create canonical records; unrelated pending items must remain in queue.
+6. Resolve UI refresh on same-day mutation and when returning via navigation, browser reload, or second tab. Consistency must hold in Today, review page, and origin tab; no ghost cards after an approved import is stored.
+
+**Tests / acceptance:** Workout photo save disappears from Today + Training pending queues after confirmation and persists after reload; meal photo save disappears from Today + Nutrition queues; two pending photos with one approved leave exactly one pending; provider poll after commit does not resurrect the approved job; double-submit/retry yields one canonical entity and one committed job; failed DB transaction remains recoverable; navigation / page refresh / second-tab scenarios reconcile. Test with both Gemini and Home-AI paths where applicable. If investigation finds duplicate canonical writes, swallowed persistence failures, or loss of source history, **escalate this issue to PIQ-1 immediately** instead of treating it as lightweight visual cleanup.
+
+**PIQ-8 EXIT:** Owner can enter natural fractional inches or cm, navigate concise default-collapsed Settings, enjoy a handful of distinctive earned endgame themes, and approve a photo once without manually dismissing its stale review card. Work is independently validated without modifying core intelligence behavior. Track `implemented → validated → deployed → owner_accepted` separately for each item; do not conflate shipped with verified.
+
+---
+
 # 15. Product UX acceptance: quiet, clear, useful
 
 ## 15.1 Today page
@@ -1280,6 +1368,49 @@ These should exist as unit/integration/E2E fixtures as feasible. Avoid hardcodin
 **Input:** Invalid provider JSON and failed evidence IDs.  
 **Must:** Bounded validation repair only; meter attempt and actual costs; fail transparently.  
 **Must NOT:** drop unsupported personal-citation failures into uncited personal claims or infinite retry loop.
+
+## T29. Fractional-inch equivalence
+
+**Input:** Body waist: `31 1/2 in`, `31.5 in`, `31½ in`, `80.01 cm`.  
+**Must:** Normalize these to the same canonical length (within permitted precision), maintain value after edit, and allow normal text entry on mobile.  
+**Must NOT:** Demand manual decimal conversion or round-trip drift.
+
+## T30. Body field unit/malformed input rules
+
+**Input:** Form unit toggle between cm/in; `31/0`, `31 1/2/3`, blank field; unrelated percent/weight metrics.  
+**Must:** Correctly convert valid lengths; reject malformed fractions; respect metric-specific units and previous data.  
+**Must NOT:** Save partial/NaN values, reinterpret blank as zero or mislabel weight as inches.
+
+## T31. Endgame themes, progression and accessibility
+
+**Input:** Owner at levels 20–24, historic unlocked themes, dark/light preference, reduced-motion preference.  
+**Must:** Only append unlocks, preserve prior earned packs, render flashy but readable original themes and respect accessibility.  
+**Must NOT:** Reprice XP, change old unlock levels, flash excessively, or let reward-wallet spending remove a lifetime unlock.
+
+## T32. Default-collapsed Settings and direct-link access
+
+**Input:** Open `/settings` and `/settings#health-profile` or `#theme-studio` on mobile.  
+**Must:** Normal visit shows collapsed subjects; a hash opens its target, focuses/scrolls appropriately and all controls work.  
+**Must NOT:** Force long scrolling, trap focus or silently discard edits.
+
+## T33. Workout photo approved, no ghost queue card
+
+**Input:** One processed paper workout photo; owner reviews and saves a canonical workout.  
+**Must:** Persist one workout, commit source job, remove pending views in Today/Training and remain removed after reload.  
+**Must NOT:** Require a second Dismiss or resurrect on polling.
+
+## T34. Meal photo approved, no ghost queue card
+
+**Input:** One reviewed meal photo; owner approves/saves its nutrition entries.  
+**Must:** Persist proper entries once, mark job committed and remove from Today/Nutrition active queues after refresh.  
+**Must NOT:** Hide an unsaved draft or keep a misleading pending card.
+
+## T35. Photo approval crash/retry/parallel queue safety
+
+**Input:** Two pending jobs, one accepted; repeated Save tap; network failure after DB commit; provider status arrives late.  
+**Must:** Preserve the other pending job and one canonical result, support recovery and idempotent refresh, retain provenance.  
+**Must NOT:** Duplicate data, delete committed history, or mark an unsuccessful save as committed.
+
 
 ### 17.1 Required test layers
 
