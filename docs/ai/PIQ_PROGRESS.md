@@ -492,3 +492,25 @@ Stop expanding test counts for their own sake. Next, pursue runtime verification
 **Definition of next small done:** synthetic fixture runner distinguishes no-data general question from a genuine absent personal measurement; explicit diagnostics differentiate early exit, retrieval failure, model failure; no extra Gemini calls on routine Today render; tests and mobile workflow validation documented.
 
 **Blocking safety:** Do not claim the current product is improved until an actual health question, source-specific evidence and owner acceptance substantiate it.
+
+## PIQ-1.1 — Health AI logged-vs-verified nutrition integrity (2026-10-15)
+
+**State:** Branch-validated; **not deployed or owner-accepted**. PIQ-0 remains open, and none of PIQ-0–8 is fully owner-accepted.
+
+**Why:** T03/T12/T45: nutrition entry quality and count alone do not establish complete days. The shared intelligence engine could previously report a high-confidence calorie baseline, fiber/bowel correlation, or intervention comparison from accurately entered but incomplete meals, even after Maintenance and Weekly Coach had been protected.
+
+**Implementation:** `src/domain/intelligence/shared.ts`, `server/intelligence/snapshot.ts`, `server/nutrition/maintenance-eligibility.ts`, `src/domain/ask-health/packet.ts`, `tests/piq1-shared-nutrition-completeness.test.ts`.
+- A single revision-checked, owner-confirmed/source-reliable candidate SQL read is matched against the original intelligence frame and reused over the selected range. The working server loader always supplies an explicit verified-date Set; query/migration failure fails closed with a count-only, sanitized warning.
+- Raw canonical food observations and their source-quality labels remain available for *logged* value questions. Derived nutrition baselines, confidence, curated relationships and before/after intervention comparisons now require verified dates; other domains remain untouched.
+- Health AI coverage identifies *logged* days separately from *confirmed/reliable* days. A verification outage is labeled *unavailable*, not incorrectly described as the owner having zero confirmations. Empty/historical unverified days are never automatically promoted.
+- No AI calls, auto calorie-target modifications, health-record mutations, migration changes or production branch promotions. Existing migration `0053_nutrition_day_completeness.sql` still requires a gated release.
+
+**Validation:** Branch code commit `643106718cb7bfb50d2cf76605433126ba3bd4f9`, [GitHub Actions 38697995939](https://github.com/daurham/daurham-health/actions/runs/38697995939) **SUCCESS**: npm ci, TypeScript, ESLint, full Vitest suite, production build. Seven new synthetic tests exercise T03 unconfirmed precise one-meal records, T12 fiber/bowel pairs, only-verified before/after comparisons, partial coverage, current-day provisional filtering, Ask Health evidence/correct outage wording, and source-ID/calorie crosschecks. Previous full 0001–0053 migration replay and backup confirmation round-trip remain green (run 38693650304); this checkpoint introduced no migration.
+
+**Decisions:** Distinguish *logged raw nutrition* from *sufficiently verified for full-day inferences*, without discarding logs or pretending failed reads imply absence. Preserve direct synthetic-build backward compatibility; **server** is authoritative and fail-closed. Verification is one deterministic SQL query per loaded intelligence snapshot; no provider model call.
+
+**Outstanding:** No production Neon project in the available connector (list returned []), serving Vercel deployment SHA not verified, no production 0053 migration applied, no actual owner preview/mobile acceptance, no full production-schema clone with all-table restore, and other Health AI overview aggregates still describe *logged* intake only. Real question/safety/outcome scoring remains PIQ-0/PIQ-3 work. Do not claim production is improved yet.
+
+**Next bounded task:** Audit independent Ask Health nutrition trend/target evidence for ambiguous full-day interpretations and health-decision use; preserve exact logged values and avoid treating them as actual intake. Then, with authorized project access, validate production-schema clone and mobile Nutrition completeness preview before considering release. Keep PIQ-8 polish deferred.
+
+**Continuation:** Repo `daurham/daurham-health`, branch `piq/00-baseline-20261014`, schema repo head `0053`, production applied head **unknown**, `main` unchanged. Recheck branch CI and source, read this entry plus master plan before further implementation. **0/9 phases accepted.**

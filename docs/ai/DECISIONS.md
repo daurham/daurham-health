@@ -490,3 +490,8 @@ Observed from the current code and product docs. Where the original rationale is
 **Reason:** When evidence is meaningful but still ambiguous, a stable observation protocol is more informative than repeatedly changing targets.  
 **Implications:** I7 may create a deterministic `maintenance_calibration` suggestion. The owner must review and accept it through the existing Lab flow. Stale fingerprints and duplicate open-Goal coverage are enforced. The protocol observes intake, comparable weight, carbohydrate, and Daily Context; it does not prescribe dehydration or sodium manipulation.
 
+## Decision: shared nutrition evidence retains logs but gates full-day inference by canonical owner confirmation (PIQ-1.1, 2026-10-15)
+
+**Status:** Branch-validated; production release gated.  
+**Reason:** Precise individual food entries do not prove complete-day consumption. Shared-intelligence baselines, correlations, trend confidence and intervention comparisons must not inflate certainty from unknown or partial days.  
+**Implications:** Server reads existing revision-bound, reliable confirmed-day eligibility; failed reads withhold full-day inference while preserving raw logged values. Health AI clearly labels logged versus verified coverage and distinguishes verification failure from zero confirmations. General explanations and exact logged-food questions remain possible. Does not alter calorie goals, run extra Gemini calls or backfill historical confirmations. Owner mobile QA and applied Neon schema verification remain mandatory.
