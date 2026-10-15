@@ -63,8 +63,62 @@ describe('PIQ-1.6 owner-confirmed nutrition relationship eligibility', () => {
     expect(changed.evidence?.pairCoverage).toBeNull()
     expect(changed.evidence?.dateClustering).toBeNull()
     const html = renderToStaticMarkup(<MemoryRouter><GoalControlCard state={current} /></MemoryRouter>)
-    expect(html).toContain('nutrition day is no longer confirmed complete')
+    expect(html).toContain('nutrition day is not both confirmed complete and source-reliable')
     expect(html).toContain('Spearman rank correlation (ρ): unavailable')
+  })
+
+  it.each([
+    { quality: 'estimate_heavy', provenance: 'ai' as const, reason: 'estimate-heavy log' },
+    { quality: 'mixed', provenance: 'mixed' as const, reason: 'mixed source reliability' },
+    { quality: 'unknown', provenance: 'unknown' as const, reason: 'unknown nutrition source' },
+    { quality: null, provenance: 'owner' as const, reason: 'missing quality metadata' },
+  ])('withholds verified-looking rho for a complete day with $reason', ({ quality, provenance }) => {
+    const intelligence = source()
+    const candidate = intelligence.relationships.find((x) => x.id === 'shared:protein:soreness:next_day')!
+    const changedFrame = intelligence.frame.map((day) => day.date !== nutritionDates[4]
+      ? day
+      : { ...day, signals: { ...day.signals,
+        'nutrition.protein_g': {
+          ...day.signals['nutrition.protein_g']!,
+          quality, provenance,
+        },
+      } })
+    // Values, dates, confirmed-day status and original correlation all match.
+    expect(changedFrame.find((day) => day.date === nutritionDates[4])?.signals['nutrition.protein_g']?.dayCompleteness)
+      .toBe('verified_complete')
+    expect(relationshipCoefficientMatchesFrame(changedFrame, candidate)).toBe(true)
+    expect(relationshipNutritionPairsRemainEligible(changedFrame, candidate)).toBe(false)
+    const state = buildGoalControlState({
+      asOf, intelligence: { ...intelligence, frame: changedFrame }, brief, goals,
+    })
+    const selected = state.relationships.find((item) => item.id === candidate.id)!
+    expect(selected.sampleSize).toBe(candidate.sampleSize)
+    expect(selected.confidence).toBe('unknown')
+    expect(selected.evidence?.coefficientVerified).toBe(false)
+    expect(selected.evidence?.rho).toBeNull()
+    expect(selected.evidence?.pairCoverage).toBeNull()
+    const html = renderToStaticMarkup(<MemoryRouter><GoalControlCard state={state} /></MemoryRouter>)
+    expect(html).toContain('nutrition day is not both confirmed complete and source-reliable')
+    expect(html).toContain('Spearman rank correlation (ρ): unavailable')
+  })
+
+  it('checks nutrition reliability on either endpoint, not just X-side protein', () => {
+    const intelligence = source()
+    const date = nutritionDates[1]!
+    const relation = {
+      xKey: 'wellness.soreness' as const, yKey: 'nutrition.protein_g' as const,
+      evidenceDates: [{ xDate: date, yDate: date }],
+    }
+    expect(relationshipNutritionPairsRemainEligible(intelligence.frame, relation)).toBe(true)
+    const changedFrame = intelligence.frame.map((day) =>
+      day.date === date
+        ? { ...day, signals: { ...day.signals,
+          'nutrition.protein_g': { ...day.signals['nutrition.protein_g']!, quality: 'mixed' },
+        } } : day)
+    expect(relationshipNutritionPairsRemainEligible(changedFrame, relation)).toBe(false)
+    expect(relationshipNutritionPairsRemainEligible(intelligence.frame, {
+      ...relation, evidenceDates: [],
+    })).toBe(false)
   })
 
   it('does not impose a nutrition confirmation rule on unrelated sleep/recovery pairs', () => {

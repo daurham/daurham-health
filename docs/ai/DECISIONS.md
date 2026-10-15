@@ -753,3 +753,8 @@ Reproducing Spearman rho is necessary but does not validate independently stored
 ## Decision: aggregate coefficient verification must also recheck nutrition day eligibility (PIQ-1.6, 2026-10-15)
 
 An unchanged measured nutrient number can be ineligible for an association after the owner edits or withdraws the corresponding complete-day confirmation. Downstream Goal Overview evidence interpretation must fail closed for such cited X/Y nutrition dates, independent of whether Spearman rho still reproduces. Preserve historical counts and source inspection; withhold numeric interpretation and confidence. No fabricated zero days, new statistics, or upstream re-ranking.
+
+
+## Decision: complete nutrition days require independent source reliability for interpreted relationships (PIQ-1.6, 2026-10-15)
+
+A complete food-day confirmation reports recording completeness, not accuracy of each ingredient's evidence. Goal Overview only verifies a currently displayed nutrition association when each cited nutrition observation remains confirmed complete, high-confidence and owner/reference/mixed-source provenanced; values/date/rank reproducibility alone is insufficient. Retain historical snapshot and original screening order, but withhold current precise correlation and pairing context on quality downgrade; show explanation. This is a read-time integrity gate, not re-estimation or owner behavior.

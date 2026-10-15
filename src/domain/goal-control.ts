@@ -439,19 +439,28 @@ export function relationshipPairsBackedByFrame(
  * coefficient even when all matched dates still exist. This never rescales,
  * replaces, or re-ranks the upstream snapshot's original relationship.
  */
-/** Day-level nutrition evidence must remain explicitly complete. Matching numeric
- * readings is not enough after an owner revokes a past-day confirmation.
+/** Nutrition relationship evidence needs both confirmed full-day coverage
+ * AND source-reliable entries. A completed day can still be mostly AI estimates
+ * or legacy unknowns. Retain old associations as history but do not describe
+ * such observations as verified current effects.
  */
 export function relationshipNutritionPairsRemainEligible(
   frame: readonly HealthIntelligenceSnapshot['frame'][number][],
   relation: Pick<HealthIntelligenceSnapshot['relationships'][number], 'xKey' | 'yKey' | 'evidenceDates'>,
 ): boolean {
+  if (relation.evidenceDates.length === 0) return false
   const byDate = new Map(frame.map((day) => [day.date, day]))
+  const reliable = (key: IntelligenceSignalKey, date: string): boolean => {
+    if (!key.startsWith('nutrition.')) return true
+    const observation = byDate.get(date)?.signals[key]
+    return observation?.dayCompleteness === 'verified_complete' &&
+      observation.quality === 'high_confidence' &&
+      (observation.provenance === 'owner' ||
+        observation.provenance === 'reference' ||
+        observation.provenance === 'mixed')
+  }
   return relation.evidenceDates.every(({ xDate, yDate }) =>
-    (!relation.xKey.startsWith('nutrition.') ||
-      byDate.get(xDate)?.signals[relation.xKey]?.dayCompleteness === 'verified_complete') &&
-    (!relation.yKey.startsWith('nutrition.') ||
-      byDate.get(yDate)?.signals[relation.yKey]?.dayCompleteness === 'verified_complete')
+    reliable(relation.xKey, xDate) && reliable(relation.yKey, yDate)
   )
 }
 

@@ -445,3 +445,8 @@ Goal Overview checks that originally reported observational strength and directi
 ## 2026-10-15 PIQ-1.6 relationship nutrition eligibility recheck
 
 Bounded work-branch read-time validation for selected observed relationships: exact numeric coefficient and dates are insufficient if a cited nutrition day is no longer `verified_complete`. Withhold numeric interpretation without editing canonical history. Synthetic regression and UI disclosure added; CI and authenticated owner QA remain pending. Production/main unchanged.
+
+
+## 2026-10-15 PIQ-1.6 relationship nutrition source-quality guard
+
+Work-branch verification now requires both confirmed complete nutrition days and source-reliable high-confidence nutrition observations before Goal Overview interprets a selected observational relationship. Estimate-heavy, mixed-quality, unknown and missing-quality entries withhold numerical claims even when the original rho remains mathematically reproducible. Regression and UI disclosure added; CI/owner-device acceptance still gated. No production or provider work.
