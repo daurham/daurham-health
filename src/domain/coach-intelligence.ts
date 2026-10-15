@@ -110,12 +110,21 @@ function restAware(
   draft: CoachRecommendationDraft,
   control: GoalControlState,
 ): CoachRecommendationDraft {
-  if (draft.domain !== 'training' || control.trainingAdherence.state !== 'rest_day_on_track') {
-    return draft
+  if (draft.domain !== 'training') return draft
+  const adherence = control.trainingAdherence
+  // A preferred day already qualified is not a request to train again.
+  if (adherence.state === 'rest_day_on_track' &&
+      (adherence.todayIntent === 'training_preferred' || adherence.todayIntent === 'training_moved_here')) {
+    return {
+      ...draft,
+      detail: `Today's qualified training already counts toward your target; there is no need to add another session to satisfy Coach. ${draft.detail}`,
+      actionText: 'Review next session',
+    }
   }
+  if (adherence.state !== 'rest_day_on_track' && adherence.state !== 'flexible_week') return draft
   return {
     ...draft,
-    detail: `Today is a planned non-Training day and the remaining plan is still on track. Do not add work just to satisfy Coach. ${draft.detail}`,
+    detail: `Today is an optional Training day; resting or moving a workout is not a missed-session penalty. ${draft.detail}`,
     actionText: 'Review next session',
   }
 }
