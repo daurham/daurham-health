@@ -932,3 +932,21 @@ Stop expanding test counts for their own sake. Next, pursue runtime verification
 **Next bounded target:** authenticated owner-safe end-to-end workout-edit/version conflict acceptance with two concurrently editing clients or isolated read-only route harness; verify Neon HTTP transaction semantics and owner-visible reload on iOS/mobile. Audit any direct child-write path for parent-version invalidation, and separately decide whether DELETE also needs CAS. Complete schema head and owner QA before promotion. Do not treat automated PostgreSQL as owner acceptance or merge `main` without explicit authorization.
 
 **Continuation:** Repo `daurham/daurham-health`, branch `piq/00-baseline-20261014`, validated code `2790c349`; **0/9 full PIQ phases accepted**.
+
+## PIQ-1.4 — Version-guarded workout deletion, preserving newer edits (2026-10-15)
+
+**Status:** Implementation and synthetic/disposable-PostgreSQL tests **branch-validated**, not owner/browser accepted or released. **PIQ phase acceptance remains 0/9**.
+
+**Problem:** Workout PATCH had PostgreSQL revision compare-and-swap, but DELETE still detached associated transcription jobs and removed sessions unconditionally, even if another tab or device edited the saved workout after the owner loaded it. A stale delete could erase newer sets.
+
+**Changes at code commit `c5b440c68b17c0899ae88821def38a73aa7e08db`:**
+- DELETE handler requires the same server-issued numeric `expectedEditRevision` as PATCH; missing or malformed tokens fail with 428 before database access.
+- Within one Neon HTTP transaction, a parent UPDATE checks `xmin`, writes an ephemeral per-delete nonce, and only that claimed row authorizes transcription detachment and session deletion. On an old revision all statements are no-ops and the owner receives 409; no other tab's newer workout or exercises are silently removed. A successful delete consumes the row and nonce. Ordinary FK cascade behavior still applies.
+- Workout detail client sends the visible saved token, or the edit draft's original token, and does not navigate away on 409/428. The draft remains, warning/error prompts explicit owner review/reload. A successful user-confirmed deletion still navigates back to Training.
+- Added no-token service unit and SQL guard assertions, plus rollback-only PostgreSQL stale/current DELETE sequence covering preservation and removal of parent and child exercise data. No migration, AI/provider calls, automatic owner writes or paid services added.
+
+**Validation evidence:** [GitHub Actions branch validation 38782039599](https://github.com/daurham/daurham-health/actions/runs/38782039599), attempt 2, **SUCCESS**: npm ci, TypeScript, ESLint, **1,809 Vitest passed / 22 skipped** (233 passed/2 skipped files), production build. Attempt 1 failed only because a legacy `tests/goal-training-units-db.test.ts` ephemeral PostgreSQL process did not start; the same commit passed on retry without a code change. [Isolated PostgreSQL run 38782039764](https://github.com/daurham/daurham-health/actions/runs/38782039764) **SUCCESS** for real disposable schema and stale delete regression.
+
+**Remaining release gates:** Real Neon HTTP transaction semantics and authenticated PATCH/DELETE GET flows; iOS Safari/background restoration and two-tab/conflict navigation owner QA; client cache freshness across Nutrition, Body, profile, goals, check-in and quality decisions; explicit stale/read-error signaling; production applied migration 0053 and owner-schema readiness. This does not prove an old client can delete: versionless DELETE now intentionally fails closed. Direct child-table mutations outside parent-controlled Training services must be audited before declaring full revision coverage.
+
+**Release state:** Work branch `piq/00-baseline-20261014` only. `main` remains unchanged, and no owner production data, deployment, migration, or Gemini usage was affected. **Next bounded target:** PIQ-1.4 remaining cross-domain revalidation, especially profile/quality-state and same-day Nutrition/Body/Goal source changes, with synthetic race/consumer tests before authenticated owner QA. PIQ-1.5 recommendation lifecycle remains next major subsystem.
