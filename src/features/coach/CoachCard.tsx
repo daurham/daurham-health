@@ -447,6 +447,26 @@ function CoachIntelligencePanel({
             <article key={item.id} className="rounded-lg bg-zinc-50 p-2.5">
               <p className="text-sm font-semibold text-zinc-900">{item.title}</p>
               <p className="mt-1 text-xs leading-relaxed text-zinc-600">{item.detail}</p>
+              {item.evidenceExplanation ? (
+                <details className="mt-2 rounded-md border border-zinc-200 bg-white px-2.5 py-2">
+                  <summary className="cursor-pointer text-xs font-medium text-zinc-700">How this was assessed</summary>
+                  <dl className="mt-2 space-y-2 border-t border-zinc-100 pt-2">
+                    {([
+                      ['Food-log evidence', item.evidenceExplanation.nutrition],
+                      ['Weight-trend evidence', item.evidenceExplanation.weightTrend],
+                      ['Plateau assessment', item.evidenceExplanation.plateau],
+                      ['Calorie-change decision', item.evidenceExplanation.calorieDecision],
+                    ] as const).map(([title, evidence]) => (
+                      <div key={title}>
+                        <dt className="text-xs font-semibold text-zinc-700">
+                          {title} · {evidence.status.replaceAll('_', ' ')}
+                        </dt>
+                        <dd className="mt-0.5 text-xs leading-relaxed text-zinc-600">{evidence.detail}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </details>
+              ) : null}
               <div className="mt-2 flex flex-wrap gap-2">
                 <button type="button" className={primaryButtonClass} disabled={pending} onClick={() => onResponse(item, 'do_this')}>
                   {item.actionText}
