@@ -15,7 +15,9 @@ export function auditAskHealthSharedCoverage(
   snapshot: HealthIntelligenceSnapshot,
   routed: RoutedHealthIntelligence,
 ): AskHealthSourceCoverageAudit {
-  const observed = new Set(snapshot.coverage.filter((item) => item.observedDays > 0).map((item) => item.key))
+  const observed = new Set(snapshot.coverage
+    .filter((item) => item.observedDays > (item.provenance.derived ?? 0))
+    .map((item) => item.key))
   const selected = routed.selectedKeys.filter((key) => observed.has(key)).length
   return {
     observedSignalCount: observed.size,
