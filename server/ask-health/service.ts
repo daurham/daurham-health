@@ -79,7 +79,9 @@ export async function answerAskHealth(input: {
       }),
     )
   } catch (error) {
-    if (error instanceof HttpError) {
+    // Preserve expected owner/client 4xx errors; never expose internal 5xx
+    // loader messages (potential SQL or clinical content) to the caller.
+    if (error instanceof HttpError && error.statusCode >= 400 && error.statusCode < 500) {
       throw error
     }
     console.error('ask-health failure stage=evidence_load')

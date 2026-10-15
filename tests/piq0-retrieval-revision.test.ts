@@ -93,6 +93,32 @@ describe('PIQ-0 evidence load boundary and corrected-source cache', () => {
     }
   })
 
+  it('an internal HttpError from the data loader is sanitized without exposing medical or SQL details', async () => {
+    const privateDetail = 'PRIVATE_SYNTHETIC_SQL_PATIENT_ROW'
+    loader.load.mockRejectedValueOnce(new HttpError(500, privateDetail, undefined, 'DB_ROW_PRIVATE'))
+    const model = provider()
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      let actual: unknown
+      try {
+        await callAnswer('What did my records show?', model)
+      } catch (error) {
+        actual = error
+      }
+      expect(actual).toBeInstanceOf(HttpError)
+      const safe = actual as HttpError
+      expect(safe).toMatchObject({
+        statusCode: 503,
+        code: 'ASK_HEALTH_EVIDENCE_LOAD',
+      })
+      expect(safe.message).not.toContain(privateDetail)
+      expect(JSON.stringify(spy.mock.calls)).not.toContain(privateDetail)
+      expect(model).not.toHaveBeenCalled()
+    } finally {
+      spy.mockRestore()
+    }
+  })
+
   it('owner authorization HttpError remains distinct from a missing record', async () => {
     loader.load.mockRejectedValueOnce(new HttpError(403, 'Forbidden', undefined, 'OWNER_FORBIDDEN'))
     const model = provider()
