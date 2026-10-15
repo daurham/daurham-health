@@ -463,6 +463,20 @@ export function CoachIntelligencePanel({
                   <div className="mt-2 space-y-1 border-t border-zinc-100 pt-2 text-xs leading-relaxed text-zinc-600">
                     <p>Goal Control assessment: {item.evidenceGap.period.start} to {item.evidenceGap.period.end}.</p>
                     <p>{item.evidenceGap.explanation}</p>
+                    {item.evidenceGap.coverage ? (
+                      <div className="space-y-1 border-t border-zinc-100 pt-2">
+                        <p>Source observation window: {item.evidenceGap.coverage.period.start} to {item.evidenceGap.coverage.period.end}.</p>
+                        <p>{item.evidenceGap.coverage.label}: {item.evidenceGap.coverage.observedDays} observed dates out of {item.evidenceGap.coverage.eligibleDays} eligible dates.</p>
+                        <p>Excluded observations: {item.evidenceGap.coverage.excludedObservations}.</p>
+                        <p>Recorded source provenance: {Object.entries(item.evidenceGap.coverage.provenance)
+                          .filter(([, count]) => typeof count === 'number' && count > 0)
+                          .map(([source, count]) => `${source.replace(/_/g, ' ')} ${count}`)
+                          .join(', ') || 'unavailable'}.</p>
+                        <p>These counts describe recorded data coverage, not complete tracking, sleep quality, recovery, or proof of a health change.</p>
+                      </div>
+                    ) : (
+                      <p>Source observation counts are unavailable; do not infer complete or zero tracking.</p>
+                    )}
                     <p>This is a request to review missing context, not evidence that a health outcome occurred or a reason to change a target.</p>
                   </div>
                 </details>

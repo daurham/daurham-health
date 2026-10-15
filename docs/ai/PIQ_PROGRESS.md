@@ -1175,3 +1175,18 @@ HAVING COUNT(*) > 1;
 **Tests:** Synthetic high global confidence with missing sleep; unresolved goal not characterized as failed; generic limited cross-domain evidence; precise assessment period; no fabricated nutrition coverage; saved response context changes with evidence detail. No migration, Gemini call, owner-data modification, `main` merge or deployment.
 
 **Remaining PIQ-1.6:** Demonstrate calibration of confidence grades and source-window provenance for recovery and other comparative insights; attach real source event metadata when present rather than inventing it; authenticated mobile UX; canonical revision guarantee for raw edits. Existing migration `0054` remains unapplied and owner-gated.
+
+
+## PIQ-1.6 — Recovery signal observation coverage and provenance (2026-10-15)
+
+**State:** PIQ work-branch implementation; CI and authenticated mobile/owner review are gates. **Owner-accepted phases: 0/9.**
+
+**Problem:** Coach asked for missing sleep/wellness signals with correctly downgraded confidence but no actual observation count, source window or provenance. A generic seven-day Goal Control assessment window could be mistaken for the longer Health Intelligence source window, and absent observation counts could be misconstrued as zero recorded activity or verified complete tracking.
+
+**Contract:** Goal Control's missing-signal limitations now carry the existing Health Intelligence coverage snapshot **only when a matching coverage record is available**, including source period, observed/eligible date counts, excluded observations, provenance by source and source-specific confidence. Coach shows those numbers in a small expandable explanation, explicitly separating its own Goal Control assessment dates from the underlying source observation dates and explaining that recording coverage is not proof of sleep quality, recovery, full-day completeness or a health change. If there is no source coverage, it says counts are unavailable instead of inventing a zero. Evidence-gap recommendation confidence remains **unknown** when the signal is missing, regardless of unrelated high Goal Control confidence.
+
+**Stale decision guard:** The already existing non-calorie evidence context revision hashes the owner-visible evidence gap, so a change in underlying source observations, exclusions, provenance or source window rejects an outdated owner response without creating a false acknowledgement.
+
+**Regression:** Synthetic Coach disclosure/unknown-source tests, deterministic context-token change on new source observations with stable recommendation ID, and a complete Goal Control derivation from fictional Health Intelligence coverage that verifies the true longer source window. No new schema, provider calls, owner records, `main` merge or deployment.
+
+**Remaining:** Confidence calibration against real evaluation outcomes; raw-event-level causal and invalidation guarantees; confounding/quality metadata for comparisons; owner-authenticated iOS QA. Migration 0054 remains unapplied and strictly owner-gated.

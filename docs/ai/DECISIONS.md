@@ -693,3 +693,8 @@ For Coach nutrition-evidence advice, display source-window evidence from the exi
 ## Decision: absence of Recovery/Goal evidence is not a high-confidence signal (PIQ-1.6, 2026-10-15)
 
 A request to fill a missing sleep, wellness or goal-evaluation gap cannot inherit global Goal Control `high` confidence. Mark missing-signal/unknown-goal evidence confidence as `unknown`, and generic cross-domain insufficiency as `limited`; show only the known limitation and actual Goal Control period. Do not infer a decline, failure, compliance, or need for new treatment from absent data. Preserve existing nutrition-quality confidence, independent Maintenance/Training attribution and all owner-start safeguards. Include displayed gap details in context revisions so old tabs cannot silently accept changed rationale.
+
+
+## Decision: missing-signal Coach evidence uses actual source coverage, not inferred completion (PIQ-1.6, 2026-10-15)
+
+For a missing sleep or wellness signal, expose only the measured observed/eligible dates and source provenance already provided by Health Intelligence, with its own dated source window. Do not substitute the weekly Goal Control dates for the observation period, equate recorded dates with complete tracking or a physiological outcome, or manufacture zero when coverage is unavailable. Keep missing-signal intervention confidence unknown; include these owner-visible facts in the non-calorie response revision so stale acknowledgements fail closed. No canonical health data or schema mutation.

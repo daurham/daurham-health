@@ -1,5 +1,5 @@
 import { addCalendarDays, type TrainingDayIntent } from './training-plan.js'
-import type { HealthIntelligenceSnapshot, IntelligenceConfidence, IntelligenceSignalKey } from './intelligence/shared.js'
+import type { HealthIntelligenceSnapshot, IntelligenceConfidence, IntelligenceCoverage, IntelligenceSignalKey } from './intelligence/shared.js'
 import type { WeeklyCandidate, WeeklyCoachBrief, WeeklyGoalSnapshot, WeeklyTrainingPlanSnapshot } from './weekly-coach/types.js'
 import type { MaintenanceState } from './maintenance.js'
 import type { TrainingProgressionState } from './training-progression.js'
@@ -60,10 +60,18 @@ export type GoalControlGoal = {
   detailPath: string
 }
 
+/** Derived coverage from the intelligence observation window, not proof
+ * that the owner completed a day or that a physiological outcome changed.
+ */
+export type GoalControlEvidenceCoverage = Pick<IntelligenceCoverage,
+  'key' | 'label' | 'observedDays' | 'eligibleDays' | 'excludedObservations' | 'provenance' | 'confidence'
+> & { period: { start: string; end: string } }
+
 export type GoalControlLimitation = {
   code: string
   text: string
   detailPath: string | null
+  coverage?: GoalControlEvidenceCoverage
 }
 
 export type GoalControlRelationship = {
@@ -353,10 +361,18 @@ function limitationsFor(
   const keys = activeGoalSignalKeys(goals)
   for (const item of snapshot.context.missing) {
     if (!keys.has(item.key as IntelligenceSignalKey)) continue
+    const match = snapshot.coverage.find((entry) => entry.key === item.key)
     limitations.push({
       code: `missing:${item.key}`,
       text: `${item.label}: ${item.detail}`,
       detailPath: item.detailPath,
+      ...(match ? { coverage: {
+        key: match.key, label: match.label,
+        observedDays: match.observedDays, eligibleDays: match.eligibleDays,
+        excludedObservations: match.excludedObservations,
+        provenance: { ...match.provenance }, confidence: match.confidence,
+        period: { start: snapshot.period.start, end: snapshot.period.end },
+      } } : {}),
     })
   }
   if (nutrition.state !== 'met') {

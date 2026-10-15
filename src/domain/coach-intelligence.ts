@@ -1,4 +1,4 @@
-import type { GoalControlLimitation, GoalControlNutritionQuality, GoalControlState } from './goal-control.js'
+import type { GoalControlEvidenceCoverage, GoalControlLimitation, GoalControlNutritionQuality, GoalControlState } from './goal-control.js'
 import type { MaintenanceEvidenceExplanation } from './maintenance.js'
 import { progressionSeriesForOpportunity, type TrainingProgressionSeries } from './training-progression.js'
 import type { IntelligenceConfidence } from './intelligence/shared.js'
@@ -56,6 +56,8 @@ export type CoachEvidenceGap = {
   limitationCode: string
   period: { start: string; end: string }
   explanation: string
+  /** Actual eligible/observed days from the source window, if present. */
+  coverage?: GoalControlEvidenceCoverage
 }
 
 function evidenceGapForLimitation(limitation: GoalControlLimitation, control: GoalControlState): CoachEvidenceGap {
@@ -64,6 +66,11 @@ function evidenceGapForLimitation(limitation: GoalControlLimitation, control: Go
       : 'limited_cross_domain'
   return {
     kind, limitationCode: limitation.code, period: { ...control.period },
+    ...(kind === 'missing_signal' && limitation.coverage
+      ? { coverage: { ...limitation.coverage,
+        period: { ...limitation.coverage.period },
+        provenance: { ...limitation.coverage.provenance },
+      } } : {}),
     explanation: kind === 'missing_signal'
       ? 'The relevant signal is unavailable or incomplete. This does not prove worse sleep, recovery, or a negative change.'
       : kind === 'unresolved_goal'

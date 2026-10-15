@@ -390,3 +390,8 @@ Added Coach disclosure using bounded seven-completed-day nutrition-quality count
 ## 2026-10-15 PIQ-1.6 recovery/goal missingness confidence — work branch
 
 A missing Recovery sensor/check-in or unknown active Goal no longer inherits global high confidence on a Coach evidence-gap card. Coach displays a source-specific missingness explanation and derived assessment period, explicitly declining to interpret unknown as deterioration or failure. Non-calorie context tokens include the displayed explanation. Regression tests cover sleep, goal, generic weak evidence, and stale-context fingerprints. No schema/provider/owner/prod changes. Release gates remain in `docs/ai/PIQ_PROGRESS.md`.
+
+
+## 2026-10-15 PIQ-1.6 missing-signal source coverage — work branch
+
+Goal Control missing-signal limitations carry optional exact observation-window coverage and source provenance. Coach differentiates its assessment window from the actual source window, displays observed and eligible dates and excluded observations, and explains limits without assuming unlogged equals zero or complete. The existing non-calorie context fingerprint includes these fields. Synthetic and derived-Goal-Control regression tests added. No schema/production/provider/owner-data writes.
