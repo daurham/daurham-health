@@ -308,7 +308,7 @@ export async function getTrainingPlan(asOfInput?: string): Promise<TrainingPlanV
   const [overrides, completedCodes, completed, performedEvidence, routineEvidence] = await Promise.all([
     loadOverrides(applicableStart, end),
     completedRoutineCodes(sequenceCodes, effectiveFrom, asOf, plan.created_at),
-    completedProgrammedSessions(sequenceCodes, applicableStart, end),
+    completedProgrammedSessions(sequenceCodes, applicableStart, asOf),
     performedExerciseEvidence(start, asOf),
     performedExerciseEvidence(effectiveFrom, asOf, plan.created_at),
   ])
