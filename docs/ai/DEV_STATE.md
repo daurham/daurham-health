@@ -335,3 +335,8 @@ Read-only review of Coach advice and Lab experiment preview no longer create sav
 ## 2026-10-15 PIQ-1.5 explicit started provenance — branch only
 
 Owner "I started this" now sends `ownerStarted: true`, which is stored in existing Coach recommendation JSONB metadata. Old review-only `do_this` responses cannot trigger new follow-ups or outcomes, and older clients without the marker cannot create more. No schema/production/provider changes. Review-only navigation passed CI 38787118162; provenance commit `ca1d6e7` still has separate CI and mobile/browser acceptance gates. Continue from `docs/ai/PIQ_PROGRESS.md`.
+
+
+## 2026-10-15 PIQ-1.5 legacy suppression requalification — branch only
+
+Read-only Coach memory now requires stored `ownerStarted` provenance to suppress via `do_this`, while old `turn_into_experiment` previews no longer suppress and direct legacy conversion writes are rejected. Current safety, quality and recommendation revision gates still apply before resurfacing. Explicit not-now/not-relevant remain intact. No migration, legacy data repair, owner data changes or main promotion. CI and owner QA status tracked in PIQ_PROGRESS.

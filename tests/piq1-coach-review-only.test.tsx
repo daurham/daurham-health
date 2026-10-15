@@ -115,4 +115,12 @@ describe('PIQ-1.5 viewing advice is not an intervention', () => {
     expect(api).toContain("response === 'do_this' ? { response, ownerStarted: true } : { response }")
     expect(handler).toContain("response, date, body.ownerStarted === true")
   })
+
+  it('rejects legacy experiment-preview responses before SQL writes', async () => {
+    const query = vi.fn()
+    await expect(writeCoachRecommendationResponse(
+      { query } as unknown as Sql, ID, 'turn_into_experiment', '2026-10-15', async () => undefined,
+    )).rejects.toMatchObject({ statusCode: 409 })
+    expect(query).not.toHaveBeenCalled()
+  })
 })

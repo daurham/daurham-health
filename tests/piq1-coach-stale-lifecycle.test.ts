@@ -106,7 +106,19 @@ describe('PIQ-1.2 stale Coach recommendation lifecycle, synthetic saved rows', (
       responseState: 'do_this' as const, suppressUntil: null,
       followUpOn: '2026-10-15', outcomeState: null, lastSurfacedOn: '2026-10-06',
     }
-    expect(recommendationIsSuppressed(memory, '2026-10-15')).toBe(true)
+    expect(recommendationIsSuppressed(memory, '2026-10-15')).toBe(false)
+    expect(recommendationIsSuppressed({ ...memory, ownerStarted: true }, '2026-10-15')).toBe(true)
     expect(keepCurrentCoachFollowUps([row('review_intake_adjustment', REV_B)], available, REV_A, true)).toEqual([])
+  })
+
+  it('old experiment-preview memory is not an approved experiment and does not suppress advice', () => {
+    const memory = {
+      id: 'preview', fingerprint: intake, recommendationKind: 'review_intake_adjustment',
+      responseState: 'turn_into_experiment' as const, suppressUntil: null,
+      followUpOn: null, outcomeState: null, lastSurfacedOn: '2026-10-06',
+    }
+    expect(recommendationIsSuppressed(memory, '2026-10-15')).toBe(false)
+    expect(recommendationIsSuppressed({ ...memory, responseState: 'not_relevant' }, '2026-10-15')).toBe(true)
+    expect(recommendationIsSuppressed({ ...memory, responseState: 'not_now', suppressUntil: '2026-10-22' }, '2026-10-15')).toBe(true)
   })
 })

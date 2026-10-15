@@ -75,6 +75,7 @@ function recordMemory(row: RecommendationRow): CoachRecommendationMemory {
     fingerprint: row.fingerprint,
     recommendationKind: row.recommendation_kind,
     responseState: row.response_state,
+    ownerStarted: row.metadata?.ownerStarted === true,
     suppressUntil: row.suppress_until,
     followUpOn: row.follow_up_on,
     outcomeState: row.outcome_state,
@@ -395,6 +396,11 @@ export async function writeCoachRecommendationResponse(
 ): Promise<void> {
   if (response === 'do_this' && !ownerStarted) {
     throw new HttpError(400, 'Starting Coach advice requires explicit acknowledgement. Refresh Coach and try again.')
+  }
+  // Choosing a Lab handoff never proves an experiment was created. Older
+  // clients must not persist a false conversion or hide valid advice.
+  if (response === 'turn_into_experiment') {
+    throw new HttpError(409, 'Explore the experiment first; previewing it does not confirm a conversion.')
   }
   const row = await recommendationById(sql, id)
   if (row.recommendation_kind === 'follow_up_question') {

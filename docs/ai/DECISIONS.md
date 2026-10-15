@@ -638,3 +638,8 @@ A "Review" CTA must never call a response endpoint or schedule an owner outcome 
 ## Decision: legacy Coach `do_this` is not proof an intervention began (PIQ-1.5, 2026-10-15)
 
 The former "Review" action set `response_state=do_this` without an actual owner intervention. Going forward, explicitly tapping "I started this" is the only client path supplying `ownerStarted: true`, and the service rejects unmarked `do_this` requests. The flag persists in existing JSONB metadata; only flagged responses qualify for due outcome prompts, which are phrased as owner-reported starts. Preserve legacy rows unchanged pending explicit safe reconciliation rather than backfilling claims of action or deleting owner response history. No migration or live data mutation; owner QA is required.
+
+
+## Decision: legacy review/experiment preview must not suppress current qualified advice (PIQ-1.5, 2026-10-15)
+
+Old `do_this` responses lack proof that the owner initiated an intervention, and `turn_into_experiment` only recorded navigation before experiment creation. Preserve those historical rows but do not treat them as actionable suppression of freshly qualifying advice. `do_this` suppresses only when the stored `metadata.ownerStarted` flag is true; explicit owner `not_now` and `not_relevant` still suppress normally. The old experiment-conversion API input fails closed with a conflict; exploration is noncommittal, Lab remains experiment authority. Existing data is not rewritten, backfilled, or claimed as implementation. A genuinely started legacy action may reappear and require renewed owner acknowledgement, an explicit conservative trade-off. Phase acceptance requires CI and owner QA.

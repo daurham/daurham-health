@@ -42,6 +42,8 @@ export type CoachRecommendationMemory = {
   fingerprint: string
   recommendationKind: string
   responseState: CoachRecommendationResponse | null
+  /** True only for a newly acknowledged owner start, never inferred from legacy Review. */
+  ownerStarted?: boolean
   suppressUntil: string | null
   followUpOn: string | null
   outcomeState: CoachRecommendationOutcome | null
@@ -389,7 +391,10 @@ export function buildCoachFollowUpQuestion(control: GoalControlState): CoachFoll
 
 export function recommendationIsSuppressed(memory: CoachRecommendationMemory | undefined, asOf: string): boolean {
   if (!memory?.responseState) return false
-  if (memory.responseState === 'not_relevant' || memory.responseState === 'turn_into_experiment') return true
-  if (memory.responseState === 'do_this') return true
+  if (memory.responseState === 'not_relevant') return true
+  // Historical Review and Experiment-preview clicks were incorrectly persisted
+  // as decisions. Only an explicitly acknowledged start may suppress on do_this.
+  if (memory.responseState === 'do_this') return memory.ownerStarted === true
+  if (memory.responseState === 'turn_into_experiment') return false
   return memory.suppressUntil != null && asOf < memory.suppressUntil
 }
