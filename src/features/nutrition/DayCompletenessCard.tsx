@@ -60,6 +60,7 @@ export function DayCompletenessCard({ date, today, entries }: {
     setStatus(null)
     setLoading(true)
     setUnavailable(false)
+    setSaving(false)
     setReviewOpen(false)
     void fetchNutritionDayCompleteness(date, abort.signal)
       .then((next) => {
