@@ -120,7 +120,7 @@ describe('PIQ-1.1 Health AI shared nutrition integrity (synthetic only)', () => 
     })
     const nutrient = packet.evidence.find((item) => item.id === 'intelligence.coverage.nutrition.calories')
     expect(nutrient?.text).toContain('14 logged day(s)')
-    expect(nutrient?.text).toContain('0 owner-confirmed')
+    expect(nutrient?.text).toContain('full-day trends are withheld')
     expect(nutrient?.text).toContain('verification is currently unavailable')
     expect(nutrient?.coverage).toMatchObject({ loggedDays: 14, observedDays: 0 })
     expect(nutrient?.substantive).toBe(true)
