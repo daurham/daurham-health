@@ -7,6 +7,9 @@ import { listGoals } from '../goals/service.js'
 import { loadHealthIntelligenceSnapshot } from './snapshot.js'
 import { loadVerifiedNutritionDays } from '../nutrition/maintenance-eligibility.js'
 import { getSql } from '../db.js'
+import { assessMaintenancePerformanceSafety } from '../../src/domain/maintenance-performance.js'
+import { loadTrainingProgressionState } from './training-progression.js'
+import type { TrainingProgressionState } from '../../src/domain/training-progression.js'
 
 type GoalList = Awaited<ReturnType<typeof listGoals>>['goals']
 
@@ -79,17 +82,31 @@ export async function loadMaintenanceState(input: {
   asOf: string
   snapshot?: HealthIntelligenceSnapshot
   listedGoals?: GoalList
+  /** Share canonical training evidence with Goal Control; avoid duplicate SQL. */
+  trainingProgressionPromise?: Promise<TrainingProgressionState>
 }): Promise<MaintenanceState> {
   const today = await currentHealthDate()
   const snapshot = input.snapshot ?? await loadHealthIntelligenceSnapshot({ range: '30d', asOf: input.asOf })
   const contextStart = addCalendarDays(input.asOf, -29)
-  const [contexts, weightGoal, eligibleNutritionDates, adjustmentContext] = await Promise.all([
+  const [contexts, listedGoals, training, eligibleNutritionDates, adjustmentContext] = await Promise.all([
     listDailyContexts(contextStart, input.asOf),
-    currentWeightGoal(input.asOf, today, input.listedGoals),
+    input.listedGoals
+      ? Promise.resolve(input.listedGoals)
+      : input.asOf === today ? listGoals().then((value) => value.goals) : Promise.resolve([] as GoalList),
+    (input.trainingProgressionPromise ?? loadTrainingProgressionState(input.asOf)).catch(() => null),
     // Database/source failures fail CLOSED, never to pre-PIQ source-quality-only behavior.
     loadVerifiedNutritionDays({ snapshot, asOf: input.asOf, today }).catch(() => new Set<string>()),
     loadMaintenanceAdjustmentContext(input.asOf),
   ])
+  const weightGoal = await currentWeightGoal(input.asOf, today, listedGoals)
+  const performance = assessMaintenancePerformanceSafety({
+    asOf: input.asOf,
+    training,
+    goals: listedGoals.map((goal) => ({
+      label: goal.displayName, kind: goal.goalKind, lifecycle: goal.status,
+      targetState: goal.goalStatus.targetState, deadlineState: goal.goalStatus.deadlineState,
+    })),
+  })
   return buildMaintenanceState({
     asOf: input.asOf,
     today,
@@ -97,6 +114,6 @@ export async function loadMaintenanceState(input: {
     contexts,
     weightGoal,
     eligibleNutritionDates,
-    adjustmentContext,
+    adjustmentContext: { ...adjustmentContext, performance },
   })
 }
