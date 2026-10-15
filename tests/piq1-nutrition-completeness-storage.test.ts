@@ -1,8 +1,6 @@
-import { IncomingMessage, ServerResponse } from 'node:http'
-import { Socket } from 'node:net'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { Sql } from '../server/db.js'
-import { HttpError, wrapNodeResponse, type ApiRequest, type ApiResponse } from '../server/http.js'
+import { HttpError } from '../server/http.js'
 import {
   SOURCE_REVISION_SQL, WRITE_NUTRITION_DAY_CONFIRMATION_SQL,
   getNutritionDayCompleteness, saveNutritionDayCompleteness,
