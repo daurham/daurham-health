@@ -157,7 +157,8 @@ describe('I7 observed maintenance estimator', () => {
       intelligence: snapshot(completeSeries({ intake: 2100, weightDeltaPerDay: 0 })),
       contexts: [],
       weightGoal: loseGoal(),
-      adjustmentContext: { status: 'available', currentCalorieTarget: 2200, activeExperimentCount: 0 },
+      adjustmentContext: { status: 'available', currentCalorieTarget: 2200, activeExperimentCount: 0,
+        performance: { status: 'available', asOf: AS_OF, decliningExercises: [], competingGoals: [] } },
     })
     expect(state.estimate.state).toBe('available')
     expect(state.estimate.observedMaintenanceKcal).toBe(2100)
