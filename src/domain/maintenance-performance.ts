@@ -35,7 +35,7 @@ export function assessMaintenancePerformanceSafety(input: {
     (item.state === 'declining' || (item.state === 'confounded' && (item.changePct ?? 0) <= -2.5)) &&
     (item.confidence === 'moderate' || item.confidence === 'high') &&
     item.exposureCount >= 4 &&
-    item.latestDate != null && item.latestDate >= freshSince && item.latestDate <= asOf
+    item.latestDate != null && item.latestDate >= freshSince && item.latestDate <= latestCompleted
   ).map((item) => item.exerciseName))]
   const performanceKinds = new Set([
     'strength_e1rm', 'training_reps', 'training_duration',
