@@ -95,9 +95,9 @@ As of this PIQ-0 continuation, `src/domain/ask-health/diagnostics.ts` calculates
 
 Required metrics: request ID, task intent, evidence packet/omitted domain counts, source freshness, route, data completeness, early exit vs provider/error path, cache hit, latency, tokens and cost; no raw medical data or full questions in routine logs. First code change in this slice must include retention and user-visible vs developer-only boundary.
 
-## PIQ-0.4 — regression infrastructure (ACTIVE / CI pending)
+## PIQ-0.4 — regression infrastructure (CODE CI GREEN; evaluation coverage incomplete)
 
-Registry shape/integrity Vitest added on development branch; awaits branch CI and full synthetic test fixtures. No clinical logic or model responses changed.
+Registry integrity tests and four Ask Health service-level baseline tests added; branch CI passed for implementation commit `8450428`. More fixtures and owner QA remain. No clinical logic or model responses changed.
 
 ## Executable baseline checkpoint — PIQ-0.2 / PIQ-0.3
 
@@ -107,7 +107,7 @@ Registry shape/integrity Vitest added on development branch; awaits branch CI an
 - A canonical synthetic Goal can produce a correctly cited answer through the provider stub, and repeat requests hit the cache.
 - An enum/count-only `meta.diagnostic` distinguishes no-evidence packet, clarification, model answer and cache hit. No raw health data and no production provider spend.
 - **Remaining PIQ-0 gates:** all 50 core scenarios, executable evidence retrieval fixtures, actual response quality scoring, bounded provider diagnostics, owner QA and verified production deployment/schema/usage baseline.
-- Build and branch CI result for this checkpoint: **PENDING** at authoring time; verify the GitHub Actions run before calling this change validated.
+- **Branch code validation PASSED** for implementation commit `845042835997ddf465dcdc6e5d9847f3fc17e2fe` in GitHub Actions run `38677127236` (npm ci, TypeScript, ESLint, Vitest, build); link: https://github.com/daurham/daurham-health/actions/runs/38677127236. This validates the new instrumentation and synthetic baseline tests, **not** the missing product behavior they document.
 
 ## Release state / constraints
 
