@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { displayValueForMetric, FIT_PROFILE_XLSX_ACCEPT } from '@/domain/body-metrics'
 import { metricDefinition, ownerInputNumber } from '@/domain/body-manual'
@@ -27,6 +27,7 @@ import { MeasureForm } from './MeasureForm'
 import { customKeysFor, presetForMetric } from './measure-preset'
 import { selectedFingerprints, selectionFromPreview } from './import-state'
 import { useHealthCalendarTimeZone } from '@/lib'
+import { subscribeHealthDataChanges } from '@/lib/health-changes'
 
 function formatCaptureTime(iso: string, timeZone: string): string {
   return new Intl.DateTimeFormat('en-US', {
@@ -83,6 +84,7 @@ export function BodyPage() {
   const [cadences, setCadences] = useState<BodyCadenceItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [historyError, setHistoryError] = useState<string | null>(null)
   const [file, setFile] = useState<File | null>(null)
   const timezone = instanceTimeZone
   const [preview, setPreview] = useState<FitProfilePreviewResponse | null>(null)
@@ -93,42 +95,51 @@ export function BodyPage() {
   const [editing, setEditing] = useState<BodyMeasurementSession | null>(null)
   const [formOpen, setFormOpen] = useState(params.get('action') === 'measure')
   const focusKey = params.get('metric')
+  const historyGeneration = useRef(0)
 
-  async function reloadHistory() {
+  // Every authoritative Body read is one indivisible snapshot in the UI.
+  // A slow request must not replace newer measurements, cadences, or inbox.
+  const reloadHistory = useCallback(async () => {
+    const generation = ++historyGeneration.current
     const [nextSessions, nextCadences, nextInbox] = await Promise.all([
       fetchBodyMeasurements(),
       fetchBodyCadences(),
       fetchBodyInbox(),
     ])
+    if (generation !== historyGeneration.current) return
     setSessions(nextSessions)
     setCadences(nextCadences)
     setInbox(nextInbox)
-  }
+    setHistoryError(null)
+  }, [])
 
   useEffect(() => {
-    let cancelled = false
-    Promise.all([fetchBodyMeasurements(), fetchBodyCadences(), fetchBodyInbox()])
-      .then(([nextSessions, nextCadences, nextInbox]) => {
-        if (!cancelled) {
-          setSessions(nextSessions)
-          setCadences(nextCadences)
-          setInbox(nextInbox)
-        }
-      })
+    let active = true
+    void reloadHistory()
       .catch((caught: unknown) => {
-        if (!cancelled) {
-          setError(caught instanceof Error ? caught.message : 'Could not load measurements')
-        }
+        if (active) setHistoryError(caught instanceof Error ? caught.message : 'Could not load measurements')
       })
       .finally(() => {
-        if (!cancelled) {
-          setLoading(false)
-        }
+        if (active) setLoading(false)
       })
     return () => {
-      cancelled = true
+      active = false
+      historyGeneration.current += 1
     }
-  }, [])
+  }, [reloadHistory])
+
+  useEffect(() => {
+    let active = true
+    const unsubscribe = subscribeHealthDataChanges(() => {
+      void reloadHistory().catch((caught: unknown) => {
+        if (active) setHistoryError(caught instanceof Error ? caught.message : 'Could not refresh measurements')
+      })
+    }, { revalidateOnFocus: true })
+    return () => {
+      active = false
+      unsubscribe()
+    }
+  }, [reloadHistory])
 
   useEffect(() => {
     if (params.get('action') === 'measure') {
@@ -291,18 +302,18 @@ export function BodyPage() {
         busy={busy != null}
         onSave={async (metricKey, intervalDays, enabledFrom) => {
           await saveBodyCadence(metricKey, intervalDays, enabledFrom)
-          setCadences(await fetchBodyCadences())
+          await reloadHistory()
         }}
         onDisable={async (metricKey) => {
           await deleteBodyCadence(metricKey)
-          setCadences(await fetchBodyCadences())
+          await reloadHistory()
         }}
         onApply={async (keys, intervalDays) => {
           const existing = new Map(cadences.map((item) => [item.metricKey, item.enabledFrom]))
           for (const key of keys) {
             await saveBodyCadence(key, intervalDays, existing.get(key))
           }
-          setCadences(await fetchBodyCadences())
+          await reloadHistory()
         }}
       />
 
@@ -331,6 +342,17 @@ export function BodyPage() {
         </div>
       </details>
 
+      {historyError ? (
+        <p role="alert" className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          {sessions.length > 0 ? 'Showing the last loaded measurements. ' : ''}
+          {historyError}
+          <button type="button" className={quietButtonClass + ' ml-2 underline'} onClick={() => {
+            void reloadHistory().catch((caught: unknown) => {
+              setHistoryError(caught instanceof Error ? caught.message : 'Could not refresh measurements')
+            })
+          }}>Retry</button>
+        </p>
+      ) : null}
       {error ? (
         <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
           {error}

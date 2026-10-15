@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { subscribeHealthDataChanges } from '@/lib/health-changes'
 import {
   nutritionDayQuality,
   nutritionDayQualityLabel,
@@ -82,6 +83,18 @@ export function NutritionPage() {
   const [notice, setNotice] = useState<string | null>(null)
   const [undo, setUndo] = useState<NutritionEntry | null>(null)
   const [captures, setCaptures] = useState<PendingNutritionCapture[]>([])
+  // The atomic resource owns freshness generations. Keep a current reference
+  // without resubscribing whenever unrelated Nutrition UI state changes.
+  const refreshResource = useRef(resource)
+  refreshResource.current = resource
+
+  useEffect(() => subscribeHealthDataChanges(() => {
+    const latest = refreshResource.current
+    // Generic no-PII invalidation cannot identify the day touched. Evict the
+    // prefetched neighbors so switching dates never resurrects stale totals.
+    for (const key of [date, ...adjacentNutritionDates(date)]) latest.invalidate(key)
+    latest.retry()
+  }, { revalidateOnFocus: true }), [date])
 
   useEffect(() => {
     if (urlDate !== urlDateRef.current) {

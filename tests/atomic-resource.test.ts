@@ -100,6 +100,26 @@ describe('atomic keyed-resource transition', () => {
     expect(failed.pendingKey).toBeNull()
   })
 
+  it('a late same-date refetch cannot replace the newest Nutrition snapshot or hide its error', () => {
+    const committed = commitAtomicRequest(
+      startAtomicRequest(emptyAtomicTransition<string, Day>(), SEP_21),
+      SEP_21,
+      day(SEP_21, 1420),
+      1,
+    )
+    const first = refreshAtomicRequest(committed, SEP_21)
+    const second = refreshAtomicRequest(first, SEP_21)
+    // A background focus refresh completed after the newer mutation refresh.
+    const staleSuccess = commitAtomicRequest(second, SEP_21, day(SEP_21, 1400), first.generation)
+    const staleFailure = failAtomicRequest(second, SEP_21, 'old timeout', first.generation)
+    expect(staleSuccess).toBe(second)
+    expect(staleFailure).toBe(second)
+    const newest = commitAtomicRequest(second, SEP_21, day(SEP_21, 1900), second.generation)
+    expect(newest.data).toEqual(day(SEP_21, 1900))
+    expect(newest.pendingKey).toBeNull()
+    expect(newest.error).toBeNull()
+  })
+
   it('replaces committed data without changing the key', () => {
     const loaded = commitAtomicRequest(
       startAtomicRequest(emptyAtomicTransition<string, Day>(), SEP_21),
