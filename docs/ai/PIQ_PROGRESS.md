@@ -369,16 +369,41 @@ Stop expanding test counts for their own sake. Next, pursue runtime verification
 
 **Next bounded work:** Obtain owner-authorized isolated Postgres/Neon branch access; validate SQL SHA-256 revisions, optimistic version conflict, food edit/exclusion races, auth, backup/restore; then connect verified read-time completeness to maintenance/Goal Control/Coach with the T03 single-meal regression. Do not silently treat unknown historical days as complete or ship calorie adjustment changes before these gates.
 
+## PIQ-1.1 checkpoint — isolated PostgreSQL SQL and concurrency validation (2026-10-14 owner-local)
+
+**Feature-branch implementation:** `2e0d2b3bed925b90b126c0fdf4de056949290876`  
+**Real PostgreSQL integration:** [GitHub Actions 38690105448](https://github.com/daurham/daurham-health/actions/runs/38690105448) — **SUCCESS**, **6/6** real-database tests.  
+**Full application validation:** [GitHub Actions 38690105524](https://github.com/daurham/daurham-health/actions/runs/38690105524) — **SUCCESS**, TypeScript, lint, Vitest, production build.
+
+### Exactly what was verified
+
+- Introduced an isolated, branch-scoped GitHub Actions workflow `.github/workflows/piq1-postgres.yml` with temporary **PostgreSQL 16**, fixture-only credentials and **no production DATABASE_URL/Neon connection**.
+- Integration script `tests/piq1-nutrition-postgres.integration.test.ts` creates canonical nutrition tables using actual migration `0008`, selects the nutrition-evidence column and data-quality-review schema from migration `0046`, then **executes migration `0053`**. This is **representative schema replay**, **NOT complete migrations 0001–0053** or a Neon project migration.
+- Executed real SHA-256 source revision reads (including deterministic empty day); stored owner confirmation and incremented version; corrected an entry then verified stale reported state and 409; excluded an entry then re-confirmed to show it cannot calibrate maintenance; required an explicit fast for genuinely empty days; verified one success and one 409 from two independent concurrent PostgreSQL connections; verified food deletion invalidates the confirmation.
+- First real SQL run found a **genuine data-integrity defect**: a log containing only **analysis-excluded** entries looked like a zero-entry day and incorrectly required reporting a fast. This was corrected in `src/domain/nutrition/day-completeness.ts` and `server/nutrition/day-completeness.ts` by separating `recordedEntryCount` (all diary rows) from qualified `quality.entryCount` (analysis-included rows). Added a domain regression and updated mock storage tests. The fixed Postgres integration test and full app CI both passed.
+- `recordedEntryCount` is informational; it never proves a day has all food logged. A complete report with excluded records remains **ineligible for maintenance**, without inventing a fast or deleting records.
+- No schema migration has been applied to live Neon; no user health records read, no Vercel production promotion, no merge to `main`, no paid Gemini requests and no calorie-target changes by this work.
+
+### Strict remaining gates
+
+1. **Production Neon and Vercel identity still unverified:** connected Neon list_projects returned `[]`, previous Vercel scope blocked deployed-version inspection. Branch SQL correctness cannot identify the active app or applied production migration head.
+2. The test covers relevant tables from migrations 0008/0046 plus 0053. **Full sequential migration replay, backup/restore and realistic Neon concurrency/latency remain unverified.** Source-write races after an individual SQL statement's MVCC snapshot are not prevented by a client confirmation hash alone; final read-time revision verification must remain fail-closed.
+3. The optional Nutrition UI and owner-authenticated GET/PUT are **branch implementation**, not live owner mobile acceptance. Food edits must continue to invalidate confirmation, especially late imports and exclusion review changes.
+4. **Existing Maintenance, Coach and Goal Control still use food source quality without actual stored day-completeness gating.** The unsafe 28-day single-meal estimator reproduction remains a known product defect in the deployed path; no auto calorie-cut is authorized.
+5. The next bounded PIQ-1.1 work should add a **set-based, read-time, fail-closed calendar-day eligibility manifest** using stored owner confirmations + current source revisions, then connect it to Maintenance/Coach/Goal Control on the branch with T03 regression. Avoid one SQL round trip per day or pretending that the 0053 table already exists in production.
+
+**Phase truth: 0/9 completed; PIQ-0 runtime/quality acceptance open; PIQ-1.1 code + representative real PostgreSQL SQL path validated, but not end-to-end production accepted.**
+
 ## Release state / constraints
 
 - Branch-only preparation: **no production deployments, database migrations, schema changes, AI API calls, or owner data writes performed by this PIQ work**.
 - The Vercel connector's project discovery succeeding does not imply deployment inspection permission.
 - A future phase may use read-only owner-authorized database/project access; never apply migrations merely to satisfy a baseline document.
-- Branch CI for latest implementation: **success** — Actions run `38689289994` on `041f6d8`, all standard checks passed. Subsequent documentation-only commits are not new implementation validation.
+- Latest implementation checks: isolated PostgreSQL [38690105448] successful and full branch validation [38690105524] successful on `2e0d2b3`. Subsequent documentation-only commits do not imply new code validation.
 
 ## Continuation packet — NEXT SESSION
 
-**Task:** PIQ-1.1 next action: acquire authorized temporary Neon/Postgres branch, run migration 0053 and real SQL/concurrency/backup verification, then owner mobile confirmation QA. Client stale-food-confirmation display is now guarded and CI validated. Only after DB verification wire revision-verified days into maintenance/Coach/Goal Control; PIQ-0 live baseline remains open, no main promotion or calorie-target changes.
+**Task:** PIQ-1.1 next action: use the verified isolated PostgreSQL foundation to implement a set-based read-time verified day-completeness eligibility manifest, then branch-only Maintenance/Coach/Goal Control gating with the 28-day single-meal T03 regression. Continue to verify full schema replay/backup and live production scope before any promotion or migration.
 
 **First steps:** Read master §§0–6 + PIQ-0 + §§17–21; inspect this file; verify current main/feature branch, production status, CI and schema. Try authorized Vercel project scope and Neon lookup only if access exists. Reconcile `CURRENT_TASK.md` drift once the verified production state is available. Confirm the baseline contract is still aligned with owner's purpose.
 
