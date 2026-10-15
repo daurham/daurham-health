@@ -554,3 +554,11 @@ Observed from the current code and product docs. Where the original rationale is
 - A high-confidence empirical maintenance **estimate** does not imply causal proof of a plateau, probability of disease, or approval of a lower calorie target. The floor heuristic cannot certify individual energy sufficiency, and no automatic target changes are authorized.
 - Present the breakdown inside a collapsed accessible details element on Maintenance-backed Coach cards; keep ordinary training Coach cards compact. Neither add model spend nor new SQL/migrations.
 - Branch CI and synthetic UI render tests prove representation under fixtures, not human comprehension on mobile. Owner accept/release tests remain mandatory.
+
+## Decision: due Coach follow-ups must qualify in SQL before the visible limit, and accepted calorie revision must remain original (PIQ-1.2, 2026-10-15)
+
+**Branch-validated; production release held.** A queue of obsolete calorie `do_this` follow-ups must never consume the first 24 scanned rows and hide later valid training follow-ups. Database filters numeric calorie and dependent activity cards by stored revision and *currently qualified draft fingerprint* before applying the visible `LIMIT 3`; an after-read failed settings check drops calorie rows and re-queries noncalorie candidates. Never interpret missing legacy metadata as current.
+
+On the upsert path, preserve an already accepted numeric recommendation's **original decision-revision metadata** instead of relabeling it with fresh settings. Save/response-history is not a mutable endorsement of new decisions. Block a stale saved ID at the actual service SQL write boundary before owner-response mutation with an HTTP 409; preserve historical response/outcome memory.
+
+Proved with 32 stale + four valid follow-ups, accepted ID under a real target edit, and ON CONFLICT against the disposable PostgreSQL migration chain. The write path is shared with the API, but an authenticated HTTP/browser E2E is still outstanding. No target, medical record, production database or migration was changed. Final check remains optimistic rather than transactional; historical card text mutability remains a separate lifecycle consideration.
