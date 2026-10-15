@@ -56,6 +56,7 @@ function control(verified: ReadonlySet<string>, unavailable = false) {
     asOf: AS_OF, today: AS_OF, intelligence, contexts: [],
     eligibleNutritionDates: verified,
     adjustmentContext: { status: 'available', currentCalorieTarget: 2500, activeExperimentCount: 0,
+      revisionStatus: 'consistent', decisionRevision: 'test-current-revision',
       performance: { status: 'available', asOf: AS_OF, decliningExercises: [], competingGoals: [] } },
     weightGoal: {
       goalId: 'weight-goal', goalVersionId: 'weight-goal-v1',
