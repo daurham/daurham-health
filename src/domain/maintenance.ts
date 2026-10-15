@@ -139,6 +139,16 @@ export type CalorieAdjustmentSafety = {
   recentCheckinDays: number
 }
 
+export type MaintenancePhysiologyScreen = {
+  /** The Health Profile is a CURRENT owner report; do not reuse for historical as-of decisions. */
+  status: 'available' | 'unavailable'
+  asOf: string
+  ageYears: number | null
+  heightCm: number | null
+  /** Count only self-reported active or uncertain conditions, not an inferred diagnosis. */
+  activeOrUncertainConditionCount: number
+}
+
 export type MaintenanceAdjustmentContext = {
   /** Read-time current target, never inferred from partially logged intake. */
   currentCalorieTarget: number | null
@@ -149,6 +159,7 @@ export type MaintenanceAdjustmentContext = {
   revisionStatus?: DecisionRevisionStatus
   /** Canonical exact-exercise trends and active goal urgency, separately verified. */
   performance?: MaintenancePerformanceSafety | null
+  physiology?: MaintenancePhysiologyScreen | null
   /** Any failed read is unknown, not equivalent to zero experiments. */
   status: 'available' | 'unavailable'
 }
@@ -845,6 +856,40 @@ export function calorieAdjustmentSafety(
     }
   }
   if (isLossGoal) {
+    const physiology = context?.physiology
+    if (physiology?.status !== 'available' || physiology.asOf !== input.asOf ||
+        physiology.ageYears == null || !Number.isFinite(physiology.ageYears) ||
+        physiology.heightCm == null || !Number.isFinite(physiology.heightCm) ||
+        physiology.heightCm < 50 || physiology.heightCm > 250) {
+      reasons.push('Current age and height context is missing or historical; review the Health Profile before a numerical calorie reduction.')
+    } else {
+      if (physiology.ageYears < 18 || physiology.ageYears >= 65) {
+        reasons.push('This generic calorie-reduction screen is intended only for adults 18–64; individualized review is needed for other ages.')
+      }
+      const weightKg = estimate.latestWeightKg
+      const heightM = physiology.heightCm / 100
+      const bmi = weightKg != null && weightKg > 0 ? weightKg / (heightM * heightM) : null
+      if (bmi == null || !Number.isFinite(bmi) || bmi < 18.5) {
+        reasons.push('Low or unknown weight relative to height warrants individual assessment instead of another calorie cut.')
+      }
+      if (physiology.activeOrUncertainConditionCount > 0) {
+        reasons.push('Reported active or uncertain clinical conditions require an individualized review before lowering intake.')
+      }
+    }
+    // A statistical maintenance range is not energy availability or BMR.
+    // Do not use its point estimate to certify an arbitrary lower target.
+    if (proposedTarget != null && estimate.rangeLowKcal != null &&
+        proposedTarget < estimate.rangeLowKcal) {
+      reasons.push('The proposed target falls below the lower edge of the uncertain maintenance estimate; it cannot be justified by this scale trend alone.')
+    }
+    if (proposedTarget != null && estimate.averageIntakeKcal != null &&
+        proposedTarget >= estimate.averageIntakeKcal) {
+      reasons.push('Recent logged intake is already at or below the proposed target; changing the target may not change actual intake. Review target adherence instead.')
+    }
+    if (target != null && estimate.averageIntakeKcal != null &&
+        estimate.averageIntakeKcal > target * 1.05) {
+      reasons.push('Recent logged intake exceeds the current target by more than five percent; review adherence and intake completeness before lowering the target.')
+    }
     const performance = context?.performance
     if (performance?.status !== 'available' || performance.asOf !== input.asOf) {
       reasons.push('Training performance and active goal checks are unavailable; decline or competing goals cannot be ruled out.')
