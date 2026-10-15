@@ -9,6 +9,7 @@ import type {
 import { calendarDaysBetween } from './progress/dates.js'
 import { theilSenSlopePerDay } from './progress/statistics.js'
 import { addCalendarDays } from './training-plan.js'
+import type { MaintenancePerformanceSafety } from './maintenance-performance.js'
 
 export const MAINTENANCE_ENGINE_VERSION = 'maintenance-engine-v1' as const
 export const KCAL_PER_KG_BODY_MASS_CHANGE = 7700
@@ -130,6 +131,8 @@ export type MaintenanceAdjustmentContext = {
   currentCalorieTarget: number | null
   /** Active or imminently scheduled owner experiments. */
   activeExperimentCount: number
+  /** Canonical exact-exercise trends and active goal urgency, separately verified. */
+  performance?: MaintenancePerformanceSafety | null
   /** Any failed read is unknown, not equivalent to zero experiments. */
   status: 'available' | 'unavailable'
 }
@@ -820,6 +823,19 @@ export function calorieAdjustmentSafety(
     }
   }
   if (isLossGoal) {
+    const performance = context?.performance
+    if (performance?.status !== 'available' || performance.asOf !== input.asOf) {
+      reasons.push('Training performance and active goal checks are unavailable; decline or competing goals cannot be ruled out.')
+    } else {
+      if (performance.decliningExercises.length > 0) {
+        reasons.push('Recent comparable strength performance is lower or confounded (' +
+          performance.decliningExercises.join(', ') + '); review training and recovery before reducing calories.')
+      }
+      if (performance.competingGoals.length > 0) {
+        reasons.push('Time-sensitive active performance goals need review (' +
+          performance.competingGoals.join(', ') + ') before a calorie reduction.')
+      }
+    }
     if (screeningFloor == null || proposedTarget == null || proposedTarget < screeningFloor) {
       reasons.push('The proposed target would be too low relative to the conservative intake-screening floor, or its safety cannot be assessed.')
     }
