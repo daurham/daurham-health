@@ -1147,3 +1147,18 @@ HAVING COUNT(*) > 1;
 **Regression:** Synthetic high Goal / moderate Maintenance / limited Training confidence disagreement, independent Training trend explanation, unavailable exact-match evidence => unknown, nonmatching similar suffix, no invented exposure/adherence; existing calorie-safety and owner-response guards unaffected. No new schema, provider/model call, owner data write, deployment or `main` promotion.
 
 **Still required for PIQ-1.6:** Calibration of confidence levels, provenance and source-range completeness for other domains and comparative assertions, explicit uncertainty on estimates, and mobile/owner QA. Migration `0054` remains unapplied in production and separately gated.
+
+
+## PIQ-1.6 — Owner-confirmed Nutrition coverage explanation in Coach (2026-10-15)
+
+**State:** Bounded PIQ work-branch implementation; requires independent full CI and authenticated mobile QA. **PIQ phases owner-accepted: 0/9.**
+
+**Problem:** When broad Goal Control confidence was high, Coach's advice to improve incomplete food evidence inherited that unrelated high confidence. A reader could see logged days without seeing how few whole days were truly owner-confirmed complete/source-reliable, or incorrectly interpret missing logging as a known zero-calorie day. Even valid calorie-review options had no quick explanation of the seven most recent completed days' distinct safety floor (as opposed to the longer maintenance-estimation window).
+
+**Contract:** Attach the existing Goal Control `nutritionQuality` evidence snapshot, without new inference, to `nutrition_quality_floor` recommendations and eligible calorie/activity plateau options. The Coach disclosure shows the last seven *completed* calendar dates, recorded-calorie-entry days, verified complete/source-reliable days, estimate-heavy days, unknown-source/quality days, and separate minimums. It expressly states that an entry is not whole-day confirmation and an unverified/missing day is not zero intake. The `improve_evidence` card uses confidence `limited` or `unknown` based on that evidence, never borrowing cross-domain `high`. Maintenance and Training confidence remain independently scoped. This is informational only: the preexisting numeric calorie-adjustment safety and verification gates are unchanged.
+
+**Staleness:** Non-calorie Coach context revisions include the exact owner-visible nutrition breakdown in addition to the already present Goal Control evidence fingerprint. A changed verification count with an otherwise identical card invalidates a saved stale-tab response rather than silently recording an action.
+
+**Tests:** Synthetic high overall confidence vs limited/unknown nutrition, exact counts and no zero/complete inference in server-rendered Coach UI, presence on both qualified plateau levers without bypassing their safety floor, and context token invalidation as quality evidence changes. No migration, new owner medical facts, provider/model calls, edits to actual owner data, or main/prod changes.
+
+**Still open:** Clinical/statistical calibration of confidence, general source provenance and missingness explanation across other signals and Ask Health, canonical/raw-event revision guarantees, authenticated owner QA, and the owner-approved production preflight and unapplied migration `0054`.

@@ -1,4 +1,4 @@
-import type { GoalControlLimitation, GoalControlState } from './goal-control.js'
+import type { GoalControlLimitation, GoalControlNutritionQuality, GoalControlState } from './goal-control.js'
 import type { MaintenanceEvidenceExplanation } from './maintenance.js'
 import { progressionSeriesForOpportunity, type TrainingProgressionSeries } from './training-progression.js'
 import type { IntelligenceConfidence } from './intelligence/shared.js'
@@ -45,6 +45,15 @@ function trainingEvidenceForOpportunity(control: GoalControlState, opportunityId
   }
 }
 
+/** A last-seven-completed-day coverage snapshot from Goal Control;
+ * entered items never silently count as verified whole-day intake.
+ */
+export type CoachNutritionEvidence = GoalControlNutritionQuality
+
+function recentNutritionEvidence(control: GoalControlState): CoachNutritionEvidence {
+  return { ...control.nutritionQuality, period: { ...control.nutritionQuality.period } }
+}
+
 export type CoachRecommendationDraft = {
   fingerprint: string
   sourceId: string
@@ -57,6 +66,7 @@ export type CoachRecommendationDraft = {
   confidence: IntelligenceConfidence
   evidenceExplanation?: MaintenanceEvidenceExplanation
   trainingEvidence?: CoachTrainingEvidence
+  nutritionEvidence?: CoachNutritionEvidence
   evidenceRefs: string[]
   priority: number
   experimentEligible: boolean
@@ -87,6 +97,7 @@ export type CoachRecommendationView = {
   confidence: IntelligenceConfidence
   evidenceExplanation?: MaintenanceEvidenceExplanation
   trainingEvidence?: CoachTrainingEvidence
+  nutritionEvidence?: CoachNutritionEvidence
   evidenceRefs: string[]
   responseState: CoachRecommendationResponse | null
   /** Opaque exact DB response timestamp; null means never responded. */
@@ -202,6 +213,7 @@ function opportunityDraft(
       : control.confidence,
     ...(maintenanceExplanation ? { evidenceExplanation: maintenanceExplanation } : {}),
     ...(trainingEvidence ? { trainingEvidence } : {}),
+    ...(isCalorieDecisionKind(opportunity.kind) ? { nutritionEvidence: recentNutritionEvidence(control) } : {}),
     evidenceRefs: [...opportunity.evidenceRefs],
     priority: 100,
     experimentEligible: opportunity.domain !== 'review',
@@ -256,6 +268,7 @@ function maintenanceDrafts(control: GoalControlState): CoachRecommendationDraft[
       detailPath: item.detailPath,
       confidence: control.maintenance!.estimate.confidence,
       evidenceExplanation: control.maintenance!.evidenceExplanation,
+      ...(isCalorieDecisionKind(item.kind) ? { nutritionEvidence: recentNutritionEvidence(control) } : {}),
       evidenceRefs: ['maintenance:estimate', 'maintenance:plateau-state'],
       priority: 70,
       experimentEligible: true,
@@ -281,7 +294,8 @@ function limitationDraft(limitation: GoalControlLimitation, control: GoalControl
     detail: limitation.text,
     actionText: 'Add context',
     detailPath: limitation.detailPath,
-    confidence: control.confidence,
+    confidence: nutrition ? (control.nutritionQuality.state === 'unknown' ? 'unknown' : 'limited') : control.confidence,
+    ...(nutrition ? { nutritionEvidence: recentNutritionEvidence(control) } : {}),
     evidenceRefs: [`limitation:${limitation.code}`],
     priority: 60,
     experimentEligible: false,

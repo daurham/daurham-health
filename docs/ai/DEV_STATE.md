@@ -380,3 +380,8 @@ Goal overview confidence now explicitly describes cross-domain goal evidence; ob
 ## 2026-10-15 PIQ-1.6 exercise-specific Training confidence — branch only
 
 Coach now attributes Training progression confidence to the exact matching exercise-series assessment, rather than the Goal Overview's cross-domain badge or a partial exercise-ID match. Goal Overview and Coach show scoped Training evidence explanations (recorded comparable exposure count, latest exposure date, trend, confounders); unmatched evidence shows unknown. Added synthetic confidence-disagreement and rendering tests. No owner DB migration, live data writes, provider calls, or production promotion. CI/owner QA recorded in `PIQ_PROGRESS.md`.
+
+
+## 2026-10-15 PIQ-1.6 Nutrition evidence scope — work branch
+
+Added Coach disclosure using bounded seven-completed-day nutrition-quality counts already computed by Goal Control. Evidence-gap cards no longer borrow global confidence; numerically gated plateau options expose the same coverage without changing gating. Context revisions include the displayed evidence. Tests cover high-versus-limited/unknown conflict, exact counts, no zero-intake inference, and stale-count invalidation. Branch only; no production migration, merge, provider call or owner-record change. Release gates: full CI, authenticated device validation, migration `0054` preflight.

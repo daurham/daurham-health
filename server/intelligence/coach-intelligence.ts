@@ -108,6 +108,7 @@ export function coachRecommendationContextRevision(
     evidenceRefs: draft.evidenceRefs,
     evidenceExplanation: draft.evidenceExplanation ?? null,
     trainingEvidence: draft.trainingEvidence ?? null,
+    nutritionEvidence: draft.nutritionEvidence ?? null,
     evidence,
   })).digest('hex')
 }
@@ -242,6 +243,7 @@ function recommendationView(row: RecommendationRow, draft: CoachRecommendationDr
     confidence: draft.confidence,
     ...(draft.evidenceExplanation ? { evidenceExplanation: draft.evidenceExplanation } : {}),
     ...(draft.trainingEvidence ? { trainingEvidence: draft.trainingEvidence } : {}),
+    ...(draft.nutritionEvidence ? { nutritionEvidence: draft.nutritionEvidence } : {}),
     evidenceRefs: [...draft.evidenceRefs],
     responseState,
     responseAt: row.response_at == null ? null : String(row.response_at),

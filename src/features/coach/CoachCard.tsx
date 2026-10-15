@@ -455,6 +455,21 @@ export function CoachIntelligencePanel({
             <article key={item.id} className="rounded-lg bg-zinc-50 p-2.5">
               <p className="text-sm font-semibold text-zinc-900">{item.title}</p>
               <p className="mt-1 text-xs leading-relaxed text-zinc-600">{item.detail}</p>
+              {item.nutritionEvidence ? (
+                <details className="mt-2 rounded-md border border-zinc-200 bg-white px-2.5 py-2">
+                  <summary className="cursor-pointer text-xs font-medium text-zinc-700">
+                    Recent food-log coverage · {item.nutritionEvidence.state === 'met' ? 'minimum met' : item.nutritionEvidence.state === 'unknown' ? 'unknown' : 'limited'}
+                  </summary>
+                  <div className="mt-2 space-y-1 border-t border-zinc-100 pt-2 text-xs leading-relaxed text-zinc-600">
+                    <p>Last seven completed days: {item.nutritionEvidence.period.start} to {item.nutritionEvidence.period.end}.</p>
+                    <p>Days with calorie entries: {item.nutritionEvidence.loggedDays} · minimum {item.nutritionEvidence.requiredLoggedDays}.</p>
+                    <p>Owner-confirmed complete, source-reliable days: {item.nutritionEvidence.reliableDays} · minimum {item.nutritionEvidence.requiredReliableDays}.</p>
+                    <p>Estimate-heavy days: {item.nutritionEvidence.estimateHeavyDays} · unknown source or quality days: {item.nutritionEvidence.unknownQualityDays}.</p>
+                    <p>{item.nutritionEvidence.detail}</p>
+                    <p>Food entries alone do not establish complete daily intake. An unverified or missing day is not assumed to be zero intake or a fully logged day.</p>
+                  </div>
+                </details>
+              ) : null}
               {item.evidenceExplanation ? (
                 <details className="mt-2 rounded-md border border-zinc-200 bg-white px-2.5 py-2">
                   <summary className="cursor-pointer text-xs font-medium text-zinc-700">How this was assessed · {item.confidence} confidence in maintenance estimate</summary>

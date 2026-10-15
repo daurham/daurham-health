@@ -683,3 +683,8 @@ Treat cross-domain Goal Control confidence and Maintenance estimate confidence a
 ## Decision: Training progression confidence is a claim about comparable exercise records (PIQ-1.6, 2026-10-15)
 
 Use the matching primary Training progression series, identified by exact `training-progression:<exerciseId>`, as the source of confidence for Training recommendations, not a page-level Goal confidence. Treat absent exact evidence as unknown rather than borrowing another exercise's confidence through suffix matching. Show recorded comparable exposure count, window, recency, limitations, and rationale behind a disclosure without implying the user adhered to a recommendation. Keep numerical Maintenance confidence independent. A derived progression score is not proof that sleep, equipment and technique confounders have been captured. This is an evidence-explanation correction, not a new clinical or exercise prescription.
+
+
+## Decision: nutrition entry coverage is not day-completeness confidence (PIQ-1.6, 2026-10-15)
+
+For Coach nutrition-evidence advice, display source-window evidence from the existing Goal Control nutrition-quality gate: logged days, explicitly owner-confirmed complete/source-reliable days, estimate-heavy and unknown-quality days, and minimum thresholds. Classify an evidence-gap card as `limited` or `unknown` even when aggregate Goal confidence is high. Never convert a recorded entry, legacy import, missing day, or unverified day into proof of complete/zero intake. Explain the recent 7-day safety floor separately from the longer maintenance-estimation window. Keep advice observational and do not change canonical data or calorie-adjustment eligibility.
