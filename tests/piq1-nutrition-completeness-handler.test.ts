@@ -1,7 +1,7 @@
 import { IncomingMessage, ServerResponse } from 'node:http'
 import { Socket } from 'node:net'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { HttpError, wrapNodeResponse, type ApiRequest, type ApiResponse } from '../server/http.js'
+import { HttpError, wrapNodeResponse, type ApiRequest } from '../server/http.js'
 import handler from '../server/handlers/nutrition-day-completeness.js'
 
 const fixtures = vi.hoisted(() => ({

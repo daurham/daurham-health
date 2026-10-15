@@ -186,6 +186,8 @@ describe('PIQ-1.1 authenticated persistence repository and optimistic conflict c
     expect(WRITE_NUTRITION_DAY_CONFIRMATION_SQL).toContain('nutrition_day_completeness.version = $5::integer')
     expect(WRITE_NUTRITION_DAY_CONFIRMATION_SQL).toContain('ON CONFLICT')
     expect(WRITE_NUTRITION_DAY_CONFIRMATION_SQL).toContain('NOT EXISTS')
+    expect(WRITE_NUTRITION_DAY_CONFIRMATION_SQL).toContain("AND ($3::text <> 'complete' OR $4::boolean OR EXISTS (")
+    expect(SOURCE_REVISION_SQL).toContain('r.entity_id, r.fingerprint')
   })
 
   it('API dispatcher recognizes the dedicated completeness route', () => {
