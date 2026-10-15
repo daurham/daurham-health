@@ -47,7 +47,8 @@ SELECT (SELECT calories_target FROM current_target) AS calorie_target,
        md5(jsonb_build_object(
          'target', (SELECT to_jsonb(t) FROM current_target t),
          'goals', (SELECT state FROM active_goals),
-         'experiments', (SELECT state FROM relevant_experiments)
+         'experiments', (SELECT state FROM relevant_experiments),
+         'profile', (SELECT to_jsonb(p) FROM health_profile p WHERE singleton_id = 1)
        )::text) AS decision_revision
 `
 
