@@ -57,7 +57,8 @@ function control(verified: ReadonlySet<string>, unavailable = false) {
     eligibleNutritionDates: verified,
     adjustmentContext: { status: 'available', currentCalorieTarget: 2500, activeExperimentCount: 0,
       revisionStatus: 'consistent', decisionRevision: 'test-current-revision',
-      performance: { status: 'available', asOf: AS_OF, decliningExercises: [], competingGoals: [] } },
+      performance: { status: 'available', asOf: AS_OF, decliningExercises: [], competingGoals: [] },
+      physiology: { status: 'available', asOf: AS_OF, ageYears: 31, heightCm: 178, activeOrUncertainConditionCount: 0 } },
     weightGoal: {
       goalId: 'weight-goal', goalVersionId: 'weight-goal-v1',
       label: 'Weight', targetState: 'unmet', direction: 'lose',
