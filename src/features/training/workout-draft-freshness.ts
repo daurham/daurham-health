@@ -6,9 +6,9 @@ import type { WorkoutSession } from '@/domain/training'
  * Deliberately excludes derived performance bests and exercise library display
  * changes: neither changes the session the owner is trying to edit.
  *
- * This is NOT a server-side CAS revision. Saving must re-fetch current canonical
- * state and reject a detected conflict, and there remains a narrow read/write
- * race until an atomic server-side precondition is implemented.
+ * This is not a server-side revision. The separate opaque editRevision from
+ * PostgreSQL guards PATCH and DELETE atomically; this content fingerprint only
+ * informs the owner-facing draft and confirmation UX.
  */
 export function workoutEditRevision(session: WorkoutSession): string {
   return JSON.stringify({
@@ -65,4 +65,51 @@ export function workoutDraftIsStale(
   current: WorkoutSession | null,
 ): boolean {
   return !originalRevision || !current || workoutEditRevision(current) !== originalRevision
+}
+
+/** The exact saved workout the owner approved for deletion. Never refresh its
+ * token silently while a confirmation dialog is open. */
+export type WorkoutDeleteIntent = {
+  sessionId: string
+  editRevision: string
+  contentRevision: string
+}
+
+type WorkoutDraftOrigin = {
+  id: string
+  revision: string
+  editRevision: string | null
+}
+
+/** Unknown, stale, or mismatched saved versions cannot open a valid dialog. */
+export function createWorkoutDeleteIntent(
+  session: WorkoutSession | null,
+  editing: boolean,
+  draftOrigin: WorkoutDraftOrigin | null,
+  staleDraft: boolean,
+): WorkoutDeleteIntent | null {
+  if (!session || staleDraft) return null
+  const origin = editing ? draftOrigin : {
+    id: session.id,
+    revision: workoutEditRevision(session),
+    editRevision: session.editRevision ?? null,
+  }
+  if (!origin?.editRevision || origin.id !== session.id ||
+      origin.editRevision !== session.editRevision ||
+      workoutDraftIsStale(origin.revision, session)) return null
+  return {
+    sessionId: origin.id,
+    editRevision: origin.editRevision,
+    contentRevision: origin.revision,
+  }
+}
+
+/** A background refetch cannot silently change the deletion authorization. */
+export function workoutDeleteIntentIsCurrent(
+  intent: WorkoutDeleteIntent | null,
+  session: WorkoutSession | null,
+): boolean {
+  return !!intent && !!session && intent.sessionId === session.id &&
+    intent.editRevision === session.editRevision &&
+    !workoutDraftIsStale(intent.contentRevision, session)
 }

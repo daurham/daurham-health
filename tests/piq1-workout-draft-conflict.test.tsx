@@ -2,7 +2,10 @@ import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import type { WorkoutSession } from '../src/domain/training.js'
-import { workoutDraftIsStale, workoutEditRevision } from '../src/features/training/workout-draft-freshness.js'
+import {
+  createWorkoutDeleteIntent, workoutDeleteIntentIsCurrent,
+  workoutDraftIsStale, workoutEditRevision,
+} from '../src/features/training/workout-draft-freshness.js'
 import { WorkoutDraftConflictNotice } from '../src/features/training/WorkoutDetailPage.js'
 
 function session(): WorkoutSession {
@@ -66,6 +69,33 @@ describe('PIQ-1.4 workout saved-source revalidation', () => {
     expect(workoutDraftIsStale(undefined, session())).toBe(true)
     expect(workoutDraftIsStale(workoutEditRevision(session()), null)).toBe(true)
     expect(workoutDraftIsStale(workoutEditRevision(session()), { ...session(), id: 'different' })).toBe(true)
+  })
+
+  it('pins deletion to the exact saved version reviewed when confirmation opened', () => {
+    const shown = { ...session(), editRevision: '1234' }
+    const approved = createWorkoutDeleteIntent(shown, false, null, false)
+    expect(approved).toMatchObject({ sessionId: shown.id, editRevision: '1234' })
+    expect(workoutDeleteIntentIsCurrent(approved, structuredClone(shown))).toBe(true)
+
+    // A refocus or cross-tab refresh must not silently upgrade the approved
+    // version to newer canonical content or a newer database row revision.
+    expect(workoutDeleteIntentIsCurrent(approved, { ...shown, editRevision: '1235' })).toBe(false)
+    expect(workoutDeleteIntentIsCurrent(approved, { ...shown, notes: 'changed elsewhere' })).toBe(false)
+    expect(workoutDeleteIntentIsCurrent(approved, { ...shown, id: 'different' })).toBe(false)
+    expect(workoutDeleteIntentIsCurrent(approved, null)).toBe(false)
+  })
+
+  it('does not allow a stale edit draft or missing revision to authorize deletion', () => {
+    const shown = { ...session(), editRevision: '1234' }
+    const origin = { id: shown.id, revision: workoutEditRevision(shown), editRevision: '1234' }
+    expect(createWorkoutDeleteIntent(shown, true, origin, false)).not.toBeNull()
+    expect(createWorkoutDeleteIntent(shown, true, origin, true)).toBeNull()
+    expect(createWorkoutDeleteIntent(shown, true, { ...origin, id: 'different' }, false)).toBeNull()
+    expect(createWorkoutDeleteIntent(shown, true, { ...origin, editRevision: null }, false)).toBeNull()
+    expect(createWorkoutDeleteIntent({ ...shown, editRevision: '1235' }, true, origin, false)).toBeNull()
+    expect(createWorkoutDeleteIntent({ ...shown, notes: 'changed elsewhere' }, true, origin, false)).toBeNull()
+    expect(createWorkoutDeleteIntent({ ...shown, editRevision: undefined }, false, null, false)).toBeNull()
+    expect(createWorkoutDeleteIntent(null, false, null, false)).toBeNull()
   })
 
   it('renders owner-visible alert and explicit draft-discard control without automatic overwrite', () => {

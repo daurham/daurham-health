@@ -950,3 +950,14 @@ Stop expanding test counts for their own sake. Next, pursue runtime verification
 **Remaining release gates:** Real Neon HTTP transaction semantics and authenticated PATCH/DELETE GET flows; iOS Safari/background restoration and two-tab/conflict navigation owner QA; client cache freshness across Nutrition, Body, profile, goals, check-in and quality decisions; explicit stale/read-error signaling; production applied migration 0053 and owner-schema readiness. This does not prove an old client can delete: versionless DELETE now intentionally fails closed. Direct child-table mutations outside parent-controlled Training services must be audited before declaring full revision coverage.
 
 **Release state:** Work branch `piq/00-baseline-20261014` only. `main` remains unchanged, and no owner production data, deployment, migration, or Gemini usage was affected. **Next bounded target:** PIQ-1.4 remaining cross-domain revalidation, especially profile/quality-state and same-day Nutrition/Body/Goal source changes, with synthetic race/consumer tests before authenticated owner QA. PIQ-1.5 recommendation lifecycle remains next major subsystem.
+
+
+## PIQ-1.4 — Version-bound workout Delete confirmation (2026-10-15)
+
+**Status:** Branch fix staged for GitHub Actions; not yet mobile/browser owner-accepted or deployed. **0/9 PIQ phases fully accepted.**
+
+**Remaining UX race after `c5b440c`:** On a read-only saved-workout screen, opening Delete confirmation and then receiving a background same-page refetch could silently upgrade the version being submitted. The server CAS then legitimately deletes the *newer* version the owner never reviewed. An active edit draft also needs its original source identity to remain authoritative.
+
+**Bounded change:** Capture workout ID, opaque server `editRevision`, and editable-content fingerprint once when the owner first opens confirmation. Never update these authorization fields on a background refetch. Disable Delete and display a review-required warning if the canonical version/content changes while the modal is open. Fail closed when the saved version is missing, mismatched, or already stale; preserve the edit draft. Add deterministic no-provider, no-database regressions for changed notes/sets, newer server token, wrong ID, stale draft and missing version. No schema change or owner data mutation.
+
+**Evidence boundary:** Prior database DELETE CAS work passed full and disposable-PostgreSQL CI (recorded immediately above). This new owner-confirmation snapshot still requires its own branch validation, browser/mobile acceptance and live authenticated two-client/Neon HTTP QA. `main`, owner DB, production schema, Gemini spend and actual owner workout data remain untouched. Next: broader PIQ-1.4 revalidation/quality-state invalidation, then PIQ-1.5 lifecycle; owner QA and schema-readiness are release gates, not optional.

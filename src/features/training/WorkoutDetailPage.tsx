@@ -25,7 +25,13 @@ import {
 } from './draft'
 import { formatLoad, formatPounds, formatSetPerformance, formatTrainingPerformanceBest, formatWorkoutDate } from './format'
 import { WorkoutEditor } from './WorkoutEditor'
-import { workoutDraftIsStale, workoutEditRevision } from './workout-draft-freshness'
+import {
+  createWorkoutDeleteIntent,
+  workoutDeleteIntentIsCurrent,
+  workoutDraftIsStale,
+  workoutEditRevision,
+  type WorkoutDeleteIntent,
+} from './workout-draft-freshness'
 
 export function WorkoutDetailPage() {
   const { sessionId } = useParams()
@@ -40,7 +46,7 @@ export function WorkoutDetailPage() {
   const [draft, setDraft] = useState<WorkoutDraft | null>(null)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
-  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleteIntent, setDeleteIntent] = useState<WorkoutDeleteIntent | null>(null)
   const [fieldErrors, setFieldErrors] = useState<ReviewFieldError[]>([])
   const [errorFocusKey, setErrorFocusKey] = useState(0)
   const loadedId = useRef<string | null>(null)
@@ -71,6 +77,7 @@ export function WorkoutDetailPage() {
       setDraft(null)
       draftOrigin.current = null
       setStaleDraft(false)
+      setDeleteIntent(null)
     }
     setError(null)
     Promise.all([fetchSession(sessionId), fetchTemplates().catch(() => [] as WorkoutTemplate[])])
@@ -200,20 +207,28 @@ export function WorkoutDetailPage() {
     }
   }
 
+  function requestDeleteConfirmation() {
+    const intent = createWorkoutDeleteIntent(session, editing, draftOrigin.current, staleDraft)
+    if (!intent) {
+      setError('Reload and review the latest saved workout before deleting.')
+      return
+    }
+    setError(null)
+    setDeleteIntent(intent)
+  }
+
   async function onDelete() {
-    if (!sessionId || deleting) return
-    // An active draft must keep its source version despite background refresh.
-    const version = editing ? draftOrigin.current?.editRevision : session?.editRevision
-    if (staleDraft || !version) {
-      if (editing) setStaleDraft(true)
-      setError('Reload the latest saved workout before deleting.')
-      setConfirmDelete(false)
+    if (!sessionId || deleting || !deleteIntent) return
+    if (staleDraft || !workoutDeleteIntentIsCurrent(deleteIntent, session) ||
+        deleteIntent.sessionId !== sessionId) {
+      setError('Saved workout changed before deletion. Review the latest version before choosing Delete again.')
+      setDeleteIntent(null)
       return
     }
     setDeleting(true)
     setError(null)
     try {
-      await deleteSession(sessionId, version)
+      await deleteSession(sessionId, deleteIntent.editRevision)
       navigate('/training', { replace: true })
     } catch (caught) {
       if (caught instanceof WorkoutEditConflictError) {
@@ -223,7 +238,7 @@ export function WorkoutDetailPage() {
         setError(caught instanceof Error ? caught.message : 'Could not delete workout')
       }
       setDeleting(false)
-      setConfirmDelete(false)
+      setDeleteIntent(null)
     }
   }
 
@@ -277,11 +292,11 @@ export function WorkoutDetailPage() {
             setDraft(null)
             draftOrigin.current = null
             setStaleDraft(false)
-            setConfirmDelete(false)
+            setDeleteIntent(null)
           }}
           cancelLabel="Cancel"
           commitLabel={staleDraft ? 'Review saved changes first' : 'Save workout' }
-          onDelete={() => setConfirmDelete(true)}
+          onDelete={requestDeleteConfirmation}
           saving={saving || staleDraft}
           error={null}
           fieldErrors={fieldErrors}
@@ -296,23 +311,33 @@ export function WorkoutDetailPage() {
             setStaleDraft(false)
             setDraft(draftFromSession(session, template))
             setEditing(true)
-            setConfirmDelete(false)
+            setDeleteIntent(null)
           }}
-          onDelete={() => setConfirmDelete(true)}
+          onDelete={requestDeleteConfirmation}
         />
       ) : null}
-      {confirmDelete ? (
+      {deleteIntent ? (
         <div className="fixed inset-0 z-40 flex items-end justify-center bg-zinc-950/40 p-4 sm:items-center">
           <div className="w-full max-w-md rounded-lg border border-zinc-200 bg-white p-4 shadow-lg">
             <h2 className="text-lg font-semibold tracking-tight">Delete workout?</h2>
             <p className="mt-2 text-sm text-zinc-600">
-              This permanently removes this workout and its recorded exercises and sets. This cannot be undone.
+              This permanently removes the saved version you reviewed, including its exercises and sets. This cannot be undone.
             </p>
+            {!workoutDeleteIntentIsCurrent(deleteIntent, session) || staleDraft ? (
+              <p role="alert" className="mt-3 text-sm text-amber-800">
+                This saved workout changed while the confirmation was open. Cancel and review the latest version.
+              </p>
+            ) : null}
             <div className="mt-4 flex flex-wrap justify-end gap-2">
-              <button type="button" className={secondaryButtonClass} onClick={() => setConfirmDelete(false)} disabled={deleting}>
+              <button type="button" className={secondaryButtonClass} onClick={() => setDeleteIntent(null)} disabled={deleting}>
                 Cancel
               </button>
-              <button type="button" className={dangerButtonClass} onClick={() => void onDelete()} disabled={deleting}>
+              <button
+                type="button"
+                className={dangerButtonClass}
+                onClick={() => void onDelete()}
+                disabled={deleting || staleDraft || !workoutDeleteIntentIsCurrent(deleteIntent, session)}
+              >
                 {deleting ? 'Deleting…' : 'Delete workout'}
               </button>
             </div>

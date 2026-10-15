@@ -1,3 +1,12 @@
+## 2026-10-15 PIQ-1.4 saved workout edit/delete freshness — branch only
+
+- Program authority: `docs/ai/HEALTH_INTELLIGENCE_QUALITY_MASTER_PLAN.md`; detailed phase evidence and remaining gates: `docs/ai/PIQ_PROGRESS.md`.
+- PIQ branch `piq/00-baseline-20261014` has server-issued saved-session `editRevision` and transactionally version-guarded workout PATCH and DELETE, with old-token HTTP 409 and missing-token HTTP 428.
+- Workout Details preserve unsaved edit drafts on detected background changes, disallow an automatic overwrite, and require explicit owner reload. Destructive Delete confirmation now binds its authorization to the originally reviewed saved version and cannot silently upgrade after background revalidation.
+- Previous server DELETE commit `c5b440c` passed full CI 38782039599 and isolated PostgreSQL CI 38782039764. The separate confirmation-snapshot change awaits its own validation; no authenticated iOS/Safari or two-device end-to-end test is claimed.
+- Schema has **no new migration** for saved-workout CAS; production applied migrations (including repository 0053) remain unknown. No clinical data, owner workouts, Gemini provider usage or production deployment were changed.
+- No PIQ phase has met all acceptance gates (0/9 accepted). Before release: branch validation for the confirmation snapshot, owner/browser concurrent-edit/delete testing, production schema read-only reconciliation and explicit owner rollout approval. Do **not** promote `main` based on isolated tests.
+
 ## 2026-10-06 I0–I10 integrated validation complete — rollout gated on database access
 
 - The dormant I0–I10 stack was exposed once on `validate-i0-i10` after the Vercel deployment-rate limit cleared.
