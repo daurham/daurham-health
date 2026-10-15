@@ -135,8 +135,8 @@ describe.skipIf(!url)('PIQ-1.1 full 0001–0054 migration-chain and backup on is
 
   it('applied each migration exactly once without creating historical owner confirmations', async () => {
     const history = await client.query('SELECT filename FROM schema_migrations ORDER BY filename')
-    expect(history.rowCount).toBe(53)
-    expect(history.rows.at(-1)?.filename).toBe('0053_nutrition_day_completeness.sql')
+    expect(history.rowCount).toBe(54)
+    expect(history.rows.at(-1)?.filename).toBe(LATEST_SCHEMA_MIGRATION)
     const count = await client.query('SELECT count(*)::int AS count FROM nutrition_day_completeness')
     expect(count.rows[0].count).toBe(0)
     const unreviewed = await getNutritionDayCompleteness(date, adapter, today)
