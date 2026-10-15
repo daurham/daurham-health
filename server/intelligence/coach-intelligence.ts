@@ -8,6 +8,7 @@ import {
   keepCurrentCalorieDecisionDrafts,
   isCalorieDecisionKind,
   storedCoachRecommendationIsCurrent,
+  keepCurrentCoachFollowUps,
   recommendationIsSuppressed,
   type CoachFollowUpQuestion,
   type CoachIntelligenceState,
@@ -283,12 +284,9 @@ export async function loadCoachIntelligenceState(asOf: string): Promise<CoachInt
   const acceptedRevisionCurrent = dueHasCalorieAdvice
     ? await isMaintenanceDecisionRevisionCurrent(asOf, control.maintenance?.decisionRevision)
     : true
-  const followUps: CoachRecommendationFollowUp[] = dueRows
-    .filter((row) => !isCalorieDecisionKind(row.recommendation_kind) || (
-      acceptedRevisionCurrent && storedCoachRecommendationIsCurrent(
-        row, validFingerprints, control.maintenance?.decisionRevision)))
-    .slice(0, 3)
-    .map((row) => ({
+  const followUps: CoachRecommendationFollowUp[] = keepCurrentCoachFollowUps(
+    dueRows, validFingerprints, control.maintenance?.decisionRevision, acceptedRevisionCurrent,
+  ).map((row) => ({
       id: row.id, title: row.title, detail: row.detail, detailPath: row.detail_path,
       acceptedOn: row.response_at == null
         ? null
