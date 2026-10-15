@@ -36,11 +36,11 @@ describe('PIQ-0 golden evaluation registry integrity', () => {
 
   it('keeps all 50 golden scenarios identical to the master contract', () => {
     const source = readFileSync('docs/ai/HEALTH_INTELLIGENCE_QUALITY_MASTER_PLAN.md', 'utf8')
-    const segments = [...source.matchAll(/^## (T\\d{2})\\. ([^\\n]+)\\n([\\s\\S]*?)(?=^## T\\d{2}\\.|^### 17\\.1)/gm)]
+    const segments = [...source.matchAll(/^## (T\d{2})\. ([^\n]+)\n([\s\S]*?)(?=^## T\d{2}\.|^### 17\.1)/gm)]
     expect(segments).toHaveLength(50)
     for (const [, id, title, body] of segments) {
       const found = PIQ_GOLDEN_CASES.find((item) => item.id === id)
-      const field = (key: string) => body!.match(new RegExp('^\\*\\*' + key + ':\\*\\* (.+), 'm'))?.[1]?.trim()
+      const field = (key: string) => body!.match(new RegExp('^\\*\\*' + key + ':\\*\\* (.+)$', 'm'))?.[1]?.trim()
       expect(found?.title, id).toBe(title)
       expect(found?.trigger, id).toBe(field('Input') ?? field('Given'))
       expect(found?.must, id).toEqual([field('Must')])
