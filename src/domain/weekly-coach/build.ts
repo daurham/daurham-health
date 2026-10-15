@@ -188,29 +188,48 @@ function nutritionFacts(input: WeeklyCoachInput, period: WeeklyPeriod, previous:
   const current = nutritionPeriodSummary({ entries, targets: input.nutritionTargets, start: period.start, end: period.end })
   const prior = nutritionPeriodSummary({ entries, targets: input.nutritionTargets, start: previous.start, end: previous.end })
   const logged = current.loggedDays
+  const verified = new Set(input.nutritionVerifiedCompleteDates ?? [])
+  const currentVerified = [...verified].filter((date) => date >= period.start && date <= period.end).length
+  const previousVerified = [...verified].filter((date) => date >= previous.start && date <= previous.end).length
+  const comparable = currentVerified >= WEEKLY_COACH_NUTRITION_MIN_LOGGED &&
+    previousVerified >= WEEKLY_COACH_NUTRITION_MIN_LOGGED
   const protein = proteinTarget(entries, input.nutritionTargets, period)
   const facts: WeeklyFactLine[] = [
     {
       id: 'fact:nutrition:coverage',
       domain: 'nutrition',
-      text: `Nutrition was logged on ${logged} of ${current.calendarDays} days.`,
+      text: `Nutrition was logged on ${logged} of ${current.calendarDays} days. Whole-day intake is verified complete for ${currentVerified} of ${current.calendarDays} days; remaining days cannot establish total intake.`,
       detailPath: '/nutrition',
     },
   ]
   const calorie = current.calories.averageOnLoggedDays
   const proteinAverage = current.protein.averageOnObservedDays
   if (calorie != null) {
-    const priorCalorie = prior.calories.averageOnLoggedDays
-    const comparison =
-      logged >= WEEKLY_COACH_NUTRITION_MIN_LOGGED && prior.loggedDays >= WEEKLY_COACH_NUTRITION_MIN_LOGGED && priorCalorie != null && priorCalorie > 0
-        ? ` Compared with the prior logged-day average, calories were ${directionWord(percentChange(calorie, priorCalorie))} (${formatQuantity(calorie, 0)} vs ${formatQuantity(priorCalorie, 0)} kcal/day on logged days).`
-        : ''
     facts.push({
       id: 'fact:nutrition:calories',
       domain: 'nutrition',
-      text: `Calorie average on logged days was ${formatQuantity(calorie, 0)} kcal/day.${comparison}`,
+      text: `Logged calorie average was ${formatQuantity(calorie, 0)} kcal/day; this is recorded intake, not necessarily all intake.`,
       detailPath: '/nutrition',
     })
+  }
+  if (comparable) {
+    const confirmedEntries = entries.filter((entry) => verified.has(entry.logDate))
+    const currentPeriod = nutritionPeriodSummary({
+      entries: confirmedEntries, targets: input.nutritionTargets, start: period.start, end: period.end,
+    })
+    const previousPeriod = nutritionPeriodSummary({
+      entries: confirmedEntries, targets: input.nutritionTargets, start: previous.start, end: previous.end,
+    })
+    const now = currentPeriod.calories.averageOnLoggedDays
+    const before = previousPeriod.calories.averageOnLoggedDays
+    if (now != null && before != null && before > 0) {
+      facts.push({
+        id: 'fact:nutrition:verified-calorie-comparison',
+        domain: 'nutrition',
+        text: `For owner-confirmed, source-reliable complete days, logged calorie average was ${formatQuantity(now, 0)} vs ${formatQuantity(before, 0)} kcal/day in the prior week (${directionWord(percentChange(now, before))}). This is not a calorie-adjustment recommendation.`,
+        detailPath: '/nutrition',
+      })
+    }
   }
   if (proteinAverage != null) {
     facts.push({
@@ -247,7 +266,7 @@ function nutritionFacts(input: WeeklyCoachInput, period: WeeklyPeriod, previous:
     loggedDays: logged,
     proteinMet: protein.known > 0 ? protein.met : null,
     proteinKnown: protein.known > 0 ? protein.known : null,
-    comparable: logged >= WEEKLY_COACH_NUTRITION_MIN_LOGGED && prior.loggedDays >= WEEKLY_COACH_NUTRITION_MIN_LOGGED,
+    comparable,
   }
 }
 

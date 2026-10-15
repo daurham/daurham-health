@@ -13,7 +13,8 @@ import { listBenchmarkRetests } from '../lab/retests.js'
 import { loadProgressCanonicalRows } from '../progress/queries.js'
 import { listSleepNightlySummaries } from '../sleep/queries.js'
 import { listSupplementRangeInputs } from '../supplements/queries.js'
-import { healthCalendarTimeZone } from '../health-time.js'
+import { currentHealthDate, healthCalendarTimeZone } from '../health-time.js'
+import { loadVerifiedWeeklyNutritionDates } from '../nutrition/maintenance-eligibility.js'
 import { getTrainingPlan } from '../training/plan-service.js'
 
 export async function loadWeeklyCoachInput(asOf: string): Promise<WeeklyCoachInput> {
@@ -34,6 +35,15 @@ export async function loadWeeklyCoachInput(asOf: string): Promise<WeeklyCoachInp
       listReviewCaptures(period.end, timezone),
       getTrainingPlan(asOf),
     ])
+  // Source-quality alone is never day-completeness. A failed/absent
+  // confirmation lookup supplies NO verified dates and no calorie comparison.
+  const nutritionVerifiedCompleteDates = await currentHealthDate()
+    .then((today) => loadVerifiedWeeklyNutritionDates({
+      asOf: period.end, today,
+      entries: rows.nutritionEntries.filter((entry) => entry.logDate <= period.end),
+    }))
+    .then((dates) => [...dates])
+    .catch(() => [] as string[])
   const visibleSets = rows.sets.filter((set) => set.sessionDate <= period.end)
   const performanceBests = rows.exercises.flatMap((exercise) =>
     performanceBestsForExercise(
@@ -71,6 +81,7 @@ export async function loadWeeklyCoachInput(asOf: string): Promise<WeeklyCoachInp
     })),
     nutritionEntries: rows.nutritionEntries.filter((entry) => entry.logDate <= period.end),
     nutritionTargets: rows.nutritionTargets,
+    nutritionVerifiedCompleteDates,
     trainingSessions: await listTrainingSessions(period.end),
     performanceBests,
     bodyObservations: rows.bodyObservations.filter((item) => item.calendarDate <= period.end),

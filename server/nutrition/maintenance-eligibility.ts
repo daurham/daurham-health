@@ -1,3 +1,4 @@
+import type { NutritionEntry } from '../../src/domain/nutrition/types.js'
 import type { HealthIntelligenceSnapshot } from '../../src/domain/intelligence/shared.js'
 import { addCalendarDays } from '../../src/domain/training-plan.js'
 import { getSql, type Sql } from '../db.js'
@@ -87,4 +88,51 @@ export async function loadVerifiedNutritionDays(input: {
     addCalendarDays(input.asOf, -29), input.asOf, input.today,
   ]) as Candidate[]
   return verifiedNutritionDaysFromRows(rows, input.snapshot)
+}
+
+/**
+ * Weekly intake comparisons require an explicit read-time cross-check of
+ * stored confirmations against the same canonical Nutrition rows Weekly Coach
+ * used for its other facts. A stale or changed row disqualifies the date.
+ */
+export function verifiedWeeklyNutritionDatesFromRows(
+  candidates: readonly Candidate[],
+  entries: readonly Pick<NutritionEntry, 'id' | 'logDate' | 'calories'>[],
+): ReadonlySet<string> {
+  const byDate = new Map<string, Array<{ id: string; calories: number }>>()
+  for (const entry of entries) {
+    const rows = byDate.get(entry.logDate) ?? []
+    rows.push({ id: entry.id, calories: entry.calories })
+    byDate.set(entry.logDate, rows)
+  }
+  const allowed = new Set<string>()
+  for (const row of candidates) {
+    if (typeof row.date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(row.date)) continue
+    if (!Array.isArray(row.source_ids) || row.source_ids.length === 0 ||
+        row.source_ids.some((id) => typeof id !== 'string')) continue
+    const records = byDate.get(row.date) ?? []
+    const actualIds = records.map((entry) => entry.id).sort()
+    const expectedIds = [...row.source_ids].sort()
+    const kcal = Number(row.calories)
+    if (!Number.isFinite(kcal) || kcal <= 0 || actualIds.length !== expectedIds.length ||
+        expectedIds.some((id, i) => actualIds[i] !== id) ||
+        Math.abs(records.reduce((sum, entry) => sum + entry.calories, 0) - kcal) > 0.00001) continue
+    allowed.add(row.date)
+  }
+  return allowed
+}
+
+/** Single set-based SQL query; no paid provider call or per-day database loop. */
+export async function loadVerifiedWeeklyNutritionDates(input: {
+  asOf: string
+  today: string | null
+  entries: readonly NutritionEntry[]
+  sqlOverride?: Sql
+}): Promise<ReadonlySet<string>> {
+  if (!input.today) return new Set<string>()
+  const sql = input.sqlOverride ?? await getSql()
+  const rows = await sql.query(VERIFIED_NUTRITION_DAYS_SQL, [
+    addCalendarDays(input.asOf, -29), input.asOf, input.today,
+  ]) as Candidate[]
+  return verifiedWeeklyNutritionDatesFromRows(rows, input.entries)
 }

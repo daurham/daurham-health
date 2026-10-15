@@ -82,6 +82,8 @@ export type WeeklyCoachInput = {
   sleepNights: readonly (SleepSummaryNight & { sourceName?: string | null })[]
   nutritionEntries: readonly NutritionEntry[]
   nutritionTargets: readonly NutritionTarget[]
+  /** DB-confirmed and source-revision-verified complete days. Missing means unverified. */
+  nutritionVerifiedCompleteDates?: readonly string[]
   trainingSessions: readonly { performedOn: string; sessionType: string }[]
   performanceBests: readonly WeeklyPerformanceBest[]
   bodyObservations: readonly BodyObservation[]
