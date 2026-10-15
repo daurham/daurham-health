@@ -59,8 +59,16 @@ export function GoalControlCard({
           Observed maintenance ≈ {Math.round(state.maintenance.estimate.observedMaintenanceKcal).toLocaleString('en-US')} kcal/day · {state.maintenance.estimate.confidence} confidence
         </p>
       ) : null}
-      {state.trainingAdherence.state === 'rest_day_on_track' ? (
-        <p className="mt-2 text-xs text-zinc-500">Rest-aware: {state.trainingAdherence.detail}</p>
+      {state.trainingAdherence.configured ? (
+        <p className="mt-2 text-xs text-zinc-500">
+          <span className="font-medium">
+            {state.trainingAdherence.todayIntent === 'rest' ? 'Rest-aware Training:' : 'Training:'}
+          </span>{' '}
+          {state.trainingAdherence.qualifiedTrainingDays == null
+            ? 'Qualified-day count unavailable; programmed sessions are not target credit.'
+            : `${state.trainingAdherence.qualifiedTrainingDays}/${state.trainingAdherence.weeklyFrequencyTarget} qualified strength days · ${state.trainingAdherence.remainingQualifiedDays} to target.`}
+          <span className="block">{state.trainingAdherence.detail}</span>
+        </p>
       ) : null}
       {state.limitations.length > 0 ? (
         <details className="mt-2 text-xs text-zinc-500">
