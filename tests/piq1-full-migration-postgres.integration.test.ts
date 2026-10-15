@@ -250,7 +250,7 @@ describe.skipIf(!url)('PIQ-1.1 full 0001–0053 migration-chain and backup on is
              response_state, response_at, follow_up_on, metadata
            ) VALUES ($1::uuid, $2, 'training_progression', 'training', 'Bench review',
              'Check form', 'Review', '/training', 'moderate', '[]'::jsonb,
-             $3::date, $3::date, 'do_this', now(), $3::date, '{}'::jsonb)`,
+             $3::date, $3::date, 'do_this', now(), $3::date, '{"ownerStarted":true}'::jsonb)`,
           [randomUUID(), 'bench-' + i, '2026-10-01'],
         )
       }
