@@ -280,6 +280,25 @@ export function storedCoachRecommendationIsCurrent(
     currentDraftFingerprints.has(row.fingerprint)
 }
 
+/** Filter before applying the UI's 3-item limit, so retired historical
+ * calorie rows cannot crowd out a still-current, unrelated owner follow-up.
+ */
+export function keepCurrentCoachFollowUps<
+  T extends { recommendation_kind: string; fingerprint: string; metadata: Record<string, unknown> | null }
+>(
+  rows: readonly T[],
+  currentDraftFingerprints: ReadonlySet<string>,
+  currentDecisionRevision: string | null | undefined,
+  revisionRechecked: boolean,
+  limit = 3,
+): T[] {
+  return rows.filter((row) =>
+    !isCalorieDecisionKind(row.recommendation_kind) ||
+      (revisionRechecked && storedCoachRecommendationIsCurrent(
+        row, currentDraftFingerprints, currentDecisionRevision))
+  ).slice(0, limit)
+}
+
 function questionForLimitation(limitation: GoalControlLimitation): Omit<CoachFollowUpQuestionDraft, 'fingerprint' | 'kind' | 'confidence' | 'evidenceRefs'> | null {
   if (!limitation.detailPath) return null
   if (limitation.code === 'nutrition_quality_floor') {
