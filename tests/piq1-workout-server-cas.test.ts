@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { updateManualSession, UPDATE_WORKOUT_SESSION_CAS_SQL } from '../server/training/service.js'
+import {
+  deleteManualSession, updateManualSession, UPDATE_WORKOUT_SESSION_CAS_SQL,
+  DELETE_WORKOUT_SESSION_CAS_SQL, DETACH_TRANSCRIPTION_SESSION_GUARDED_SQL,
+  DELETE_WORKOUT_SESSION_GUARDED_SQL,
+} from '../server/training/service.js'
 import { workoutSessionSchema } from '../src/domain/training.js'
 
 describe('PIQ-1.4 server-owned workout edit precondition', () => {
@@ -17,6 +21,20 @@ describe('PIQ-1.4 server-owned workout edit precondition', () => {
     expect(UPDATE_WORKOUT_SESSION_CAS_SQL).toContain('xmin::text = $16')
     expect(UPDATE_WORKOUT_SESSION_CAS_SQL).toContain("jsonb_build_object('_piq_edit_nonce'")
     expect(UPDATE_WORKOUT_SESSION_CAS_SQL).toContain('RETURNING id')
+  })
+
+  it('refuses deletion without a valid edit revision before database access', async () => {
+    for (const body of [null, {}, { expectedEditRevision: 'wrong' }, { expectedEditRevision: 42 }]) {
+      await expect(deleteManualSession('11111111-1111-4111-8111-111111111111', body))
+        .rejects.toMatchObject({ statusCode: 428 })
+    }
+  })
+
+  it('gates both transcription detachment and deletion on the version-claimed parent', () => {
+    expect(DELETE_WORKOUT_SESSION_CAS_SQL).toContain('xmin::text = $2')
+    expect(DELETE_WORKOUT_SESSION_CAS_SQL).toContain("'_piq_delete_nonce'")
+    expect(DETACH_TRANSCRIPTION_SESSION_GUARDED_SQL).toContain("metadata ->> '_piq_delete_nonce' = $2")
+    expect(DELETE_WORKOUT_SESSION_GUARDED_SQL).toContain("metadata ->> '_piq_delete_nonce' = $2")
   })
 
   it('accepts an opaque edit revision on a canonical workout response without changing other session fields', () => {

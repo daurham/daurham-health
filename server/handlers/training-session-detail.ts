@@ -35,7 +35,7 @@ export default withOwnerAuth(async function sessionDetailHandler(req: ApiRequest
       return
     }
     if (req.method === 'DELETE') {
-      await deleteManualSession(parsed.data)
+      await deleteManualSession(parsed.data, await readJsonBody(req))
       sendJson(res, 200, { deleted: true, id: parsed.data })
       return
     }

@@ -592,6 +592,25 @@ export const DETACH_TRANSCRIPTION_SESSION_SQL = `UPDATE workout_transcription_jo
 
 export const DELETE_WORKOUT_SESSION_SQL = `DELETE FROM workout_sessions WHERE id = $1::uuid`
 
+// Delete only the saved version the owner reviewed. On a stale version,
+// transcription detachment and deletion are both no-ops in one transaction.
+export const DELETE_WORKOUT_SESSION_CAS_SQL = `UPDATE workout_sessions
+  SET metadata = metadata || jsonb_build_object('_piq_delete_nonce', $3::text),
+      updated_at = clock_timestamp()
+  WHERE id = $1::uuid AND xmin::text = $2
+  RETURNING id::text AS id`
+
+export const DETACH_TRANSCRIPTION_SESSION_GUARDED_SQL = `UPDATE workout_transcription_jobs
+  SET workout_session_id = NULL, updated_at = clock_timestamp()
+  WHERE workout_session_id = $1::uuid AND EXISTS (
+    SELECT 1 FROM workout_sessions
+    WHERE id = $1::uuid AND metadata ->> '_piq_delete_nonce' = $2
+  )`
+
+export const DELETE_WORKOUT_SESSION_GUARDED_SQL = `DELETE FROM workout_sessions
+  WHERE id = $1::uuid AND metadata ->> '_piq_delete_nonce' = $2
+  RETURNING id::text AS id`
+
 export async function createImportedSession(
   body: unknown,
   jobId: string,
@@ -1139,11 +1158,11 @@ export async function archiveOwnerRoutine(templateId: string): Promise<{ ok: tru
   return { ok: true }
 }
 
-function requireExpectedEditRevision(body: unknown): string {
+function requireExpectedEditRevision(body: unknown, action: 'saving' | 'deleting' = 'saving'): string {
   const token = body && typeof body === 'object' && !Array.isArray(body)
     ? (body as Record<string, unknown>).expectedEditRevision : null
   if (typeof token !== 'string' || !/^[0-9]{1,10}$/.test(token)) {
-    throw new HttpError(428, 'Reload this workout to get its current edit version before saving.')
+    throw new HttpError(428, `Reload this workout to get its current edit version before ${action}.`)
   }
   return token
 }
@@ -1294,18 +1313,24 @@ export async function updateManualSession(sessionId: string, body: unknown): Pro
   return getSession(prepared.sessionId)
 }
 
-export async function deleteManualSession(sessionId: string): Promise<void> {
+export async function deleteManualSession(sessionId: string, body: unknown): Promise<void> {
+  const expectedRevision = requireExpectedEditRevision(body, 'deleting')
   await getSession(sessionId)
   const sql = await getSql()
+  const nonce = randomUUID()
+  let transactionResult: unknown
   try {
-    await sql.transaction([
-      sql.query(DETACH_TRANSCRIPTION_SESSION_SQL, [sessionId]),
-      sql.query(DELETE_WORKOUT_SESSION_SQL, [sessionId]),
+    transactionResult = await sql.transaction([
+      sql.query(DELETE_WORKOUT_SESSION_CAS_SQL, [sessionId, expectedRevision, nonce]),
+      sql.query(DETACH_TRANSCRIPTION_SESSION_GUARDED_SQL, [sessionId, nonce]),
+      sql.query(DELETE_WORKOUT_SESSION_GUARDED_SQL, [sessionId, nonce]),
     ])
   } catch (error) {
-    if (asMissingRelation(error)) {
-      throw new HttpError(503, TABLES_UNAVAILABLE)
-    }
+    if (asMissingRelation(error)) throw new HttpError(503, TABLES_UNAVAILABLE)
     throw new HttpError(500, 'Workout could not be deleted')
+  }
+  const results = transactionResult as Array<Array<{ id?: string }>>
+  if (!results[0]?.[0]?.id || !results[2]?.[0]?.id) {
+    throw new HttpError(409, 'Saved workout changed or was deleted. Reload the latest saved version before deleting.')
   }
 }

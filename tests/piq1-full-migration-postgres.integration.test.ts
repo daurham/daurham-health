@@ -11,7 +11,11 @@ import { randomUUID } from 'node:crypto'
 import { PERFORMED_STRENGTH_EXERCISES_SQL } from '../server/training/plan-service.js'
 import { buildTrainingWeekQualification, buildTrainingRoutineCredits, type PerformedExerciseEvidence } from '../src/domain/training-qualification.js'
 import { buildTrainingProgressSummary } from '../src/domain/training-progress-summary.js'
-import { buildGuardedWorkoutEditQueries, type PreparedManualSession } from '../server/training/service.js'
+import {
+  buildGuardedWorkoutEditQueries, DELETE_WORKOUT_SESSION_CAS_SQL,
+  DETACH_TRANSCRIPTION_SESSION_GUARDED_SQL, DELETE_WORKOUT_SESSION_GUARDED_SQL,
+  type PreparedManualSession,
+} from '../server/training/service.js'
 
 /**
  * Only runs under CI's explicit PIQ_POSTGRES_URL. Uses its own isolated schema
@@ -502,6 +506,49 @@ describe.skipIf(!url)('PIQ-1.1 full 0001–0053 migration-chain and backup on is
       expect(buildTrainingWeekQualification(await actualTrainingEvidence('2026-10-14'), '2026-10-14')
         .completedDays).toBe(0)
       expect(buildTrainingRoutineCredits(await actualTrainingEvidence('2026-10-14'))).toEqual([])
+    } finally {
+      await client.query('ROLLBACK')
+    }
+  })
+
+  it('PIQ-1.4: an old DELETE revision is a no-op; a current revision removes the workout', async () => {
+    await client.query('BEGIN')
+    try {
+      const original = await insertFictionalWorkout({
+        workoutDate: '2026-10-14', sessionType: 'ad_hoc',
+        exercises: [{ externalId: 'EX01' }],
+      })
+      const versionRows = await client.query(
+        'SELECT xmin::text AS version FROM workout_sessions WHERE id = $1::uuid',
+        [original.sessionId],
+      )
+      const validVersion = String(versionRows.rows[0].version)
+      // Fixture writes share an XID, so simulate another connection's prior
+      // revision with a distinct numeric token, not an intra-tx UPDATE.
+      const oldVersion = validVersion === '0' ? '1' : '0'
+      const run = async (token: string) => {
+        const nonce = randomUUID()
+        const claim = await client.query(DELETE_WORKOUT_SESSION_CAS_SQL, [original.sessionId, token, nonce])
+        await client.query(DETACH_TRANSCRIPTION_SESSION_GUARDED_SQL, [original.sessionId, nonce])
+        const removed = await client.query(DELETE_WORKOUT_SESSION_GUARDED_SQL, [original.sessionId, nonce])
+        return [claim.rows, removed.rows]
+      }
+      expect(await run(oldVersion)).toEqual([[], []])
+      expect((await client.query(
+        'SELECT id FROM workout_sessions WHERE id = $1::uuid', [original.sessionId],
+      )).rows).toHaveLength(1)
+      expect((await client.query(
+        'SELECT id FROM workout_session_exercises WHERE workout_session_id = $1::uuid', [original.sessionId],
+      )).rows).toHaveLength(1)
+      const removed = await run(validVersion)
+      expect(removed[0]).toHaveLength(1)
+      expect(removed[1]).toHaveLength(1)
+      expect((await client.query(
+        'SELECT id FROM workout_sessions WHERE id = $1::uuid', [original.sessionId],
+      )).rows).toEqual([])
+      expect((await client.query(
+        'SELECT id FROM workout_session_exercises WHERE workout_session_id = $1::uuid', [original.sessionId],
+      )).rows).toEqual([])
     } finally {
       await client.query('ROLLBACK')
     }

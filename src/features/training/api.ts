@@ -160,10 +160,16 @@ export async function updateSession(
   return createSessionResponseSchema.parse(await response.json()).session
 }
 
-export async function deleteSession(id: string): Promise<void> {
-  const response = await healthFetch(`/api/training/sessions/${id}`, { method: 'DELETE' })
+export async function deleteSession(id: string, expectedEditRevision: string): Promise<void> {
+  const response = await healthFetch(`/api/training/sessions/${id}`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ expectedEditRevision }),
+  })
   if (!response.ok) {
-    throw new Error(await readApiError(response))
+    const message = await readApiError(response)
+    if (response.status === 409 || response.status === 428) throw new WorkoutEditConflictError(message)
+    throw new Error(message)
   }
 }
 

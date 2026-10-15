@@ -88,7 +88,7 @@ export function WorkoutDetailPage() {
       })
       .catch((caught: unknown) => {
         if (!cancelled && request === refreshGeneration.current) {
-          setError(caught instanceof Error ? caught.message : 'Could not load workout')
+          setError(`Could not refresh this workout. Showing the last loaded session. ${caught instanceof Error ? caught.message : ''}`.trim())
         }
       })
       .finally(() => {
@@ -201,16 +201,27 @@ export function WorkoutDetailPage() {
   }
 
   async function onDelete() {
-    if (!sessionId || deleting) {
+    if (!sessionId || deleting) return
+    // An active draft must keep its source version despite background refresh.
+    const version = editing ? draftOrigin.current?.editRevision : session?.editRevision
+    if (staleDraft || !version) {
+      if (editing) setStaleDraft(true)
+      setError('Reload the latest saved workout before deleting.')
+      setConfirmDelete(false)
       return
     }
     setDeleting(true)
     setError(null)
     try {
-      await deleteSession(sessionId)
+      await deleteSession(sessionId, version)
       navigate('/training', { replace: true })
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Could not delete workout')
+      if (caught instanceof WorkoutEditConflictError) {
+        if (editing) setStaleDraft(true)
+        setError('Saved workout changed before deletion. Review the latest version, then choose Delete again.')
+      } else {
+        setError(caught instanceof Error ? caught.message : 'Could not delete workout')
+      }
       setDeleting(false)
       setConfirmDelete(false)
     }
@@ -227,7 +238,7 @@ export function WorkoutDetailPage() {
       </p>
       {error ? (
         <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
-          {session ? 'Could not refresh this workout. Showing the last loaded session.' : error}
+          {error}
           {sessionId ? (
             <button type="button" className="ml-3 font-medium underline" onClick={() => setReloadToken((value) => value + 1)}>
               Retry
