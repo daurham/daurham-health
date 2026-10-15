@@ -16,7 +16,6 @@ const { Client } = pg
 const client = new Client({
   connectionString: url ?? 'postgres://unconfigured:unconfigured@127.0.0.1:1/none',
 })
-const schema = 'piq_full_chain'
 const date = '2026-10-13'
 const today = '2026-10-14'
 const adapter = { query: async (text: string, params?: unknown[]) =>
