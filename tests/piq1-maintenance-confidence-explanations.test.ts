@@ -35,6 +35,7 @@ function build(input: {
       status: 'available', currentCalorieTarget: input.target ?? 2500, activeExperimentCount: 0,
       revisionStatus: 'consistent', decisionRevision: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
       performance,
+      physiology: { status: 'available', asOf: AS_OF, ageYears: 31, heightCm: 178, activeOrUncertainConditionCount: 0 },
     },
   })
   return { intelligence, maintenance }
