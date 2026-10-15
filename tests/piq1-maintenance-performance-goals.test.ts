@@ -75,7 +75,8 @@ function maintenance(performance: ReturnType<typeof evidence>) {
     asOf: AS_OF, today: AS_OF, intelligence, contexts: [], eligibleNutritionDates: new Set(dates),
     weightGoal: { goalId: 'weight', goalVersionId: 'weight-v1', label: 'Weight', targetState: 'unmet', direction: 'lose' },
     adjustmentContext: { status: 'available', currentCalorieTarget: 2400, activeExperimentCount: 0,
-      revisionStatus: 'consistent', decisionRevision: 'test-current-revision', performance },
+      revisionStatus: 'consistent', decisionRevision: 'test-current-revision', performance,
+      physiology: { status: 'available', asOf: AS_OF, ageYears: 31, heightCm: 178, activeOrUncertainConditionCount: 0 } },
   })
   return { intelligence, state }
 }
