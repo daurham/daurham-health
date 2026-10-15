@@ -43,6 +43,8 @@ function control(overrides: Partial<GoalControlState> = {}): GoalControlState {
     trainingAdherence: {
       configured: true,
       completedProgrammedSessions: 1,
+      qualifiedTrainingDays: 1,
+      remainingQualifiedDays: 2,
       weeklyFrequencyTarget: 3,
       remainingSessions: 2,
       todayIntent: 'rest_preferred',
