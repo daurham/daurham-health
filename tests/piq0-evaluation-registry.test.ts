@@ -8,7 +8,7 @@ describe('PIQ-0 golden evaluation registry integrity', () => {
   it('has unique stable case references to the master plan', () => {
     const ids = PIQ_GOLDEN_CASES.map((entry) => entry.id)
     expect(ids).toHaveLength(new Set(ids).size)
-    expect(ids.every((id) => /^T\\d{2}$/.test(id))).toBe(true)
+    expect(ids.every((id) => /^T\d{2}$/.test(id))).toBe(true)
   })
 
   it('tracks the user-critical baseline questions and safety cases', () => {
