@@ -244,7 +244,7 @@ describe('weekly coach periods and evidence', () => {
     expect(brief.period).toEqual({ start: '2026-09-13', end: '2026-09-19' })
     expect(brief.facts.some((fact) => fact.text.includes('99,999'))).toBe(false)
     expect(brief.candidates.some((item) => item.id.includes('2026-09-21'))).toBe(false)
-    expect(brief.facts.find((fact) => fact.domain === 'training')?.text.startsWith('0 canonical')).toBe(true)
+    expect(brief.facts.find((fact) => fact.domain === 'training')?.text.startsWith('0 recorded')).toBe(true)
   })
 
   it('requires two substantive domains before generation is eligible', () => {
@@ -639,7 +639,7 @@ describe('weekly coach route', () => {
     expect(example.label).toContain('not generated live')
     expect(example.brief.period).toEqual({ start: '2026-09-08', end: '2026-09-14' })
     expect(example.brief.facts.some((fact) => fact.text.includes('20,000'))).toBe(false)
-    expect(example.brief.facts.some((fact) => fact.text.includes('1 canonical'))).toBe(true)
+    expect(example.brief.facts.some((fact) => fact.text.includes('1 recorded'))).toBe(true)
     expect(example.brief.focus?.actionText).toContain('Log Nutrition more consistently')
     expect(example.commentary?.focusId).toBe(example.brief.focus?.id)
     const source = readFileSync('src/demo/weekly-coach.ts', 'utf8')
