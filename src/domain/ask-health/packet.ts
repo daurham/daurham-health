@@ -84,8 +84,11 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
     addSharedIntelligence(input.intelligence, push, limitations)
   }
 
-  const evidence = trimEvidence(drafts, input.maxChars ?? ASK_PACKET_MAX_CHARS)
+  const maxChars = input.maxChars ?? ASK_PACKET_MAX_CHARS
+  const evidence = trimEvidence(drafts, maxChars)
+  const selectedIds = new Set(evidence.map((item) => item.id))
   const clarification = exerciseClarification(input)
+  const selectedSerializedChars = JSON.stringify(evidence).length
   return {
     packetVersion: ASK_HEALTH_PACKET_VERSION,
     lens: input.lens,
@@ -101,6 +104,16 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
       missing: input.intelligence?.missing ?? [],
     },
     clarification,
+    evidenceSelectionAudit: {
+      candidateCount: drafts.length,
+      selectedCount: evidence.length,
+      removedCount: drafts.length - evidence.length,
+      removedSubstantiveCount: drafts.filter((item) => item.substantive && !selectedIds.has(item.id)).length,
+      maxChars,
+      selectedSerializedChars,
+      exceedsMaxChars: selectedSerializedChars > maxChars,
+    },
+    sourceCoverageAudit: input.sourceCoverageAudit ?? null,
   }
 }
 

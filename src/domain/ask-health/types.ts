@@ -89,6 +89,24 @@ export type AskClinicalProfileInput = {
   medications: Array<{ name: string; dose: string | null; frequency: string | null; status: 'active' | 'paused' | 'discontinued' }>
 }
 
+/** Diagnostics only: never store observation values, question text or evidence IDs here. */
+export type AskHealthSourceCoverageAudit = {
+  observedSignalCount: number
+  selectedObservedSignalCount: number
+  unselectedObservedSignalCount: number
+}
+
+/** Packet-builder facts only; source loading may still be incomplete. */
+export type AskHealthEvidenceSelectionAudit = {
+  candidateCount: number
+  selectedCount: number
+  removedCount: number
+  removedSubstantiveCount: number
+  maxChars: number
+  selectedSerializedChars: number
+  exceedsMaxChars: boolean
+}
+
 export type AskHealthPacketInput = {
   lens: AskLens
   range: ProgressRange
@@ -108,6 +126,7 @@ export type AskHealthPacketInput = {
   profile?: AskClinicalProfileInput | null
   intelligence?: RoutedHealthIntelligence | null
   maxChars?: number
+  sourceCoverageAudit?: AskHealthSourceCoverageAudit | null
 }
 
 export type AskHealthPacket = {
@@ -125,6 +144,8 @@ export type AskHealthPacket = {
     missing: IntelligenceContextItem[]
   }
   clarification: string | null
+  evidenceSelectionAudit?: AskHealthEvidenceSelectionAudit | null
+  sourceCoverageAudit?: AskHealthSourceCoverageAudit | null
 }
 
 export type AskTurn = {

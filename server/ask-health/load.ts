@@ -1,4 +1,5 @@
 import { buildActivityProgressView } from '../../src/domain/activity/index.js'
+import { auditAskHealthSharedCoverage } from '../../src/domain/ask-health/diagnostics.js'
 import { askClinicalProfileForDate } from '../../src/domain/ask-health/clinical-profile.js'
 import type { AskBenchmarkInput, AskContextInput, AskExperimentInput, AskHealthPacketInput } from '../../src/domain/ask-health/index.js'
 import { buildProgressOverview } from '../../src/domain/progress/index.js'
@@ -80,6 +81,7 @@ export async function loadAskHealthPacketInput(input: {
     patterns,
     profile: askClinicalProfileForDate(profile, input.asOf, today),
     intelligence,
+    sourceCoverageAudit: auditAskHealthSharedCoverage(intelligenceSnapshot, intelligence),
   }
 }
 

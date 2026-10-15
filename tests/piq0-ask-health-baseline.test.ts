@@ -128,6 +128,7 @@ describe('PIQ-0 Ask Health executable baseline — synthetic data only', () => {
     expect(Object.keys(d).sort()).toEqual([
       'limitationCount', 'missingContextCount', 'packetDomainCount',
       'packetEvidenceCount', 'path', 'substantiveEvidenceCount',
+      'evidenceSelectionAudit', 'sourceCoverageAudit',
     ].sort())
     expect(JSON.stringify(d)).not.toContain('What did I weigh yesterday?')
   })
