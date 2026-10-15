@@ -1,5 +1,6 @@
 import { activityRangeSummary, type ActivityMetricSummary } from '../activity/analytics.js'
 import { goalNeedsWeeklyAttention } from '../goal-control.js'
+import { buildTrainingProgressSummary } from '../training-progress-summary.js'
 import { ACTIVITY_SHORT_TERM_MIN_OBSERVED, ACTIVITY_TIMEZONE } from '../activity/config.js'
 import { bodyWeightTrend } from '../progress/body-trend.js'
 import { addCalendarDays } from '../progress/dates.js'
@@ -629,32 +630,25 @@ function focusCandidates(input: WeeklyCoachInput, nutrition: ReturnType<typeof n
   }
 
   const plan = input.trainingPlan
-  if (plan?.configured && plan.weeklyFrequencyTarget != null && plan.completedProgrammedSessions < plan.weeklyFrequencyTarget) {
-    const remaining = plan.weeklyFrequencyTarget - plan.completedProgrammedSessions
-    const trainingToday = plan.todayIntent === 'training_preferred' || plan.todayIntent === 'training_moved_here'
-    if (trainingToday) {
-      items.push({
-        id: 'focus:training-plan:today',
-        section: 'focus',
-        kind: 'training_plan_today',
-        fact: `${remaining} programmed session${remaining === 1 ? '' : 's'} remain this week, and today is a planned Training day.`,
-        evidenceRefs: ['training-plan:week'],
-        detailPath: '/training',
-        actionText: plan.todayRoutineName ? `Complete the planned ${plan.todayRoutineName} session when ready.` : 'Complete the planned Training session when ready.',
-        rank: 7,
-      })
-    } else if (plan.futureTrainingDates.length < remaining) {
-      items.push({
-        id: 'focus:training-plan:review',
-        section: 'focus',
-        kind: 'training_plan_review',
-        fact: `${remaining} programmed session${remaining === 1 ? '' : 's'} remain, with only ${plan.futureTrainingDates.length} planned Training day${plan.futureTrainingDates.length === 1 ? '' : 's'} left this week.`,
-        evidenceRefs: ['training-plan:week'],
-        detailPath: '/training/plan',
-        actionText: 'Review this week’s Training Plan. Health will not turn an intentional rest day into a missed-workout penalty.',
-        rank: 9,
-      })
-    }
+  const trainingProgress = buildTrainingProgressSummary(plan)
+  // Only an optional preferred-day suggestion is actionable here.
+  // Preferred dates are not deadlines, and programmed session rows do
+  // not substitute for performed-exercise-qualified calendar days.
+  if (plan && trainingProgress.status === 'preferred_today' &&
+      trainingProgress.remainingQualifiedDays != null) {
+    const remaining = trainingProgress.remainingQualifiedDays
+    items.push({
+      id: 'focus:training-plan:today',
+      section: 'focus',
+      kind: 'training_plan_today',
+      fact: `${remaining} qualified strength ${remaining === 1 ? 'day' : 'days'} remain toward this week's target; today is a preferred day, not a requirement.`,
+      evidenceRefs: ['training-plan:qualified-days'],
+      detailPath: '/training',
+      actionText: plan.todayRoutineName
+        ? `If you train today, ${plan.todayRoutineName} is the suggested next routine.`
+        : 'Train when it suits you; the next planned day is optional.',
+      rank: 7,
+    })
   }
 
   if (nutrition.loggedDays < WEEKLY_COACH_NUTRITION_MIN_LOGGED) {
