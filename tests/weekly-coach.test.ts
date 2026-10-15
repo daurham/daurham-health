@@ -67,6 +67,8 @@ vi.mock('../server/intelligence/goal-control.ts', () => ({
     trainingAdherence: {
       configured: false,
       completedProgrammedSessions: 0,
+      qualifiedTrainingDays: null,
+      remainingQualifiedDays: null,
       weeklyFrequencyTarget: null,
       remainingSessions: null,
       todayIntent: null,
