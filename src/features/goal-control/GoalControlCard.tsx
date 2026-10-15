@@ -141,12 +141,19 @@ export function GoalControlCard({
             {state.relationships.map((item) => (
               <li key={item.id} className="rounded-md border border-zinc-100 p-2">
                 <p className="font-medium text-zinc-800">{item.summary}</p>
-                <p className="mt-1">Matched-pair count grade: {item.confidence} · {item.sampleSize} matched date pairs
+                <p className="mt-1">Matched-pair count grade: {item.confidence} · {item.sampleSize} {item.evidence?.coefficientVerified ? 'matched' : 'previously reported'} date pairs
                   {item.evidence ? ` · screening minimum ${item.evidence.requiredPairs} pairs` : ''}.
                   This grade describes sample availability, not statistical certainty.
                 </p>
                 {item.evidence ? (
                   <>
+                    {!item.evidence.coefficientVerified ? (
+                      <p className="mt-1 font-medium text-amber-800">
+                        This association could not be reproduced from its cited paired readings.
+                        Its reported coefficient, strength and precise date diagnostics are withheld
+                        until the source evidence is refreshed; no change to a health target is justified.
+                      </p>
+                    ) : null}
                     {item.evidence.pairCoverage ? (
                       <p className="mt-1">
                         Pairing opportunity: {item.evidence.pairCoverage.matchedPairs} of

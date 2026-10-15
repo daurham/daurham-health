@@ -1294,3 +1294,16 @@ HAVING COUNT(*) > 1;
 **Tests:** Canonical fictional observed pairs retain existing 16/28 availability. Missing Y value, a signal whose internal date conflicts with its frame date, nonfinite value, repeated frame date, empty/forged pair metadata all withhold precise pair diagnostics. Unrelated non-relationship evidence is unchanged. No owner records, migrations, main promotion or Gemini/provider calls. The separate unapplied migration `0054` still requires owner approval and live duplicate preflight.
 
 **Remaining:** Canonical event-revision validation for retrospective source changes, formal clinical/statistical calibration and owner device validation. This is a provenance check, not a statistical significance or causal inference upgrade.
+
+
+## PIQ-1.6 — Association coefficient reproducibility from cited paired readings (2026-10-15)
+
+**State:** Bounded work-branch change pending full CI and owner-authenticated device review. **0/9 phases owner-accepted.**
+
+**Integrity gap:** Earlier paired-date provenance checks verified that matching finite X/Y readings exist at every cited date. A source reading could nevertheless be edited to a different finite value, leaving the old aggregate Spearman coefficient and categorical strength apparently verified against those readings. Date existence alone does not establish coefficient provenance.
+
+**Contract:** Independently reproduce Spearman rho from the exact cited paired X/Y frame observations, with the registered tie-aware rank method. Require a finite, bounded original rho and agreement to 1e-10 numeric tolerance. This is a *verification check*, not a new candidate computation, re-ranking, substitute coefficient, effect-size estimate or change to selection criteria. If the originally reported rho cannot be reproduced, preserve its original snapshot history and candidate screening counts but withhold the current numeric coefficient, association strength, precise paired dates, calendar opportunity, clustering and adjacent-day sensitivity; mark the displayed count-grade unknown and label the relationship historical/unverified. Never infer missing logging, zero physiology, causal effect, trial independence or a reason to modify a health target. Source detail links remain available for inspection.
+
+**Tests:** Synthetic 16-pair valid readings, tolerance, falsified/out-of-range/nonfinite reported coefficient and a finite changed reading that retains all cited dates but invalidates the old rho, with server-rendered safe unavailable explanation. Existing source date, lag, missingness and selection-bias regressions remain in force. No additional provider/Gemini calls, DB migration, raw owner data mutations, production promotion or `main` merge.
+
+**Still open:** Canonical event-level freshness outside the loaded source snapshot, formal statistical uncertainty/confounding/multiple-testing correction, owner mobile review, and the production backup/duplicate preflight for unapplied migration `0054`. A reproduced observational coefficient still does not establish causal, clinical or statistical validity.

@@ -430,3 +430,8 @@ Goal Overview observational relationships now disclose actual paired observation
 ## 2026-10-15 PIQ-1.6 paired-reading provenance — work branch
 
 Relationship date disclosures now verify each claimed X/Y pair is backed by two finite, key-matched, date-consistent recorded observations in a unique daily frame. Invalid provenance hides pair opportunity, matched window, clustering and daily sensitivity; the original observed association is not recomputed. Synthetic tests and release gates documented in `PIQ_PROGRESS.md`. No live records, migrations or provider calls.
+
+
+## 2026-10-15 PIQ-1.6 observed association coefficient source reproducibility
+
+Added read-only rank-coefficient attestation for Goal Overview relationships using their exact cited daily X/Y observations. When a finite source edit makes the old rho non-reproducible, the panel suppresses rho/strength and precise pair diagnostics and identifies the prior association as unverified; original snapshot ranking and owner records remain untouched. Focused SSR/analytic regression added; CI and owner-device review remain release gates in PIQ_PROGRESS. No schema/provider/production change.

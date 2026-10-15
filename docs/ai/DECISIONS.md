@@ -738,3 +738,8 @@ An observational correlation's 16 recorded pairs are not 16 complete owner days.
 ## Decision: relationship-date provenance requires real paired readings (PIQ-1.6, 2026-10-15)
 
 A derived relationship's listed date pairs are not sufficient to claim matched observations. Before showing precise pair opportunity, clustering or adjacent-day sensitivity, confirm that every X and Y date resolves to a finite, key-correct, date-consistent signal within a unique daily frame. When this check fails, display unavailable instead of invented paired-day metrics or missing intake. Original derived correlation, count grade and ranking remain untouched. No production migration or owner records change.
+
+
+## Decision: numerical observational coefficients require reproducible source readings (PIQ-1.6, 2026-10-15)
+
+Citing valid paired dates with finite values is necessary but insufficient to substantiate a reported association: ranks can change after finite source edits. Reproduce the original Spearman rho from the exact same dated signal readings; display original rho/strength and precise date diagnostics only if the source statistic is reproducible within floating-point tolerance. Do not silently recompute a replacement, increase the sample grade, rerank the shortlist or claim causal/statistical validation. When provenance fails, label it historical/unverified and withhold the interpretation until the original intelligence snapshot is refreshed. Owner source records are never changed in this check.

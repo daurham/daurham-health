@@ -90,6 +90,8 @@ export type GoalControlRelationship = {
     pairCoverage: { matchedPairs: number; calendarSlots: number; unmatchedSlots: number } | null
     requiredPairs: number
     lagDays: number
+    /** A reported association must reproduce from its exact cited readings before interpretation. */
+    coefficientVerified: boolean
     /** Original Spearman rank coefficient, separate from the count-based grade. */
     rho: number | null
     /** Describes time clustering; not a statistical effective sample size. */
@@ -432,6 +434,31 @@ export function relationshipPairsBackedByFrame(
   })
 }
 
+/** Verify the original aggregate rank association against the exact cited X/Y
+ * readings. A modified but still-finite source value can invalidate a stale
+ * coefficient even when all matched dates still exist. This never rescales,
+ * replaces, or re-ranks the upstream snapshot's original relationship.
+ */
+export function relationshipCoefficientMatchesFrame(
+  frame: readonly HealthIntelligenceSnapshot['frame'][number][],
+  relation: Pick<HealthIntelligenceSnapshot['relationships'][number],
+    'xKey' | 'yKey' | 'evidenceDates' | 'rho'>,
+): boolean {
+  if (relation.rho == null || !Number.isFinite(relation.rho) ||
+      Math.abs(relation.rho) > 1 ||
+      !relationshipPairsBackedByFrame(frame, relation)) return false
+  const byDate = new Map(frame.map((day) => [day.date, day]))
+  const xs: number[] = []
+  const ys: number[] = []
+  for (const pair of relation.evidenceDates) {
+    xs.push(byDate.get(pair.xDate)!.signals[relation.xKey]!.value)
+    ys.push(byDate.get(pair.yDate)!.signals[relation.yKey]!.value)
+  }
+  const reproduced = spearmanRho(xs, ys)
+  return reproduced !== null && Number.isFinite(reproduced) &&
+    Math.abs(reproduced - relation.rho) <= 1e-10
+}
+
 export function relationshipDateClustering(
   dates: readonly { xDate: string; yDate: string }[],
 ): { distinctDates: number; contiguousRuns: number; longestRunDays: number } | null {
@@ -524,8 +551,9 @@ function relationshipsFor(
       const calendarCoverage = relationshipPairDateCoverage(
         item.evidenceDates, item.sampleSize, item.lagDays, sourceWindow,
       )
-      const pairCoverage = calendarCoverage && relationshipPairsBackedByFrame(snapshot.frame, item)
-        ? calendarCoverage : null
+      const coefficientVerified = !!calendarCoverage &&
+        relationshipCoefficientMatchesFrame(snapshot.frame, item)
+      const pairCoverage = coefficientVerified ? calendarCoverage : null
       const sources: GoalControlEvidenceCoverage[] = [item.xKey, item.yKey].flatMap((key) => {
         const coverage = snapshot.coverage.find((entry) => entry.key === key)
         return coverage ? [{
@@ -538,8 +566,9 @@ function relationshipsFor(
       })
       return {
         id: item.id,
-        summary: item.summary,
-        confidence: item.confidence,
+        summary: coefficientVerified ? item.summary
+          : 'Previously reported observational relationship; its coefficient could not be verified against the current paired readings.',
+        confidence: coefficientVerified ? item.confidence : 'unknown',
         sampleSize: item.sampleSize,
         detailPaths: [...item.detailPaths],
         evidence: {
@@ -552,11 +581,12 @@ function relationshipsFor(
           } : null,
           requiredPairs: item.requiredSampleSize,
           lagDays: item.lagDays,
-          rho: typeof item.rho === 'number' && Number.isFinite(item.rho) && Math.abs(item.rho) <= 1 ? item.rho : null,
+          coefficientVerified,
+          rho: coefficientVerified ? item.rho : null,
           dateClustering: pairCoverage ? relationshipDateClustering(item.evidenceDates) : null,
           changeSensitivity: pairCoverage ? relationshipDayToDaySensitivity(snapshot.frame, item) : null,
           screening,
-          strength: item.strength,
+          strength: coefficientVerified ? item.strength : null,
           sources,
         },
       }
