@@ -16,7 +16,7 @@ Daurham Health must become an evidence-aware personal analyst and coach: answer 
 | Phase | State | Notes / exit requirement |
 | --- | --- | --- |
 | PIQ-0 baseline/evaluation | IN PROGRESS | Repository truth and initial case registry recorded; owner runtime/DB and measured model baseline still unknown |
-| PIQ-1 data/decision integrity | NOT STARTED | Requires PIQ-0 critical golden cases and source audit |
+| PIQ-1 data/decision integrity | BRANCH PREPARATION | PIQ-1.1 day-completeness pure domain and persisted owner API code validated; migration/UI/consumer wiring and owner runtime QA missing |
 | PIQ-2 physiological owner context | NOT STARTED | Verify profile fields and historical behavior first |
 | PIQ-3 Ask Health answer quality | NOT STARTED | Classify early exits versus retrieval versus model errors |
 | PIQ-4 cross-domain reasoning | NOT STARTED | Realistic GI, weight, recovery and contradiction cases |
@@ -306,16 +306,44 @@ Stop expanding test counts for their own sake. Next, pursue runtime verification
 
 **Scoreboard: 0/9 phases accepted. PIQ-0 remains open; PIQ-1.1 storage implementation is code-validated but NOT database-validated or user-live.**
 
+## PIQ-1.1 persistence hardening checkpoint — verified branch CI (2026-10-14)
+
+**Validated implementation:** `1b47aaff62cfaf5f1ddff8969ce3bbf29d27aa3f`  
+**GitHub Actions:** [38684874814](https://github.com/daurham/daurham-health/actions/runs/38684874814) — **PASSED** npm ci, TypeScript, ESLint, full Vitest suite, production build.
+
+### Implemented and checked
+
+- Retains unapplied `0053_nutrition_day_completeness.sql`, owner-authenticated `GET/PUT /api/nutrition/day/completeness`, version-bound source digest and compare-and-swap confirmation write, migration backup inventory. No historical data is automatically marked complete.
+- **Six new authenticated handler cases** in `tests/piq1-nutrition-completeness-handler.test.ts` exercise refused unauthenticated GET/PUT, authorized read/update routing, 409 stale-write responses, and 400/405 errors.
+- **Two additional repository cases** in `tests/piq1-nutrition-completeness-storage.test.ts` exercise a food-record change between source reads and an individually excluded food. The service now refuses mixed-revision reads with sanitized 409 and excludes any day containing an analysis-excluded entry from maintenance eligibility even when other entries have high source quality.
+- SQL source fingerprint aggregation now has deterministic tie-breaking by review fingerprint; compare-and-swap SQL independently enforces an explicit fasting flag for an empty complete day, including a concurrent food deletion between initial validation and the write.
+- First CI iteration caught an unused new test import in ESLint; fixed and revalidated. A green CI run verifies TypeScript/lint/tests/build; mock database fixtures and static SQL assertions still **cannot prove SQL executes or serializes correctly on Neon**.
+
+### What is *not* implemented or validated
+
+- **No migration applied** (even to a staging DB), no real SQL execution or transaction/concurrency verification; Vercel live serving SHA and Neon applied schema remain unknown under existing connector access limitations.
+- No user-facing Nutrition confirmation control, no use of persisted confirmations by `src/domain/maintenance.ts`, Goal Control or Coach. The original one-meal-day unsafe maintenance recommendation is **still a live product risk** until the actual consumer gate is wired and deployed safely.
+- No Gemini calls, clinical records accessed, new production deployments, calorie target mutations or `main` merges.
+
+### Next bounded action
+
+1. Gain authorized **temporary** Neon branch access; run `0053` there, execute real food insert/edit/delete, exclusion and concurrent confirmation queries, verify backup/restore + deterministic digest and no implicit old-day completion. Do **not** point the migration at production by default.
+2. Build a lightweight owner Nutrition UI that displays `unknown/partial/confirmed/stale` and sends `expectedRevision`/`expectedVersion`, with explicit fast and easy correction. Test mobile interactions.
+3. Connect the real maintenance/Coach/Goal-Control food-calorie eligibility gate to **stored** owner confirmations, only when the DB read path is verified. Re-run T03: 28 single-meal days cannot authorize intake reduction.
+4. Continue PIQ-0 owner-approved live answer quality and production status audit independently.
+
+**Phase scoreboard:** PIQ-0 active/open. PIQ-1.1 persistence backend implemented on branch with green code CI, **not end-to-end complete**. PIQ-1 full phase unaccepted; PIQ-2–7 pending and PIQ-8 deferred. **0/9 phases complete**.
+
 ## Release state / constraints
 
 - Branch-only preparation: **no production deployments, database migrations, schema changes, AI API calls, or owner data writes performed by this PIQ work**.
 - The Vercel connector's project discovery succeeding does not imply deployment inspection permission.
 - A future phase may use read-only owner-authorized database/project access; never apply migrations merely to satisfy a baseline document.
-- Branch CI for latest implementation: **success** — Actions run `38681257864` on `f5abecc`, all standard checks passed. Documentation-only commits do not imply new code validation.
+- Branch CI for latest implementation: **success** — Actions run `38684874814` on `1b47aaff`, all standard checks passed. Documentation-only commits do not imply new code validation.
 
 ## Continuation packet — NEXT SESSION
 
-**Task:** PIQ-0 exit/readiness review plus scoped PIQ-1.1 day-completeness specification and acceptance fixtures. Do not mark PIQ-0 complete while live Vercel/Neon and owner acceptance remain unverified. No calorie-target change authorized.
+**Task:** PIQ-1.1 next action: validate migration 0053 and read/write SQL in an authorized disposable Neon branch, then add owner Nutrition confirmation UI and wire persisted/revision-verified complete days into maintenance, Coach and Goal Control. PIQ-0 live baseline remains unverified; do not mark either phase complete or deploy calorie-target changes.
 
 **First steps:** Read master §§0–6 + PIQ-0 + §§17–21; inspect this file; verify current main/feature branch, production status, CI and schema. Try authorized Vercel project scope and Neon lookup only if access exists. Reconcile `CURRENT_TASK.md` drift once the verified production state is available. Confirm the baseline contract is still aligned with owner's purpose.
 

@@ -1,6 +1,6 @@
 # PIQ-1.1 — Nutrition Day Completeness implementation contract
 
-Status: branch-only domain rules, proposed 0053 migration, owner-authenticated GET/PUT API and synthetic mocked-DB tests. Full branch CI passed for commit de8f527 (Actions 38684238616). **Migration not applied or real-DB validated; UI and maintenance-engine integration still pending.** PIQ-0 production/runtime/owner acceptance remains open.
+Status: branch-only domain rules, proposed 0053 migration, owner-authenticated GET/PUT API and synthetic mocked-DB tests. Full branch CI passed for implementation commit 1b47aaff (Actions 38684874814). **Migration not applied or real-DB validated; UI and maintenance-engine integration still pending.** PIQ-0 production/runtime/owner acceptance remains open.
 
 ## Code verified before work
 
@@ -58,4 +58,13 @@ No production changes were made in creating this contract.
 - `server/backup/inventory.ts` includes canonical report table in backup/restore inventory; migration head and older test fixtures updated to 0053.
 - `tests/piq1-nutrition-completeness-storage.test.ts` exercises mocked database version conflicts, current-state reads, stale edits, explicit fast, safety errors and route registration.
 - **Known remaining validation:** GitHub CI is green but mock DB tests cannot guarantee SQL syntax or concurrency on real Neon; must run 0053 migration and service queries on a disposable DB branch first. No UI has been added, no maintenance eligibility has been wired to the API, and no migration applied to production.
+
+
+## Read consistency, atomicity and route hardening (validated code; real DB test pending)
+
+- `server/nutrition/day-completeness.ts` now performs a second source fingerprint read, rejecting with sanitized 409 if entries or affected review state change during its multi-query read. This is a conservative protection but **not a full repeatable-read transaction**: verify transaction semantics and race conditions against a disposable Postgres/Neon branch before making maintenance decisions depend on it.
+- Any individually analysis-excluded food causes `excluded_from_analysis` maintenance ineligibility for that date, even if the remaining entry source quality is good; user can still view and correct the underlying ledger.
+- The SQL source digest uses review fingerprint to order ties deterministically. Atomic write SQL enforces the no-food fasting requirement as well as the source-revision/version guard, even if food rows change after a preliminary API check.
+- `tests/piq1-nutrition-completeness-handler.test.ts` adds six synthetic authenticated route checks, including unauthorized GET/PUT and stale 409. `tests/piq1-nutrition-completeness-storage.test.ts` adds two source-consistency/excluded-food checks, bringing the mocked storage suite to 12 cases.
+- `migrations/0053_nutrition_day_completeness.sql` remains **unapplied**; no real database transaction or backup restore has run. Verified CI covers code, mocks and build, not deployment/migration. Next: stage migration safely, verify SQL against real schema, then implement UI and consumers.
 
