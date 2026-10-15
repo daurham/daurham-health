@@ -122,6 +122,9 @@ function opportunityDraft(
 ): CoachRecommendationDraft | null {
   const opportunity = control.primaryOpportunity
   if (!opportunity) return null
+  // A previously derived calorie recommendation must not bypass the current
+  // verified full-day nutrition floor when Coach constructs action cards.
+  if (opportunity.kind === 'review_intake_adjustment' && control.nutritionQuality.state !== 'met') return null
   return restAware({
     fingerprint: fingerprint(opportunity.id),
     sourceId: opportunity.id,
@@ -164,6 +167,11 @@ function maintenanceDrafts(control: GoalControlState): CoachRecommendationDraft[
   if (!control.maintenance) return []
   return control.maintenance.interventions.flatMap((item) => {
     if (item.priority !== 'secondary' || item.kind === 'hold_course') return []
+    if (item.kind === 'review_intake_adjustment' && control.nutritionQuality.state !== 'met') return []
+    // The activity option is explicitly an alternative to the primary
+    // calorie lever; never surface a standalone dangling alternative card.
+    if (item.kind === 'review_activity_adjustment' &&
+        (control.primaryOpportunity?.kind !== 'review_intake_adjustment' || control.nutritionQuality.state !== 'met')) return []
     const id = `maintenance:${item.id}`
     if (control.primaryOpportunity?.id === item.id) return []
     return [{
