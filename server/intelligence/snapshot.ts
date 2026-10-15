@@ -13,6 +13,7 @@ import { poundsToKilograms } from '../../src/domain/units.js'
 import { getSql } from '../db.js'
 import { healthTimeContext } from '../health-time.js'
 import { getChangeLedger } from './change-ledger.js'
+import { loadVerifiedNutritionDays } from '../nutrition/maintenance-eligibility.js'
 
 type ExclusionRow = {
   entity_kind: string
@@ -368,7 +369,7 @@ export async function loadHealthIntelligenceSnapshot(input: {
 
   const earliest = earliestDate(observations, input.asOf)
   const period = trailingPeriod(input.range, input.asOf, earliest)
-  return buildHealthIntelligenceSnapshot({
+  const snapshotInput = {
     range: input.range,
     asOf: input.asOf,
     start: period.start,
@@ -378,5 +379,27 @@ export async function loadHealthIntelligenceSnapshot(input: {
     observations,
     excludedObservationCountByKey: excludedCounts,
     changes: changeLedger.entries.filter((entry) => entry.date <= input.asOf),
+  }
+  // Raw entries remain visible for exact logged-value questions. Full-day
+  // baselines, nutrition relationships and intervention comparisons require
+  // a current revision-matched owner confirmation and reliable source rows.
+  const loaded = buildHealthIntelligenceSnapshot(snapshotInput)
+  let verifiedDates: ReadonlySet<string> = new Set<string>()
+  let verificationStatus: 'available' | 'unavailable' = 'available'
+  try {
+    verifiedDates = await loadVerifiedNutritionDays({
+      snapshot: loaded, asOf: input.asOf, today: time.date,
+      startDate: period.start, sqlOverride: sql,
+    })
+  } catch {
+    // Pre-0053 or failed verification is NOT proof that the owner logged no
+    // food. Only derived full-day claims fail closed; raw logs remain available.
+    verificationStatus = 'unavailable'
+    console.warn('intelligence nutrition completeness verification unavailable')
+  }
+  return buildHealthIntelligenceSnapshot({
+    ...snapshotInput,
+    nutritionVerifiedCompleteDates: verifiedDates,
+    nutritionVerificationStatus: verificationStatus,
   })
 }
