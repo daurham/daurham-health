@@ -419,6 +419,7 @@ describe.skipIf(!url)('PIQ-1.1 full 0001–0053 migration-chain and backup on is
         [intake.id],
       )
       expect(rejected.rows[0]).toEqual({ response_state: null, response_at: null })
+      // The migration-chain DB enforces an outcome timestamp whenever feedback exists.
       await client.query(
         "UPDATE coach_recommendations SET outcome_state = 'helped', outcome_at = now() WHERE id = $1::uuid", [activity.id],
       )
