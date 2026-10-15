@@ -133,16 +133,51 @@ Registry/master alignment tests, four Ask Health service-level baseline tests, f
 
 **PIQ-0.2/0.3:** add a deterministic evidence fixture runner proving useful citation/coverage behavior and distinguishing failure to retrieve from genuinely absent personal records, without increasing ordinary Gemini consumption. Introduce a small evaluated cohort before PIQ-1; preserve the master plan and green regression suite. No production promotion until authorized and safety/data gates pass.
 
+## PIQ-0 checkpoint 4 — evidence selection and source coverage audit (validated)
+
+**Implementation:** `90bcdde64c098cf92bbd8cd46f908b5428e09649` on `piq/00-baseline-20261014`  
+**CI:** [GitHub Actions 38678265999](https://github.com/daurham/daurham-health/actions/runs/38678265999) — **PASSED** (`npm ci`, TypeScript, ESLint, full Vitest, production build).
+
+### What was proven with synthetic fixtures
+
+- In `src/domain/ask-health/packet.ts`, the existing packet selection algorithm now produces **count-only audit metadata**: draft candidate count, kept count, dropped count, dropped substantive count, configured character limit, selected evidence length and whether the selected items still exceed the limit.
+- This audits **what the packet builder attempted and discarded**, without changing existing evidence priority, serialization for the model, prompt, or the Ask Health insufficient-evidence gate.
+- In `src/domain/ask-health/diagnostics.ts`, `auditAskHealthSharedCoverage` compares **non-derived observed shared signals** from the full intelligence snapshot to the subset selected by `routeHealthIntelligence`. Output is three *counts only*; no source names, values, IDs, raw question, provider output or clinical profile.
+- The server loader passes the source audit into the packet; Ask Health response `meta.diagnostic` includes the source-coverage audit and builder-selection audit. Both are nullable, so **uninspected is not equivalent to observed zero**. Client types updated accordingly.
+- `tests/piq0-evidence-selection.test.ts` adds **five** synthetic tests: no observed shared data, observed-but-unselected signals, size-trimmed substantive evidence, impossible tiny cap, and absent source audit. Existing `tests/piq0-ask-health-baseline.test.ts` was updated for the expanded count-only diagnostic shape.
+- Important uncovered confounder: `src/domain/intelligence/shared.ts` synthesizes training zeroes on completed days. This is **not** proof a source recorded a session. The audit deliberately excludes purely derived observations when counting available source signals.
+- No canonical DB access, model call, migration, health target change or production promotion.
+
+### Strict interpretation boundaries
+
+1. **`unselectedObservedSignalCount > 0` is not a failed answer by itself.** Unselected signals may be irrelevant. It means there is source material outside the routing selection worth checking against question intent.
+2. **`observedSignalCount === 0` is not proof there are no owner records.** It only describes non-derived observations in the *loaded shared-signal snapshot*, within its date/range.
+3. **`removedSubstantiveCount > 0` identifies potentially material packet loss, not necessarily that the removed facts were relevant.** T21 still needs question-focused evidence-priority evaluation.
+4. Some health facts bypass this shared-signal snapshot (profile, Goals, individual exercises, medications, etc.). A full cross-source retrieval audit remains outstanding.
+5. Packet overflow after removing all priority-positive candidates is now explicitly detectable. No automatic truncation/silent reshaping was added in this baseline phase.
+6. Raw owner questions, health facts, or provider payloads must never be placed in shared CI reports, routine diagnostics or repository fixtures.
+
+### Remaining PIQ-0 blockers
+
+- Broaden question-intent versus source-selection evaluation beyond the shared signal registry. Demonstrate true relevance with realistic synthetic canonical inputs and a graded evidence manifest.
+- Distinguish source-loading failure from missing records, and evaluate stale/historical evidence and corrected records in the end-to-end Ask Health path.
+- Verify production Git deployment, database migrations, AI costs/latency, and owner mobile acceptance when authorized access is available. Existing Vercel 403 and no Neon projects returned are still barriers.
+- **PIQ-0 remains IN PROGRESS. PIQ-1 through PIQ-7 are NOT STARTED; PIQ-8 deferred.** Green CI validates instrumentation and synthetic tests, not health-answer correctness.
+
+### Next bounded task
+
+Build **question-focused evidence relevance fixtures** for T01/T12/T18/T21 using real domain builders and synthetic source records. Score whether required evidence was eligible, selected, truncated or unavailable. Prefer pure deterministic evaluation. Do not modify prompts, increase routine Gemini usage or call private owner data without approval.
+
 ## Release state / constraints
 
 - Branch-only preparation: **no production deployments, database migrations, schema changes, AI API calls, or owner data writes performed by this PIQ work**.
 - The Vercel connector's project discovery succeeding does not imply deployment inspection permission.
 - A future phase may use read-only owner-authorized database/project access; never apply migrations merely to satisfy a baseline document.
-- Branch CI for newest code changes: **success** — Actions run `38677784305` on `df18aae`, all standard checks passed. Documentation-only updates may trigger additional runs; only claim verified checks by their SHA.
+- Branch CI for latest implementation: **success** — Actions run `38678265999` on `90bcdde`, all standard checks passed. A subsequent progress-document commit is not itself proof of a new code validation.
 
 ## Continuation packet — NEXT SESSION
 
-**Task:** PIQ-0.2/0.3: add a small synthetic canonical-evidence retrieval evaluation cohort, separate source absences from routing/truncation and strengthen sanitized failure diagnostics; do not jump into PIQ-1 before verifying its evidence gates.
+**Task:** PIQ-0.2/0.3: build the next question-focused relevance fixture cohort (T01/T12/T18/T21), tracing eligibility, routing and truncation while preserving the current assistant behavior. Use only synthetic canonical inputs and keep the no-production policy.
 
 **First steps:** Read master §§0–6 + PIQ-0 + §§17–21; inspect this file; verify current main/feature branch, production status, CI and schema. Try authorized Vercel project scope and Neon lookup only if access exists. Reconcile `CURRENT_TASK.md` drift once the verified production state is available. Confirm the baseline contract is still aligned with owner's purpose.
 
