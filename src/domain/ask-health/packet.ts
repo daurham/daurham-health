@@ -964,7 +964,7 @@ function addSharedIntelligence(
       unit: 'percent',
       text: item.loggedDays == null
         ? `${item.observedDays} observed day${item.observedDays === 1 ? '' : 's'} of ${item.eligibleDays} eligible days. ${item.excludedObservations > 0 ? `${item.excludedObservations} reviewed observation${item.excludedObservations === 1 ? '' : 's'} excluded from intelligence. ` : ''}Confidence: ${item.confidence}.`
-        : `${item.loggedDays} logged day(s) of ${item.eligibleDays} eligible calendar days; ${item.observedDays} owner-confirmed, current-revision, source-reliable complete day(s) qualify for full-day trends. Unverified logs are not zeros or proof of total intake.${item.completenessCheck === 'unavailable' ? ' Completeness verification is currently unavailable.' : ''} Confidence for verified trend evidence: ${item.confidence}.`,
+        : `${item.loggedDays} logged day(s) of ${item.eligibleDays} eligible calendar days; ${item.completenessCheck === 'unavailable' ? 'completeness verification is currently unavailable, so full-day trends are withheld' : `${item.observedDays} owner-confirmed, current-revision, source-reliable complete day(s) qualify for full-day trends`}. Unverified logs are not zeros or proof of total intake. Confidence for verified trend evidence: ${item.confidence}.`,
       coverage: {
         observedDays: item.observedDays,
         ...(item.loggedDays == null ? {} : { loggedDays: item.loggedDays, completenessCheck: item.completenessCheck ?? 'available' }),
