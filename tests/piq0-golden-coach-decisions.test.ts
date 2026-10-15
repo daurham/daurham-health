@@ -79,7 +79,9 @@ const cases: Case[] = [
       coachMustNotContain: ['review_intake_adjustment', 'review_activity_adjustment'] } },
   { id: 'G04', premise: 'Falling weight contradicts a claim of no progress',
     weightDeltaKgPerDay: -0.05, expected: { estimate: 'available', plateau: 'trend_in_goal_direction',
-      safety: 'review_possible', nutrition: 'met', coachMustNotContain: ['review_intake_adjustment', 'review_activity_adjustment'] } },
+      // There is no loss plateau to justify a new action, and its computed
+      // candidate also fails the separate maintenance-range safety screen.
+      safety: 'blocked', nutrition: 'met', coachMustNotContain: ['review_intake_adjustment', 'review_activity_adjustment'] } },
   { id: 'G05', premise: 'Intentional weight maintenance is not a loss plateau',
     goal: 'maintain', expected: { estimate: 'available', plateau: 'stable_at_maintenance',
       safety: 'review_possible', nutrition: 'met', coachMustNotContain: ['review_intake_adjustment', 'review_activity_adjustment'] } },
