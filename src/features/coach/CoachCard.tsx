@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import type { CoachState, CoachTaskView } from '@/domain/coach'
 import type {
   CoachIntelligenceState,
@@ -94,7 +94,6 @@ export function CoachCard({ state, pending, error, onState }: {
   onState: (state: CoachState) => void
 }) {
   const location = useLocation()
-  const navigate = useNavigate()
   const prefix = useAppPathPrefix()
   const [inboxOpen, setInboxOpen] = useState(false)
   const [detailTask, setDetailTask] = useState<CoachTaskView | null>(null)
