@@ -1,6 +1,6 @@
 # PIQ-1.1 — Nutrition Day Completeness implementation contract
 
-Status: branch-only pure domain layer + synthetic tests. PIQ-0 production/runtime/owner acceptance remains open. No migration, API, UI, production deployment or maintenance-engine integration in this checkpoint.
+Status: branch-only domain rules, proposed 0053 migration, owner-authenticated GET/PUT API and synthetic mocked-DB tests. Full branch CI passed for commit de8f527 (Actions 38684238616). **Migration not applied or real-DB validated; UI and maintenance-engine integration still pending.** PIQ-0 production/runtime/owner acceptance remains open.
 
 ## Code verified before work
 
@@ -49,3 +49,13 @@ PIQ-0 remains IN PROGRESS: deployed Vercel commit, applied Neon schema, owner mo
 Next: validate pure tests under branch CI; then inspect applicable migration/CRUD code and implement a database-safe, owner-authenticated completion flow only after verifying production migration prerequisites. The final maintenance recommendation changes require actual stored confirmation and full regression pass, with zero accidental calorie reductions.
 
 No production changes were made in creating this contract.
+
+## Storage checkpoint (implemented in branch, NOT deployed)
+
+- Proposed `migrations/0053_nutrition_day_completeness.sql`: historical days remain unknown; new per-date report, fasting bit, entry revision and optimistic confirmation version.
+- `server/nutrition/day-completeness.ts`: SHA-256 of canonical food rows and affected exclusion-review rows, including edits/deletions and current source state; atomic confirmation revision/version comparison returns HTTP 409 on mismatch.
+- `GET/PUT /api/nutrition/day/completeness`: owner-authenticated; read current revision and confirmation, write explicit complete/partial/unknown. Rejects future days, empty-day nonfasted completion and bad revision input. Missing migration yields sanitized 503.
+- `server/backup/inventory.ts` includes canonical report table in backup/restore inventory; migration head and older test fixtures updated to 0053.
+- `tests/piq1-nutrition-completeness-storage.test.ts` exercises mocked database version conflicts, current-state reads, stale edits, explicit fast, safety errors and route registration.
+- **Known remaining validation:** GitHub CI is green but mock DB tests cannot guarantee SQL syntax or concurrency on real Neon; must run 0053 migration and service queries on a disposable DB branch first. No UI has been added, no maintenance eligibility has been wired to the API, and no migration applied to production.
+

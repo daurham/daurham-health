@@ -281,6 +281,31 @@ Stop expanding test counts for their own sake. Next, pursue runtime verification
 
 **Phase scoreboard:** PIQ-0 ACTIVE / not exited. PIQ-1 PREPARATION STARTED / not implemented end-to-end. PIQ-2..7 not started. PIQ-8 deferred. **0 / 9 completed**.
 
+## PIQ-1.1 storage checkpoint — owner-confirmed nutrition days (branch CI green)
+
+**Verified code commit:** `de8f5275692859d177d1eca4bbaa812cd0554b6b`  
+**GitHub Actions:** [38684238616](https://github.com/daurham/daurham-health/actions/runs/38684238616) — **PASSED** npm ci, TypeScript, ESLint, full Vitest suite, and production build.
+
+### New implementation
+
+- **Branch-only migration `0053_nutrition_day_completeness.sql`** creates a one-row-per-instance-day owner report with `health_date`, `owner_report` (`complete|partial|unknown`), explicit `zero_intake_fast`, canonical `entry_revision`, monotonic `version`, and confirmation/update timestamps. No historical row backfill or auto-confirmation.
+- **`server/nutrition/day-completeness.ts`** supplies current-day GET and version-checked PUT domain service. Revision is SHA-256 of sorted canonical food rows plus relevant analysis-review rows, computed in PostgreSQL and exposed only as an opaque digest. Source edits/removed entries, retroactive corrections, imported entries, and analysis exclusion changes invalidate a prior confirmation. Atomic SQL checks `expectedRevision` and `expectedVersion`; a mismatch gives sanitized 409.
+- **`server/handlers/nutrition-day-completeness.ts`** is protected by the existing owner auth middleware and routed at `GET/PUT /api/nutrition/day/completeness`. Future-date and malformed writes are rejected; empty days require explicit fasting; unavailable DB state becomes sanitized 503, never "complete".
+- Backup inventory includes the new canonical day-confirmation table and source schema head `0053`; existing migration-head tests were advanced accordingly.
+- **10 synthetic mocked-DB contract tests** plus the earlier 18 PIQ-1.1 completeness and maintenance tests cover unknown historical days, explicit confirmation, version conflicts, edits, fasted days, future requests, 503 fallback, SQL compare-and-swap structure, and routing.
+- Full suite initially found old `0052` schema head assertions plus a fasting mock mistake. Both were corrected. Final code CI is fully green.
+- **Crucial qualification:** CI exercises mocked DB behavior and query structure, **not a real Postgres/Neon transaction**; before any deployment, run migration and GET/PUT against a disposable Neon branch and test concurrent food mutation/exclusion, backup+restore, correctness of SQL digest, and authenticated API on local/preview. Also note separate source/read queries can race; a single atomic write guards stale submission but consumers must independently require a matching read revision.
+- **No production schema migration, merge, medical-record access, UI change, actual maintenance wiring, model spending or calorie-target modification.**
+
+### Remaining integration
+
+1. Verify live Neon migration head and Vercel serving commit (existing PIQ-0 access blockers), branch-test migration `0053` and reconcile schema before applying anything live.
+2. Run real DB integration/restore tests to verify SHA-256 query, review exclusion coverage and optimistic writes. Investigate revisions across live nutrition ingestion/legacy variants; ensure a change to the source cannot leave a positive stale eligibility decision.
+3. Add low-friction Nutrition confirmation control and ensure authentic owner report/date/revision/version handling, clear stale status after edits and explicit fast.
+4. Only then connect verified completeness to the **actual** maintenance/Coach/Goal Control calculations, and prove T03 prevents calorie changes for 28 precise one-meal days, plus appropriate behavior for reliably completed periods.
+
+**Scoreboard: 0/9 phases accepted. PIQ-0 remains open; PIQ-1.1 storage implementation is code-validated but NOT database-validated or user-live.**
+
 ## Release state / constraints
 
 - Branch-only preparation: **no production deployments, database migrations, schema changes, AI API calls, or owner data writes performed by this PIQ work**.
