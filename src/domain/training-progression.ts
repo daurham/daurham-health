@@ -81,6 +81,8 @@ export type TrainingProgressionSeries = {
   state: TrainingProgressionKind
   confidence: IntelligenceConfidence
   exposureCount: number
+  /** Most recent comparable exercise exposure, for freshness-gated decisions. */
+  latestDate: string | null
   recentValue: number | null
   priorValue: number | null
   changePct: number | null
@@ -317,6 +319,7 @@ function classifySeries(points: readonly SessionPoint[]): Omit<TrainingProgressi
     state,
     confidence: points.length >= 6 && span >= 21 ? 'high' : points.length >= 4 ? 'moderate' : 'limited',
     exposureCount: points.length,
+    latestDate: points.length ? points[points.length - 1]!.date : null,
     recentValue,
     priorValue,
     changePct,
