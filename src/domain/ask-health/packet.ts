@@ -1,6 +1,7 @@
 import { resolveScheduleRange } from '../supplements/resolve.js'
 import type { OccurrenceState } from '../supplements/types.js'
 import { ASK_HEALTH_PACKET_VERSION, ASK_PACKET_MAX_CHARS, type AskLens } from './config.js'
+import { MIN_VERIFIED_NUTRITION_TARGET_DAYS } from './nutrition-integrity.js'
 import type {
   AskClinicalProfileInput,
   AskContextInput,
@@ -348,25 +349,29 @@ function bodyMetricLabel(key: string): string {
 
 function addNutrition(input: AskHealthPacketInput, push: (item: PushItem) => void, limitations: AskLimitation[]) {
   const nutrition = input.overview?.nutrition
-  if (!nutrition) {
-    return
-  }
+  if (!nutrition) return
+  const integrity = input.nutritionIntegrity
+  const verified = integrity?.status === 'available' ? integrity.verifiedCompleteDays : null
+  const verificationText = verified == null
+    ? 'Whole-day completeness verification is unavailable; logged meals cannot establish full-day intake.'
+    : `${verified} logged day(s) match current owner confirmation and source/revision evidence for full-day analysis. Other logged days are not known to be complete.`
   push({
     id: 'nutrition.coverage',
     domain: 'nutrition',
-    label: 'Nutrition coverage',
+    label: 'Nutrition logging and completeness',
     value: nutrition.coveragePct,
     unit: 'percent',
-    text: `Nutrition was logged on ${nutrition.loggedDays} of ${nutrition.calendarDays} days. Averages are logged days only.`,
+    text: `Nutrition was logged on ${nutrition.loggedDays} of ${nutrition.calendarDays} days. Averages are amounts recorded on logged days, not necessarily all intake. ${verificationText}`,
     coverage: {
       loggedDays: nutrition.loggedDays,
       calendarDays: nutrition.calendarDays,
       coveragePct: nutrition.coveragePct,
+      ...(verified == null ? { completenessCheck: 'unavailable' } : { verifiedCompleteDays: verified, completenessCheck: 'available' }),
     },
     detailPath: '/nutrition',
     userEntered: false,
     substantive: nutrition.loggedDays > 0,
-    priority: 2,
+    priority: 1,
   })
   if (nutrition.status === 'insufficient_data') {
     limitations.push({
@@ -375,32 +380,60 @@ function addNutrition(input: AskHealthPacketInput, push: (item: PushItem) => voi
       evidenceId: 'nutrition.coverage',
     })
   }
-  addNutrient(push, 'nutrition.calories', 'Average calories on logged days', nutrition.calories.averageOnLoggedDays, 'kcal', nutrition.calories.observedDays)
-  const calorieTarget = nutrition.calories.targetContext
-  if (calorieTarget) {
-    const difference = calorieTarget.averageDifference
-    const roundedDifference = Math.round(Math.abs(difference))
-    const relation = difference < 0 ? `${roundedDifference} kcal/day below` : difference > 0 ? `${roundedDifference} kcal/day above` : 'at'
-    push({
-      id: 'nutrition.calories_vs_target',
-      domain: 'nutrition',
-      label: 'Calories vs configured target',
-      value: difference,
-      unit: 'kcal/day',
-      text: `Across ${calorieTarget.daysWithTarget} logged days with a configured calorie target, logged intake averaged ${relation} that target. This compares intake with the configured target; it does not measure total energy expenditure or prove a physiological energy deficit.`,
-      coverage: {
-        daysWithTarget: calorieTarget.daysWithTarget,
-        averageDifference: difference,
-      },
-      detailPath: '/nutrition',
-      userEntered: false,
-      substantive: true,
-      priority: 1,
-    })
+  addNutrient(push, 'nutrition.calories', 'Average recorded calories on logged days', nutrition.calories.averageOnLoggedDays, 'kcal', nutrition.calories.observedDays)
+  const target = nutrition.calories.targetContext
+  if (target) {
+    const verifiedTargetDays = integrity?.status === 'available' ? integrity.verifiedTargetDays : 0
+    const eligible = verifiedTargetDays >= MIN_VERIFIED_NUTRITION_TARGET_DAYS &&
+      integrity?.verifiedAverageTargetDifference != null
+    if (eligible) {
+      const difference = integrity.verifiedAverageTargetDifference!
+      const roundedDifference = Math.round(Math.abs(difference))
+      const relation = difference < 0 ? `${roundedDifference} kcal/day below` : difference > 0 ? `${roundedDifference} kcal/day above` : 'at'
+      push({
+        id: 'nutrition.calories_vs_target',
+        domain: 'nutrition',
+        label: 'Owner-confirmed complete-day logged calories vs configured target',
+        value: difference,
+        unit: 'kcal/day',
+        text: `Across ${verifiedTargetDays} owner-confirmed complete, source-reliable days with configured targets, recorded calories averaged ${relation} the configured calorie targets. No missing or unconfirmed days contribute. A target is not measured expenditure and this difference does not prove a physiological energy deficit or justify a calorie adjustment.`,
+        coverage: { verifiedTargetDays, minimumVerifiedTargetDays: MIN_VERIFIED_NUTRITION_TARGET_DAYS },
+        detailPath: '/nutrition',
+        userEntered: false,
+        substantive: true,
+        priority: 1,
+      })
+    } else {
+      const reason = integrity?.status !== 'available'
+        ? 'Whole-day confirmation cannot currently be verified.'
+        : `Only ${verifiedTargetDays} of the ${MIN_VERIFIED_NUTRITION_TARGET_DAYS} minimum owner-confirmed, source-reliable days have both logged calories and configured targets.`
+      push({
+        id: 'nutrition.calories_target_ineligible',
+        domain: 'nutrition',
+        label: 'Calorie-target comparison withheld',
+        value: null,
+        unit: null,
+        text: `${target.daysWithTarget} logged day(s) had configured calorie targets, but that does not prove complete intake. ${reason} Do not calculate an energy deficit, trend or calorie-adjustment recommendation from these records.`,
+        coverage: {
+          loggedDaysWithTarget: target.daysWithTarget,
+          ...(integrity?.status === 'available' ? { verifiedTargetDays } : { completenessCheck: 'unavailable' }),
+          minimumVerifiedTargetDays: MIN_VERIFIED_NUTRITION_TARGET_DAYS,
+        },
+        detailPath: '/nutrition',
+        userEntered: false,
+        substantive: false,
+        priority: 1,
+      })
+      limitations.push({
+        code: 'nutrition_target_unverified',
+        text: `Calorie-target inference withheld: ${reason} Accurate logged meals do not establish total daily intake.`,
+        evidenceId: 'nutrition.calories_target_ineligible',
+      })
+    }
   }
-  addNutrient(push, 'nutrition.protein', 'Average protein on logged days', nutrition.protein.averageOnObservedDays, 'g', nutrition.protein.observedDays)
-  addNutrient(push, 'nutrition.carbs', 'Average carbs on logged days', nutrition.carbs.averageOnObservedDays, 'g', nutrition.carbs.observedDays)
-  addNutrient(push, 'nutrition.fat', 'Average fat on logged days', nutrition.fat.averageOnObservedDays, 'g', nutrition.fat.observedDays)
+  addNutrient(push, 'nutrition.protein', 'Average recorded protein on logged days', nutrition.protein.averageOnObservedDays, 'g', nutrition.protein.observedDays)
+  addNutrient(push, 'nutrition.carbs', 'Average recorded carbs on logged days', nutrition.carbs.averageOnObservedDays, 'g', nutrition.carbs.observedDays)
+  addNutrient(push, 'nutrition.fat', 'Average recorded fat on logged days', nutrition.fat.averageOnObservedDays, 'g', nutrition.fat.observedDays)
 }
 
 function addNutrient(
@@ -420,7 +453,7 @@ function addNutrient(
     label,
     value,
     unit,
-    text: 'Average on logged days. Unlogged days are not treated as zero.',
+    text: 'Average amount recorded on logged days, not proven full-day consumption or nutrient adequacy. Missing or unlogged items are not counted as zero intake.',
     coverage: { observedDays },
     detailPath: '/nutrition',
     userEntered: false,
