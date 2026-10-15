@@ -435,3 +435,8 @@ Relationship date disclosures now verify each claimed X/Y pair is backed by two 
 ## 2026-10-15 PIQ-1.6 observed association coefficient source reproducibility
 
 Added read-only rank-coefficient attestation for Goal Overview relationships using their exact cited daily X/Y observations. When a finite source edit makes the old rho non-reproducible, the panel suppresses rho/strength and precise pair diagnostics and identifies the prior association as unverified; original snapshot ranking and owner records remain untouched. Focused SSR/analytic regression added; CI and owner-device review remain release gates in PIQ_PROGRESS. No schema/provider/production change.
+
+
+## 2026-10-15 PIQ-1.6 relationship label consistency — work branch
+
+Goal Overview checks that originally reported observational strength and direction agree with reproducible Spearman rho and original thresholds; inconsistencies withhold numerical interpretation, with synthetic/SSR tests. Branch only; pending CI, authenticated owner review and existing migration 0054 release gate.

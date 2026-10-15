@@ -743,3 +743,8 @@ A derived relationship's listed date pairs are not sufficient to claim matched o
 ## Decision: numerical observational coefficients require reproducible source readings (PIQ-1.6, 2026-10-15)
 
 Citing valid paired dates with finite values is necessary but insufficient to substantiate a reported association: ranks can change after finite source edits. Reproduce the original Spearman rho from the exact same dated signal readings; display original rho/strength and precise date diagnostics only if the source statistic is reproducible within floating-point tolerance. Do not silently recompute a replacement, increase the sample grade, rerank the shortlist or claim causal/statistical validation. When provenance fails, label it historical/unverified and withhold the interpretation until the original intelligence snapshot is refreshed. Owner source records are never changed in this check.
+
+
+## Decision: a verified relationship coefficient needs consistent interpretation labels (PIQ-1.6, 2026-10-15)
+
+Reproducing Spearman rho is necessary but does not validate independently stored strength and direction labels. Require agreement with the canonical magnitude thresholds and the original near-zero neutral-direction rule before treating a selected observational association as currently verified. Inconsistency withholds exact rho, strength and paired-date diagnostics rather than guessing which field is right, modifying recorded evidence or recommending a target change. Preserve its historical place in existing selection accounting; do not claim statistical significance, causality, or a new calibration.

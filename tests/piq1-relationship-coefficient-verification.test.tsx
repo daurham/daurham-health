@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
 import { addCalendarDays } from '../src/domain/training-plan.js'
 import { buildHealthIntelligenceSnapshot, type IntelligenceObservation } from '../src/domain/intelligence/shared.js'
-import { buildGoalControlState, relationshipCoefficientMatchesFrame, relationshipPairsBackedByFrame } from '../src/domain/goal-control.js'
+import { buildGoalControlState, relationshipCoefficientMatchesFrame, relationshipPairsBackedByFrame, relationshipReportedLabelsMatchCoefficient } from '../src/domain/goal-control.js'
 import type { WeeklyCoachBrief, WeeklyGoalSnapshot } from '../src/domain/weekly-coach/types.js'
 import { GoalControlCard } from '../src/features/goal-control/GoalControlCard.js'
 
@@ -84,4 +84,39 @@ describe('PIQ-1.6 exact relationship coefficient provenance', () => {
     expect(current.relationships[0]?.evidence?.coefficientVerified).toBe(true)
     expect(current.relationships[0]?.evidence?.rho).toBe(relation.rho)
   })
+  it('withholds a reproducible coefficient paired with a forged direction or strength label', () => {
+    const source = fixture()
+    const relation = source.intelligence.relationships.find((item) => item.id === 'shared:sleep:energy')!
+    expect(relationshipCoefficientMatchesFrame(source.intelligence.frame, relation)).toBe(true)
+    expect(relationshipReportedLabelsMatchCoefficient(relation)).toBe(true)
+
+    const inaccurate = [
+      { ...relation, strength: relation.strength === 'strong' ? 'weak' as const : 'strong' as const },
+      { ...relation, direction: relation.direction === 'positive' ? 'negative' as const : 'positive' as const },
+    ]
+    for (const forged of inaccurate) {
+      expect(relationshipCoefficientMatchesFrame(source.intelligence.frame, forged)).toBe(true)
+      expect(relationshipReportedLabelsMatchCoefficient(forged)).toBe(false)
+      const stale = buildGoalControlState({
+        asOf, ...source,
+        intelligence: { ...source.intelligence,
+          relationships: source.intelligence.relationships.map((item) =>
+            item.id === relation.id ? forged : item),
+        },
+      })
+      const entry = stale.relationships.find((item) => item.id === relation.id)!
+      expect(entry.confidence).toBe('unknown')
+      expect(entry.evidence?.coefficientVerified).toBe(false)
+      expect(entry.evidence?.rho).toBeNull()
+      expect(entry.evidence?.strength).toBeNull()
+      expect(entry.evidence?.pairCoverage).toBeNull()
+      const html = renderToStaticMarkup(<MemoryRouter><GoalControlCard state={stale} /></MemoryRouter>)
+      expect(html).toContain('reported strength/direction did not agree')
+      expect(html).toContain('Spearman rank correlation (ρ): unavailable')
+    }
+    expect(relationshipReportedLabelsMatchCoefficient({ ...relation, rho: Number.NaN })).toBe(false)
+    expect(relationshipReportedLabelsMatchCoefficient({ ...relation, rho: null })).toBe(false)
+    expect(relationshipReportedLabelsMatchCoefficient({ ...relation, rho: 1.5 })).toBe(false)
+  })
+
 })

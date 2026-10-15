@@ -4,7 +4,7 @@ import type { WeeklyCandidate, WeeklyCoachBrief, WeeklyGoalSnapshot, WeeklyTrain
 import type { MaintenanceState } from './maintenance.js'
 import type { TrainingProgressionState } from './training-progression.js'
 import { buildTrainingProgressSummary } from './training-progress-summary.js'
-import { spearmanRho } from './intelligence/spearman.js'
+import { associationStrength, spearmanRho } from './intelligence/spearman.js'
 
 export const GOAL_CONTROL_VERSION = 'goal-control-v1' as const
 
@@ -459,6 +459,19 @@ export function relationshipCoefficientMatchesFrame(
     Math.abs(reproduced - relation.rho) <= 1e-10
 }
 
+/** An observed coefficient can be reproducible while its descriptive strength
+ * or direction label is stale. Check both against the *original* rho without
+ * changing upstream ranking, thresholds or the owner's source observations.
+ */
+export function relationshipReportedLabelsMatchCoefficient(
+  relation: Pick<HealthIntelligenceSnapshot['relationships'][number], 'rho' | 'strength' | 'direction'>,
+): boolean {
+  const rho = relation.rho
+  if (rho == null || !Number.isFinite(rho) || Math.abs(rho) > 1) return false
+  const direction = Math.abs(rho) < 0.05 ? 'neutral' : rho > 0 ? 'positive' : 'negative'
+  return relation.strength === associationStrength(rho) && relation.direction === direction
+}
+
 export function relationshipDateClustering(
   dates: readonly { xDate: string; yDate: string }[],
 ): { distinctDates: number; contiguousRuns: number; longestRunDays: number } | null {
@@ -552,7 +565,8 @@ function relationshipsFor(
         item.evidenceDates, item.sampleSize, item.lagDays, sourceWindow,
       )
       const coefficientVerified = !!calendarCoverage &&
-        relationshipCoefficientMatchesFrame(snapshot.frame, item)
+        relationshipCoefficientMatchesFrame(snapshot.frame, item) &&
+        relationshipReportedLabelsMatchCoefficient(item)
       const pairCoverage = coefficientVerified ? calendarCoverage : null
       const sources: GoalControlEvidenceCoverage[] = [item.xKey, item.yKey].flatMap((key) => {
         const coverage = snapshot.coverage.find((entry) => entry.key === key)
@@ -567,7 +581,7 @@ function relationshipsFor(
       return {
         id: item.id,
         summary: coefficientVerified ? item.summary
-          : 'Previously reported observational relationship; its coefficient could not be verified against the current paired readings.',
+          : 'Previously reported observational relationship; its coefficient or interpretation labels could not be verified against the current paired readings.',
         confidence: coefficientVerified ? item.confidence : 'unknown',
         sampleSize: item.sampleSize,
         detailPaths: [...item.detailPaths],

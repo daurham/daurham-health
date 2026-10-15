@@ -1307,3 +1307,16 @@ HAVING COUNT(*) > 1;
 **Tests:** Synthetic 16-pair valid readings, tolerance, falsified/out-of-range/nonfinite reported coefficient and a finite changed reading that retains all cited dates but invalidates the old rho, with server-rendered safe unavailable explanation. Existing source date, lag, missingness and selection-bias regressions remain in force. No additional provider/Gemini calls, DB migration, raw owner data mutations, production promotion or `main` merge.
 
 **Still open:** Canonical event-level freshness outside the loaded source snapshot, formal statistical uncertainty/confounding/multiple-testing correction, owner mobile review, and the production backup/duplicate preflight for unapplied migration `0054`. A reproduced observational coefficient still does not establish causal, clinical or statistical validity.
+
+
+## PIQ-1.6 — Consistent observational relationship labels (2026-10-15)
+
+**State:** Bounded work-branch implementation; independent CI and authenticated device QA required. **0/9 phases owner-accepted.**
+
+**Integrity gap:** A reported Spearman coefficient could be exactly reproducible from all cited readings, yet its precomputed strength or positive/negative label might disagree. Goal Overview previously displayed the inconsistent labels as verified, potentially changing the owner's interpretation even when the numeric source matched.
+
+**Contract:** Check the *reported* strength category against the existing canonical association-strength thresholds and the *reported* direction against the original Health Intelligence small-coefficient neutral convention. This check is coupled to source-date, pair-count and tie-aware Spearman reproducibility: if any fail, withhold numeric rho, strength and precise pair/date diagnostics; label the association unverified, retaining the historical source and screening counts for context. Do not silently replace a label, reinterpret medical meaning, select a different coefficient or re-rank a relationship. Verification requires no additional query, Gemini calls, canonical writes, schema changes or production deployment.
+
+**Regression:** Valid synthetic observational relationship retains verified labels; metadata-forged strength or sign with an otherwise reproducible rho is withheld, SSR discloses the inconsistency, and invalid original coefficients fail closed. Existing changes to physical readings, dates, missingness, trend sensitivity and selection screening remain guarded.
+
+**Still open:** Upstream source-revision atomicity, empirical uncertainty / multiple testing / confounding, authenticated owner mobile QA, and separate release authorization for unapplied migration 0054. No `main` merge or production change.
