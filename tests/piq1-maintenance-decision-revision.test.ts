@@ -56,6 +56,7 @@ describe('PIQ-1.2 decision revision and cross-read settings integrity', () => {
     expect(MAINTENANCE_DECISION_REVISION_SQL).toContain('v.is_current')
     expect(MAINTENANCE_DECISION_REVISION_SQL).toContain('g.status = \'active\'')
     expect(MAINTENANCE_DECISION_REVISION_SQL).toContain('e.protocol_version_id')
+    expect(MAINTENANCE_DECISION_REVISION_SQL).toContain("'profile', (SELECT to_jsonb(p) FROM health_profile p")
     expect(MAINTENANCE_DECISION_REVISION_SQL).toContain('e.status = \'scheduled\'')
     expect(MAINTENANCE_DECISION_REVISION_SQL).toContain('ORDER BY g.id')
     expect(MAINTENANCE_DECISION_REVISION_SQL).toContain('ORDER BY e.id')
