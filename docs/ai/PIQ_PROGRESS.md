@@ -87,13 +87,27 @@ Completion is based on user-visible acceptance evidence, never number of commits
 - A deterministic/provider-stub evaluation runner checking evidence refs, unsupported claims, hard fail conditions and classified response reason.
 - Owner-approved **private** sample-question evaluation without storing PHI or raw questions in GitHub.
 
-## PIQ-0.3 — diagnostics (NOT STARTED)
+## PIQ-0.3 — diagnostics (PARTIALLY IMPLEMENTED; owner QA pending)
+
+As of this PIQ-0 continuation, `src/domain/ask-health/diagnostics.ts` calculates privacy-safe *response-path* metadata, included in Ask Health API response `meta.diagnostic`. Counts and enum path only—no question text, clinical values or owner identity. Paths: `packet_no_substantive_evidence`, `clarification_required`, `model_answer`, `cache_hit`.
+
+**Known interpretation limit:** `packet_no_substantive_evidence` means the *packet* was empty, not proof that the owner's database lacks evidence. Diagnostics for provider exceptions remain existing `HttpError` codes; end-to-end timing, cost, retrieval/truncation and durable troubleshooting are still outstanding.
 
 Required metrics: request ID, task intent, evidence packet/omitted domain counts, source freshness, route, data completeness, early exit vs provider/error path, cache hit, latency, tokens and cost; no raw medical data or full questions in routine logs. First code change in this slice must include retention and user-visible vs developer-only boundary.
 
-## PIQ-0.4 — regression infrastructure (STARTED / NOT VALIDATED)
+## PIQ-0.4 — regression infrastructure (ACTIVE / CI pending)
 
 Registry shape/integrity Vitest added on development branch; awaits branch CI and full synthetic test fixtures. No clinical logic or model responses changed.
+
+## Executable baseline checkpoint — PIQ-0.2 / PIQ-0.3
+
+- `tests/piq0-ask-health-baseline.test.ts` exercises synthetic/no-owner Ask Health service behavior with a fake provider and in-memory budget gate.
+- **T01 KNOWN PRODUCT FAILURE (expected baseline):** A general creatine question with no personal evidence exits before the model. The test records the observed failure; it must be upgraded to a desired-behavior test when PIQ-3 fixes the route. A green baseline test is **not** an assertion that T01 passes.
+- A missing exact personal measurement currently takes the same fallback, proving the pipeline does not yet distinguish question types.
+- A canonical synthetic Goal can produce a correctly cited answer through the provider stub, and repeat requests hit the cache.
+- An enum/count-only `meta.diagnostic` distinguishes no-evidence packet, clarification, model answer and cache hit. No raw health data and no production provider spend.
+- **Remaining PIQ-0 gates:** all 50 core scenarios, executable evidence retrieval fixtures, actual response quality scoring, bounded provider diagnostics, owner QA and verified production deployment/schema/usage baseline.
+- Build and branch CI result for this checkpoint: **PENDING** at authoring time; verify the GitHub Actions run before calling this change validated.
 
 ## Release state / constraints
 

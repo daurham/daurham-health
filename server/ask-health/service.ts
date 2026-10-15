@@ -14,6 +14,7 @@ import {
   type AskTurn,
 } from '../../src/domain/ask-health/index.js'
 import { validateAskHealthAnswer } from '../../src/domain/ask-health/validate.js'
+import { describeAskHealthResponsePath, type AskHealthResponseDiagnostic } from '../../src/domain/ask-health/diagnostics.js'
 import type { AskEvidence } from '../../src/domain/ask-health/types.js'
 import { NutritionInterpretError } from '../../src/domain/nutrition/interpret.js'
 import { billableOutputTokens, boundedProviderCostUsd } from '../ai-usage/cost.js'
@@ -50,6 +51,7 @@ export type AskHealthResponse = {
     range: string
     requestType: typeof ASK_HEALTH_REQUEST_TYPE
     context: AskHealthPacket['contextSummary']
+    diagnostic: AskHealthResponseDiagnostic
   }
 }
 
@@ -274,6 +276,7 @@ function metaFor(
     range: input.packet.range,
     requestType: ASK_HEALTH_REQUEST_TYPE,
     context: input.packet.contextSummary,
+    diagnostic: describeAskHealthResponsePath(input.packet, result),
   }
 }
 
