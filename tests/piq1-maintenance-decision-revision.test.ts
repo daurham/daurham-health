@@ -21,6 +21,7 @@ const checkedPerformance = {
 const settings: MaintenanceAdjustmentContext = {
   status: 'available', currentCalorieTarget: 2500, activeExperimentCount: 0,
   revisionStatus: 'consistent', decisionRevision: REV_A, performance: checkedPerformance,
+  physiology: { status: 'available', asOf: AS_OF, ageYears: 31, heightCm: 178, activeOrUncertainConditionCount: 0 },
 }
 function evaluate(context: MaintenanceAdjustmentContext) {
   const observations: IntelligenceObservation[] = dates.flatMap((date) => ([
