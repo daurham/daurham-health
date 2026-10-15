@@ -1035,8 +1035,9 @@ export function explainMaintenanceEvidence(
 ): MaintenanceEvidenceExplanation {
   const { nutrition, body } = estimate.quality
   const sampledDays = nutrition.calendarDays
-  const nutritionStatus = nutrition.state === 'sufficient' ? 'well_sampled'
-    : nutrition.state === 'limited' ? 'limited' : 'insufficient'
+  const nutritionStatus = nutrition.state === 'insufficient' ? 'insufficient'
+    : !ownerVerifiedNutrition ? 'limited'
+      : nutrition.state === 'sufficient' ? 'well_sampled' : 'limited'
   const nutritionDetail =
     `${nutrition.reliableDays} of ${sampledDays} completed days had eligible calorie observations ` +
     `(${nutrition.highConfidenceDays} high-source-quality, ${nutrition.estimateHeavyDays} estimate-heavy). ` +
