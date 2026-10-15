@@ -17,6 +17,7 @@ function fakeDb(input: {
   savedRevision?: string
   entries?: Array<{ calories: number; evidence_quality: string; excluded?: boolean }>
   dayExcluded?: boolean
+  revisionOnSecondRead?: string
 } = {}) {
   let revision = input.revision ?? A
   let version = input.version ?? 0
@@ -25,9 +26,14 @@ function fakeDb(input: {
   let savedFast = false
   const entries = input.entries ?? [{ calories: 1800, evidence_quality: 'measured_reference' }]
   const calls: Array<{ sql: string; args: unknown[] }> = []
+  let revisionReads = 0
   const query = vi.fn(async (sql: string, args: unknown[] = []) => {
     calls.push({ sql, args })
-    if (sql === SOURCE_REVISION_SQL) return [{ revision }]
+    if (sql === SOURCE_REVISION_SQL) {
+      revisionReads += 1
+      return [{ revision: revisionReads === 2 && input.revisionOnSecondRead
+        ? input.revisionOnSecondRead : revision }]
+    }
     if (sql.includes('SELECT owner_report, zero_intake_fast, entry_revision, version')) {
       return report ? [{ owner_report: report, zero_intake_fast: savedFast, entry_revision: savedRevision, version }] : []
     }
@@ -148,6 +154,27 @@ describe('PIQ-1.1 authenticated persistence repository and optimistic conflict c
       statusCode: 503, code: 'NUTRITION_COMPLETENESS_UNAVAILABLE',
     })
     expect((failure as Error).message).not.toContain('sensitive query')
+  })
+
+  it('refuses a completion read when nutrition changed between canonical source reads', async () => {
+    const db = fakeDb({ revisionOnSecondRead: B, report: 'complete', version: 1 })
+    await expect(getNutritionDayCompleteness('2026-10-13', db.sql, '2026-10-14'))
+      .rejects.toMatchObject({ statusCode: 409, code: 'NUTRITION_COMPLETENESS_STALE' })
+  })
+
+  it('an individually excluded food does not allow its remaining entries to calibrate maintenance', async () => {
+    const db = fakeDb({ version: 1, report: 'complete',
+      entries: [
+        { calories: 750, evidence_quality: 'measured_reference', excluded: false },
+        { calories: 600, evidence_quality: 'measured_reference', excluded: true },
+      ],
+    })
+    const result = await getNutritionDayCompleteness('2026-10-13', db.sql, '2026-10-14')
+    expect(result).toMatchObject({
+      quality: { entryCount: 1, kind: 'high_confidence' },
+      assessment: { state: 'confirmed_complete', eligibleForMaintenance: false,
+        maintenanceExclusion: 'excluded_from_analysis' },
+    })
   })
 
   it('SQL uses one revision snapshot and locks confirmation writes to both revision and version', () => {

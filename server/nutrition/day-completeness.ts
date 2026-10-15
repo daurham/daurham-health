@@ -144,6 +144,15 @@ export async function getNutritionDayCompleteness(
       sql.query(ENTRY_ROWS_SQL, [date]) as Promise<Row[]>,
       sql.query(DAY_EXCLUDED_SQL, [date]) as Promise<Row[]>,
     ])
+    // The four read queries are not wrapped in a shared database transaction.
+    // Recheck the canonical source fingerprint before treating this as a
+    // consistent response; a concurrent food edit must not silently yield
+    // a completed or maintenance-eligible snapshot.
+    const secondRevision = await sql.query(SOURCE_REVISION_SQL, [date]) as Row[]
+    if (secondRevision[0]?.revision !== revisions[0]?.revision) {
+      throw new HttpError(409, 'Food records changed during this request. Refresh and review again.',
+        undefined, 'NUTRITION_COMPLETENESS_STALE')
+    }
     const entryRevision = revisions[0]?.revision
     if (!entryRevision || !/^[a-f0-9]{64}$/.test(entryRevision)) throw new Error('Bad revision')
     const report = reports[0]
@@ -156,7 +165,7 @@ export async function getNutritionDayCompleteness(
         ? { state: report.owner_report, entryRevision: report.entry_revision,
           zeroIntakeFast: report.zero_intake_fast === true }
         : null,
-      excludedFromAnalysis: exclusions[0]?.excluded === true,
+      excludedFromAnalysis: exclusions[0]?.excluded === true || entries.some((row) => row.excluded === true),
     })
     return { date, today, entryRevision, version,
       ownerReport: report?.owner_report ?? null, quality, assessment }
