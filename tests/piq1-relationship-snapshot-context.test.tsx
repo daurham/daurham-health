@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
 import { addCalendarDays } from '../src/domain/training-plan.js'
 import { buildHealthIntelligenceSnapshot, type IntelligenceObservation } from '../src/domain/intelligence/shared.js'
-import { buildGoalControlState, relationshipSnapshotContextIsCurrent } from '../src/domain/goal-control.js'
+import { buildGoalControlState, relationshipCoefficientMatchesFrame, relationshipSnapshotContextIsCurrent } from '../src/domain/goal-control.js'
 import type { WeeklyCoachBrief, WeeklyGoalSnapshot } from '../src/domain/weekly-coach/types.js'
 import { GoalControlCard } from '../src/features/goal-control/GoalControlCard.js'
 
@@ -76,4 +76,36 @@ describe('PIQ-1.6 exact source snapshot context for present-tense observed relat
     }
     expect(relationshipSnapshotContextIsCurrent(original, '2026-02-30')).toBe(false)
   })
+  it('withholds interpretation when calendar frame, day count or expected range disagrees with the snapshot', () => {
+    const original = source()
+    const selected = original.relationships.find((item) => item.id === 'shared:protein:soreness:next_day')!
+    expect(relationshipCoefficientMatchesFrame(original.frame, selected)).toBe(true)
+
+    const tampered = [
+      { ...original, frame: [...original.frame].reverse() }, // unordered, same readings
+      { ...original, frame: original.frame.slice(1) }, // a non-cited day missing
+      { ...original, frame: [original.frame[0]!, ...original.frame.slice(0, -1)] }, // duplicated day
+      { ...original, period: { ...original.period, dayCount: original.period.dayCount + 1 } },
+      { ...original, range: '90d' as const },
+    ]
+    for (const snapshot of tampered) {
+      expect(relationshipCoefficientMatchesFrame(snapshot.frame, selected)).toBe(true)
+      expect(relationshipSnapshotContextIsCurrent(snapshot, asOf)).toBe(false)
+      const state = buildGoalControlState({ asOf, intelligence: snapshot, brief, goals })
+      const observed = state.relationships.find((item) => item.id === selected.id)!
+      expect(observed.evidence?.snapshotCurrent).toBe(false)
+      expect(observed.evidence?.coefficientVerified).toBe(false)
+      expect(observed.evidence?.rho).toBeNull()
+      expect(observed.evidence?.pairCoverage).toBeNull()
+      expect(observed.evidence?.dateClustering).toBeNull()
+    }
+
+    const html = renderToStaticMarkup(<MemoryRouter><GoalControlCard state={
+      buildGoalControlState({ asOf, intelligence: tampered[0]!, brief, goals })
+    } /></MemoryRouter>)
+    expect(html).toContain('invalid or inconsistent observation window')
+    expect(html).toContain('Spearman rank correlation (ρ): unavailable')
+    expect(html).not.toContain('Pairing opportunity: 16 of')
+  })
+
 })

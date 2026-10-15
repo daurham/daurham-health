@@ -1357,3 +1357,12 @@ HAVING COUNT(*) > 1;
 **Regression:** A verified fictional 16-pair protein/recovery relationship survives a matching as-of snapshot. An older as-of snapshot with identical finite observations and the same computed correlation is labeled historical with all precision withheld; impossible February, reversed and future-ending windows fail closed. Separate observational, numeric, quality, and statistical-caveat tests remain intact.
 
 **Limit:** This is an *in-memory loaded snapshot context* guard, NOT proof that underlying SQL source events could not change during or immediately after multi-query reads. Canonical event revision atomicity, multiple-comparison calibration, owner mobile QA and unapplied migration 0054's owner approval remain open. No Gemini requests, schema changes, production actions, real health record writes, or `main` merge.
+
+
+## PIQ-1.6 — Calendar frame consistency for observed relationships (2026-10-15)
+
+**State:** Bounded PIQ work-branch change; full CI and authenticated owner review pending. Owner-accepted phases: **0/9**.
+
+A reproducible correlation based on cited X/Y readings is insufficient if the loaded Health Intelligence frame itself omits, duplicates or reorders a day outside those citations. Goal Control now checks the expected 30-day range, the declared integer day count, and that every row advances exactly one valid calendar date from the source period start through end. If the frame is inconsistent, retain the historical relationship and its source links but withhold present rho, strength, pairing opportunities, clustering and sensitivity. No source values are fabricated or changed.
+
+Synthetic 16-pair regressions mutate the frame and day count while preserving the exact coefficient and prove the display fails closed. This is an in-memory consistency check, not proof of atomic SQL reads. No migration, Gemini, production writes or `main` merge. Outstanding: CI, mobile QA, canonical DB source-revision atomicity, statistical uncertainty, and owner-gated migration 0054.

@@ -763,3 +763,8 @@ A complete food-day confirmation reports recording completeness, not accuracy of
 ## Decision: a reproduced old relationship is not a current Health-date relationship (PIQ-1.6, 2026-10-15)
 
 Withhold present-tense observational coefficient interpretation when loaded Health Intelligence snapshot `asOf` differs from Goal Control's requested health date, or its source window is impossible, reversed or in the future. Exact source-value/rank reproducibility alone does not establish current temporal provenance. Preserve original historical relationship, source detail links, screening counts and avoid fabricated zero/missing days. The guard does not claim atomicity with underlying DB events; production release remains separately gated.
+
+
+## Decision: observational source frames must be calendar-coherent (PIQ-1.6, 2026-10-15)
+
+Require exact loaded frame row continuity, expected 30-day source range, and truthful period day count before treating a cited, reproducible relationship coefficient as current. Missing, duplicated and reordered non-cited days invalidate the source context and pairing opportunity just as missing cited values do. Keep historical source links and original screening order, while suppressing precise interpretation; never infer zero logs or report canonical DB revision atomicity from this check.

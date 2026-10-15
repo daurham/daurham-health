@@ -455,3 +455,8 @@ Work-branch verification now requires both confirmed complete nutrition days and
 ## 2026-10-15 PIQ-1.6 observed relationship snapshot context — work branch
 
 A matching exact Health-date snapshot and valid observation window are now prerequisites for present-tense observed relationship statistics. Mismatch withholds rho, strength, paired dates and sensitivity while retaining historical evidence links. Synthetic SSR regression covers matching, stale and corrupted windows. This is not canonical SQL source-event revision checking. Refer to `PIQ_PROGRESS.md` for release gates.
+
+
+## 2026-10-15 PIQ-1.6 relationship frame calendar coherence — work branch
+
+Goal Control now requires the loaded 30-day source frame to agree with its declared day count and have exact, ordered contiguous calendar rows, not merely matching cited pairs. A corrupted source window withholds present-tense observational rho and paired-date diagnostics but leaves historical source links available. Added synthetic/SSR regressions. CI, owner device QA, source-event revision atomicity and the separately gated migration 0054 remain open.

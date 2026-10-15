@@ -416,15 +416,28 @@ export function relationshipPairDateCoverage(
 /** A relationship cannot be presented as current when its original source
  * snapshot belongs to another date or an impossible/reversed source window.
  * Reproducing an old coefficient is not sufficient to prove freshness.
- * This only checks loaded-snapshot context, NOT DB-level event revisions.
+ * This only checks loaded-snapshot context and calendar continuity, NOT DB-level event revisions.
  */
 export function relationshipSnapshotContextIsCurrent(
-  snapshot: Pick<HealthIntelligenceSnapshot, 'asOf' | 'period'>,
+  snapshot: Pick<HealthIntelligenceSnapshot, 'asOf' | 'period' | 'range' | 'frame'>,
   requestedAsOf: string,
 ): boolean {
-  return isCalendarDate(requestedAsOf) && snapshot.asOf === requestedAsOf &&
-    isCalendarDate(snapshot.period.start) && isCalendarDate(snapshot.period.end) &&
-    snapshot.period.start <= snapshot.period.end && snapshot.period.end <= requestedAsOf
+  if (!isCalendarDate(requestedAsOf) || snapshot.asOf !== requestedAsOf ||
+      snapshot.range !== '30d' || !isCalendarDate(snapshot.period.start) ||
+      !isCalendarDate(snapshot.period.end) || snapshot.period.start > snapshot.period.end ||
+      snapshot.period.end > requestedAsOf ||
+      !Number.isSafeInteger(snapshot.period.dayCount) ||
+      snapshot.period.dayCount <= 0 || snapshot.frame.length !== snapshot.period.dayCount) return false
+
+  // Frame rows are the loaded calendar window's source of matched dates. A
+  // missing, duplicated, reordered or out-of-window day invalidates even a
+  // reproducible coefficient because opportunity and coverage are not sound.
+  let expectedDate = snapshot.period.start
+  for (const day of snapshot.frame) {
+    if (day.date !== expectedDate) return false
+    expectedDate = addCalendarDays(expectedDate, 1)
+  }
+  return expectedDate === addCalendarDays(snapshot.period.end, 1)
 }
 
 /** A plausible pair date is not proof of a measured X/Y pair. Only expose
