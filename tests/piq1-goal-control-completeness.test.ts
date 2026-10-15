@@ -23,6 +23,7 @@ const baseObservations: IntelligenceObservation[] = dates.flatMap((date) => ([
     key: 'body.weight_kg' as const, date, value: 85, unit: 'kg',
     quality: 'usual', provenance: 'owner' as const, sourceIds: [date + '-scale'],
   },
+  { key: 'wellness.energy' as const, date, value: 4, unit: '1–5', provenance: 'owner' as const, sourceIds: [] },
 ]))
 
 function snapshot(verified: ReadonlySet<string>, unavailable = false) {
@@ -54,6 +55,7 @@ function control(verified: ReadonlySet<string>, unavailable = false) {
   const maintenance = buildMaintenanceState({
     asOf: AS_OF, today: AS_OF, intelligence, contexts: [],
     eligibleNutritionDates: verified,
+    adjustmentContext: { status: 'available', currentCalorieTarget: 2500, activeExperimentCount: 0 },
     weightGoal: {
       goalId: 'weight-goal', goalVersionId: 'weight-goal-v1',
       label: 'Weight', targetState: 'unmet', direction: 'lose',
