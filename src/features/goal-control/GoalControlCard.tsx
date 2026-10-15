@@ -93,6 +93,58 @@ export function GoalControlCard({
           )}
         </div>
       ) : null}
+      {state.relationships.length > 0 ? (
+        <details className="mt-3 border-t border-zinc-100 pt-2 text-xs text-zinc-600">
+          <summary className="cursor-pointer font-medium text-zinc-700">
+            Observed relationships ({state.relationships.length}) · not causal
+          </summary>
+          <p className="mt-1">
+            These are associations in recorded data, not evidence that changing one factor will change another.
+            Other factors, missing records, and day-to-day variation may explain the patterns.
+          </p>
+          <ol className="mt-2 space-y-3">
+            {state.relationships.map((item) => (
+              <li key={item.id} className="rounded-md border border-zinc-100 p-2">
+                <p className="font-medium text-zinc-800">{item.summary}</p>
+                <p className="mt-1">Paired-sample confidence: {item.confidence} · {item.sampleSize} matched date pairs
+                  {item.evidence ? ` · screening minimum ${item.evidence.requiredPairs} pairs` : ''}.
+                  Confidence here does not establish causation or control for confounders.
+                </p>
+                {item.evidence ? (
+                  <>
+                    <p className="mt-1">Source observation window: {item.evidence.sourceWindow.start} to {item.evidence.sourceWindow.end}.
+                      {' '}Matched dates: {item.evidence.pairedWindow
+                        ? `${item.evidence.pairedWindow.start} to ${item.evidence.pairedWindow.end}`
+                        : 'unavailable'}.
+                      {' '}Timing: {item.evidence.lagDays === 0 ? 'same tracked day' : `${item.evidence.lagDays}-day lag`}.
+                    </p>
+                    {item.evidence.sources.length ? (
+                      <ul className="mt-1 space-y-1">
+                        {item.evidence.sources.map((source) => (
+                          <li key={source.key}>
+                            {source.label}: {source.observedDays}/{source.eligibleDays} observed dates
+                            {' '}· {source.excludedObservations} excluded observations
+                            {' '}· source coverage confidence {source.confidence}
+                            {' '}· provenance {Object.entries(source.provenance).filter(([, count]) => count > 0)
+                              .map(([kind, count]) => `${kind} ${count}`).join(', ') || 'unavailable'}.
+                          </li>
+                        ))}
+                      </ul>
+                    ) : <p className="mt-1">Source observation counts are unavailable; do not infer complete or zero tracking.</p>}
+                  </>
+                ) : <p className="mt-1">Matched-date window and source provenance are unavailable.</p>}
+                <div className="mt-1 flex flex-wrap gap-2">
+                  {item.detailPaths.map((path, index) => (
+                    <Link key={path} to={prefixedPath(prefix, path)} className="underline underline-offset-2">
+                      Review source {index + 1}
+                    </Link>
+                  ))}
+                </div>
+              </li>
+            ))}
+          </ol>
+        </details>
+      ) : null}
       {state.trainingAdherence.configured ? (
         <p className="mt-2 text-xs text-zinc-500">
           <span className="font-medium">

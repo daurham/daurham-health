@@ -698,3 +698,8 @@ A request to fill a missing sleep, wellness or goal-evaluation gap cannot inheri
 ## Decision: missing-signal Coach evidence uses actual source coverage, not inferred completion (PIQ-1.6, 2026-10-15)
 
 For a missing sleep or wellness signal, expose only the measured observed/eligible dates and source provenance already provided by Health Intelligence, with its own dated source window. Do not substitute the weekly Goal Control dates for the observation period, equate recorded dates with complete tracking or a physiological outcome, or manufacture zero when coverage is unavailable. Keep missing-signal intervention confidence unknown; include these owner-visible facts in the non-calorie response revision so stale acknowledgements fail closed. No canonical health data or schema mutation.
+
+
+## Decision: paired observational relationships must show their evidence scope (PIQ-1.6, 2026-10-15)
+
+A high confidence grade computed from at least 14 paired dates is **not** high confidence that source coverage is complete, nor evidence that one signal causes another. Present the currently selected Goal Control relationships only as observational: report actual matched dates, paired sample count/screening minimum, time lag, source observation window, independent per-signal coverage and source provenance, with clearly stated confounder and missingness limits. If coverage details are unavailable, say so rather than substituting zeros or Goal Control's shorter weekly window. Do not make new prescriptions or change evidence eligibility and never treat a correlation as intervention proof.

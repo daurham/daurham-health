@@ -395,3 +395,8 @@ A missing Recovery sensor/check-in or unknown active Goal no longer inherits glo
 ## 2026-10-15 PIQ-1.6 missing-signal source coverage — work branch
 
 Goal Control missing-signal limitations carry optional exact observation-window coverage and source provenance. Coach differentiates its assessment window from the actual source window, displays observed and eligible dates and excluded observations, and explains limits without assuming unlogged equals zero or complete. The existing non-calorie context fingerprint includes these fields. Synthetic and derived-Goal-Control regression tests added. No schema/production/provider/owner-data writes.
+
+
+## 2026-10-15 PIQ-1.6 paired-signal association evidence — work branch
+
+Goal Overview now has a collapsed observational relationship disclosure with actual paired dates, sample minimum, lag, source window, independently derived source coverage and provenance, plus an explicit non-causality caveat. Existing Health Intelligence correlation thresholds/ranking are unchanged; tests include real synthetic data and absent coverage. No DB migration, provider call, production data change, deployment or `main` merge. CI and owner QA pending.

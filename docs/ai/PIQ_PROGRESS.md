@@ -1190,3 +1190,16 @@ HAVING COUNT(*) > 1;
 **Regression:** Synthetic Coach disclosure/unknown-source tests, deterministic context-token change on new source observations with stable recommendation ID, and a complete Goal Control derivation from fictional Health Intelligence coverage that verifies the true longer source window. No new schema, provider calls, owner records, `main` merge or deployment.
 
 **Remaining:** Confidence calibration against real evaluation outcomes; raw-event-level causal and invalidation guarantees; confounding/quality metadata for comparisons; owner-authenticated iOS QA. Migration 0054 remains unapplied and strictly owner-gated.
+
+
+## PIQ-1.6 — Paired relationship evidence and non-causal disclosure (2026-10-15)
+
+**State:** Bounded work-branch implementation; requires full CI and authenticated mobile/owner acceptance. **0/9 PIQ phases owner-accepted.**
+
+**Gap:** Health Intelligence already computes paired observational correlations (sleep/energy, sleep/steps, hydration/bowel and other registered pairs), and Goal Control selects a few relevant high/moderate-confidence associations. Goal Overview previously never displayed these selected insights, let alone their sample-window and provenance. A high relationship confidence could be mistaken for causal or complete-source confidence.
+
+**Contract:** Goal Control retains each selected registered relationship's exact source observation window, matched date range, matched-pair count, screening minimum, lag and *independent* signal coverage/provenance when available. These are derived solely from the existing snapshot's `evidenceDates` and `coverage`; missing source coverage stays unavailable, not zero or complete. Goal Overview adds a collapsed, bounded `Observed relationships` panel showing at most the three already-filtered associations, linked evidence routes, matched sample confidence separately from each signal's coverage confidence, source counts and observational/confounding caveats. Weekly Goal Control assessment dates are not substituted for longer observation dates. No new correlation, intervention recommendation, confidence calibration, data mutation, model call, or schema change. Absence of a statistically eligible relationship does not create a card.
+
+**Verification:** Synthetic 16-paired-day, mismatched high pair/moderate source confidence test; sparse eight-pair exclusion; missing coverage explicitly unavailable; React SSR disclosure and source links. CI, owner mobile layout and real-data reliability remain required. The older migration `0054` remains unapplied in production and separately approval-gated; no `main` merge or production write.
+
+**Remaining PIQ-1.6:** statistically calibrated uncertainty on relationships and effects, raw source-event invalidation, trial/outcome confounding controls, owner-verified UX and production schema readiness.

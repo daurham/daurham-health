@@ -77,9 +77,20 @@ export type GoalControlLimitation = {
 export type GoalControlRelationship = {
   id: string
   summary: string
+  /** Confidence of the paired-sample signal, not evidence of causation. */
   confidence: IntelligenceConfidence
   sampleSize: number
   detailPaths: string[]
+  evidence?: {
+    /** Observation window can be longer than the matching pair dates. */
+    sourceWindow: { start: string; end: string }
+    pairedWindow: { start: string; end: string } | null
+    requiredPairs: number
+    lagDays: number
+    strength: 'weak' | 'moderate' | 'strong' | null
+    /** Raw signal coverage, not necessarily the subset of paired dates. */
+    sources: GoalControlEvidenceCoverage[]
+  }
 }
 
 export type GoalControlState = {
@@ -317,13 +328,35 @@ function relationshipsFor(
     )
     .sort((a, b) => confidenceRank(b.confidence) - confidenceRank(a.confidence) || b.sampleSize - a.sampleSize)
     .slice(0, 3)
-    .map((item) => ({
-      id: item.id,
-      summary: item.summary,
-      confidence: item.confidence,
-      sampleSize: item.sampleSize,
-      detailPaths: [...item.detailPaths],
-    }))
+    .map((item) => {
+      const dates = item.evidenceDates.flatMap((pair) => [pair.xDate, pair.yDate]).sort()
+      const sourceWindow = { start: snapshot.period.start, end: snapshot.period.end }
+      const sources: GoalControlEvidenceCoverage[] = [item.xKey, item.yKey].flatMap((key) => {
+        const coverage = snapshot.coverage.find((entry) => entry.key === key)
+        return coverage ? [{
+          key: coverage.key, label: coverage.label,
+          observedDays: coverage.observedDays, eligibleDays: coverage.eligibleDays,
+          excludedObservations: coverage.excludedObservations,
+          provenance: { ...coverage.provenance }, confidence: coverage.confidence,
+          period: { ...sourceWindow },
+        }] : []
+      })
+      return {
+        id: item.id,
+        summary: item.summary,
+        confidence: item.confidence,
+        sampleSize: item.sampleSize,
+        detailPaths: [...item.detailPaths],
+        evidence: {
+          sourceWindow,
+          pairedWindow: dates.length ? { start: dates[0]!, end: dates[dates.length - 1]! } : null,
+          requiredPairs: item.requiredSampleSize,
+          lagDays: item.lagDays,
+          strength: item.strength,
+          sources,
+        },
+      }
+    })
 }
 
 function confidenceRank(value: IntelligenceConfidence): number {
