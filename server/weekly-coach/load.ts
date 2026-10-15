@@ -128,11 +128,13 @@ export async function loadWeeklyCoachInput(asOf: string): Promise<WeeklyCoachInp
     trainingPlan: {
       configured: trainingPlan.configured,
       completedProgrammedSessions: trainingPlan.completedProgrammedSessions,
+      qualifiedTrainingDays: trainingPlan.weekTraining?.completedDays ?? null,
+      todayQualified: trainingPlan.weekTraining?.days.find((day) => day.date === asOf)?.qualifies ?? null,
       weeklyFrequencyTarget: trainingPlan.weeklyFrequencyTarget,
       todayIntent: trainingPlan.today?.effectiveIntent ?? null,
       todayRoutineName: trainingPlan.nextSession?.name ?? null,
       futureTrainingDates: trainingPlan.week
-        .filter((day) => day.date >= asOf && ['training_preferred', 'training_moved_here'].includes(day.effectiveIntent))
+        .filter((day) => day.date > asOf && ['training_preferred', 'training_moved_here'].includes(day.effectiveIntent))
         .map((day) => day.date),
     },
   }
