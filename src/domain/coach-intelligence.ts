@@ -260,6 +260,26 @@ export function keepCurrentCalorieDecisionDrafts<T extends { kind: string }>(
     item.kind !== 'review_intake_adjustment' && item.kind !== 'review_activity_adjustment')
 }
 
+/** A historical calorie-review row is actionable only while its original
+ * settings revision AND its complete contemporary evidence still qualify.
+ * Legacy rows lack this metadata and are therefore never silently upgraded.
+ */
+export function isCalorieDecisionKind(kind: string): boolean {
+  return kind === 'review_intake_adjustment' || kind === 'review_activity_adjustment'
+}
+
+export function storedCoachRecommendationIsCurrent(
+  row: { recommendation_kind: string; fingerprint: string; metadata: Record<string, unknown> | null },
+  currentDraftFingerprints: ReadonlySet<string>,
+  currentDecisionRevision: string | null | undefined,
+): boolean {
+  if (!isCalorieDecisionKind(row.recommendation_kind)) return true
+  const originalRevision = row.metadata?.decisionRevision
+  return typeof originalRevision === 'string' && /^[a-f0-9]{32}$/.test(originalRevision) &&
+    currentDecisionRevision === originalRevision &&
+    currentDraftFingerprints.has(row.fingerprint)
+}
+
 function questionForLimitation(limitation: GoalControlLimitation): Omit<CoachFollowUpQuestionDraft, 'fingerprint' | 'kind' | 'confidence' | 'evidenceRefs'> | null {
   if (!limitation.detailPath) return null
   if (limitation.code === 'nutrition_quality_floor') {
