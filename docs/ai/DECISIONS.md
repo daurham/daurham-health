@@ -673,3 +673,8 @@ A stale non-calorie recommendation ID does not authorize a new `do_this`, `not_n
 ## Decision: non-calorie recommendation ID is not its evidence version (PIQ-1.5, 2026-10-15)
 
 Do not accept owner decisions against a recommendation solely because its stable ID and kind are still present. For non-calorie advice, compute an opaque owner-facing context revision from the current Health day/period, visible draft and relevant derived evidence; require exact matching client context on any response. Missing context is 428; stale context is 409, with a fresh Coach read and no automatic acknowledgement. Unrelated domain data should not invalidate Training unnecessarily. Existing numerical calorie revision logic remains separate. This is an optimistic derived-state check, not a raw event-ledger revision or serializable evidence lock, and must not be called complete canonical source versioning. No migration or production release is authorized.
+
+
+## Decision: confidence belongs to a specific evidence or estimate, not the whole page (PIQ-1.6, 2026-10-15)
+
+Treat cross-domain Goal Control confidence and Maintenance estimate confidence as separately scoped labels. When Coach uses a Maintenance intervention, use the estimate's own confidence as its evidence signal. Show maintenance range and supporting sample-quality counts behind a disclosure, while preserving the separate `calorieDecision` gate and withholding numeric estimates with insufficient evidence. Do not interpret broad Goal Control confidence as proof of precision or safety in a numerical calorie recommendation. No owner-data or provider changes.

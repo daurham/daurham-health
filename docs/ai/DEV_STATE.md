@@ -370,3 +370,8 @@ Added a live saved-ID kind+fingerprint guard on non-calorie recommendation respo
 ## 2026-10-15 PIQ-1.5 non-calorie context tokens — branch only
 
 Non-calorie Coach cards now include `contextRevision`, a domain-bounded SHA-256 of the displayed advice plus current derived Goal Control evidence/date. The client carries it on response; the server recomputes current evidence and returns 428/409 on missing/stale tokens before accepting owner decisions. Numerical calorie decisions retain their existing safety and revision contract. No schema changes or production writes. Tests and limits: `docs/ai/PIQ_PROGRESS.md`.
+
+
+## 2026-10-15 PIQ-1.6 scoped-confidence presentation — work branch
+
+Goal overview confidence now explicitly describes cross-domain goal evidence; observed maintenance estimates display their independent estimate confidence, range, and an expandable evidence basis. Maintenance-backed Coach drafts use estimator confidence instead of Goal Control summary confidence; unrelated Training advice is unchanged. Synthetic tests verify disagreement, insufficient numeric evidence and distinct decision safety labels. No `main` or production changes; CI and mobile review remain release gates in `docs/ai/PIQ_PROGRESS.md`.

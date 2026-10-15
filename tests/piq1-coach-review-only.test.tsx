@@ -155,3 +155,30 @@ describe('PIQ-1.5 viewing advice is not an intervention', () => {
     expect(source).toContain('responseAt: row.response_at == null ? null : String(row.response_at)')
   })
 })
+
+describe('PIQ-1.6 Coach scope-aware confidence', () => {
+  it('labels Maintenance estimate confidence in the evidence explanation without calling it decision certainty', () => {
+    const evidence = {
+      nutrition: { status: 'limited' as const, detail: 'Some nutrition days were unverified.' },
+      weightTrend: { status: 'limited' as const, detail: 'Weigh-in conditions varied.' },
+      plateau: { status: 'possible' as const, detail: 'The trend may be stable.' },
+      calorieDecision: { status: 'review_only' as const, detail: 'No automated calorie change.' },
+    }
+    const html = renderToStaticMarkup(
+      <MemoryRouter><CoachIntelligencePanel
+        state={{ ...state, nextBestActions: [recommendation({
+          kind: 'review_intake_adjustment',
+          confidence: 'moderate',
+          evidenceExplanation: evidence,
+        })] }}
+        pending={false}
+        onResponse={() => undefined}
+        onOutcome={() => undefined}
+      /></MemoryRouter>,
+    )
+    expect(html).toContain('How this was assessed · moderate confidence in maintenance estimate')
+    expect(html).toContain('Calorie-change decision')
+    expect(html).toContain('No automated calorie change.')
+    expect(html).not.toContain('high confidence in maintenance estimate')
+  })
+})

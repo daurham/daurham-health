@@ -457,7 +457,7 @@ export function CoachIntelligencePanel({
               <p className="mt-1 text-xs leading-relaxed text-zinc-600">{item.detail}</p>
               {item.evidenceExplanation ? (
                 <details className="mt-2 rounded-md border border-zinc-200 bg-white px-2.5 py-2">
-                  <summary className="cursor-pointer text-xs font-medium text-zinc-700">How this was assessed</summary>
+                  <summary className="cursor-pointer text-xs font-medium text-zinc-700">How this was assessed · {item.confidence} confidence in maintenance estimate</summary>
                   <dl className="mt-2 space-y-2 border-t border-zinc-100 pt-2">
                     {([
                       ['Food-log evidence', item.evidenceExplanation.nutrition],

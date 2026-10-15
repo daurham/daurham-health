@@ -166,7 +166,9 @@ function opportunityDraft(
     detail: opportunity.detail,
     actionText: opportunity.actionText,
     detailPath: opportunity.detailPath,
-    confidence: control.confidence,
+    // A Maintenance-specific action must use the estimate's own confidence,
+    // not the cross-domain Goal Control summary confidence.
+    confidence: maintenanceExplanation ? control.maintenance!.estimate.confidence : control.confidence,
     ...(maintenanceExplanation ? { evidenceExplanation: maintenanceExplanation } : {}),
     evidenceRefs: [...opportunity.evidenceRefs],
     priority: 100,

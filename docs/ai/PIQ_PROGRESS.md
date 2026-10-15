@@ -1121,3 +1121,16 @@ HAVING COUNT(*) > 1;
 **Caveats:** This is a deterministic fingerprint of *currently derived Goal Control evidence*, **not** a canonical revision of every raw Training/Nutrition/Goal record. An underlying raw edit that does not change any included derived value may leave the token unchanged. Re-reading Goal Control before the update is optimistic rather than a lock over simultaneous external imports. Do not claim fully general evidence versioning or an implemented/adhered intervention. Next: assess owner-effectiveness and real canonical source invalidation evidence before closing PIQ-1.5.
 
 **No production changes:** Branch-only; migration `0054` remains unapplied and requires owner-approved preflight; no merge to `main`.
+
+
+## PIQ-1.6 — Scoped confidence on Goal Overview and Coach (2026-10-15)
+
+**State:** PIQ work branch implementation; independent CI and owner mobile acceptance required. **Owner-accepted PIQ phases remain 0/9.**
+
+**Problem:** The Goal Overview badge said only `high confidence` for cross-domain Goal Control, next to a Maintenance estimate independently classified as `moderate`. A Maintenance-sourced primary Coach opportunity inherited the broad Goal Control confidence rather than the Maintenance estimate's own confidence. Together these could imply unjustifiably high certainty in a calorie-related recommendation.
+
+**Bounded UI and domain correction:** Goal Overview explicitly labels `Goal evidence · [level] confidence`, while numeric Maintenance is separately labeled `Maintenance estimate confidence: [own level]`, alongside its calculated kcal/day and estimated range where present. A small expand-on-demand section shows the Maintenance evidence window, reliable nutrition-day count, comparable weigh-in count and the estimator's existing explanation; these counts are not represented as proof of complete intake. A primary Maintenance-backed Coach draft now uses `maintenance.estimate.confidence`; unrelated Training opportunities keep cross-domain confidence. The Coach explanation disclosure labels its confidence explicitly as estimate confidence, not approval/safety certainty. If Maintenance evidence is insufficient, no observed numeric estimate is displayed.
+
+**Regression:** Synthetic disagreement (overall high vs estimate moderate), confidence attribution for Maintenance-vs-Training drafts, a missing-estimate fail-closed view, and Coach evidence disclosure with distinct calorie decision status. This slice changes neither recommendation eligibility/safety nor canonical health facts; no schema migration, owner-data write, Gemini call, `main` promotion, or deployment.
+
+**Still open:** Explain each domain evidence source with specific time/sample/provenance and confounding detail; formal calibration for confidence and uncertainty range; full PIQ-1.6 coverage in Ask Health, Training and comparative claims; authenticated browser and owner mobile review; release preflight for unapplied migration 0054.
