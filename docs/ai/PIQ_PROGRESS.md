@@ -1268,3 +1268,16 @@ HAVING COUNT(*) > 1;
 **Verification:** Pure cases for reversed/matching/null/zero/out-of-range/too-few comparisons; UI SSR for the opposite-sign warning and unavailable fallback; calendar cases for impossible February dates and valid month-boundary runs. Existing observational, provenance, sampling and selection-bias tests remain in force.
 
 **Remaining:** Formal trend/autocorrelation uncertainty and multiple comparisons require separately reviewed statistical design; canonical event-level freshness, owner real-data/device review and the 0054 production migration remain release gates. Work branch only; do not merge to `main` without approval.
+
+
+## PIQ-1.6 — Paired-date availability and observation-selection caveat (2026-10-15)
+
+**State:** Bounded PIQ branch work, full CI and owner mobile QA required. **0/9 phases owner-accepted.**
+
+**Gap:** Even after disclosing the number of matched dates, rank coefficient, coverage, date clustering and selection count, Goal Overview still did not state how many dates in the *source observation window* could have formed an X-to-Y pair at the registered lag. Thus 16 observed pairs could be misread as complete coverage or representative sampling.
+
+**Contract:** For already-selected, observational relationship explanations, derive calendar-alignment opportunity: count X anchor calendar dates for which the lagged Y date also lies within the source observation window, report actual matched pair count and the remaining calendar slots. Name unmatched slots **unpaired dates**, not confirmed missing logs, skipped days, zeros, symptoms or owner nonadherence. Explicitly warn that a paired subset can be selected by which dates are recorded and can differ from unmatched days. A lag of one day has one fewer calendar-alignment slot than a same-day pairing over the same finite window. Require actual calendar dates, valid lag alignment and range, unique X anchors and agreement with the measured pair count. Inconsistent provenance shows unavailable window, clustering, daily sensitivity and pairing opportunity, instead of presenting fabricated precise date metadata. Original correlation, pair-count grade, eligible relationship shortlist, screening order and Coach advice remain unchanged.
+
+**Regression:** Derive 16/28 same-day pairs and 16/27 lagged pairs from fictional dated observations; verify distinct unpaired counts, SSR non-zero/causality language, and failure-closed cases for mismatched counts, duplicates, impossible/future dates, incompatible lags and source windows. Does not query owner sources, change real logs, run a new statistic, invent complete days, consume Gemini/provider budget, add schema migration or deploy/merge to main.
+
+**Next:** CI and authenticated owner evidence-drilldown QA; PIQ-1 release still gated by owner acceptance and production schema 0054's backup/preflight. Broader longitudinal selection-bias correction, source event revisions, confounding and formal statistical inference require separately reviewed designs.

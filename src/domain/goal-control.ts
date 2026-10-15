@@ -86,6 +86,8 @@ export type GoalControlRelationship = {
     /** Observation window can be longer than the matching pair dates. */
     sourceWindow: { start: string; end: string }
     pairedWindow: { start: string; end: string } | null
+    /** Pairing opportunity is calendar alignment only, not logging completeness. */
+    pairCoverage: { matchedPairs: number; calendarSlots: number; unmatchedSlots: number } | null
     requiredPairs: number
     lagDays: number
     /** Original Spearman rank coefficient, separate from the count-based grade. */
@@ -356,6 +358,57 @@ export function relationshipDirectionContrast(
   return Math.sign(overallRho) === Math.sign(adjacentRho) ? 'same_signs' : 'opposite_signs'
 }
 
+/** Transparency only: of all calendar X anchors with a Y lag still inside
+ * the source window, how many actually yielded a verified recorded pair?
+ * "Unmatched" does NOT assert skipped logs, zero physiology or completeness.
+ * Fail closed on inconsistent dates/counts rather than inventing a denominator.
+ */
+export function relationshipPairDateCoverage(
+  dates: readonly { xDate: string; yDate: string }[],
+  reportedSampleSize: number,
+  lagDays: number,
+  window: { start: string; end: string },
+): {
+  matchedPairs: number
+  calendarSlots: number
+  unmatchedSlots: number
+  pairedWindow: { start: string; end: string }
+} | null {
+  if (!isCalendarDate(window.start) || !isCalendarDate(window.end) || window.start > window.end ||
+      !Number.isSafeInteger(lagDays) || !Number.isSafeInteger(reportedSampleSize) ||
+      reportedSampleSize < 1 || reportedSampleSize !== dates.length) return null
+
+  let calendarSlots = 0
+  let cursor = window.start
+  for (let days = 0; cursor <= window.end; days += 1) {
+    // The current Health snapshot is a bounded window; reject unbounded or
+    // corrupted metadata rather than enumerating an arbitrary interval.
+    if (days >= 3660) return null
+    const alignedY = addCalendarDays(cursor, lagDays)
+    if (alignedY >= window.start && alignedY <= window.end) calendarSlots += 1
+    cursor = addCalendarDays(cursor, 1)
+  }
+  if (calendarSlots === 0 || reportedSampleSize > calendarSlots) return null
+  const anchors = new Set<string>()
+  const endpoints: string[] = []
+  for (const pair of dates) {
+    if (!isCalendarDate(pair.xDate) || !isCalendarDate(pair.yDate) ||
+        pair.xDate < window.start || pair.xDate > window.end ||
+        pair.yDate < window.start || pair.yDate > window.end ||
+        addCalendarDays(pair.xDate, lagDays) !== pair.yDate ||
+        anchors.has(pair.xDate)) return null
+    anchors.add(pair.xDate)
+    endpoints.push(pair.xDate, pair.yDate)
+  }
+  endpoints.sort()
+  return {
+    matchedPairs: reportedSampleSize,
+    calendarSlots,
+    unmatchedSlots: calendarSlots - reportedSampleSize,
+    pairedWindow: { start: endpoints[0]!, end: endpoints[endpoints.length - 1]! },
+  }
+}
+
 export function relationshipDateClustering(
   dates: readonly { xDate: string; yDate: string }[],
 ): { distinctDates: number; contiguousRuns: number; longestRunDays: number } | null {
@@ -444,8 +497,10 @@ function relationshipsFor(
     shownPairs: selected.length,
   }
   return selected.map((item) => {
-      const dates = item.evidenceDates.flatMap((pair) => [pair.xDate, pair.yDate]).sort()
       const sourceWindow = { start: snapshot.period.start, end: snapshot.period.end }
+      const pairCoverage = relationshipPairDateCoverage(
+        item.evidenceDates, item.sampleSize, item.lagDays, sourceWindow,
+      )
       const sources: GoalControlEvidenceCoverage[] = [item.xKey, item.yKey].flatMap((key) => {
         const coverage = snapshot.coverage.find((entry) => entry.key === key)
         return coverage ? [{
@@ -464,12 +519,17 @@ function relationshipsFor(
         detailPaths: [...item.detailPaths],
         evidence: {
           sourceWindow,
-          pairedWindow: dates.length ? { start: dates[0]!, end: dates[dates.length - 1]! } : null,
+          pairedWindow: pairCoverage?.pairedWindow ?? null,
+          pairCoverage: pairCoverage ? {
+            matchedPairs: pairCoverage.matchedPairs,
+            calendarSlots: pairCoverage.calendarSlots,
+            unmatchedSlots: pairCoverage.unmatchedSlots,
+          } : null,
           requiredPairs: item.requiredSampleSize,
           lagDays: item.lagDays,
           rho: typeof item.rho === 'number' && Number.isFinite(item.rho) && Math.abs(item.rho) <= 1 ? item.rho : null,
-          dateClustering: relationshipDateClustering(item.evidenceDates),
-          changeSensitivity: relationshipDayToDaySensitivity(snapshot.frame, item),
+          dateClustering: pairCoverage ? relationshipDateClustering(item.evidenceDates) : null,
+          changeSensitivity: pairCoverage ? relationshipDayToDaySensitivity(snapshot.frame, item) : null,
           screening,
           strength: item.strength,
           sources,

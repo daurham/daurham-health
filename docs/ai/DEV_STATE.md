@@ -420,3 +420,8 @@ Goal Overview derives candidate/evidence-qualified/goal-relevant/displayed relat
 ## 2026-10-15 PIQ-1.6 observational direction comparison — work branch
 
 Goal Overview now labels descriptive agreement/opposition between overall and adjacent-day Spearman signs with explicit noncausal, non-actionable caveats. Null/zero/invalid/sparse evidence remains unavailable. Calendar-date clustering rejects impossible dates. SSR and pure regression tests added. No schema, model calls, prod writes, main promotion or owner-history backfill. CI/owner-device gates remain recorded in `PIQ_PROGRESS.md`.
+
+
+## 2026-10-15 PIQ-1.6 paired-date availability disclosure — branch only
+
+Goal Overview observational relationships now disclose actual paired observations against calendar-alignable lag opportunities within the source window, with explicit observation-selection and no-zero/no-completeness cautions. Inconsistent pair dates/counts disable precise derived pairing, clustering and day-change context. Synthetic and SSR tests cover 16/28 same-day and 16/27 next-day cases, impossible/duplicate/out-of-range dates and unavailable fallback. No owner DB writes, Gemini/provider calls, schema changes, production promotion or main merge. CI/mobile acceptance status tracked in PIQ_PROGRESS.

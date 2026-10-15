@@ -728,3 +728,8 @@ Present each Goal Overview observational shortlist alongside its actual candidat
 ## Decision: observational sign reversals deserve explicit caution, not action (PIQ-1.6, 2026-10-15)
 
 Keep the original rank association and adjacent-day first-difference correlation separate, without modifying screening or decisions. When both coefficients have an actual nonzero finite sign and there are at least six measured consecutive changes, label whether their **signs** match or oppose. No sign claim for zero, invalid, unavailable or undersampled data. Sign differences can result from shared trends, noise or selection and do not demonstrate causation, effect size reliability, statistical significance or a reason to change a target. Reject impossible calendar dates when grouping matched daily observations. No new schema or automatic owner behavior.
+
+
+## Decision: label paired-date opportunity separately from recorded completeness (PIQ-1.6, 2026-10-15)
+
+An observational correlation's 16 recorded pairs are not 16 complete owner days. Expose a calendar-based denominator for X/Y date offsets that both fall inside the original signal window. The difference between calendar-alignable slots and actually paired eligible observations is **unpaired**, not medically missing, physiologically zero, or owner-confirmed logging failure; the paired subset can be systematically selected. Fail closed on duplicate/impossible/out-of-range/inconsistent pair metadata; retain the original registered association/ranking rather than inferring a new effect. No target changes, new model calls, synthetic canonical fills or production schema edits.

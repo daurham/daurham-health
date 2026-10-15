@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { addCalendarDays } from '../src/domain/training-plan.js'
 import { buildHealthIntelligenceSnapshot, type IntelligenceObservation, type IntelligenceFrameDay } from '../src/domain/intelligence/shared.js'
 import { spearmanRho } from '../src/domain/intelligence/spearman.js'
-import { buildGoalControlState, relationshipDateClustering, relationshipDayToDaySensitivity, relationshipDirectionContrast, type GoalControlState } from '../src/domain/goal-control.js'
+import { buildGoalControlState, relationshipDateClustering, relationshipDayToDaySensitivity, relationshipDirectionContrast, relationshipPairDateCoverage, type GoalControlState } from '../src/domain/goal-control.js'
 import type { WeeklyCoachBrief, WeeklyGoalSnapshot } from '../src/domain/weekly-coach/types.js'
 import { GoalControlCard } from '../src/features/goal-control/GoalControlCard.js'
 
@@ -60,6 +60,7 @@ describe('PIQ-1.6 paired relationship evidence is observational', () => {
     expect(rel?.evidence).toMatchObject({
       sourceWindow,
       pairedWindow: { start: '2026-09-20', end: '2026-10-05' },
+      pairCoverage: { matchedPairs: 16, calendarSlots: 28, unmatchedSlots: 12 },
       lagDays: 0, requiredPairs: 10,
       screening: { evaluatedPairs: 10, evidenceQualifiedPairs: 1, goalRelevantPairs: 1, shownPairs: 1 },
       dateClustering: { distinctDates: 16, contiguousRuns: 1, longestRunDays: 16 },
@@ -80,6 +81,11 @@ describe('PIQ-1.6 paired relationship evidence is observational', () => {
     expect(html).toContain('not by effect magnitude')
     expect(html).toContain('not a multiple-comparisons adjustment')
     expect(html).toContain('Matched-pair count grade: high · 16 matched date pairs')
+    expect(html).toContain('Pairing opportunity: 16 of')
+    expect(html).toContain('28 calendar-alignable date slots')
+    expect(html).toContain('12 slots did not yield a pair')
+    expect(html).toContain('not automatically missed logs, zero values')
+    expect(html).toContain('observation-selection bias')
     expect(html).toContain('This grade describes sample availability, not statistical certainty')
     expect(html).toContain('Spearman rank correlation (ρ): ')
     expect(html).toContain('reported strength: ')
@@ -311,5 +317,61 @@ describe('PIQ-1.6 paired relationship evidence is observational', () => {
     const html = render(state)
     expect(html).toContain('Source observation counts are unavailable')
     expect(html).not.toContain('0/28 observed dates')
+  })
+  it('counts calendar-alignable lagged anchors without calling unpaired dates missed logs', () => {
+    const same = Array.from({ length: 16 }, (_, i) => {
+      const date = addCalendarDays('2026-09-20', i)
+      return { xDate: date, yDate: date }
+    })
+    const normal = relationshipPairDateCoverage(same, 16, 0, sourceWindow)
+    expect(normal).toEqual({
+      matchedPairs: 16, calendarSlots: 28, unmatchedSlots: 12,
+      pairedWindow: { start: '2026-09-20', end: '2026-10-05' },
+    })
+    const lagged = same.map(({ xDate }) => ({ xDate, yDate: addCalendarDays(xDate, 1) }))
+    expect(relationshipPairDateCoverage(lagged, 16, 1, sourceWindow)).toEqual({
+      matchedPairs: 16, calendarSlots: 27, unmatchedSlots: 11,
+      pairedWindow: { start: '2026-09-20', end: '2026-10-06' },
+    })
+    expect(relationshipPairDateCoverage(same, 16, 0, {
+      start: '2026-10-01', end: '2026-09-01',
+    })).toBeNull()
+    expect(relationshipPairDateCoverage(same, 16, 28, sourceWindow)).toBeNull()
+  })
+
+  it('fails closed for mismatched pair counts, repeated anchors, bad lag, impossible dates and dates outside the source window', () => {
+    const dates = Array.from({ length: 16 }, (_, i) => {
+      const date = addCalendarDays('2026-09-20', i)
+      return { xDate: date, yDate: date }
+    })
+    expect(relationshipPairDateCoverage(dates, 15, 0, sourceWindow)).toBeNull()
+    expect(relationshipPairDateCoverage([...dates.slice(1), dates[1]!], 16, 0, sourceWindow)).toBeNull()
+    expect(relationshipPairDateCoverage(dates, 16, 1, sourceWindow)).toBeNull()
+    expect(relationshipPairDateCoverage([{ xDate: '2026-02-30', yDate: '2026-02-30' }], 1, 0, sourceWindow)).toBeNull()
+    expect(relationshipPairDateCoverage([{ xDate: '2026-10-16', yDate: '2026-10-16' }], 1, 0, sourceWindow)).toBeNull()
+    expect(relationshipPairDateCoverage(dates, 29, 0, sourceWindow)).toBeNull()
+    expect(relationshipPairDateCoverage([], 0, 0, sourceWindow)).toBeNull()
+  })
+
+  it('withholds pairing window and clustering for inconsistent derived source pair metadata', () => {
+    const initial = inputs(16)
+    const relationships = initial.intelligence.relationships.map((entry) =>
+      entry.id === 'shared:sleep:energy'
+        ? { ...entry, evidenceDates: entry.evidenceDates.slice(1) }
+        : entry,
+    )
+    const state = buildGoalControlState({
+      asOf, ...initial, intelligence: { ...initial.intelligence, relationships },
+    })
+    const observed = state.relationships.find((item) => item.id === 'shared:sleep:energy')
+    expect(observed?.sampleSize).toBe(16)
+    expect(observed?.evidence?.pairCoverage).toBeNull()
+    expect(observed?.evidence?.pairedWindow).toBeNull()
+    expect(observed?.evidence?.dateClustering).toBeNull()
+    expect(observed?.evidence?.changeSensitivity).toBeNull()
+    const html = render(state)
+    expect(html).toContain('Pairing opportunity is unavailable')
+    expect(html).toContain('Matched dates: unavailable')
+    expect(html).not.toContain('Pairing opportunity: 16 of')
   })
 })

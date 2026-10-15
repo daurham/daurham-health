@@ -147,6 +147,22 @@ export function GoalControlCard({
                 </p>
                 {item.evidence ? (
                   <>
+                    {item.evidence.pairCoverage ? (
+                      <p className="mt-1">
+                        Pairing opportunity: {item.evidence.pairCoverage.matchedPairs} of
+                        {' '}{item.evidence.pairCoverage.calendarSlots} calendar-alignable date slots
+                        {' '}had eligible paired observations;
+                        {' '}{item.evidence.pairCoverage.unmatchedSlots} slots did not yield a pair.
+                        Unmatched dates are not automatically missed logs, zero values or confirmed incomplete days.
+                        The paired subset may differ systematically from unpaired dates, so these
+                        associations can reflect observation-selection bias.
+                      </p>
+                    ) : (
+                      <p className="mt-1">
+                        Pairing opportunity is unavailable because the source pair dates or
+                        counts could not be verified; do not infer logging completeness from this relationship.
+                      </p>
+                    )}
                     <p className="mt-1">
                       Spearman rank correlation (ρ): {spearmanLabel(item.evidence.rho)}
                       {' '}· reported strength: {item.evidence.strength ?? 'unavailable'}.
