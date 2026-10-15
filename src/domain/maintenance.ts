@@ -116,6 +116,24 @@ export type MaintenanceCalibrationSuggestion = {
   evidenceRefs: string[]
 }
 
+export type CalorieAdjustmentSafety = {
+  status: 'review_possible' | 'blocked'
+  reasons: string[]
+  /** A screening threshold, NOT a measured minimum energy need or clinical prescription. */
+  screeningFloorKcal: number | null
+  proposedTargetKcal: number | null
+  recentCheckinDays: number
+}
+
+export type MaintenanceAdjustmentContext = {
+  /** Read-time current target, never inferred from partially logged intake. */
+  currentCalorieTarget: number | null
+  /** Active or imminently scheduled owner experiments. */
+  activeExperimentCount: number
+  /** Any failed read is unknown, not equivalent to zero experiments. */
+  status: 'available' | 'unavailable'
+}
+
 export type MaintenanceState = {
   version: typeof MAINTENANCE_ENGINE_VERSION
   asOf: string
@@ -125,6 +143,7 @@ export type MaintenanceState = {
   noiseFactors: ScaleNoiseFactor[]
   interventions: MaintenanceIntervention[]
   calibration: MaintenanceCalibrationSuggestion
+  calorieAdjustmentSafety: CalorieAdjustmentSafety
 }
 
 export type BuildMaintenanceInput = {
@@ -133,6 +152,7 @@ export type BuildMaintenanceInput = {
   intelligence: HealthIntelligenceSnapshot
   contexts: readonly DailyContext[]
   weightGoal?: MaintenanceWeightGoal | null
+  adjustmentContext?: MaintenanceAdjustmentContext | null
   /** An explicit, read-time verified whitelist. Undefined preserves legacy fixture semantics;
    * the server must ALWAYS provide a Set, including the empty set on missing/mismatched DB data. */
   eligibleNutritionDates?: ReadonlySet<string>
@@ -762,9 +782,76 @@ function roundTo25(value: number): number {
   return Math.round(value / 25) * 25
 }
 
+/**
+ * Screening BEFORE offering any downward-calorie change. This is a
+ * conservative decision gate, not a diagnosis, metabolic minimum, or
+ * instruction to update targets. Missing source/check-in data never
+ * establishes safety.
+ */
+export function calorieAdjustmentSafety(
+  input: BuildMaintenanceInput,
+  estimate: MaintenanceEstimate,
+  plateau: PlateauAssessment,
+  completeThrough: string,
+): CalorieAdjustmentSafety {
+  const reasons: string[] = []
+  const context = input.adjustmentContext
+  const isLossGoal = plateau.goalDirection === 'lose'
+  const proposedCut = estimate.observedMaintenanceKcal == null
+    ? null : roundTo25(Math.min(250, Math.max(100, estimate.observedMaintenanceKcal * 0.075)))
+  const target = context?.currentCalorieTarget
+  const screeningFloor = estimate.observedMaintenanceKcal != null
+    ? Math.max(1500, Math.round(estimate.observedMaintenanceKcal * 0.8))
+    : null
+  const proposedTarget = isLossGoal && target != null && proposedCut != null ? target - proposedCut : null
+  const start = addCalendarDays(completeThrough, -6)
+  const wellness = input.intelligence.frame.filter((day) => day.date >= start && day.date <= completeThrough)
+  const recentCheckinDays = wellness.filter((day) =>
+    ['wellness.hunger', 'wellness.energy', 'wellness.soreness'].some((key) =>
+      day.signals[key as IntelligenceSignalKey] != null)).length
+  if (context?.status !== 'available') {
+    reasons.push('Current target and experiment checks are unavailable; review context before changing intake.')
+  } else {
+    if (!Number.isFinite(target) || target == null || target <= 0) {
+      reasons.push('A current configured calorie target is required before proposing a change.')
+    }
+    if (context.activeExperimentCount > 0) {
+      reasons.push('An active or imminent personal experiment should not be confounded by a new calorie change.')
+    }
+  }
+  if (isLossGoal) {
+    if (screeningFloor == null || proposedTarget == null || proposedTarget < screeningFloor) {
+      reasons.push('The proposed target would be too low relative to the conservative intake-screening floor, or its safety cannot be assessed.')
+    }
+    if (recentCheckinDays < 3) {
+      reasons.push('Recent hunger and recovery context is sparse; low symptoms cannot be assumed.')
+    }
+    const highHunger = wellness.filter((day) => (day.signals['wellness.hunger']?.value ?? 0) >= 4).length
+    const lowEnergy = wellness.filter((day) => (day.signals['wellness.energy']?.value ?? 6) <= 2).length
+    const highSoreness = wellness.filter((day) => (day.signals['wellness.soreness']?.value ?? 0) >= 4).length
+    if (highHunger >= 2 || lowEnergy >= 2 || highSoreness >= 2) {
+      reasons.push('Repeated high hunger, low energy, or high soreness warrants recovery review instead of another calorie cut.')
+    }
+    const concerningTags = input.contexts.filter((entry) =>
+      entry.contextDate >= start && entry.contextDate <= completeThrough &&
+      entry.tags.some((tag) => tag === 'sick' || tag === 'pain' || tag === 'poor_sleep_opportunity'))
+    if (concerningTags.length > 0) {
+      reasons.push('Recent illness, pain, or sleep-disruption context requires review before cutting intake.')
+    }
+  }
+  return {
+    status: reasons.length ? 'blocked' : 'review_possible',
+    reasons,
+    screeningFloorKcal: screeningFloor,
+    proposedTargetKcal: proposedTarget,
+    recentCheckinDays,
+  }
+}
+
 function interventionsFor(
   estimate: MaintenanceEstimate,
   plateau: PlateauAssessment,
+  safety: CalorieAdjustmentSafety,
 ): MaintenanceIntervention[] {
   const output: MaintenanceIntervention[] = []
   if (estimate.quality.nutrition.state === 'insufficient') {
@@ -822,7 +909,18 @@ function interventionsFor(
       suggestedDeltaKcal: null,
     })
   }
-  if (plateau.state === 'plateau_likely' && estimate.observedMaintenanceKcal != null) {
+  if (plateau.state === 'plateau_likely' && estimate.observedMaintenanceKcal != null && safety.status === 'blocked') {
+    output.push({
+      id: 'maintenance:review-safety',
+      kind: 'review_goal_plan',
+      priority: 'primary',
+      title: 'Review calorie targets and recovery before adjusting intake',
+      detail: safety.reasons.join(' ') + ' The plateau estimate is descriptive and does not authorize a new calorie target.',
+      detailPath: '/goals',
+      suggestedDeltaKcal: null,
+    })
+  }
+  if (plateau.state === 'plateau_likely' && estimate.observedMaintenanceKcal != null && safety.status === 'review_possible') {
     const delta = roundTo25(Math.min(250, Math.max(100, estimate.observedMaintenanceKcal * 0.075)))
     const direction = plateau.goalDirection === 'gain' ? 'upward' : 'downward'
     output.push({
@@ -891,6 +989,7 @@ export function buildMaintenanceState(input: BuildMaintenanceInput): Maintenance
   const estimate = buildEstimate(input, completeThrough)
   const noise = noiseFactors(input, completeThrough)
   const plateau = plateauAssessment(estimate, input.weightGoal, noise)
+  const safety = calorieAdjustmentSafety(input, estimate, plateau, completeThrough)
   return {
     version: MAINTENANCE_ENGINE_VERSION,
     asOf: input.asOf,
@@ -898,7 +997,8 @@ export function buildMaintenanceState(input: BuildMaintenanceInput): Maintenance
     estimate,
     plateau,
     noiseFactors: noise,
-    interventions: interventionsFor(estimate, plateau),
+    interventions: interventionsFor(estimate, plateau, safety),
     calibration: calibrationFor(estimate, plateau, input.weightGoal),
+    calorieAdjustmentSafety: safety,
   }
 }
