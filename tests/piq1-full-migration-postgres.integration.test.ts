@@ -5,6 +5,7 @@ import { inspectMigrations } from '../server/migrate.js'
 import { LATEST_SCHEMA_MIGRATION, backupTable } from '../server/backup/inventory.js'
 import { buildBackupArchive, restoreStatements, verifyBackupArchive, planRestore, type BackupRow } from '../server/backup/format.js'
 import { getNutritionDayCompleteness, saveNutritionDayCompleteness } from '../server/nutrition/day-completeness.js'
+import { readMaintenanceDecisionSnapshot, isMaintenanceDecisionRevisionCurrent } from '../server/intelligence/maintenance-revision.js'
 
 /**
  * Only runs under CI's explicit PIQ_POSTGRES_URL. Uses its own isolated schema
@@ -132,4 +133,36 @@ describe.skipIf(!url)('PIQ-1.1 full 0001–0053 migration-chain and backup on is
       assessment: { state: 'unknown', confirmationStale: true, eligibleForMaintenance: false },
     })
   })
+  it('PIQ-1.2: real SQL revision changes after a target edit and is restored by transaction rollback', async () => {
+    const before = await readMaintenanceDecisionSnapshot(today, adapter)
+    expect(before.status).toBe('available')
+    expect(before.revision).toMatch(/^[a-f0-9]{32}$/)
+    await client.query('BEGIN')
+    try {
+      await client.query(
+        `INSERT INTO nutrition_targets (effective_from, calories_target, protein_target)
+         VALUES ($1::date, 2400, 140)`,
+        ['2026-10-12'],
+      )
+      const inserted = await readMaintenanceDecisionSnapshot(today, adapter)
+      expect(inserted).toMatchObject({
+        status: 'available', currentCalorieTarget: 2400, activeExperimentCount: 0,
+      })
+      expect(inserted.revision).not.toBe(before.revision)
+      expect(await isMaintenanceDecisionRevisionCurrent(today, before.revision, adapter)).toBe(false)
+      await client.query(
+        'UPDATE nutrition_targets SET calories_target = 2200, updated_at = now() WHERE effective_from = $1::date',
+        ['2026-10-12'],
+      )
+      const changed = await readMaintenanceDecisionSnapshot(today, adapter)
+      expect(changed.currentCalorieTarget).toBe(2200)
+      expect(changed.revision).not.toBe(inserted.revision)
+      expect(await isMaintenanceDecisionRevisionCurrent(today, changed.revision, adapter)).toBe(true)
+    } finally {
+      await client.query('ROLLBACK')
+    }
+    const restored = await readMaintenanceDecisionSnapshot(today, adapter)
+    expect(restored.revision).toBe(before.revision)
+  })
+
 })
