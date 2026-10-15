@@ -137,6 +137,17 @@ export function GoalControlCard({
                     ) : (
                       <p className="mt-1">Matched-date clustering is unavailable; independence cannot be inferred.</p>
                     )}
+                    <p className="mt-1">
+                      Day-to-day sensitivity: {item.evidence.changeSensitivity
+                        ? `${item.evidence.changeSensitivity.adjacentTransitions} consecutive matched-day transitions`
+                        : 'source comparison unavailable'}
+                      {' '}· first-difference Spearman ρ: {spearmanLabel(item.evidence.changeSensitivity?.rho ?? null)}.
+                      Comparing changes between consecutive matched days can reveal a pattern that differs from
+                      the raw rank association; gaps are never treated as adjacent observations.
+                      Fewer than six eligible transitions or no variation leaves the coefficient unavailable.
+                      This is a descriptive sensitivity check, not a test of significance,
+                      removal of time trends or autocorrelation, proof of independence, or a causal effect.
+                    </p>
                     <p className="mt-1">Source observation window: {item.evidence.sourceWindow.start} to {item.evidence.sourceWindow.end}.
                       {' '}Matched dates: {item.evidence.pairedWindow
                         ? `${item.evidence.pairedWindow.start} to ${item.evidence.pairedWindow.end}`

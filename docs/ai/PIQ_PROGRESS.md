@@ -1229,3 +1229,16 @@ HAVING COUNT(*) > 1;
 **Tests:** Derived 16-consecutive-date example preserves the original rho/strength and yields one contiguous run; synthetic gapped, duplicated and lagged anchor dates yield distinct run counts; malformed/missing date information is shown as unavailable. Rendering asserts the independent-trial caveat. No new schema, provider/Gemini calls, production writes, historical alterations or main merge.
 
 **Remaining:** Actually quantify temporal trend sensitivity/autocorrelation under a pre-reviewed statistical design; multiple-comparison selection bias, missingness-dependent observation selection, observed confounders and formal evidence calibration. Owner iOS QA and production schema/migration 0054 approval remain separate mandatory release gates.
+
+
+## PIQ-1.6 — Adjacent-day relationship sensitivity (2026-10-15)
+
+**State:** Bounded PIQ work-branch implementation awaiting full CI, authenticated iOS review and owner acceptance. **0/9 PIQ phases owner-accepted.**
+
+**Risk addressed:** A strong Spearman rank relationship over 16+ paired dates can reflect two time-trending signals rather than day-to-day co-movement, especially when measurements are clustered. The existing matched-date run/count disclosure is useful but cannot show whether the *direction of day-to-day changes* resembles the overall rank association.
+
+**Scope:** For the same already-screened, goal-relevant relationships, derive a **secondary, descriptive first-difference Spearman** on *consecutive X anchor dates only*, preserving the original paired Y lag. Use only original eligible `evidenceDates` and their original `frame` observations: no invented zeroes, gap bridging, resampling, new source facts, extra model calls, or recalculated primary coefficient. Duplicate, invalid, missing or non-finite match evidence makes the sensitivity unavailable; fewer than six consecutive transitions or unvarying deltas produces a null coefficient, never artificial zero. Display exact transition count, signed change coefficient when valid, and explicit warnings that this is not a significance test, a time-trend or autocorrelation correction, a reliable effect estimate or causal evidence. Original relationship selection, strength, count-based grade and three-card cap remain **unchanged**.
+
+**Verification:** Synthetic co-trending signals with raw Spearman ρ near +1 but consecutive changes ρ near −1, gapped dates, small samples, constant increments, duplicate/malformed pairs, lagged Y dates and SSR explanation. No DB migration or writes to owner records, no Gemini/provider budget, `main` untouched. Previous schema migration `0054` remains **unapplied** and subject to separate owner-approved backup/duplicate preflight.
+
+**Still open:** Formal time-series uncertainty, changes driven by confounders/recording selection, multiple-testing correction, clinical calibration, canonical event-level freshness, authenticated owner review and PIQ phase acceptance. The optional sensitivity is a *qualitative warning*, not sufficient evidence to act or revise an intervention.

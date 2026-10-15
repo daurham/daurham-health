@@ -4,6 +4,7 @@ import type { WeeklyCandidate, WeeklyCoachBrief, WeeklyGoalSnapshot, WeeklyTrain
 import type { MaintenanceState } from './maintenance.js'
 import type { TrainingProgressionState } from './training-progression.js'
 import { buildTrainingProgressSummary } from './training-progress-summary.js'
+import { spearmanRho } from './intelligence/spearman.js'
 
 export const GOAL_CONTROL_VERSION = 'goal-control-v1' as const
 
@@ -91,6 +92,8 @@ export type GoalControlRelationship = {
     rho: number | null
     /** Describes time clustering; not a statistical effective sample size. */
     dateClustering: { distinctDates: number; contiguousRuns: number; longestRunDays: number } | null
+    /** Descriptive first-difference Spearman on consecutive, verified matched dates only. */
+    changeSensitivity: { adjacentTransitions: number; rho: number | null } | null
     strength: 'weak' | 'moderate' | 'strong' | null
     /** Raw signal coverage, not necessarily the subset of paired dates. */
     sources: GoalControlEvidenceCoverage[]
@@ -348,6 +351,45 @@ export function relationshipDateClustering(
   return { distinctDates: uniqueDates.length, contiguousRuns: runs, longestRunDays: longest }
 }
 
+/** Descriptive time-trend sensitivity check for an existing observed pair.
+ * Difference only genuinely adjacent X-side anchor dates, retaining each
+ * original lagged Y matching. Missing, duplicated or malformed evidence
+ * invalidates this disclosure rather than manufacturing pair continuity.
+ * Six comparisons is a UI reporting floor, NOT an inferential sample size.
+ * First differences cannot prove detrending, independence or causation.
+ */
+export function relationshipDayToDaySensitivity(
+  frame: readonly HealthIntelligenceSnapshot['frame'][number][],
+  relation: Pick<HealthIntelligenceSnapshot['relationships'][number],
+    'xKey' | 'yKey' | 'lagDays' | 'evidenceDates'>,
+): { adjacentTransitions: number; rho: number | null } | null {
+  const pairs = [...relation.evidenceDates].sort((a, b) => a.xDate.localeCompare(b.xDate))
+  if (pairs.length < 2 || new Set(pairs.map((pair) => pair.xDate)).size !== pairs.length) return null
+  const byDate = new Map(frame.map((day) => [day.date, day]))
+  const values: Array<{ date: string; x: number; y: number }> = []
+  for (const pair of pairs) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(pair.xDate) ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(pair.yDate) ||
+        addCalendarDays(pair.xDate, 0) !== pair.xDate ||
+        addCalendarDays(pair.xDate, relation.lagDays) !== pair.yDate) return null
+    const x = byDate.get(pair.xDate)?.signals[relation.xKey]?.value
+    const y = byDate.get(pair.yDate)?.signals[relation.yKey]?.value
+    if (x == null || y == null || !Number.isFinite(x) || !Number.isFinite(y)) return null
+    values.push({ date: pair.xDate, x, y })
+  }
+  const dx: number[] = []
+  const dy: number[] = []
+  for (let i = 1; i < values.length; i++) {
+    const before = values[i - 1]!
+    const after = values[i]!
+    if (addCalendarDays(before.date, 1) !== after.date) continue
+    dx.push(after.x - before.x)
+    dy.push(after.y - before.y)
+  }
+  const measured = dx.length >= 6 ? spearmanRho(dx, dy) : null
+  return { adjacentTransitions: dx.length, rho: measured != null && Number.isFinite(measured) ? measured : null }
+}
+
 function relationshipsFor(
   snapshot: HealthIntelligenceSnapshot,
   goals: readonly WeeklyGoalSnapshot[],
@@ -388,6 +430,7 @@ function relationshipsFor(
           lagDays: item.lagDays,
           rho: typeof item.rho === 'number' && Number.isFinite(item.rho) && Math.abs(item.rho) <= 1 ? item.rho : null,
           dateClustering: relationshipDateClustering(item.evidenceDates),
+          changeSensitivity: relationshipDayToDaySensitivity(snapshot.frame, item),
           strength: item.strength,
           sources,
         },

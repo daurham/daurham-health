@@ -3,8 +3,9 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
 import { addCalendarDays } from '../src/domain/training-plan.js'
-import { buildHealthIntelligenceSnapshot, type IntelligenceObservation } from '../src/domain/intelligence/shared.js'
-import { buildGoalControlState, relationshipDateClustering, type GoalControlState } from '../src/domain/goal-control.js'
+import { buildHealthIntelligenceSnapshot, type IntelligenceObservation, type IntelligenceFrameDay } from '../src/domain/intelligence/shared.js'
+import { spearmanRho } from '../src/domain/intelligence/spearman.js'
+import { buildGoalControlState, relationshipDateClustering, relationshipDayToDaySensitivity, type GoalControlState } from '../src/domain/goal-control.js'
 import type { WeeklyCoachBrief, WeeklyGoalSnapshot } from '../src/domain/weekly-coach/types.js'
 import { GoalControlCard } from '../src/features/goal-control/GoalControlCard.js'
 
@@ -61,6 +62,7 @@ describe('PIQ-1.6 paired relationship evidence is observational', () => {
       pairedWindow: { start: '2026-09-20', end: '2026-10-05' },
       lagDays: 0, requiredPairs: 10,
       dateClustering: { distinctDates: 16, contiguousRuns: 1, longestRunDays: 16 },
+      changeSensitivity: { adjacentTransitions: 15, rho: null },
       sources: [
         { label: 'Sleep duration', observedDays: 16, eligibleDays: 28,
           provenance: { device: 16 }, confidence: 'moderate' },
@@ -81,6 +83,9 @@ describe('PIQ-1.6 paired relationship evidence is observational', () => {
     expect(html).toContain('across 1 consecutive-day run')
     expect(html).toContain('longest run 16 days')
     expect(html).toContain('not independent trials')
+    expect(html).toContain('Day-to-day sensitivity: 15 consecutive matched-day transitions')
+    expect(html).toContain('first-difference Spearman ρ: unavailable')
+    expect(html).toContain('not a test of significance')
     expect(html).toContain('screening minimum 10 pairs')
     expect(html).toContain('Source observation window: 2026-09-17 to 2026-10-14')
     expect(html).toContain('Matched dates: 2026-09-20 to 2026-10-05')
@@ -141,6 +146,72 @@ describe('PIQ-1.6 paired relationship evidence is observational', () => {
     expect(html).toContain('Matched-date clustering is unavailable')
     expect(html).not.toContain('0 distinct tracked dates')
     expect(html).not.toContain('independent trials,')
+  })
+
+  it('separates shared time trends from opposite day-to-day changes', () => {
+    let x = 350
+    let y = 3000
+    const frame: IntelligenceFrameDay[] = Array.from({ length: 16 }, (_, i) => {
+      if (i > 0) {
+        x += i % 2 === 0 ? 2 : 5
+        y += i % 2 === 0 ? 500 : 200
+      }
+      const date = addCalendarDays('2026-09-20', i)
+      return { date, signals: {
+        'sleep.total_minutes': { key: 'sleep.total_minutes', date, value: x,
+          unit: 'min', provenance: 'device' as const, sourceIds: [] },
+        'activity.steps': { key: 'activity.steps', date, value: y,
+          unit: 'steps', provenance: 'device' as const, sourceIds: [] },
+      } }
+    })
+    const spec = {
+      xKey: 'sleep.total_minutes' as const, yKey: 'activity.steps' as const,
+      lagDays: 0, evidenceDates: frame.map(({ date }) => ({ xDate: date, yDate: date })),
+    }
+    const raw = spearmanRho(
+      frame.map((day) => day.signals['sleep.total_minutes']!.value),
+      frame.map((day) => day.signals['activity.steps']!.value),
+    )
+    expect(raw).toBeCloseTo(1)
+    const sensitivity = relationshipDayToDaySensitivity(frame, spec)
+    expect(sensitivity?.adjacentTransitions).toBe(15)
+    expect(sensitivity?.rho).toBeCloseTo(-1, 8)
+
+    const gaps = { ...spec, evidenceDates: spec.evidenceDates.filter((_, i) => i % 2 === 0) }
+    expect(relationshipDayToDaySensitivity(frame, gaps)).toEqual({
+      adjacentTransitions: 0, rho: null,
+    })
+    const tooFew = { ...spec, evidenceDates: spec.evidenceDates.slice(0, 6) }
+    expect(relationshipDayToDaySensitivity(frame, tooFew)).toEqual({
+      adjacentTransitions: 5, rho: null,
+    })
+  })
+
+  it('fails closed on malformed/duplicate pairs and preserves lagged X anchor continuity', () => {
+    const data = inputs(16)
+    const frame = data.intelligence.frame
+    const dates = Array.from({ length: 12 }, (_, i) => addCalendarDays('2026-09-20', i))
+    const source = { xKey: 'sleep.total_minutes' as const, yKey: 'wellness.energy' as const,
+      lagDays: 0, evidenceDates: dates.map((d) => ({ xDate: d, yDate: d })) }
+    expect(relationshipDayToDaySensitivity(frame, {
+      ...source, evidenceDates: [...source.evidenceDates, source.evidenceDates[0]!],
+    })).toBeNull()
+    expect(relationshipDayToDaySensitivity(frame, {
+      ...source, evidenceDates: [
+        { xDate: '2026-02-30', yDate: '2026-02-30' }, source.evidenceDates[0]!,
+      ],
+    })).toBeNull()
+    expect(relationshipDayToDaySensitivity(frame, {
+      ...source, evidenceDates: [
+        { xDate: '2026-09-20', yDate: '2026-09-21' }, source.evidenceDates[1]!,
+      ],
+    })).toBeNull()
+    const shifted = dates.slice(0, 11).map((xDate) => ({
+      xDate, yDate: addCalendarDays(xDate, 1),
+    }))
+    expect(relationshipDayToDaySensitivity(frame, {
+      ...source, lagDays: 1, evidenceDates: shifted,
+    })).toMatchObject({ adjacentTransitions: 10 })
   })
 
   it('reports unavailable provenance as unavailable, never invented zero-coverage evidence', () => {

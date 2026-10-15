@@ -405,3 +405,8 @@ Goal Overview now has a collapsed observational relationship disclosure with act
 ## 2026-10-15 PIQ-1.6 observational coefficient meaning — work branch
 
 Goal Overview now distinguishes paired-date count grading from Spearman rank-association magnitude and its original categorical strength, and explicitly avoids claiming statistical significance, confounder control or causation. An unavailable coefficient remains unavailable. The Health Intelligence relationship calculation itself is unchanged. Synthetic and SSR regressions added; CI and owner-device QA remain gates. No schema, prod, Gemini or canonical owner data changes.
+
+
+## 2026-10-15 PIQ-1.6 time-trend sensitivity — work branch
+
+Added an optional, derived day-to-day first-difference Spearman sensitivity beside the existing observed relationship coefficient. Uses strictly consecutive eligible X-side matched anchor dates and original Y lag; explicitly labels sparse/constant/bad data unavailable. Does not change relationship eligibility, confidence grade, Coach interventions, database schema or production data. Regression tests include a shared monotone trend with opposite short-term change correlation and lag/gap edge cases. Full CI, authenticated iOS QA and PIQ owner acceptance remain gates; migration 0054 still not applied.

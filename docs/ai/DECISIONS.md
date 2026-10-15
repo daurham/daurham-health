@@ -713,3 +713,8 @@ Do not label the count-derived Health Intelligence relationship grade as general
 ## Decision: repeated daily pairs are not independent relationship trials (PIQ-1.6, 2026-10-15)
 
 Keep a Spearman correlation's existing signed coefficient and matched-pair-count grade explicitly separate from sampling independence or statistical confidence. For observational relationship explanations, disclose how original paired X-anchor dates cluster into contiguous calendar-day runs, using matched source dates without manufacturing missing observations. Deduplicate repeated anchors and do not count lagged target dates as new samples. Do not calculate or imply adjusted sample size, significance, causal impact or confidence improvement from these diagnostics. On missing/invalid dates, show unavailable. No changes to historical owner data, selection algorithm, canonical migrations or production.
+
+
+## Decision: day-to-day sensitivity is descriptive, never an adjusted causal correlation (PIQ-1.6, 2026-10-15)
+
+Keep the existing observed relationship selection, original Spearman coefficient and pair-count grade unchanged. For already-eligible matched observations, compute a separate first-difference Spearman only on strictly consecutive tracked X anchor dates with their original lagged Y values. Exclude calendar gaps; fail closed for missing/invalid/duplicated paired evidence; show unavailable for fewer than six transitions or constant changes. Present the change coefficient with strong limitations, not as a p-value, independent trial count, effective sample size, time-trend removal, clinical interpretation or proof of causality. No canonical or owner data are changed. Further statistical calibration requires a separately reviewed plan and owner acceptance.
