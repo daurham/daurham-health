@@ -101,16 +101,22 @@ export function BodyPage() {
   // A slow request must not replace newer measurements, cadences, or inbox.
   const reloadHistory = useCallback(async () => {
     const generation = ++historyGeneration.current
-    const [nextSessions, nextCadences, nextInbox] = await Promise.all([
-      fetchBodyMeasurements(),
-      fetchBodyCadences(),
-      fetchBodyInbox(),
-    ])
-    if (generation !== historyGeneration.current) return
-    setSessions(nextSessions)
-    setCadences(nextCadences)
-    setInbox(nextInbox)
-    setHistoryError(null)
+    try {
+      const [nextSessions, nextCadences, nextInbox] = await Promise.all([
+        fetchBodyMeasurements(),
+        fetchBodyCadences(),
+        fetchBodyInbox(),
+      ])
+      if (generation !== historyGeneration.current) return
+      setSessions(nextSessions)
+      setCadences(nextCadences)
+      setInbox(nextInbox)
+      setHistoryError(null)
+    } catch (caught) {
+      // Both stale successes and stale failures must be ignored: an older
+      // network error must not label a newer successful snapshot as stale.
+      if (generation === historyGeneration.current) throw caught
+    }
   }, [])
 
   useEffect(() => {

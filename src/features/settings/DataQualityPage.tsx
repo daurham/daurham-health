@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { DataQualityIssue, DataQualityResponse, DataQualityReviewStatus } from '@/domain/data-quality'
 import { healthFetch, primaryButtonClass, quietButtonClass, readApiError, secondaryButtonClass } from '@/lib'
+import { subscribeHealthDataChanges } from '@/lib/health-changes'
 
 async function fetchQuality(): Promise<DataQualityResponse> {
   const response = await healthFetch('/api/data-quality')
@@ -82,26 +83,45 @@ export function DataQualityPage() {
   const [quality, setQuality] = useState<DataQualityResponse | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const refreshGeneration = useRef(0)
 
-  useEffect(() => {
-    let cancelled = false
-    fetchQuality()
-      .then((next) => {
-        if (!cancelled) setQuality(next)
-      })
-      .catch((caught: unknown) => {
-        if (!cancelled) setError(caught instanceof Error ? caught.message : 'Could not load data quality')
-      })
-    return () => { cancelled = true }
+  const reloadQuality = useCallback(async () => {
+    const generation = ++refreshGeneration.current
+    try {
+      const next = await fetchQuality()
+      if (generation !== refreshGeneration.current) return
+      setQuality(next)
+      setError(null)
+    } catch (caught) {
+      if (generation === refreshGeneration.current) {
+        setError(caught instanceof Error ? caught.message : 'Could not refresh data quality')
+      }
+    }
   }, [])
 
+  useEffect(() => {
+    void reloadQuality()
+    const unsubscribe = subscribeHealthDataChanges(() => {
+      void reloadQuality()
+    }, { revalidateOnFocus: true })
+    return () => {
+      unsubscribe()
+      refreshGeneration.current += 1
+    }
+  }, [reloadQuality])
+
   async function decide(issue: DataQualityIssue, status: DataQualityReviewStatus) {
+    // Do not let a read started before the owner action overwrite its result.
+    const generation = ++refreshGeneration.current
     setBusy(issue.fingerprint)
     setError(null)
     try {
-      setQuality(await reviewIssue(issue, status))
+      const next = await reviewIssue(issue, status)
+      if (generation === refreshGeneration.current) setQuality(next)
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Could not save the review')
+      if (generation === refreshGeneration.current) {
+        setError(caught instanceof Error ? caught.message : 'Could not save the review')
+      }
     } finally {
       setBusy(null)
     }
@@ -116,7 +136,14 @@ export function DataQualityPage() {
         </p>
       </div>
 
-      {error ? <p role="alert" className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</p> : null}
+      {error ? (
+        <p role="alert" className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+          {error}. Review actions are paused until the latest evidence loads.
+          <button type="button" className={quietButtonClass + ' ml-2 underline'} onClick={() => void reloadQuality()}>
+            Retry
+          </button>
+        </p>
+      ) : null}
 
       {!quality && !error ? (
         <p className="text-sm text-zinc-500">Checking recent Health data…</p>
@@ -131,7 +158,7 @@ export function DataQualityPage() {
             <IssueCard
               key={issue.fingerprint}
               issue={issue}
-              busy={busy === issue.fingerprint}
+              busy={busy !== null || error !== null}
               onReview={(status) => void decide(issue, status)}
             />
           ))}
