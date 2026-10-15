@@ -588,3 +588,11 @@ Automated decision goldens do **not** replace owner acceptance, clinician review
 **UX:** Preferred weekdays, open days, planned rest and moved-away/moved-here are advisory. Do not imply a missed workout or force another session when today already qualified; report numeric **qualified days** and remaining **days**, not remaining **programmed sessions**. Weekly Coach's preceding seven completed days and Training Plan's current Monday–Sunday week are distinct windows and must be identified in explanations. Leave routine progression pointers and historical evidence unchanged.
 
 **Limits:** This release does not validate in-app mutation refresh/cross-tab timing; PIQ-1.4 owns revalidation. SQL programmed rows are not evidence that every exercise in a programmed workout was finished. Owner/mobile tests and disposable PostgreSQL multi-log qualification/plan-integrity tests are further PIQ-1.3 acceptance gates. No migration, live owner record modification, automatic plan rewrite or production deploy.
+
+## Decision: training calendar-day credit is sourced from performed-set SQL, not the number or timing of workout-session rows (PIQ-1.3, 2026-10-15)
+
+**Status:** Isolated PostgreSQL branch-validated; owner/prod release blocked.
+
+The same canonical SQL used by the Training Plan must extract qualifying, actually performed strength exercises, then feed a **distinct date plus exercise-ID** reducer. Two ad-hoc session rows on one date may jointly earn one day. Two complete routine attributions on another date may earn separate rotation credits but only one weekly day. Warmups without working evidence, future-as-of rows, and exercise entries stripped of their performed set never count. Creating a Training Plan midweek does not erase prior days of actually logged work. The configured weekly target must remain a **qualified-day target**; raw programmed session rows are distinct diagnostics.
+
+Validate these distinctions with inserts and queries against the disposable full migration-chain PostgreSQL schema, rollback every fixture, and do not rely only on mocked exercise arrays. The result does not substitute for end-to-end plan API, edit-triggered client cache invalidation, owner/mobile, or production-schema tests. No new automatic schedule enforcement, billing, migration or owner-data edits.
