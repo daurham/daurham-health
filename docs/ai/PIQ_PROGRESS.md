@@ -73,9 +73,9 @@ Completion is based on user-visible acceptance evidence, never number of commits
 
 ## PIQ-0.2 — question evaluation inventory and rubric
 
-- Initial **synthetic-only** question/evidence registry: `tests/fixtures/piq/golden-cases.ts`.
-- Registry integrity tests: `tests/piq0-evaluation-registry.test.ts`. These validate **case specifications only**, not that the Health AI/Coach responses are fixed.
-- Owner-triggered questions and 50 required golden scenarios remain authoritative in the master plan §17. The initial executable registry is deliberately narrower and must be expanded before PIQ-0.2 exits.
+- **50 / 50 master-aligned** synthetic-only question/evidence scenario *specifications*: `tests/fixtures/piq/golden-cases.ts`. This is not 50 passing scenarios.
+- Registry integrity and master-sync tests: `tests/piq0-evaluation-registry.test.ts`. These validate **case specifications only**, not that Health AI/Coach behavior is fixed.
+- Owner-triggered questions and 50 required golden scenarios remain authoritative in the master plan §17. All 50 scenarios are specified. Only selected cases have automated behavior/baseline fixtures; the rest remain unproven until implemented and evaluated.
 - All cases have a prompt or owner-trigger, expected retrieved domains, must/must-not constraints, and evaluation owner. General questions must be answered even with no personal data; high-stakes personal advice must remain scoped.
 - Rubric dimensions (0–4 each, or N/A): direct answer; retrieval relevance and coverage; factual/physiological correctness; personal context; evidence attribution; uncertainty; safety; actionability; contradiction handling; brevity; latency/cost. Score each case with transcript + evidence manifest and record *why* it failed.
 - **Critical failure overrides average score**: fabricated owner health fact, dangerous advice, undetected emergency, incorrect owner/account data, unreconciled training completion, false calorie reduction based on incomplete days.
@@ -97,7 +97,7 @@ Required metrics: request ID, task intent, evidence packet/omitted domain counts
 
 ## PIQ-0.4 — regression infrastructure (CODE CI GREEN; evaluation coverage incomplete)
 
-Registry integrity tests and four Ask Health service-level baseline tests added; branch CI passed for implementation commit `8450428`. More fixtures and owner QA remain. No clinical logic or model responses changed.
+Registry/master alignment tests, four Ask Health service-level baseline tests, four synthetic source-trust tests, and four service failure-path tests added. Both commits `8450428` and `df18aae` have passed branch CI. Behavior gaps T01, T03 and T36 are intentionally characterized, not resolved. Further scenario fixtures, real-owner QA and production verification are outstanding. No clinical reasoning or health target behavior changed.
 
 ## Executable baseline checkpoint — PIQ-0.2 / PIQ-0.3
 
@@ -109,16 +109,40 @@ Registry integrity tests and four Ask Health service-level baseline tests added;
 - **Remaining PIQ-0 gates:** all 50 core scenarios, executable evidence retrieval fixtures, actual response quality scoring, bounded provider diagnostics, owner QA and verified production deployment/schema/usage baseline.
 - **Branch code validation PASSED** for implementation commit `845042835997ddf465dcdc6e5d9847f3fc17e2fe` in GitHub Actions run `38677127236` (npm ci, TypeScript, ESLint, Vitest, build); link: https://github.com/daurham/daurham-health/actions/runs/38677127236. This validates the new instrumentation and synthetic baseline tests, **not** the missing product behavior they document.
 
+## PIQ-0 checkpoint 3 — 50 specifications + executable source/error baseline
+
+**Verified on branch `piq/00-baseline-20261014`** (2026-10-14 owner-local):
+
+- Master-plan IDs **T01–T50** now exist in the checked-in registry; title, input/trigger, mandatory outcomes, and prohibitions are automatically checked against §17 of the master contract.
+- **Corrected source-of-truth mismatch:** earlier registry T45 described negated chest pain and T50 described logging effects. The canonical master defines T45 simultaneous/confounded interventions, T50 midnight and DST handling. Related cases remain covered under T41 and T44, respectively.
+- `tests/piq0-source-trust.test.ts` covers T03 (currently a high-quality *entry* can represent an incomplete day), T14 (missing bowel entry != recorded zero), T36 (past training days preceding observed tracking currently become synthetic zero), and T28 (invented personal citation rejected).
+- `tests/piq0-service-failures.test.ts` covers T20 budget/rate/cached branching and T28 bounded JSON repair, plus provider exception sanitization with a fake model and in-memory usage ledger.
+- Ask Health 429 responses now include stable, privacy-safe codes `ASK_HEALTH_BUDGET_EXCEEDED` and `ASK_HEALTH_RATE_LIMIT`. Their behavior and provider allowance limits are unchanged; this does **not** fix the early-insufficiency branch.
+- **Full branch CI passed:** GitHub Actions [38677784305](https://github.com/daurham/daurham-health/actions/runs/38677784305), commit `df18aae517664e683fdd2d4d02d594b29eac129e`, including `npm ci`, TypeScript, ESLint, Vitest, and build.
+- This checkpoint is an **evaluation/instrumentation milestone**. **0 / 9 PIQ phases complete**; PIQ-0 is still in progress. Green CI is not 50 behavior passes, user-specific useful answers, or clinical safety validation.
+- No production merge, owner-data access, migration or AI provider spend. Vercel deployment 403 and inaccessible Neon project list remain unresolved.
+
+### Explicitly remaining before PIQ-0 exit
+
+1. Evaluate the 50 cases in priority cohorts with realistic synthetic *canonical records*, full retrieval manifests, falsifiable expected outcomes, and independent quality scoring. Do not falsely claim all 50 tested from their presence in a registry.
+2. Add evidence-load/retrieval/truncation diagnostics (the pipeline currently identifies a zero-substantive **packet**, not whether the underlying database truly lacks observations), with limited/redacted retention.
+3. Confirm configured live deployment commit, production schema head, and owner-authorized token/cost/latency baseline; do not use production medical records as GitHub fixtures.
+4. Owner mobile acceptance: baseline questions and the actual Today/Coach behavior with privacy-preserving notes, then mark exit requirements one at a time.
+
+### Next bounded task
+
+**PIQ-0.2/0.3:** add a deterministic evidence fixture runner proving useful citation/coverage behavior and distinguishing failure to retrieve from genuinely absent personal records, without increasing ordinary Gemini consumption. Introduce a small evaluated cohort before PIQ-1; preserve the master plan and green regression suite. No production promotion until authorized and safety/data gates pass.
+
 ## Release state / constraints
 
 - Branch-only preparation: **no production deployments, database migrations, schema changes, AI API calls, or owner data writes performed by this PIQ work**.
 - The Vercel connector's project discovery succeeding does not imply deployment inspection permission.
 - A future phase may use read-only owner-authorized database/project access; never apply migrations merely to satisfy a baseline document.
-- Branch CI state for this work: **not yet verified when this record was drafted**. Update by citing actual workflow ID/result.
+- Branch CI for newest code changes: **success** — Actions run `38677784305` on `df18aae`, all standard checks passed. Documentation-only updates may trigger additional runs; only claim verified checks by their SHA.
 
 ## Continuation packet — NEXT SESSION
 
-**Task:** PIQ-0.2 and PIQ-0.3: finish the baseline, expand synthetic cases and start redacted request reason-code instrumentation, beginning with Ask Health's insufficiency gate. Do not implement a generic “better prompt” or lower-calorie change yet.
+**Task:** PIQ-0.2/0.3: add a small synthetic canonical-evidence retrieval evaluation cohort, separate source absences from routing/truncation and strengthen sanitized failure diagnostics; do not jump into PIQ-1 before verifying its evidence gates.
 
 **First steps:** Read master §§0–6 + PIQ-0 + §§17–21; inspect this file; verify current main/feature branch, production status, CI and schema. Try authorized Vercel project scope and Neon lookup only if access exists. Reconcile `CURRENT_TASK.md` drift once the verified production state is available. Confirm the baseline contract is still aligned with owner's purpose.
 
