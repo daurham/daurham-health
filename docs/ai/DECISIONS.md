@@ -758,3 +758,8 @@ An unchanged measured nutrient number can be ineligible for an association after
 ## Decision: complete nutrition days require independent source reliability for interpreted relationships (PIQ-1.6, 2026-10-15)
 
 A complete food-day confirmation reports recording completeness, not accuracy of each ingredient's evidence. Goal Overview only verifies a currently displayed nutrition association when each cited nutrition observation remains confirmed complete, high-confidence and owner/reference/mixed-source provenanced; values/date/rank reproducibility alone is insufficient. Retain historical snapshot and original screening order, but withhold current precise correlation and pairing context on quality downgrade; show explanation. This is a read-time integrity gate, not re-estimation or owner behavior.
+
+
+## Decision: a reproduced old relationship is not a current Health-date relationship (PIQ-1.6, 2026-10-15)
+
+Withhold present-tense observational coefficient interpretation when loaded Health Intelligence snapshot `asOf` differs from Goal Control's requested health date, or its source window is impossible, reversed or in the future. Exact source-value/rank reproducibility alone does not establish current temporal provenance. Preserve original historical relationship, source detail links, screening counts and avoid fabricated zero/missing days. The guard does not claim atomicity with underlying DB events; production release remains separately gated.

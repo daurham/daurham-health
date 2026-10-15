@@ -92,6 +92,8 @@ export type GoalControlRelationship = {
     lagDays: number
     /** A reported association must reproduce from its exact cited readings before interpretation. */
     coefficientVerified: boolean
+    /** Exact as-of snapshot contract, independent of coefficient arithmetic. */
+    snapshotCurrent: boolean
     /** Original Spearman rank coefficient, separate from the count-based grade. */
     rho: number | null
     /** Describes time clustering; not a statistical effective sample size. */
@@ -411,6 +413,20 @@ export function relationshipPairDateCoverage(
   }
 }
 
+/** A relationship cannot be presented as current when its original source
+ * snapshot belongs to another date or an impossible/reversed source window.
+ * Reproducing an old coefficient is not sufficient to prove freshness.
+ * This only checks loaded-snapshot context, NOT DB-level event revisions.
+ */
+export function relationshipSnapshotContextIsCurrent(
+  snapshot: Pick<HealthIntelligenceSnapshot, 'asOf' | 'period'>,
+  requestedAsOf: string,
+): boolean {
+  return isCalendarDate(requestedAsOf) && snapshot.asOf === requestedAsOf &&
+    isCalendarDate(snapshot.period.start) && isCalendarDate(snapshot.period.end) &&
+    snapshot.period.start <= snapshot.period.end && snapshot.period.end <= requestedAsOf
+}
+
 /** A plausible pair date is not proof of a measured X/Y pair. Only expose
  * exact matched-date diagnostics when both source observations really exist
  * in the already-loaded frame. Never substitute a missing reading with zero.
@@ -562,9 +578,11 @@ export function relationshipDayToDaySensitivity(
 function relationshipsFor(
   snapshot: HealthIntelligenceSnapshot,
   goals: readonly WeeklyGoalSnapshot[],
+  asOf: string,
 ): GoalControlRelationship[] {
   const keys = activeGoalSignalKeys(goals)
   if (keys.size === 0) return []
+  const snapshotCurrent = relationshipSnapshotContextIsCurrent(snapshot, asOf)
   // Count candidates before goal relevance and the three-card cap. Displaying
   // only selected associations can conceal how many pairs were screened.
   // Qualification is the existing display rule, never a significance test.
@@ -589,7 +607,7 @@ function relationshipsFor(
       const calendarCoverage = relationshipPairDateCoverage(
         item.evidenceDates, item.sampleSize, item.lagDays, sourceWindow,
       )
-      const coefficientVerified = !!calendarCoverage &&
+      const coefficientVerified = snapshotCurrent && !!calendarCoverage &&
         relationshipCoefficientMatchesFrame(snapshot.frame, item) &&
         relationshipNutritionPairsRemainEligible(snapshot.frame, item) &&
         relationshipReportedLabelsMatchCoefficient(item)
@@ -607,7 +625,9 @@ function relationshipsFor(
       return {
         id: item.id,
         summary: coefficientVerified ? item.summary
-          : 'Previously reported observational relationship; its coefficient or interpretation labels could not be verified against the current paired readings, or cited nutrition days no longer qualify.',
+          : !snapshotCurrent
+            ? 'Previously reported observational relationship; its source snapshot does not match the requested Health date or has an invalid observation window.'
+            : 'Previously reported observational relationship; its coefficient or interpretation labels could not be verified against the current paired readings, or cited nutrition days no longer qualify.',
         confidence: coefficientVerified ? item.confidence : 'unknown',
         sampleSize: item.sampleSize,
         detailPaths: [...item.detailPaths],
@@ -622,6 +642,7 @@ function relationshipsFor(
           requiredPairs: item.requiredSampleSize,
           lagDays: item.lagDays,
           coefficientVerified,
+          snapshotCurrent,
           rho: coefficientVerified ? item.rho : null,
           dateClustering: pairCoverage ? relationshipDateClustering(item.evidenceDates) : null,
           changeSensitivity: pairCoverage ? relationshipDayToDaySensitivity(snapshot.frame, item) : null,
@@ -773,7 +794,7 @@ export function buildGoalControlState(input: BuildGoalControlInput): GoalControl
     goals,
     nutritionQuality: nutrition,
     trainingAdherence: training,
-    relationships: relationshipsFor(input.intelligence, input.goals),
+    relationships: relationshipsFor(input.intelligence, input.goals, input.asOf),
     limitations,
     maintenance: input.maintenance ?? null,
     trainingProgression: input.trainingProgression ?? null,

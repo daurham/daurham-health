@@ -149,10 +149,10 @@ export function GoalControlCard({
                   <>
                     {!item.evidence.coefficientVerified ? (
                       <p className="mt-1 font-medium text-amber-800">
-                        This association could not be reproduced from its cited paired readings,
-                        or its reported strength/direction did not agree with the verified coefficient,
-                        or a cited nutrition day is not both confirmed complete and source-reliable.
-                        Its reported coefficient, strength and precise date diagnostics are withheld
+                        {!item.evidence.snapshotCurrent
+                          ? 'The relationship source snapshot is from another Health date or has an invalid observation window.'
+                          : 'This association could not be reproduced from its cited paired readings, or its reported strength/direction did not agree with the verified coefficient, or a cited nutrition day is not both confirmed complete and source-reliable.'}
+                        {' '}Its reported coefficient, strength and precise date diagnostics are withheld
                         until the source evidence is refreshed; no change to a health target is justified.
                       </p>
                     ) : null}

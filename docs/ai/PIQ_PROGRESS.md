@@ -1344,3 +1344,16 @@ HAVING COUNT(*) > 1;
 **Tests:** Fictional 16-pair protein/soreness source retains precise interpretation when complete and reliable; revoked day, estimate-heavy, mixed-quality, unknown provenance and missing quality metadata with unchanged observed dates/values all withhold numeric rho and provide a transparent UI explanation; a nutrition Y-endpoint is checked too. No owner-data reads or writes, migration, Gemini usage, or production/main promotion.
 
 **Open:** Event-level source revision atomicity, CI, authenticated device review, uncertainty/confounding design, and the owner-gated production migration 0054 backup and duplicate preflight. Source trust rechecks do not establish causality or treatment efficacy.
+
+
+## PIQ-1.6 — Exact loaded-snapshot as-of consistency for observed relationships (2026-10-15)
+
+**State:** Bounded work-branch implementation requiring full CI and authenticated owner device validation. **0/9 PIQ phases owner-accepted.**
+
+**Gap:** Exact source pairs, coefficient, labels, nutrition completeness and reliability could all verify within a previously loaded Health Intelligence snapshot, even when Goal Overview was being built for a later health date or malformed/future-dated observation window. Reproducing a historical association is not evidence that the current Health date's reading is valid.
+
+**Contract:** Before treating a selected observational association as currently reproducible, verify that the snapshot's `asOf` exactly matches Goal Overview's requested `asOf`, both dates of the source window are real calendar dates, the window is ordered, and its end is not after the requested date. A previously reported relationship remains available for historical inspection, but source-date mismatch or invalid window withholds current rho, strength, precise pair coverage, clustered dates and adjacent-day sensitivity. A distinct disclosure says the source snapshot belongs to another date or has an invalid window; it does not accuse the owner of logging failure or infer a changed clinical effect. Other Goal Control state, existing relationship ranking and screening counts, and canonical observations are unchanged.
+
+**Regression:** A verified fictional 16-pair protein/recovery relationship survives a matching as-of snapshot. An older as-of snapshot with identical finite observations and the same computed correlation is labeled historical with all precision withheld; impossible February, reversed and future-ending windows fail closed. Separate observational, numeric, quality, and statistical-caveat tests remain intact.
+
+**Limit:** This is an *in-memory loaded snapshot context* guard, NOT proof that underlying SQL source events could not change during or immediately after multi-query reads. Canonical event revision atomicity, multiple-comparison calibration, owner mobile QA and unapplied migration 0054's owner approval remain open. No Gemini requests, schema changes, production actions, real health record writes, or `main` merge.

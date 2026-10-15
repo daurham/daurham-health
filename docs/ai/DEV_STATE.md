@@ -450,3 +450,8 @@ Bounded work-branch read-time validation for selected observed relationships: ex
 ## 2026-10-15 PIQ-1.6 relationship nutrition source-quality guard
 
 Work-branch verification now requires both confirmed complete nutrition days and source-reliable high-confidence nutrition observations before Goal Overview interprets a selected observational relationship. Estimate-heavy, mixed-quality, unknown and missing-quality entries withhold numerical claims even when the original rho remains mathematically reproducible. Regression and UI disclosure added; CI/owner-device acceptance still gated. No production or provider work.
+
+
+## 2026-10-15 PIQ-1.6 observed relationship snapshot context — work branch
+
+A matching exact Health-date snapshot and valid observation window are now prerequisites for present-tense observed relationship statistics. Mismatch withholds rho, strength, paired dates and sensitivity while retaining historical evidence links. Synthetic SSR regression covers matching, stale and corrupted windows. This is not canonical SQL source-event revision checking. Refer to `PIQ_PROGRESS.md` for release gates.
