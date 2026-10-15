@@ -88,8 +88,10 @@ describe('PIQ-1.6 exact source snapshot context for present-tense observed relat
       { ...original, period: { ...original.period, dayCount: original.period.dayCount + 1 } },
       { ...original, range: '90d' as const },
     ]
-    for (const snapshot of tampered) {
-      expect(relationshipCoefficientMatchesFrame(snapshot.frame, selected)).toBe(true)
+    for (const [index, snapshot] of tampered.entries()) {
+      // A duplicated row already fails the existing pair-provenance check.
+      // All other cases retain a reproducible rho yet fail full-frame context.
+      expect(relationshipCoefficientMatchesFrame(snapshot.frame, selected)).toBe(index !== 2)
       expect(relationshipSnapshotContextIsCurrent(snapshot, asOf)).toBe(false)
       const state = buildGoalControlState({ asOf, intelligence: snapshot, brief, goals })
       const observed = state.relationships.find((item) => item.id === selected.id)!
