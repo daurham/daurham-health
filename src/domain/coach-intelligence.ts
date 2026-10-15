@@ -125,9 +125,17 @@ function opportunityDraft(
 ): CoachRecommendationDraft | null {
   const opportunity = control.primaryOpportunity
   if (!opportunity) return null
-  // A previously derived calorie recommendation must not bypass the current
-  // verified full-day nutrition floor when Coach constructs action cards.
-  if (opportunity.kind === 'review_intake_adjustment' && control.nutritionQuality.state !== 'met') return null
+  // Both a stale weekly focus and a manually reconstructed Goal Control
+  // object must fail closed: only the matching current Maintenance decision
+  // may create a numerical calorie review. Never promote its alternative
+  // to a standalone primary card.
+  if (isCalorieDecisionKind(opportunity.kind)) {
+    if (opportunity.kind !== 'review_intake_adjustment' ||
+        control.nutritionQuality.state !== 'met' ||
+        control.maintenance?.calorieAdjustmentSafety.status !== 'review_possible' ||
+        !control.maintenance.interventions.some((item) =>
+          item.id === opportunity.id && item.kind === opportunity.kind)) return null
+  }
   const maintenanceExplanation = control.maintenance?.interventions.some((item) => item.id === opportunity.id)
     ? control.maintenance.evidenceExplanation : null
   return restAware({
@@ -177,7 +185,9 @@ function maintenanceDrafts(control: GoalControlState): CoachRecommendationDraft[
     // The activity option is explicitly an alternative to the primary
     // calorie lever; never surface a standalone dangling alternative card.
     if (item.kind === 'review_activity_adjustment' &&
-        (control.primaryOpportunity?.kind !== 'review_intake_adjustment' || control.nutritionQuality.state !== 'met')) return []
+        (control.primaryOpportunity?.kind !== 'review_intake_adjustment' ||
+         control.maintenance?.calorieAdjustmentSafety.status !== 'review_possible' ||
+         control.nutritionQuality.state !== 'met')) return []
     const id = `maintenance:${item.id}`
     if (control.primaryOpportunity?.id === item.id) return []
     return [{
