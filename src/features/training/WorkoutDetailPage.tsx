@@ -25,6 +25,7 @@ import {
 } from './draft'
 import { formatLoad, formatPounds, formatSetPerformance, formatTrainingPerformanceBest, formatWorkoutDate } from './format'
 import { WorkoutEditor } from './WorkoutEditor'
+import { workoutDraftIsStale, workoutEditRevision } from './workout-draft-freshness'
 
 export function WorkoutDetailPage() {
   const { sessionId } = useParams()
@@ -43,6 +44,8 @@ export function WorkoutDetailPage() {
   const [fieldErrors, setFieldErrors] = useState<ReviewFieldError[]>([])
   const [errorFocusKey, setErrorFocusKey] = useState(0)
   const loadedId = useRef<string | null>(null)
+  const draftOrigin = useRef<{ id: string; revision: string } | null>(null)
+  const [staleDraft, setStaleDraft] = useState(false)
 
   // Refresh a saved workout after another tab edits it, or when returning
   // from a different device. Keep the unsaved edit draft untouched.
@@ -64,6 +67,8 @@ export function WorkoutDetailPage() {
       setLoading(true)
       setEditing(false)
       setDraft(null)
+      draftOrigin.current = null
+      setStaleDraft(false)
     }
     setError(null)
     Promise.all([fetchSession(sessionId), fetchTemplates().catch(() => [] as WorkoutTemplate[])])
@@ -72,6 +77,10 @@ export function WorkoutDetailPage() {
           return
         }
         loadedId.current = sessionId
+        if (draftOrigin.current?.id === sessionId &&
+            workoutDraftIsStale(draftOrigin.current.revision, next)) {
+          setStaleDraft(true)
+        }
         setSession(next)
         setTemplate(templates.find((item) => item.id === next.workoutTemplateId) ?? null)
       })
@@ -115,14 +124,28 @@ export function WorkoutDetailPage() {
       setError(null)
       return
     }
+    if (staleDraft || !draftOrigin.current || draftOrigin.current.id !== sessionId) {
+      setStaleDraft(true)
+      return
+    }
     setFieldErrors([])
     setError(null)
     setSaving(true)
     try {
+      // Recheck at the point of action. This is optimistic client protection,
+      // not an atomic database compare-and-swap with the PATCH below.
+      const fresh = await fetchSession(sessionId)
+      if (workoutDraftIsStale(draftOrigin.current?.revision, fresh)) {
+        setSession(fresh)
+        setStaleDraft(true)
+        return
+      }
       const next = await updateSession(sessionId, buildManualWorkoutPayload(draft))
       setSession(next)
       setEditing(false)
       setDraft(null)
+      draftOrigin.current = null
+      setStaleDraft(false)
     } catch (caught) {
       if (caught instanceof DraftValidationError) {
         setFieldErrors(caught.fields)
@@ -131,6 +154,28 @@ export function WorkoutDetailPage() {
         return
       }
       setError(caught instanceof Error ? caught.message : 'Could not save workout')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function reloadSavedVersion() {
+    if (!sessionId || saving) return
+    setSaving(true)
+    setError(null)
+    try {
+      const [fresh, templates] = await Promise.all([
+        fetchSession(sessionId), fetchTemplates().catch(() => [] as WorkoutTemplate[]),
+      ])
+      const currentTemplate = templates.find((item) => item.id === fresh.workoutTemplateId) ?? null
+      setSession(fresh)
+      setTemplate(currentTemplate)
+      setDraft(draftFromSession(fresh, currentTemplate))
+      draftOrigin.current = { id: sessionId, revision: workoutEditRevision(fresh) }
+      setStaleDraft(false)
+      setFieldErrors([])
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Could not reload the saved workout')
     } finally {
       setSaving(false)
     }
@@ -173,6 +218,10 @@ export function WorkoutDetailPage() {
       ) : null}
       {loading && !session ? <p className="text-sm text-zinc-600">Loading workout…</p> : null}
       {editing && draft ? (
+        <>
+        {staleDraft ? (
+          <WorkoutDraftConflictNotice onReload={() => void reloadSavedVersion()} busy={saving} />
+        ) : null}
         <WorkoutEditor
           title={session ? trainingSessionDisplayName(session) : 'Edit workout'}
           subtitle="Changes update this workout. They are not saved until you tap Save workout."
@@ -196,20 +245,25 @@ export function WorkoutDetailPage() {
           onCancel={() => {
             setEditing(false)
             setDraft(null)
+            draftOrigin.current = null
+            setStaleDraft(false)
             setConfirmDelete(false)
           }}
           cancelLabel="Cancel"
-          commitLabel="Save workout"
+          commitLabel={staleDraft ? 'Review saved changes first' : 'Save workout' }
           onDelete={() => setConfirmDelete(true)}
-          saving={saving}
+          saving={saving || staleDraft}
           error={null}
           fieldErrors={fieldErrors}
           errorFocusKey={errorFocusKey}
         />
+        </>
       ) : session ? (
         <SessionDetail
           session={session}
           onEdit={() => {
+            draftOrigin.current = { id: session.id, revision: workoutEditRevision(session) }
+            setStaleDraft(false)
             setDraft(draftFromSession(session, template))
             setEditing(true)
             setConfirmDelete(false)
@@ -236,6 +290,33 @@ export function WorkoutDetailPage() {
         </div>
       ) : null}
     </section>
+  )
+}
+
+/** Explicit owner choice only: this operation discards the unsaved draft. */
+export function WorkoutDraftConflictNotice({
+  onReload,
+  busy,
+}: {
+  onReload: () => void
+  busy: boolean
+}) {
+  return (
+    <div role="alert" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+      <p className="font-semibold">Saved workout changed while you were editing</p>
+      <p className="mt-1">
+        Your unsaved draft is still here. Saving it now could overwrite changes
+        made in another tab or device, so saving is paused.
+      </p>
+      <button
+        type="button"
+        className={secondaryButtonClass + ' mt-3'}
+        disabled={busy}
+        onClick={onReload}
+      >
+        Discard my draft and load latest saved workout
+      </button>
+    </div>
   )
 }
 
