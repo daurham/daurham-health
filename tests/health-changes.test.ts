@@ -23,6 +23,8 @@ describe('canonical mutations invalidate Coach', () => {
     ['POST', '/api/lab/experiments/experiment/start'], ['DELETE', '/api/lab/experiments/experiment'],
     ['POST', '/api/lab/experiments/experiment/result'], ['PATCH', '/api/context/days/2026-09-29'],
     ['POST', '/api/goals/goal/versions'], ['POST', '/api/supplements/adherence'],
+    ['PUT', '/api/profile'], ['POST', '/api/data-quality/reviews'],
+    ['PUT', '/api/nutrition/day/completeness'],
   ])('%s %s changes current Coach truth', (method, path) => {
     expect(isCoachRelevantMutation(path, method)).toBe(true)
   })
@@ -33,6 +35,8 @@ describe('canonical mutations invalidate Coach', () => {
     ['POST', '/api/nutrition/describe'], ['POST', '/api/nutrition/foods'], ['POST', '/api/nutrition/label/commit'],
     ['POST', '/api/nutrition/meal/jobs'], ['POST', '/api/nutrition/recipes/assist'], ['POST', '/api/training/transcription/jobs'],
     ['POST', '/api/apple-health/import/preview'], ['POST', '/api/body/import/fit-profile/preview'], ['POST', '/api/ask-health'],
+    ['GET', '/api/profile'], ['GET', '/api/data-quality'], ['GET', '/api/nutrition/day/completeness'],
+    ['POST', '/api/data-quality/reviews/preview'],
   ])('%s %s does not masquerade as completion or start a refresh loop', (method, path) => {
     expect(isCoachRelevantMutation(path, method)).toBe(false)
   })
@@ -59,6 +63,29 @@ describe('healthFetch invalidation and coalescing', () => {
     expect(refresh).toHaveBeenCalledTimes(1)
     expect(await received.json()).toEqual({ session: { id: 'saved' } })
     expect(fetch).toHaveBeenCalledWith('/api/training/sessions', expect.objectContaining({ credentials: 'same-origin' }))
+    unsubscribe()
+  })
+
+  it('refreshes current Coach truth on successful profile, quality, or completeness changes only', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('window', new EventTarget())
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 200 }))
+      .mockResolvedValueOnce(new Response(null, { status: 409 }))
+      .mockResolvedValueOnce(new Response(null, { status: 200 }))
+      .mockResolvedValueOnce(new Response(null, { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+    const refreshed = vi.fn()
+    const unsubscribe = subscribeHealthDataChanges(refreshed)
+    await healthFetch('/api/profile', { method: 'PUT' })
+    await healthFetch('/api/nutrition/day/completeness', { method: 'PUT' })
+    await healthFetch('/api/data-quality/reviews', { method: 'POST' })
+    vi.runAllTimers()
+    expect(refreshed).toHaveBeenCalledTimes(1)
+    await healthFetch('/api/data-quality', { method: 'GET' })
+    vi.runAllTimers()
+    expect(refreshed).toHaveBeenCalledTimes(1)
+    expect(fetchMock).toHaveBeenCalledTimes(4)
     unsubscribe()
   })
 

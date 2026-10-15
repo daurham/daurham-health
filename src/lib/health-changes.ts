@@ -10,6 +10,10 @@ export function isCoachRelevantMutation(url: string, method: string): boolean {
     return false
   }
   if (/\/(preview|draft)$/.test(path)) return false
+  // These owner decisions change interpretation/eligibility even without
+  // adding a new measurement. A stale Coach can otherwise repeat unsafe advice.
+  if (path === '/api/profile' || path === '/api/data-quality/reviews' ||
+      path === '/api/nutrition/day/completeness') return true
   if (/^\/api\/(lab|goals|context|supplements|hydration|bowel|check-in)(\/|$)/.test(path)) return true
   if (/^\/api\/training\/(sessions|exercises|templates|plan)(\/|$)/.test(path)) return true
   if (path === '/api/training/transcription/commit') return true
