@@ -8,6 +8,7 @@ import type { SleepProgressView } from '../sleep/progress-view.js'
 import type { TodaySupplementInput } from '../supplements/types.js'
 import type { IntelligenceContextItem, RoutedHealthIntelligence } from '../intelligence/shared.js'
 import type { AskLens } from './config.js'
+import type { AskNutritionIntegrity } from './nutrition-integrity.js'
 
 export type AskEvidenceCoverage = Record<string, number | string | null>
 
@@ -125,6 +126,7 @@ export type AskHealthPacketInput = {
   patterns: readonly AskPatternInput[]
   profile?: AskClinicalProfileInput | null
   intelligence?: RoutedHealthIntelligence | null
+  nutritionIntegrity?: AskNutritionIntegrity | null
   maxChars?: number
   sourceCoverageAudit?: AskHealthSourceCoverageAudit | null
 }
