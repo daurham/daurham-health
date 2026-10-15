@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import pg from 'pg'
 import type { Sql } from '../server/db.js'
 import { buildHealthIntelligenceSnapshot, type IntelligenceObservation } from '../src/domain/intelligence/shared.js'
-import { loadVerifiedNutritionDays } from '../server/nutrition/maintenance-eligibility.js'
+import { loadVerifiedNutritionDays, loadVerifiedWeeklyNutritionDates } from '../server/nutrition/maintenance-eligibility.js'
 import { getNutritionDayCompleteness, saveNutritionDayCompleteness, SOURCE_REVISION_SQL } from '../server/nutrition/day-completeness.js'
 
 /**
@@ -220,6 +220,27 @@ describe.skipIf(!url)('PIQ-1.1 isolated PostgreSQL migration and real confirmati
     expect((await selected()).size).toBe(0)
   })
 
+  it('Weekly Coach uses real verified complete-day SQL and rejects a stale food-log snapshot', async () => {
+    const id = await insertMeal(1650)
+    const source = (calories: number) => [{ id, logDate: date, calories }]
+      as unknown as import('../src/domain/nutrition/types.js').NutritionEntry[]
+    const allowed = (entries: import('../src/domain/nutrition/types.js').NutritionEntry[]) =>
+      loadVerifiedWeeklyNutritionDates({ entries, asOf: today, today, sqlOverride: sql })
+    expect((await allowed(source(1650))).size).toBe(0)
+    const first = await getNutritionDayCompleteness(date, sql, today)
+    await saveNutritionDayCompleteness(report(first.entryRevision, 0), sql, today)
+    expect([...await allowed(source(1650))]).toEqual([date])
+    // Concurrent source correction invalidates the stored revision.
+    await db.query('UPDATE nutrition_entries SET calories = 1700 WHERE id = $1::uuid', [id])
+    expect((await allowed(source(1650))).size).toBe(0)
+    const updated = await getNutritionDayCompleteness(date, sql, today)
+    await saveNutritionDayCompleteness(report(updated.entryRevision, 1), sql, today)
+    // Even after reconfirmation, a stale in-memory Weekly Coach row is rejected.
+    expect((await allowed(source(1650))).size).toBe(0)
+    expect([...await allowed(source(1700))]).toEqual([date])
+    expect((await loadVerifiedWeeklyNutritionDates({ entries: source(1700), asOf: today,
+      today: date, sqlOverride: sql })).size).toBe(0)
+  })
   it('real manifest never promotes an explicit zero-intake fast or a day lacking food', async () => {
     const empty = await getNutritionDayCompleteness(date, sql, today)
     await saveNutritionDayCompleteness(report(empty.entryRevision, 0, 'complete', true), sql, today)
