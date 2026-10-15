@@ -445,16 +445,47 @@ Stop expanding test counts for their own sake. Next, pursue runtime verification
 
 **Next bounded task:** verify full migration compatibility and backup/restore on isolated PostgreSQL, then preview mobile owner-confirmation flow when runtime access is authorized; audit independent Health AI/insight food-inference claims. Do not promote to main before actual production schema and release gates are confirmed.
 
+## PIQ-1.1 isolated FULL migration-chain and confirmation backup round trip — validated
+
+**Implementation:** `de858ce5a71f9aec7ee20817992aca6ba86448b4`  
+**Full application CI:** [38693650286](https://github.com/daurham/daurham-health/actions/runs/38693650286) — **SUCCESS**, npm ci, TypeScript, ESLint, full Vitest suite, production build.  
+**Isolated PostgreSQL 16 CI:** [38693650304](https://github.com/daurham/daurham-health/actions/runs/38693650304) — **SUCCESS**, representative nutrition integration and **complete 0001–0053 migration replay**.
+
+### What this independently validates
+
+- Added `tests/piq1-full-migration-postgres.integration.test.ts`, enabled in `.github/workflows/piq1-postgres.yml`. It uses **only** `PIQ_POSTGRES_URL` on GitHub's disposable PostgreSQL 16 service, creates a separate schema, and executes all **53 migration files in numeric order** through the same `inspectMigrations()` / `splitSqlStatements()` path as the repository migrator. Each migration is committed atomically in its own SQL transaction, with a checked migration ledger.
+- Migration `0053` succeeds after all earlier migrations, leaves zero historical owner-complete rows, and new days remain **unknown** absent explicit owner confirmation.
+- Inserts a fictional logged meal, saves a revision-bound explicit complete-day report using the *real* PostgreSQL query, packages that confirmation in the application's **full-format backup archive**, verifies its checksums and restore plan, deletes that one row, executes the corresponding restore SQL and re-reads its eligible owner report.
+- A subsequent calorie correction changes the source revision and makes the restored report **stale/unknown/ineligible**. A restored owner report cannot freeze the food log or override real edits.
+- The older isolated SQL tests additionally cover conflicting writes, excludes, fasting, verified-date Maintenance and Weekly Coach eligibility. The full-suite run and isolated database run now both pass on the same commit.
+- First CI attempt found a test-only unused constant in lint; removed and reran. No clinical decision logic changed in this checkpoint.
+
+### Boundary of the claim
+
+- This establishes **fresh full migration-chain compatibility** and a **targeted confirmation-row backup/restore**, not a restoration of every seeded and unseeded table or a recreation of an existing owner database. The full backup format was verified for the synthetic row, but the full multi-table database restore was *not* executed here.
+- It does **not** verify production Neon schema history, migration state, performance, Vercel serving commit, owner authentication on an actual device, or hidden historical drift. **No production Neon branch or database was touched.**
+- The post-0053 intake protection is still code- and disposable-Postgres-tested on a development branch; not released to production. No automatic calorie target updates or Gemini calls.
+
+### Remaining release gates / next bounded scope
+
+1. Verify owner-authorized production read-only migration head, deployed Vercel serving SHA, and real runtime health-data pathways; current Neon connector project list does not show the owner project.
+2. Validate complete multi-table backup/restore and migration on a realistic **production-schema clone**, not production itself, to account for accumulated source history, default/nullable differences and owner-specific data.
+3. Mobile owner QA of the Nutrition confirmation card, staleness after editing, full-day fasting, daily check-in UX, auth, and conflict/error handling on a deployed isolated preview with matching migration.
+4. Audit additional Health AI and other non-Maintenance nutrition interpretations; never use unknown/partial food days to authorize a calorie reduction.
+5. Continue PIQ-0 owner-reviewed real response-quality gates before declaring program phase acceptance.
+
+**Phase truth: 0/9 accepted. PIQ-0 active and PIQ-1.1 implementation underway; other phases unchanged.** No production merge, live migration, owner-data mutation, provider cost, or calorie target change by this checkpoint.
+
 ## Release state / constraints
 
 - Branch-only preparation: **no production deployments, database migrations, schema changes, AI API calls, or owner data writes performed by this PIQ work**.
 - The Vercel connector's project discovery succeeding does not imply deployment inspection permission.
 - A future phase may use read-only owner-authorized database/project access; never apply migrations merely to satisfy a baseline document.
-- Latest substantive implementation checks: isolated PostgreSQL run 38692728356 SUCCESS and full branch validation run 38692728349 SUCCESS on 4bde2e7; documentation-only commits do not imply a new code validation.
+- Latest implementation checks: isolated PostgreSQL full 53-migration replay and confirmation restore run `38693650304` SUCCESS; full branch validation run `38693650286` SUCCESS on `de858ce`. Documentation-only commits do not imply new code validation.
 
 ## Continuation packet — NEXT SESSION
 
-**Task:** PIQ-1.1: validate isolated full migration-chain and backup/restore, owner preview/mobile confirmation flow, and remaining independent Health AI/insight nutrition assertions. Maintenance/Goal Control and Weekly Coach already have branch-tested fail-closed intake gates; do not merge or apply migration 0053 until production schema and owner release gates are verified.
+**Task:** PIQ-1.1: full migration chain and targeted confirmation restore are now code/isolated-Postgres validated. Next prioritize an isolated owner preview/mobile confirmation flow, production-schema clone verification with full multi-table backup/restore, and remaining Health AI/insight nutrition inference audits. Maintenance/Goal Control and Weekly Coach already have branch-tested fail-closed intake gates; do not merge or apply migration 0053 until production schema and owner release gates are verified.
 
 **First steps:** Read master §§0–6 + PIQ-0 + §§17–21; inspect this file; verify current main/feature branch, production status, CI and schema. Try authorized Vercel project scope and Neon lookup only if access exists. Reconcile `CURRENT_TASK.md` drift once the verified production state is available. Confirm the baseline contract is still aligned with owner's purpose.
 
