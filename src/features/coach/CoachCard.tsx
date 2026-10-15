@@ -139,7 +139,7 @@ export function CoachCard({ state, pending, error, onState }: {
     return () => {
       cancelled = true
     }
-  }, [state?.date])
+  }, [state])
 
   useEffect(() => {
     if (!state) {
