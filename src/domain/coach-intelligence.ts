@@ -238,6 +238,16 @@ export function buildCoachRecommendationDrafts(control: GoalControlState): Coach
     .slice(0, 3)
 }
 
+/** Apply after owner suppression, not merely when drafting: the secondary
+ * activity alternative must never survive without its visible calorie parent.
+ * This is presentation dependency handling, not an automatic plan mutation. */
+export function keepVisibleCoachDependencies(
+  drafts: readonly CoachRecommendationDraft[],
+): CoachRecommendationDraft[] {
+  const intakeParentVisible = drafts.some((item) => item.kind === 'review_intake_adjustment')
+  return drafts.filter((item) => item.kind !== 'review_activity_adjustment' || intakeParentVisible)
+}
+
 function questionForLimitation(limitation: GoalControlLimitation): Omit<CoachFollowUpQuestionDraft, 'fingerprint' | 'kind' | 'confidence' | 'evidenceRefs'> | null {
   if (!limitation.detailPath) return null
   if (limitation.code === 'nutrition_quality_floor') {
