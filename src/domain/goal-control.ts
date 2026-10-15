@@ -149,11 +149,17 @@ function nutritionQuality(snapshot: HealthIntelligenceSnapshot, asOf: string): G
   const loggedDays = observations.length
   const estimateHeavyDays = observations.filter((item) => item.quality === 'estimate_heavy').length
   const unknownQualityDays = observations.filter((item) => item.provenance === 'unknown' || item.quality == null).length
+  // PIQ-1: a trustworthy food ENTRY is not a complete food DAY. The server
+  // snapshot marks only owner-confirmed, revision-matched, source-reliable
+  // dates as verified_complete. Missing marks (including legacy fixtures) are
+  // ineligible for any intake-based decision.
   const reliableDays = observations.filter((item) =>
-    item.quality !== 'estimate_heavy' &&
-    item.provenance !== 'unknown' &&
-    item.quality != null
+    item.dayCompleteness === 'verified_complete' &&
+    item.quality === 'high_confidence' &&
+    item.provenance !== 'unknown'
   ).length
+  const verificationUnavailable = snapshot.coverage.find((item) => item.key === 'nutrition.calories')
+    ?.completenessCheck === 'unavailable'
   const requiredLoggedDays = 4
   const requiredReliableDays = 4
   const state: GoalControlNutritionQuality['state'] =
@@ -164,10 +170,12 @@ function nutritionQuality(snapshot: HealthIntelligenceSnapshot, asOf: string): G
         : 'limited'
   const detail =
     state === 'met'
-      ? `Nutrition has ${reliableDays} sufficiently reliable logged days in the last seven completed days.`
+      ? `Nutrition has ${reliableDays} owner-confirmed complete, source-reliable days in the last seven completed days.`
       : state === 'unknown'
-        ? 'No completed Nutrition days are available for intake-based decisions this week.'
-        : `Nutrition has ${loggedDays} logged days but only ${reliableDays} sufficiently reliable days; intake-based changes should wait for better coverage.`
+        ? 'No completed Nutrition days are logged for intake-based decisions this week.'
+        : verificationUnavailable
+          ? `Nutrition was logged on ${loggedDays} days, but full-day verification is unavailable. This does not mean the owner confirmed zero days; intake changes should wait.`
+          : `Nutrition was logged on ${loggedDays} days, but only ${reliableDays} are owner-confirmed complete and source-reliable. More verified full-day evidence is needed before changing intake.`
   return {
     state,
     period: { start, end },
@@ -280,7 +288,7 @@ function trainingProgressionOpportunity(training: TrainingProgressionState | nul
   }
 }
 
-function maintenanceOpportunity(maintenance: MaintenanceState | null | undefined): GoalControlOpportunity | null {
+function maintenanceOpportunity(maintenance: MaintenanceState | null | undefined, nutrition: GoalControlNutritionQuality): GoalControlOpportunity | null {
   if (
     !maintenance ||
     !maintenance.plateau.goalUnmet ||
@@ -292,6 +300,9 @@ function maintenanceOpportunity(maintenance: MaintenanceState | null | undefined
     item.kind !== 'review_activity_adjustment'
   )
   if (!intervention) return null
+  // A credible 28-day estimate alone cannot authorize fresh calorie-change
+  // advice if the last week has no verified complete-day intake coverage.
+  if (intervention.kind === 'review_intake_adjustment' && nutrition.state !== 'met') return null
   return {
     id: intervention.id,
     kind: intervention.kind,
@@ -423,7 +434,7 @@ export function buildGoalControlState(input: BuildGoalControlInput): GoalControl
     detailPath: `/goals/${goal.id}`,
   }))
   const confidence = overallConfidence(input.brief, input.intelligence, input.goals)
-  const primaryOpportunity = opportunity(input.brief.focus) ?? maintenanceOpportunity(input.maintenance) ?? trainingProgressionOpportunity(input.trainingProgression)
+  const primaryOpportunity = opportunity(input.brief.focus) ?? maintenanceOpportunity(input.maintenance, nutrition) ?? trainingProgressionOpportunity(input.trainingProgression)
   const limitations = limitationsFor(input.intelligence, input.goals, nutrition, confidence)
   const activeControlGoals = goals.filter((goal) => goal.lifecycle === 'active')
   const allActiveGoalsUnknown = activeControlGoals.length > 0 && activeControlGoals.every((goal) => goal.state === 'unknown')
