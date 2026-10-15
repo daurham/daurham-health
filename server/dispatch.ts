@@ -29,6 +29,7 @@ import progressCompareHandler from './handlers/progress-compare.js'
 import progressCheckpointsHandler from './handlers/progress-checkpoints.js'
 import progressCheckpointDetailHandler from './handlers/progress-checkpoint-detail.js'
 import nutritionDayHandler from './handlers/nutrition-day.js'
+import nutritionDayCompletenessHandler from './handlers/nutrition-day-completeness.js'
 import nutritionEntriesHandler from './handlers/nutrition-entries.js'
 import nutritionEntryDetailHandler from './handlers/nutrition-entry-detail.js'
 import nutritionFoodsHandler from './handlers/nutrition-foods.js'
@@ -97,6 +98,7 @@ export type HealthApiRoute =
   | 'progress-checkpoints'
   | 'progress-checkpoint-detail'
   | 'nutrition-day'
+  | 'nutrition-day-completeness'
   | 'nutrition-entries'
   | 'nutrition-entry-detail'
   | 'nutrition-foods'
@@ -167,6 +169,7 @@ const HANDLERS: Record<HealthApiRoute, HealthApiHandler> = {
   'progress-checkpoints': progressCheckpointsHandler,
   'progress-checkpoint-detail': progressCheckpointDetailHandler,
   'nutrition-day': nutritionDayHandler,
+  'nutrition-day-completeness': nutritionDayCompletenessHandler,
   'nutrition-entries': nutritionEntriesHandler,
   'nutrition-entry-detail': nutritionEntryDetailHandler,
   'nutrition-foods': nutritionFoodsHandler,
@@ -290,6 +293,8 @@ export function matchHealthApiRoute(pathname: string): HealthApiRoute | null {
       return 'progress-checkpoints'
     case '/api/nutrition/day':
       return 'nutrition-day'
+    case '/api/nutrition/day/completeness':
+      return 'nutrition-day-completeness'
     case '/api/nutrition/entries':
       return 'nutrition-entries'
     case '/api/nutrition/foods':

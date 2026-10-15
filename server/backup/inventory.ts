@@ -1,6 +1,6 @@
 export const BACKUP_FORMAT = 'daurham-health-backup'
 export const BACKUP_FORMAT_VERSION = 1
-export const LATEST_SCHEMA_MIGRATION = '0052_hydration_daily_goal.sql'
+export const LATEST_SCHEMA_MIGRATION = '0053_nutrition_day_completeness.sql'
 export const PORTABLE_EXPORT_BYTE_LIMIT = 3_500_000
 
 export type ColumnKind = 'uuid' | 'text' | 'date' | 'timestamptz' | 'numeric' | 'int' | 'bool' | 'json' | 'bytea'
@@ -452,6 +452,23 @@ export const BACKUP_TABLES: readonly BackupTable[] = [
       col('recipe_portion_kind', 'text'),
       col('recipe_portion_amount', 'numeric'),
       col('recipe_fraction', 'numeric'),
+    ],
+  }),
+  table({
+    name: 'nutrition_day_completeness',
+    backupClass: 'canonical',
+    primaryKey: ['health_date'],
+    seeded: false,
+    portable: true,
+    references: [],
+    columns: [
+      col('health_date', 'date'),
+      col('owner_report', 'text'),
+      col('zero_intake_fast', 'bool'),
+      col('entry_revision', 'text'),
+      col('version', 'int'),
+      col('confirmed_at', 'timestamptz'),
+      col('updated_at', 'timestamptz'),
     ],
   }),
   table({
