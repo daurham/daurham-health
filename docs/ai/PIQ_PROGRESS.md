@@ -195,16 +195,43 @@ Expand question-intent checks to distinguish a true **data-load failure** from a
 
 **Phase truth:** PIQ-0 **IN PROGRESS**; PIQ-1..PIQ-7 **NOT STARTED**; PIQ-8 **DEFERRED**. 0 / 9 phases owner accepted.
 
+## PIQ-0 checkpoint 6 — failed reads vs empty evidence; cache corrections (CI validated)
+
+**Validated code commit:** `2eb657c9a0f2f65a27f8a474bbdb8436b3cd2ca5`  
+**GitHub Actions:** [38679378153](https://github.com/daurham/daurham-health/actions/runs/38679378153) — **PASSED**: installation, TypeScript, lint, full Vitest suite, production build.
+
+### Synthetic boundary tests and protected behaviors
+
+- `tests/piq0-retrieval-revision.test.ts`: **seven** tests that exercise the actual Ask Health service or its canonical packet/fingerprint helpers with a mocked data loader and a provider stub (no real Neon credentials or Gemini calls).
+- **Valid read with no substantive records** returns the established `packet_no_substantive_evidence` path. This describes only the loaded packet; it does **not** prove the owner database is empty or that a safe general-knowledge question should be refused.
+- **Unexpected database/loader failure** results in sanitized **503 `ASK_HEALTH_EVIDENCE_LOAD`**, with no provider request and no raw failure/health-record content in routine error logs.
+- **Internal HttpError 5xx hardening:** Previously such errors were rethrown verbatim by the load boundary, potentially exposing an internal SQL/medical error message. The server now normalizes internal 5xx errors to the same sanitized 503 while retaining known 4xx client/owner authorization errors. No changes to database queries, authentication, model cost limits or clinical guidance.
+- **T27 selected-fact correction:** Editing a fixture goal changes the serialized evidence fingerprint and causes a new mocked model answer rather than reusing the cached answer; unchanged evidence continues to hit cache. Historical `asOf` periods also have distinct fingerprints.
+- **T48 KNOWN INTEGRITY LIMITATION:** When a clinical medication fact was omitted by packet trimming, correcting that omitted fact **did not change the packet fingerprint**. This is a real source-revision/cache-freshness hole, NOT an approved product behavior. PIQ-3 should add source revision/freshness or query-relevant preservation and a regression that expects cache invalidation after correction/deletion.
+- These tests establish what current code can and cannot do. They do not demonstrate live owner question correctness or the full source-load fanout's specific failure origin.
+
+### Observability boundaries and next step
+
+- Server already distinguishes a successful but insufficient packet from an exception, now independently covered by regression tests.
+- Packet diagnostics identify selected/unselected/truncated shared signals, but a fully empty *loaded* evidence view still cannot prove absence in the underlying database.
+- **Open PIQ-0 gates:** production Vercel commit and applied Neon schema, actual provider spend/latency baseline, additional owner-driven response-quality/clinical-safety scoring, timestamp/correction integration beyond the selected Goal fixture, and mobile acceptance. Access to Vercel deployment listing was 403 and the available Neon project list was empty at prior read-only check; do not substitute assumptions.
+- **No production merge/deploy, migration, owner-data read/write or live Gemini billing by PIQ work.**
+- **Phase truth:** PIQ-0 IN PROGRESS, PIQ-1–PIQ-7 NOT STARTED, PIQ-8 DEFERRED. **0/9 phases completed**, despite checkpoint 6 code CI passing.
+
+### Handoff
+
+Next bounded work: strengthen synthetic owner-question outcome assessments and triage the remaining PIQ-0 exit gates against what is technically testable without production access. If runtime scope remains blocked, preserve the blocker and the verified CI state rather than inventing deploy/schema facts. When PIQ-1 begins, prioritize source-completeness and training missing-vs-zero semantics; never automatically cut calories based on partial food days.
+
 ## Release state / constraints
 
 - Branch-only preparation: **no production deployments, database migrations, schema changes, AI API calls, or owner data writes performed by this PIQ work**.
 - The Vercel connector's project discovery succeeding does not imply deployment inspection permission.
 - A future phase may use read-only owner-authorized database/project access; never apply migrations merely to satisfy a baseline document.
-- Branch CI for latest implementation: **success** — Actions run `38678922849` on `b44b6455`, all standard checks passed. Documentation-only commits do not imply a new code validation.
+- Branch CI for latest implementation: **success** — Actions run `38679378153` on `2eb657c`, all standard checks passed. Documentation-only commits do not imply new code validation.
 
 ## Continuation packet — NEXT SESSION
 
-**Task:** PIQ-0.3: distinguish SQL/source-load errors from valid-but-empty evidence, add sanitized request-path classification across the retrieval boundary, and expand correction/recency/truncation evaluations. Continue synthetic-only testing and preserve no-production policy.
+**Task:** PIQ-0 finalization preparation: expand owner-question outcome safety scoring with synthetic fixtures, document current owner-runtime access blockers, and prepare the bounded PIQ-1 data-integrity contract. The read boundary and selected-source cache tests are now CI validated; the omitted-source correction hole remains open for PIQ-3.
 
 **First steps:** Read master §§0–6 + PIQ-0 + §§17–21; inspect this file; verify current main/feature branch, production status, CI and schema. Try authorized Vercel project scope and Neon lookup only if access exists. Reconcile `CURRENT_TASK.md` drift once the verified production state is available. Confirm the baseline contract is still aligned with owner's purpose.
 
