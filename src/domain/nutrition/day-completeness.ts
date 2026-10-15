@@ -76,7 +76,7 @@ export function assessNutritionDayCompleteness(
   else if (currentDayProvisional) maintenanceExclusion = 'current_day'
   else if (confirmationStale) maintenanceExclusion = 'stale_confirmation'
   else if (state !== 'confirmed_complete') maintenanceExclusion = 'unconfirmed_completeness'
-  else if (fast || input.quality.knownCalories <= 0) maintenanceExclusion = 'zero_or_unusual_intake'
+  else if (fast || input.quality.knownCalories + input.quality.unknownCalories <= 0) maintenanceExclusion = 'zero_or_unusual_intake'
   else if (input.quality.kind !== 'high_confidence') maintenanceExclusion = 'source_quality'
   return {
     state,
