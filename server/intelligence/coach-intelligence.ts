@@ -5,6 +5,7 @@ import {
   buildCoachFollowUpQuestion,
   buildCoachRecommendationDrafts,
   keepVisibleCoachDependencies,
+  keepCurrentCalorieDecisionDrafts,
   recommendationIsSuppressed,
   type CoachFollowUpQuestion,
   type CoachIntelligenceState,
@@ -19,6 +20,7 @@ import { addCalendarDays } from '../../src/domain/training-plan.js'
 import { getSql, type Sql } from '../db.js'
 import { HttpError } from '../http.js'
 import { loadGoalControlState } from './goal-control.js'
+import { isMaintenanceDecisionRevisionCurrent } from './maintenance-revision.js'
 
 type RecommendationRow = {
   id: string
@@ -250,8 +252,16 @@ export async function loadCoachIntelligenceState(asOf: string): Promise<CoachInt
   const visible = keepVisibleCoachDependencies(
     drafts.filter((draft) => !recommendationIsSuppressed(memory.get(draft.fingerprint), asOf)),
   )
+  // Recheck the exact revision immediately before surfacing numeric advice.
+  // This is optimistic read consistency; no automatic target writes occur.
+  const containsCalorieReview = visible.some((draft) =>
+    draft.kind === 'review_intake_adjustment' || draft.kind === 'review_activity_adjustment')
+  const currentRevision = containsCalorieReview
+    ? await isMaintenanceDecisionRevisionCurrent(asOf, control.maintenance?.decisionRevision)
+    : true
+  const currentDrafts = keepCurrentCalorieDecisionDrafts(visible, currentRevision)
   const surfaced: CoachRecommendationView[] = []
-  for (const draft of visible) {
+  for (const draft of currentDrafts) {
     const row = await surfaceDraft(sql, draft, asOf)
     surfaced.push(recommendationView(row, draft, asOf))
   }
