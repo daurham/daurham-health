@@ -68,7 +68,7 @@ describe('PIQ-1.1 baseline: demonstrate existing maintenance hazard and future e
     const data = series(600, -0.075)
     const exactlyTwo = new Set([addCalendarDays('2026-09-10', 0), addCalendarDays('2026-09-10', 1)])
     const decision = state(data, exactlyTwo)
-    expect(decision.estimate.quality.nutrition.observedDays).toBeLessThanOrEqual(2)
+    expect(decision.estimate.quality.nutrition.reliableDays).toBeLessThanOrEqual(2)
     expect(decision.estimate.state).toBe('insufficient_evidence')
   })
 
