@@ -55,7 +55,7 @@ function control(verified: ReadonlySet<string>, unavailable = false) {
   const maintenance = buildMaintenanceState({
     asOf: AS_OF, today: AS_OF, intelligence, contexts: [],
     eligibleNutritionDates: verified,
-    adjustmentContext: { status: 'available', currentCalorieTarget: 2500, activeExperimentCount: 0,
+    adjustmentContext: { status: 'available', currentCalorieTarget: 2300, activeExperimentCount: 0,
       revisionStatus: 'consistent', decisionRevision: 'test-current-revision',
       performance: { status: 'available', asOf: AS_OF, decliningExercises: [], competingGoals: [] },
       physiology: { status: 'available', asOf: AS_OF, ageYears: 31, heightCm: 178, activeOrUncertainConditionCount: 0 } },
