@@ -32,7 +32,7 @@ function build(input: {
     ...(verified ? { eligibleNutritionDates: verified } : {}),
     weightGoal: { goalId: 'weight', goalVersionId: 'v1', label: 'Weight', targetState: 'unmet', direction: input.ownerGoal ?? 'lose' },
     adjustmentContext: {
-      status: 'available', currentCalorieTarget: input.target ?? 2500, activeExperimentCount: 0,
+      status: 'available', currentCalorieTarget: input.target ?? 2300, activeExperimentCount: 0,
       revisionStatus: 'consistent', decisionRevision: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
       performance,
       physiology: { status: 'available', asOf: AS_OF, ageYears: 31, heightCm: 178, activeOrUncertainConditionCount: 0 },
