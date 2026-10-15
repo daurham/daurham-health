@@ -168,16 +168,43 @@ Registry/master alignment tests, four Ask Health service-level baseline tests, f
 
 Build **question-focused evidence relevance fixtures** for T01/T12/T18/T21 using real domain builders and synthetic source records. Score whether required evidence was eligible, selected, truncated or unavailable. Prefer pure deterministic evaluation. Do not modify prompts, increase routine Gemini usage or call private owner data without approval.
 
+## PIQ-0 checkpoint 5 — question-intent evidence relevance (validated)
+
+**Code commit:** `b44b6455cded0d319348043c7238b42841c001a9` · **CI:** [GitHub Actions 38678922849](https://github.com/daurham/daurham-health/actions/runs/38678922849) — passed installation, TypeScript, ESLint, full Vitest suite and production build.
+
+### Executable synthetic evidence-path cohort
+
+- New `tests/fixtures/piq/evidence-relevance.ts` implements a **test-only** requirement manifest. Each test explicitly proves its fixture's source and routing assumptions with existing domain functions, then classifies required evidence as `no_source_record`, `not_modelled`, `historically_ineligible`, `excluded_by_router`, `missing_from_builder`, `removed_by_packet_cap`, or `selected`. It counts mandatory facts, selected mandatory facts, and missing mandatory facts.
+- New `tests/piq0-intent-evidence.test.ts`: **six** executable tests for the T01/T12/T18/T21 cohort and classification edge cases. They use real Ask Health packet builder, shared snapshot/router and clinical-profile date gate with **fictional inputs**, never private owner data or Gemini calls.
+- **T01 known product gap remains:** a general education question has no mandatory owner evidence, yet the existing Ask Health gate still refuses when its packet lacks substantive owner facts. The regression fixing the answer belongs in PIQ-3.
+- **T12 partial retrieval / not-modelled fact:** bowel count, logged water, and fiber are routed, but recorded *stool consistency/Bristol type* is not represented in the shared-signal evidence model. In the synthetic manifest **3/4 mandatory facts selected**. A Bristol value supplied as fixture scenario context is **not** automatically a canonical DB fixture or a diagnosed condition.
+- **T18 safe historical limitation:** the current Health Profile medication list is intentionally omitted for an earlier as-of date; the system cannot infer historical medication status from today. The manifest calls this `historically_ineligible`; it is **not** license to silently reuse today's facts. Historical effective-date provenance must be implemented or the answer clearly scoped.
+- **T21 actual size-trim gap:** 16 synthetic profile medications with the last one relevant to the question, passed through the real packet builder at default vs restricted `maxChars=1700`. The last medication is available in the unrestricted packet and absent in the bounded packet. This proves material evidence may be discarded without intent-aware preservation.
+- **T21 appropriate router exclusion:** a sleep-only question routes out unrelated recorded hydration; the test classifies it but does not count it as a mandatory failure.
+- The helper distinguishes an actually unavailable source record from a selected-source builder omission; it **does not automatically determine relevance**, which remains the fixture author's explicit, reviewable assertion.
+
+### Scope / limitations
+
+- This is an **evidence-route and fixture acceptance baseline**, not proof Gemini answers are correct, evidence is clinically sufficient, or all 50 scenarios pass.
+- Previously validated PIQ-0 evidence-count diagnostics remain unchanged. The code added in this checkpoint is **test-only**.
+- No profile/medication history was fabricated, no schema or data writes were made, no provider calls occurred, and no production code was deployed.
+
+### Next bounded work
+
+Expand question-intent checks to distinguish a true **data-load failure** from a valid but empty source, add privacy-safe classification at the server evidence-load boundary and relevant evidence-revision/truncation cases. Then review PIQ-0 exit gates explicitly; production deployment and DB migration state remain unverified due to access scope.
+
+**Phase truth:** PIQ-0 **IN PROGRESS**; PIQ-1..PIQ-7 **NOT STARTED**; PIQ-8 **DEFERRED**. 0 / 9 phases owner accepted.
+
 ## Release state / constraints
 
 - Branch-only preparation: **no production deployments, database migrations, schema changes, AI API calls, or owner data writes performed by this PIQ work**.
 - The Vercel connector's project discovery succeeding does not imply deployment inspection permission.
 - A future phase may use read-only owner-authorized database/project access; never apply migrations merely to satisfy a baseline document.
-- Branch CI for latest implementation: **success** — Actions run `38678265999` on `90bcdde`, all standard checks passed. A subsequent progress-document commit is not itself proof of a new code validation.
+- Branch CI for latest implementation: **success** — Actions run `38678922849` on `b44b6455`, all standard checks passed. Documentation-only commits do not imply a new code validation.
 
 ## Continuation packet — NEXT SESSION
 
-**Task:** PIQ-0.2/0.3: build the next question-focused relevance fixture cohort (T01/T12/T18/T21), tracing eligibility, routing and truncation while preserving the current assistant behavior. Use only synthetic canonical inputs and keep the no-production policy.
+**Task:** PIQ-0.3: distinguish SQL/source-load errors from valid-but-empty evidence, add sanitized request-path classification across the retrieval boundary, and expand correction/recency/truncation evaluations. Continue synthetic-only testing and preserve no-production policy.
 
 **First steps:** Read master §§0–6 + PIQ-0 + §§17–21; inspect this file; verify current main/feature branch, production status, CI and schema. Try authorized Vercel project scope and Neon lookup only if access exists. Reconcile `CURRENT_TASK.md` drift once the verified production state is available. Confirm the baseline contract is still aligned with owner's purpose.
 
