@@ -8,6 +8,9 @@ import { getNutritionDayCompleteness, saveNutritionDayCompleteness } from '../se
 import { readMaintenanceDecisionSnapshot, isMaintenanceDecisionRevisionCurrent } from '../server/intelligence/maintenance-revision.js'
 import { dueFollowUps, requireCurrentCalorieRecommendation, surfaceDraft, writeCoachRecommendationResponse } from '../server/intelligence/coach-intelligence.js'
 import { randomUUID } from 'node:crypto'
+import { PERFORMED_STRENGTH_EXERCISES_SQL } from '../server/training/plan-service.js'
+import { buildTrainingWeekQualification, buildTrainingRoutineCredits, type PerformedExerciseEvidence } from '../src/domain/training-qualification.js'
+import { buildTrainingProgressSummary } from '../src/domain/training-progress-summary.js'
 
 /**
  * Only runs under CI's explicit PIQ_POSTGRES_URL. Uses its own isolated schema
@@ -23,6 +26,55 @@ const date = '2026-10-13'
 const today = '2026-10-14'
 const adapter = { query: async (text: string, params?: unknown[]) =>
   (await client.query(text, params)).rows } as unknown as Sql
+
+/** Fictional performed Training sessions in this isolated migration test DB.
+ * All inserted rows are transaction-rolled-back and never reach owner data.
+ */
+async function insertFictionalWorkout(input: {
+  workoutDate: string
+  sessionType: 'ad_hoc' | 'programmed' | 'experiment'
+  routineCode?: string
+  exercises: Array<{ externalId: string; setType?: 'working' | 'warmup' }>
+}): Promise<{ sessionId: string; exerciseRows: string[] }> {
+  const sessions = await client.query(
+    `INSERT INTO workout_sessions
+      (workout_date, session_type, routine_code, source_kind)
+     VALUES ($1::date, $2, $3, 'manual') RETURNING id::text AS id`,
+    [input.workoutDate, input.sessionType, input.routineCode ?? null],
+  )
+  const sessionId = String(sessions.rows[0].id)
+  const exerciseRows: string[] = []
+  for (const [index, exercise] of input.exercises.entries()) {
+    const definitions = await client.query(
+      'SELECT id::text AS id, name FROM exercise_definitions WHERE external_id = $1',
+      [exercise.externalId],
+    )
+    if (definitions.rows.length !== 1) throw new Error('Missing seeded exercise: ' + exercise.externalId)
+    const row = await client.query(
+      `INSERT INTO workout_session_exercises
+        (workout_session_id, exercise_definition_id, position, exercise_name)
+       VALUES ($1::uuid, $2::uuid, $3, $4) RETURNING id::text AS id`,
+      [sessionId, definitions.rows[0].id, index + 1, definitions.rows[0].name],
+    )
+    const exerciseRowId = String(row.rows[0].id)
+    exerciseRows.push(exerciseRowId)
+    await client.query(
+      `INSERT INTO workout_sets
+         (workout_session_exercise_id, set_number, set_type, load_state, reps)
+       VALUES ($1::uuid, 1, $2, 'bodyweight', 8)`,
+      [exerciseRowId, exercise.setType ?? 'working'],
+    )
+  }
+  return { sessionId, exerciseRows }
+}
+
+async function actualTrainingEvidence(asOf: string): Promise<PerformedExerciseEvidence[]> {
+  const rows = await adapter.query(PERFORMED_STRENGTH_EXERCISES_SQL, ['2026-10-12', asOf, null])
+    as Array<{ date: string; exercise_id: string; routine_code: string | null }>
+  return rows.map((row) => ({
+    date: row.date, exerciseId: row.exercise_id, routineCode: row.routine_code,
+  }))
+}
 
 function serializedConfirmation(row: Record<string, unknown>): BackupRow {
   const definition = backupTable('nutrition_day_completeness')
@@ -337,6 +389,119 @@ describe.skipIf(!url)('PIQ-1.1 full 0001–0053 migration-chain and backup on is
     }
     const restored = await readMaintenanceDecisionSnapshot(today, adapter)
     expect(restored.revision).toBe(before.revision)
+  })
+
+  it('PIQ-1.3: real performed-set SQL merges ad-hoc sessions into one calendar day and keeps routine credits separate', async () => {
+    await client.query('BEGIN')
+    try {
+      // Monday was recorded before this plan existed, so it must still count.
+      await insertFictionalWorkout({
+        workoutDate: '2026-10-12', sessionType: 'ad_hoc',
+        exercises: [{ externalId: 'EX01' }, { externalId: 'EX02' }],
+      })
+      const secondLog = await insertFictionalWorkout({
+        workoutDate: '2026-10-12', sessionType: 'ad_hoc',
+        exercises: [{ externalId: 'EX03' }, { externalId: 'EX04', setType: 'warmup' }],
+      })
+      // Both a complete A and a complete B can earn routine-rotation credit on
+      // Tuesday, but they only represent one additional weekly calendar day.
+      await insertFictionalWorkout({
+        workoutDate: '2026-10-13', sessionType: 'programmed', routineCode: 'A',
+        exercises: ['EX01', 'EX02', 'EX03'].map((externalId) => ({ externalId })),
+      })
+      await insertFictionalWorkout({
+        workoutDate: '2026-10-13', sessionType: 'programmed', routineCode: 'B',
+        exercises: ['EX04', 'EX05', 'EX06'].map((externalId) => ({ externalId })),
+      })
+      await insertFictionalWorkout({
+        workoutDate: '2026-10-16', sessionType: 'ad_hoc',
+        exercises: ['EX01', 'EX02', 'EX03'].map((externalId) => ({ externalId })),
+      })
+      // Midweek plan creation is independent of performed calendar-day evidence.
+      const planRows = await client.query(
+        `INSERT INTO training_plan_versions
+          (version, effective_from, weekly_frequency_target,
+           sequence_start_routine_code, default_non_training_intent)
+         VALUES (1, '2026-10-14', 3, 'A', 'flexible') RETURNING id`,
+      )
+      await client.query(
+        `INSERT INTO training_plan_sequence_items (plan_version_id, position, routine_code)
+         VALUES ($1::uuid, 1, 'A'), ($1::uuid, 2, 'B')`,
+        [planRows.rows[0].id],
+      )
+      const actual = await actualTrainingEvidence('2026-10-15')
+      const week = buildTrainingWeekQualification(actual, '2026-10-15')
+      expect(week.completedDays).toBe(2)
+      expect(week.days[0]).toMatchObject({
+        date: '2026-10-12', qualifies: true, distinctExerciseCount: 3,
+      })
+      expect(week.days[1]).toMatchObject({
+        date: '2026-10-13', qualifies: true, distinctExerciseCount: 6,
+        routineExerciseCounts: { A: 3, B: 3 },
+      })
+      expect(week.days[4]).toMatchObject({
+        date: '2026-10-16', qualifies: false, distinctExerciseCount: 0,
+      })
+      expect(buildTrainingRoutineCredits(actual).map((item) => item.routineCode)).toEqual(['A', 'B'])
+      const summary = buildTrainingProgressSummary({
+        configured: true, completedProgrammedSessions: 2,
+        qualifiedTrainingDays: week.completedDays, todayQualified: false,
+        weeklyFrequencyTarget: 3, todayIntent: 'flexible',
+        todayRoutineName: 'Routine A', futureTrainingDates: ['2026-10-16'],
+      })
+      expect(summary.remainingQualifiedDays).toBe(1)
+      expect(summary.completedProgrammedSessions).toBe(2)
+      // Removing a performed set retroactively removes the Monday day credit,
+      // without deleting either workout session row or changing routine credits.
+      await client.query(
+        'DELETE FROM workout_sets WHERE workout_session_exercise_id = $1::uuid',
+        [secondLog.exerciseRows[0]],
+      )
+      const recalculated = await actualTrainingEvidence('2026-10-15')
+      expect(buildTrainingWeekQualification(recalculated, '2026-10-15').completedDays).toBe(1)
+      expect(buildTrainingRoutineCredits(recalculated).map((item) => item.routineCode)).toEqual(['A', 'B'])
+      expect((await client.query(`SELECT count(*)::int AS count FROM workout_sessions
+        WHERE workout_date BETWEEN '2026-10-12' AND '2026-10-15'`)).rows[0].count).toBe(4)
+    } finally {
+      await client.query('ROLLBACK')
+    }
+  })
+
+  it('PIQ-1.3: actual SQL filters warmup-only, unperformed and future rows for historical as-of', async () => {
+    await client.query('BEGIN')
+    try {
+      await insertFictionalWorkout({
+        workoutDate: '2026-10-12', sessionType: 'programmed', routineCode: 'A',
+        exercises: [
+          { externalId: 'EX01', setType: 'warmup' },
+          { externalId: 'EX02', setType: 'warmup' },
+          { externalId: 'EX03', setType: 'warmup' },
+        ],
+      })
+      const session = await insertFictionalWorkout({
+        workoutDate: '2026-10-14', sessionType: 'ad_hoc',
+        exercises: ['EX01', 'EX02', 'EX03'].map((externalId) => ({ externalId })),
+      })
+      await insertFictionalWorkout({
+        workoutDate: '2026-10-16', sessionType: 'programmed', routineCode: 'B',
+        exercises: ['EX04', 'EX05', 'EX06'].map((externalId) => ({ externalId })),
+      })
+      const monday = buildTrainingWeekQualification(await actualTrainingEvidence('2026-10-12'), '2026-10-12')
+      expect(monday.completedDays).toBe(0)
+      const wednesday = buildTrainingWeekQualification(await actualTrainingEvidence('2026-10-14'), '2026-10-14')
+      expect(wednesday.completedDays).toBe(1)
+      expect(wednesday.days[2]).toMatchObject({ date: '2026-10-14', qualifies: true })
+      // Remove a working set; two remaining exercises are not a strength day.
+      await client.query(
+        'DELETE FROM workout_sets WHERE workout_session_exercise_id = $1::uuid',
+        [session.exerciseRows[2]],
+      )
+      expect(buildTrainingWeekQualification(await actualTrainingEvidence('2026-10-14'), '2026-10-14')
+        .completedDays).toBe(0)
+      expect(buildTrainingRoutineCredits(await actualTrainingEvidence('2026-10-14'))).toEqual([])
+    } finally {
+      await client.query('ROLLBACK')
+    }
   })
 
 })
