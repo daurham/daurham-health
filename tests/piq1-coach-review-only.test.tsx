@@ -34,8 +34,8 @@ describe('PIQ-1.5 viewing advice is not an intervention', () => {
       <MemoryRouter><CoachIntelligencePanel state={state} pending={false}
         onResponse={() => undefined} onOutcome={() => undefined} /></MemoryRouter>,
     )
-    expect(html).toContain('href="/training">Review training</a>')
-    expect(html).toContain('href="/nutrition">Add context</a>')
+    expect(html).toMatch(/href="\/training"[^>]*>Review training<\/a>/)
+    expect(html).toMatch(/href="\/nutrition"[^>]*>Add context<\/a>/)
     expect(html).toContain('I started this</button>')
     expect((html.match(/I started this<\/button>/g) ?? [])).toHaveLength(1)
     expect(html).toContain('Reviewing is not acceptance')
