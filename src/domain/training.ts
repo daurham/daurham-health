@@ -472,6 +472,7 @@ export const workoutSessionRowSchema = z.object({
   metadata: jsonRecordSchema,
   created_at: timestamptzSchema,
   updated_at: timestamptzSchema,
+  edit_revision: z.string().regex(/^[0-9]{1,10}$/).optional(),
 })
 
 export type WorkoutSessionRow = z.infer<typeof workoutSessionRowSchema>
