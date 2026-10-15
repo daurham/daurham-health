@@ -286,8 +286,10 @@ describe('ask health evidence', () => {
 
     expect(packet.evidence.find((item) => item.id === 'body.body_fat_percentage.latest')?.value).toBe(21)
     expect(packet.evidence.find((item) => item.id === 'body.body_fat_percentage.change')?.value).toBe(1)
-    expect(packet.evidence.find((item) => item.id === 'nutrition.calories_vs_target')?.value).toBe(-150)
-    expect(packet.evidence.find((item) => item.id === 'nutrition.calories_vs_target')?.text).toContain('does not measure total energy expenditure')
+    // Two precisely logged meals are not two verified complete days.
+    expect(packet.evidence.find((item) => item.id === 'nutrition.calories_vs_target')).toBeUndefined()
+    expect(packet.evidence.find((item) => item.id === 'nutrition.calories_target_ineligible')?.text)
+      .toContain('Whole-day confirmation cannot currently be verified')
     expect(packet.evidence.find((item) => item.id === 'training.sessions')?.value).toBe(4)
     expect(packet.evidence.find((item) => item.id === 'training.frequency')?.value).toBeCloseTo(4 * 7 / 30)
     expect(ASK_HEALTH_SYSTEM_PROMPT).toContain('cross-domain')
