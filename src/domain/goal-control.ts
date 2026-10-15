@@ -334,12 +334,33 @@ function activeGoalSignalKeys(goals: readonly WeeklyGoalSnapshot[]): Set<Intelli
  * silently treating invalid dates as a measured gap. No inference of
  * independence, significance or effective sample size is made here.
  */
+/** A real source date, not just a yyyy-mm-dd-shaped value. */
+function isCalendarDate(date: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(date) && addCalendarDays(date, 0) === date
+}
+
+/** Compare only descriptive signed coefficients; zero and insufficient
+ * adjacent-day evidence have no defensible direction. No significance claim.
+ */
+export function relationshipDirectionContrast(
+  overallRho: number | null,
+  sensitivity: { adjacentTransitions: number; rho: number | null } | null,
+): 'opposite_signs' | 'same_signs' | 'unavailable' {
+  const adjacentRho = sensitivity?.rho
+  if (overallRho == null || adjacentRho == null ||
+      !Number.isFinite(overallRho) || !Number.isFinite(adjacentRho) ||
+      Math.abs(overallRho) > 1 || Math.abs(adjacentRho) > 1 ||
+      overallRho === 0 || adjacentRho === 0 || (sensitivity?.adjacentTransitions ?? 0) < 6) {
+    return 'unavailable'
+  }
+  return Math.sign(overallRho) === Math.sign(adjacentRho) ? 'same_signs' : 'opposite_signs'
+}
+
 export function relationshipDateClustering(
   dates: readonly { xDate: string; yDate: string }[],
 ): { distinctDates: number; contiguousRuns: number; longestRunDays: number } | null {
   if (!dates.length || dates.some((item) =>
-    !/^\d{4}-\d{2}-\d{2}$/.test(item.xDate) ||
-    !/^\d{4}-\d{2}-\d{2}$/.test(item.yDate))) return null
+    !isCalendarDate(item.xDate) || !isCalendarDate(item.yDate))) return null
   const uniqueDates = [...new Set(dates.map((item) => item.xDate))].sort()
   let runs = 0
   let currentRun = 0

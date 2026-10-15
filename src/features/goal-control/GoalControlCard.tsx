@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import type { GoalControlState } from '@/domain/goal-control'
+import { relationshipDirectionContrast, type GoalControlState } from '@/domain/goal-control'
 import { progressionSeriesForOpportunity } from '@/domain/training-progression'
 import { quietButtonClass } from '@/lib'
 import { prefixedPath, useAppPathPrefix } from '@/lib/app-prefix'
@@ -9,6 +9,21 @@ function spearmanLabel(rho: number | null): string {
   if (rho == null || !Number.isFinite(rho) || Math.abs(rho) > 1) return 'unavailable'
   const rounded = Math.round(rho * 100) / 100
   return (rounded > 0 ? '+' : '') + rounded.toFixed(2)
+}
+
+/** Descriptive sign comparison, never a statistical hypothesis test. */
+function relationshipContrastText(
+  raw: number | null,
+  change: { adjacentTransitions: number; rho: number | null } | null,
+): string {
+  const contrast = relationshipDirectionContrast(raw, change)
+  if (contrast === 'opposite_signs') {
+    return 'opposite signed directions: the recorded adjacent-day pattern runs against the overall association'
+  }
+  if (contrast === 'same_signs') {
+    return 'matching signed directions in the overall and adjacent-day associations'
+  }
+  return 'unavailable because one coefficient, its direction, or sufficient consecutive-day evidence is missing'
 }
 
 export function GoalControlCard({
@@ -160,6 +175,13 @@ export function GoalControlCard({
                       Fewer than six eligible transitions or no variation leaves the coefficient unavailable.
                       This is a descriptive sensitivity check, not a test of significance,
                       removal of time trends or autocorrelation, proof of independence, or a causal effect.
+                    </p>
+                    <p className="mt-1">
+                      Direction comparison: {relationshipContrastText(
+                        item.evidence.rho, item.evidence.changeSensitivity,
+                      )}.
+                      Signs can flip near zero or with noisy or missing records; agreement or disagreement
+                      does not validate an effect or justify changing a health target.
                     </p>
                     <p className="mt-1">Source observation window: {item.evidence.sourceWindow.start} to {item.evidence.sourceWindow.end}.
                       {' '}Matched dates: {item.evidence.pairedWindow

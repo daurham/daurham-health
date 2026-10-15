@@ -723,3 +723,8 @@ Keep the existing observed relationship selection, original Spearman coefficient
 ## Decision: disclose correlation-screening selection, do not imply confirmation (PIQ-1.6, 2026-10-15)
 
 Present each Goal Overview observational shortlist alongside its actual candidate-definition count, existing data/display qualification count, active-goal relevance count and displayed count. A selected relationship chosen from multiple registered pairs is not independently replicated or statistically significant merely because its sample count or rho is high. Make the actual selection rule clear (matched-pair grade/sample size, not maximizing rho). Do not add p-values, autocorrelation adjustments, revised thresholds or interpretation beyond observed provenance without a separately reviewed statistical plan. No canonical, owner, or production data changes.
+
+
+## Decision: observational sign reversals deserve explicit caution, not action (PIQ-1.6, 2026-10-15)
+
+Keep the original rank association and adjacent-day first-difference correlation separate, without modifying screening or decisions. When both coefficients have an actual nonzero finite sign and there are at least six measured consecutive changes, label whether their **signs** match or oppose. No sign claim for zero, invalid, unavailable or undersampled data. Sign differences can result from shared trends, noise or selection and do not demonstrate causation, effect size reliability, statistical significance or a reason to change a target. Reject impossible calendar dates when grouping matched daily observations. No new schema or automatic owner behavior.

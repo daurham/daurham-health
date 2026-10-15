@@ -1255,3 +1255,16 @@ HAVING COUNT(*) > 1;
 **Tests:** The 10-definition fictional snapshot with one qualifying goal-relevant relationship reports 10/1/1/1. A synthetic five-qualified/four-goal-relevant case displays three and discloses 10/5/4/3, while existing weak/evidence-insufficient relationship tests remain guarded. No migrations, AI/Gemini/provider calls, owner-record modifications, production deployment or merge to `main`.
 
 **Remaining:** Proper pre-reviewed statistical multiple-comparison uncertainty design, autocorrelation and trend controls, confounder-aware modeling and independent validation; source freshness and owner-mobile QA. Migration `0054` remains unapplied and requires separate owner-approved production preflight.
+
+
+## PIQ-1.6 — Descriptive direction contrast and impossible-date guard (2026-10-15)
+
+**State:** Work-branch change requiring full CI and authenticated owner mobile acceptance. **0/9 PIQ phases owner-accepted.**
+
+**Interpretation gap:** The existing Goal Overview evidence details displayed the original Spearman rank coefficient beside its descriptive consecutive-day first-difference coefficient. When an apparently strong overall association reverses sign day-to-day, the owner had to infer that discrepancy from the two numbers; the product did not explicitly warn about it. Meanwhile matched-date clustering accepted a syntactically shaped but impossible date such as February 30.
+
+**Bounded contract:** Add a *display-only direction comparison* for already-selected observed relationships. Valid, finite, nonzero Spearman coefficients within [-1, 1] with at least six existing eligible day-to-day transitions are labeled as **opposite signed directions** or **matching signed directions**. Zero, null, out-of-range and sparse comparisons are unavailable—not a claim of no relationship. The panel explicitly warns that near-zero signs are unstable, opposite/same signs do not establish significance or causal effect, and neither justifies changing a health target. Date clustering now validates actual calendar dates before calculating its consecutive-day runs. No new correlation, evidence thresholds, ranking, clinical inference, automatic action, provider/Gemini calls, DB migration or owner record mutation.
+
+**Verification:** Pure cases for reversed/matching/null/zero/out-of-range/too-few comparisons; UI SSR for the opposite-sign warning and unavailable fallback; calendar cases for impossible February dates and valid month-boundary runs. Existing observational, provenance, sampling and selection-bias tests remain in force.
+
+**Remaining:** Formal trend/autocorrelation uncertainty and multiple comparisons require separately reviewed statistical design; canonical event-level freshness, owner real-data/device review and the 0054 production migration remain release gates. Work branch only; do not merge to `main` without approval.

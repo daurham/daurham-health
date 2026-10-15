@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { addCalendarDays } from '../src/domain/training-plan.js'
 import { buildHealthIntelligenceSnapshot, type IntelligenceObservation, type IntelligenceFrameDay } from '../src/domain/intelligence/shared.js'
 import { spearmanRho } from '../src/domain/intelligence/spearman.js'
-import { buildGoalControlState, relationshipDateClustering, relationshipDayToDaySensitivity, type GoalControlState } from '../src/domain/goal-control.js'
+import { buildGoalControlState, relationshipDateClustering, relationshipDayToDaySensitivity, relationshipDirectionContrast, type GoalControlState } from '../src/domain/goal-control.js'
 import type { WeeklyCoachBrief, WeeklyGoalSnapshot } from '../src/domain/weekly-coach/types.js'
 import { GoalControlCard } from '../src/features/goal-control/GoalControlCard.js'
 
@@ -254,6 +254,51 @@ describe('PIQ-1.6 paired relationship evidence is observational', () => {
     expect(relationshipDayToDaySensitivity(frame, {
       ...source, lagDays: 1, evidenceDates: shifted,
     })).toMatchObject({ adjacentTransitions: 10 })
+  })
+
+  it('labels descriptive direction reversals without confusing signs with significance or an actionable health change', () => {
+    const base = buildGoalControlState({ asOf, ...inputs(16) })
+    const apply = (overall: number | null, change: number | null, transitions = 12): GoalControlState => ({
+      ...base,
+      relationships: base.relationships.map((item) => ({
+        ...item,
+        evidence: item.evidence ? {
+          ...item.evidence, rho: overall,
+          changeSensitivity: { adjacentTransitions: transitions, rho: change },
+        } : undefined,
+      })),
+    })
+    expect(relationshipDirectionContrast(0.94, { adjacentTransitions: 12, rho: -0.78 }))
+      .toBe('opposite_signs')
+    expect(relationshipDirectionContrast(-0.8, { adjacentTransitions: 12, rho: -0.3 }))
+      .toBe('same_signs')
+    for (const [overall, change, n] of [
+      [null, 0.6, 10], [0.7, null, 10], [0, 0.9, 12], [0.5, 0, 12],
+      [1.4, -0.5, 12], [0.5, -1.2, 12], [0.5, -0.8, 5],
+    ] as Array<[number | null, number | null, number]>) {
+      expect(relationshipDirectionContrast(overall, { adjacentTransitions: n, rho: change }))
+        .toBe('unavailable')
+    }
+    const opposite = render(apply(0.94, -0.78))
+    expect(opposite).toContain('Direction comparison: opposite signed directions')
+    expect(opposite).toContain('adjacent-day pattern runs against the overall association')
+    expect(opposite).toContain('does not validate an effect or justify changing a health target')
+    expect(render(apply(-0.8, -0.3))).toContain('matching signed directions')
+    expect(render(apply(0.94, null))).toContain('Direction comparison: unavailable')
+    expect(render(apply(0.94, -0.78, 5))).toContain('Direction comparison: unavailable')
+  })
+
+  it('refuses impossible calendar dates in relationship clustering rather than counting invented tracked days', () => {
+    expect(relationshipDateClustering([
+      { xDate: '2026-02-30', yDate: '2026-03-02' },
+    ])).toBeNull()
+    expect(relationshipDateClustering([
+      { xDate: '2026-02-28', yDate: '2026-02-31' },
+    ])).toBeNull()
+    expect(relationshipDateClustering([
+      { xDate: '2026-02-28', yDate: '2026-02-28' },
+      { xDate: '2026-03-01', yDate: '2026-03-01' },
+    ])).toEqual({ distinctDates: 2, contiguousRuns: 1, longestRunDays: 2 })
   })
 
   it('reports unavailable provenance as unavailable, never invented zero-coverage evidence', () => {
