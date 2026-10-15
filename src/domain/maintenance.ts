@@ -321,8 +321,8 @@ function confidenceFor(evidence: WindowEvidence): IntelligenceConfidence {
     evidence.weightSpanDays >= 18 &&
     usualShare >= 0.7 &&
     evidence.leastNutritionDaysPerWeek >= 4 &&
-    evidence.firstLastGapDays.first != null && evidence.firstLastGapDays.first <= 2 &&
-    evidence.firstLastGapDays.last != null && evidence.firstLastGapDays.last <= 2
+    evidence.firstLastGapDays.first != null && evidence.firstLastGapDays.first <= 1 &&
+    evidence.firstLastGapDays.last != null && evidence.firstLastGapDays.last <= 1
   ) return 'high'
   if (
     calorieCoverage >= 0.65 &&
