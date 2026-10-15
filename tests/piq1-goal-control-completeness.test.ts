@@ -81,14 +81,14 @@ describe('PIQ-1.2 Goal Control and Coach day-completeness gate', () => {
     expect(buildCoachRecommendationDrafts(goalControl).some((item) => item.kind === 'review_intake_adjustment')).toBe(false)
   })
 
-  it('T03: verified older history cannot justify an intake cut after an unverified recent week', () => {
-    const { maintenance, goalControl } = control(new Set(prior21))
-    // Enough verified older intake and comparable weight to produce a
+  it('T03: verified history cannot justify an intake cut with only three recent complete days', () => {
+    const { maintenance, goalControl } = control(new Set([...prior21, ...latest7.slice(0, 3)]))
+    // Enough spread-out historical intake and comparable weight to produce a
     // plausible empirical estimate and a plateau, despite a missing recent week.
     expect(maintenance.estimate.state).toBe('available')
     expect(maintenance.plateau.state).toBe('plateau_likely')
     expect(maintenance.interventions.some((item) => item.kind === 'review_intake_adjustment')).toBe(true)
-    expect(goalControl.nutritionQuality).toMatchObject({ loggedDays: 7, reliableDays: 0, state: 'limited' })
+    expect(goalControl.nutritionQuality).toMatchObject({ loggedDays: 7, reliableDays: 3, state: 'limited' })
     expect(goalControl.primaryOpportunity?.kind).not.toBe('review_intake_adjustment')
     const drafts = buildCoachRecommendationDrafts(goalControl)
     expect(drafts.some((item) => item.kind === 'review_intake_adjustment')).toBe(false)
@@ -137,7 +137,7 @@ describe('PIQ-1.2 Goal Control and Coach day-completeness gate', () => {
   })
 
   it('Coach still gates a stale direct calorie-action card even if Goal Control was bypassed', () => {
-    const { goalControl, maintenance } = control(new Set(prior21))
+    const { goalControl, maintenance } = control(new Set([...prior21, ...latest7.slice(0, 3)]))
     const stale = {
       ...goalControl, state: 'act' as const,
       primaryOpportunity: {
