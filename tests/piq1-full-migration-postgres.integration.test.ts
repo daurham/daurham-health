@@ -260,7 +260,11 @@ describe.skipIf(!url)('PIQ-1.1 full 0001–0053 migration-chain and backup on is
           domain: 'nutrition', title: draft.title, detail: draft.detail,
           actionText: 'Review', detailPath: '/nutrition', evidenceRefs: [],
         },
-        maintenance: { decisionRevision: revision, interventions: [] },
+        maintenance: {
+          decisionRevision: revision,
+          calorieAdjustmentSafety: { status: 'review_possible' },
+          interventions: [{ id: 'maintenance:review-intake', kind: 'review_intake_adjustment' }],
+        },
         trainingAdherence: { state: 'on_track' },
         limitations: [],
       }) as unknown as NonNullable<Parameters<typeof requireCurrentCalorieRecommendation>[2]>
