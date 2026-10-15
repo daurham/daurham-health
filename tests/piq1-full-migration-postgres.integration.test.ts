@@ -6,7 +6,7 @@ import { LATEST_SCHEMA_MIGRATION, backupTable } from '../server/backup/inventory
 import { buildBackupArchive, restoreStatements, verifyBackupArchive, planRestore, type BackupRow } from '../server/backup/format.js'
 import { getNutritionDayCompleteness, saveNutritionDayCompleteness } from '../server/nutrition/day-completeness.js'
 import { readMaintenanceDecisionSnapshot, isMaintenanceDecisionRevisionCurrent } from '../server/intelligence/maintenance-revision.js'
-import { dueFollowUps, requireCurrentCalorieRecommendation, surfaceDraft } from '../server/intelligence/coach-intelligence.js'
+import { dueFollowUps, requireCurrentCalorieRecommendation, surfaceDraft, writeCoachRecommendationResponse } from '../server/intelligence/coach-intelligence.js'
 import { randomUUID } from 'node:crypto'
 
 /**
@@ -273,18 +273,25 @@ describe.skipIf(!url)('PIQ-1.1 full 0001–0053 migration-chain and backup on is
       )
       const updated = await readMaintenanceDecisionSnapshot(today, adapter)
       expect(updated.revision).not.toBe(initial.revision)
-      await expect(requireCurrentCalorieRecommendation(saved, today, makeControl(initial.revision), checkRevision))
-        .rejects.toThrow('no longer current')
+      await expect(writeCoachRecommendationResponse(
+        adapter, saved.id, 'do_this', today,
+        (persisted) => requireCurrentCalorieRecommendation(persisted, today, makeControl(initial.revision), checkRevision),
+      )).rejects.toThrow('no longer current')
       await expect(requireCurrentCalorieRecommendation(saved, today, makeControl(updated.revision!), checkRevision))
         .rejects.toThrow('no longer current')
-      const legacy = { ...saved, metadata: {} }
-      await expect(requireCurrentCalorieRecommendation(legacy, today, makeControl(updated.revision!), checkRevision))
-        .rejects.toThrow('no longer current')
+      await client.query(
+        `UPDATE coach_recommendations SET metadata = '{}'::jsonb WHERE id = $1::uuid`,
+        [saved.id],
+      )
+      await expect(writeCoachRecommendationResponse(
+        adapter, saved.id, 'do_this', today,
+        (persisted) => requireCurrentCalorieRecommendation(persisted, today, makeControl(updated.revision!), checkRevision),
+      )).rejects.toThrow('no longer current')
       const historic = await client.query(
         'SELECT response_state, outcome_state, metadata FROM coach_recommendations WHERE id = $1::uuid', [saved.id],
       )
       expect(historic.rows).toHaveLength(1)
-      expect(historic.rows[0].metadata.decisionRevision).toBe(initial.revision)
+      expect(historic.rows[0].metadata).toEqual({})
       expect(historic.rows[0].response_state).toBeNull()
     } finally {
       await client.query('ROLLBACK')
