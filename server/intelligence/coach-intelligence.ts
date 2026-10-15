@@ -6,6 +6,8 @@ import {
   buildCoachRecommendationDrafts,
   keepVisibleCoachDependencies,
   keepCurrentCalorieDecisionDrafts,
+  isCalorieDecisionKind,
+  storedCoachRecommendationIsCurrent,
   recommendationIsSuppressed,
   type CoachFollowUpQuestion,
   type CoachIntelligenceState,
@@ -89,7 +91,7 @@ async function rowsForFingerprints(sql: Sql, fingerprints: readonly string[]): P
   )) as RecommendationRow[]
 }
 
-async function surfaceDraft(sql: Sql, draft: CoachRecommendationDraft, asOf: string): Promise<RecommendationRow> {
+async function surfaceDraft(sql: Sql, draft: CoachRecommendationDraft, asOf: string, decisionRevision: string | null): Promise<RecommendationRow> {
   const rows = (await sql.query(
     `INSERT INTO coach_recommendations (
        id, fingerprint, recommendation_kind, domain, title, detail, action_text, detail_path,
@@ -122,7 +124,8 @@ async function surfaceDraft(sql: Sql, draft: CoachRecommendationDraft, asOf: str
       draft.confidence,
       JSON.stringify(draft.evidenceRefs),
       asOf,
-      JSON.stringify({ sourceId: draft.sourceId, experimentEligible: draft.experimentEligible }),
+      JSON.stringify({ sourceId: draft.sourceId, experimentEligible: draft.experimentEligible,
+        ...(isCalorieDecisionKind(draft.kind) ? { decisionRevision: decisionRevision ?? null } : {}) }),
     ],
   )) as RecommendationRow[]
   const row = rows[0]
@@ -189,7 +192,7 @@ function recommendationView(row: RecommendationRow, draft: CoachRecommendationDr
   }
 }
 
-async function dueFollowUps(sql: Sql, asOf: string): Promise<CoachRecommendationFollowUp[]> {
+async function dueFollowUps(sql: Sql, asOf: string): Promise<RecommendationRow[]> {
   const rows = (await sql.query(
     `SELECT ${ROW_COLUMNS}
        FROM coach_recommendations
@@ -198,19 +201,10 @@ async function dueFollowUps(sql: Sql, asOf: string): Promise<CoachRecommendation
         AND follow_up_on IS NOT NULL
         AND follow_up_on <= $1::date
       ORDER BY follow_up_on, response_at, id
-      LIMIT 3`,
+      LIMIT 24`,
     [asOf],
   )) as RecommendationRow[]
-  return rows.map((row) => ({
-    id: row.id,
-    title: row.title,
-    detail: row.detail,
-    detailPath: row.detail_path,
-    acceptedOn: row.response_at == null
-      ? null
-      : (row.response_at instanceof Date ? row.response_at.toISOString() : new Date(row.response_at).toISOString()),
-    followUpOn: row.follow_up_on!,
-  }))
+  return rows
 }
 
 async function recentQuestion(sql: Sql, asOf: string): Promise<RecommendationRow | null> {
@@ -262,7 +256,7 @@ export async function loadCoachIntelligenceState(asOf: string): Promise<CoachInt
   const currentDrafts = keepCurrentCalorieDecisionDrafts(visible, currentRevision)
   const surfaced: CoachRecommendationView[] = []
   for (const draft of currentDrafts) {
-    const row = await surfaceDraft(sql, draft, asOf)
+    const row = await surfaceDraft(sql, draft, asOf, control.maintenance?.decisionRevision ?? null)
     surfaced.push(recommendationView(row, draft, asOf))
   }
 
@@ -281,22 +275,47 @@ export async function loadCoachIntelligenceState(asOf: string): Promise<CoachInt
     }
   }
 
-  const followUps = await dueFollowUps(sql, asOf)
+  const dueRows = await dueFollowUps(sql, asOf)
+  const validFingerprints = new Set(drafts.map((draft) => draft.fingerprint))
+  const dueHasCalorieAdvice = dueRows.some((row) => isCalorieDecisionKind(row.recommendation_kind))
+  // Previously accepted rows are not in the visible drafts (owner response
+  // memory suppresses them), so they need independent live qualification.
+  const acceptedRevisionCurrent = dueHasCalorieAdvice
+    ? await isMaintenanceDecisionRevisionCurrent(asOf, control.maintenance?.decisionRevision)
+    : true
+  const followUps: CoachRecommendationFollowUp[] = dueRows
+    .filter((row) => !isCalorieDecisionKind(row.recommendation_kind) || (
+      acceptedRevisionCurrent && storedCoachRecommendationIsCurrent(
+        row, validFingerprints, control.maintenance?.decisionRevision)))
+    .slice(0, 3)
+    .map((row) => ({
+      id: row.id, title: row.title, detail: row.detail, detailPath: row.detail_path,
+      acceptedOn: row.response_at == null
+        ? null
+        : (row.response_at instanceof Date ? row.response_at.toISOString() : new Date(row.response_at).toISOString()),
+      followUpOn: row.follow_up_on!,
+    }))
+  const staleAdviceWithheld = containsCalorieReview && !currentRevision
+  const effectiveState = staleAdviceWithheld && surfaced.length === 0 && control.state === 'act'
+    ? 'insufficient_evidence' as const : control.state
   const headline =
-    control.state === 'act'
+    staleAdviceWithheld && surfaced.length === 0 ? 'Review updated goals before changing calories'
+    : effectiveState === 'act'
       ? surfaced.length > 0 ? 'A few things are worth your attention' : 'Your current recommendation is already handled'
-      : control.state === 'maintain'
+      : effectiveState === 'maintain'
         ? 'Stay the course'
         : surfaced.length > 0 ? 'Improve the evidence before changing course' : 'More evidence before changing course'
   const summary =
-    control.state === 'maintain'
+    staleAdviceWithheld && surfaced.length === 0
+      ? 'A calorie-adjustment recommendation was withheld because its settings revision changed or could not be verified. Review current goals and intake before changing course.'
+    : effectiveState === 'maintain'
       ? 'No change recommended. Current evidence does not justify adding work or changing targets.'
       : surfaced[0]?.detail ?? control.summary
 
   return {
     version: COACH_INTELLIGENCE_VERSION,
     asOf,
-    state: control.state,
+    state: effectiveState,
     headline,
     summary,
     noChangeRecommended: control.noChangeRecommended,
@@ -320,6 +339,19 @@ async function recommendationById(sql: Sql, id: string): Promise<RecommendationR
   return row
 }
 
+/** No stale or legacy numerical calorie advice may be accepted via a saved ID.
+ * The full current quality/safety decision must still yield the same draft.
+ */
+async function requireCurrentCalorieRecommendation(row: RecommendationRow, asOf: string): Promise<void> {
+  if (!isCalorieDecisionKind(row.recommendation_kind)) return
+  const control = await loadGoalControlState(asOf)
+  const eligible = new Set(buildCoachRecommendationDrafts(control).map((draft) => draft.fingerprint))
+  if (!storedCoachRecommendationIsCurrent(row, eligible, control.maintenance?.decisionRevision) ||
+      !await isMaintenanceDecisionRevisionCurrent(asOf, control.maintenance?.decisionRevision)) {
+    throw new HttpError(409, 'This calorie recommendation is no longer current. Reopen Coach and review the latest goals and evidence.')
+  }
+}
+
 export async function respondCoachRecommendation(
   id: string,
   response: CoachRecommendationResponse,
@@ -330,6 +362,7 @@ export async function respondCoachRecommendation(
   if (row.recommendation_kind === 'follow_up_question') {
     throw new HttpError(409, 'Follow-up questions do not use recommendation response states')
   }
+  await requireCurrentCalorieRecommendation(row, asOf)
   const suppressUntil = response === 'not_now' ? addCalendarDays(asOf, 7) : null
   const followUpOn = response === 'do_this' ? addCalendarDays(asOf, 7) : null
   await sql.query(
