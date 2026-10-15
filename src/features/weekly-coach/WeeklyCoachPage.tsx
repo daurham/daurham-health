@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { GoalControlState } from '@/domain/goal-control'
 import { labExperimentHandoffPath } from '@/domain/lab-handoff'
@@ -11,6 +11,7 @@ import {
 } from '@/domain/weekly-coach'
 import { healthFetch, quietButtonClass, readApiError } from '@/lib'
 import { prefixedPath, useAppPathPrefix, useDemoReadOnly } from '@/lib/app-prefix'
+import { subscribeHealthDataChanges } from '@/lib/health-changes'
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
@@ -301,40 +302,57 @@ export function WeeklyCoachPage() {
   const [payload, setPayload] = useState<WeeklyCoachResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [generating, setGenerating] = useState(false)
+  const requestGeneration = useRef(0)
 
   useEffect(() => {
-    const controller = new AbortController()
-    healthFetch('/api/progress/weekly', { signal: controller.signal })
-      .then(async (response) => {
-        if (!response.ok) {
-          throw new Error(await readApiError(response))
-        }
-        return (await response.json()) as WeeklyCoachResponse
-      })
-      .then((body) => {
-        if (!controller.signal.aborted) {
-          setPayload(body)
-        }
-      })
-      .catch((caught: unknown) => {
-        if (!controller.signal.aborted) {
-          setError(caught instanceof Error ? caught.message : 'Weekly Coach is unavailable right now.')
-        }
-      })
-    return () => controller.abort()
+    let active = true
+    let controller: AbortController | null = null
+    const refresh = () => {
+      const request = ++requestGeneration.current
+      controller?.abort()
+      const current = new AbortController()
+      controller = current
+      void healthFetch('/api/progress/weekly', { signal: current.signal })
+        .then(async (response) => {
+          if (!response.ok) throw new Error(await readApiError(response))
+          return (await response.json()) as WeeklyCoachResponse
+        })
+        .then((body) => {
+          if (active && !current.signal.aborted && request === requestGeneration.current) {
+            setPayload(body)
+            setError(null)
+          }
+        })
+        .catch((caught: unknown) => {
+          if (active && !current.signal.aborted && request === requestGeneration.current) {
+            setError(caught instanceof Error ? caught.message : 'Weekly Coach is unavailable right now.')
+          }
+        })
+    }
+    refresh()
+    const unsubscribe = subscribeHealthDataChanges(refresh, { revalidateOnFocus: true })
+    return () => {
+      active = false
+      requestGeneration.current += 1
+      controller?.abort()
+      unsubscribe()
+    }
   }, [])
 
   async function generate() {
+    const request = ++requestGeneration.current
     setGenerating(true)
     setError(null)
     try {
       const response = await healthFetch('/api/progress/weekly', { method: 'POST' })
-      if (!response.ok) {
-        throw new Error(await readApiError(response))
-      }
-      setPayload((await response.json()) as WeeklyCoachResponse)
+      if (!response.ok) throw new Error(await readApiError(response))
+      const next = (await response.json()) as WeeklyCoachResponse
+      // A newer mutation-triggered GET must win over stale generated wording.
+      if (request === requestGeneration.current) setPayload(next)
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Coach wording is unavailable right now.')
+      if (request === requestGeneration.current) {
+        setError(caught instanceof Error ? caught.message : 'Coach wording is unavailable right now.')
+      }
     } finally {
       setGenerating(false)
     }
