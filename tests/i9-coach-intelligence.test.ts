@@ -65,7 +65,34 @@ describe('I9 Coach intelligence', () => {
     const drafts = buildCoachRecommendationDrafts(control())
     expect(drafts).toHaveLength(1)
     expect(drafts[0]?.actionText).toBe('Review next session')
-    expect(drafts[0]?.detail).toContain('Do not add work just to satisfy Coach')
+    expect(drafts[0]?.detail).toContain('not a missed-session penalty')
+  })
+
+  it('does not urge a second workout on a preferred day that already qualified', () => {
+    const current = control()
+    const drafts = buildCoachRecommendationDrafts(control({
+      trainingAdherence: {
+        ...current.trainingAdherence,
+        todayIntent: 'training_preferred',
+        state: 'rest_day_on_track',
+      },
+    }))
+    expect(drafts[0]?.detail).toContain('already counts toward your target')
+    expect(drafts[0]?.detail).not.toContain('planned non-Training day')
+  })
+
+  it('does not penalize a flexible week even when preferred weekdays are sparse', () => {
+    const current = control()
+    const drafts = buildCoachRecommendationDrafts(control({
+      trainingAdherence: {
+        ...current.trainingAdherence,
+        todayIntent: 'flexible',
+        futureTrainingDates: [],
+        state: 'flexible_week',
+      },
+    }))
+    expect(drafts[0]?.detail).toContain('resting or moving a workout')
+    expect(drafts[0]?.actionText).toBe('Review next session')
   })
 
   it('emits an explicit no-change state without inventing actions', () => {
