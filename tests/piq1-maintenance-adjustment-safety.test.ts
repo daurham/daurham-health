@@ -14,6 +14,7 @@ const target: MaintenanceAdjustmentContext = {
   status: 'available', currentCalorieTarget: 2400, activeExperimentCount: 0,
   revisionStatus: 'consistent', decisionRevision: 'test-current-revision',
   performance: { status: 'available', asOf: TODAY, decliningExercises: [], competingGoals: [] },
+  physiology: { status: 'available', asOf: TODAY, ageYears: 31, heightCm: 178, activeOrUncertainConditionCount: 0 },
 }
 function observation(
   key: IntelligenceObservation['key'], date: string, value: number,
