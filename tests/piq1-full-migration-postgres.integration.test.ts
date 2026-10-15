@@ -267,6 +267,15 @@ describe.skipIf(!url)('PIQ-1.1 full 0001–0053 migration-chain and backup on is
       const checkRevision = (day: string, rev: string | null | undefined) =>
         isMaintenanceDecisionRevisionCurrent(day, rev, adapter)
       await expect(requireCurrentCalorieRecommendation(saved, today, makeControl(initial.revision), checkRevision)).resolves.toBeUndefined()
+      await writeCoachRecommendationResponse(
+        adapter, saved.id, 'do_this', today,
+        (persisted) => requireCurrentCalorieRecommendation(persisted, today, makeControl(initial.revision), checkRevision),
+      )
+      const accepted = await client.query(
+        'SELECT response_state, follow_up_on FROM coach_recommendations WHERE id = $1::uuid', [saved.id],
+      )
+      expect(accepted.rows[0].response_state).toBe('do_this')
+      expect(accepted.rows[0].follow_up_on).toBeTruthy()
       await client.query(
         `UPDATE nutrition_targets SET calories_target = 2200, updated_at = now()
          WHERE effective_from = $1::date`, ['2026-10-12'],
@@ -292,7 +301,7 @@ describe.skipIf(!url)('PIQ-1.1 full 0001–0053 migration-chain and backup on is
       )
       expect(historic.rows).toHaveLength(1)
       expect(historic.rows[0].metadata).toEqual({})
-      expect(historic.rows[0].response_state).toBeNull()
+      expect(historic.rows[0].response_state).toBe('do_this')
     } finally {
       await client.query('ROLLBACK')
     }
