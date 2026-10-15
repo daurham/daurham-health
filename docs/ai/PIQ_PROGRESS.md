@@ -355,16 +355,30 @@ Stop expanding test counts for their own sake. Next, pursue runtime verification
 
 **Phase truth: 0/9 completed. PIQ-0 remains open. PIQ-1.1 backend/domain/UI code is CI-validated on branch, not database-validated or end-to-end accepted.**
 
+## PIQ-1.1 UI edit-freshness hardening — verified (2026-10-14)
+
+**Validated code commit:** `041f6d885c69beb5d8d43713cb346390ec4c5bf2` · **CI:** [GitHub Actions 38689289994](https://github.com/daurham/daurham-health/actions/runs/38689289994) — **SUCCESS** (npm ci, TypeScript, ESLint, full Vitest, production build).
+
+- Followed the already-verified `9b1686a` optional Nutrition day-completeness card and `1b47aaf` versioned storage/API code; no overlapping source edits or main-branch merge.
+- Corrected a subtle React render race in `src/features/nutrition/DayCompletenessCard.tsx`: a *previously fetched* day confirmation could remain displayed for one render when food entries changed, before the effect cleared and refetched it. Stored confirmation now includes the local food-list snapshot key it belongs to, and render gates status/review availability on an **exact key match**. Old confirmation is hidden immediately until a canonical server refresh.
+- Strengthened the client-only food snapshot key to include macros, sodium/fiber, portion/grams, source quality, notes, meal identity, food identity and timestamps, rather than relying only on calories, quantity and timestamp. It is never sent or logged as the canonical digest. Server SHA-256 revision remains the authority for 409/revalidation.
+- Three more deterministic tests cover a nutrient-only edit (with unchanged calories/timestamps), multiple other source edits, and order-independent comparisons. They test client invalidation logic, **not** a full browser touch session.
+- Connected Neon project listing rechecked and still returns `[]`; **no accessible database** for isolated Postgres SQL execution or migration 0053 validation. This remains an explicit acceptance blocker, not a source of assumed schema truth.
+
+**PIQ status: 0/9 phases accepted.** PIQ-0 live-state/owner-quality gates still open; PIQ-1.1's code-level persistence + UI checks are green but **migration 0053 is unapplied**, no real Postgres transactional/concurrent integration was run, maintenance and Coach do **not** consume owner day-confirmation yet. No production deployment, migration, health-record change, target change or paid model call.
+
+**Next bounded work:** Obtain owner-authorized isolated Postgres/Neon branch access; validate SQL SHA-256 revisions, optimistic version conflict, food edit/exclusion races, auth, backup/restore; then connect verified read-time completeness to maintenance/Goal Control/Coach with the T03 single-meal regression. Do not silently treat unknown historical days as complete or ship calorie adjustment changes before these gates.
+
 ## Release state / constraints
 
 - Branch-only preparation: **no production deployments, database migrations, schema changes, AI API calls, or owner data writes performed by this PIQ work**.
 - The Vercel connector's project discovery succeeding does not imply deployment inspection permission.
 - A future phase may use read-only owner-authorized database/project access; never apply migrations merely to satisfy a baseline document.
-- Branch CI for latest implementation: **success** — Actions run `38685607348` on `9b1686a`, all standard checks passed. Documentation-only commits do not imply new code validation.
+- Branch CI for latest implementation: **success** — Actions run `38689289994` on `041f6d8`, all standard checks passed. Subsequent documentation-only commits are not new implementation validation.
 
 ## Continuation packet — NEXT SESSION
 
-**Task:** PIQ-1.1 next action: validate migration 0053 plus digest and revision/version write SQL in a disposable Neon/Postgres branch, then run mobile owner confirmation QA. Only after database validation wire persisted/revision-verified complete days into maintenance, Coach and Goal Control. PIQ-0 live baseline remains unverified; no production merge or calorie-target changes.
+**Task:** PIQ-1.1 next action: acquire authorized temporary Neon/Postgres branch, run migration 0053 and real SQL/concurrency/backup verification, then owner mobile confirmation QA. Client stale-food-confirmation display is now guarded and CI validated. Only after DB verification wire revision-verified days into maintenance/Coach/Goal Control; PIQ-0 live baseline remains open, no main promotion or calorie-target changes.
 
 **First steps:** Read master §§0–6 + PIQ-0 + §§17–21; inspect this file; verify current main/feature branch, production status, CI and schema. Try authorized Vercel project scope and Neon lookup only if access exists. Reconcile `CURRENT_TASK.md` drift once the verified production state is available. Confirm the baseline contract is still aligned with owner's purpose.
 
