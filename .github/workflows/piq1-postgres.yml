@@ -16,6 +16,10 @@ on:
       - 'tests/piq1-maintenance-eligibility-baseline.test.ts'
       - 'src/domain/nutrition/day-completeness.ts'
       - 'tests/piq1-nutrition-postgres.integration.test.ts'
+      - 'tests/piq1-full-migration-postgres.integration.test.ts'
+      - 'server/migrate.ts'
+      - 'server/backup/format.ts'
+      - 'server/backup/inventory.ts'
   workflow_dispatch:
 
 jobs:
@@ -46,4 +50,4 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx vitest run tests/piq1-nutrition-postgres.integration.test.ts
+      - run: npx vitest run tests/piq1-nutrition-postgres.integration.test.ts tests/piq1-full-migration-postgres.integration.test.ts
