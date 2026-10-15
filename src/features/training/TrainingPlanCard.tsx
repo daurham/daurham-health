@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { TrainingPlanView } from '@/domain/training-plan'
 import { primaryButtonClass, quietButtonClass } from '@/lib'
+import { subscribeHealthDataChanges } from '@/lib/health-changes'
 import { fetchTrainingPlan } from './api'
 import { TrainingRotationPreview } from './TrainingRotationPreview'
 
@@ -13,15 +14,29 @@ export function TrainingPlanCard() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    let cancelled = false
-    fetchTrainingPlan()
-      .then((next) => {
-        if (!cancelled) setPlan(next)
-      })
-      .catch((caught: unknown) => {
-        if (!cancelled) setError(caught instanceof Error ? caught.message : 'Could not load Training Plan')
-      })
-    return () => { cancelled = true }
+    let active = true
+    let generation = 0
+    const refresh = () => {
+      const request = ++generation
+      void fetchTrainingPlan()
+        .then((next) => {
+          if (!active || request !== generation) return
+          setPlan(next)
+          setError(null)
+        })
+        .catch((caught: unknown) => {
+          if (active && request === generation) {
+            setError(caught instanceof Error ? caught.message : 'Could not load Training Plan')
+          }
+        })
+    }
+    refresh()
+    const unsubscribe = subscribeHealthDataChanges(refresh, { revalidateOnFocus: true })
+    return () => {
+      active = false
+      generation += 1
+      unsubscribe()
+    }
   }, [])
 
   if (error) {
