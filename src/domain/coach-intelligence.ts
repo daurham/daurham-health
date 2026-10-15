@@ -1,5 +1,6 @@
 import type { GoalControlLimitation, GoalControlState } from './goal-control.js'
 import type { MaintenanceEvidenceExplanation } from './maintenance.js'
+import { progressionSeriesForOpportunity, type TrainingProgressionSeries } from './training-progression.js'
 import type { IntelligenceConfidence } from './intelligence/shared.js'
 
 export const COACH_INTELLIGENCE_VERSION = 'coach-intelligence-v1' as const
@@ -21,6 +22,29 @@ export const COACH_RECOMMENDATION_OUTCOMES = [
 ] as const
 export type CoachRecommendationOutcome = (typeof COACH_RECOMMENDATION_OUTCOMES)[number]
 
+export type CoachTrainingEvidence = Pick<
+  TrainingProgressionSeries,
+  'exerciseName' | 'state' | 'metric' | 'exposureCount' | 'latestDate' | 'changePct' | 'limitationKinds' | 'explanation'
+> & { window: { start: string; end: string } }
+
+/** An exact-exercise signal, not a cross-domain confidence score. */
+function trainingEvidenceForOpportunity(control: GoalControlState, opportunityId: string): CoachTrainingEvidence | null {
+  const series = progressionSeriesForOpportunity(control.trainingProgression, opportunityId)
+  const window = control.trainingProgression?.window
+  if (!series || !window) return null
+  return {
+    exerciseName: series.exerciseName,
+    state: series.state,
+    metric: series.metric,
+    exposureCount: series.exposureCount,
+    latestDate: series.latestDate,
+    changePct: series.changePct,
+    limitationKinds: [...series.limitationKinds],
+    explanation: series.explanation,
+    window: { ...window },
+  }
+}
+
 export type CoachRecommendationDraft = {
   fingerprint: string
   sourceId: string
@@ -32,6 +56,7 @@ export type CoachRecommendationDraft = {
   detailPath: string
   confidence: IntelligenceConfidence
   evidenceExplanation?: MaintenanceEvidenceExplanation
+  trainingEvidence?: CoachTrainingEvidence
   evidenceRefs: string[]
   priority: number
   experimentEligible: boolean
@@ -61,6 +86,7 @@ export type CoachRecommendationView = {
   detailPath: string
   confidence: IntelligenceConfidence
   evidenceExplanation?: MaintenanceEvidenceExplanation
+  trainingEvidence?: CoachTrainingEvidence
   evidenceRefs: string[]
   responseState: CoachRecommendationResponse | null
   /** Opaque exact DB response timestamp; null means never responded. */
@@ -157,6 +183,9 @@ function opportunityDraft(
   }
   const maintenanceExplanation = control.maintenance?.interventions.some((item) => item.id === opportunity.id)
     ? control.maintenance.evidenceExplanation : null
+  const trainingSeries = opportunity.kind === 'training_progression'
+    ? progressionSeriesForOpportunity(control.trainingProgression, opportunity.id) : null
+  const trainingEvidence = trainingSeries ? trainingEvidenceForOpportunity(control, opportunity.id) : null
   return restAware({
     fingerprint: fingerprint(opportunity.id),
     sourceId: opportunity.id,
@@ -168,8 +197,11 @@ function opportunityDraft(
     detailPath: opportunity.detailPath,
     // A Maintenance-specific action must use the estimate's own confidence,
     // not the cross-domain Goal Control summary confidence.
-    confidence: maintenanceExplanation ? control.maintenance!.estimate.confidence : control.confidence,
+    confidence: maintenanceExplanation ? control.maintenance!.estimate.confidence
+      : opportunity.kind === 'training_progression' ? trainingSeries?.confidence ?? 'unknown'
+      : control.confidence,
     ...(maintenanceExplanation ? { evidenceExplanation: maintenanceExplanation } : {}),
+    ...(trainingEvidence ? { trainingEvidence } : {}),
     evidenceRefs: [...opportunity.evidenceRefs],
     priority: 100,
     experimentEligible: opportunity.domain !== 'review',
@@ -181,6 +213,8 @@ function trainingDrafts(control: GoalControlState): CoachRecommendationDraft[] {
   if (!progression?.primaryOpportunity) return []
   const item = progression.primaryOpportunity
   if (control.primaryOpportunity?.id === item.id) return []
+  const series = progressionSeriesForOpportunity(progression, item.id)
+  const trainingEvidence = series ? trainingEvidenceForOpportunity(control, item.id) : null
   return [restAware({
     fingerprint: fingerprint(item.id),
     sourceId: item.id,
@@ -190,8 +224,8 @@ function trainingDrafts(control: GoalControlState): CoachRecommendationDraft[] {
     detail: item.detail,
     actionText: item.actionText,
     detailPath: item.detailPath,
-    confidence:
-      progression.series.find((series) => item.id.endsWith(series.exerciseId))?.confidence ?? control.confidence,
+    confidence: series?.confidence ?? 'unknown',
+    ...(trainingEvidence ? { trainingEvidence } : {}),
     evidenceRefs: [...item.evidenceRefs],
     priority: 80,
     experimentEligible: true,

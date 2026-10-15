@@ -1134,3 +1134,16 @@ HAVING COUNT(*) > 1;
 **Regression:** Synthetic disagreement (overall high vs estimate moderate), confidence attribution for Maintenance-vs-Training drafts, a missing-estimate fail-closed view, and Coach evidence disclosure with distinct calorie decision status. This slice changes neither recommendation eligibility/safety nor canonical health facts; no schema migration, owner-data write, Gemini call, `main` promotion, or deployment.
 
 **Still open:** Explain each domain evidence source with specific time/sample/provenance and confounding detail; formal calibration for confidence and uncertainty range; full PIQ-1.6 coverage in Ask Health, Training and comparative claims; authenticated browser and owner mobile review; release preflight for unapplied migration 0054.
+
+
+## PIQ-1.6 — Exact-exercise Training confidence and explanation (2026-10-15)
+
+**State:** Bounded work-branch implementation requiring TypeScript, ESLint, Vitest, production build, and authenticated owner mobile QA. **Owner-accepted PIQ phases: 0/9.**
+
+**Issue:** A primary `training_progression` Coach recommendation could inherit cross-domain Goal Control confidence, even when the underlying exact-exercise series supported a lower confidence. The secondary Training card also used an ambiguous `endsWith(exerciseId)` lookup. Coach did not explain the number/date of comparable exercise exposures or recorded limitations behind its displayed strength trend.
+
+**Contract:** Match progression evidence only when the current primary Training opportunity ID exactly equals `training-progression:<exerciseId>` for its specific series. Both primary and secondary Training progression drafts use that series' own confidence; absent exact evidence becomes **unknown**, never inherited high cross-domain confidence or fabricated samples. Coach recommendation views carry an optional bounded Training evidence explanation (exercise, trend state, exposure count, latest date, evidence window, percent change if known, recorded limitations, existing analyst rationale). Coach renders it behind an accessible disclosure, explicitly noting unrecorded recovery, equipment and technique confounders. Goal Overview independently labels exact-exercise Training trend confidence when its primary item is Training, leaving broad Goal confidence and Maintenance estimate confidence scoped separately. The non-calorie context hash includes Training evidence content to invalidate obsolete owner-visible decision explanations.
+
+**Regression:** Synthetic high Goal / moderate Maintenance / limited Training confidence disagreement, independent Training trend explanation, unavailable exact-match evidence => unknown, nonmatching similar suffix, no invented exposure/adherence; existing calorie-safety and owner-response guards unaffected. No new schema, provider/model call, owner data write, deployment or `main` promotion.
+
+**Still required for PIQ-1.6:** Calibration of confidence levels, provenance and source-range completeness for other domains and comparative assertions, explicit uncertainty on estimates, and mobile/owner QA. Migration `0054` remains unapplied in production and separately gated.

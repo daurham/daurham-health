@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import type { GoalControlState } from '@/domain/goal-control'
+import { progressionSeriesForOpportunity } from '@/domain/training-progression'
 import { quietButtonClass } from '@/lib'
 import { prefixedPath, useAppPathPrefix } from '@/lib/app-prefix'
 
@@ -31,6 +32,8 @@ export function GoalControlCard({
   }
 
   const opportunity = state.primaryOpportunity
+  const trainingTrend = opportunity?.kind === 'training_progression'
+    ? progressionSeriesForOpportunity(state.trainingProgression, opportunity.id) : null
   return (
     <section className="rounded-lg border border-zinc-200 bg-white px-3 py-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -73,6 +76,21 @@ export function GoalControlCard({
             </p>
             <p className="mt-1">{state.maintenance.estimate.explanation}</p>
           </details>
+        </div>
+      ) : null}
+      {opportunity?.kind === 'training_progression' ? (
+        <div className="mt-2 text-xs text-zinc-500">
+          <p>Exact-exercise Training trend confidence: {trainingTrend?.confidence ?? 'unknown'}</p>
+          {trainingTrend ? (
+            <details className="mt-1">
+              <summary className="cursor-pointer">Training trend evidence</summary>
+              <p className="mt-1">{trainingTrend.exerciseName} · {trainingTrend.exposureCount} comparable recorded exposures
+                {' '}· latest {trainingTrend.latestDate ?? 'date unavailable'}.</p>
+              <p className="mt-1">{trainingTrend.explanation}</p>
+            </details>
+          ) : (
+            <p>Matching exercise evidence is unavailable; Goal evidence confidence does not validate this trend.</p>
+          )}
         </div>
       ) : null}
       {state.trainingAdherence.configured ? (

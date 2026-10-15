@@ -3,7 +3,8 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
 import type { GoalControlState } from '../src/domain/goal-control.js'
-import { buildCoachRecommendationDrafts } from '../src/domain/coach-intelligence.js'
+import { buildCoachRecommendationDrafts, type CoachIntelligenceState } from '../src/domain/coach-intelligence.js'
+import { CoachIntelligencePanel } from '../src/features/coach/CoachCard.tsx'
 import { GoalControlCard } from '../src/features/goal-control/GoalControlCard.tsx'
 
 /** Deliberately different cross-domain and Maintenance confidence values.
@@ -99,7 +100,7 @@ describe('PIQ-1.6 confidence scopes are not interchangeable', () => {
     expect(drafts[0]?.evidenceExplanation?.calorieDecision.status).toBe('review_only')
   })
 
-  it('keeps unrelated Training card confidence scoped to current Goal evidence', () => {
+  it('does not borrow broad Goal confidence when an unmatched Training trend lacks exact evidence', () => {
     const state = fixture()
     const drafts = buildCoachRecommendationDrafts({
       ...state, primaryOpportunity: {
@@ -110,7 +111,8 @@ describe('PIQ-1.6 confidence scopes are not interchangeable', () => {
       },
     })
     const training = drafts.find((item) => item.kind === 'training_progression')
-    expect(training?.confidence).toBe('high')
+    expect(training?.confidence).toBe('unknown')
+    expect(training?.trainingEvidence).toBeUndefined()
   })
 
   it('never renders a numeric maintenance estimate when evidence is insufficient', () => {
@@ -125,5 +127,93 @@ describe('PIQ-1.6 confidence scopes are not interchangeable', () => {
     )
     expect(html).not.toContain('Observed maintenance estimate')
     expect(html).not.toContain('1,884')
+  })
+})
+
+function trainingFixture(): GoalControlState {
+  const state = fixture()
+  const opportunity = {
+    id: 'training-progression:bench-press', kind: 'training_progression', domain: 'training',
+    title: 'Bench performance may be stalled', detail: 'Review comparable lifting sessions.',
+    actionText: 'Review Training', detailPath: '/training', sourceCandidateId: null,
+    evidenceRefs: ['training:exercise:bench-press'],
+  }
+  return {
+    ...state, primaryOpportunity: opportunity,
+    trainingProgression: {
+      version: 'training-progression-v1', asOf: '2026-10-15',
+      window: { start: '2026-09-18', end: '2026-10-15' },
+      summary: 'Bench trend requires review.',
+      series: [{
+        exerciseId: 'bench-press', exerciseName: 'Bench press',
+        metric: 'e1rm_kg', state: 'stalled', confidence: 'limited',
+        exposureCount: 5, latestDate: '2026-10-14',
+        recentValue: 80, priorValue: 80, changePct: 0,
+        recentRelativeStrength: null, recentAverageRir: 2,
+        recentAverageRpe: 8, recentHardSets: 3,
+        limitationKinds: ['soreness'], explanation: 'Five exact-exercise exposures suggest a narrow performance band.',
+      }],
+      movementExposure: [], muscleExposure: [], goalRelationships: [],
+      primaryOpportunity: {
+        id: opportunity.id, title: opportunity.title, detail: opportunity.detail,
+        actionText: opportunity.actionText, detailPath: opportunity.detailPath,
+        evidenceRefs: [...opportunity.evidenceRefs],
+      },
+    },
+  }
+}
+
+describe('PIQ-1.6 exact Training evidence confidence', () => {
+  it('keeps Goal, Maintenance and Training confidence independent in the same overview', () => {
+    const html = renderToStaticMarkup(<MemoryRouter><GoalControlCard state={trainingFixture()} /></MemoryRouter>)
+    expect(html).toContain('Goal evidence · high confidence')
+    expect(html).toContain('Maintenance estimate confidence: moderate')
+    expect(html).toContain('Exact-exercise Training trend confidence: limited')
+    expect(html).toContain('Training trend evidence')
+    expect(html).toContain('5 comparable recorded exposures')
+    expect(html).not.toContain('Exact-exercise Training trend confidence: high')
+  })
+
+  it('shows comparable exposure, latest date, limitations and trend explanation without inferring adherence', () => {
+    const control = trainingFixture()
+    const draft = buildCoachRecommendationDrafts(control).find((item) => item.kind === 'training_progression')
+    expect(draft).toMatchObject({
+      confidence: 'limited',
+      trainingEvidence: {
+        exerciseName: 'Bench press', exposureCount: 5, latestDate: '2026-10-14',
+        state: 'stalled', changePct: 0, limitationKinds: ['soreness'],
+      },
+    })
+    const view = { ...draft!, id: '11111111-1111-4111-8111-111111111111', responseState: null, responseAt: null }
+    const state: CoachIntelligenceState = {
+      version: 'coach-intelligence-v1', asOf: control.asOf, state: 'act',
+      headline: 'Review your Training', summary: 'Evidence-specific confidence',
+      noChangeRecommended: false, nextBestActions: [view],
+      followUps: [], question: null, questionBudgetDays: 3,
+    }
+    const html = renderToStaticMarkup(
+      <MemoryRouter><CoachIntelligencePanel state={state} pending={false}
+        onResponse={() => undefined} onOutcome={() => undefined} /></MemoryRouter>,
+    )
+    expect(html).toContain('How this Training trend was assessed')
+    expect(html).toContain('limited confidence in exact-exercise trend')
+    expect(html).toContain('5 comparable recorded exposures')
+    expect(html).toContain('latest exposure 2026-10-14')
+    expect(html).toContain('Recorded session limitations: soreness')
+    expect(html).toContain('Only logged comparable exercise sets')
+  })
+
+  it('does not match a similarly suffixed exercise ID or fabricate exposure values', () => {
+    const control = trainingFixture()
+    const bad = {
+      ...control, primaryOpportunity: {
+        ...control.primaryOpportunity!, id: 'other:bench-press',
+      },
+    }
+    const draft = buildCoachRecommendationDrafts(bad).find((item) => item.kind === 'training_progression')
+    expect(draft?.confidence).toBe('unknown')
+    expect(draft?.trainingEvidence).toBeUndefined()
+    const html = renderToStaticMarkup(<MemoryRouter><GoalControlCard state={bad} /></MemoryRouter>)
+    expect(html).toContain('Exact-exercise Training trend confidence: unknown')
   })
 })

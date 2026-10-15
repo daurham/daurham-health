@@ -678,3 +678,8 @@ Do not accept owner decisions against a recommendation solely because its stable
 ## Decision: confidence belongs to a specific evidence or estimate, not the whole page (PIQ-1.6, 2026-10-15)
 
 Treat cross-domain Goal Control confidence and Maintenance estimate confidence as separately scoped labels. When Coach uses a Maintenance intervention, use the estimate's own confidence as its evidence signal. Show maintenance range and supporting sample-quality counts behind a disclosure, while preserving the separate `calorieDecision` gate and withholding numeric estimates with insufficient evidence. Do not interpret broad Goal Control confidence as proof of precision or safety in a numerical calorie recommendation. No owner-data or provider changes.
+
+
+## Decision: Training progression confidence is a claim about comparable exercise records (PIQ-1.6, 2026-10-15)
+
+Use the matching primary Training progression series, identified by exact `training-progression:<exerciseId>`, as the source of confidence for Training recommendations, not a page-level Goal confidence. Treat absent exact evidence as unknown rather than borrowing another exercise's confidence through suffix matching. Show recorded comparable exposure count, window, recency, limitations, and rationale behind a disclosure without implying the user adhered to a recommendation. Keep numerical Maintenance confidence independent. A derived progression score is not proof that sleep, equipment and technique confounders have been captured. This is an evidence-explanation correction, not a new clinical or exercise prescription.

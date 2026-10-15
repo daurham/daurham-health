@@ -475,6 +475,28 @@ export function CoachIntelligencePanel({
                   </dl>
                 </details>
               ) : null}
+              {item.trainingEvidence ? (
+                <details className="mt-2 rounded-md border border-zinc-200 bg-white px-2.5 py-2">
+                  <summary className="cursor-pointer text-xs font-medium text-zinc-700">
+                    How this Training trend was assessed · {item.confidence} confidence in exact-exercise trend
+                  </summary>
+                  <div className="mt-2 space-y-1 border-t border-zinc-100 pt-2 text-xs leading-relaxed text-zinc-600">
+                    <p>{item.trainingEvidence.exerciseName}: {item.trainingEvidence.state.replace(/_/g, ' ')} · {item.trainingEvidence.exposureCount} comparable recorded exposures.</p>
+                    <p>Evidence window: {item.trainingEvidence.window.start} to {item.trainingEvidence.window.end}
+                      {' '}· latest exposure {item.trainingEvidence.latestDate ?? 'unavailable'}.</p>
+                    {item.trainingEvidence.changePct != null && Number.isFinite(item.trainingEvidence.changePct) ? (
+                      <p>Recent versus prior performance: {item.trainingEvidence.changePct > 0 ? '+' : ''}{item.trainingEvidence.changePct.toFixed(1)}%.</p>
+                    ) : null}
+                    <p>{item.trainingEvidence.explanation}</p>
+                    {item.trainingEvidence.limitationKinds.length > 0 ? (
+                      <p>Recorded session limitations: {item.trainingEvidence.limitationKinds.map((value) => value.replace(/_/g, ' ')).join(', ')}.</p>
+                    ) : null}
+                    <p>Only logged comparable exercise sets are considered. Unrecorded recovery, equipment or technique changes may affect the trend.</p>
+                  </div>
+                </details>
+              ) : item.kind === 'training_progression' ? (
+                <p className="mt-2 text-xs text-zinc-500">Exact-exercise confidence unknown; matching trend evidence is unavailable.</p>
+              ) : null}
               <div className="mt-2 flex flex-wrap gap-2">
                 <Link to={prefixedPath(prefix, item.detailPath)} className={primaryButtonClass}>
                   {item.actionText}

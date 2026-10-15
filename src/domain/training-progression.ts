@@ -130,6 +130,17 @@ export type TrainingProgressionState = {
   primaryOpportunity: TrainingProgressionOpportunity | null
 }
 
+/** Match the exact progression opportunity and its exercise. A broad Training
+ * card or a coincidental ID suffix does not inherit another exercise's data.
+ */
+export function progressionSeriesForOpportunity(
+  state: TrainingProgressionState | null | undefined,
+  opportunityId: string,
+): TrainingProgressionSeries | null {
+  if (!state?.primaryOpportunity || state.primaryOpportunity.id !== opportunityId) return null
+  return state.series.find((series) => opportunityId === 'training-progression:' + series.exerciseId) ?? null
+}
+
 export type BuildTrainingProgressionInput = {
   asOf: string
   sets: readonly TrainingProgressionSet[]

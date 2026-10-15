@@ -375,3 +375,8 @@ Non-calorie Coach cards now include `contextRevision`, a domain-bounded SHA-256 
 ## 2026-10-15 PIQ-1.6 scoped-confidence presentation — work branch
 
 Goal overview confidence now explicitly describes cross-domain goal evidence; observed maintenance estimates display their independent estimate confidence, range, and an expandable evidence basis. Maintenance-backed Coach drafts use estimator confidence instead of Goal Control summary confidence; unrelated Training advice is unchanged. Synthetic tests verify disagreement, insufficient numeric evidence and distinct decision safety labels. No `main` or production changes; CI and mobile review remain release gates in `docs/ai/PIQ_PROGRESS.md`.
+
+
+## 2026-10-15 PIQ-1.6 exercise-specific Training confidence — branch only
+
+Coach now attributes Training progression confidence to the exact matching exercise-series assessment, rather than the Goal Overview's cross-domain badge or a partial exercise-ID match. Goal Overview and Coach show scoped Training evidence explanations (recorded comparable exposure count, latest exposure date, trend, confounders); unmatched evidence shows unknown. Added synthetic confidence-disagreement and rendering tests. No owner DB migration, live data writes, provider calls, or production promotion. CI/owner QA recorded in `PIQ_PROGRESS.md`.
