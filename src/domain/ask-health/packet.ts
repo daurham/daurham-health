@@ -384,10 +384,10 @@ function addNutrition(input: AskHealthPacketInput, push: (item: PushItem) => voi
   const target = nutrition.calories.targetContext
   if (target) {
     const verifiedTargetDays = integrity?.status === 'available' ? integrity.verifiedTargetDays : 0
-    const eligible = verifiedTargetDays >= MIN_VERIFIED_NUTRITION_TARGET_DAYS &&
-      integrity?.verifiedAverageTargetDifference != null
+    const verifiedDifference = integrity?.verifiedAverageTargetDifference
+    const eligible = verifiedTargetDays >= MIN_VERIFIED_NUTRITION_TARGET_DAYS && verifiedDifference != null
     if (eligible) {
-      const difference = integrity.verifiedAverageTargetDifference!
+      const difference = verifiedDifference
       const roundedDifference = Math.round(Math.abs(difference))
       const relation = difference < 0 ? `${roundedDifference} kcal/day below` : difference > 0 ? `${roundedDifference} kcal/day above` : 'at'
       push({
