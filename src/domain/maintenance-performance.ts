@@ -29,6 +29,7 @@ export function assessMaintenancePerformanceSafety(input: {
     return { status: 'unavailable', asOf, decliningExercises: [], competingGoals: [] }
   }
   const freshSince = addCalendarDays(asOf, -14)
+  const latestCompleted = addCalendarDays(asOf, -1)
   const decliningExercises = [...new Set(training.series.filter((item) =>
     (item.metric === 'e1rm_kg' || item.metric === 'reps') &&
     (item.state === 'declining' || (item.state === 'confounded' && (item.changePct ?? 0) <= -2.5)) &&
