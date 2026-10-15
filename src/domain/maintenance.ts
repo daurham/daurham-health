@@ -438,6 +438,46 @@ function averageSignal(
   }
 }
 
+/**
+ * Daily carb/sodium totals have a different evidentiary bar from "a nutrient
+ * was logged". A valid calorie source and a known nutrient value still do not
+ * prove that every meal was logged. For short-window scale context require:
+ * - the independently revision-checked owner-complete whitelist;
+ * - trustworthy, finite nutrient and calorie totals from identical entry IDs;
+ * - two of the last three days and four of the prior seven days (caller below).
+ * Undefined is deliberately fail-closed for this inference, even though older
+ * estimator fixtures may still omit the whitelist.
+ */
+function verifiedNutritionSignal(
+  frame: readonly IntelligenceFrameDay[],
+  key: 'nutrition.sodium_mg' | 'nutrition.carbs_g',
+  start: string,
+  end: string,
+  verifiedDates: ReadonlySet<string> | undefined,
+): { mean: number | null; dates: string[] } {
+  if (!verifiedDates || verifiedDates.size === 0) return { mean: null, dates: [] }
+  const observations = frame.flatMap((day) => {
+    if (day.date < start || day.date > end || !verifiedDates.has(day.date)) return []
+    const nutrient = day.signals[key]
+    const calories = day.signals['nutrition.calories']
+    if (!nutrient || !calories ||
+        !finite(nutrient.value) || nutrient.value < 0 ||
+        !finite(calories.value) || calories.value <= 0 ||
+        nutrient.quality !== 'high_confidence' || calories.quality !== 'high_confidence' ||
+        nutrient.provenance === 'unknown' || calories.provenance === 'unknown') return []
+    const left = [...nutrient.sourceIds].sort()
+    const right = [...calories.sourceIds].sort()
+    if (left.length === 0 || left.length !== right.length ||
+        new Set(left).size !== left.length ||
+        left.some((id, i) => id !== right[i])) return []
+    return [{ date: day.date, value: nutrient.value }]
+  })
+  return {
+    mean: observations.length === 0 ? null : observations.reduce((sum, item) => sum + item.value, 0) / observations.length,
+    dates: observations.map((item) => item.date),
+  }
+}
+
 function relativeIncrease(recent: number, baseline: number, absoluteThreshold: number, relativeThreshold: number): boolean {
   if (baseline <= 0) return recent - baseline >= absoluteThreshold
   return recent - baseline >= absoluteThreshold && (recent - baseline) / baseline >= relativeThreshold
@@ -463,27 +503,31 @@ function noiseFactors(
   const baselineStart = addCalendarDays(baselineEnd, -6)
   const output: ScaleNoiseFactor[] = []
 
-  const sodiumRecent = averageSignal(input.intelligence.frame, 'nutrition.sodium_mg', recentStart, completeThrough)
-  const sodiumBase = averageSignal(input.intelligence.frame, 'nutrition.sodium_mg', baselineStart, baselineEnd)
-  if (finite(sodiumRecent.mean) && finite(sodiumBase.mean) && relativeIncrease(sodiumRecent.mean, sodiumBase.mean, 500, 0.2)) {
+  const sodiumRecent = verifiedNutritionSignal(input.intelligence.frame, 'nutrition.sodium_mg', recentStart, completeThrough, input.eligibleNutritionDates)
+  const sodiumBase = verifiedNutritionSignal(input.intelligence.frame, 'nutrition.sodium_mg', baselineStart, baselineEnd, input.eligibleNutritionDates)
+  if (sodiumRecent.dates.length >= 2 && sodiumBase.dates.length >= 4 &&
+      finite(sodiumRecent.mean) && finite(sodiumBase.mean) &&
+      relativeIncrease(sodiumRecent.mean, sodiumBase.mean, 500, 0.2)) {
     output.push({
       id: 'scale-noise:sodium',
       kind: 'sodium',
-      title: 'Recent sodium is higher than your prior week',
-      detail: 'Higher sodium can coincide with short-term water-weight changes. This is context for the scale, not proof of the cause.',
+      title: 'Logged sodium rose on comparable, verified food days',
+      detail: `Logged sodium averaged higher on ${sodiumRecent.dates.length} owner-confirmed, source-reliable days versus ${sodiumBase.dates.length} prior days. A sodium shift may coincide with short-term water weight; this is not proof of the cause or a measure of sodium outside the log.`,
       dates: sodiumRecent.dates,
       detailPath: '/nutrition',
     })
   }
 
-  const carbsRecent = averageSignal(input.intelligence.frame, 'nutrition.carbs_g', recentStart, completeThrough)
-  const carbsBase = averageSignal(input.intelligence.frame, 'nutrition.carbs_g', baselineStart, baselineEnd)
-  if (finite(carbsRecent.mean) && finite(carbsBase.mean) && relativeIncrease(carbsRecent.mean, carbsBase.mean, 50, 0.2)) {
+  const carbsRecent = verifiedNutritionSignal(input.intelligence.frame, 'nutrition.carbs_g', recentStart, completeThrough, input.eligibleNutritionDates)
+  const carbsBase = verifiedNutritionSignal(input.intelligence.frame, 'nutrition.carbs_g', baselineStart, baselineEnd, input.eligibleNutritionDates)
+  if (carbsRecent.dates.length >= 2 && carbsBase.dates.length >= 4 &&
+      finite(carbsRecent.mean) && finite(carbsBase.mean) &&
+      relativeIncrease(carbsRecent.mean, carbsBase.mean, 50, 0.2)) {
     output.push({
       id: 'scale-noise:carbs',
       kind: 'carbohydrate',
-      title: 'Recent carbohydrate intake is higher than your prior week',
-      detail: 'A carbohydrate shift can accompany short-term glycogen and water changes. Health treats this as possible scale noise, not fat-mass change.',
+      title: 'Logged carbohydrates rose on comparable, verified food days',
+      detail: `Logged carbohydrates averaged higher on ${carbsRecent.dates.length} owner-confirmed, source-reliable days versus ${carbsBase.dates.length} prior days. A carbohydrate shift may accompany short-term glycogen and water changes; this is not proof of the cause or fat-mass change.`,
       dates: carbsRecent.dates,
       detailPath: '/nutrition',
     })
