@@ -502,6 +502,8 @@ export const workoutSessionSummarySchema = z.object({
 export type WorkoutSessionSummary = z.infer<typeof workoutSessionSummarySchema>
 
 export const workoutSessionSchema = workoutSessionSummarySchema.extend({
+  /** Opaque server-owned PostgreSQL edit token, required to update an existing workout. */
+  editRevision: z.string().regex(/^\\d{1,10}$/).optional(),
   bodyweightKg: z.number().positive().nullable(),
   notes: z.string().nullable(),
   metadata: jsonRecordSchema,
