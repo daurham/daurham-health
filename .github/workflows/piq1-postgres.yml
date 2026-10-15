@@ -1,0 +1,44 @@
+name: PIQ-1.1 isolated PostgreSQL verification
+on:
+  push:
+    branches:
+      - piq/00-baseline-20261014
+    paths:
+      - '.github/workflows/piq1-postgres.yml'
+      - 'migrations/0008_nutrition.sql'
+      - 'migrations/0046_evidence_semantics_change_watchdog.sql'
+      - 'migrations/0053_nutrition_day_completeness.sql'
+      - 'server/nutrition/day-completeness.ts'
+      - 'src/domain/nutrition/day-completeness.ts'
+      - 'tests/piq1-nutrition-postgres.integration.test.ts'
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: piq
+          POSTGRES_PASSWORD: piq-fixture-only
+          POSTGRES_DB: piq_fixture
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U piq -d piq_fixture"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      TZ: America/Phoenix
+      PIQ_POSTGRES_URL: postgres://piq:piq-fixture-only@localhost:5432/piq_fixture
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx vitest run tests/piq1-nutrition-postgres.integration.test.ts
