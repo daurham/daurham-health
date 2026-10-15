@@ -4,6 +4,7 @@ import {
   COACH_QUESTION_BUDGET_DAYS,
   buildCoachFollowUpQuestion,
   buildCoachRecommendationDrafts,
+  keepVisibleCoachDependencies,
   recommendationIsSuppressed,
   type CoachFollowUpQuestion,
   type CoachIntelligenceState,
@@ -246,7 +247,9 @@ export async function loadCoachIntelligenceState(asOf: string): Promise<CoachInt
   const drafts = buildCoachRecommendationDrafts(control)
   const existing = await rowsForFingerprints(sql, drafts.map((item) => item.fingerprint))
   const memory = new Map(existing.map((row) => [row.fingerprint, recordMemory(row)]))
-  const visible = drafts.filter((draft) => !recommendationIsSuppressed(memory.get(draft.fingerprint), asOf))
+  const visible = keepVisibleCoachDependencies(
+    drafts.filter((draft) => !recommendationIsSuppressed(memory.get(draft.fingerprint), asOf)),
+  )
   const surfaced: CoachRecommendationView[] = []
   for (const draft of visible) {
     const row = await surfaceDraft(sql, draft, asOf)
