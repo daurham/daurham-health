@@ -6,6 +6,8 @@ import { LATEST_SCHEMA_MIGRATION, backupTable } from '../server/backup/inventory
 import { buildBackupArchive, restoreStatements, verifyBackupArchive, planRestore, type BackupRow } from '../server/backup/format.js'
 import { getNutritionDayCompleteness, saveNutritionDayCompleteness } from '../server/nutrition/day-completeness.js'
 import { readMaintenanceDecisionSnapshot, isMaintenanceDecisionRevisionCurrent } from '../server/intelligence/maintenance-revision.js'
+import { dueFollowUps, requireCurrentCalorieRecommendation, surfaceDraft } from '../server/intelligence/coach-intelligence.js'
+import { randomUUID } from 'node:crypto'
 
 /**
  * Only runs under CI's explicit PIQ_POSTGRES_URL. Uses its own isolated schema
@@ -163,6 +165,129 @@ describe.skipIf(!url)('PIQ-1.1 full 0001–0053 migration-chain and backup on is
     }
     const restored = await readMaintenanceDecisionSnapshot(today, adapter)
     expect(restored.revision).toBe(before.revision)
+  })
+
+  it('PIQ-1.2: SQL filters >24 stale accepted calorie rows BEFORE limiting visible follow-ups', async () => {
+    await client.query('BEGIN')
+    try {
+      const asOf = today
+      for (let i = 0; i < 32; i += 1) {
+        await client.query(
+          `INSERT INTO coach_recommendations (
+             id, fingerprint, recommendation_kind, domain, title, detail, action_text, detail_path,
+             confidence, evidence_refs, surfaced_on, last_surfaced_on,
+             response_state, response_at, follow_up_on, metadata
+           ) VALUES ($1::uuid, $2, 'review_intake_adjustment', 'nutrition', 'Old cut',
+             'Old advice', 'Review', '/nutrition', 'high', '[]'::jsonb,
+             $3::date, $3::date, 'do_this', now(), $3::date, $4::jsonb)`,
+          [randomUUID(), 'stale-' + i, '2026-09-01', JSON.stringify({ decisionRevision: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' })],
+        )
+      }
+      for (let i = 0; i < 4; i += 1) {
+        await client.query(
+          `INSERT INTO coach_recommendations (
+             id, fingerprint, recommendation_kind, domain, title, detail, action_text, detail_path,
+             confidence, evidence_refs, surfaced_on, last_surfaced_on,
+             response_state, response_at, follow_up_on, metadata
+           ) VALUES ($1::uuid, $2, 'training_progression', 'training', 'Bench review',
+             'Check form', 'Review', '/training', 'moderate', '[]'::jsonb,
+             $3::date, $3::date, 'do_this', now(), $3::date, '{}'::jsonb)`,
+          [randomUUID(), 'bench-' + i, '2026-10-01'],
+        )
+      }
+      const due = await dueFollowUps(adapter, asOf, 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', [])
+      expect(due).toHaveLength(3)
+      expect(due.every((x) => x.recommendation_kind === 'training_progression')).toBe(true)
+      expect(due.map((x) => x.fingerprint)).toEqual(['bench-0', 'bench-1', 'bench-2'])
+      const noRevision = await dueFollowUps(adapter, asOf, null, [])
+      expect(noRevision.map((x) => x.fingerprint)).toEqual(due.map((x) => x.fingerprint))
+    } finally {
+      await client.query('ROLLBACK')
+    }
+  })
+
+  it('PIQ-1.2: accepted saved calorie card retains original revision under a later ON CONFLICT surface', async () => {
+    await client.query('BEGIN')
+    try {
+      const oldRevision = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+      const newerRevision = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
+      const fingerprint = 'coach:i9:maintenance:review-intake'
+      const draft = {
+        fingerprint, sourceId: 'maintenance:review-intake', kind: 'review_intake_adjustment',
+        domain: 'nutrition', title: 'Review a cut', detail: 'Manual review only', actionText: 'Review',
+        detailPath: '/nutrition', confidence: 'high' as const, evidenceRefs: ['maintenance:estimate'],
+        priority: 100, experimentEligible: false,
+      }
+      const initially = await surfaceDraft(adapter, draft, today, oldRevision)
+      await client.query(
+        `UPDATE coach_recommendations SET response_state = 'do_this', response_at = now(),
+         follow_up_on = $2::date WHERE id = $1::uuid`,
+        [initially.id, today],
+      )
+      const resurfaced = await surfaceDraft(adapter, { ...draft, detail: 'Changed recommendation narrative' }, today, newerRevision)
+      expect(resurfaced.id).toBe(initially.id)
+      expect(resurfaced.metadata?.decisionRevision).toBe(oldRevision)
+      expect(resurfaced.response_state).toBe('do_this')
+      expect(resurfaced.response_at).not.toBeNull()
+    } finally {
+      await client.query('ROLLBACK')
+    }
+  })
+
+  it('PIQ-1.2: saved-id action rechecks live SQL target changes and refuses a stale or legacy ID', async () => {
+    await client.query('BEGIN')
+    try {
+      await client.query(
+        `INSERT INTO nutrition_targets (effective_from, calories_target, protein_target)
+         VALUES ($1::date, 2400, 140)`, ['2026-10-12'],
+      )
+      const initial = await readMaintenanceDecisionSnapshot(today, adapter)
+      expect(initial.status).toBe('available')
+      if (!initial.revision) throw new Error('Expected revision')
+      const draft = {
+        fingerprint: 'coach:i9:maintenance:review-intake', sourceId: 'maintenance:review-intake',
+        kind: 'review_intake_adjustment', domain: 'nutrition', title: 'Manual calorie review',
+        detail: 'Original owner-visible advice', actionText: 'Review', detailPath: '/nutrition',
+        confidence: 'high' as const, evidenceRefs: ['maintenance:estimate'],
+        priority: 100, experimentEligible: false,
+      }
+      const saved = await surfaceDraft(adapter, draft, today, initial.revision)
+      const makeControl = (revision: string) => ({
+        state: 'act', nutritionQuality: { state: 'met' },
+        primaryOpportunity: {
+          id: 'maintenance:review-intake', kind: 'review_intake_adjustment',
+          domain: 'nutrition', title: draft.title, detail: draft.detail,
+          actionText: 'Review', detailPath: '/nutrition', evidenceRefs: [],
+        },
+        maintenance: { decisionRevision: revision, interventions: [] },
+        trainingAdherence: { state: 'on_track' },
+        limitations: [],
+      }) as unknown as NonNullable<Parameters<typeof requireCurrentCalorieRecommendation>[2]>
+      const checkRevision = (day: string, rev: string | null | undefined) =>
+        isMaintenanceDecisionRevisionCurrent(day, rev, adapter)
+      await expect(requireCurrentCalorieRecommendation(saved, today, makeControl(initial.revision), checkRevision)).resolves.toBeUndefined()
+      await client.query(
+        `UPDATE nutrition_targets SET calories_target = 2200, updated_at = now()
+         WHERE effective_from = $1::date`, ['2026-10-12'],
+      )
+      const updated = await readMaintenanceDecisionSnapshot(today, adapter)
+      expect(updated.revision).not.toBe(initial.revision)
+      await expect(requireCurrentCalorieRecommendation(saved, today, makeControl(initial.revision), checkRevision))
+        .rejects.toThrow('no longer current')
+      await expect(requireCurrentCalorieRecommendation(saved, today, makeControl(updated.revision!), checkRevision))
+        .rejects.toThrow('no longer current')
+      const legacy = { ...saved, metadata: {} }
+      await expect(requireCurrentCalorieRecommendation(legacy, today, makeControl(updated.revision!), checkRevision))
+        .rejects.toThrow('no longer current')
+      const historic = await client.query(
+        'SELECT response_state, outcome_state, metadata FROM coach_recommendations WHERE id = $1::uuid', [saved.id],
+      )
+      expect(historic.rows).toHaveLength(1)
+      expect(historic.rows[0].metadata.decisionRevision).toBe(initial.revision)
+      expect(historic.rows[0].response_state).toBeNull()
+    } finally {
+      await client.query('ROLLBACK')
+    }
   })
 
 })
