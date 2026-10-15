@@ -113,7 +113,7 @@ export function TodayPage() {
       retryToday.current()
       void loadCoach()
       void loadGoalControl()
-    })
+    }, { revalidateOnFocus: true })
     return () => {
       unsubscribe()
       ++coach.generation
