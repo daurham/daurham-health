@@ -4,6 +4,13 @@ import { progressionSeriesForOpportunity } from '@/domain/training-progression'
 import { quietButtonClass } from '@/lib'
 import { prefixedPath, useAppPathPrefix } from '@/lib/app-prefix'
 
+/** Display a measured rank statistic, not a probability or p-value. */
+function spearmanLabel(rho: number | null): string {
+  if (rho == null || !Number.isFinite(rho) || Math.abs(rho) > 1) return 'unavailable'
+  const rounded = Math.round(rho * 100) / 100
+  return (rounded > 0 ? '+' : '') + rounded.toFixed(2)
+}
+
 export function GoalControlCard({
   state,
   pending,
@@ -106,12 +113,18 @@ export function GoalControlCard({
             {state.relationships.map((item) => (
               <li key={item.id} className="rounded-md border border-zinc-100 p-2">
                 <p className="font-medium text-zinc-800">{item.summary}</p>
-                <p className="mt-1">Paired-sample confidence: {item.confidence} · {item.sampleSize} matched date pairs
+                <p className="mt-1">Matched-pair count grade: {item.confidence} · {item.sampleSize} matched date pairs
                   {item.evidence ? ` · screening minimum ${item.evidence.requiredPairs} pairs` : ''}.
-                  Confidence here does not establish causation or control for confounders.
+                  This grade describes sample availability, not statistical certainty.
                 </p>
                 {item.evidence ? (
                   <>
+                    <p className="mt-1">
+                      Spearman rank correlation (ρ): {spearmanLabel(item.evidence.rho)}
+                      {' '}· reported strength: {item.evidence.strength ?? 'unavailable'}.
+                      The coefficient describes recorded rank co-movement; statistical significance,
+                      adjustment for confounders, and a causal effect have not been established.
+                    </p>
                     <p className="mt-1">Source observation window: {item.evidence.sourceWindow.start} to {item.evidence.sourceWindow.end}.
                       {' '}Matched dates: {item.evidence.pairedWindow
                         ? `${item.evidence.pairedWindow.start} to ${item.evidence.pairedWindow.end}`

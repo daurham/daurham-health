@@ -703,3 +703,8 @@ For a missing sleep or wellness signal, expose only the measured observed/eligib
 ## Decision: paired observational relationships must show their evidence scope (PIQ-1.6, 2026-10-15)
 
 A high confidence grade computed from at least 14 paired dates is **not** high confidence that source coverage is complete, nor evidence that one signal causes another. Present the currently selected Goal Control relationships only as observational: report actual matched dates, paired sample count/screening minimum, time lag, source observation window, independent per-signal coverage and source provenance, with clearly stated confounder and missingness limits. If coverage details are unavailable, say so rather than substituting zeros or Goal Control's shorter weekly window. Do not make new prescriptions or change evidence eligibility and never treat a correlation as intervention proof.
+
+
+## Decision: count-based grade is not statistical confidence in a correlation (PIQ-1.6, 2026-10-15)
+
+Do not label the count-derived Health Intelligence relationship grade as general statistical certainty. Preserve the already-calculated original Spearman coefficient and magnitude separately from the count grade; disclose both next to source dates and matched-pair counts with explicit observational, significance and confounding limits. Missing or invalid coefficients are unavailable, not zero. No re-estimation, invented p-values, causal claims, or automatic owner action.

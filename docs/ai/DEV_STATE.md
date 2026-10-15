@@ -400,3 +400,8 @@ Goal Control missing-signal limitations carry optional exact observation-window 
 ## 2026-10-15 PIQ-1.6 paired-signal association evidence — work branch
 
 Goal Overview now has a collapsed observational relationship disclosure with actual paired dates, sample minimum, lag, source window, independently derived source coverage and provenance, plus an explicit non-causality caveat. Existing Health Intelligence correlation thresholds/ranking are unchanged; tests include real synthetic data and absent coverage. No DB migration, provider call, production data change, deployment or `main` merge. CI and owner QA pending.
+
+
+## 2026-10-15 PIQ-1.6 observational coefficient meaning — work branch
+
+Goal Overview now distinguishes paired-date count grading from Spearman rank-association magnitude and its original categorical strength, and explicitly avoids claiming statistical significance, confounder control or causation. An unavailable coefficient remains unavailable. The Health Intelligence relationship calculation itself is unchanged. Synthetic and SSR regressions added; CI and owner-device QA remain gates. No schema, prod, Gemini or canonical owner data changes.

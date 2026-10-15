@@ -46,8 +46,13 @@ function render(state: GoalControlState) {
 
 describe('PIQ-1.6 paired relationship evidence is observational', () => {
   it('shows verified pair window and separate per-signal source provenance, without claiming causation', () => {
-    const state = buildGoalControlState({ asOf, ...inputs(16) })
+    const data = inputs(16)
+    const state = buildGoalControlState({ asOf, ...data })
     const rel = state.relationships.find((item) => item.id === 'shared:sleep:energy')
+    const measured = data.intelligence.relationships.find((item) => item.id === 'shared:sleep:energy')
+    expect(rel?.evidence?.rho).toBe(measured?.rho)
+    expect(rel?.evidence?.strength).toBe(measured?.strength)
+    expect(typeof rel?.evidence?.rho).toBe('number')
     expect(rel).toBeDefined()
     expect(rel?.sampleSize).toBe(16)
     expect(rel?.confidence).toBe('high')
@@ -65,7 +70,12 @@ describe('PIQ-1.6 paired relationship evidence is observational', () => {
     expect(state.period).toEqual({ start: '2026-10-08', end: '2026-10-14' })
     const html = render(state)
     expect(html).toContain('Observed relationships (1) · not causal')
-    expect(html).toContain('Paired-sample confidence: high · 16 matched date pairs')
+    expect(html).toContain('Matched-pair count grade: high · 16 matched date pairs')
+    expect(html).toContain('This grade describes sample availability, not statistical certainty')
+    expect(html).toContain('Spearman rank correlation (ρ): ')
+    expect(html).toContain('reported strength: ')
+    expect(html).toContain('statistical significance,')
+    expect(html).toContain('a causal effect have not been established')
     expect(html).toContain('screening minimum 10 pairs')
     expect(html).toContain('Source observation window: 2026-09-17 to 2026-10-14')
     expect(html).toContain('Matched dates: 2026-09-20 to 2026-10-05')
@@ -82,6 +92,20 @@ describe('PIQ-1.6 paired relationship evidence is observational', () => {
     const state = buildGoalControlState({ asOf, ...inputs(8) })
     expect(state.relationships).toEqual([])
     expect(render(state)).not.toContain('Observed relationships (')
+  })
+
+  it('does not invent a coefficient when its source evidence lacks one', () => {
+    const state = buildGoalControlState({ asOf, ...inputs(16) })
+    const relationship = state.relationships[0]!
+    const noCoefficient: GoalControlState = {
+      ...state, relationships: [{
+        ...relationship, evidence: { ...relationship.evidence!, rho: null, strength: null },
+      }],
+    }
+    const html = render(noCoefficient)
+    expect(html).toContain('Spearman rank correlation (ρ): unavailable')
+    expect(html).toContain('reported strength: unavailable')
+    expect(html).not.toContain('NaN')
   })
 
   it('reports unavailable provenance as unavailable, never invented zero-coverage evidence', () => {

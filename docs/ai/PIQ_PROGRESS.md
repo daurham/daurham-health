@@ -1203,3 +1203,16 @@ HAVING COUNT(*) > 1;
 **Verification:** Synthetic 16-paired-day, mismatched high pair/moderate source confidence test; sparse eight-pair exclusion; missing coverage explicitly unavailable; React SSR disclosure and source links. CI, owner mobile layout and real-data reliability remain required. The older migration `0054` remains unapplied in production and separately approval-gated; no `main` merge or production write.
 
 **Remaining PIQ-1.6:** statistically calibrated uncertainty on relationships and effects, raw source-event invalidation, trial/outcome confounding controls, owner-verified UX and production schema readiness.
+
+
+## PIQ-1.6 — Correlation magnitude distinct from evidence quantity (2026-10-15)
+
+**State:** Bounded PIQ work-branch implementation. Full CI and owner-authenticated mobile acceptance required. **0/9 phases owner-accepted.**
+
+**Problem:** Goal Overview called 16+ paired observations a high-confidence relationship without exposing the rank-association coefficient. A count-based grade could be mistaken for a test of statistical significance, confidence in causation, or strength of co-movement. The underlying Health Intelligence already computed Spearman's rank coefficient and a separate magnitude category.
+
+**Contract:** For the already-screened, goal-relevant observed associations, preserve their original Spearman `rho` and categorical `strength` without recalculation. The Goal Overview evidence disclosure now labels the existing grade **matched-pair count grade**, independently shows the signed correlation coefficient and strength, and states that neither statistical significance, confounder adjustment nor a causal effect has been established. Null, nonfinite or out-of-range source coefficients remain unavailable rather than becoming false zeros or invented statistics. Source windows, matched dates, coverage/provenance, relevance eligibility, order and the three-card cap remain unchanged.
+
+**Verification:** Derived synthetic 16-pair evidence matches the original snapshot's coefficient/strength exactly; server-rendered UI shows the distinct count grade, signed rank coefficient and non-causality; missing coefficient renders unavailable; previously tested eight-pair nonqualification and missing provenance remain guarded. No new correlation algorithm, threshold/claim, health-record modification, Gemini/provider call, migration, `main` merge or production deployment.
+
+**Still open:** Formal statistical calibration and sensitivity to longitudinal trends, multiple comparisons/autocorrelation and incomplete observation, direct raw-source revision guarantees, owner iOS/mobile QA and release preflights. Migration `0054` remains unapplied and owner-gated.

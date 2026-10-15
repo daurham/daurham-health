@@ -77,7 +77,7 @@ export type GoalControlLimitation = {
 export type GoalControlRelationship = {
   id: string
   summary: string
-  /** Confidence of the paired-sample signal, not evidence of causation. */
+  /** Existing grade from matched-pair count, NOT statistical confidence or a p-value. */
   confidence: IntelligenceConfidence
   sampleSize: number
   detailPaths: string[]
@@ -87,6 +87,8 @@ export type GoalControlRelationship = {
     pairedWindow: { start: string; end: string } | null
     requiredPairs: number
     lagDays: number
+    /** Original Spearman rank coefficient, separate from the count-based grade. */
+    rho: number | null
     strength: 'weak' | 'moderate' | 'strong' | null
     /** Raw signal coverage, not necessarily the subset of paired dates. */
     sources: GoalControlEvidenceCoverage[]
@@ -352,6 +354,7 @@ function relationshipsFor(
           pairedWindow: dates.length ? { start: dates[0]!, end: dates[dates.length - 1]! } : null,
           requiredPairs: item.requiredSampleSize,
           lagDays: item.lagDays,
+          rho: typeof item.rho === 'number' && Number.isFinite(item.rho) && Math.abs(item.rho) <= 1 ? item.rho : null,
           strength: item.strength,
           sources,
         },
