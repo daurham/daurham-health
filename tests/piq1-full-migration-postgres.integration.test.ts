@@ -24,6 +24,7 @@ const adapter = { query: async (text: string, params?: unknown[]) =>
 
 function serializedConfirmation(row: Record<string, unknown>): BackupRow {
   const definition = backupTable('nutrition_day_completeness')
+  if (!definition) throw new Error('Confirmation table is missing from backup inventory')
   return Object.fromEntries(definition.columns.map(({ name, kind }) => {
     const value = row[name]
     if (value == null) return [name, null]
