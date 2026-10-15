@@ -56,7 +56,7 @@ function observation(
   }
 }
 
-function intelligence(observations: IntelligenceObservation[]) {
+function intelligence(observations: IntelligenceObservation[], verifiedDays?: ReadonlySet<string>, verificationUnavailable = false) {
   return buildHealthIntelligenceSnapshot({
     range: '30d',
     asOf: AS_OF,
@@ -65,6 +65,8 @@ function intelligence(observations: IntelligenceObservation[]) {
     timezone: 'America/Phoenix',
     today: AS_OF,
     observations,
+    nutritionVerifiedCompleteDates: verifiedDays,
+    nutritionVerificationStatus: verificationUnavailable ? 'unavailable' : 'available',
   })
 }
 
@@ -199,7 +201,7 @@ describe('I6 Goal Control authority', () => {
     const state = buildGoalControlState({
       asOf: AS_OF,
       brief: brief(),
-      intelligence: intelligence(observations),
+      intelligence: intelligence(observations, new Set(['2026-10-01', '2026-10-02', '2026-10-04'])),
       goals: [],
       trainingPlan: null,
     })
@@ -216,7 +218,7 @@ describe('I6 Goal Control authority', () => {
     const enough = buildGoalControlState({
       asOf: AS_OF,
       brief: brief(),
-      intelligence: intelligence(observations),
+      intelligence: intelligence(observations, new Set(['2026-10-01', '2026-10-02', '2026-10-04', '2026-10-05'])),
       goals: [],
       trainingPlan: null,
     })
