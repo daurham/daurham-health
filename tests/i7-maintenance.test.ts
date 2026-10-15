@@ -201,22 +201,24 @@ describe('I7 short-term scale-noise context', () => {
   it('uses sodium, carbs, logged water, bowel and Daily Context as non-causal reasons to defer a plateau call', () => {
     const observations: IntelligenceObservation[] = []
     const start = '2026-09-24'
+    const completeDates = new Set<string>()
     for (let offset = 0; offset < 14; offset += 1) {
       const date = addCalendarDays(start, offset)
       if (offset >= 4) {
-        observations.push(obs('nutrition.calories', date, 2000, { quality: 'high_confidence' }))
+        completeDates.add(date)
+        observations.push(obs('nutrition.calories', date, 2000, { quality: 'high_confidence', sourceIds: [date + '-meal'] }))
       }
       if ([0, 3, 6, 9, 12].includes(offset)) {
         observations.push(obs('body.weight_kg', date, 85, { quality: 'usual' }))
       }
       if (offset < 11) {
-        observations.push(obs('nutrition.sodium_mg', date, 1800, { quality: 'high_confidence' }))
-        observations.push(obs('nutrition.carbs_g', date, 150, { quality: 'high_confidence' }))
+        observations.push(obs('nutrition.sodium_mg', date, 1800, { quality: 'high_confidence', sourceIds: [date + '-meal'] }))
+        observations.push(obs('nutrition.carbs_g', date, 150, { quality: 'high_confidence', sourceIds: [date + '-meal'] }))
         observations.push(obs('hydration.ml', date, 1800))
         observations.push(obs('bowel.count', date, 1))
       } else {
-        observations.push(obs('nutrition.sodium_mg', date, 2800, { quality: 'high_confidence' }))
-        observations.push(obs('nutrition.carbs_g', date, 230, { quality: 'high_confidence' }))
+        observations.push(obs('nutrition.sodium_mg', date, 2800, { quality: 'high_confidence', sourceIds: [date + '-meal'] }))
+        observations.push(obs('nutrition.carbs_g', date, 230, { quality: 'high_confidence', sourceIds: [date + '-meal'] }))
         observations.push(obs('hydration.ml', date, 2600))
         observations.push(obs('bowel.count', date, 0))
       }
@@ -225,6 +227,7 @@ describe('I7 short-term scale-noise context', () => {
       asOf: AS_OF,
       today: AS_OF,
       intelligence: snapshot(observations),
+      eligibleNutritionDates: completeDates,
       contexts: [context('2026-10-06', ['late_meal']), context('2026-10-07', ['unusual_stress'])],
       weightGoal: loseGoal(),
     })
@@ -234,6 +237,8 @@ describe('I7 short-term scale-noise context', () => {
       expect.arrayContaining(['sodium', 'carbohydrate', 'hydration', 'bowel', 'context']),
     )
     expect(state.noiseFactors.every((item) => /not proof|not fat-mass|not total hydration|does not infer|without assigning causality/i.test(item.detail))).toBe(true)
+    expect(state.noiseFactors.find((item) => item.kind === 'sodium')?.detail).toContain('owner-confirmed')
+    expect(state.noiseFactors.find((item) => item.kind === 'carbohydrate')?.detail).toContain('owner-confirmed')
     expect(state.plateau.state).toBe('noise_obscured')
     expect(state.interventions.find((item) => item.kind === 'hold_course')?.title).toContain('Hold')
     expect(state.calibration.eligible).toBe(true)
