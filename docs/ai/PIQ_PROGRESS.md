@@ -685,3 +685,30 @@ Stop expanding test counts for their own sake. Next, pursue runtime verification
 **Next bounded task:** Improve *user-facing* evidence/confidence explanations for maintenance, plateau, and calorie-review gating, and/or qualify saved recommendation lifecycle through isolated database/API tests before PIQ-1.2 acceptance. Preserve distinct uncertainty and avoid presenting heuristic calorie floors as clinical approval.
 
 **Continuation:** Repo `daurham/daurham-health`; branch `piq/00-baseline-20261014`; validated code `f285d06`; `main` unchanged. Owner QA, production-schema-clone, day-completeness migration 0053 production status all unresolved. **0/9 full PIQ phases accepted**.
+
+## PIQ-1.2 — Separate Nutrition, weight, plateau and decision confidence explanations in Coach (2026-10-15)
+
+**Status:** Bounded implementation fully **branch-validated**, but **not deployed or owner-accepted**. PIQ-1.2 still needs physiological-personalization/owner-realistic review; **0/9 complete PIQ phases accepted**.
+
+**Problem:** Before this slice, `MaintenanceEstimate.confidence` summarized combined sampling, while `GoalControlState.confidence` broadly summarized cross-domain coverage. Maintenance had objective sample counts and a separate calorie safety gate, but Coach recommendation cards showed a narrative and action without making their distinct evidence/decision strengths visible. This could mislead an owner into treating a plausible observed-maintenance estimate as confidence in the cause of a plateau or authorization for another calorie reduction.
+
+**Implementation:**
+- `src/domain/maintenance.ts`: new `MaintenanceEvidenceExplanation` with four independent labeled/statused fields, returned on every `MaintenanceState`:
+  1. `nutrition`: eligible completed-day calorie observations **N of days**, high-source-quality, estimated/unknown counts, and owner-confirmed full-day report caveat. If no verified-day whitelist is provided, never describe source-only evidence as verified `well_sampled`.
+  2. `weightTrend`: comparable weigh-ins, span, measurement-condition quality, and remaining scale/noise limitations.
+  3. `plateau`: empirical window dates, percent-per-week robust weight trend, classifier result, possible confounders and explicit no-causality note. `likely` is a deterministic classification, not a calculated medical probability.
+  4. `calorieDecision`: `review_only`, `withheld`, or `not_applicable`, with concrete blocked reasons and no clinical clearance; a passing 1500/80% heuristic threshold is not personalized medical safety evidence. No targets are updated.
+- `src/domain/coach-intelligence.ts` and `server/intelligence/coach-intelligence.ts`: carry the breakdown on **only Maintenance-derived** fresh recommendation drafts/views; unrelated training and broad Coach evidence retain their existing semantics. The broad `confidence` field remains intact and is not mislabeled as clinical safety.
+- `src/features/coach/CoachCard.tsx`: a compact collapsed `<details>` element named **How this was assessed**, with four explicitly separate disclosure entries (Food-log evidence, Weight-trend evidence, Plateau assessment, Calorie-change decision). Other cards remain compact; no new navigation/UX burden.
+- `tests/piq1-maintenance-confidence-explanations.test.ts` adds **eight synthetic regressions**: fully verified 28-day data, a plausible high-confidence estimate with unsafe existing target, repeated low energy despite good scale data, sparse verified days retaining weight signal while hiding estimate, legacy no-whitelist not claiming complete days, weight moving toward goal, blocked review propagated into Coach, and optional eligible review with no automatic action.
+- `tests/piq1-coach-confidence-ui.test.tsx` adds **two server-render checks** confirming four disclosure labels when Maintenance evidence is attached and no spurious disclosure for unrelated cards. UI component exported for deterministic SSR. Existing route response types remain backward compatible via optional view field.
+
+**Validation / QA:** First CI for partial code surfaced a TypeScript compatibility error due to `String.replaceAll()` in the new UI; corrected to supported `.replace(/_/g, ' ')`. Final validated code SHA **`8dcfe6c0d4b2f432cd9fffc7b26342cf20a5b526`**: [GitHub Actions run 38758823374](https://github.com/daurham/daurham-health/actions/runs/38758823374) **SUCCESS** (npm ci, `npx tsc -b`, `npx eslint .`, **1744 tests passed / 14 skipped** across 228 passed files / 2 skipped, and `npm run build`). All fixture records are synthetic; owner mobile/browser QA remains outstanding. No new paid-model calls or migrations.
+
+**Scope / still needed:** Explanations are deterministic and cannot establish actual full-day logging or an individualized safe calorie floor. Numerical observations are estimates of energy balance, not measured metabolism; no probability or causal attribution is asserted. Need real-owner acceptance and review of understandable copy on mobile; expert/owner assessment of a physiological lower-intake screen and strength/goal tradeoffs; e2e saved Coach stale-ID/API lifecycle coverage; comparison of confidence source-version freshness; future PIQ-1.3 source reliability and later PIQ-3/4 answer quality. The app's production schema head and whether 0053 is applied remain unverified.
+
+**Release:** `piq/00-baseline-20261014` only; **`main` `dbc3fcb68324d75d30a96132b725456ec7e45d49` unchanged**, no deployment, production migration, target edits, owner-data writes, or Gemini spending. PIQ-1.1 and PIQ-1.2 remain branch-prepared, not owner accepted.
+
+**Next bounded direction:** Exercise stale recommendation lifecycle via a disposable PostgreSQL/API integration fixture, particularly older accepted IDs and >24 due follow-ups. Then undertake remaining PIQ-1.2 owner-relevant physiological screening and live mobile validation; do not release before explicit signoff.
+
+**Continuation:** Repo `daurham/daurham-health`, dev branch `piq/00-baseline-20261014`, validated code `8dcfe6c0`, 0/9 phases accepted.

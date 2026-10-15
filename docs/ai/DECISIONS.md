@@ -545,3 +545,12 @@ Observed from the current code and product docs. Where the original rationale is
 **Status:** Branch-validated; owner/prod release still blocked.  
 **Policy:** Attach the qualifying target/goals/experiments revision fingerprint to every persisted calorie or dependent activity review. To present an accepted row as a due follow-up or to accept a new response by an old recommendation ID, require a valid original fingerprint matching a newly checked settings revision *and* live quality/safety-qualified Coach evidence still generating that recommendation fingerprint. Missing/legacy metadata, changed settings, now-ineligible evidence and failed reads always withhold numeric action. Filter saved rows before the three-visible-follow-up cap; leave unrelated training follow-ups, owner response memory and historical outcomes intact. Reject stale responses with a clear HTTP 409. Never auto-edit targets, erase outcome history or infer that a stale row is medically safe because the previous response was `do_this`.  
 **Known gaps:** Optimistic final check is not atomic with SQL write; records beyond the due-row query cap and real end-to-end stale-ID API validation remain lifecycle follow-ups.
+
+## Decision: Maintenance confidence is evidence-specific, never a clinical action score (PIQ-1.2, 2026-10-15)
+
+**Branch-validated, not owner-accepted or deployed.**
+- Show four independently derived dimensions: eligible full-day calorie coverage/source quality; comparable weigh-in count/span/conditions; plateau observation window/trend plus possible scale confounders; and whether the *proposed downward calorie review* is withheld, inapplicable, or eligible only for owner review.
+- Verified nutrition days reflect a matching **owner report**, not objective proof every meal was captured. Do not call high-quality entries complete days without that report; preserve all logged observations.
+- A high-confidence empirical maintenance **estimate** does not imply causal proof of a plateau, probability of disease, or approval of a lower calorie target. The floor heuristic cannot certify individual energy sufficiency, and no automatic target changes are authorized.
+- Present the breakdown inside a collapsed accessible details element on Maintenance-backed Coach cards; keep ordinary training Coach cards compact. Neither add model spend nor new SQL/migrations.
+- Branch CI and synthetic UI render tests prove representation under fixtures, not human comprehension on mobile. Owner accept/release tests remain mandatory.
