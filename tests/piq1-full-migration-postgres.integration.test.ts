@@ -420,7 +420,7 @@ describe.skipIf(!url)('PIQ-1.1 full 0001–0053 migration-chain and backup on is
       )
       expect(rejected.rows[0]).toEqual({ response_state: null, response_at: null })
       await client.query(
-        "UPDATE coach_recommendations SET outcome_state = 'helped' WHERE id = $1::uuid", [activity.id],
+        "UPDATE coach_recommendations SET outcome_state = 'helped', outcome_at = now() WHERE id = $1::uuid", [activity.id],
       )
       expect(await activeCalorieDecisionInRevision(adapter, revision)).toBe(false)
       await writeCoachRecommendationResponse(adapter, intake.id, 'do_this', today, async () => undefined, true, null)
