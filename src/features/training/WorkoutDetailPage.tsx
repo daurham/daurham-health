@@ -15,6 +15,7 @@ import {
   secondaryButtonClass,
 } from '@/lib'
 import { createOwnerExercise, deleteSession, fetchExerciseLibrary, fetchSession, fetchTemplates, updateSession } from './api'
+import { subscribeHealthDataChanges } from '@/lib/health-changes'
 import {
   DraftValidationError,
   buildManualWorkoutPayload,
@@ -42,6 +43,13 @@ export function WorkoutDetailPage() {
   const [fieldErrors, setFieldErrors] = useState<ReviewFieldError[]>([])
   const [errorFocusKey, setErrorFocusKey] = useState(0)
   const loadedId = useRef<string | null>(null)
+
+  // Refresh a saved workout after another tab edits it, or when returning
+  // from a different device. Keep the unsaved edit draft untouched.
+  useEffect(() => subscribeHealthDataChanges(
+    () => setReloadToken((current) => current + 1),
+    { revalidateOnFocus: true },
+  ), [])
 
   useEffect(() => {
     if (!sessionId) {
