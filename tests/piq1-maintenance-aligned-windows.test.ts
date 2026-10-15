@@ -73,12 +73,13 @@ describe('PIQ-1.2 aligned maintenance estimate sampling (synthetic)', () => {
     expect(s.interventions.some((i) => i.kind === 'review_intake_adjustment')).toBe(false)
   })
 
-  it('withholds a missing middle-week sample even when three other weeks were perfectly logged', () => {
+  it('rejects a missing middle week for 28-day inference but may use a fully aligned 14-day window', () => {
     const s = analyze({
       nutritionDates: [...dates.slice(0, 7), ...dates.slice(14)],
     })
-    expect(s.estimate.state).toBe('insufficient_evidence')
-    expect(s.estimate.explanation).toContain('seven-day block')
+    expect(s.estimate.state).toBe('available')
+    expect(s.estimate.period?.days).toBe(14)
+    expect(s.estimate.confidence).toBe('moderate')
   })
 
   it('withholds a full logged-intake window when scale measurements only cover its first half', () => {
