@@ -187,6 +187,7 @@ function recommendationView(row: RecommendationRow, draft: CoachRecommendationDr
     actionText: draft.actionText,
     detailPath: draft.detailPath,
     confidence: draft.confidence,
+    ...(draft.evidenceExplanation ? { evidenceExplanation: draft.evidenceExplanation } : {}),
     evidenceRefs: [...draft.evidenceRefs],
     responseState,
     experimentEligible: draft.experimentEligible,
