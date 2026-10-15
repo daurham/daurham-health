@@ -278,13 +278,7 @@ export function CoachCard({ state, pending, error, onState }: {
       const next = await respondCoachRecommendation(item.id, response)
       setIntelligence(next)
       if (response === 'do_this') {
-        navigate(prefixedPath(prefix, item.detailPath))
-      } else if (response === 'turn_into_experiment') {
-        navigate(prefixedPath(prefix, labExperimentHandoffPath({
-          title: item.title,
-          rationale: item.detail,
-          source: 'coach',
-        })))
+        setNotice('Marked as started. Coach will ask how it went after seven days.')
       } else if (response === 'not_now') {
         setNotice('Coach will hold this recommendation for a week.')
       } else {
@@ -468,17 +462,31 @@ export function CoachIntelligencePanel({
                 </details>
               ) : null}
               <div className="mt-2 flex flex-wrap gap-2">
-                <button type="button" className={primaryButtonClass} disabled={pending} onClick={() => onResponse(item, 'do_this')}>
+                <Link to={prefixedPath(prefix, item.detailPath)} className={primaryButtonClass}>
                   {item.actionText}
-                </button>
+                </Link>
+                {item.experimentEligible ? (
+                  <button type="button" className={quietButtonClass} disabled={pending} onClick={() => onResponse(item, 'do_this')}>
+                    I started this
+                  </button>
+                ) : null}
                 <button type="button" className={quietButtonClass} disabled={pending} onClick={() => onResponse(item, 'not_now')}>Not now</button>
                 <button type="button" className={quietButtonClass} disabled={pending} onClick={() => onResponse(item, 'not_relevant')}>Not relevant</button>
                 {item.experimentEligible ? (
-                  <button type="button" className={quietButtonClass} disabled={pending} onClick={() => onResponse(item, 'turn_into_experiment')}>
-                    Experiment
-                  </button>
+                  <Link to={prefixedPath(prefix, labExperimentHandoffPath({
+                    title: item.title,
+                    rationale: item.detail,
+                    source: 'coach',
+                  }))} className={quietButtonClass}>
+                    Explore experiment
+                  </Link>
                 ) : null}
               </div>
+              {item.experimentEligible ? (
+                <p className="mt-2 text-[11px] leading-relaxed text-zinc-500">
+                  Reviewing is not acceptance. Only select “I started this” after taking action; Coach will check in after seven days.
+                </p>
+              ) : null}
             </article>
           ))}
         </div>

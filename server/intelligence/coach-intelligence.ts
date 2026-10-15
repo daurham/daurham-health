@@ -395,6 +395,11 @@ export async function writeCoachRecommendationResponse(
   if (row.recommendation_kind === 'follow_up_question') {
     throw new HttpError(409, 'Follow-up questions do not use recommendation response states')
   }
+  // Evidence collection is a navigation task, not an intervention the owner
+  // can report as already started. Keep old or direct clients fail-closed.
+  if (response === 'do_this' && row.recommendation_kind === 'improve_evidence') {
+    throw new HttpError(409, 'Reviewing evidence does not start a Coach intervention')
+  }
   await assertCurrent(row)
   const suppressUntil = response === 'not_now' ? addCalendarDays(asOf, 7) : null
   const followUpOn = response === 'do_this' ? addCalendarDays(asOf, 7) : null

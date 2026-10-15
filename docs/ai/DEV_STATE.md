@@ -325,3 +325,8 @@ GitHub Actions run `36787289740`:
 V2-H5 — Pantry + Exercise Library + Flexible Programmed Workouts.
 
 The staged contract is in `docs/ai/H5_DRAFT.md` until promoted into `CURRENT_TASK.md`.
+
+
+## 2026-10-15 PIQ-1.5 started vs reviewed guard (work branch)
+
+Read-only review of Coach advice and Lab experiment preview no longer create saved acceptance or seven-day follow-ups. Actionable recommendations expose a separately labeled "I started this" acknowledgement; evidence-only proposals cannot be started. Added server-side 409 guard for legacy/direct evidence-only `do_this` requests. No schema, provider, data or production changes; full CI / owner QA status is recorded in `PIQ_PROGRESS.md`. Branch `piq/00-baseline-20261014` remains isolated from `main`.
