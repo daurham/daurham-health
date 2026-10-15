@@ -132,7 +132,7 @@ function opportunityDraft(
   if (isCalorieDecisionKind(opportunity.kind)) {
     if (opportunity.kind !== 'review_intake_adjustment' ||
         control.nutritionQuality.state !== 'met' ||
-        control.maintenance?.calorieAdjustmentSafety.status !== 'review_possible' ||
+        control.maintenance?.calorieAdjustmentSafety?.status !== 'review_possible' ||
         !control.maintenance.interventions.some((item) =>
           item.id === opportunity.id && item.kind === opportunity.kind)) return null
   }
@@ -186,7 +186,7 @@ function maintenanceDrafts(control: GoalControlState): CoachRecommendationDraft[
     // calorie lever; never surface a standalone dangling alternative card.
     if (item.kind === 'review_activity_adjustment' &&
         (control.primaryOpportunity?.kind !== 'review_intake_adjustment' ||
-         control.maintenance?.calorieAdjustmentSafety.status !== 'review_possible' ||
+         control.maintenance?.calorieAdjustmentSafety?.status !== 'review_possible' ||
          control.nutritionQuality.state !== 'met')) return []
     const id = `maintenance:${item.id}`
     if (control.primaryOpportunity?.id === item.id) return []
