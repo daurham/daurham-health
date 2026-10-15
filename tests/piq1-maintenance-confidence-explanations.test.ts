@@ -127,7 +127,7 @@ describe('PIQ-1.2 independent maintenance evidence vs calorie review explanation
   })
 
   it('does not represent broad cross-domain Coach confidence as clearance to lower calories', () => {
-    const { intelligence, maintenance } = build({ target: 2500 })
+    const { intelligence, maintenance } = build({ target: 2300 })
     const control = buildGoalControlState({ asOf: AS_OF, brief: brief(), intelligence, maintenance, goals: [] })
     const drafts = buildCoachRecommendationDrafts(control)
     const review = drafts.find((x) => x.kind === 'review_intake_adjustment')
