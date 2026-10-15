@@ -186,7 +186,6 @@ function nutritionFacts(input: WeeklyCoachInput, period: WeeklyPeriod, previous:
 } {
   const entries = input.nutritionEntries.filter((entry) => entry.logDate <= period.end)
   const current = nutritionPeriodSummary({ entries, targets: input.nutritionTargets, start: period.start, end: period.end })
-  const prior = nutritionPeriodSummary({ entries, targets: input.nutritionTargets, start: previous.start, end: previous.end })
   const logged = current.loggedDays
   const verified = new Set(input.nutritionVerifiedCompleteDates ?? [])
   const currentVerified = [...verified].filter((date) => date >= period.start && date <= period.end).length
