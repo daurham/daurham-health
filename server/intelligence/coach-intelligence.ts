@@ -212,6 +212,7 @@ export async function dueFollowUps(
     `SELECT ${ROW_COLUMNS}
        FROM coach_recommendations
       WHERE response_state = 'do_this'
+        AND metadata ->> 'ownerStarted' = 'true'
         AND outcome_state IS NULL
         AND follow_up_on IS NOT NULL
         AND follow_up_on <= $1::date
@@ -390,7 +391,11 @@ export async function writeCoachRecommendationResponse(
   response: CoachRecommendationResponse,
   asOf: string,
   assertCurrent: (row: RecommendationRow) => Promise<void>,
+  ownerStarted = false,
 ): Promise<void> {
+  if (response === 'do_this' && !ownerStarted) {
+    throw new HttpError(400, 'Starting Coach advice requires explicit acknowledgement. Refresh Coach and try again.')
+  }
   const row = await recommendationById(sql, id)
   if (row.recommendation_kind === 'follow_up_question') {
     throw new HttpError(409, 'Follow-up questions do not use recommendation response states')
@@ -406,6 +411,9 @@ export async function writeCoachRecommendationResponse(
   await sql.query(
     `UPDATE coach_recommendations
         SET response_state = $2,
+            metadata = CASE WHEN $2 = 'do_this'
+              THEN jsonb_set(COALESCE(metadata, '{}'::jsonb), '{ownerStarted}', 'true'::jsonb, true)
+              ELSE COALESCE(metadata, '{}'::jsonb) - 'ownerStarted' END,
             suppress_until = $3::date,
             follow_up_on = $4::date,
             response_at = now(),
@@ -421,11 +429,13 @@ export async function respondCoachRecommendation(
   id: string,
   response: CoachRecommendationResponse,
   asOf: string,
+  ownerStarted = false,
 ): Promise<CoachIntelligenceState> {
   const sql = await getSql()
   await writeCoachRecommendationResponse(
     sql, id, response, asOf,
     (row) => requireCurrentCalorieRecommendation(row, asOf),
+    ownerStarted,
   )
   return loadCoachIntelligenceState(asOf)
 }
@@ -437,8 +447,8 @@ export async function recordCoachRecommendationOutcome(
 ): Promise<CoachIntelligenceState> {
   const sql = await getSql()
   const row = await recommendationById(sql, id)
-  if (row.response_state !== 'do_this') {
-    throw new HttpError(409, 'Only accepted Coach recommendations can receive an outcome')
+  if (row.response_state !== 'do_this' || row.metadata?.ownerStarted !== true) {
+    throw new HttpError(409, 'An outcome requires an explicitly started action, not a historical review')
   }
   await sql.query(
     `UPDATE coach_recommendations

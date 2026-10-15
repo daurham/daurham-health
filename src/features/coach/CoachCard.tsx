@@ -494,6 +494,9 @@ export function CoachIntelligencePanel({
           {state.followUps.map((item) => (
             <div key={item.id}>
               <p className="text-xs font-semibold text-zinc-900">How did this go? · {item.title}</p>
+              <p className="mt-1 text-xs text-zinc-500">{item.acceptedOn
+                ? `You marked this as started on ${new Date(item.acceptedOn).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}.`
+                : 'You marked this as started.'}</p>
               <div className="mt-2 flex flex-wrap gap-2">
                 <button type="button" className={quietButtonClass} disabled={pending} onClick={() => onOutcome(item.id, 'helped')}>Helped</button>
                 <button type="button" className={quietButtonClass} disabled={pending} onClick={() => onOutcome(item.id, 'no_change')}>No change</button>

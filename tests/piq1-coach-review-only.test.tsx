@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 import type { Sql } from '../server/db.js'
-import { writeCoachRecommendationResponse } from '../server/intelligence/coach-intelligence.js'
+import { dueFollowUps, writeCoachRecommendationResponse } from '../server/intelligence/coach-intelligence.js'
 import { CoachIntelligencePanel } from '../src/features/coach/CoachCard.tsx'
 import type { CoachIntelligenceState, CoachRecommendationView } from '../src/domain/coach-intelligence.js'
 
@@ -70,12 +70,49 @@ describe('PIQ-1.5 viewing advice is not an intervention', () => {
         .mockResolvedValueOnce([])
       const assertCurrent = vi.fn().mockResolvedValue(undefined)
       await writeCoachRecommendationResponse(
-        { query } as unknown as Sql, ID, response, '2026-10-15', assertCurrent,
+        { query } as unknown as Sql, ID, response, '2026-10-15', assertCurrent, response === 'do_this',
       )
       expect(assertCurrent).toHaveBeenCalledTimes(1)
       expect(query).toHaveBeenCalledTimes(2)
       const [, params] = query.mock.calls[1]
       expect(params[3]).toBe(response === 'do_this' ? '2026-10-22' : null)
     }
+  })
+
+  it('fails closed for legacy do_this callers without a started acknowledgement', async () => {
+    const query = vi.fn()
+    await expect(writeCoachRecommendationResponse(
+      { query } as unknown as Sql, ID, 'do_this', '2026-10-15', async () => undefined,
+    )).rejects.toMatchObject({ statusCode: 400 })
+    expect(query).not.toHaveBeenCalled()
+  })
+
+  it('records started provenance and clears the marker on other owner decisions', async () => {
+    for (const response of ['do_this', 'not_now', 'not_relevant'] as const) {
+      const query = vi.fn().mockResolvedValueOnce([{ recommendation_kind: 'training_progression' }]).mockResolvedValueOnce([])
+      await writeCoachRecommendationResponse(
+        { query } as unknown as Sql, ID, response, '2026-10-15', async () => undefined, response === 'do_this',
+      )
+      const [sql, params] = query.mock.calls[1] as [string, unknown[]]
+      expect(sql).toContain("jsonb_set(COALESCE(metadata, '{}'::jsonb), '{ownerStarted}', 'true'::jsonb, true)")
+      expect(sql).toContain("COALESCE(metadata, '{}'::jsonb) - 'ownerStarted'")
+      expect(params[3]).toBe(response === 'do_this' ? '2026-10-22' : null)
+    }
+  })
+
+  it('requires started provenance in the due follow-up SQL, excluding prior review-only data', async () => {
+    const query = vi.fn().mockResolvedValue([])
+    await dueFollowUps({ query } as unknown as Sql, '2026-10-23', null, [])
+    const [statement] = query.mock.calls[0] as [string, unknown[]]
+    expect(statement).toContain("metadata ->> 'ownerStarted' = 'true'")
+    expect(statement).toContain("response_state = 'do_this'")
+    expect(statement).toContain("outcome_state IS NULL")
+  })
+
+  it('the client only sends ownerStarted for an explicit start', () => {
+    const api = readFileSync('src/features/coach/api.ts', 'utf8')
+    const handler = readFileSync('server/handlers/coach-intelligence.ts', 'utf8')
+    expect(api).toContain("response === 'do_this' ? { response, ownerStarted: true } : { response }")
+    expect(handler).toContain("response, date, body.ownerStarted === true")
   })
 })

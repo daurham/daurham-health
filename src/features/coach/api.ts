@@ -108,7 +108,7 @@ export function respondCoachRecommendation(
   return sendCoachIntelligence(
     `/api/intelligence/coach/recommendations/${recommendationId}/respond`,
     'POST',
-    { response },
+    response === 'do_this' ? { response, ownerStarted: true } : { response },
   )
 }
 
