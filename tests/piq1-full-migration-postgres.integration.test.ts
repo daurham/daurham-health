@@ -11,6 +11,7 @@ import { randomUUID } from 'node:crypto'
 import { PERFORMED_STRENGTH_EXERCISES_SQL } from '../server/training/plan-service.js'
 import { buildTrainingWeekQualification, buildTrainingRoutineCredits, type PerformedExerciseEvidence } from '../src/domain/training-qualification.js'
 import { buildTrainingProgressSummary } from '../src/domain/training-progress-summary.js'
+import { buildGuardedWorkoutEditQueries, type PreparedManualSession } from '../server/training/service.js'
 
 /**
  * Only runs under CI's explicit PIQ_POSTGRES_URL. Uses its own isolated schema
@@ -501,6 +502,104 @@ describe.skipIf(!url)('PIQ-1.1 full 0001–0053 migration-chain and backup on is
       expect(buildTrainingWeekQualification(await actualTrainingEvidence('2026-10-14'), '2026-10-14')
         .completedDays).toBe(0)
       expect(buildTrainingRoutineCredits(await actualTrainingEvidence('2026-10-14'))).toEqual([])
+    } finally {
+      await client.query('ROLLBACK')
+    }
+  })
+
+  it('PIQ-1.4: real PostgreSQL row-CAS replaces sets atomically and blocks an old token without deleting anything', async () => {
+    await client.query('BEGIN')
+    try {
+      const original = await insertFictionalWorkout({
+        workoutDate: '2026-10-14', sessionType: 'ad_hoc',
+        exercises: [{ externalId: 'EX01' }],
+      })
+      const oldRows = await client.query(
+        'SELECT xmin::text AS version FROM workout_sessions WHERE id = $1::uuid',
+        [original.sessionId],
+      )
+      const originalVersion = String(oldRows.rows[0]?.version)
+      const definition = await client.query(
+        "SELECT id::text AS id, name FROM exercise_definitions WHERE external_id = 'EX02'",
+      )
+      expect(definition.rows).toHaveLength(1)
+      const newExerciseId = randomUUID()
+      const prepared = {
+        sessionId: original.sessionId, workoutDate: '2026-10-13', workoutTemplateId: null,
+        routineCode: null, templateVersion: null, templateName: null,
+        durationMin: 42, effort: 3, painLevel: 0, limitationKind: null,
+        limitationNote: null, bodyweightKg: 80, notes: 'A newly saved session',
+        sourceKind: 'manual', sessionType: 'ad_hoc', sessionName: 'Updated workout',
+        experimentId: null, benchmarkProtocolVersionId: null, metadata: {},
+        exercises: [{
+          id: newExerciseId, exerciseDefinitionId: String(definition.rows[0].id), position: 1,
+          slotId: null, exerciseExternalId: 'EX02',
+          exerciseName: String(definition.rows[0].name), notes: null,
+          sets: [{
+            setNumber: 1, setType: 'working', loadState: 'bodyweight', weightKg: null,
+            reps: 12, durationSec: null, leftReps: null, rightReps: null,
+            leftDurationSec: null, rightDurationSec: null, distanceM: null,
+            completed: null, rir: 2, rpe: 7, failureKind: null,
+            leftFailureKind: null, rightFailureKind: null, notes: null,
+          }],
+        }],
+      } as PreparedManualSession
+      type QueryPart = { text: string; params: unknown[] }
+      const makeQueries = (revision: string) => buildGuardedWorkoutEditQueries(
+        { query: (text: string, params: unknown[]) => ({ text, params }) } as unknown as Sql,
+        prepared, revision, randomUUID(),
+      ) as unknown as QueryPart[]
+      async function execute(parts: QueryPart[]) {
+        // Mirrors the ordered statements of the Neon HTTP transaction batch,
+        // inside the parent test's rollback-only transaction.
+        const results: Array<Array<Record<string, unknown>>> = []
+        await client.query('SAVEPOINT piq_cas_attempt')
+        try {
+          for (const part of parts) {
+            const outcome = await client.query(part.text, part.params)
+            results.push(outcome.rows)
+          }
+          await client.query('RELEASE SAVEPOINT piq_cas_attempt')
+          return results
+        } catch (error) {
+          await client.query('ROLLBACK TO SAVEPOINT piq_cas_attempt')
+          throw error
+        }
+      }
+      const success = await execute(makeQueries(originalVersion))
+      expect(success[0]).toHaveLength(1)
+      const after = await client.query(
+        `SELECT xmin::text AS version, workout_date::text AS date, notes,
+                metadata ? '_piq_edit_nonce' AS nonce_present
+           FROM workout_sessions WHERE id = $1::uuid`,
+        [original.sessionId],
+      )
+      expect(after.rows[0]).toMatchObject({
+        date: '2026-10-13', notes: 'A newly saved session', nonce_present: false,
+      })
+      expect(after.rows[0].version).not.toBe(originalVersion)
+      const newExercise = await client.query(
+        'SELECT id::text AS id, exercise_name FROM workout_session_exercises WHERE workout_session_id = $1::uuid',
+        [original.sessionId],
+      )
+      expect(newExercise.rows).toEqual([{ id: newExerciseId, exercise_name: definition.rows[0].name }])
+      const newSets = await client.query(
+        'SELECT reps, set_type FROM workout_sets WHERE workout_session_exercise_id = $1::uuid',
+        [newExerciseId],
+      )
+      expect(newSets.rows).toEqual([{ reps: 12, set_type: 'working' }])
+      const stale = await execute(makeQueries(originalVersion))
+      expect(stale[0]).toEqual([])
+      expect((await client.query(
+        'SELECT id::text AS id FROM workout_session_exercises WHERE workout_session_id = $1::uuid',
+        [original.sessionId],
+      )).rows).toEqual([{ id: newExerciseId }])
+      expect((await client.query(
+        'SELECT reps FROM workout_sets WHERE workout_session_exercise_id = $1::uuid', [newExerciseId],
+      )).rows).toEqual([{ reps: 12 }])
+      expect((await client.query(
+        'SELECT xmin::text AS version FROM workout_sessions WHERE id = $1::uuid', [original.sessionId],
+      )).rows[0].version).toBe(after.rows[0].version)
     } finally {
       await client.query('ROLLBACK')
     }
