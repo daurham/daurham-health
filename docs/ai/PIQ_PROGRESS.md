@@ -334,16 +334,37 @@ Stop expanding test counts for their own sake. Next, pursue runtime verification
 
 **Phase scoreboard:** PIQ-0 active/open. PIQ-1.1 persistence backend implemented on branch with green code CI, **not end-to-end complete**. PIQ-1 full phase unaccepted; PIQ-2–7 pending and PIQ-8 deferred. **0/9 phases complete**.
 
+## PIQ-1.1 Nutrition owner review UI — branch code validated
+
+**Code:** `9b1686a1882c98343101b46f3f441ae0f2a66c8e` — **CI:** [GitHub Actions 38685607348](https://github.com/daurham/daurham-health/actions/runs/38685607348) **SUCCESS** (npm ci, TS, ESLint, full Vitest, production build).
+
+- `src/features/nutrition/api.ts`: typed, same-origin, owner-authenticated client GET/PUT for revision/version-bound daily completeness; no Gemini usage.
+- `src/features/nutrition/DayCompletenessCard.tsx`: optional compact inline Nutrition review card, low-friction sheet for **everything logged / some missing / unsure**; empty days require an explicit whole-day fasting acknowledgment to mark complete. Clear provisional-today, partial, unknown, fast, data-ineligible and **needs re-confirmation** states.
+- `src/features/nutrition/NutritionPage.tsx`: card below Nutrition summary without changing existing Add Food/Quick Add interactions; source row edits cause a fresh GET. Abort stale requests and guard against in-flight save completing after the food log changes; saving state resets on canonical reload.
+- Graceful **unavailable** messaging and retry rather than blocking or falsely marking a day complete if migration 0053 has not been deployed. A stale/conflicting save prompts an authoritative refresh; no automatic owner assertion.
+- `tests/piq1-nutrition-completeness-ui.test.ts`: **7 synthetic presentational state checks**. **No real mobile tap-through or database-backed GET/PUT** was performed. User device and live API QA remain unverified.
+- **No production merge, migration, deploy, owner-data access, AI billing, maintenance recommendation/goal or calorie target mutation.** This UI is **feature-branch-only**; the existing maintenance/Coach path does not consume confirmations.
+
+### PIQ-1.1 outstanding acceptance gates
+
+1. **Real SQL/transaction verification** on disposable Neon/Postgres; migration `0053` is committed but unapplied. Verify extension availability, digest behavior, exclusion joins, concurrent food updates and atomic 409, history/default unknown, and backup/restore.
+2. Verify live production migration head and deployed commit using authorized read-only access; do not infer from GitHub source or build status.
+3. Run owner mobile preview QA (day navigation, food edits while sheet open, fasting choices, 409/503, retry and undo) when isolated DB is available.
+4. Only then wire verified complete-and-source-reliable days to real maintenance/Coach/Goal Control. Preserve all logs and T03 no-auto-calorie-cut invariant. Require adequate confirmed-calendar coverage; mark insufficient otherwise.
+5. Continue PIQ-0 real model quality/cost/latency and owner acceptance gates independently.
+
+**Phase truth: 0/9 completed. PIQ-0 remains open. PIQ-1.1 backend/domain/UI code is CI-validated on branch, not database-validated or end-to-end accepted.**
+
 ## Release state / constraints
 
 - Branch-only preparation: **no production deployments, database migrations, schema changes, AI API calls, or owner data writes performed by this PIQ work**.
 - The Vercel connector's project discovery succeeding does not imply deployment inspection permission.
 - A future phase may use read-only owner-authorized database/project access; never apply migrations merely to satisfy a baseline document.
-- Branch CI for latest implementation: **success** — Actions run `38684874814` on `1b47aaff`, all standard checks passed. Documentation-only commits do not imply new code validation.
+- Branch CI for latest implementation: **success** — Actions run `38685607348` on `9b1686a`, all standard checks passed. Documentation-only commits do not imply new code validation.
 
 ## Continuation packet — NEXT SESSION
 
-**Task:** PIQ-1.1 next action: validate migration 0053 and read/write SQL in an authorized disposable Neon branch, then add owner Nutrition confirmation UI and wire persisted/revision-verified complete days into maintenance, Coach and Goal Control. PIQ-0 live baseline remains unverified; do not mark either phase complete or deploy calorie-target changes.
+**Task:** PIQ-1.1 next action: validate migration 0053 plus digest and revision/version write SQL in a disposable Neon/Postgres branch, then run mobile owner confirmation QA. Only after database validation wire persisted/revision-verified complete days into maintenance, Coach and Goal Control. PIQ-0 live baseline remains unverified; no production merge or calorie-target changes.
 
 **First steps:** Read master §§0–6 + PIQ-0 + §§17–21; inspect this file; verify current main/feature branch, production status, CI and schema. Try authorized Vercel project scope and Neon lookup only if access exists. Reconcile `CURRENT_TASK.md` drift once the verified production state is available. Confirm the baseline contract is still aligned with owner's purpose.
 

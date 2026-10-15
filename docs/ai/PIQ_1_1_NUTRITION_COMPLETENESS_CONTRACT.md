@@ -57,8 +57,15 @@ No production changes were made in creating this contract.
 - `GET/PUT /api/nutrition/day/completeness`: owner-authenticated; read current revision and confirmation, write explicit complete/partial/unknown. Rejects future days, empty-day nonfasted completion and bad revision input. Missing migration yields sanitized 503.
 - `server/backup/inventory.ts` includes canonical report table in backup/restore inventory; migration head and older test fixtures updated to 0053.
 - `tests/piq1-nutrition-completeness-storage.test.ts` exercises mocked database version conflicts, current-state reads, stale edits, explicit fast, safety errors and route registration.
-- **Known remaining validation:** GitHub CI is green but mock DB tests cannot guarantee SQL syntax or concurrency on real Neon; must run 0053 migration and service queries on a disposable DB branch first. No UI has been added, no maintenance eligibility has been wired to the API, and no migration applied to production.
+- **Known remaining validation as of storage checkpoint:** mock DB tests cannot guarantee SQL syntax or concurrency on real Neon; validate 0053 on a disposable DB branch. The UI was added in a later checkpoint below; maintenance has still not been wired and no migration has been applied.
 
+
+## Optional Nutrition review UI (implemented on development branch, CI validated)
+
+- `src/features/nutrition/DayCompletenessCard.tsx` adds a compact date-scoped review under the Nutrition summary; no extra required questionnaire. It displays unknown, partial, confirmed, provisional current day, explicit fast, and stale-needs-review states; it does not infer whole-day completeness from calorie totals or entry count.
+- `src/features/nutrition/api.ts` sends typed expectedRevision/expectedVersion to the owner-authenticated GET/PUT route; the UI reacts conservatively to revision changes, 409 conflicts, missing API/migration 503 and food-log edits. This does not change the existing logging or calorie-target semantics.
+- Seven synthetic rendering-state tests in `tests/piq1-nutrition-completeness-ui.test.ts`. Code commit `9b1686a` passed all checks in [Actions 38685607348](https://github.com/daurham/daurham-health/actions/runs/38685607348).
+- **NOT validated:** live browser touch flow, actual Postgres SQL/migration/transaction behavior, Neon backup/restore, or completeness-informed maintenance/Coach decisions. Migration 0053 is deliberately not applied.
 
 ## Read consistency, atomicity and route hardening (validated code; real DB test pending)
 
