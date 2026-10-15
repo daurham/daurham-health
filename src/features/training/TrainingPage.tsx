@@ -4,6 +4,7 @@ import { sessionIntentLabel, trainingSessionDisplayName, type WorkoutSessionSumm
 import type { PendingTranscriptionJob } from '@/domain/training-transcription'
 import { fetchPublicInstanceConfig, interactiveCardClass, ListPlaceholder, primaryButtonClass, secondaryButtonClass } from '@/lib'
 import { fetchSessions, fetchTranscriptionJobs } from './api'
+import { subscribeHealthDataChanges } from '@/lib/health-changes'
 import { formatWorkoutDate } from './format'
 import { TrainingPlanCard } from './TrainingPlanCard'
 
@@ -31,25 +32,31 @@ export function TrainingPage() {
   }, [])
 
   useEffect(() => {
-    let cancelled = false
-    fetchSessions()
-      .then((next) => {
-        if (!cancelled) {
+    let active = true
+    let generation = 0
+    const refresh = () => {
+      const request = ++generation
+      void fetchSessions()
+        .then((next) => {
+          if (!active || generation !== request) return
           setSessions(next)
-        }
-      })
-      .catch((caught: unknown) => {
-        if (!cancelled) {
-          setError(caught instanceof Error ? caught.message : 'Could not load workouts')
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoading(false)
-        }
-      })
+          setError(null)
+        })
+        .catch((caught: unknown) => {
+          if (active && generation === request) {
+            setError(caught instanceof Error ? caught.message : 'Could not load workouts')
+          }
+        })
+        .finally(() => {
+          if (active && generation === request) setLoading(false)
+        })
+    }
+    refresh()
+    const unsubscribe = subscribeHealthDataChanges(refresh, { revalidateOnFocus: true })
     return () => {
-      cancelled = true
+      active = false
+      generation += 1
+      unsubscribe()
     }
   }, [])
 
