@@ -414,6 +414,20 @@ export async function requireCurrentCalorieRecommendation(
   }
 }
 
+/** A conditional NOT EXISTS protects sequential decisions; only the new
+ * partial unique index closes the distinct-row simultaneous-write race.
+ * Translate precisely that index conflict into an owner-readable 409.
+ */
+export function isActivePlateauUniquenessConflict(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false
+  const candidate = error as { code?: unknown; constraint?: unknown; message?: unknown }
+  return candidate.code === '23505' && (
+    candidate.constraint === 'coach_recommendations_one_active_plateau_revision_idx' ||
+    (typeof candidate.message === 'string' &&
+      candidate.message.includes('coach_recommendations_one_active_plateau_revision_idx'))
+  )
+}
+
 /** The same guarded mutation used by the API; injectable only with a
  * read-only verifier for isolated SQL integration. No mutation is attempted
  * when the saved ID is stale, missing, or a non-action question.
@@ -451,8 +465,9 @@ export async function writeCoachRecommendationResponse(
   await assertCurrent(row)
   const suppressUntil = response === 'not_now' ? addCalendarDays(asOf, 7) : null
   const followUpOn = response === 'do_this' ? addCalendarDays(asOf, 7) : null
-  await sql.query(
-    `UPDATE coach_recommendations
+  try {
+    const changed = await sql.query(
+      `UPDATE coach_recommendations
         SET response_state = $2,
             metadata = CASE WHEN $2 = 'do_this'
               THEN jsonb_set(COALESCE(metadata, '{}'::jsonb), '{ownerStarted}', 'true'::jsonb, true)
@@ -480,12 +495,17 @@ export async function writeCoachRecommendationResponse(
           )
         )
       RETURNING id::text AS id`,
-    [id, response, suppressUntil, followUpOn, expectedResponseAt],
-  ).then((changed) => {
+      [id, response, suppressUntil, followUpOn, expectedResponseAt],
+    )
     if (changed.length !== 1) {
       throw new HttpError(409, 'This Coach decision changed or a competing plateau option is already active. Reopen Coach to review the latest state.')
     }
-  })
+  } catch (error) {
+    if (isActivePlateauUniquenessConflict(error)) {
+      throw new HttpError(409, 'Another plateau option has already been started. Reopen Coach to review the active decision.')
+    }
+    throw error
+  }
 }
 
 export async function respondCoachRecommendation(

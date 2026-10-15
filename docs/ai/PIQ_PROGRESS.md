@@ -1068,3 +1068,30 @@ The existing Data Quality reviewer loaded only once on mount. After a canonical 
 **Tests:** Synthetic domain tests for grouped alternatives, isolated PostgreSQL test for actual started activity -> blocked intake -> no mutation -> outcome recorded -> intake allowed, and the earlier conflict and historical-suppression suites. The PostgreSQL test uses fictional rows in a rolled-back transaction.
 
 **Known remaining concurrency gap:** The `NOT EXISTS` constraint protects sequential conflicting writes but is **not a hard cross-row uniqueness guarantee** if two different option IDs start in truly concurrent PostgreSQL transactions. A database-enforced group-level invariant or serialized decision-lock implementation is still required before claiming strict simultaneous-start prevention. Owner iOS/two-tab and Neon HTTP validation remain pending, as do broader decision-context fingerprints and supersession across unrelated domains. This phase is not release-ready and should not be promoted to `main`.
+
+
+## PIQ-1.5 — Database-enforced simultaneous plateau option exclusion (2026-10-15)
+
+**State:** Work branch implementation; full TypeScript/lint/Vitest/build and disposable PostgreSQL migration/concurrency validation required. **0/9 PIQ phases owner-accepted.**
+
+**Race being closed:** A `NOT EXISTS` subquery on the Coach response update prevented sequentially starting a second option, but two distinct row updates from simultaneous connections could both pass before either committed. An HTTP-level optimistic token protects only each individual row, not competing rows.
+
+**DB hard rule:** New unapplied `0054_coach_plateau_active_unique.sql` creates partial unique index `coach_recommendations_one_active_plateau_revision_idx` over the persisted maintenance decision revision, for calorie/activity alternatives when `response_state='do_this'`, `metadata.ownerStarted=true`, `outcome_state IS NULL`, and the revision exists. PostgreSQL conflict resolution serializes simultaneous writes across distinct IDs. An evaluated outcome releases the active-revision slot; a changed decision revision is independent. Historical preview-only rows and unrelated training/evidence decisions are untouched. The API maps *only this index's* PostgreSQL 23505 violation to an owner-friendly HTTP 409; other SQL failures are never silently reclassified.
+
+**Validation additions:** Migration-chain test count and schema inventory now expect migration 0054; the isolated PG workflow includes the new migration path. A two-connection PG regression starts two different plateau IDs with the same revision and verifies exactly one can be active, then cleans up fictional fixtures in the disposable schema. Unit tests verify precise unique-constraint error translation and distinguish unrelated database faults. Existing response- and outcome-CAS tests remain intact.
+
+**Mandatory release gate:** Do **not** apply migration 0054 or promote the code to production without owner approval, applied schema inventory review, current verified backup and a read-only duplicate preflight. Any existing duplicate active starts must stop migration and receive explicit owner reconciliation; do not silently discard, merge, or relabel recorded action. Suggested read-only preflight:
+
+```sql
+SELECT metadata ->> 'decisionRevision' AS decision_revision, COUNT(*) AS active_choices
+FROM coach_recommendations
+WHERE recommendation_kind IN ('review_intake_adjustment', 'review_activity_adjustment')
+  AND response_state = 'do_this'
+  AND metadata ->> 'ownerStarted' = 'true'
+  AND outcome_state IS NULL
+  AND metadata ->> 'decisionRevision' IS NOT NULL
+GROUP BY metadata ->> 'decisionRevision'
+HAVING COUNT(*) > 1;
+```
+
+**Outstanding:** Owner authentic two-device/iOS testing, production migration approval, case where evidence changes within a non-calorie recommendation fingerprint, supersession text, broader same-domain intervention dependencies, and accepted-versus-implemented proof. No production writes, provider calls, or merge to `main`.

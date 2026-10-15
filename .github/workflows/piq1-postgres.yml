@@ -8,6 +8,7 @@ on:
       - 'migrations/0008_nutrition.sql'
       - 'migrations/0046_evidence_semantics_change_watchdog.sql'
       - 'migrations/0053_nutrition_day_completeness.sql'
+      - 'migrations/0054_coach_plateau_active_unique.sql'
       - 'server/nutrition/day-completeness.ts'
       - 'server/nutrition/maintenance-eligibility.ts'
       - 'server/weekly-coach/load.ts'

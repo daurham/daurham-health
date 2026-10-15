@@ -355,3 +355,8 @@ Coach follow-ups now carry the original exact SQL response revision. Recording a
 ## 2026-10-15 PIQ-1.5 plateau option grouping — work branch
 
 Intake and activity adjustments now share the named `possible_plateau_response` decision group. A same-revision, owner-started, unevaluated option prevents competing cards from surfacing and blocks sequential conflicting starts in the response SQL. Older revisions and legacy Review clicks do not count. Tests include disposable PostgreSQL rollback. Remaining strict concurrency, device and Neon validation gates: `docs/ai/PIQ_PROGRESS.md`. No promotion or migration.
+
+
+## 2026-10-15 PIQ-1.5 database-backed plateau exclusivity — work branch
+
+Prepared migration `0054_coach_plateau_active_unique.sql`, schema inventory and isolated migration-chain update. A partial unique index guarantees distinct concurrent activity/intake starts cannot share one active plateau revision; one writer is rejected and Coach receives HTTP 409. Two-connection disposable PostgreSQL regression and precise error mapping tests added. No production migration or `main` merge. Release prerequisites documented in `PIQ_PROGRESS.md`.

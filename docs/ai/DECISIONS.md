@@ -658,3 +658,8 @@ An outcome is not a mutable global label on a recommendation ID. It refers to on
 ## Decision: one active plateau lever per decision revision (PIQ-1.5, 2026-10-15)
 
 Treat intake changes and activity changes in a plausible plateau as alternatives in the same `possible_plateau_response` group rather than independent action cards. Hide both while a genuine acknowledged start within the same current maintenance-decision revision is awaiting evaluation; allow unrelated training or evidence actions. Sequential competing starts must return 409 without altering saved responses. An old revision, legacy Review without `ownerStarted`, or assessed outcome does not constitute an active conflict. Keep all historical owner records; the surfacing operation remains advisory. The initial SQL anti-join does not guarantee mutual exclusion of simultaneous cross-row writes; a hard DB invariant is a separate release prerequisite.
+
+
+## Decision: database uniqueness for mutually exclusive plateau starts (PIQ-1.5, 2026-10-15)
+
+The response-level `NOT EXISTS` check is insufficient for two truly concurrent writes to distinct rows. Enforce one active `possible_plateau_response` option per exact maintenance decision revision with a PostgreSQL partial unique index, not an advisory read-only race check. Only explicitly acknowledged, unevaluated owner starts qualify; preserve older decisions and unrelated advice. Turn the index-specific 23505 into a 409 requiring refreshed Coach context. Other database errors propagate. Migration 0054 is written but **must not be applied in production** without backup, duplicate preflight, schema verification and owner release approval. Existing collisions are an explicit stop gate, never auto-repaired.

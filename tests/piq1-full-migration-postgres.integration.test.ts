@@ -98,7 +98,7 @@ function serializedConfirmation(row: Record<string, unknown>): BackupRow {
   })) as BackupRow
 }
 
-describe.skipIf(!url)('PIQ-1.1 full 0001–0053 migration-chain and backup on isolated PostgreSQL', () => {
+describe.skipIf(!url)('PIQ-1.1 full 0001–0054 migration-chain and backup on isolated PostgreSQL', () => {
   beforeAll(async () => {
     if (!url) return
     await client.connect()
@@ -107,7 +107,7 @@ describe.skipIf(!url)('PIQ-1.1 full 0001–0053 migration-chain and backup on is
     await client.query('CREATE TABLE schema_migrations (filename text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())')
     const migrations = await inspectMigrations()
     expect(migrations.at(-1)?.filename).toBe(LATEST_SCHEMA_MIGRATION)
-    expect(migrations).toHaveLength(53)
+    expect(migrations).toHaveLength(54)
     for (const migration of migrations) {
       await client.query('BEGIN')
       try {
@@ -433,6 +433,64 @@ describe.skipIf(!url)('PIQ-1.1 full 0001–0053 migration-chain and backup on is
       expect(accepted.rows[0].metadata.decisionGroup).toBe('possible_plateau_response')
     } finally {
       await client.query('ROLLBACK')
+    }
+  })
+
+  it('PIQ-1.5: unique index rejects two independent concurrent plateau starts with the same revision', async () => {
+    // Unlike the single-connection test, these are separate transactions with
+    // separate snapshots, representing simultaneous Neon/HTTP writers.
+    const revision = randomUUID().replace(/-/g, '')
+    const makeDraft = (kind: 'review_intake_adjustment' | 'review_activity_adjustment') => ({
+      fingerprint: 'coach:piq:strict:' + kind + ':' + randomUUID(),
+      sourceId: 'maintenance:' + kind, kind,
+      domain: 'nutrition', title: 'Choose plateau lever', detail: 'Select only one.',
+      actionText: 'Review', detailPath: '/nutrition', confidence: 'moderate' as const,
+      evidenceRefs: ['maintenance:estimate'], priority: 80, experimentEligible: true,
+    })
+    const intake = await surfaceDraft(adapter, makeDraft('review_intake_adjustment'), today, revision)
+    const activity = await surfaceDraft(adapter, makeDraft('review_activity_adjustment'), today, revision)
+    const first = new Client({ connectionString: url! })
+    const second = new Client({ connectionString: url! })
+    const startSql = `UPDATE coach_recommendations
+      SET response_state = 'do_this', response_at = now(),
+          metadata = jsonb_set(metadata, '{ownerStarted}', 'true'::jsonb, true),
+          follow_up_on = DATE '2026-10-21'
+      WHERE id = $1::uuid`
+    try {
+      await Promise.all([first.connect(), second.connect()])
+      await Promise.all([
+        first.query('SET search_path TO piq_full_chain, public'),
+        second.query('SET search_path TO piq_full_chain, public'),
+      ])
+      await first.query('BEGIN')
+      await second.query('BEGIN')
+      await first.query(startSql, [activity.id])
+      // The next UPDATE is issued while the first writer has not committed.
+      // PostgreSQL's unique-index conflict check waits/rechecks even if the
+      // second transaction's ordinary visibility snapshot is stale.
+      const competing = second.query(startSql, [intake.id]).then(
+        () => ({ ok: true, code: null, constraint: null }),
+        (error: { code?: string; constraint?: string }) => ({
+          ok: false, code: error.code ?? null, constraint: error.constraint ?? null,
+        }),
+      )
+      await first.query('COMMIT')
+      expect(await competing).toEqual({
+        ok: false, code: '23505',
+        constraint: 'coach_recommendations_one_active_plateau_revision_idx',
+      })
+      await second.query('ROLLBACK')
+      const rows = await client.query(
+        'SELECT id::text AS id, response_state FROM coach_recommendations WHERE id = ANY($1::uuid[]) ORDER BY id',
+        [[intake.id, activity.id]],
+      )
+      expect(rows.rows.filter((row) => row.response_state === 'do_this')).toHaveLength(1)
+    } finally {
+      await Promise.allSettled([first.query('ROLLBACK'), second.query('ROLLBACK')])
+      await Promise.allSettled([first.end(), second.end()])
+      // Fictional data in an isolated disposable schema; remove it promptly,
+      // including if the assertion fails.
+      await client.query('DELETE FROM coach_recommendations WHERE id = ANY($1::uuid[])', [[intake.id, activity.id]])
     }
   })
 
