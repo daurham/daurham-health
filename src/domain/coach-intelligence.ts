@@ -1,4 +1,5 @@
 import type { GoalControlLimitation, GoalControlState } from './goal-control.js'
+import type { MaintenanceEvidenceExplanation } from './maintenance.js'
 import type { IntelligenceConfidence } from './intelligence/shared.js'
 
 export const COACH_INTELLIGENCE_VERSION = 'coach-intelligence-v1' as const
@@ -30,6 +31,7 @@ export type CoachRecommendationDraft = {
   actionText: string
   detailPath: string
   confidence: IntelligenceConfidence
+  evidenceExplanation?: MaintenanceEvidenceExplanation
   evidenceRefs: string[]
   priority: number
   experimentEligible: boolean
@@ -56,6 +58,7 @@ export type CoachRecommendationView = {
   actionText: string
   detailPath: string
   confidence: IntelligenceConfidence
+  evidenceExplanation?: MaintenanceEvidenceExplanation
   evidenceRefs: string[]
   responseState: CoachRecommendationResponse | null
   experimentEligible: boolean
@@ -125,6 +128,8 @@ function opportunityDraft(
   // A previously derived calorie recommendation must not bypass the current
   // verified full-day nutrition floor when Coach constructs action cards.
   if (opportunity.kind === 'review_intake_adjustment' && control.nutritionQuality.state !== 'met') return null
+  const maintenanceExplanation = control.maintenance?.interventions.some((item) => item.id === opportunity.id)
+    ? control.maintenance.evidenceExplanation : null
   return restAware({
     fingerprint: fingerprint(opportunity.id),
     sourceId: opportunity.id,
@@ -135,6 +140,7 @@ function opportunityDraft(
     actionText: opportunity.actionText,
     detailPath: opportunity.detailPath,
     confidence: control.confidence,
+    ...(maintenanceExplanation ? { evidenceExplanation: maintenanceExplanation } : {}),
     evidenceRefs: [...opportunity.evidenceRefs],
     priority: 100,
     experimentEligible: opportunity.domain !== 'review',
@@ -184,6 +190,7 @@ function maintenanceDrafts(control: GoalControlState): CoachRecommendationDraft[
       actionText: 'Review',
       detailPath: item.detailPath,
       confidence: control.maintenance!.estimate.confidence,
+      evidenceExplanation: control.maintenance!.evidenceExplanation,
       evidenceRefs: ['maintenance:estimate', 'maintenance:plateau-state'],
       priority: 70,
       experimentEligible: true,
