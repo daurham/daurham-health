@@ -133,14 +133,29 @@ export async function fetchSession(id: string): Promise<WorkoutSession> {
   return sessionDetailResponseSchema.parse(await response.json()).session
 }
 
-export async function updateSession(id: string, request: ManualWorkoutRequest): Promise<WorkoutSession> {
+export class WorkoutEditConflictError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'WorkoutEditConflictError'
+  }
+}
+
+export async function updateSession(
+  id: string,
+  request: ManualWorkoutRequest,
+  expectedEditRevision: string,
+): Promise<WorkoutSession> {
   const response = await healthFetch(`/api/training/sessions/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(request),
+    body: JSON.stringify({ ...request, expectedEditRevision }),
   })
   if (!response.ok) {
-    throw new Error(await readApiError(response))
+    const message = await readApiError(response)
+    if (response.status === 409 || response.status === 428) {
+      throw new WorkoutEditConflictError(message)
+    }
+    throw new Error(message)
   }
   return createSessionResponseSchema.parse(await response.json()).session
 }
