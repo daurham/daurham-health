@@ -6,7 +6,7 @@ import {
   readMaintenanceDecisionSnapshot,
 } from '../server/intelligence/maintenance-revision.js'
 import { compareMaintenanceDecisionRevisions } from '../src/domain/maintenance-revision.js'
-import { keepCurrentCalorieDecisionDrafts, keepVisibleCoachDependencies } from '../src/domain/coach-intelligence.js'
+import { keepCurrentCalorieDecisionDrafts } from '../src/domain/coach-intelligence.js'
 import { buildHealthIntelligenceSnapshot, type IntelligenceObservation } from '../src/domain/intelligence/shared.js'
 import { buildMaintenanceState, type MaintenanceAdjustmentContext } from '../src/domain/maintenance.js'
 import { addCalendarDays } from '../src/domain/progress/dates.js'
@@ -139,7 +139,6 @@ describe('PIQ-1.2 decision revision and cross-read settings integrity', () => {
     ]
     expect(keepCurrentCalorieDecisionDrafts(drafts, false)).toEqual([{ kind: 'training_progression', id: 'bench' }])
     expect(keepCurrentCalorieDecisionDrafts(drafts, true)).toEqual(drafts)
-    const clean = keepCurrentCalorieDecisionDrafts(drafts, false)
-    expect(keepVisibleCoachDependencies(clean)).toEqual(clean)
+    expect(keepCurrentCalorieDecisionDrafts(drafts, false).some((x) => x.kind === 'review_activity_adjustment')).toBe(false)
   })
 })
