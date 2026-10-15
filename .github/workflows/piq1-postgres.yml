@@ -9,6 +9,8 @@ on:
       - 'migrations/0046_evidence_semantics_change_watchdog.sql'
       - 'migrations/0053_nutrition_day_completeness.sql'
       - 'server/nutrition/day-completeness.ts'
+      - 'server/nutrition/maintenance-eligibility.ts'
+      - 'tests/piq1-maintenance-eligibility-baseline.test.ts'
       - 'src/domain/nutrition/day-completeness.ts'
       - 'tests/piq1-nutrition-postgres.integration.test.ts'
   workflow_dispatch:

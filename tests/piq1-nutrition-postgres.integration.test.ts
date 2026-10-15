@@ -2,6 +2,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import pg from 'pg'
 import type { Sql } from '../server/db.js'
+import { buildHealthIntelligenceSnapshot, type IntelligenceObservation } from '../src/domain/intelligence/shared.js'
+import { loadVerifiedNutritionDays } from '../server/nutrition/maintenance-eligibility.js'
 import { getNutritionDayCompleteness, saveNutritionDayCompleteness, SOURCE_REVISION_SQL } from '../server/nutrition/day-completeness.js'
 
 /**
@@ -158,5 +160,71 @@ describe.skipIf(!url)('PIQ-1.1 isolated PostgreSQL migration and real confirmati
       confirmationStale: true, state: 'unknown', eligibleForMaintenance: false,
     })
     expect(latest.quality.entryCount).toBe(0)
+  })
+
+  function fixtureSnapshot(day: string, calories: number, ids: readonly string[]) {
+    const observations: IntelligenceObservation[] = [{
+      key: 'nutrition.calories', date: day, value: calories,
+      unit: 'kcal', provenance: 'reference', quality: 'high_confidence',
+      sourceIds: [...ids],
+    }]
+    return buildHealthIntelligenceSnapshot({
+      range: '30d', asOf: today, start: '2026-09-15', end: today,
+      today, timezone: 'America/Phoenix', observations,
+    })
+  }
+
+  it('real set-based eligibility: requires owner confirmation, correct current hash and matching snapshot', async () => {
+    const id = await insertMeal(1400)
+    const originalSnapshot = fixtureSnapshot(date, 1400, [id])
+    const eligible = () => loadVerifiedNutritionDays({
+      snapshot: originalSnapshot, asOf: today, today, sqlOverride: sql,
+    })
+    expect((await eligible()).size).toBe(0)
+    const status = await getNutritionDayCompleteness(date, sql, today)
+    await saveNutritionDayCompleteness(report(status.entryRevision, 0), sql, today)
+    expect([...await eligible()]).toEqual([date])
+    await db.query('UPDATE nutrition_entries SET calories = 1650 WHERE id = $1::uuid', [id])
+    // Correction breaks digest; even re-confirming cannot legitimize a STALE snapshot.
+    expect((await eligible()).size).toBe(0)
+    const corrected = await getNutritionDayCompleteness(date, sql, today)
+    await saveNutritionDayCompleteness(report(corrected.entryRevision, 1), sql, today)
+    expect((await eligible()).size).toBe(0)
+    const freshSnapshot = fixtureSnapshot(date, 1650, [id])
+    expect([...await loadVerifiedNutritionDays({
+      snapshot: freshSnapshot, asOf: today, today, sqlOverride: sql,
+    })]).toEqual([date])
+  })
+
+  it('real eligibility excludes analysis-excluded, AI-estimated, current and fasted days', async () => {
+    const id = await insertMeal(1250)
+    const first = await getNutritionDayCompleteness(date, sql, today)
+    await saveNutritionDayCompleteness(report(first.entryRevision, 0), sql, today)
+    const snapshot = fixtureSnapshot(date, 1250, [id])
+    const selected = (forToday = today) => loadVerifiedNutritionDays({
+      snapshot, asOf: today, today: forToday, sqlOverride: sql,
+    })
+    expect([...await selected()]).toEqual([date])
+    expect((await selected(date)).size).toBe(0)
+    await db.query(`
+      INSERT INTO data_quality_reviews
+      (id, fingerprint, issue_kind, entity_kind, entity_id, review_status)
+      VALUES (gen_random_uuid(), 'piq-manifest-exclusion', 'synthetic',
+        'nutrition_entry', $1, 'excluded_from_analysis')
+    `, [id])
+    expect((await selected()).size).toBe(0)
+    await db.query('DELETE FROM data_quality_reviews')
+    await db.query("UPDATE nutrition_entries SET evidence_quality = 'ai_estimate' WHERE id = $1::uuid", [id])
+    const revised = await getNutritionDayCompleteness(date, sql, today)
+    await saveNutritionDayCompleteness(report(revised.entryRevision, 1), sql, today)
+    expect((await selected()).size).toBe(0)
+  })
+
+  it('real manifest never promotes an explicit zero-intake fast or a day lacking food', async () => {
+    const empty = await getNutritionDayCompleteness(date, sql, today)
+    await saveNutritionDayCompleteness(report(empty.entryRevision, 0, 'complete', true), sql, today)
+    const snapshot = fixtureSnapshot(date, 0, [])
+    const found = await loadVerifiedNutritionDays({ snapshot, asOf: today, today, sqlOverride: sql })
+    expect(found.size).toBe(0)
   })
 })
