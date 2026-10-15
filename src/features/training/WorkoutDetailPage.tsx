@@ -44,6 +44,7 @@ export function WorkoutDetailPage() {
   const [fieldErrors, setFieldErrors] = useState<ReviewFieldError[]>([])
   const [errorFocusKey, setErrorFocusKey] = useState(0)
   const loadedId = useRef<string | null>(null)
+  const refreshGeneration = useRef(0)
   const draftOrigin = useRef<{ id: string; revision: string } | null>(null)
   const [staleDraft, setStaleDraft] = useState(false)
 
@@ -61,6 +62,7 @@ export function WorkoutDetailPage() {
       return
     }
     let cancelled = false
+    const request = ++refreshGeneration.current
     const sameWorkout = loadedId.current === sessionId
     if (!sameWorkout) {
       setSession(null)
@@ -73,7 +75,7 @@ export function WorkoutDetailPage() {
     setError(null)
     Promise.all([fetchSession(sessionId), fetchTemplates().catch(() => [] as WorkoutTemplate[])])
       .then(([next, templates]) => {
-        if (cancelled) {
+        if (cancelled || request !== refreshGeneration.current) {
           return
         }
         loadedId.current = sessionId
@@ -85,17 +87,18 @@ export function WorkoutDetailPage() {
         setTemplate(templates.find((item) => item.id === next.workoutTemplateId) ?? null)
       })
       .catch((caught: unknown) => {
-        if (!cancelled) {
+        if (!cancelled && request === refreshGeneration.current) {
           setError(caught instanceof Error ? caught.message : 'Could not load workout')
         }
       })
       .finally(() => {
-        if (!cancelled) {
+        if (!cancelled && request === refreshGeneration.current) {
           setLoading(false)
         }
       })
     return () => {
       cancelled = true
+      refreshGeneration.current += 1
     }
   }, [sessionId, reloadToken])
 
@@ -136,11 +139,13 @@ export function WorkoutDetailPage() {
       // not an atomic database compare-and-swap with the PATCH below.
       const fresh = await fetchSession(sessionId)
       if (workoutDraftIsStale(draftOrigin.current?.revision, fresh)) {
+        refreshGeneration.current += 1
         setSession(fresh)
         setStaleDraft(true)
         return
       }
       const next = await updateSession(sessionId, buildManualWorkoutPayload(draft))
+      refreshGeneration.current += 1
       setSession(next)
       setEditing(false)
       setDraft(null)
@@ -163,10 +168,12 @@ export function WorkoutDetailPage() {
     if (!sessionId || saving) return
     setSaving(true)
     setError(null)
+    const request = ++refreshGeneration.current
     try {
       const [fresh, templates] = await Promise.all([
         fetchSession(sessionId), fetchTemplates().catch(() => [] as WorkoutTemplate[]),
       ])
+      if (request !== refreshGeneration.current) return
       const currentTemplate = templates.find((item) => item.id === fresh.workoutTemplateId) ?? null
       setSession(fresh)
       setTemplate(currentTemplate)
@@ -175,7 +182,7 @@ export function WorkoutDetailPage() {
       setStaleDraft(false)
       setFieldErrors([])
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Could not reload the saved workout')
+      if (request === refreshGeneration.current) setError(caught instanceof Error ? caught.message : 'Could not reload the saved workout')
     } finally {
       setSaving(false)
     }
