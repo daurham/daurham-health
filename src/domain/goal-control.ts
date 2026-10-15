@@ -434,7 +434,21 @@ export function buildGoalControlState(input: BuildGoalControlInput): GoalControl
     detailPath: `/goals/${goal.id}`,
   }))
   const confidence = overallConfidence(input.brief, input.intelligence, input.goals)
-  const primaryOpportunity = opportunity(input.brief.focus) ?? maintenanceOpportunity(input.maintenance, nutrition) ?? trainingProgressionOpportunity(input.trainingProgression)
+  // Weekly focus is upstream of Maintenance. Never let a stale or generic
+  // candidate override a verified current calorie-action safety decision.
+  const weeklyFocus = opportunity(input.brief.focus)
+  const safeWeeklyFocus = weeklyFocus?.kind === 'review_activity_adjustment'
+    ? null // Dependent activity alternative is never a primary standalone decision.
+    : weeklyFocus?.kind === 'review_intake_adjustment' &&
+      (nutrition.state !== 'met' ||
+        input.maintenance?.calorieAdjustmentSafety.status !== 'review_possible' ||
+        !input.maintenance.interventions.some((item) =>
+          item.id === weeklyFocus.id && item.kind === weeklyFocus.kind))
+      ? null
+      : weeklyFocus
+  const primaryOpportunity = safeWeeklyFocus ??
+    maintenanceOpportunity(input.maintenance, nutrition) ??
+    trainingProgressionOpportunity(input.trainingProgression)
   const limitations = limitationsFor(input.intelligence, input.goals, nutrition, confidence)
   const activeControlGoals = goals.filter((goal) => goal.lifecycle === 'active')
   const allActiveGoalsUnknown = activeControlGoals.length > 0 && activeControlGoals.every((goal) => goal.state === 'unknown')
