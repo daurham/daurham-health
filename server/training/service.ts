@@ -844,7 +844,7 @@ export async function getSession(sessionId: string): Promise<SessionDetailRespon
     sql.query(
       `SELECT id, workout_date, workout_template_id, routine_code, template_version, template_name,
               session_type, session_name, experiment_id, benchmark_protocol_version_id,
-              duration_min, effort, pain_level, limitation_kind, limitation_note, bodyweight_kg, notes, source_kind, metadata, created_at, updated_at
+              duration_min, effort, pain_level, limitation_kind, limitation_note, bodyweight_kg, notes, source_kind, metadata, created_at, updated_at, xmin::text AS edit_revision
        FROM workout_sessions
        WHERE id = $1
        LIMIT 1`,
@@ -895,6 +895,7 @@ export async function getSession(sessionId: string): Promise<SessionDetailRespon
 
   const session: WorkoutSession = {
     ...sessionSummaryFromRow(sessionRow),
+    editRevision: typeof sessionRow.edit_revision === 'string' ? sessionRow.edit_revision : undefined,
     bodyweightKg: sessionRow.bodyweight_kg,
     notes: sessionRow.notes,
     metadata: sessionRow.metadata,
@@ -1138,7 +1139,100 @@ export async function archiveOwnerRoutine(templateId: string): Promise<{ ok: tru
   return { ok: true }
 }
 
+function requireExpectedEditRevision(body: unknown): string {
+  const token = body && typeof body === 'object' && !Array.isArray(body)
+    ? (body as Record<string, unknown>).expectedEditRevision : null
+  if (typeof token !== 'string' || !/^[0-9]{1,10}$/.test(token)) {
+    throw new HttpError(428, 'Reload this workout to get its current edit version before saving.')
+  }
+  return token
+}
+
+/**
+ * Batch SQL runs in a single Neon HTTP transaction. The first UPDATE
+ * obtains a row lock and compare-and-swaps its PostgreSQL tuple revision.
+ * Every following DML statement is gated by that successful UPDATE's
+ * unpredictable per-operation token. On a failed CAS every statement is a
+ * no-op; no old exercises are deleted and no new sets can be inserted.
+ *
+ * This is intentionally not the client's in-memory content fingerprint:
+ * PostgreSQL determines if the source is still the same saved row version.
+ */
+export function buildGuardedWorkoutEditQueries(
+  sql: Awaited<ReturnType<typeof getSql>>,
+  prepared: PreparedManualSession,
+  expectedRevision: string,
+  nonce: string,
+) {
+  const queries = [
+    sql.query(UPDATE_WORKOUT_SESSION_CAS_SQL, [
+      prepared.sessionId, prepared.workoutDate, prepared.workoutTemplateId,
+      prepared.routineCode, prepared.templateVersion, prepared.templateName,
+      prepared.durationMin == null ? null : decimalString(prepared.durationMin),
+      prepared.effort, prepared.painLevel, prepared.limitationKind,
+      prepared.limitationNote,
+      prepared.bodyweightKg == null ? null : decimalString(prepared.bodyweightKg),
+      prepared.notes, JSON.stringify(prepared.metadata), prepared.sessionName,
+      expectedRevision, nonce,
+    ]),
+    sql.query(`DELETE FROM workout_session_exercises
+       WHERE workout_session_id = $1::uuid
+         AND EXISTS (SELECT 1 FROM workout_sessions
+                      WHERE id = $1::uuid AND metadata ->> '_piq_edit_nonce' = $2)`,
+    [prepared.sessionId, nonce]),
+  ]
+
+  for (const exercise of prepared.exercises) {
+    queries.push(sql.query(`INSERT INTO workout_session_exercises (
+      id, workout_session_id, exercise_definition_id, position, slot_id,
+      exercise_external_id, exercise_name, notes
+    ) SELECT $1::uuid, $2::uuid, $3::uuid, $4::int, $5, $6, $7, $8
+      FROM workout_sessions WHERE id = $2::uuid
+        AND metadata ->> '_piq_edit_nonce' = $9`,
+    [exercise.id, prepared.sessionId, exercise.exerciseDefinitionId, exercise.position,
+      exercise.slotId, exercise.exerciseExternalId, exercise.exerciseName, exercise.notes, nonce]))
+    for (const set of exercise.sets) {
+      queries.push(sql.query(`INSERT INTO workout_sets (
+        workout_session_exercise_id, set_number, set_type, load_state, weight_kg,
+        reps, duration_sec, left_reps, right_reps, left_duration_sec, right_duration_sec,
+        distance_m, completed, rir, rpe, failure_kind, left_failure_kind, right_failure_kind, notes
+      ) SELECT $1::uuid, $2::int, $3, $4, $5::numeric,
+        $6::int, $7::int, $8::int, $9::int, $10::int, $11::int,
+        $12::numeric, $13::boolean, $14::int, $15::numeric, $16, $17, $18, $19
+        FROM workout_session_exercises e
+        JOIN workout_sessions ws ON ws.id = e.workout_session_id
+        WHERE e.id = $1::uuid AND ws.id = $20::uuid
+          AND ws.metadata ->> '_piq_edit_nonce' = $21`,
+      [exercise.id, set.setNumber, set.setType, set.loadState,
+        set.weightKg == null ? null : decimalString(set.weightKg),
+        set.reps, set.durationSec, set.leftReps, set.rightReps, set.leftDurationSec,
+        set.rightDurationSec, set.distanceM == null ? null : decimalString(set.distanceM),
+        set.completed, set.rir, set.rpe == null ? null : decimalString(set.rpe),
+        set.failureKind, set.leftFailureKind, set.rightFailureKind, set.notes,
+        prepared.sessionId, nonce]))
+    }
+  }
+
+  queries.push(sql.query(`UPDATE workout_sessions
+       SET metadata = metadata - '_piq_edit_nonce', updated_at = clock_timestamp()
+       WHERE id = $1::uuid AND metadata ->> '_piq_edit_nonce' = $2`,
+  [prepared.sessionId, nonce]))
+  return queries
+}
+
+export const UPDATE_WORKOUT_SESSION_CAS_SQL = `UPDATE workout_sessions
+       SET workout_date = $2::date, workout_template_id = $3::uuid,
+           routine_code = $4, template_version = $5, template_name = $6,
+           duration_min = $7::numeric, effort = $8::int,
+           pain_level = $9::int, limitation_kind = $10, limitation_note = $11,
+           bodyweight_kg = $12::numeric, notes = $13,
+           metadata = $14::jsonb || jsonb_build_object('_piq_edit_nonce', $17::text),
+           session_name = $15, updated_at = clock_timestamp()
+       WHERE id = $1::uuid AND xmin::text = $16
+       RETURNING id::text AS id`
+
 export async function updateManualSession(sessionId: string, body: unknown): Promise<SessionDetailResponse> {
+  const expectedRevision = requireExpectedEditRevision(body)
   const existing = await getSession(sessionId)
   const request = parseManualWorkoutRequest(body)
   const typeError = sessionTypeEditError(existing.session.sessionType, request.sessionType)
@@ -1181,33 +1275,21 @@ export async function updateManualSession(sessionId: string, body: unknown): Pro
     metadata: existing.session.metadata,
   })
   const sql = await getSql()
+  const nonce = randomUUID()
+  let transactionResult: unknown
   try {
-    await sql.transaction([
-      sql.query(UPDATE_WORKOUT_SESSION_SQL, [
-        prepared.sessionId,
-        prepared.workoutDate,
-        prepared.workoutTemplateId,
-        prepared.routineCode,
-        prepared.templateVersion,
-        prepared.templateName,
-        prepared.durationMin == null ? null : decimalString(prepared.durationMin),
-        prepared.effort,
-        prepared.painLevel,
-        prepared.limitationKind,
-        prepared.limitationNote,
-        prepared.bodyweightKg == null ? null : decimalString(prepared.bodyweightKg),
-        prepared.notes,
-        JSON.stringify(prepared.metadata),
-        prepared.sessionName,
-      ]),
-      sql.query(DELETE_WORKOUT_SESSION_EXERCISES_SQL, [prepared.sessionId]),
-      ...buildSessionInsertQueries(sql, prepared).slice(1),
-    ])
+    transactionResult = await sql.transaction(
+      buildGuardedWorkoutEditQueries(sql, prepared, expectedRevision, nonce),
+    )
   } catch (error) {
     if (asMissingRelation(error)) {
       throw new HttpError(503, TABLES_UNAVAILABLE)
     }
     throw new HttpError(500, 'Workout could not be saved')
+  }
+  const result = transactionResult as Array<Array<{ id?: string }>>
+  if (!result[0]?.[0]?.id) {
+    throw new HttpError(409, 'Saved workout changed or was deleted. Keep your draft and reload the latest saved version.')
   }
   return getSession(prepared.sessionId)
 }
