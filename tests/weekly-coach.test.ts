@@ -337,7 +337,7 @@ describe('weekly coach periods and evidence', () => {
         { exerciseId: 'row', name: 'Row', date: '2026-09-10', summary: 'older best' },
       ],
     })
-    expect(brief.facts.find((fact) => fact.domain === 'training')?.text).toContain('1 canonical Training session')
+    expect(brief.facts.find((fact) => fact.domain === 'training')?.text).toContain('1 recorded Training session')
     expect(brief.wentWell.map((item) => item.id)).toEqual(['win:training-pr:squat:2026-09-22'])
     expect(brief.candidates.some((item) => item.fact.includes('older best'))).toBe(false)
   })
