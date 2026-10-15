@@ -158,6 +158,7 @@ describe('I7 observed maintenance estimator', () => {
       contexts: [],
       weightGoal: loseGoal(),
       adjustmentContext: { status: 'available', currentCalorieTarget: 2200, activeExperimentCount: 0,
+        revisionStatus: 'consistent', decisionRevision: 'test-current-revision',
         performance: { status: 'available', asOf: AS_OF, decliningExercises: [], competingGoals: [] } },
     })
     expect(state.estimate.state).toBe('available')
