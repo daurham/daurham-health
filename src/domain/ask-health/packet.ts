@@ -962,16 +962,19 @@ function addSharedIntelligence(
       label: `${item.label} coverage`,
       value: item.coveragePct,
       unit: 'percent',
-      text: `${item.observedDays} observed day${item.observedDays === 1 ? '' : 's'} of ${item.eligibleDays} eligible days. ${item.excludedObservations > 0 ? `${item.excludedObservations} reviewed observation${item.excludedObservations === 1 ? '' : 's'} excluded from intelligence. ` : ''}Confidence: ${item.confidence}.`,
+      text: item.loggedDays == null
+        ? `${item.observedDays} observed day${item.observedDays === 1 ? '' : 's'} of ${item.eligibleDays} eligible days. ${item.excludedObservations > 0 ? `${item.excludedObservations} reviewed observation${item.excludedObservations === 1 ? '' : 's'} excluded from intelligence. ` : ''}Confidence: ${item.confidence}.`
+        : `${item.loggedDays} logged day(s) of ${item.eligibleDays} eligible calendar days; ${item.observedDays} owner-confirmed, current-revision, source-reliable complete day(s) qualify for full-day trends. Unverified logs are not zeros or proof of total intake.${item.completenessCheck === 'unavailable' ? ' Completeness verification is currently unavailable.' : ''} Confidence for verified trend evidence: ${item.confidence}.`,
       coverage: {
         observedDays: item.observedDays,
+        ...(item.loggedDays == null ? {} : { loggedDays: item.loggedDays, completenessCheck: item.completenessCheck ?? 'available' }),
         eligibleDays: item.eligibleDays,
         coveragePct: item.coveragePct,
         excludedObservations: item.excludedObservations,
       },
       detailPath: item.detailPath,
       userEntered: false,
-      substantive: item.observedDays > 0,
+      substantive: (item.loggedDays ?? item.observedDays) > 0,
       confidence: item.confidence,
       provenance: Object.entries(item.provenance).map(([kind, count]) => `${kind}:${count}`).join(', '),
       priority: 2,
