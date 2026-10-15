@@ -59,7 +59,7 @@ describe('PIQ-1.5 viewing advice is not an intervention', () => {
     const assertCurrent = vi.fn()
     await expect(writeCoachRecommendationResponse(
       sql, ID, 'do_this', '2026-10-15', assertCurrent,
-    )).rejects.toMatchObject({ status: 409 })
+    )).rejects.toMatchObject({ statusCode: 409 })
     expect(assertCurrent).not.toHaveBeenCalled()
     expect(query).toHaveBeenCalledTimes(1)
   })
