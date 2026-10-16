@@ -240,7 +240,7 @@ export async function explainAskHealth(input: {
     throw new HttpError(502, FAILURE, undefined, 'ASK_HEALTH_INVALID_RESPONSE')
   }
   work.gate.store(key, { answer: validated.answer, evidence: citedEvidence(work.packet, validated.answer) })
-  return responseFor(input, {
+  return responseFor(work, {
     answer: validated.answer,
     provider: 'gemini',
     model: generated.model,
