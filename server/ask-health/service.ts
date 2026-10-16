@@ -18,6 +18,7 @@ import { describeAskHealthResponsePath, type AskHealthResponseDiagnostic } from 
 import type { AskEvidence } from '../../src/domain/ask-health/types.js'
 import { NutritionInterpretError } from '../../src/domain/nutrition/interpret.js'
 import { routeAskHealthIntent } from '../../src/domain/ask-health/intent.js'
+import type { AskContextMode } from '../../src/domain/ask-health/config.js'
 import { detectImmediateSafety, immediateSafetyAnswer } from '../../src/domain/ask-health/immediate-safety.js'
 import {
   ASK_HEALTH_GENERAL_PROMPT_VERSION, GENERAL_ASK_SYSTEM_PROMPT,
@@ -50,6 +51,8 @@ export type AskHealthResponse = {
     packetVersion: typeof ASK_HEALTH_PACKET_VERSION
     promptVersion: string
     answerScope: 'general' | 'personal' | 'urgent_safety'
+    contextMode: AskContextMode
+    evidenceOverview: { availableCount: number; domains: string[]; omittedCount: number; limited: boolean }
     provider: string
     model: string
     cached: boolean
@@ -73,12 +76,15 @@ export async function answerAskHealth(input: {
   model?: string
   now?: number
   generatedAt?: string
+  contextMode?: AskContextMode
 }): Promise<AskHealthResponse> {
   // PIQ-3: a standalone education question should not retrieve or send
   // private Health data at all. Owner authentication still happens in handler;
   // the existing AI rate/budget ledger still applies to provider calls.
+  const contextMode = input.contextMode ?? 'smart'
   const route = routeAskHealthIntent(input.question, input.conversation)
-  if (detectImmediateSafety(input.question) || route.route === 'general') {
+  if (detectImmediateSafety(input.question) || contextMode === 'general_only' ||
+      (contextMode === 'smart' && route.route === 'general')) {
     return explainAskHealth({
       packet: blankGeneralAskPacket({
         lens: input.lens, range: input.range, asOf: input.asOf,
@@ -86,6 +92,7 @@ export async function answerAskHealth(input: {
       }),
       question: input.question,
       conversation: [],
+      contextMode,
       provider: input.provider ?? askHealthGemini,
       gate: input.gate ?? getAskHealthGate(),
       model: input.model ?? askHealthModel(),
@@ -97,7 +104,9 @@ export async function answerAskHealth(input: {
   try {
     packet = buildAskHealthEvidencePacket(
       await loadAskHealthPacketInput({
-        lens: input.lens,
+        // Deep Dive chooses the broadest existing evidence lens, regardless
+        // of tab. It remains range- and packet-size bounded.
+        lens: contextMode === 'deep' ? 'general' : input.lens,
         range: input.range,
         asOf: input.asOf,
         question: input.question,
@@ -117,6 +126,7 @@ export async function answerAskHealth(input: {
     packet,
     question: input.question,
     conversation: input.conversation,
+    contextMode,
     provider: input.provider ?? askHealthGemini,
     gate: input.gate ?? getAskHealthGate(),
     model: input.model ?? askHealthModel(),
@@ -132,7 +142,9 @@ export async function explainAskHealth(input: {
   gate: AskHealthGate
   model: string
   now?: number
+  contextMode?: AskContextMode
 }): Promise<AskHealthResponse> {
+  const contextMode = input.contextMode ?? 'smart'
   const immediate = detectImmediateSafety(input.question)
   if (immediate) {
     // A stated current emergency must never require Health records, Gemini,
@@ -141,10 +153,11 @@ export async function explainAskHealth(input: {
       answer: immediateSafetyAnswer(immediate),
       provider: 'health', model: 'deterministic', cached: false,
       urgentSafety: true,
+      contextMode,
     })
   }
   const intent = routeAskHealthIntent(input.question, input.conversation)
-  const general = intent.route === 'general'
+  const general = contextMode === 'general_only' || (contextMode === 'smart' && intent.route === 'general')
   // Also sanitize direct callers supplying an owner packet for a purely
   // educational prompt. No private record or prior personal chat reaches AI.
   const work = general ? {
@@ -164,7 +177,9 @@ export async function explainAskHealth(input: {
       cached: false,
     })
   }
-  if (!general && !packetHasSubstantiveEvidence(work.packet)) {
+  const canExplainWithoutOwnerFacts = contextMode !== 'smart' &&
+    (intent.route === 'general' || intent.route === 'owner' || intent.intent === 'ambiguous' || intent.intent === 'compare_options')
+  if (!general && !packetHasSubstantiveEvidence(work.packet) && !canExplainWithoutOwnerFacts) {
     return responseFor(input, {
       answer: insufficientAskHealthAnswer(work.packet),
       provider: 'health',
@@ -180,6 +195,7 @@ export async function explainAskHealth(input: {
     packetFingerprintMaterial(work.packet),
     general ? ASK_HEALTH_GENERAL_PROMPT_VERSION : ASK_HEALTH_PROMPT_VERSION,
     general ? 'general' : 'personal',
+    contextMode,
     work.model,
     JSON.stringify(work.conversation),
   ])
@@ -198,7 +214,7 @@ export async function explainAskHealth(input: {
     return {
       answer: decision.cached.answer,
       evidence: citedEvidence(work.packet, decision.cached.answer),
-      meta: metaFor(work, { provider: 'gemini', model: work.model, cached: true, general }),
+      meta: metaFor(work, { provider: 'gemini', model: work.model, cached: true, general, contextMode }),
     }
   }
   let generated: Awaited<ReturnType<AskHealthProvider>>
@@ -257,6 +273,7 @@ export async function explainAskHealth(input: {
     model: generated.model,
     cached: false,
     general,
+    contextMode,
   })
 }
 
@@ -306,7 +323,7 @@ async function settleFailure(gate: AskHealthGate, usageId: string | null, error:
 
 function responseFor(
   input: { packet: AskHealthPacket },
-  result: { answer: AskHealthAnswer; provider: string; model: string; cached: boolean; general?: boolean; urgentSafety?: boolean },
+  result: { answer: AskHealthAnswer; provider: string; model: string; cached: boolean; general?: boolean; urgentSafety?: boolean; contextMode?: AskContextMode },
 ): AskHealthResponse {
   return {
     answer: result.answer,
@@ -317,12 +334,19 @@ function responseFor(
 
 function metaFor(
   input: { packet: AskHealthPacket },
-  result: { provider: string; model: string; cached: boolean; general?: boolean; urgentSafety?: boolean },
+  result: { provider: string; model: string; cached: boolean; general?: boolean; urgentSafety?: boolean; contextMode?: AskContextMode },
 ): AskHealthResponse['meta'] {
   return {
     packetVersion: ASK_HEALTH_PACKET_VERSION,
     promptVersion: result.urgentSafety ? 'ask-health-immediate-safety-v1' : result.general ? ASK_HEALTH_GENERAL_PROMPT_VERSION : ASK_HEALTH_PROMPT_VERSION,
     answerScope: result.urgentSafety ? 'urgent_safety' : result.general ? 'general' : 'personal',
+    contextMode: result.contextMode ?? 'smart',
+    evidenceOverview: {
+      availableCount: input.packet.evidence.length,
+      domains: [...new Set(input.packet.evidence.filter(e => e.substantive).map(e => e.domain))].sort(),
+      omittedCount: input.packet.evidenceSelectionAudit?.removedCount ?? 0,
+      limited: (input.packet.evidenceSelectionAudit?.removedCount ?? 0) > 0 || Boolean(input.packet.evidenceSelectionAudit?.exceedsMaxChars),
+    },
     provider: result.provider,
     model: result.model,
     cached: result.cached,
