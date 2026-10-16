@@ -30,6 +30,7 @@ const request = (question: string) => ({
 function personalPacket(question: string) {
   const input: AskHealthPacketInput = {
     ...request(question),
+    healthToday:today,
     period: { start: '2026-09-16', end: today },
     overview: null, activity: null, sleep: null, context: null, patterns: [],
     goals: [{

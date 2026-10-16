@@ -21,6 +21,7 @@ const request = {
 function syntheticInput(lens: AskHealthPacketInput['lens'] = 'general'): AskHealthPacketInput {
   return {
     question, lens, contextMode: 'personalized', range: '30d', asOf: date,
+    healthToday:date,
     generatedAt: request.generatedAt, period: { start: '2026-09-16', end: date },
     overview: null, activity: null, sleep: null, context: null, patterns: [],
     goals: [{ id: 'qa-weight-target', kind: 'body_metric', lifecycle: 'active',

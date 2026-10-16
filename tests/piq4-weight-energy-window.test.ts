@@ -48,7 +48,7 @@ function inspect(question:string,records:readonly IntelligenceObservation[]=base
     question,snapshot:snap,today,includeBroadContext:mode==='deep',
   })
   const input:AskHealthPacketInput={question,contextMode:mode,lens:'general',
-    range:'30d',asOf:opts.asOf??today,period:{start:opts.scopeStart??start,end:opts.asOf??today},
+    range:'30d',asOf:opts.asOf??today,healthToday:today,period:{start:opts.scopeStart??start,end:opts.asOf??today},
     generatedAt:today+'T18:00:00Z',overview:null,activity:null,sleep:null,
     goals:[],experiments:[],benchmarks:[],supplements:[],context:null,patterns:[],
     focusedWeightEnergy:focus,focusedWeightEnergyDay:day,focusedWeightEnergyWindow:window}
