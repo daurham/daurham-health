@@ -351,7 +351,7 @@ export function groundHistoricalAnswer(
   const message = dateIssue
     ? 'A personal historical claim was withheld because the requested date or period is ambiguous or unsupported. Ask for one YYYY-MM-DD or a supported week/month; the selected-range records cannot resolve this comparison automatically.'
     : scope
-      ? 'A personal historical claim was withheld because its cited date, metric domain, numeric value, or association was not established for the requested ' +
+      ? 'A personal historical claim was withheld because its cited date, metric domain, recorded numeric value, or association was not established for the requested ' +
         scope.start + (scope.end === scope.start ? ' date.' : ' through ' + scope.end + ' window.') +
         ' An observational association does not prove a cause.'
       : 'An owner-specific causal or relationship claim was withheld because the supplied evidence cannot establish causation or did not include a qualifying personal relationship calculation.'
@@ -360,7 +360,7 @@ export function groundHistoricalAnswer(
       ? blocks
       : [{ text: scope || dateIssue
         ? 'I cannot verify a personal measurement or trend for the requested historical period from the supplied, date-matched Health evidence.'
-        : 'I cannot establish a personal cause or association from the supplied Health evidence.', evidenceRefs: [] }],
+        : 'I cannot verify a personal cause or association from the supplied Health evidence.', evidenceRefs: [] }],
     limitations: [...limitations, { text: message, evidenceRefs: [] }],
     followUps: answer.followUps,
   }
