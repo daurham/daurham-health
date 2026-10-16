@@ -510,3 +510,8 @@ Goal Control now reads the dated owner goal priority and may select its existing
 ## 2026-10-15 PIQ-2.4 named supplements in Ask Health — work branch
 
 Question-specific Ask Health evidence now reads existing owner-saved supplement lifecycle/schedule/adherence and keeps a strict planned vs taken distinction, with the packet range capped at its as-of date. Named supplement questions are included independent of UI lens; unrelated questions remain aggregate. No new migration, Gemini call, live records or main promotion; CI and owner iOS QA tracked in `docs/ai/PIQ_PROGRESS.md`.
+
+
+## 2026-10-15 PIQ-2.4 named supplement aliases — work branch
+
+Ask Health now matches an exact saved supplement name or a conservative primary ingredient word, enabling queries like "my creatine dose" for `Creatine monohydrate`. Multiple matching saved products remain independent; unrelated, generic and similar-word questions do not trigger false source matches. Packet-only regression and green CI/owner-device gate tracked in `PIQ_PROGRESS.md`. No schema, provider, production or main changes.

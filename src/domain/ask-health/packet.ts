@@ -722,13 +722,39 @@ function addTraining(input: AskHealthPacketInput, push: (item: PushItem) => void
   }
 }
 
-/** A name query or a request to list one's recorded supplements merits an
- * itemized source summary, without flooding unrelated general questions.
+/** Match the exact saved label or an unambiguous primary ingredient word.
+ * A generic qualifier (e.g. "vitamin", "complex", "powder") cannot identify a
+ * specific owner's supplement. Token equality prevents creatine/creatinine,
+ * or fish/fishing, substring false positives. Multiple matched formulations
+ * remain separate rather than silently guessing which one was meant.
+ */
+function matchedSavedSupplements(input: AskHealthPacketInput): AskHealthPacketInput['supplements'] {
+  const tokens = (text: string) => text.toLowerCase().match(/[a-z0-9]+/g) ?? []
+  const question = tokens(input.question)
+  const phrase = ` ${question.join(' ')} `
+  const questionWords = new Set(question)
+  const generic = new Set([
+    'vitamin', 'vitamins', 'supplement', 'supplements', 'mineral', 'minerals',
+    'complex', 'blend', 'formula', 'daily', 'powder', 'capsule', 'capsules',
+    'tablet', 'tablets', 'softgel', 'softgels', 'gummies', 'extract',
+  ])
+  return input.supplements.filter((item) => {
+    const name = tokens(item.name)
+    if (name.length === 0) return false
+    if (phrase.includes(` ${name.join(' ')} `)) return true
+    // Conservatively permit a principal ingredient alias, not every word in
+    // a product label. Multiword vitamins must be named specifically.
+    const main = name[0]!
+    return name.length > 1 && main.length >= 6 &&
+      !generic.has(main) && questionWords.has(main)
+  })
+}
+
+/** A saved named-supplement question needs itemized owner evidence even when
+ * the selected interface lens is Training rather than Supplements.
  */
 function questionMentionsSavedSupplement(input: AskHealthPacketInput): boolean {
-  const question = input.question.toLowerCase()
-  return input.supplements.some((item) =>
-    item.name.trim().length >= 3 && question.includes(item.name.trim().toLowerCase()))
+  return matchedSavedSupplements(input).length > 0
 }
 
 function addSupplements(input: AskHealthPacketInput, push: (item: PushItem) => void) {
@@ -737,9 +763,7 @@ function addSupplements(input: AskHealthPacketInput, push: (item: PushItem) => v
   const end = input.period.end < input.asOf ? input.period.end : input.asOf
   if (end < input.period.start) return
   const totals = { taken: 0, skipped: 0, unknown: 0, paused: 0, notScheduled: 0 }
-  const question = input.question.toLowerCase()
-  const names = input.supplements.filter((item) =>
-    item.name.trim().length >= 3 && question.includes(item.name.trim().toLowerCase()))
+  const names = matchedSavedSupplements(input)
   const asksInventory = /\b(?:my|recorded|saved)\b[\s\S]{0,36}\b(?:supplements?|vitamins?|doses?|regimen)\b|\b(?:supplements?|vitamins?)\b[\s\S]{0,36}\b(?:taking|take|scheduled|use|recorded|saved)\b/i.test(input.question)
   const selected = (names.length > 0 ? names : asksInventory ? input.supplements : []).slice(0, 4)
   for (const supplement of input.supplements) {

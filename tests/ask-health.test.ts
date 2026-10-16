@@ -499,6 +499,36 @@ describe('ask health evidence', () => {
     expect(detail?.text).toContain('This is recorded usage, not proof of ingestion or efficacy.')
   })
 
+  it('PIQ-2.4 resolves primary ingredient aliases without confusing similar words or unspecified vitamins', () => {
+    const saved = (id: string, name: string): AskHealthPacketInput['supplements'][number] => ({
+      id, name, sortOrder: 0, schedules: [], adherence: [],
+      events: [{ effectiveDate: '2026-09-01', status: 'active' }],
+    })
+    const supplements = [
+      saved('creatine-mono', 'Creatine monohydrate'),
+      saved('creatine-hcl', 'Creatine HCl'),
+      saved('magnesium', 'Magnesium glycinate'),
+      saved('vitamin-c', 'Vitamin C'),
+      saved('vitamin-d', 'Vitamin D3'),
+    ]
+    const questionEvidence = (question: string) =>
+      buildAskHealthEvidencePacket(packetInput({
+        lens: 'training', question, supplements,
+      })).evidence.filter((fact) => fact.id.startsWith('supplements.recorded.')).map((fact) => fact.id)
+
+    // Both formulations are relevant. Health must not silently select a
+    // single dose from two owner-saved products sharing a principal ingredient.
+    expect(questionEvidence('What creatine dose have I recorded?')).toEqual([
+      'supplements.recorded.creatine-hcl',
+      'supplements.recorded.creatine-mono',
+    ])
+    expect(questionEvidence('Have I recorded magnesium?')).toEqual(['supplements.recorded.magnesium'])
+    expect(questionEvidence('My vitamin C dose?')).toEqual(['supplements.recorded.vitamin-c'])
+    expect(questionEvidence('What about creatinine levels?')).toEqual([])
+    expect(questionEvidence('Do vitamins help?')).toEqual([])
+    expect(questionEvidence('Should I fish this weekend?')).toEqual([])
+  })
+
   it('keeps owner notes untrusted, allows uncited general context, and rejects fabricated evidence refs', () => {
     const packet = buildAskHealthEvidencePacket(
       packetInput({

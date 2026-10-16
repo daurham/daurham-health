@@ -1492,3 +1492,14 @@ Synthetic 16-pair regressions mutate the frame and day count while preserving th
 **Regression:** Synthetic packet tests exercise a named creatine-like plan through Training with a future taken entry excluded, the no-question no-detail boundary, a paused vitamin with zero reported use, inventory wording, exact evidence IDs, dose and provenance. Existing aggregate adherence handling remains. CI and owner browser QA are mandatory before release; no `main` merge or production owner-data write.
 
 **Still open PIQ-2.4:** Source-truth revalidation when schedule/status edits overlap asynchronous packet reads, generic ingredient alias matching, medication and supplement combined-effect cautions, proof of actual dose adherence beyond owner self-report, and explicit owner-promoted durable conversation facts (never auto-promote a past chat statement).
+
+
+## PIQ-2.4 — Conservative named-supplement ingredient aliases (2026-10-15)
+
+**State:** Bounded PIQ branch implementation, full CI and authenticated owner QA required. **0/9 phases owner-accepted.**
+
+**Gap:** A question about "my creatine dose" failed to find the owner-saved product `Creatine monohydrate`, because itemized Ask Health evidence required the question to repeat the entire supplement display name.
+
+**Contract:** Use one deterministic, token-boundary matcher for both cross-lens evidence routing and itemized evidence selection. Match the saved full name or the first sufficiently specific, non-generic ingredient token (at least six alphanumeric characters), rather than fuzzy substring matching of arbitrary product words. `creatine` can find both `Creatine monohydrate` and `Creatine HCl`; Ask Health must preserve both separate owner records instead of guessing which dose was meant. A generic "vitamin" or unrelated "creatinine" must not trigger a saved creatine regimen. The existing four-item maximum, recorded plan-versus-self-reported-taken separation, as-of range clamp and provenance remain unchanged. No extra SQL, provider call, schema migration, canonical data edits or `main` promotion.
+
+**Verification:** Synthetic question-packet regressions cover principal ingredient, multiple formulations, the full Vitamin C name, a generic vitamin request, false substring match and unrelated queries. No claimed support for brand-name aliases, synonyms or medicine interaction screening; these still require explicit sourced terminology and safety review. Owner iOS QA and full CI remain required.
