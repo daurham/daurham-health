@@ -779,6 +779,33 @@ function addFocusedWeightEnergy(
       invalidatedResults:finalized.invalidatedResults},
     detailPath:'/lab',userEntered:false,substantive:false,priority:1,
   })
+  const combined=focus.reconciliation
+  const summary=combined.state==='goal_source_conflict'
+    ? 'The selected primary weight goal disagrees with the attested active-goal identity or recorded goal evidence. Review Goal Control before interpreting direction. '
+    :combined.state==='primary_not_weight'
+      ? 'The owner has not selected the active weight goal as primary; weight loss must not be presumed to outrank the declared priority. '
+      :combined.state==='performance_attention'
+        ? 'At least one qualified matched-exercise series has a possible decline needing review before interpreting energy balance. '
+        :combined.state==='experiment_review'
+          ? 'Active/upcoming experiments or recent direct-outcome observations require context review; an outcome is not proof that the experiment caused a change. '
+          :combined.state==='descriptive_only'
+            ? 'Some current source descriptions agree, but this is descriptive alignment ONLY, not proof of goal achievement or intervention safety. '
+            : 'Cross-domain goal, experiment and performance reconciliation is not sufficiently verified. '
+  push({
+    id:'weight_energy.cross_signal_reconciliation',domain:'intelligence',
+    label:'Read-only goal, experiment and strength evidence reconciliation',
+    value:null,unit:null,period,
+    text:summary+
+      'The calorie target is a configured plan, not verified energy expenditure. '+
+      'Neither a clean strength screen nor an interpretable experiment result proves muscle retention, causality, or calorie adequacy. '+
+      'Owner-specific plateau classification and calorie adjustments remain NOT AUTHORIZED.',
+    coverage:{reconciliationState:combined.state,
+      calorieAdjustment:combined.calorieAdjustment,
+      plateauClassification:combined.plateauClassification,
+      strengthPreservation:combined.strengthPreservation,
+      reviewReasons:combined.reasons},
+    detailPath:'/goals',userEntered:false,substantive:false,priority:0,
+  })
   const settings = focus.currentSettings
   const settingsExplanation = settings.state === 'consistent_read'
     ? 'A read-time current-settings revision was consistent across two checks. At that moment the owner ' +
@@ -808,7 +835,7 @@ function addFocusedWeightEnergy(
     domain:'intelligence',label:'Plateau, calorie-change and strength-preservation decision boundary',
     value:null,unit:null,period,
     text:'This Ask Health screen has NOT established whether a weight goal is truly met, target suitability, or preserved strength-performance outcomes. '+
-      settingsExplanation + goalSummary + prioritySummary + timingText + outcomeSummary + finalizedText +
+      settingsExplanation + goalSummary + prioritySummary + timingText + outcomeSummary + finalizedText + summary +
       'Therefore it CANNOT classify an owner-specific weight-loss plateau, certify that strength is preserved, or recommend any calorie cut. '+
       'Logged training session dates are activity records, not evidence of stable lifting performance. Recorded hunger/energy/soreness ratings are context, not proof of adequate recovery. '+
       'Carbohydrate/sodium shifts, fluid balance, bowel changes, weigh-in conditions and supplements may confound short-term scale readings; none is established as this owner’s cause here. '+
@@ -827,6 +854,8 @@ function addFocusedWeightEnergy(
       experimentTimingState:timing.state,
       experimentOutcomeRelevance:outcome.state,
       recentFinalizedResultReview:finalized.state,
+      crossSignalReconciliation:combined.state,
+      calorieChangeAuthorization:combined.calorieAdjustment,
       strengthPreservation:focus.strengthPreservation,
     },
     detailPath:'/goals',userEntered:false,substantive:false,priority:0,
