@@ -25,7 +25,8 @@
     "backup:restore": "tsx server/backup/cli.ts restore",
     "test": "vitest run",
     "config:check": "tsx server/config-check.ts",
-    "instance:check": "tsx server/instance-check.ts"
+    "instance:check": "tsx server/instance-check.ts",
+    "piq:preview-preflight": "tsx server/piq-preview-preflight.ts"
   },
   "dependencies": {
     "@google/genai": "^2.24.0",
