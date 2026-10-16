@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import { healthProfileInputSchema, healthProfileSchema, ageYearsOnDate } from '../../src/domain/health-profile.js'
 import { getSql } from '../db.js'
 import { currentHealthDate } from '../health-time.js'
@@ -80,76 +81,80 @@ export async function getHealthProfile() {
   })
 }
 
+// All writers supply the last GET version, or null for an empty singleton.
+const profileWriteSchema = healthProfileInputSchema.extend({
+  expectedUpdatedAt: z.string().datetime({ offset: true }).nullable(),
+})
+
 export async function putHealthProfile(body: unknown) {
-  const parsed = healthProfileInputSchema.safeParse(body)
+  const parsed = profileWriteSchema.safeParse(body)
   if (!parsed.success) {
+    if (body && typeof body === 'object' && !Object.prototype.hasOwnProperty.call(body, 'expectedUpdatedAt')) {
+      throw new HttpError(428, 'Reload Health Profile before saving: a version is required.', undefined, 'PROFILE_VERSION_REQUIRED')
+    }
     throw new HttpError(400, parsed.error.issues[0]?.message ?? 'Invalid Health Profile')
   }
   const input = parsed.data
   if (input.dateOfBirth) {
     const today = await currentHealthDate()
-    if (input.dateOfBirth > today) {
-      throw new HttpError(400, 'Date of birth cannot be in the future')
-    }
+    if (input.dateOfBirth > today) throw new HttpError(400, 'Date of birth cannot be in the future')
     let age: number
-    try {
-      age = ageYearsOnDate(input.dateOfBirth, today)
-    } catch {
-      throw new HttpError(400, 'Date of birth is invalid')
-    }
-    if (age > 130) {
-      throw new HttpError(400, 'Date of birth is outside the supported range')
-    }
+    try { age = ageYearsOnDate(input.dateOfBirth, today) }
+    catch { throw new HttpError(400, 'Date of birth is invalid') }
+    if (age > 130) throw new HttpError(400, 'Date of birth is outside the supported range')
   }
 
-  const current = await getHealthProfile()
-  const sexForPhysiology = input.sexForPhysiology === undefined ? current.sexForPhysiology : input.sexForPhysiology
-  const clinicalConditions = input.clinicalConditions ?? current.clinicalConditions
-  const clinicalAllergies = input.clinicalAllergies ?? current.clinicalAllergies
-  const clinicalMedications = input.clinicalMedications ?? current.clinicalMedications
+  const names = [
+    'sexForPhysiology', 'dateOfBirth', 'heightCm', 'persistentHealthContext',
+    'trainingLimitations', 'dietaryContext', 'bodyMeasurementProtocol',
+    'clinicalConditions', 'clinicalAllergies', 'clinicalMedications',
+  ] as const
+  const supplied = names.map((name) => Object.prototype.hasOwnProperty.call(body, name))
+  const values = [
+    input.sexForPhysiology ?? null, input.dateOfBirth, input.heightCm,
+    input.persistentHealthContext, input.trainingLimitations, input.dietaryContext,
+    input.bodyMeasurementProtocol,
+    JSON.stringify(input.clinicalConditions ?? []),
+    JSON.stringify(input.clinicalAllergies ?? []),
+    JSON.stringify(input.clinicalMedications ?? []),
+  ]
   const sql = await getSql()
-  await sql.query(
-    `INSERT INTO health_profile (
-       singleton_id,
-       sex_for_physiology,
-       date_of_birth,
-       height_cm,
-       persistent_health_context,
-       training_limitations,
-       dietary_context,
-       body_measurement_protocol,
-       clinical_conditions,
-       clinical_allergies,
-       clinical_medications,
-       created_at,
-       updated_at
-     ) VALUES (
-       1, $1::text, $2::date, $3::numeric, $4, $5, $6, $7, $8::jsonb, $9::jsonb, $10::jsonb, now(), now()
-     )
-     ON CONFLICT (singleton_id) DO UPDATE SET
-       sex_for_physiology = EXCLUDED.sex_for_physiology,
-       date_of_birth = EXCLUDED.date_of_birth,
-       height_cm = EXCLUDED.height_cm,
-       persistent_health_context = EXCLUDED.persistent_health_context,
-       training_limitations = EXCLUDED.training_limitations,
-       dietary_context = EXCLUDED.dietary_context,
-       body_measurement_protocol = EXCLUDED.body_measurement_protocol,
-       clinical_conditions = EXCLUDED.clinical_conditions,
-       clinical_allergies = EXCLUDED.clinical_allergies,
-       clinical_medications = EXCLUDED.clinical_medications,
-       updated_at = now()`,
-    [
-      sexForPhysiology,
-      input.dateOfBirth,
-      input.heightCm,
-      input.persistentHealthContext,
-      input.trainingLimitations,
-      input.dietaryContext,
-      input.bodyMeasurementProtocol,
-      JSON.stringify(clinicalConditions),
-      JSON.stringify(clinicalAllergies),
-      JSON.stringify(clinicalMedications),
-    ],
-  )
+  let rows: Array<{ singleton_id: number }>
+  if (input.expectedUpdatedAt === null) {
+    rows = await sql.query(
+      `INSERT INTO health_profile (
+        singleton_id, sex_for_physiology, date_of_birth, height_cm,
+        persistent_health_context, training_limitations, dietary_context,
+        body_measurement_protocol, clinical_conditions, clinical_allergies,
+        clinical_medications, created_at, updated_at
+      ) VALUES (1, $1::text, $2::date, $3::numeric, $4, $5, $6, $7,
+        $8::jsonb, $9::jsonb, $10::jsonb, clock_timestamp(), clock_timestamp())
+      ON CONFLICT (singleton_id) DO NOTHING RETURNING singleton_id`,
+      values,
+    ) as Array<{ singleton_id: number }>
+  } else {
+    rows = await sql.query(
+      `UPDATE health_profile SET
+        sex_for_physiology = CASE WHEN $12::boolean THEN $1::text ELSE sex_for_physiology END,
+        date_of_birth = CASE WHEN $13::boolean THEN $2::date ELSE date_of_birth END,
+        height_cm = CASE WHEN $14::boolean THEN $3::numeric ELSE height_cm END,
+        persistent_health_context = CASE WHEN $15::boolean THEN $4::text ELSE persistent_health_context END,
+        training_limitations = CASE WHEN $16::boolean THEN $5::text ELSE training_limitations END,
+        dietary_context = CASE WHEN $17::boolean THEN $6::text ELSE dietary_context END,
+        body_measurement_protocol = CASE WHEN $18::boolean THEN $7::text ELSE body_measurement_protocol END,
+        clinical_conditions = CASE WHEN $19::boolean THEN $8::jsonb ELSE clinical_conditions END,
+        clinical_allergies = CASE WHEN $20::boolean THEN $9::jsonb ELSE clinical_allergies END,
+        clinical_medications = CASE WHEN $21::boolean THEN $10::jsonb ELSE clinical_medications END,
+        updated_at = GREATEST(clock_timestamp(), date_trunc('milliseconds', updated_at) + interval '1 millisecond')
+      WHERE singleton_id = 1 AND date_trunc('milliseconds', updated_at) = $11::timestamptz
+      RETURNING singleton_id`,
+      [...values, input.expectedUpdatedAt, ...supplied],
+    ) as Array<{ singleton_id: number }>
+  }
+  if (rows.length !== 1) {
+    throw new HttpError(409,
+      'Health Profile changed elsewhere. Your draft was not saved. Reload and review before saving.',
+      undefined, 'PROFILE_STALE_WRITE')
+  }
   return getHealthProfile()
 }
