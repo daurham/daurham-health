@@ -11,13 +11,15 @@ import type { AskEvidence, AskHealthAnswer, AskHealthPacket } from './types.js'
  */
 export type TemporalCitationScope = { start: string; end: string }
 
-/** "Yesterday" and "today" depend on the actual Health-local current date,
- * which the answer validator does not own. The retrieval layer still handles
- * those; this narrower guard skips them rather than guessing from asOf.
+/** Relative-day questions are only grounded when the packet explicitly carries
+ * the actual Health-local date. A selected historical asOf is NOT "today".
+ * Direct/legacy packet callers with no healthToday conservatively skip these.
  */
-export function temporalCitationScope(question: string, asOf: string): TemporalCitationScope | null {
-  if (/\b(?:today|yesterday)\b/i.test(question)) return null
-  const selection = digestDateSelection(question, asOf, asOf)
+export function temporalCitationScope(
+  question: string, asOf: string, healthToday?: string,
+): TemporalCitationScope | null {
+  if (/\b(?:today|yesterday)\b/i.test(question) && !healthToday) return null
+  const selection = digestDateSelection(question, healthToday ?? asOf, asOf)
   if (selection.issue) return null
   if (selection.date) return { start: selection.date, end: selection.date }
   return selection.window ? { start: selection.window.start, end: selection.window.end } : null
@@ -76,12 +78,85 @@ export function explicitlyClaimedMetricDomains(text: string): string[] {
   return patterns.filter(([, pattern]) => pattern.test(text)).map(([domain]) => domain)
 }
 
+type RecordedQuantity = { value: number; unit: 'kg' | 'lb' | 'g' | 'ml' | 'kcal' | 'reps' | 'steps' | 'sessions' | 'movements' }
+
+function recordedUnit(raw: string): RecordedQuantity['unit'] | null {
+  if (/^(?:kg|kilogram)/i.test(raw)) return 'kg'
+  if (/^(?:lb|pound)/i.test(raw)) return 'lb'
+  if (/^(?:g|gram)/i.test(raw)) return 'g'
+  if (/^(?:ml|millilit)/i.test(raw)) return 'ml'
+  if (/^(?:kcal|calorie)/i.test(raw)) return 'kcal'
+  if (/^rep/i.test(raw)) return 'reps'
+  if (/^step/i.test(raw)) return 'steps'
+  if (/^session/i.test(raw)) return 'sessions'
+  if (/^movement/i.test(raw)) return 'movements'
+  return null
+}
+
+/** Intentionally excludes unqualified numbers, dates, percentages, macros in
+ * different units, medication doses, and inferred conversions. Claim-value
+ * comparison applies only to literal supported measurement-unit phrases.
+ */
+export function literalOwnerQuantities(text: string): RecordedQuantity[] {
+  const pattern = /\b(\d+(?:\.\d+)?)\s*(kilograms?|kg|pounds?|lbs?|grams?|g|millilit(?:ers?|res?)|ml|kcal|calories?|reps?|steps?|sessions?|movements?)\b/gi
+  return [...text.matchAll(pattern)].flatMap((match) => {
+    const value = Number(match[1])
+    const unit = recordedUnit(match[2] ?? '')
+    return unit && Number.isFinite(value) ? [{ value, unit }] : []
+  })
+}
+
+function closelyMatches(a: number, b: number): boolean {
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return false
+  // Presentation may round a verified value to one decimal, but do not accept
+  // arbitrary "about" amounts or nearby unrelated observations.
+  return Math.abs(a - b) < 0.051
+}
+
+function numericEvidenceSupports(
+  quantity: RecordedQuantity,
+  sources: readonly AskEvidence[],
+  claim: string,
+  windowAggregate: boolean,
+): boolean {
+  const mean = /\b(?:averag(?:e|ed)|mean|per (?:logged|verified|observed) day)\b/i.test(claim)
+  const candidate = sources.some((source) => {
+    const c = source.coverage
+    // A requested window aggregate has no complete-day numeric backing
+    // unless the source explicitly carries a recorded sum or conditional mean.
+    if (windowAggregate) {
+      const expectedUnit = source.domain === 'hydration' ? 'ml'
+        : source.domain === 'nutrition' ? 'g'
+        : source.domain === 'bowel' ? 'movements' : null
+      if (!expectedUnit || quantity.unit !== expectedUnit) return false
+      const number = mean ? c?.meanPerObservedDay : c?.recordedWindowSum
+      return typeof number === 'number' && closelyMatches(quantity.value, number)
+    }
+    const ownUnit = recordedUnit(source.unit ?? '')
+    if (ownUnit === quantity.unit &&
+        typeof source.value === 'number' && closelyMatches(quantity.value, source.value)) {
+      return true
+    }
+    // A representative comparable training set includes separately typed
+    // load and reps. Never mistake its estimated 1RM for the recorded load.
+    if (source.id.startsWith('training.focus.set.')) {
+      if (quantity.unit === 'kg' && !/\b(?:estimated|estimate|e1rm|1rm|one.rep max)\b/i.test(claim) &&
+          typeof c?.recordedLoadKg === 'number' &&
+          closelyMatches(quantity.value, c.recordedLoadKg)) return true
+      if (quantity.unit === 'reps' && typeof c?.reps === 'number' &&
+          closelyMatches(quantity.value, c.reps)) return true
+    }
+    return false
+  })
+  return candidate
+}
+
 export function groundHistoricalAnswer(
   answer: AskHealthAnswer,
-  packet: Pick<AskHealthPacket, 'asOf' | 'evidence'>,
+  packet: Pick<AskHealthPacket, 'asOf' | 'healthToday' | 'evidence'>,
   question: string,
 ): AskHealthAnswer {
-  const scope = temporalCitationScope(question, packet.asOf)
+  const scope = temporalCitationScope(question, packet.asOf, packet.healthToday)
   if (!scope) return answer
   const byId = new Map(packet.evidence.map((item) => [item.id, item]))
   let withheld = 0
@@ -99,7 +174,11 @@ export function groundHistoricalAnswer(
       return [cited]
     })
     const domains = explicitlyClaimedMetricDomains(block.text)
-    const grounded = relevant.length > 0 &&
+    const values = literalOwnerQuantities(block.text)
+    const hasVerifiedValue = values.every((quantity) => numericEvidenceSupports(
+      quantity, relevant, block.text, windowAggregate,
+    ))
+    const grounded = relevant.length > 0 && hasVerifiedValue &&
       domains.every((domain) => relevant.some((item) => item.domain === domain))
     if (grounded) return true
     withheld += 1
@@ -108,7 +187,7 @@ export function groundHistoricalAnswer(
   const blocks = answer.blocks.filter(keep)
   const limitations = answer.limitations.filter(keep)
   if (!withheld) return answer
-  const message = 'A personal historical measurement or trend statement was withheld because its citations did not establish the requested ' +
+  const message = 'A personal historical measurement or trend statement was withheld because the cited date, metric domain, or recorded numeric value did not establish the requested ' +
     scope.start + (scope.end === scope.start ? ' date.' : ' through ' + scope.end + ' window.') +
     ' Health has not verified that statement for this period; check the saved records or choose a wider evidence range.'
   return {
