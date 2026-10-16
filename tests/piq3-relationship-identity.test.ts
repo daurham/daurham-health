@@ -128,6 +128,75 @@ describe('PIQ-3 relationship pairing and lag identity audit', () => {
     expect(safe.limitations).toHaveLength(1)
   })
 
+  it('does not confuse available statistical pairs with fully observed calendar coverage', () => {
+    accepted('Your logged water and bowel results were correlated last month.', [waterBowelSame])
+    for (const wording of [
+      'Your logged water and bowel observations were correlated every day last month.',
+      'Your water and bowel observations were always correlated last month.',
+      'Your water and bowel observations correlated on all recorded days last month.',
+      'Your water and bowel observations were correlated without exception last month.',
+      'Your water and bowel observations were statistically significant last month.',
+      'Your water and bowel observations showed a proven correlation last month.',
+    ]) withheld(wording, [waterBowelSame])
+    // A seven-day claim can never be certified by a 14-pair sample,
+    // even when the source's selected period includes those seven days.
+    withheld('Your water and bowel observations were correlated last week.', [waterBowelSame],
+      'Were my water and bowel observations correlated last week?')
+  })
+
+  it('enforces sample-date count, registered screening recipe, and confidence integrity', () => {
+    const statement = 'Your logged water and bowel observations were correlated last month.'
+    const raw = waterBowelSame
+    const c = raw.coverage!
+    const variants: AskEvidence[] = [
+      { ...raw, coverage: { ...c, pairedDateCount: 13 } },
+      { ...raw, coverage: { ...c, pairedObservations: 15 } },
+      { ...raw, coverage: { ...c, pairedObservations: 9, pairedDateCount: 9 } },
+      { ...raw, coverage: { ...c, selectedCalendarDays: 9 } },
+      { ...raw, coverage: { ...c, requiredObservations: 9 } },
+      { ...raw, coverage: { ...c, requiredObservations: 14 } },
+      { ...raw, coverage: { ...c, pairedDateCount: null } },
+      { ...raw, coverage: { ...c, selectedCalendarDays: null } },
+      { ...raw, confidence: 'moderate' },
+      { ...raw, confidence: undefined },
+      { ...raw, evidenceDates: undefined },
+      { ...raw, evidenceDates: raw.evidenceDates?.slice(0, 9) },
+      { ...raw, evidenceDates: Array(14).fill('2026-09-01') },
+      { ...raw, value: 0.19 },
+      { ...raw, value: Number.NaN },
+    ]
+    for (const source of variants) withheld(statement, [source])
+    accepted(statement, [raw])
+  })
+
+  it('matches screened relationship strength without claiming statistical significance', () => {
+    accepted('Your water and bowel results were strongly correlated last month.', [waterBowelSame])
+    withheld('Your water and bowel results were weakly correlated last month.', [waterBowelSame])
+    withheld('Your water and bowel results were moderately correlated last month.', [waterBowelSame])
+    accepted('Your water and bowel results were moderately correlated last month.', [waterBowelNext])
+    withheld('Your water and bowel results were strongly correlated last month.', [waterBowelNext])
+    const weak = { ...waterBowelSame, value: 0.25 }
+    accepted('Your water and bowel results showed a weak correlation last month.', [weak])
+    withheld('Your water and bowel results showed a strong correlation last month.', [weak])
+  })
+
+  it('rejects unsupported or contradictory lag prose rather than silently treating it as unspecified', () => {
+    for (const statement of [
+      'Your water and bowel observations were correlated two days later last month.',
+      'Your water and bowel observations were correlated the previous day last month.',
+      'Your water and bowel observations were correlated several days later last month.',
+      'Your water and bowel observations were correlated within 48 hours last month.',
+      'Your water and bowel observations were correlated the next week last month.',
+      'Your water and bowel observations were correlated immediately last month.',
+      'Your water and bowel observations were correlated the same week last month.',
+      'Your water and bowel observations were correlated on the same day and following day last month.',
+    ]) {
+      withheld(statement, [waterBowelSame, waterBowelNext])
+    }
+    accepted('Your water and bowel observations were correlated on the same day last month.', [waterBowelSame])
+    accepted('Your water and bowel observations were correlated the next day last month.', [waterBowelNext])
+  })
+
   it('sanitizes unsupported pair on initial model reply and cached answer with no second call', async () => {
     const wrong = 'Your water and bowel records were correlated last month.'
     const correct = 'Your fiber and bowel records were correlated last month.'
