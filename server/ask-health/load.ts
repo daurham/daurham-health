@@ -21,7 +21,7 @@ import { routeHealthIntelligence } from '../../src/domain/intelligence/shared.js
 import { loadHealthIntelligenceSnapshot } from '../intelligence/snapshot.js'
 import { getHealthProfile } from '../profile/service.js'
 import { focusTrainingWorkingSets } from '../../src/domain/ask-health/focused-training.js'
-import { focusDigestiveContext } from '../../src/domain/ask-health/focused-digestive.js'
+import { attachBristolTypes, digestiveQuestionTopics, focusDigestiveContext } from '../../src/domain/ask-health/focused-digestive.js'
 import type { AskContextMode } from '../../src/domain/ask-health/config.js'
 
 export async function loadAskHealthPacketInput(input: {
@@ -70,6 +70,27 @@ export async function loadAskHealthPacketInput(input: {
     wide: input.contextMode === 'deep',
   })
   const patterns: AskHealthPacketInput['patterns'] = []
+  const digestive = focusDigestiveContext({
+    question: input.question, snapshot: intelligenceSnapshot, today,
+    includeBroadContext: input.contextMode === 'deep',
+  })
+  const topics = digestiveQuestionTopics(input.question)
+  // At most 60 already-identified canonical event IDs from the three sampled
+  // days. No free-form notes or unrelated bowel history are queried.
+  const bowelIds = digestive && (input.contextMode === 'deep' || topics.bowel)
+    ? digestive.bowel.observations.flatMap((day) => day.sourceIds).slice(0, 60)
+    : []
+  let focusedDigestive = digestive
+  if (bowelIds.length > 0) {
+    const sql = await getSql()
+    const rows = (await sql.query(
+      'SELECT id::text AS id, bowel_date::text AS date, bristol_type AS bristol_type FROM bowel_events WHERE id = ANY($1::uuid[]) AND bowel_date >= $2::date AND bowel_date <= $3::date',
+      [bowelIds, period.start, input.asOf],
+    )) as Array<Record<string, unknown>>
+    focusedDigestive = attachBristolTypes(digestive, rows.map((row) => ({
+      id: String(row.id), date: String(row.date), bristolType: Number(row.bristol_type),
+    })))
+  }
   return {
     lens: input.lens,
     range: input.range,
@@ -85,7 +106,7 @@ export async function loadAskHealthPacketInput(input: {
     experiments,
     benchmarks,
     supplements,
-    focusedDigestive: focusDigestiveContext({ question: input.question, snapshot: intelligenceSnapshot, today, includeBroadContext: input.contextMode === 'deep' }),
+    focusedDigestive,
     focusedTraining: focusTrainingWorkingSets({
       question: input.question,
       exercises: rows.exercises,
