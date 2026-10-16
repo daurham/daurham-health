@@ -729,6 +729,33 @@ function addFocusedWeightEnergy(
       activeOutsideOrUndated:timing.activeOutsideOrUndated},
     detailPath:'/lab',userEntered:false,substantive:false,priority:1,
   })
+  const outcome=focus.experimentOutcomeReview
+  const outcomeSummary=outcome.state==='none'
+    ? 'No experiments in the attested active/near-scheduled cohort were found; this does not rule out other experiments or causes. '
+    :outcome.state==='direct_outcome_recorded'
+      ? 'At least one experiment protocol explicitly tracks bodyweight or calories as a primary/secondary outcome. '
+      :outcome.state==='other_outcomes_only'
+        ? 'The attested protocol outcomes do not explicitly include bodyweight or calories; indirect effects remain entirely possible. '
+        :outcome.state==='unclassified_protocols'
+          ? 'One or more attested experiment protocols do not declare a primary/secondary outcome, so outcome relevance is unclassified. '
+          :outcome.state==='mixed_protocols'
+            ? 'The cohort includes a mix of direct weight/calorie outcomes and other or unclassified outcomes. '
+            : 'Experiment protocol outcome relevance is UNKNOWN because verification was unavailable. '
+  push({
+    id:'weight_energy.experiment_outcomes',domain:'experiments',
+    label:'Attested experiment protocol outcome relevance (not causal efficacy)',
+    value:null,unit:null,period,
+    text:outcomeSummary+
+      'This screen uses frozen typed protocol outcome definitions, NOT free-text title guesses. '+
+      'An outcome definition is not measured adherence, clinical validation, an observed effect, or permission to change calories.',
+    coverage:{relevanceState:outcome.state,
+      directOutcomeExperiments:outcome.directOutcomeExperiments,
+      directOutcomesActiveNow:outcome.directOutcomesActiveNow,
+      directOutcomesScheduledSoon:outcome.directOutcomesScheduledSoon,
+      noDirectOutcomeExperiments:outcome.noDirectOutcomeExperiments,
+      noDeclaredOutcomeExperiments:outcome.noDeclaredOutcomeExperiments},
+    detailPath:'/lab',userEntered:false,substantive:false,priority:1,
+  })
   const settings = focus.currentSettings
   const settingsExplanation = settings.state === 'consistent_read'
     ? 'A read-time current-settings revision was consistent across two checks. At that moment the owner ' +
@@ -758,7 +785,7 @@ function addFocusedWeightEnergy(
     domain:'intelligence',label:'Plateau, calorie-change and strength-preservation decision boundary',
     value:null,unit:null,period,
     text:'This Ask Health screen has NOT established whether a weight goal is truly met, target suitability, or preserved strength-performance outcomes. '+
-      settingsExplanation + goalSummary + prioritySummary + timingText +
+      settingsExplanation + goalSummary + prioritySummary + timingText + outcomeSummary +
       'Therefore it CANNOT classify an owner-specific weight-loss plateau, certify that strength is preserved, or recommend any calorie cut. '+
       'Logged training session dates are activity records, not evidence of stable lifting performance. Recorded hunger/energy/soreness ratings are context, not proof of adequate recovery. '+
       'Carbohydrate/sodium shifts, fluid balance, bowel changes, weigh-in conditions and supplements may confound short-term scale readings; none is established as this owner’s cause here. '+
@@ -775,6 +802,7 @@ function addFocusedWeightEnergy(
       calorieTargetState:settings.calorieTargetState,
       relevantExperimentCount:settings.relevantExperimentCount,
       experimentTimingState:timing.state,
+      experimentOutcomeRelevance:outcome.state,
       strengthPreservation:focus.strengthPreservation,
     },
     detailPath:'/goals',userEntered:false,substantive:false,priority:0,

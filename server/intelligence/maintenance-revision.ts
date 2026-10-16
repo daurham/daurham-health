@@ -6,7 +6,9 @@ import { compareMaintenanceDecisionRevisions } from '../../src/domain/maintenanc
  *  - effective target ID, numeric value, effective date, modification time;
  *  - every active goal's lifecycle, version ID and current target definition;
  *  - as-of effective-dated explicit owner primary-goal intent (incl. clear);
- *  - active or soon-scheduled experiment IDs/status/windows.
+ *  - active or soon-scheduled experiment IDs/status/windows;
+ *  - the corresponding immutable-protocol requirement roles, kinds and selectors
+ *    (included to detect even incorrect external requirement mutations).
  *
  * The digest is for deterministic change detection, not authentication.
  * Selecting these settings again just before surfacing advice is optimistic,
@@ -51,6 +53,18 @@ WITH current_target AS (
    WHERE e.status = 'active'
       OR (e.status = 'scheduled' AND e.window_start <= $1::date + 14
           AND e.window_end >= $1::date)
+), relevant_requirements AS (
+  SELECT COALESCE(jsonb_agg(
+     jsonb_build_array(e.id::text, e.protocol_version_id::text,
+       r.id::text, r.role, r.domain, r.requirement_kind, r.selector)
+     ORDER BY e.id::text, r.id::text
+  ), '[]'::jsonb) AS state
+    FROM experiments e
+    LEFT JOIN lab_protocol_requirements r
+      ON r.protocol_version_id = e.protocol_version_id
+   WHERE e.status = 'active'
+      OR (e.status = 'scheduled' AND e.window_start <= $1::date + 14
+          AND e.window_end >= $1::date)
 )
 SELECT (SELECT calories_target FROM current_target) AS calorie_target,
        (SELECT active_count FROM relevant_experiments) AS experiment_count,
@@ -59,6 +73,7 @@ SELECT (SELECT calories_target FROM current_target) AS calorie_target,
          'goals', (SELECT state FROM active_goals),
          'primary_intent', (SELECT to_jsonb(i) FROM primary_intent i),
          'experiments', (SELECT state FROM relevant_experiments),
+         'experiment_requirements', (SELECT state FROM relevant_requirements),
          'profile', (SELECT to_jsonb(p) FROM health_profile p WHERE singleton_id = 1)
        )::text) AS decision_revision
 `
