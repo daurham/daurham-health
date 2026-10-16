@@ -45,6 +45,8 @@ export type AskGoalInput = {
   id: string
   /** Private current Goal Control version for cross-source identity checking. */
   versionId?: string
+  /** Private fingerprint of the exact weight point read by Goal Control. */
+  bodyWeightSourceRevision?: string | null
   kind: GoalKind
   lifecycle: GoalStatus
   label: string

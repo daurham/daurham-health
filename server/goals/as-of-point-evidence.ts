@@ -1,4 +1,5 @@
 import type { Sql } from '../db.js'
+import {createHash} from 'node:crypto'
 import { calendarDateFromInstant } from '../../src/domain/progress/dates.js'
 
 /** Goal Control point measurements, bound to the requested Health-local
@@ -7,6 +8,8 @@ import { calendarDateFromInstant } from '../../src/domain/progress/dates.js'
  */
 export const BODY_GOAL_AS_OF_SQL = `
 SELECT metrics.value::text AS value, metrics.unit,
+       metrics.id::text AS metric_id, metrics.updated_at::text AS metric_updated_at,
+       sessions.id::text AS session_id, sessions.updated_at::text AS session_updated_at,
        sessions.measured_at::text AS measured_at, sessions.timezone
   FROM body_metrics metrics
   JOIN body_measurement_sessions sessions ON sessions.id = metrics.measurement_session_id
@@ -18,9 +21,10 @@ SELECT metrics.value::text AS value, metrics.unit,
 `
 export async function loadBodyGoalPointAsOf(
   sql: Sql, metricKey: string, timezone: string, asOf: string,
-): Promise<{ value: number; unit: string; observedOn: string } | null> {
+): Promise<{ value: number; unit: string; observedOn: string; sourceRevision: string | null } | null> {
   const rows = await sql.query(BODY_GOAL_AS_OF_SQL, [metricKey, timezone, asOf]) as Array<{
     value: string | number; unit: string; measured_at: string; timezone: string | null
+    metric_id?:string;session_id?:string;metric_updated_at?:string;session_updated_at?:string
   }>
   const item = rows[0]
   if (!item || typeof item.measured_at !== 'string') return null
@@ -32,7 +36,14 @@ export async function loadBodyGoalPointAsOf(
   const value = Number(item.value)
   if (localDate > asOf || !Number.isFinite(value) ||
       typeof item.unit !== 'string' || !item.unit.trim()) return null
-  return { value, unit: item.unit, observedOn: localDate }
+  const sourceRevision=[
+    item.metric_id,item.session_id,item.metric_updated_at,item.session_updated_at,
+  ].every(s=>typeof s==='string'&&s.trim())?
+    createHash('sha256').update(JSON.stringify([
+      metricKey,item.metric_id,item.session_id,String(item.value),item.unit,
+      item.measured_at,item.timezone,item.metric_updated_at,item.session_updated_at,
+    ])).digest('hex'):null
+  return { value, unit: item.unit, observedOn: localDate, sourceRevision }
 }
 
 /** Workout dates are DATE; use only sets on/before the requested date. */
