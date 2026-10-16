@@ -7,6 +7,7 @@ import { ProgressRangeControl } from '@/features/progress/ProgressRangeControl'
 import { askHealth } from './api'
 import { AskHealthAnswerView } from './AnswerView'
 import { ExternalResearch } from './ExternalResearch'
+import { KnownProfilePanel } from './KnownProfilePanel'
 
 const LENSES = ['general', 'training', 'nutrition', 'recovery', 'experiments'] as const
 
@@ -83,6 +84,7 @@ export function AskHealthPage() {
           New chat
         </button>
       </div>
+      <KnownProfilePanel today={today} />
       <div className="flex gap-1 overflow-x-auto" role="group" aria-label="Ask Health lens">
         {LENSES.map((item) => (
           <button

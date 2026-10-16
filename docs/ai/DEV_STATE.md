@@ -490,3 +490,8 @@ New nullable owner-selected `sex_for_physiology` profile field with portable bac
 ## 2026-10-15 PIQ-2.2 stable demographic Ask context — work branch
 
 Ask Health's existing owner profile load now conditionally exposes owner-entered birth date, as-of derived calendar age, and today's recorded height for relevant questions. Historical selected dates receive only DOB-derived age, never current height or current clinical/medication/sex-reference context. Unset facts are never guessed, and unrelated general knowledge queries do not include the extra demographic facts. Independent synthetic packet tests added. The branch remains isolated from production; full CI and owner QA required.
+
+
+## 2026-10-15 PIQ-2.2 known profile inventory — work branch
+
+Ask Health has a collapsed, on-demand "What Health knows about me" inventory using the existing authenticated Health Profile GET. It shows saved fields, derived age, per-profile last update and a direct Settings edit link, without loading owner data before expansion or inferring unset values. Synthetic UI tests verify default privacy and presented field semantics. CI + real owner iOS QA required.
