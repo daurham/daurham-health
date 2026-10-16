@@ -565,3 +565,8 @@ Development branch: piq/00-baseline-20261014. Source modules ask-health/intent.t
 ## 2026-10-15 PIQ-3.3 focused training evidence
 
 Added src/domain/ask-health/focused-training.ts and wired it into the existing canonical Ask Health loader and evidence packet: exercise-name-specific strength questions can cite a bounded six most recent high-confidence Epley-estimable working-set sessions, while reporting all eligible session coverage. Ambiguous saved exercise matches never choose arbitrarily. Same progress semantics, no new SQL/migration/model calls and derived-from-owner provenance. Unit/regression tests in tests/piq3-focused-training.test.ts. Full CI and owner acceptance still required. PIQ-3.3 GI/fiber retrieval, exact window text, and typed DB optimization remain outstanding. No main merge or prod write.
+
+
+## 2026-10-15 — Context Mode handoff
+
+PIQ development branch `piq/00-baseline-20261014`. Ask Health UI/API/owner handler supports four server-enforced context modes: smart, personalized (default), deep and general_only. Personalized bypasses the general no-record route for vague educational questions; Deep widens available evidence categories and clinical profile inventory within range and 24K evidence budget, NOT entire owner database; General Only never loads or forwards owner evidence. Metadata distinguishes what was supplied from what was cited and discloses omissions; prompt contains evidenceScope limits. Selected mode is isolated in cache key and retained on canonical source-correction return. Tests: `piq3-context-modes.test.ts` and `piq2-canonical-corrections.test.ts`; CI must be verified against latest SHA. Existing AI budget/usage gates retained, 0/9 PIQ phases formally accepted, no main/prod merge or migration.
