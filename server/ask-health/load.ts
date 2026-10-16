@@ -38,6 +38,8 @@ import { screenExercisePreservationReview } from '../../src/domain/ask-health/ex
 import { screenWeightGoalObservation } from '../../src/domain/ask-health/weight-goal-observation.js'
 import { readCurrentPrimaryGoalIntent } from './current-primary-goal-intent.js'
 import { screenPrimaryWeightGoalPriority } from '../../src/domain/ask-health/primary-weight-goal-intent.js'
+import { readCurrentExperimentWindows } from './current-experiment-windows.js'
+import { screenExperimentTimingReview } from '../../src/domain/ask-health/experiment-timing-review.js'
 import { loadTrainingProgressionState } from '../intelligence/training-progression.js'
 
 export async function loadAskHealthPacketInput(input: {
@@ -85,14 +87,15 @@ export async function loadAskHealthPacketInput(input: {
       }) : null
   const capturedDecision = focusedWeightEnergy && input.asOf === today
     ? await readMaintenanceDecisionSnapshot(input.asOf) : null
-  const [currentGoalRead, currentTrainingRead, currentPrimaryRead] =
+  const [currentGoalRead, currentTrainingRead, currentPrimaryRead, currentExperimentWindows] =
     capturedDecision?.status === 'available'
       ? await Promise.all([
           readCurrentWeightGoalMode(input.asOf),
           loadTrainingProgressionState(input.asOf).catch(() => null),
           readCurrentPrimaryGoalIntent(input.asOf),
+          readCurrentExperimentWindows(input.asOf),
         ])
-      : [null, null, null]
+      : [null, null, null, null]
   const activity = buildActivityProgressView(
     activityRows.filter((row) => row.date <= input.asOf),
     { range: input.range, asOf: input.asOf, today, timezone },
@@ -216,6 +219,10 @@ export async function loadAskHealthPacketInput(input: {
     focusedWeightEnergy.primaryGoalPriority = screenPrimaryWeightGoalPriority({
       asOf:input.asOf,settings:focusedWeightEnergy.currentSettings,
       goal:currentGoalRead,primary:currentPrimaryRead,
+    })
+    focusedWeightEnergy.experimentTimingReview = screenExperimentTimingReview({
+      asOf:input.asOf,today,
+      settings:focusedWeightEnergy.currentSettings,read:currentExperimentWindows,
     })
   }
   return {

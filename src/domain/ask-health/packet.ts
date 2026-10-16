@@ -706,6 +706,29 @@ function addFocusedWeightEnergy(
     coverage:{priorityState:priority.state},
     detailPath:'/goals',userEntered:false,substantive:false,priority:1,
   })
+  const timing=focus.experimentTimingReview
+  const timingText=timing.state==='none'
+    ? 'The attested review found no active or imminently scheduled experiments in this specific window; other unreviewed experiments or plans are not ruled out. '
+    :timing.state==='active_now'
+      ? 'At least one active Personal Lab experiment has a recorded window overlapping today. '
+      :timing.state==='scheduled_soon'
+        ? 'One or more Personal Lab experiments are scheduled in the next 14 days or overlap today while still marked scheduled. '
+        :timing.state==='active_and_scheduled'
+          ? 'A current-window active experiment and at least one scheduled experiment both need review. '
+          :timing.state==='active_timing_unclear'
+            ? 'At least one experiment marked active has an absent, past, or future-only window; its timing must be reconciled before interpreting a weight response. '
+            : 'Experiment window timing is UNKNOWN because a consistent bounded read was not established. '
+  push({
+    id:'weight_energy.experiment_timing',domain:'experiments',
+    label:'Read-only current Personal Lab experiment timing',
+    value:null,unit:null,period,
+    text:timingText+
+      'Experiment status is not a causal result, adherence proof, evidence of an intervention effect, or permission to modify a calorie target.',
+    coverage:{timingState:timing.state,activeWithinWindow:timing.activeWithinWindow,
+      upcomingScheduled:timing.upcomingScheduled,
+      activeOutsideOrUndated:timing.activeOutsideOrUndated},
+    detailPath:'/lab',userEntered:false,substantive:false,priority:1,
+  })
   const settings = focus.currentSettings
   const settingsExplanation = settings.state === 'consistent_read'
     ? 'A read-time current-settings revision was consistent across two checks. At that moment the owner ' +
@@ -735,7 +758,7 @@ function addFocusedWeightEnergy(
     domain:'intelligence',label:'Plateau, calorie-change and strength-preservation decision boundary',
     value:null,unit:null,period,
     text:'This Ask Health screen has NOT established whether a weight goal is truly met, target suitability, or preserved strength-performance outcomes. '+
-      settingsExplanation + goalSummary + prioritySummary +
+      settingsExplanation + goalSummary + prioritySummary + timingText +
       'Therefore it CANNOT classify an owner-specific weight-loss plateau, certify that strength is preserved, or recommend any calorie cut. '+
       'Logged training session dates are activity records, not evidence of stable lifting performance. Recorded hunger/energy/soreness ratings are context, not proof of adequate recovery. '+
       'Carbohydrate/sodium shifts, fluid balance, bowel changes, weigh-in conditions and supplements may confound short-term scale readings; none is established as this owner’s cause here. '+
@@ -751,6 +774,7 @@ function addFocusedWeightEnergy(
       ownerPrimaryWeightGoalPriority:priority.state,
       calorieTargetState:settings.calorieTargetState,
       relevantExperimentCount:settings.relevantExperimentCount,
+      experimentTimingState:timing.state,
       strengthPreservation:focus.strengthPreservation,
     },
     detailPath:'/goals',userEntered:false,substantive:false,priority:0,
