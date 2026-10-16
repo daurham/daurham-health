@@ -53,12 +53,18 @@ export function citationCoversHistoricalScope(item: AskEvidence, scope: Temporal
  */
 export function affirmativeOwnerMetricClaim(text: string): boolean {
   const owner = /\b(?:you|your|yours|my|mine|i|the owner|health logs|your records|your logs)\b/i
-  const quantity = /\b\d+(?:\.\d+)?\s*(?:kg|kilograms?|lbs?|pounds?|g|grams?|ml|milliliters?|kcal|calories|steps?|reps?|times?|sessions?|movements?|minutes?|hours?)\b/i
+  // Recognize unsupported measurement forms too, so a plausible personal
+  // claim cannot bypass grounding merely by writing "liters" or "%".
+  const quantity = /\b\d[\d,.]*\s*(?:kg|kilograms?|lbs?|pounds?|g|grams?|ml|milliliters?|kcal|calories|steps?|reps?|times?|sessions?|movements?|minutes?|hours?|mg|milligrams?|liters?|litres?|ounces?|oz)\b|\b\d[\d,.]*\s*%/i
   const factVerb = /\b(?:recorded|logged|measured|averaged|lifted|completed|consumed|totaled|totalled|performed|improved|increased|decreased)\b/i
   const unsure = /\b(?:cannot|can't|not enough|unknown|uncertain|unavailable|insufficient|missing|unverified|no reliable|not proven|did not|does not|didn't)\b/i
   const conditional = /\b(?:could|might|may|should|would|if|consider|recommend|suggest|hypothetical|typically|generally)\b/i
-  return owner.test(text) && (quantity.test(text) || factVerb.test(text)) &&
-    !unsure.test(text) && !conditional.test(text)
+  // A verified log followed by speculative interpretation still contains an
+  // affirmative logged fact that must be audited. Conversely "you might have
+  // logged ..." is a hypothetical, not an owner measurement assertion.
+  const factualPrefix = text.split(/\b(?:which|that)\s+(?:(?:it|this)\s+)?(?:might|may|could)\b/i)[0] ?? text
+  return owner.test(factualPrefix) && (quantity.test(factualPrefix) || factVerb.test(factualPrefix)) &&
+    !unsure.test(factualPrefix) && !conditional.test(factualPrefix)
 }
 
 /** A matching day alone is insufficient if an unrelated domain is cited.
@@ -139,6 +145,29 @@ function qualifiedOwnerQuantities(text: string): QualifiedQuantity[] {
       : /^(?:lifted|load)/.test(near ?? '') ? 'load' : null
     return [{ value, unit, nutrient, aggregation, liftKind }]
   })
+}
+
+/** Detect unsupported measurement expressions before reading parsed values.
+ * Otherwise a malformed "1,5 g" could be partially parsed as "5 g" and
+ * accidentally certified, or "1.5 L"/"35%" could bypass all numeric checks.
+ * We do not silently convert units, locale separators, signed changes,
+ * partial decimals, or medication quantities in this narrow source audit.
+ */
+export function unsupportedHistoricalMeasurement(text: string): boolean {
+  const units = '(?:kilograms?|kg|pounds?|lbs?|grams?|g|millilit(?:ers?|res?)|ml|kcal|calories?|reps?|steps?|sessions?|movements?)'
+  const candidate = new RegExp('\\b(-?\\d[\\d,.]*|\\.?\\d+)\\s*(' + units + ')\\b', 'gi')
+  const validUSNumber = /^(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?$/
+  for (const match of text.matchAll(candidate)) {
+    const numeric = match[1] ?? ''
+    if (!validUSNumber.test(numeric)) return true
+    const position = match.index ?? 0
+    // Reject a detached final fragment, e.g. the "5 g" inside "1,5 g".
+    if (position > 0 && /[\d,.-]/.test(text[position - 1]!)) return true
+  }
+  if (/\b-?\d[\d,.]*\s*(?:milligrams?|mg|liters?|litres?|ounces?|oz|fl\.?\s*oz|cups?)\b/i.test(text)) return true
+  if (/\b-?\d[\d,.]*\s*%/.test(text)) return true
+  if (/(?:^|[^\w])(?:\.\d+|\d+\.)\s*(?:kg|g|ml|lbs?|kcal|calories?|reps?|steps?|sessions?|movements?)\b/i.test(text)) return true
+  return false
 }
 
 /** Exposes supported literal quantities without prose qualifiers; numbers
@@ -225,6 +254,10 @@ export function groundHistoricalAnswer(
   let withheld = 0
   const keep = (block: AskHealthAnswer['blocks'][number]) => {
     if (!affirmativeOwnerMetricClaim(block.text)) return true
+    if (unsupportedHistoricalMeasurement(block.text)) {
+      withheld += 1
+      return false
+    }
     const windowAggregate = scope.start !== scope.end &&
       /\b(?:total(?:ed)?|sum(?:med)?|averag(?:e|ed)|throughout|per day|per week|during (?:the|that|last|this)|last week|this week|last month|this month)\b/i.test(block.text)
     const relevant = block.evidenceRefs.flatMap((id) => {
