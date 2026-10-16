@@ -1547,6 +1547,8 @@ function addSharedIntelligence(
         coverage: {
           pairedObservations: relationship.sampleSize,
           requiredObservations: relationship.requiredSampleSize,
+          xKey: relationship.xKey,
+          yKey: relationship.yKey,
           lagDays: relationship.lagDays,
         },
         detailPath: relationship.detailPaths[0] ?? '/progress',
@@ -1567,6 +1569,8 @@ function addSharedIntelligence(
         coverage: {
           pairedObservations: relationship.sampleSize,
           requiredObservations: relationship.requiredSampleSize,
+          xKey: relationship.xKey,
+          yKey: relationship.yKey,
           lagDays: relationship.lagDays,
         },
         detailPath: relationship.detailPaths[0] ?? '/progress',
