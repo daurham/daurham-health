@@ -54,7 +54,9 @@ function facts(f=fixture(),mode:'personalized'|'deep'|'general_only'='personaliz
 describe('PIQ-4.1 typed bowel/fiber/water lag pairing readiness',()=>{
   it('counts exact, directional 0/1/2 day matches and requires distinct weeks',()=>{
     const f=fixture()
-    expect(f.pairing?.fiber.map(x=>x.pairedDays)).toEqual([16,0,0])
+    // Every other-day observation also overlaps the previous exposure at lag 2.
+    // This is paired coverage, not independent confirmation of an effect.
+    expect(f.pairing?.fiber.map(x=>x.pairedDays)).toEqual([16,0,15])
     expect(f.pairing?.fiber[0]).toMatchObject({
       maturity:'candidate_for_review',pairedDays:16,
       fullyTypedBowelDays:16,missingOrUnqualifiedExposureDays:0,
