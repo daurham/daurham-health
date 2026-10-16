@@ -24,9 +24,10 @@ const bowel = scoped('digestive.focus.coverage.bowel', 'bowel', 3, 4)
 const fiber = scoped('digestive.focus.coverage.fiber', 'nutrition', 3, 54)
 const unrelated: AskEvidence = {
   ...scoped('intelligence.relationship.shared:hydration:bowel:same_day', 'intelligence', .7, .7),
-  unit: 'Spearman rho',
+  unit: 'Spearman rho', confidence: 'moderate',
   coverage: {
-    pairedObservations: 12, requiredObservations: 10, lagDays: 0,
+    pairedObservations: 12, pairedDateCount: 12, selectedCalendarDays: 45,
+    requiredObservations: 10, lagDays: 0,
     xKey: 'hydration.ml', yKey: 'bowel.count',
   },
 }
@@ -34,7 +35,8 @@ const olderRelationship: AskEvidence = {
   ...unrelated, evidenceDates: ['2026-09-01', '2026-09-05'],
 }
 const withinWindowRelationship: AskEvidence = {
-  ...unrelated, evidenceDates: ['2026-10-06', '2026-10-09'],
+  ...unrelated, evidenceDates: Array.from({ length: 12 }, (_, i) =>
+    '2026-09-' + String(i + 1).padStart(2, '0')),
 }
 const unavailableRelationship = { ...withinWindowRelationship, substantive: false }
 const packet = (evidence: AskEvidence[] = [water, bowel, fiber]): AskHealthPacket => ({
@@ -105,8 +107,8 @@ describe('PIQ-3 ambiguous period and observational interpretation safeguards', (
   })
 
   it('requires a substantive personal relationship source for any affirmative owner correlation', () => {
-    const q = 'Were my water and bowel movements related last week?'
-    const claim = 'Your logged water and bowel events were correlated last week.'
+    const q = 'Were my water and bowel movements related last month?'
+    const claim = 'Your logged water and bowel events were correlated last month.'
     expect(affirmativeOwnerAssociation(claim)).toBe(true)
     for (const evidence of [
       [water, bowel], [water, bowel, olderRelationship],
