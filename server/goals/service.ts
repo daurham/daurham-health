@@ -29,6 +29,7 @@ import { bestTrainingPerformance, trainingPerformanceObservations } from '../../
 import type { BodyObservation, CanonicalSetRecord, ProgressExerciseDefinition } from '../../src/domain/progress/types.js'
 import type { AdherenceWindow, ScheduleWindow, StatusEventWindow } from '../../src/domain/supplements/types.js'
 import { getSql, type Sql } from '../db.js'
+import { loadBodyGoalPointAsOf, loadStrengthGoalSetsAsOf, loadBenchmarkGoalPointAsOf } from './as-of-point-evidence.js'
 import { HttpError } from '../http.js'
 import { currentHealthDate, healthCalendarTimeZone } from '../health-time.js'
 
@@ -376,27 +377,7 @@ async function loadEvidence(
     adherence: null,
   }
   if (row.goal_kind === 'body_metric' && row.body_metric_key) {
-    const metrics = (await sql.query(
-      `SELECT metrics.value::text AS value, metrics.unit, sessions.measured_at::text AS measured_at,
-              sessions.timezone
-       FROM body_metrics metrics
-       JOIN body_measurement_sessions sessions ON sessions.id = metrics.measurement_session_id
-       WHERE metrics.metric_key = $1
-       ORDER BY sessions.measured_at DESC
-       LIMIT 1`,
-      [row.body_metric_key],
-    )) as Array<{ value: string; unit: string; measured_at: string; timezone: string | null }>
-    const metric = metrics[0]
-    if (metric) {
-      empty.body = {
-        value: Number(metric.value),
-        unit: metric.unit,
-        observedOn: calendarDateFromInstant(
-          new Date(metric.measured_at),
-          metric.timezone?.trim() || timezone,
-        ),
-      }
-    }
+    empty.body = await loadBodyGoalPointAsOf(sql, row.body_metric_key, timezone, asOf)
   }
   if (row.goal_kind === 'strength_e1rm' && row.exercise_definition_id) {
     const exercises = (await sql.query(
@@ -405,20 +386,7 @@ async function loadEvidence(
       [row.exercise_definition_id],
     )) as Array<Record<string, unknown>>
     const exerciseRow = exercises[0]
-    const sets = (await sql.query(
-      `SELECT sets.id::text AS set_id, sessions.id::text AS session_id, session_exercises.id::text AS session_exercise_id,
-              session_exercises.exercise_definition_id::text AS exercise_id, sessions.workout_date::text AS session_date,
-              sessions.created_at::text AS session_created_at, session_exercises.position AS session_exercise_position,
-              sets.set_number, sets.set_type, sets.load_state, sets.weight_kg::text AS weight_kg, sets.reps,
-              sets.duration_sec, sets.left_reps, sets.right_reps, sets.left_duration_sec, sets.right_duration_sec
-       FROM workout_sets sets
-       JOIN workout_session_exercises session_exercises ON session_exercises.id = sets.workout_session_exercise_id
-       JOIN workout_sessions sessions ON sessions.id = session_exercises.workout_session_id
-       WHERE session_exercises.exercise_definition_id = $1::uuid
-         AND sessions.session_type IN ('programmed', 'ad_hoc', 'experiment')
-       ORDER BY sessions.workout_date, sessions.created_at, session_exercises.position, sets.set_number`,
-      [row.exercise_definition_id],
-    )) as Array<Record<string, unknown>>
+    const sets = await loadStrengthGoalSetsAsOf(sql, row.exercise_definition_id, asOf)
     if (exerciseRow) {
       const exercise: ProgressExerciseDefinition = {
         id: String(exerciseRow.id),
@@ -561,22 +529,10 @@ async function loadEvidence(
     }
   }
   if (row.goal_kind === 'benchmark_result' && row.benchmark_definition_id && row.benchmark_requirement_id && row.benchmark_protocol_version_id) {
-    const values = (await sql.query(
-      `SELECT result_values.value::text AS value, result_values.unit, results.result_date::text AS result_date
-       FROM benchmark_result_values result_values
-       JOIN benchmark_results results ON results.id = result_values.benchmark_result_id
-       WHERE results.benchmark_definition_id = $1::uuid
-         AND results.protocol_version_id = $2::uuid
-         AND results.status = 'valid'
-         AND result_values.requirement_id = $3::uuid
-       ORDER BY results.result_date DESC, results.created_at DESC
-       LIMIT 1`,
-      [row.benchmark_definition_id, row.benchmark_protocol_version_id, row.benchmark_requirement_id],
-    )) as Array<{ value: string; unit: string; result_date: string }>
-    const value = values[0]
-    if (value) {
-      empty.benchmark = { value: Number(value.value), unit: value.unit, observedOn: value.result_date }
-    }
+    empty.benchmark = await loadBenchmarkGoalPointAsOf(
+      sql, row.benchmark_definition_id, row.benchmark_protocol_version_id,
+      row.benchmark_requirement_id, asOf,
+    )
   }
   if (row.goal_kind === 'training_frequency') {
     const sessions = (await sql.query(
