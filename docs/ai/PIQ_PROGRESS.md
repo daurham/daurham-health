@@ -1573,3 +1573,14 @@ Synthetic 16-pair regressions mutate the frame and day count while preserving th
 **Respect consent and attention:** One surfaced item maximum, with Skip (this answer only), Ask later (until next local Health date), and Never ask again (browser-local until explicitly re-enabled). Preference storage contains only a generic rule identifier/next-day string, never health details, question prose or answers; demo surface preference is scoped separately. The UI transparently identifies browser-local scope and offers re-enable. No new DB columns, model calls, logging mutations or migration.
 
 **Validation gates:** Deterministic pure tests for allowed and blocked question categories, source-data uncertainty, false-positive controls, skip/later/never semantics and storage scoping; full CI and authenticated mobile navigation / no-double-prompt QA remain pending. Other missing-context domains (hydration completeness, weigh-in protocol) and cross-device opt-outs are **not implemented**; do not imply PIQ-2.5 is fully accepted. Canonical correction workflows beyond existing Nutrition/Profile editing remain open.
+
+
+## PIQ-2.5 — Owner correction through canonical source editors (2026-10-15)
+
+**State:** Work branch only, full CI and authenticated owner QA pending. **0/9 PIQ phases owner-accepted.**
+
+Ask Health now exposes a user-initiated, collapsed “Something wrong?” action for cited evidence. Only exact, supported owner Profile and Nutrition evidence IDs with known canonical paths produce an edit handoff. Derived, imported, generic intelligence signals and arbitrary server-supplied URLs do not become trusted write destinations. Health Profile routes to Settings with corrected #health-profile scroll behavior; Nutrition routes to the existing day entries and completeness review. Both source pages can display a save-first return banner. Only the canonical editor is allowed to persist a change; no AI statement, critique or profile fact is silently written.
+
+The return uses validated React Router location.state (the original owner question plus selected lens/range), without putting the question into URL query params, localStorage, analytics or a new backend record. Returning to Ask Health restores an **unsent draft** and explains that a new Ask call is necessary to recompute using current canonical evidence. No automatic model request or asserted correction occurs. A separate “Draft a follow-up about the interpretation” action raises a question about AI reasoning but does not assert or store an owner fact. This is a narrow canonical workflow, not a universal record editor.
+
+Regression suite covers exact profile/nutrition allowlists, unsafe/unknown path rejection, malformed and oversized route state, and no verified medical assertion in the follow-up draft. Full CI, authenticated navigation/mobile UX, source-save/re-answer end to end, live PostgreSQL multitab concurrency and broader canonical editor support remain release gates.
