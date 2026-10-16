@@ -31,6 +31,8 @@ import { focusHistoricalWeightEnergyWindow } from '../../src/domain/ask-health/f
 import type { AskContextMode } from '../../src/domain/ask-health/config.js'
 import { screenWeightEnergyCurrentSettings } from '../../src/domain/ask-health/weight-energy-current-settings.js'
 import { readMaintenanceDecisionSnapshot } from '../intelligence/maintenance-revision.js'
+import { readCurrentWeightGoalMode } from './current-weight-goal.js'
+import { verifiedCurrentWeightGoalMode } from '../../src/domain/ask-health/verified-weight-goal.js'
 
 export async function loadAskHealthPacketInput(input: {
   lens: AskHealthPacketInput['lens']
@@ -74,6 +76,7 @@ export async function loadAskHealthPacketInput(input: {
       }) : null
   const capturedDecision = focusedWeightEnergy && input.asOf === today
     ? await readMaintenanceDecisionSnapshot(input.asOf) : null
+  const currentGoalRead = capturedDecision ? await readCurrentWeightGoalMode() : null
   const activity = buildActivityProgressView(
     activityRows.filter((row) => row.date <= input.asOf),
     { range: input.range, asOf: input.asOf, today, timezone },
@@ -182,6 +185,9 @@ export async function loadAskHealthPacketInput(input: {
   if (focusedWeightEnergy && capturedDecision) {
     focusedWeightEnergy.currentSettings = screenWeightEnergyCurrentSettings(
       capturedDecision, await readMaintenanceDecisionSnapshot(input.asOf),
+    )
+    focusedWeightEnergy.currentSettings.weightGoalMode = verifiedCurrentWeightGoalMode(
+      currentGoalRead, focusedWeightEnergy.currentSettings,
     )
   }
   return {

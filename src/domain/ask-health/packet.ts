@@ -649,12 +649,24 @@ function addFocusedWeightEnergy(
     : settings.state === 'changed_during_read'
       ? 'Current settings changed during the read. Target and experiment state are UNKNOWN until refreshed; do not assume no experiments. '
       : 'The current calorie target, goal revisions and active or soon-scheduled experiment state were not verified by this screen; missing values are UNKNOWN, not absent. '
+  const goalMode=settings.weightGoalMode??'not_checked'
+  const goalSummary=goalMode==='at_most'
+    ? 'One active weight goal has a current-version at-most target; whether that target is unmet is UNKNOWN. '
+    :goalMode==='at_least'
+      ? 'One active weight goal has a current-version at-least target; whether that target is unmet is UNKNOWN. '
+      :goalMode==='range'
+        ? 'One active weight goal has a current-version range target; current direction and unmet status are UNKNOWN. '
+        :goalMode==='none'
+          ? 'The attested read found no active weight goal; no weight-loss objective is presumed. '
+          :goalMode==='ambiguous'
+            ? 'Multiple or invalid active weight-goal versions prevent a single-goal interpretation. '
+            : 'Current weight-goal mode remains UNKNOWN because verification is incomplete. '
   push({
     id:'weight_energy.decision_boundary',
     domain:'intelligence',label:'Plateau, calorie-change and strength-preservation decision boundary',
     value:null,unit:null,period,
-    text:'This Ask Health screen has NOT verified the active weight-goal direction, target suitability, or comparable strength-performance outcomes. '+
-      settingsExplanation +
+    text:'This Ask Health screen has NOT established whether a weight goal is unmet, target suitability, or comparable strength-performance outcomes. '+
+      settingsExplanation + goalSummary +
       'Therefore it CANNOT classify an owner-specific weight-loss plateau, certify that strength is preserved, or recommend any calorie cut. '+
       'Logged training session dates are activity records, not evidence of stable lifting performance. Recorded hunger/energy/soreness ratings are context, not proof of adequate recovery. '+
       'Carbohydrate/sodium shifts, fluid balance, bowel changes, weigh-in conditions and supplements may confound short-term scale readings; none is established as this owner’s cause here. '+
@@ -665,6 +677,7 @@ function addFocusedWeightEnergy(
       goalVerification:focus.goalVerification,
       decisionVerification:focus.decisionVerification,
       currentSettingsCheck:settings.state,
+      currentWeightGoalMode:goalMode,
       calorieTargetState:settings.calorieTargetState,
       relevantExperimentCount:settings.relevantExperimentCount,
       strengthPreservation:focus.strengthPreservation,

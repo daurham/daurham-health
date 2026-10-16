@@ -20,6 +20,8 @@ export type WeightEnergyCurrentSettings = {
   state: 'not_checked' | 'consistent_read' | 'changed_during_read' | 'unavailable'
   calorieTargetState: 'configured' | 'not_configured' | 'unknown'
   relevantExperimentCount: number | null
+  /** Only target MODE from a current goal version; NEVER an unmet-goal claim. */
+  weightGoalMode?: 'not_checked'|'unavailable'|'none'|'ambiguous'|'at_most'|'at_least'|'range'
 }
 
 export const UNCHECKED_WEIGHT_ENERGY_SETTINGS: WeightEnergyCurrentSettings = {
