@@ -1562,3 +1562,14 @@ Synthetic 16-pair regressions mutate the frame and day count while preserving th
 **Synthetic tests:** Eight new cases cover missing/bad version, first-time create, simultaneous initialization failure, conditional SQL update, stale-edit rejection, explicit clears versus omitted fields, and future birth date validation.
 
 **Open:** Full CI validation, authenticated iPhone and concurrent-tab QA, PostgreSQL integration-level concurrency test, granular canonical source correction flow, and minimal, question-efficient logging prompts. The earlier migrations 0053–0056 remain unapplied. No production record, main branch, or owner profile was changed.
+
+
+## PIQ-2.5 — Question-efficient nutrition completeness clarification (2026-10-15)
+
+**State:** Bounded work-branch implementation. **0/9 phases owner-accepted.** Full CI and owner iOS QA required.
+
+**Decision relevance:** Rather than asking for health demographics or logging details on every prompt, Ask Health may display **one optional, deterministic, non-AI question** after an answer only when (1) the owner's question is personal, (2) it asks a nutritional/weight trend or consequential decision, (3) routed missing evidence specifically reports *logged calorie days but zero verified complete, source-reliable days*, and (4) source verification is available. No question appears for general educational, unrelated, pure event, no-log, under-sampled, or unavailable-verification cases. The prompt asks if past compared days were fully logged, explains why that changes the interpretation, and directs the owner to the existing Nutrition **Day log completeness** card. Marking complete or partial happens only through the existing canonical Nutrition workflow, **never** by asking/chatting. Confirmation does not independently verify nutrients.
+
+**Respect consent and attention:** One surfaced item maximum, with Skip (this answer only), Ask later (until next local Health date), and Never ask again (browser-local until explicitly re-enabled). Preference storage contains only a generic rule identifier/next-day string, never health details, question prose or answers; demo surface preference is scoped separately. The UI transparently identifies browser-local scope and offers re-enable. No new DB columns, model calls, logging mutations or migration.
+
+**Validation gates:** Deterministic pure tests for allowed and blocked question categories, source-data uncertainty, false-positive controls, skip/later/never semantics and storage scoping; full CI and authenticated mobile navigation / no-double-prompt QA remain pending. Other missing-context domains (hydration completeness, weigh-in protocol) and cross-device opt-outs are **not implemented**; do not imply PIQ-2.5 is fully accepted. Canonical correction workflows beyond existing Nutrition/Profile editing remain open.

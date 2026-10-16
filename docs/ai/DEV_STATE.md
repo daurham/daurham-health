@@ -540,3 +540,8 @@ Ask Health now supports owner-authored notes routed privately to an explicit Set
 ## 2026-10-15 PIQ-2.5 profile stale-save guard — work branch
 
 Settings profile writes now carry the original GET version. Server writes are guarded by an atomic conditional SQL update or no-clobber initial insert, and stale attempts return 409 with no retry. Updates bump the visible timestamp by at least a millisecond; partial omitted fields remain unchanged. User drafts remain visible on stale conflict until explicit reload-discard. The prior non-atomic note-only preflight was removed. Added eight synthetic cases. CI, PostgreSQL concurrency testing, authenticated mobile QA and owner migration gates remain open; main and production unchanged.
+
+
+## 2026-10-15 PIQ-2.5 optional nutrition quality clarification — work branch
+
+One narrow Ask Health clarification is eligible only for personal diet/weight trend decisions with logged calories but no verified complete, source-reliable day in the routed context. It links to the existing Nutrition Day log completeness editor, without writing records from a chat statement or incurring AI tokens. Adds one-question cap, Skip, Ask later (until next Health calendar day), Never ask again and opt-in re-enable; browser-local preferences contain no health prose. Deterministic eligibility/suppression regressions added. Remaining: authenticated device QA, other domain clarifications, canonical correction workflows and owner acceptance. No migrations or production changes.

@@ -10,6 +10,7 @@ import { askHealth } from './api'
 import { AskHealthAnswerView } from './AnswerView'
 import { ExternalResearch } from './ExternalResearch'
 import { KnownProfilePanel } from './KnownProfilePanel'
+import { OptionalClarification } from './OptionalClarification'
 
 const LENSES = ['general', 'training', 'nutrition', 'recovery', 'experiments'] as const
 
@@ -39,6 +40,7 @@ export function AskHealthPage() {
   const [asked, setAsked] = useState<string | null>(null)
   const [noteOpen, setNoteOpen] = useState(false)
   const [ownerNote, setOwnerNote] = useState('')
+  const [answerRevision, setAnswerRevision] = useState(0)
 
   async function submit(question: string) {
     const trimmed = question.trim()
@@ -60,6 +62,7 @@ export function AskHealthPage() {
         [...current, { role: 'user' as const, text: trimmed }, { role: 'assistant' as const, text: assistant }].slice(-6),
       )
       setLatest(response)
+      setAnswerRevision((value) => value + 1)
       setAsked(trimmed)
       setDraft('')
     } catch (caught) {
@@ -138,6 +141,14 @@ export function AskHealthPage() {
         {latest ? <AskHealthAnswerView answer={latest.answer} evidence={latest.evidence} /> : null}
         {latest && asked ? <ExternalResearch question={asked} /> : null}
       </div>
+      {latest && asked ? (
+        <OptionalClarification
+          key={answerRevision}
+          question={asked}
+          missing={latest.meta.context.missing}
+          today={today}
+        />
+      ) : null}
       {latest ? (
         <section className="space-y-2 rounded-lg border border-zinc-200 bg-white p-3">
           <button type="button" aria-expanded={noteOpen}
