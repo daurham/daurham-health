@@ -663,19 +663,45 @@ function addFocusedTraining(input: AskHealthPacketInput, push: (item: PushItem) 
   const focus = input.focusedTraining
   if (!focus) return
   const detailPath = '/progress/strength/' + focus.exerciseId
+  const requested = focus.requestedDate
+  const window = focus.requestedWindow
+  const scopeNote = focus.dateSelectionIssue
+    ? 'The historical date or period in the question is ambiguous or unsupported. No recent working sets were substituted; ask for one YYYY-MM-DD or a supported calendar week/month.'
+    : requested && !requested.inSelectedRange
+      ? 'Requested day ' + requested.date + ' is outside the selected Health evidence range/as-of; no recent sets were substituted.'
+      : window && !window.inSelectedRange
+        ? 'Requested ' + window.label + ' (' + window.start + ' through ' + window.end +
+          ') extends outside the selected evidence range/as-of; no partial sets were substituted. Select a wider Health range.'
+        : requested
+          ? 'Only high-confidence comparable working sets dated ' + requested.date +
+            ' are eligible. No appearance means no qualifying recorded set, not zero strength.'
+          : window
+            ? 'Only comparable working sets in ' + window.label + ' (' +
+              window.start + ' through ' + window.end + ') are eligible; ' +
+              focus.eligibleAppearances + ' qualifying session(s). The latest six selected appearances are samples; missing sessions are unknown.'
+            : null
   push({
     id: 'training.focus.coverage.' + focus.exerciseId,
     domain: 'training',
     label: focus.exerciseName + ' comparable strength coverage',
     value: focus.eligibleAppearances,
     unit: 'sessions',
-    text: focus.eligibleAppearances === 0
+    text: scopeNote ?? (focus.eligibleAppearances === 0
       ? 'No eligible high-confidence loaded working sets for this exercise in the selected range; missing comparable data is not zero performance.'
-      : 'High-confidence comparable working-set appearances in the selected range. Up to six most recent appearances are shown. Estimates are from logged sets, not directly measured maximum lifts.',
+      : 'High-confidence comparable working-set appearances in the selected range. Up to six most recent appearances are shown. Estimates are from logged sets, not directly measured maximum lifts.'),
     coverage: {
       eligibleAppearances: focus.eligibleAppearances,
       shownAppearances: focus.appearances.length,
+      ...(requested ? { requestedDate: requested.date, requestedDateScope: requested.inSelectedRange ? 'in_range' : 'out_of_range' } : {}),
+      ...(window ? {
+        requestedWindowStart: window.start, requestedWindowEnd: window.end,
+        requestedWindowDays: window.calendarDays,
+        requestedWindowScope: window.inSelectedRange ? 'in_range' : 'out_of_range',
+      } : {}),
     },
+    period: requested && requested.inSelectedRange
+      ? { start: requested.date, end: requested.date }
+      : window && window.inSelectedRange ? { start: window.start, end: window.end } : undefined,
     detailPath,
     userEntered: false,
     substantive: focus.eligibleAppearances > 0,
@@ -697,6 +723,7 @@ function addFocusedTraining(input: AskHealthPacketInput, push: (item: PushItem) 
       substantive: true,
       provenance: 'derived_from_owner_logged_working_set',
       evidenceDates: [item.date],
+      period: { start: item.date, end: item.date },
       priority: 1,
     })
   }
@@ -845,6 +872,11 @@ function addFocusedDigestive(input: AskHealthPacketInput, push: (item: PushItem)
 }
 
 function addTraining(input: AskHealthPacketInput, push: (item: PushItem) => void, detail: boolean) {
+  // Range-wide workout counts and exercise trends do not describe a precise
+  // historical day/week. Do not supply them as substitute support for a
+  // specifically named exercise question with an explicit temporal scope.
+  const focused = input.focusedTraining
+  if (focused && (focused.requestedDate || focused.requestedWindow || focused.dateSelectionIssue)) return
   const training = input.overview?.training
   const exercises = input.overview?.exercises ?? []
   if (training) {
