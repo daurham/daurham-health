@@ -731,16 +731,46 @@ function addFocusedDigestive(input: AskHealthPacketInput, push: (item: PushItem)
         : metric.recordedDays + ' day(s) with explicit bowel observations. Only an explicit no-bowel entry means zero; absent logs mean unknown.'
 
     const requested = focus.requestedDate
+    const window = focus.requestedWindow
+    const summary = metric.windowSummary
+    const rounded = (amount: number) => Math.round(amount * 10) / 10
+    const windowNote = !window ? '' : !window.inSelectedRange
+      ? ' Requested ' + window.label + ' (' + window.start + ' through ' + window.end +
+        ') is not entirely within the selected ' + focus.start + '–' + focus.end +
+        ' evidence window and as-of date. No partial totals or recent substitutes were used; select a wider history range.'
+      : summary == null ? ' Window aggregation unavailable.'
+      : ' For ' + window.label + ' (' + window.start + ' through ' + window.end + '), ' +
+        (key === 'fiber'
+          ? summary.daysWithObservations + ' of ' + summary.calendarDays +
+            ' dates have owner-verified complete and source-reliable fiber logs; ' +
+            (summary.summedRecordedValue == null ? 'no reliable whole-day fiber total can be calculated.' :
+              'the recorded total on those verified dates is ' + rounded(summary.summedRecordedValue) +
+              ' g, averaging ' + rounded(summary.meanPerObservedDay!) +
+              ' g per verified date (not an average across all calendar days).')
+          : key === 'hydration'
+            ? summary.daysWithObservations + ' of ' + summary.calendarDays + ' dates contain water events; ' +
+              (summary.summedRecordedValue == null ? 'no event sum can be calculated.' :
+                'those events sum to ' + rounded(summary.summedRecordedValue) + ' ml, averaging ' +
+                rounded(summary.meanPerObservedDay!) + ' ml of recorded events per logged date, not daily total fluid consumption.')
+            : summary.daysWithObservations + ' of ' + summary.calendarDays +
+              ' dates have explicit bowel observations (including owner-entered zero days); ' +
+              (summary.summedRecordedValue == null ? 'no recorded count can be calculated.' :
+                'those days contain ' + rounded(summary.summedRecordedValue) +
+                ' recorded movements, averaging ' + rounded(summary.meanPerObservedDay!) +
+                ' movements per observed date, not per calendar day.')) +
+        ' Unobserved or unverified dates are unknown, not zero.' +
+        (summary.provisionalObservedDays > 0 ? ' Today includes provisional events and is not a completed day.' : '') +
+        ' At most three dated examples follow; the aggregate uses all qualifying dates in this window.'
     const requestedDayNote = focus.dateSelectionIssue
-      ? ' The question names a calendar date or period that cannot safely be resolved to one day. No recent-day observations were substituted. For a specific day, ask with YYYY-MM-DD inside the selected window.'
-      : !requested ? '' : !requested.inSelectedRange
-      ? ' Requested ' + requested.date + ' is outside the selected ' + focus.start +
-        '–' + focus.end + ' evidence window or after the as-of date; Health did not retrieve that day.'
-      : metric.observations.length === 0
-        ? ' No eligible ' + key + ' observation for requested ' + requested.date +
-          ' was found. An absent or unverified observation is unknown, not zero.'
-        : ' Showing only the requested day ' + requested.date +
-          ', not substituting the latest three days.'
+      ? ' The question names a calendar date or period that cannot safely be resolved. No recent-day observations were substituted. Ask using a single YYYY-MM-DD or a supported calendar window.'
+      : windowNote || (!requested ? '' : !requested.inSelectedRange
+        ? ' Requested ' + requested.date + ' is outside the selected ' + focus.start +
+          '–' + focus.end + ' evidence window or after the as-of date; Health did not retrieve that day.'
+        : metric.observations.length === 0
+          ? ' No eligible ' + key + ' observation for requested ' + requested.date +
+            ' was found. An absent or unverified observation is unknown, not zero.'
+          : ' Showing only the requested day ' + requested.date +
+            ', not substituting the latest three days.')
     push({
       id: 'digestive.focus.coverage.' + key,
       domain: isFiber ? 'nutrition' : key,
@@ -754,6 +784,19 @@ function addFocusedDigestive(input: AskHealthPacketInput, push: (item: PushItem)
           requestedDate: requested.date,
           requestedDateScope: requested.inSelectedRange ? 'in_range' : 'out_of_range',
         } : {}),
+        ...(window ? {
+          requestedWindowStart: window.start,
+          requestedWindowEnd: window.end,
+          requestedWindowDays: window.calendarDays,
+          requestedWindowScope: window.inSelectedRange ? 'in_range' : 'out_of_range',
+          ...(summary ? {
+            observedDaysInWindow: summary.daysWithObservations,
+            unknownOrUnverifiedDaysInWindow: summary.calendarDays - summary.daysWithObservations,
+            recordedWindowSum: summary.summedRecordedValue,
+            meanPerObservedDay: summary.meanPerObservedDay,
+            provisionalObservedDays: summary.provisionalObservedDays,
+          } : {}),
+        } : {}),
         ...(isFiber ? {
           verifiedDays: metric.verifiedDays ?? 0,
           unverifiedDays: metric.recordedDays - (metric.verifiedDays ?? 0),
@@ -763,7 +806,7 @@ function addFocusedDigestive(input: AskHealthPacketInput, push: (item: PushItem)
       },
       detailPath: path,
       userEntered: false,
-      substantive: metric.recordedDays > 0,
+      substantive: summary ? summary.daysWithObservations > 0 : metric.recordedDays > 0,
       priority: 1,
     })
 
