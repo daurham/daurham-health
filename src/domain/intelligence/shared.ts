@@ -205,6 +205,18 @@ const RELATIONSHIPS: Array<{
   { id: 'shared:steps:sleep:next_night', xKey: 'activity.steps', yKey: 'sleep.total_minutes', lagDays: 1, minPairs: 14 },
 ]
 
+/** Canonical identity for a screened relationship. Consumers must not infer
+ * two health signals or the lag from an arbitrary relationship label.
+ */
+export function registeredRelationshipSpec(id: string): {
+  xKey: IntelligenceSignalKey
+  yKey: IntelligenceSignalKey
+  lagDays: number
+} | null {
+  const spec = RELATIONSHIPS.find((item) => item.id === id)
+  return spec ? { xKey: spec.xKey, yKey: spec.yKey, lagDays: spec.lagDays } : null
+}
+
 /** Recheck the *registered* screening recipe separately from verifying rho.
  * A mathematically reproducible coefficient cannot validate a stale signal
  * pairing, lag, sample threshold, display floor or count-derived grade.
