@@ -585,3 +585,7 @@ Deep Dive now opts into a small sample of recorded fiber/hydration/bowel values 
 ## 2026-10-15 — Context Mode all-history UX checkpoint
 
 On PIQ branch, added `src/domain/ask-health/context-range.ts` and a Deep Dive-specific **Use all available history** shortcut in `AskHealthPage`. It discloses 30d/90d/6m/1y versus All and still warns that All refers to the date scope, not a raw full-database AI upload. Date range changes clear previous AI answer/chat, do not trigger a new model call, and cannot change an in-flight request. Tests: `tests/piq3-deep-dive-history-window.test.ts`. No production/main migration, model or owner-data action. CI, iPhone UX and phase approval remain open.
+
+## 2026-10-16 PIQ-4.1 first digestive sample screen — isolated branch
+
+Auth branch-binding preflight `1868eea` passed exact GitHub CI run 38933955703; it remains opt-in and does not prove runtime Auth tenant isolation. First PIQ-4.1 saved-Bristol sample-screen integration landed in `6c4e402`; CI FAILURE at checkpoint: GitHub Actions 38935399299 (exact code SHA 6c4e402587c28eae33c49325124cdacc8f2b9b52). New Vercel preview built READY; production still serves main. All real owner-data QA, migration, paid provider, DB/Auth runtime attestation, encrypted restore and owner acceptance remain blocked. Full-window digestive trend/lag reasoning is **not implemented**; sample co-presence is noncausal.
