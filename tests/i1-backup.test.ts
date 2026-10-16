@@ -21,6 +21,7 @@ describe('I1 profile and plan backup', () => {
     const rowsByTable: Record<string, BackupRow[]> = {
       health_profile: [{
         singleton_id: '1',
+        sex_for_physiology: 'male', // Explicit synthetic owner choice, never a deployment default.
         date_of_birth: '1995-10-07',
         height_cm: '177.8',
         persistent_health_context: 'Owner reported context',
