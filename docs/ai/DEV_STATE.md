@@ -475,3 +475,8 @@ The Goal Overview relationship cards now show short observational summaries, ver
 ## 2026-10-15 PIQ-1.6 registered association screening guard — work branch
 
 Goal Overview now rechecks each displayed observational relationship against the current shared source registry (signal pair, lag, minimum matched count, 0.2 display floor and count grade), in addition to the existing exact-source coefficient/calendar/quality verification. A drifted definition with unchanged numeric rho cannot receive verified present-tense details. Regression tests and CI required; owner iOS and full source-revision atomicity still pending. No schema, provider, production or main changes.
+
+
+## 2026-10-15 PIQ-1.6 cited source coverage consistency — work branch
+
+Goal Overview now verifies raw per-source observed/eligible counts, provenance and count grade against the current loaded snapshot before exposing selected observational relation precision. Missing, duplicated and mismatched coverage reports retire present-tense rho, grade and source evidence; historical links remain. Synthetic nutrition and sleep tests added. No provider, schema, owner data, production or main mutations. CI and owner device QA remain open.

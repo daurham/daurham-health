@@ -261,7 +261,7 @@ function mean(values: readonly number[]): number | null {
   return values.length === 0 ? null : values.reduce((sum, value) => sum + value, 0) / values.length
 }
 
-function confidenceFromSample(observations: number, coveragePct?: number): IntelligenceConfidence {
+export function confidenceFromSample(observations: number, coveragePct?: number): IntelligenceConfidence {
   if (observations <= 0) return 'unknown'
   if (observations >= 14 && (coveragePct == null || coveragePct >= 60)) return 'high'
   if (observations >= 7) return 'moderate'

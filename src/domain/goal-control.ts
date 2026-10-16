@@ -1,5 +1,5 @@
 import { addCalendarDays, type TrainingDayIntent } from './training-plan.js'
-import { relationshipScreeningMetadataMatchesDefinition, type HealthIntelligenceSnapshot, type IntelligenceConfidence, type IntelligenceCoverage, type IntelligenceSignalKey } from './intelligence/shared.js'
+import { confidenceFromSample, INTELLIGENCE_SIGNAL_REGISTRY, relationshipScreeningMetadataMatchesDefinition, type HealthIntelligenceSnapshot, type IntelligenceConfidence, type IntelligenceCoverage, type IntelligenceSignalKey } from './intelligence/shared.js'
 import type { WeeklyCandidate, WeeklyCoachBrief, WeeklyGoalSnapshot, WeeklyTrainingPlanSnapshot } from './weekly-coach/types.js'
 import type { MaintenanceState } from './maintenance.js'
 import type { TrainingProgressionState } from './training-progression.js'
@@ -516,6 +516,52 @@ export function relationshipPairsBackedByFrame(
   })
 }
 
+/** Reconcile cited signal coverage/provenance with the currently loaded day
+ * frame. Excluded raw events are loader-owned: their count can be validated
+ * for shape, but not independently audited from this in-memory snapshot.
+ */
+export function relationshipSourceCoverageMatchesFrame(
+  snapshot: Pick<HealthIntelligenceSnapshot, 'frame' | 'coverage' | 'asOf'>,
+  relation: Pick<HealthIntelligenceSnapshot['relationships'][number], 'xKey' | 'yKey'>,
+): boolean {
+  for (const key of new Set([relation.xKey, relation.yKey])) {
+    const rows = snapshot.coverage.filter((item) => item.key === key)
+    if (rows.length !== 1) return false
+    const reported = rows[0]!
+    const definition = INTELLIGENCE_SIGNAL_REGISTRY[key]
+    if (reported.label !== definition.label ||
+        !Number.isSafeInteger(reported.excludedObservations) ||
+        reported.excludedObservations < 0) return false
+
+    const eligible = snapshot.frame.filter((day) =>
+      !(definition.requiresCompleteDay && day.date === snapshot.asOf))
+    const logged = eligible.flatMap((day) => day.signals[key] ? [day.signals[key]!] : [])
+    const observed = logged.filter((item) =>
+      !key.startsWith('nutrition.') || reported.completenessCheck == null ||
+      item.dayCompleteness === 'verified_complete')
+    if (reported.eligibleDays !== eligible.length ||
+        reported.observedDays !== observed.length ||
+        reported.observedDays > reported.eligibleDays ||
+        (key.startsWith('nutrition.') && reported.loggedDays != null &&
+          reported.loggedDays !== logged.length)) return false
+
+    const coveragePct = eligible.length ? (observed.length / eligible.length) * 100 : 0
+    if (!Number.isFinite(reported.coveragePct) ||
+        Math.abs(reported.coveragePct - coveragePct) > 1e-9 ||
+        reported.confidence !== confidenceFromSample(observed.length, coveragePct)) return false
+    const provenance = new Map<string, number>()
+    for (const observation of observed) {
+      if (observation.key !== key || !Number.isFinite(observation.value)) return false
+      provenance.set(observation.provenance, (provenance.get(observation.provenance) ?? 0) + 1)
+    }
+    const entries = Object.entries(reported.provenance)
+    if (entries.length !== provenance.size ||
+        entries.some(([source, count]) =>
+          !Number.isSafeInteger(count) || count <= 0 || provenance.get(source) !== count)) return false
+  }
+  return true
+}
+
 /** Verify the original aggregate rank association against the exact cited X/Y
  * readings. A modified but still-finite source value can invalidate a stale
  * coefficient even when all matched dates still exist. This never rescales,
@@ -676,6 +722,7 @@ function relationshipsFor(
       const coefficientVerified = snapshotCurrent && !!calendarCoverage &&
         relationshipScreeningMetadataMatchesDefinition(item) &&
         relationshipCoefficientMatchesFrame(snapshot.frame, item) &&
+        relationshipSourceCoverageMatchesFrame(snapshot, item) &&
         relationshipNutritionPairsRemainEligible(snapshot.frame, item) &&
         relationshipReportedLabelsMatchCoefficient(item)
       const pairCoverage = coefficientVerified ? calendarCoverage : null
@@ -694,7 +741,7 @@ function relationshipsFor(
         summary: coefficientVerified ? item.summary
           : !snapshotCurrent
             ? 'Previously reported observational relationship; its source snapshot does not match the requested Health date or has an invalid observation window.'
-            : 'Previously reported observational relationship; its coefficient or interpretation labels could not be verified against the current paired readings, its registered screening rule changed, or cited nutrition days no longer qualify.',
+            : 'Previously reported observational relationship; its coefficient or interpretation labels could not be verified against the current paired readings, its registered screening rule changed, its source coverage/provenance totals disagreed with loaded observations, or cited nutrition days no longer qualify.',
         confidence: coefficientVerified ? item.confidence : 'unknown',
         sampleSize: item.sampleSize,
         detailPaths: [...item.detailPaths],
@@ -716,7 +763,7 @@ function relationshipsFor(
           singlePairSensitivity: pairCoverage ? relationshipSinglePairDeletionSensitivity(snapshot.frame, item) : null,
           screening,
           strength: coefficientVerified ? item.strength : null,
-          sources,
+          sources: coefficientVerified ? sources : [],
         },
       }
     })

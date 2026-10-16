@@ -155,7 +155,7 @@ export function GoalControlCard({
                       <p className="mt-1 font-medium text-amber-800">
                         {!item.evidence.snapshotCurrent
                           ? 'The relationship source snapshot is from another Health date or has an invalid or inconsistent observation window.'
-                          : 'This association could not be reproduced from its cited paired readings, or its reported strength/direction did not agree with the verified coefficient, or its registered signal pairing, lag, minimum sample or count grade did not match current screening rules, or a cited nutrition day is not both confirmed complete and source-reliable.'}
+                          : 'This association could not be reproduced from its cited paired readings, or its reported strength/direction did not agree with the verified coefficient, or its registered signal pairing, lag, minimum sample or count grade did not match current screening rules, or the reported source coverage/provenance did not match loaded readings, or a cited nutrition day is not both confirmed complete and source-reliable.'}
                         {' '}Its reported coefficient, strength and precise date diagnostics are withheld
                         until the source evidence is refreshed; no change to a health target is justified.
                       </p>

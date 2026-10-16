@@ -778,3 +778,8 @@ A selected correlation can be reproducible yet depend on one matched observation
 ## Decision: progressive disclosure without suppressing safety caveats (PIQ-1.6, 2026-10-15)
 
 An evidence explanation needs two reading depths: a concise observational statement plus truthful loaded-source verification/count-grade, and on demand the full screening/coverage/sensitivity diagnostics. Keep native disclosure panels closed by default so advanced statistics do not visually swamp the owner's immediate decision, while keeping stale/unverified warnings and source navigation immediately visible. Do not change verification gates, coefficients, ranking or interventions, and never use a collapsed detail to conceal an actionable safety warning.
+
+
+## Decision: observational source coverage must reconcile with the loaded evidence (PIQ-1.6, 2026-10-15)
+
+A reproducible numeric Spearman relationship does not authorize reporting inconsistent observed-day, eligible-day or source provenance claims. The two cited signals must have exactly one coverage record each; cross-check count and provenance metadata, label, grade and percentage against the same loaded day frame and withhold numeric interpretation when they disagree. Keep links and historical context. Never treat external excluded-observation counts as if the frame could verify excluded raw records, nor confuse these checks with source-event atomicity, significance or causality. No new migration.
