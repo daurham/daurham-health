@@ -59,6 +59,23 @@ export function affirmativeOwnerMetricClaim(text: string): boolean {
     !unsure.test(text) && !conditional.test(text)
 }
 
+/** A matching day alone is insufficient if an unrelated domain is cited.
+ * Only act on explicit domain keywords; avoid guessing which owner metric
+ * an ambiguous "number" means.
+ */
+export function explicitlyClaimedMetricDomains(text: string): string[] {
+  const patterns: Array<[string, RegExp]> = [
+    ['training', /\b(?:bench(?:\s+press)?|squat|deadlift|strength|lifted|reps?|working sets?)\b/i],
+    ['hydration', /\b(?:water|hydrat\w*|fluid intake|fluid consumption)\b/i],
+    ['nutrition', /\b(?:fib(?:er|re)|calor(?:ie|ies)|protein|carbohydrates?|carbs?|sodium|nutrients?)\b/i],
+    ['bowel', /\b(?:bowels?|stools?|poop\w*|bristol|constipat\w*|diarrh\w*)\b/i],
+    ['body', /\b(?:weigh(?:t|ed)?|body fat|waist|bmi)\b/i],
+    ['sleep', /\b(?:sleep|sleeping|rem)\b/i],
+    ['activity', /\b(?:steps?|walking|active energy|resting heart rate)\b/i],
+  ]
+  return patterns.filter(([, pattern]) => pattern.test(text)).map(([domain]) => domain)
+}
+
 export function groundHistoricalAnswer(
   answer: AskHealthAnswer,
   packet: Pick<AskHealthPacket, 'asOf' | 'evidence'>,
@@ -72,14 +89,18 @@ export function groundHistoricalAnswer(
     if (!affirmativeOwnerMetricClaim(block.text)) return true
     const windowAggregate = scope.start !== scope.end &&
       /\b(?:total(?:ed)?|sum(?:med)?|averag(?:e|ed)|throughout|per day|per week|during (?:the|that|last|this)|last week|this week|last month|this month)\b/i.test(block.text)
-    const grounded = block.evidenceRefs.some((id) => {
+    const relevant = block.evidenceRefs.flatMap((id) => {
       const cited = byId.get(id)
-      if (!cited || !citationCoversHistoricalScope(cited, scope)) return false
+      if (!cited || !citationCoversHistoricalScope(cited, scope)) return []
       // A single dated set/event cannot substantiate a seven-day aggregate.
-      return !windowAggregate || (cited.coverage?.requestedWindowStart === scope.start &&
+      if (windowAggregate && !(cited.coverage?.requestedWindowStart === scope.start &&
         cited.coverage?.requestedWindowEnd === scope.end &&
-        cited.coverage?.requestedWindowScope === 'in_range')
+        cited.coverage?.requestedWindowScope === 'in_range')) return []
+      return [cited]
     })
+    const domains = explicitlyClaimedMetricDomains(block.text)
+    const grounded = relevant.length > 0 &&
+      domains.every((domain) => relevant.some((item) => item.domain === domain))
     if (grounded) return true
     withheld += 1
     return false
