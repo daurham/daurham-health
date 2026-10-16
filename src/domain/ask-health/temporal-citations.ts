@@ -1,4 +1,5 @@
 import { digestDateSelection } from './focused-digestive.js'
+import { registeredRelationshipSpec, type IntelligenceSignalKey } from '../intelligence/shared.js'
 import type { AskEvidence, AskHealthAnswer, AskHealthPacket } from './types.js'
 
 /** Conservative structural safeguard, not a semantic fact checker.
@@ -277,16 +278,80 @@ export function affirmativeOwnerAssociation(text: string): boolean {
       explicitlyClaimedMetricDomains(text).length > 1
 }
 
+/** Only unambiguous named signals are eligible to support a relationship
+ * sentence. A broad "nutrition" or "activity" mention is not a verified
+ * protein/fiber or steps/sleep pair. Require exactly TWO named signals.
+ */
+export function claimedRelationshipSignals(text: string): IntelligenceSignalKey[] {
+  const patterns: Array<[IntelligenceSignalKey, RegExp]> = [
+    ['hydration.ml', /\b(?:water|hydrat\w*|fluid (?:intake|consumption))\b/i],
+    ['bowel.count', /\b(?:bowel\w*|stools?|poop\w*|bristol|constipat\w*|diarrh\w*)\b/i],
+    ['nutrition.fiber_g', /\b(?:fiber|fibre)\b/i],
+    ['nutrition.protein_g', /\bprotein\b/i],
+    ['nutrition.carbs_g', /\b(?:carbohydrates?|carbs?)\b/i],
+    ['nutrition.sodium_mg', /\bsodium\b/i],
+    ['nutrition.calories', /\b(?:calories|caloric intake)\b/i],
+    ['activity.steps', /\bsteps?\b/i],
+    ['activity.exercise_minutes', /\bexercise minutes?\b/i],
+    ['activity.resting_heart_rate_bpm', /\bresting heart rate\b/i],
+    ['sleep.total_minutes', /\b(?:sleep|sleeping|sleep duration|next night)\b/i],
+    ['wellness.soreness', /\bsoreness\b/i],
+    ['wellness.hunger', /\bhunger\b/i],
+    ['wellness.stress', /\bstress\b/i],
+    ['wellness.energy', /\b(?:energy levels?|felt energetic|daily energy)\b/i],
+    ['training.sessions', /\b(?:training sessions?|workout sessions?)\b/i],
+    ['body.weight_kg', /\b(?:body weight|weigh(?:ed|t)?)\b/i],
+  ]
+  return patterns.filter(([, pattern]) => pattern.test(text)).map(([key]) => key)
+}
+
+function claimRelationshipLag(text: string): number | null {
+  const sameDay = /\b(?:same[ -]day|on (?:the )?same (?:tracked )?day|on days (?:when|with)|whenever)\b/i.test(text)
+  const nextDay = /\b(?:next[ -](?:day|night)|following (?:day|night)|day after|night after|next morning)\b/i.test(text)
+  if (sameDay && nextDay) return -1 // contradictory, fail closed
+  if (sameDay) return 0
+  if (nextDay) return 1
+  return null
+}
+
+/** A real computed correlation is bound to one registered pair, its direction
+ * and its lag. Neither two independent totals nor another valid correlation
+ * can support that interpretation. Cached old packets missing identity fail
+ * closed instead of importing a relationship from neighboring evidence.
+ */
 function relationshipCitationSupports(
   ids: readonly string[],
   evidence: ReadonlyMap<string, AskEvidence>,
   scope: TemporalCitationScope | null,
+  claim: string,
 ): boolean {
+  const namedSignals = claimedRelationshipSignals(claim)
+  if (namedSignals.length !== 2) return false
+  const mentionedLag = claimRelationshipLag(claim)
+  const rho = /\b(?:spearman(?:'s)?\s*(?:rho)?|rho)\s*(?:of|=|:|was|is)?\s*(-?\d+(?:\.\d+)?)/i.exec(claim)
+  const assertedRho = rho ? Number(rho[1]) : null
+  const positive = /\b(?:positively correlated|positive correlation)\b/i.test(claim)
+  const negative = /\b(?:negatively correlated|negative correlation|inverse(?:ly)? (?:association|correlation))\b/i.test(claim)
   return ids.some((id) => {
     const source = evidence.get(id)
-    return Boolean(source && source.id.startsWith('intelligence.relationship.') &&
-      source.domain === 'intelligence' && source.substantive &&
-      (scope == null || citationCoversHistoricalScope(source, scope)))
+    if (!source || !source.id.startsWith('intelligence.relationship.') ||
+        source.domain !== 'intelligence' || !source.substantive ||
+        source.unit !== 'Spearman rho' || typeof source.value !== 'number' ||
+        !Number.isFinite(source.value) || Math.abs(source.value) > 1 ||
+        (scope != null && !citationCoversHistoricalScope(source, scope))) return false
+    const spec = registeredRelationshipSpec(source.id.slice('intelligence.relationship.'.length))
+    if (!spec || !source.coverage || source.coverage.xKey !== spec.xKey ||
+        source.coverage.yKey !== spec.yKey || source.coverage.lagDays !== spec.lagDays ||
+        typeof source.coverage.pairedObservations !== 'number' ||
+        typeof source.coverage.requiredObservations !== 'number' ||
+        source.coverage.pairedObservations < source.coverage.requiredObservations ||
+        source.coverage.requiredObservations < 10) return false
+    if (!namedSignals.includes(spec.xKey) || !namedSignals.includes(spec.yKey)) return false
+    if (mentionedLag !== null && spec.lagDays !== mentionedLag) return false
+    if (mentionedLag === 1 && namedSignals[0] !== spec.xKey) return false
+    if (assertedRho !== null && !closelyMatches(assertedRho, source.value)) return false
+    if (positive && source.value <= 0 || negative && source.value >= 0) return false
+    return true
   })
 }
 
@@ -304,7 +369,7 @@ export function groundHistoricalAnswer(
   const keep = (block: AskHealthAnswer['blocks'][number]) => {
     if (definitiveOwnerCause(block.text) ||
         (affirmativeOwnerAssociation(block.text) &&
-         !relationshipCitationSupports(block.evidenceRefs, byId, scope))) {
+         !relationshipCitationSupports(block.evidenceRefs, byId, scope, block.text))) {
       withheld += 1
       return false
     }
