@@ -714,7 +714,11 @@ function addFocusedDigestive(input: AskHealthPacketInput, push: (item: PushItem)
     { key: 'bowel', metric: focus.bowel, unit: 'movements', path: '/today' },
   ] as const
 
+  const bowelRelated = /\b(?:constipat\w*|bowels?|stools?|bristol)\b/i.test(input.question)
+  const fiberRelated = /\bfib(?:er|re)\b/i.test(input.question)
+  const hydrationRelated = /\b(?:hydrat\w*|water|fluid intake)\b/i.test(input.question)
   for (const { key, metric, unit, path } of metrics) {
+    if (!bowelRelated && !(key === 'fiber' && fiberRelated) && !(key === 'hydration' && hydrationRelated)) continue
     const isFiber = key === 'fiber'
     const text = isFiber
       ? metric.verificationStatus !== 'available'
