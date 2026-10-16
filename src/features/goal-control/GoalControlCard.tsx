@@ -162,6 +162,7 @@ export function GoalControlCard({
                     ) : null}
                     <details className="mt-2 rounded-md border border-zinc-100 px-2 py-1.5">
                       <summary className="cursor-pointer font-medium text-zinc-700">Evidence and sensitivity checks</summary>
+                      <p className="mt-1">Pair-count eligibility: screening minimum {item.evidence.requiredPairs} pairs.</p>
                     {item.evidence.pairCoverage ? (
                       <p className="mt-1">
                         Pairing opportunity: {item.evidence.pairCoverage.matchedPairs} of
