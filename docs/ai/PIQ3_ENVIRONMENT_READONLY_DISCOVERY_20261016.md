@@ -46,6 +46,8 @@ No action in this discovery changed `main`, Vercel deployments, Neon projects/br
 
 ## Read-only Vercel integration and application configuration evidence (2026-10-16 follow-up)
 
+- Neon `get_auth` metadata confirms two separate Better Auth base URLs and signing-key endpoint URLs for the candidate main and PIQ child branches. An opaque `auth_provider_project_id` field is the **same** across both; that does not necessarily mean shared users, and likewise distinct URLs do not certify account isolation. The Vercel deployment's effective `NEON_AUTH_BASE_URL`, cookie separation, owner identity and preview account permissions were **not** read or verified. Authentication and session/data segregation remain independently blocked.
+
 - Independent read-only Neon compute metadata returned **distinct endpoint hosts** for the candidate `main` and PIQ preview branches. The application guard compares the current process's parsed `DATABASE_URL` hostname with separately supplied expected endpoint hosts; this gives a concrete future attestation path without publishing a connection string. **No actual deployed `DATABASE_URL` was inspected or attested**.
 
 - The existing Vercel account lists a **Neon marketplace integration** on the Health project's owning team. A Vercel **PIQ preview deployment is READY**, with Git ref `piq/00-baseline-20261014`. The Neon PIQ branch reports Vercel as its creator and was initialized from parent data; this establishes automated preview **branch creation**, not an authenticated proof of the exact DATABASE_URL the deployed function ultimately received.

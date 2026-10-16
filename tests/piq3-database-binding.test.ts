@@ -12,6 +12,8 @@ const vars = (mode: 'production' | 'preview') => ({
   DATABASE_URL: url(mode === 'production' ? production : preview),
   HEALTH_DB_PRODUCTION_ENDPOINT_HOST: production,
   HEALTH_DB_PREVIEW_ENDPOINT_HOST: preview,
+  HEALTH_DB_PRODUCTION_DATABASE_NAME: 'neondb',
+  HEALTH_DB_PREVIEW_DATABASE_NAME: 'neondb',
   HEALTH_DB_PREVIEW_GIT_REF: 'piq/00-baseline-20261014',
 })
 
@@ -73,6 +75,55 @@ describe('PIQ release database endpoint isolation guard (offline, synthetic only
       expect(assessDatabaseBinding({ ...baseline, ...c.values })).toMatchObject({
         status: 'blocked', reason: c.reason,
       })
+    }
+  })
+
+  it('requires the correct database name, independently for preview and production', () => {
+    expect(assessDatabaseBinding({
+      ...vars('preview'), DATABASE_URL: url(preview).replace('/neondb', '/postgres'),
+    })).toMatchObject({ reason: 'WRONG_DATABASE_NAME' })
+    expect(assessDatabaseBinding({
+      ...vars('production'), DATABASE_URL: url(production).replace('/neondb', '/otherdb'),
+    })).toMatchObject({ reason: 'WRONG_DATABASE_NAME' })
+    expect(assessDatabaseBinding({
+      ...vars('preview'), HEALTH_DB_PREVIEW_DATABASE_NAME: undefined,
+    })).toMatchObject({ reason: 'MISSING_EXPECTED_DATABASE' })
+    expect(assessDatabaseBinding({
+      ...vars('preview'), HEALTH_DB_PRODUCTION_DATABASE_NAME: 'other/db',
+    })).toMatchObject({ reason: 'INVALID_EXPECTED_DATABASE' })
+    expect(assessDatabaseBinding({
+      ...vars('preview'), DATABASE_URL: url(preview).replace('/neondb', '/%GG'),
+    })).toMatchObject({ reason: 'INVALID_DATABASE_URL' })
+    expect(assessDatabaseBinding({
+      ...vars('preview'), DATABASE_URL: url(preview) + '&dbname=otherdb',
+    })).toMatchObject({ reason: 'UNSAFE_CONNECTION_OVERRIDE' })
+    expect(assessDatabaseBinding({
+      ...vars('preview'), DATABASE_URL: url(preview) + '&port=6432',
+    })).toMatchObject({ reason: 'UNSAFE_CONNECTION_OVERRIDE' })
+    // Different database names are supported across separately configured app instances.
+    expect(assessDatabaseBinding({
+      ...vars('preview'),
+      HEALTH_DB_PREVIEW_DATABASE_NAME: 'qa_db',
+      DATABASE_URL: url(preview).replace('/neondb', '/qa_db'),
+    })).toMatchObject({ status: 'verified' })
+  })
+
+  it('rejects missing, downgraded or ambiguous SSL mode', () => {
+    const good = url(preview)
+    const invalid = [
+      good.replace('sslmode=require&', ''),
+      good.replace('sslmode=require', 'sslmode=disable'),
+      good + '&sslmode=disable',
+      good.replace('sslmode=require', 'sslmode=prefer'),
+    ]
+    for (const DATABASE_URL of invalid) {
+      expect(assessDatabaseBinding({ ...vars('preview'), DATABASE_URL }))
+        .toMatchObject({ status: 'blocked', reason: 'TLS_REQUIRED' })
+    }
+    for (const sslmode of ['verify-ca', 'verify-full']) {
+      expect(assessDatabaseBinding({
+        ...vars('preview'), DATABASE_URL: good.replace('sslmode=require', 'sslmode=' + sslmode),
+      })).toMatchObject({ status: 'verified' })
     }
   })
 
