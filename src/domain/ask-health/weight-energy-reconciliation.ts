@@ -12,7 +12,8 @@ export type ReconciliationReason=
   'current_goal_sources_conflict'|'goal_status_not_verified'|
   'performance_decline_attention'|'strength_preservation_not_verified'|
   'experiment_timing_attention'|'experiment_source_unknown'|
-  'recent_result_not_linked_to_current_goal'|'calorie_adequacy_not_verified'
+  'recent_result_not_linked_to_current_goal'|'calorie_adequacy_not_verified'|
+  'weight_measurement_coverage_unverified'|'protein_record_coverage_unverified'
 
 export type WeightEnergyReconciliation={
   state:'not_checked'|'source_inconsistent'|'goal_source_conflict'|
@@ -67,6 +68,10 @@ export function reconcileWeightEnergyEvidence(input:{
   // Even with comparable measurements and a matched version, canonical Goal
   // status/urgency and effective historical target are not attested here.
   add('goal_status_not_verified')
+  if(['not_checked','unavailable','insufficient_comparable_weights'].includes(
+    input.goalObservation.state))add('weight_measurement_coverage_unverified')
+  if(input.proteinTraining.proteinCoverage!=='descriptive_window')
+    add('protein_record_coverage_unverified')
   if(input.performance.state==='possible_decline_for_review')
     add('performance_decline_attention')
   // A lack of decline flags is NOT proof of maintained strength/muscle.
@@ -85,7 +90,14 @@ export function reconcileWeightEnergyEvidence(input:{
   // sufficient energy, nutrient adequacy or intervention safety.
   add('calorie_adequacy_not_verified')
 
+  const incompleteSource=unknownExperiment||
+    ['unavailable','not_checked'].includes(input.performance.state)||
+    ['unavailable','not_checked'].includes(input.goalObservation.state)||
+    ['none','ambiguous','unavailable','not_checked'].includes(
+      input.settings.weightGoalMode??'not_checked')
   const state:WeightEnergyReconciliation['state']=!consistent||
+    (incompleteSource&&!conflict&&!notWeight&&
+      input.performance.state!=='possible_decline_for_review'&&!activeOrSoon)||
     ['unavailable','not_checked'].includes(primary)
       ?'source_inconsistent'
       :conflict?'goal_source_conflict'
