@@ -348,7 +348,7 @@ export function SettingsPage() {
   const location = useLocation()
 
   useEffect(() => {
-    if (location.hash !== '#theme-studio' && location.hash !== '#trend-colors') return
+    if (location.hash !== '#theme-studio' && location.hash !== '#trend-colors' && location.hash !== '#health-profile') return
     const id = location.hash.slice(1)
     window.requestAnimationFrame(() => {
       document.getElementById(id)?.scrollIntoView({ block: 'start' })
