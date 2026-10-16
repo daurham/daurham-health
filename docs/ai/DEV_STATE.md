@@ -545,3 +545,8 @@ Settings profile writes now carry the original GET version. Server writes are gu
 ## 2026-10-15 PIQ-2.5 optional nutrition quality clarification — work branch
 
 One narrow Ask Health clarification is eligible only for personal diet/weight trend decisions with logged calories but no verified complete, source-reliable day in the routed context. It links to the existing Nutrition Day log completeness editor, without writing records from a chat statement or incurring AI tokens. Adds one-question cap, Skip, Ask later (until next Health calendar day), Never ask again and opt-in re-enable; browser-local preferences contain no health prose. Deterministic eligibility/suppression regressions added. Remaining: authenticated device QA, other domain clarifications, canonical correction workflows and owner acceptance. No migrations or production changes.
+
+
+## 2026-10-15 PIQ-2.5 canonical correction routing — work branch
+
+Ask Health now offers an evidence-level “Something wrong?” review. Verified Health Profile and Nutrition evidence only can deep link to their original editors; unknown/imported/derived evidence is inspect-only. Source editors display a save-first, return-to-Ask banner. The original question/lens/range move via bounded transient router state, rehydrate an unsent question and require an explicit Ask for current records; no chat-based canonical write or unsolicited Gemini call. Settings #health-profile hash scroll is now supported. Added pure allowlist/state regressions. CI and device acceptance pending. Main, prod and schema unchanged.
