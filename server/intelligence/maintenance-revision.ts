@@ -5,6 +5,7 @@ import { compareMaintenanceDecisionRevisions } from '../../src/domain/maintenanc
  * A single PostgreSQL statement produces a shared MVCC view of:
  *  - effective target ID, numeric value, effective date, modification time;
  *  - every active goal's lifecycle, version ID and current target definition;
+ *  - as-of effective-dated explicit owner primary-goal intent (incl. clear);
  *  - active or soon-scheduled experiment IDs/status/windows.
  *
  * The digest is for deterministic change detection, not authentication.
@@ -30,6 +31,15 @@ WITH current_target AS (
     FROM goals g
     LEFT JOIN goal_versions v ON v.goal_id = g.id AND v.is_current
    WHERE g.status = 'active'
+), primary_intent AS (
+  -- The owner may change explicit priority without editing a Goal itself.
+  -- It must participate in the SAME read-time decision digest.
+  SELECT version, primary_goal_id::text AS primary_goal_id,
+         effective_from::text AS effective_from, recorded_at::text AS recorded_at
+    FROM primary_goal_intent_events
+   WHERE effective_from <= $1::date
+   ORDER BY effective_from DESC, version DESC
+   LIMIT 1
 ), relevant_experiments AS (
   SELECT COUNT(*)::int AS active_count,
          COALESCE(jsonb_agg(
@@ -47,6 +57,7 @@ SELECT (SELECT calories_target FROM current_target) AS calorie_target,
        md5(jsonb_build_object(
          'target', (SELECT to_jsonb(t) FROM current_target t),
          'goals', (SELECT state FROM active_goals),
+         'primary_intent', (SELECT to_jsonb(i) FROM primary_intent i),
          'experiments', (SELECT state FROM relevant_experiments),
          'profile', (SELECT to_jsonb(p) FROM health_profile p WHERE singleton_id = 1)
        )::text) AS decision_revision

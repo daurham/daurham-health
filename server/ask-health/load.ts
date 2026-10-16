@@ -35,6 +35,8 @@ import { readCurrentWeightGoalMode } from './current-weight-goal.js'
 import { verifiedCurrentWeightGoalMode } from '../../src/domain/ask-health/verified-weight-goal.js'
 import { screenExercisePreservationReview } from '../../src/domain/ask-health/exercise-preservation-review.js'
 import { screenWeightGoalObservation } from '../../src/domain/ask-health/weight-goal-observation.js'
+import { readCurrentPrimaryGoalIntent } from './current-primary-goal-intent.js'
+import { screenPrimaryWeightGoalPriority } from '../../src/domain/ask-health/primary-weight-goal-intent.js'
 import { loadTrainingProgressionState } from '../intelligence/training-progression.js'
 
 export async function loadAskHealthPacketInput(input: {
@@ -79,12 +81,14 @@ export async function loadAskHealthPacketInput(input: {
       }) : null
   const capturedDecision = focusedWeightEnergy && input.asOf === today
     ? await readMaintenanceDecisionSnapshot(input.asOf) : null
-  const [currentGoalRead, currentTrainingRead] = capturedDecision?.status === 'available'
-    ? await Promise.all([
-        readCurrentWeightGoalMode(input.asOf),
-        loadTrainingProgressionState(input.asOf).catch(() => null),
-      ])
-    : [null, null]
+  const [currentGoalRead, currentTrainingRead, currentPrimaryRead] =
+    capturedDecision?.status === 'available'
+      ? await Promise.all([
+          readCurrentWeightGoalMode(input.asOf),
+          loadTrainingProgressionState(input.asOf).catch(() => null),
+          readCurrentPrimaryGoalIntent(input.asOf),
+        ])
+      : [null, null, null]
   const activity = buildActivityProgressView(
     activityRows.filter((row) => row.date <= input.asOf),
     { range: input.range, asOf: input.asOf, today, timezone },
@@ -204,6 +208,10 @@ export async function loadAskHealthPacketInput(input: {
     focusedWeightEnergy.weightGoalObservation = screenWeightGoalObservation({
       asOf:input.asOf,today,snapshot:intelligenceSnapshot,
       read:currentGoalRead,settings:focusedWeightEnergy.currentSettings,
+    })
+    focusedWeightEnergy.primaryGoalPriority = screenPrimaryWeightGoalPriority({
+      asOf:input.asOf,settings:focusedWeightEnergy.currentSettings,
+      goal:currentGoalRead,primary:currentPrimaryRead,
     })
   }
   return {

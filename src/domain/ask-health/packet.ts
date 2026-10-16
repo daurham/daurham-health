@@ -684,6 +684,25 @@ function addFocusedWeightEnergy(
     },
     detailPath:'/goals',userEntered:false,substantive:false,priority:1,
   })
+  const priority=focus.primaryGoalPriority
+  const prioritySummary=priority.state==='selected_active_weight_goal'
+    ? 'The owner explicitly selected the attested active weight goal as primary on the current effective date. '
+    :priority.state==='selected_goal_not_active_weight'
+      ? 'The owner selected a primary goal, but it is not the attested active weight goal; do not assume weight loss is the priority. '
+      :priority.state==='explicitly_cleared'
+        ? 'The owner explicitly cleared the primary-goal selection; no primary goal is currently declared. '
+        :priority.state==='not_set'
+          ? 'No owner primary-goal choice was found effective today; its absence is not permission to infer a priority. '
+          : 'Current explicit primary-goal priority is UNKNOWN because its attestation was not completed. '
+  push({
+    id:'weight_energy.primary_goal_priority',domain:'goals',
+    label:'Read-only effective-dated owner goal priority',
+    value:null,unit:null,period,
+    text:prioritySummary+
+      'This does NOT verify that any goal is unmet, that a weight trend is a plateau, or that calorie adjustment is safe.',
+    coverage:{priorityState:priority.state},
+    detailPath:'/goals',userEntered:false,substantive:false,priority:1,
+  })
   const settings = focus.currentSettings
   const settingsExplanation = settings.state === 'consistent_read'
     ? 'A read-time current-settings revision was consistent across two checks. At that moment the owner ' +
@@ -713,7 +732,7 @@ function addFocusedWeightEnergy(
     domain:'intelligence',label:'Plateau, calorie-change and strength-preservation decision boundary',
     value:null,unit:null,period,
     text:'This Ask Health screen has NOT established whether a weight goal is truly met, target suitability, or preserved strength-performance outcomes. '+
-      settingsExplanation + goalSummary +
+      settingsExplanation + goalSummary + prioritySummary +
       'Therefore it CANNOT classify an owner-specific weight-loss plateau, certify that strength is preserved, or recommend any calorie cut. '+
       'Logged training session dates are activity records, not evidence of stable lifting performance. Recorded hunger/energy/soreness ratings are context, not proof of adequate recovery. '+
       'Carbohydrate/sodium shifts, fluid balance, bowel changes, weigh-in conditions and supplements may confound short-term scale readings; none is established as this owner’s cause here. '+
@@ -726,6 +745,7 @@ function addFocusedWeightEnergy(
       currentSettingsCheck:settings.state,
       currentWeightGoalMode:goalMode,
       recordedWeightBoundaryRelation:goalObs.state,
+      ownerPrimaryWeightGoalPriority:priority.state,
       calorieTargetState:settings.calorieTargetState,
       relevantExperimentCount:settings.relevantExperimentCount,
       strengthPreservation:focus.strengthPreservation,
