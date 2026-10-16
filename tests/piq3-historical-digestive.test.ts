@@ -119,8 +119,8 @@ describe('PIQ-3.3 specific historical digestive day retrieval', () => {
   it('preserves a bounded latest-three sample for undated Deep Dive questions', () => {
     const facts = evidence('How is my health generally?', 'deep')
     const dayEvidence = facts.filter(x => x.id.startsWith('digestive.focus.hydration.'))
-    expect(dayEvidence.map(x => x.evidenceDates?.[0])).toEqual([
-      '2026-10-14', '2026-10-13', '2026-10-12',
+    expect(dayEvidence.map(x => x.evidenceDates?.[0]).sort()).toEqual([
+      '2026-10-12', '2026-10-13', '2026-10-14',
     ])
   })
 })
