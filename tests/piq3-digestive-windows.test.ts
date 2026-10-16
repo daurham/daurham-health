@@ -195,6 +195,7 @@ describe('PIQ-3.3 bounded digestive calendar windows and honest missingness', ()
     for (const question of [
       'How much water last 91 days?', 'How much water last year?',
       'How much water last 2 weeks?', 'How much water last week and this month?',
+      'How much water last week and last year?',
       'How much water on 2026-10-06 last week?',
       'How much water 10/06/2026 last week?',
       'How much water since last month?',
