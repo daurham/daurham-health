@@ -16,6 +16,7 @@ export type ReconciliationReason=
   'recent_result_not_linked_to_current_goal'|'calorie_adequacy_not_verified'|
   'weight_measurement_coverage_unverified'|'protein_record_coverage_unverified'|
   'canonical_version_mismatch'|'canonical_measurements_disagree'|
+  'canonical_measurement_source_unverified'|
   'canonical_goal_status_unverified'|'canonical_deadline_attention'
 
 export type WeightEnergyReconciliation={
@@ -74,6 +75,9 @@ export function reconcileWeightEnergyEvidence(input:{
     if(input.canonicalGoal.state==='version_mismatch')add('canonical_version_mismatch')
     if(input.canonicalGoal.state==='measurement_disagreement')
       add('canonical_measurements_disagree')
+    if(input.canonicalGoal.state==='measurement_source_changed'||
+       input.canonicalGoal.state==='measurement_source_unavailable')
+      add('canonical_measurement_source_unverified')
     if(['unavailable','not_checked','canonical_target_unknown'].includes(
       input.canonicalGoal.state))add('canonical_goal_status_unverified')
     if(input.canonicalGoal.deadlineAttention==='past_reported_unmet'||
@@ -108,9 +112,11 @@ export function reconcileWeightEnergyEvidence(input:{
   add('calorie_adequacy_not_verified')
 
   const canonicalConflict=input.canonicalGoal?.state==='version_mismatch'||
-    input.canonicalGoal?.state==='measurement_disagreement'
+    input.canonicalGoal?.state==='measurement_disagreement'||
+    input.canonicalGoal?.state==='measurement_source_changed'
   const canonicalUnknown=input.canonicalGoal!=null&&
-    ['unavailable','not_checked','canonical_target_unknown'].includes(input.canonicalGoal.state)
+    ['unavailable','not_checked','canonical_target_unknown',
+      'measurement_source_unavailable'].includes(input.canonicalGoal.state)
   const incompleteSource=unknownExperiment||canonicalUnknown||
     ['unavailable','not_checked'].includes(input.performance.state)||
     ['unavailable','not_checked'].includes(input.goalObservation.state)||

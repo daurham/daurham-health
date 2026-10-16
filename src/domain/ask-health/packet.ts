@@ -788,6 +788,10 @@ function addFocusedWeightEnergy(
         ? 'Goal Control and the selected active goal do not have a matching current identity/version; the reported status is WITHHELD. '
         :canonical.state==='canonical_target_unknown'
           ? 'Goal Control does not have a usable current target observation, so satisfaction and missed deadlines are NOT verified. '
+          :canonical.state==='measurement_source_changed'
+            ? 'The latest Goal Control weight point changed or no longer matches its private source fingerprint; target and deadline reports are WITHHELD. '
+            :canonical.state==='measurement_source_unavailable'
+              ? 'The latest Goal Control weight-point recheck is unavailable; target and deadline reports are WITHHELD. '
           :canonical.state==='primary_not_weight'
             ? 'No active weight goal was selected as primary; this screen withholds weight-goal achievement and urgency. '
             : 'Exact selected-goal status or source versions could not be reconciled. '
@@ -797,7 +801,7 @@ function addFocusedWeightEnergy(
     value:null,unit:null,period,
     text:canonicalText+
       'Deadline attention is descriptive; a past or due deadline with missing observation is NOT proof the goal is unmet. '+
-      'The latest goal observation is not atomically versioned with the decision fingerprint; no plateau, efficacy, clinical urgency or calorie intervention follows.',
+      'A matching latest-point fingerprint is only an optimistic read-time check, NOT a transaction lock or verification of the complete historical projection series. No plateau, efficacy, clinical urgency or calorie intervention follows.',
     coverage:{
       canonicalGoalReview:canonical.state,
       reportedTargetState:canonical.targetReport,
