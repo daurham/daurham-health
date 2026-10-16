@@ -648,7 +648,7 @@ function addFocusedWeightEnergy(
       'Training participation does NOT establish comparable resistance, effort, exercise performance, muscle retention, or appropriate recovery. '+
       exerciseReviewSummary +
       'These are read-only training-record observations without an independently version-checked workout snapshot or a comprehensive recovery assessment. '+
-      'Strength preservation, a plateau, protein adequacy judgment, and any calorie-cut recommendation remain unauthorized.',
+      'Strength preservation, plateau and protein-adequacy conclusions remain unverified. A calorie-cut recommendation remains unauthorized.',
     coverage:{
       sourceIdentifiedTrainingDays:preservation.sourceIdentifiedTrainingDays,
       unattributedPositiveTrainingSignalDays:preservation.trainingDaysWithoutSourceIdentity,

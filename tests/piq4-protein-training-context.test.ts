@@ -251,7 +251,7 @@ describe('PIQ-4.2 exercise-matched performance flags remain review-only',()=>{
       strengthPreservation:'not_verified',
     })
     expect(item?.text).toContain('preliminary recent performance-decline')
-    expect(item?.text).toContain('remain unauthorized')
+    expect(item?.text).toContain('calorie-cut recommendation remains unauthorized')
     expect(JSON.stringify(item)).not.toContain('Private lift')
     expect(JSON.stringify(item)).not.toContain('private-exercise')
   })
