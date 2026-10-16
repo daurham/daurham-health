@@ -95,6 +95,7 @@ export async function loadAskHealthPacketInput(input: {
     lens: input.lens,
     range: input.range,
     asOf: input.asOf,
+    healthToday: today,
     period: { start: period.start, end: period.end },
     generatedAt: input.generatedAt,
     question: input.question,
