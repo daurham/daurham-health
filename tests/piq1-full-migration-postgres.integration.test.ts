@@ -9,6 +9,7 @@ import { readMaintenanceDecisionSnapshot, isMaintenanceDecisionRevisionCurrent }
 import { activeCalorieDecisionInRevision, dueFollowUps, requireCurrentCalorieRecommendation, surfaceDraft, writeCoachRecommendationResponse, writeCoachRecommendationOutcome } from '../server/intelligence/coach-intelligence.js'
 import { randomUUID } from 'node:crypto'
 import { readPrimaryGoalIntent, savePrimaryGoalIntent } from '../server/goals/primary-intent.js'
+import { getHealthProfile, putHealthProfile } from '../server/profile/service.js'
 import { PERFORMED_STRENGTH_EXERCISES_SQL } from '../server/training/plan-service.js'
 import { buildTrainingWeekQualification, buildTrainingRoutineCredits, type PerformedExerciseEvidence } from '../src/domain/training-qualification.js'
 import { buildTrainingProgressSummary } from '../src/domain/training-progress-summary.js'
@@ -914,5 +915,95 @@ describe.skipIf(!url)('PIQ-1.1 full 0001–0056 migration-chain and backup on is
       await client.query('ROLLBACK')
     }
   })
+
+  it('PIQ-2.5: two real PostgreSQL clients reject competing profile initialization and updates', async () => {
+    // The entire schema was migrated to 0056 above. The SQL adapter is injected
+    // solely for this fixture; no DATABASE_URL or real owner project is used.
+    const other = new Client({
+      connectionString: url ?? 'postgres://unconfigured:unconfigured@127.0.0.1:1/none',
+    })
+    await client.query('DELETE FROM health_profile')
+    await other.connect()
+    try {
+      await other.query('SET search_path TO piq_full_chain, public')
+      const second = {
+        query: async (statement: string, params?: unknown[]) =>
+          (await other.query(statement, params)).rows,
+      } as unknown as Sql
+
+      const blank = await getHealthProfile(adapter)
+      expect(blank.updatedAt).toBeNull()
+      expect(blank.sexForPhysiology).toBeNull()
+      const initial = await Promise.allSettled([
+        putHealthProfile({ expectedUpdatedAt: null, persistentHealthContext: 'Fixture A' }, adapter),
+        putHealthProfile({ expectedUpdatedAt: null, persistentHealthContext: 'Fixture B' }, second),
+      ])
+      expect(initial.filter((outcome) => outcome.status === 'fulfilled')).toHaveLength(1)
+      expect(initial.filter((outcome) => outcome.status === 'rejected')).toMatchObject([
+        { status: 'rejected', reason: { statusCode: 409, code: 'PROFILE_STALE_WRITE' } },
+      ])
+      const created = await getHealthProfile(adapter)
+      expect(['Fixture A', 'Fixture B']).toContain(created.persistentHealthContext)
+      expect(created.updatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/)
+      expect(await client.query('SELECT count(*)::int AS count FROM health_profile'))
+        .toMatchObject({ rows: [{ count: 1 }] })
+
+      const versions = await Promise.allSettled([
+        putHealthProfile({
+          expectedUpdatedAt: created.updatedAt,
+          persistentHealthContext: 'Updated in tab A',
+        }, adapter),
+        putHealthProfile({
+          expectedUpdatedAt: created.updatedAt,
+          persistentHealthContext: 'Updated in tab B',
+        }, second),
+      ])
+      expect(versions.filter((outcome) => outcome.status === 'fulfilled')).toHaveLength(1)
+      expect(versions.filter((outcome) => outcome.status === 'rejected')).toMatchObject([
+        { status: 'rejected', reason: { statusCode: 409, code: 'PROFILE_STALE_WRITE' } },
+      ])
+      const winner = await getHealthProfile(adapter)
+      expect(['Updated in tab A', 'Updated in tab B']).toContain(winner.persistentHealthContext)
+      expect(winner.updatedAt).not.toBe(created.updatedAt)
+      await expect(putHealthProfile({
+        expectedUpdatedAt: created.updatedAt, trainingLimitations: 'stale attempt',
+      }, second)).rejects.toMatchObject({ statusCode: 409, code: 'PROFILE_STALE_WRITE' })
+      expect((await getHealthProfile(adapter)).trainingLimitations).toBeNull()
+
+      const withFields = await putHealthProfile({
+        expectedUpdatedAt: winner.updatedAt,
+        sexForPhysiology: 'other', heightCm: 177.8,
+        clinicalConditions: [{ name: 'Fictional fixture', status: 'unknown' }],
+      }, adapter)
+      expect(withFields.persistentHealthContext).toBe(winner.persistentHealthContext)
+      expect(withFields.clinicalConditions).toHaveLength(1)
+      const omitted = await putHealthProfile({
+        expectedUpdatedAt: withFields.updatedAt,
+        dietaryContext: 'For isolated regression only',
+      }, second)
+      expect(omitted.heightCm).toBe(177.8)
+      expect(omitted.sexForPhysiology).toBe('other')
+      expect(omitted.clinicalConditions).toHaveLength(1)
+      expect(omitted.persistentHealthContext).toBe(winner.persistentHealthContext)
+
+      const cleared = await putHealthProfile({
+        expectedUpdatedAt: omitted.updatedAt,
+        heightCm: null, sexForPhysiology: null, clinicalConditions: [],
+      }, adapter)
+      expect(cleared.updatedAt).not.toBe(omitted.updatedAt)
+      expect(cleared.heightCm).toBeNull()
+      expect(cleared.sexForPhysiology).toBeNull()
+      expect(cleared.clinicalConditions).toEqual([])
+      expect(cleared.dietaryContext).toBe('For isolated regression only')
+      expect(cleared.persistentHealthContext).toBe(winner.persistentHealthContext)
+      const veryFast = await putHealthProfile({
+        expectedUpdatedAt: cleared.updatedAt, trainingLimitations: 'Retest monotonic version',
+      }, second)
+      expect(veryFast.updatedAt).not.toBe(cleared.updatedAt)
+    } finally {
+      await other.end()
+      await client.query('DELETE FROM health_profile')
+    }
+  }, 30_000)
 
 })
