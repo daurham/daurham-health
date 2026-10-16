@@ -17,9 +17,9 @@ const general = (question: string, conversation: Array<{role:'user'|'assistant';
 const answer = (text: string, evidence_refs: string[] = []) => JSON.stringify({
   blocks: [{ text, evidence_refs }], limitations: [], follow_ups: [],
 })
-const provider = (text: string) => vi.fn(async (_input: Parameters<AskHealthProvider>[0]) => ({
+const provider = (text: string) => vi.fn(async (input: Parameters<AskHealthProvider>[0]) => ({
   text: answer(text),
-  model: 'piq-stub', inputTokens: 20, outputTokens: 20,
+  model: input.model, inputTokens: 20, outputTokens: 20,
 }))
 const request = (question: string) => ({
   question, lens: 'general' as const, range: '30d' as const,
