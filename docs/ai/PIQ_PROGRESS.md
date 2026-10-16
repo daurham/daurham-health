@@ -1549,3 +1549,16 @@ Synthetic 16-pair regressions mutate the frame and day count while preserving th
 **Contract:** An opt-in action after Ask Health answers opens a blank, owner-authored 500-character field. Neither AI answers nor user questions are promoted automatically. The owner-authored text transfers via router state (never a URL parameter or provider call), and Settings shows an unsaved editable review with a required owner-confirmation checkbox. Stage into the existing 2,000-character persistent context without destroying previous notes, then independently press Save profile to actually write. Blank, duplicate and overflow notes fail. No auto clinical diagnoses, effective-dated history, or historical adherence invented. A client pre-save refresh detects common stale-tab conflict, but is not server-side atomic compare-and-swap; future PIQ-2.5 work must address this.
 
 **Tests:** New unit cases validate private transfer, forged state, length, duplicate and overflow, with legacy I10 test now explicitly asking for owner-saved inventory. CI/owner device QA and the existing unapplied migrations are rollout gates. No new schema, model token, owner production write or main merge.
+
+
+## PIQ-2.5 — Atomic Health Profile correction guard (2026-10-15)
+
+**State:** Work branch only. Full CI, owner iOS acceptance, and migration rollout gates required. **0/9 PIQ phases owner-accepted.**
+
+**Gap:** Previous profile PUT could overwrite a newer saved profile and its client-side check covered only the special Ask Health note-review workflow, leaving a race between checking and saving.
+
+**Contract:** Every owner-authenticated profile PUT requires expectedUpdatedAt (GET updatedAt or explicit null for an absent singleton). A missing field yields 428 PROFILE_VERSION_REQUIRED; malformed values yield 400. Initial creation uses INSERT ON CONFLICT DO NOTHING; existing rows use atomic conditional UPDATE with version comparison, a minimum one-millisecond version advance and a 409 PROFILE_STALE_WRITE on conflict. Supplied-field masks distinguish untouched values from deliberate clears. Settings passes its originally loaded version, retains unsaved edits on conflict and offers an explicitly destructive reload. The old note-specific preflight is removed. No migration or Gemini call.
+
+**Synthetic tests:** Eight new cases cover missing/bad version, first-time create, simultaneous initialization failure, conditional SQL update, stale-edit rejection, explicit clears versus omitted fields, and future birth date validation.
+
+**Open:** Full CI validation, authenticated iPhone and concurrent-tab QA, PostgreSQL integration-level concurrency test, granular canonical source correction flow, and minimal, question-efficient logging prompts. The earlier migrations 0053–0056 remain unapplied. No production record, main branch, or owner profile was changed.

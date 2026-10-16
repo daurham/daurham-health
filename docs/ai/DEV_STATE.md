@@ -535,3 +535,8 @@ Ask Health now routes current owner-entered saved diagnoses by exact personal na
 ## 2026-10-15 PIQ-2.4 voluntary owner fact draft — work branch
 
 Ask Health now supports owner-authored notes routed privately to an explicit Settings confirmation, staged into existing context and saved only by the original owner-operated profile save. Added conservative bounds, duplicate and overflow protection and pure tests; fixed stale broad-disclosure I10 test semantics. No migrations, AI calls, owner writes or main promotion. Full CI and mobile QA are release gates.
+
+
+## 2026-10-15 PIQ-2.5 profile stale-save guard — work branch
+
+Settings profile writes now carry the original GET version. Server writes are guarded by an atomic conditional SQL update or no-clobber initial insert, and stale attempts return 409 with no retry. Updates bump the visible timestamp by at least a millisecond; partial omitted fields remain unchanged. User drafts remain visible on stale conflict until explicit reload-discard. The prior non-atomic note-only preflight was removed. Added eight synthetic cases. CI, PostgreSQL concurrency testing, authenticated mobile QA and owner migration gates remain open; main and production unchanged.
