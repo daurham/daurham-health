@@ -149,6 +149,11 @@ export function AskHealthPage() {
               {turn.text}
             </p>
           ))}
+        {latest?.meta.answerScope === 'urgent_safety' ? (
+          <p className="text-sm font-semibold text-rose-800" role="status">
+            Immediate safety guidance · based on your message, not stored records or an AI diagnosis
+          </p>
+        ) : null}
         {latest?.meta.answerScope === 'general' ? (
           <p className="text-xs text-zinc-600" role="status">General health education · no personal Health records used{latest.meta.cached ? ' · reused answer' : ''}</p>
         ) : null}
