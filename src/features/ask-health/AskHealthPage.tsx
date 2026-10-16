@@ -186,7 +186,7 @@ export function AskHealthPage() {
         {latest?.meta.evidenceOverview ? (
           <details className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
             <summary className="cursor-pointer text-sm font-medium text-zinc-800">
-              What Health AI considered · {latest.meta.evidenceOverview.availableCount} supplied facts
+              {latest.meta.provider === 'gemini' ? 'What Health AI considered' : 'Health handled this without an AI request'} · {latest.meta.evidenceOverview.availableCount} available facts
             </summary>
             <p className="mt-2 text-xs leading-5 text-zinc-600">
               {latest.meta.answerScope === 'general' || latest.meta.answerScope === 'urgent_safety'
@@ -197,7 +197,10 @@ export function AskHealthPage() {
               {latest.meta.evidenceOverview.omittedCount > 0
                 ? ' Omitted candidate facts: ' + latest.meta.evidenceOverview.omittedCount + '.' : ''}
             </p>
-            {latest.meta.evidenceOverview.items.length > 0 ? (
+            {latest.meta.provider !== 'gemini' ? (
+              <p className="mt-2 text-xs text-zinc-600">No records were transmitted to a model for this deterministic response.</p>
+            ) : null}
+            {latest.meta.provider === 'gemini' && latest.meta.evidenceOverview.items.length > 0 ? (
               <ul className="mt-3 space-y-2" aria-label="Facts supplied to the AI">
                 {latest.meta.evidenceOverview.items.map((item) => (
                   <li key={item.id} className="rounded-md border border-zinc-200 bg-white p-2 text-xs text-zinc-700">
@@ -218,7 +221,7 @@ export function AskHealthPage() {
                 ))}
               </ul>
             ) : null}
-            {latest.meta.evidenceOverview.unlistedCount > 0 ? (
+            {latest.meta.provider === 'gemini' && latest.meta.evidenceOverview.unlistedCount > 0 ? (
               <p className="mt-2 text-xs text-zinc-600">
                 {latest.meta.evidenceOverview.unlistedCount} additional supplied facts are not individually listed here.
               </p>
