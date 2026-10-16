@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { parseAskHealthRequest, buildAskHealthEvidencePacket, type AskHealthPacketInput } from '../src/domain/ask-health/index.js'
 import { answerAskHealth, explainAskHealth, type AskHealthProvider } from '../server/ask-health/service.js'
 import { createAskHealthGate } from '../server/ask-health/gate.js'
+import { buildHealthIntelligenceSnapshot, routeHealthIntelligence } from '../src/domain/intelligence/shared.js'
 
 const load = vi.hoisted(() => vi.fn())
 vi.mock('../server/ask-health/load.js', () => ({ loadAskHealthPacketInput: load }))
@@ -92,6 +93,21 @@ describe('PIQ-3 explicit Context Mode request contract', () => {
     expect(result.meta.evidenceOverview.availableCount).toBeGreaterThan(1)
     expect(stub.mock.calls[0]![0].user).toContain('synthetic-owner-goal')
     expect(stub.mock.calls[0]![0].system).toContain('You explain one person')
+  })
+
+  it('Deep Dive requests cross-domain signals rather than only question-token matches', () => {
+    const snapshot = buildHealthIntelligenceSnapshot({
+      range: '30d', asOf: date, start: '2026-10-14', end: date,
+      today: null, timezone: 'America/Phoenix', observations: [],
+    })
+    const normal = routeHealthIntelligence(snapshot, { question: q, lens: 'general' })
+    const deep = routeHealthIntelligence(snapshot, { question: q, lens: 'general', wide: true })
+    expect(normal.selectedKeys).not.toContain('nutrition.fiber_g')
+    expect(deep.selectedKeys).toEqual(expect.arrayContaining([
+      'nutrition.fiber_g', 'hydration.ml', 'bowel.count',
+      'training.sessions', 'sleep.total_minutes', 'wellness.stress',
+    ]))
+    expect(deep.selectedKeys.length).toBeGreaterThan(normal.selectedKeys.length)
   })
 
   it('Deep Dive overrides narrow tab lens to a broad general evidence lens', async () => {
