@@ -1,4 +1,4 @@
-import { buildMaintenanceState, type MaintenanceEstimate } from '../maintenance.js'
+import { buildMaintenanceState, type MaintenanceEstimate, type ScaleNoiseFactor } from '../maintenance.js'
 import { addCalendarDays } from '../training-plan.js'
 import type { HealthIntelligenceSnapshot } from '../intelligence/shared.js'
 
@@ -21,6 +21,14 @@ export type FocusedWeightEnergyEvidence = {
   qualifiedWholeDayCalories: number
   trainingSessionDays: number
   wellnessCheckinDays: number
+  /**
+   * PIQ-4.2 second slice: Only maintenance-engine comparisons of owner-
+   * verified sodium/carb days with matching calorie entry IDs. These are
+   * descriptive alternative explanations, never verified weight causes.
+   * Hydration/bowel signals need their own stronger completeness contracts.
+   */
+  qualifiedScaleContext: Array<Pick<ScaleNoiseFactor,
+    'id' | 'kind' | 'title' | 'detail' | 'dates' | 'detailPath'>>
   /** Distinguishes "not checked" from a positive safety finding. */
   goalVerification: 'not_checked'
   decisionVerification: 'not_checked'
@@ -90,6 +98,15 @@ export function focusWeightEnergyContext(input: {
     wellnessCheckinDays: selected.filter(d =>
       ['wellness.hunger','wellness.energy','wellness.soreness'].some(key =>
         d.signals[key as 'wellness.hunger' | 'wellness.energy' | 'wellness.soreness'] != null)).length,
+    // Reuse the engine's actual 3d-vs-prior-7d, whole-day-verified,
+    // source-ID-matching sodium/carb tests. Never copy its less-qualified
+    // event-count water/bowel contrasts into an Ask Health weight conclusion.
+    qualifiedScaleContext: maintenance.noiseFactors
+      .filter(item => (item.kind === 'sodium' || item.kind === 'carbohydrate') &&
+        item.dates.every(date => date >= boundedStart && date <= maintenance.completeThrough))
+      .map(({id,kind,title,detail,dates,detailPath}) => ({
+        id,kind,title,detail,dates,detailPath,
+      })),
     goalVerification: 'not_checked',
     decisionVerification: 'not_checked',
     strengthPreservation: 'not_verified',

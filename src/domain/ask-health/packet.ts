@@ -400,6 +400,36 @@ function addFocusedWeightEnergy(
     confidence:estimate.confidence,provenance:'derived_from_owner_confirmed_data',
     detailPath:'/progress/body',userEntered:false,substantive:true,priority:1,
   })
+  // PIQ-4.2: a verified nutrient-log shift is context, not a measured
+  // explanation of scale mass or evidence supporting a calorie change.
+  // Absence of a qualifying comparison MUST NOT imply stable intake.
+  const contextual = focus.qualifiedScaleContext
+  push({
+    id:'weight_energy.scale_context',
+    domain:'intelligence',
+    label:'Recent verified nutrient shifts that might complicate scale interpretation',
+    value:null,unit:null,period,
+    text:contextual.length > 0
+      ? 'The existing maintenance screening found ' + contextual.length +
+        ' recent recorded nutrient shift(s) on owner-confirmed, source-reliable food days: ' +
+        contextual.map(item => item.title + '. ' + item.detail).join(' ') +
+        ' These are possible short-term scale-weight contexts, NOT demonstrated causes of body-mass changes, proof of fat gain, a personal association or grounds to lower calorie targets. ' +
+        'Hydration and bowel trends are not screened as explanatory shifts here because event logs cannot establish whole-day completeness.'
+      : 'No recent sodium or carbohydrate shift qualified for this source-verified comparison. ' +
+        'That does NOT establish stable sodium/carbohydrate intake, exclude fluid/GI confounding, or prove that body fat has stopped changing. ' +
+        'Missing or unverified food days and unrecorded circumstances are unknown, not normal or zero.',
+    coverage:{
+      verifiedNutrientShiftCount:contextual.length,
+      screenedNutrients:['sodium','carbohydrate'],
+      status:contextual.length > 0 ? 'qualified_logging_context' : 'no_qualified_comparison',
+      recentWindowDays:3,
+      baselineWindowDays:7,
+      observations:contextual.map(item => ({
+        sourceKey:item.kind,observedDateCount:item.dates.length,
+      })),
+    },
+    detailPath:'/nutrition',userEntered:false,substantive:false,priority:1,
+  })
   push({
     id:'weight_energy.decision_boundary',
     domain:'intelligence',label:'Plateau, calorie-change and strength-preservation decision boundary',
