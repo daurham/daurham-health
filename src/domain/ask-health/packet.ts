@@ -83,7 +83,7 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
     addPatterns(input.patterns, push)
   }
   addStableProfile(input.stableProfile ?? null, input.question, input.asOf, push)
-  addClinicalProfile(input.profile ?? null, push)
+  addClinicalProfile(input.profile ?? null, input.question, push)
   if (input.intelligence) {
     addSharedIntelligence(input.intelligence, push, limitations)
   }
@@ -1025,7 +1025,34 @@ function addStableProfile(
   }
 }
 
-function addClinicalProfile(profile: AskClinicalProfileInput | null, push: (item: PushItem) => void) {
+/** Select only owner-saved medications relevant to the question.
+ * Profile medication status describes a record, not verified ingestion.
+ */
+export function selectAskHealthMedications(
+  profile: AskClinicalProfileInput,
+  question: string,
+): Array<{ index: number; medication: AskClinicalProfileInput['medications'][number] }> {
+  const q = ' ' + (question.toLowerCase().match(/[a-z0-9]+/g) ?? []).join(' ') + ' '
+  const names = profile.medications.map((medication, index) => ({ medication, index }))
+  const explicit = /\b(?:medications?|meds?|medicines?|prescriptions?|prescribed|drugs?|drug interactions?|side effects?|adverse effects?)\b/i.test(question)
+  const personal = /\b(?:my|mine|i|me|im|taking|take|recorded|saved|currently|prescribed)\b/i.test(question)
+  const symptom = /\b(?:constipat\w*|diarrh\w*|bowel\w*|stools?|nausea|nauseous|bloat\w*|dizz\w*|fatigue|tiredness|insomnia)\b/i.test(question)
+  const explicitPersonal = explicit && personal
+  const symptomPersonal = symptom && personal
+  const named = names.filter(({ medication }) => {
+    const tokens = medication.name.toLowerCase().match(/[a-z0-9]+/g) ?? []
+    if (tokens.length === 0) return false
+    if (q.includes(' ' + tokens.join(' ') + ' ')) return true
+    const first = tokens[0]!
+    return tokens.length > 1 && first.length >= 6 && q.includes(' ' + first + ' ')
+  })
+  if (named.length > 0 && !explicitPersonal) return named.slice(0, 8)
+  if (explicitPersonal) return names.slice(0, 16)
+  if (symptomPersonal) return names.filter(({ medication }) => medication.status === 'active').slice(0, 8)
+  return []
+}
+
+function addClinicalProfile(profile: AskClinicalProfileInput | null, question: string, push: (item: PushItem) => void) {
   if (!profile) return
   // Explicit owner context only. Never invent a binary range when unset or
   // the individual's physiology is not represented by the given formula.
@@ -1099,15 +1126,16 @@ function addClinicalProfile(profile: AskClinicalProfileInput | null, push: (item
     })
   })
 
-  profile.medications.slice(0, 16).forEach((item, index) => {
+  selectAskHealthMedications(profile, question).forEach(({ medication: item, index }) => {
     push({
       id: `clinical.medication.${index}`,
       domain: 'clinical_context',
       label: `Medication · ${item.name}`,
       value: item.status,
       unit: null,
-      text: `Owner-entered medication: ${item.name}. Status: ${item.status}.${item.dose ? ` Dose: ${item.dose}.` : ''}${item.frequency ? ` Frequency: ${item.frequency}.` : ''}`,
-      coverage: { status: item.status },
+      text: `Current owner-entered medication record: ${item.name}. Saved status: ${item.status}.${item.dose ? ` Recorded dose: ${item.dose}.` : ''}${item.frequency ? ` Recorded frequency: ${item.frequency}.` : ''} A saved status or schedule is not proof the medication was taken, and cannot establish it caused a symptom.`,
+      coverage: { status: item.status, source: 'current_owner_profile' },
+      provenance: 'owner_profile_current',
       detailPath: '/settings#health-profile',
       userEntered: true,
       substantive: true,

@@ -515,3 +515,8 @@ Question-specific Ask Health evidence now reads existing owner-saved supplement 
 ## 2026-10-15 PIQ-2.4 named supplement aliases — work branch
 
 Ask Health now matches an exact saved supplement name or a conservative primary ingredient word, enabling queries like "my creatine dose" for `Creatine monohydrate`. Multiple matching saved products remain independent; unrelated, generic and similar-word questions do not trigger false source matches. Packet-only regression and green CI/owner-device gate tracked in `PIQ_PROGRESS.md`. No schema, provider, production or main changes.
+
+
+## 2026-10-15 PIQ-2.4 Ask medication evidence selection — work branch
+
+Ask Health medication evidence is now question-scoped: names, explicitly owner-asked treatment/interactions, or active records for personal GI/recovery symptoms. Source status/dose remain explicitly owner-entered and never proof of ingestion or diagnosis. Synthetic packet tests and progress gates are in \`PIQ_PROGRESS.md\`. No schema, provider calls, production modification or main merge.

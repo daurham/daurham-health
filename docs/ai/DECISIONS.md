@@ -813,3 +813,8 @@ Ask Health must distinguish intended owner-saved dose and weekday cadence from a
 ## Decision: only conservative owner-saved supplement name aliases (PIQ-2.4, 2026-10-15)
 
 To answer short named-regimen questions without guessing, select a saved supplement by its entire tokenized label or by a distinctive leading ingredient token of at least six characters. Generic leading product descriptors such as "vitamin", "complex" and "supplement" are not safe identifiers. Use token equality, not substring matching: creatine is not creatinine. If two saved formulations share an ingredient, disclose both instead of selecting a dose. This is relevant evidence retrieval, not alias knowledge from a model, evidence of ingestion, or proof of efficacy. No automatic owner-profile writes and no cross-date status extrapolation.
+
+
+## PIQ-2.4: saved medications are selected by question, not indiscriminately (2026-10-15)
+
+Use the existing owner-authenticated current-day profile as source truth, but do not attach every medication detail to unrelated Ask Health questions. Provide name-matched records, owner-requested lists/interactions, or active status only for relevant personal symptom context. Preserve inactive named records with their saved statuses, retain the recorded-vs-taken/causal distinction, and never claim medical interactions or adherence without validated evidence. No new schema, provider call or canonical write; CI and owner review are required before release.
