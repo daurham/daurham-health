@@ -145,9 +145,9 @@ export function GoalControlCard({
               <li key={item.id} className="rounded-md border border-zinc-100 p-2">
                 <p className="font-medium text-zinc-800">{item.summary}</p>
                 <p className="mt-1">
-                  {item.evidence?.coefficientVerified ? 'Verified against loaded readings' : 'Historical / unverified'}
-                  {' '}· {item.sampleSize} {item.evidence?.coefficientVerified ? 'matched' : 'previously reported'} date pairs
-                  {' '}· matched-pair count grade: {item.confidence} (not statistical certainty).
+                  {item.evidence?.coefficientVerified ? 'Verified against loaded readings' : 'Historical / unverified'}.
+                  {' '}Matched-pair count grade: {item.confidence} · {item.sampleSize} {item.evidence?.coefficientVerified ? 'matched' : 'previously reported'} date pairs.
+                  {' '}This count grade is not statistical certainty.
                 </p>
                 {item.evidence ? (
                   <>
