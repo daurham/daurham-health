@@ -1,15 +1,27 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import type { AskLens } from '@/domain/ask-health'
+import type { ProgressRange } from '@/domain/progress'
+import { canonicalCorrectionForEvidence, correctionFollowUpDraft, makeAskCorrectionState } from '@/domain/ask-health/corrections'
 import type { AskEvidence, AskHealthAnswer } from '@/domain/ask-health'
 import { prefixedPath, useAppPathPrefix } from '@/lib/app-prefix'
 
 export function AskHealthAnswerView({
   answer,
   evidence,
+  correctionContext,
+  onDraftFollowUp,
 }: {
   answer: AskHealthAnswer
   evidence: readonly AskEvidence[]
+  correctionContext: { question: string; lens: AskLens; range: ProgressRange }
+  onDraftFollowUp: (draft: string) => void
 }) {
   const prefix = useAppPathPrefix()
+  const [flaggedId, setFlaggedId] = useState<string | null>(null)
+  const returnState = makeAskCorrectionState(
+    correctionContext.question, correctionContext.lens, correctionContext.range,
+  )
   const ordered = orderedEvidence(answer, evidence)
   return (
     <div className="space-y-4">
@@ -35,10 +47,45 @@ export function AskHealthAnswerView({
                   {index + 1}. {item.label}
                 </p>
                 <p>{evidenceSummary(item)}</p>
-                {item.detailPath ? (
-                  <Link to={prefixedPath(prefix, item.detailPath)} className="mt-1 inline-flex min-h-11 items-center font-medium underline">
-                    View
-                  </Link>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                  {item.detailPath ? (
+                    <Link to={prefixedPath(prefix, item.detailPath)} className="mt-1 inline-flex min-h-11 items-center font-medium underline">
+                      View source
+                    </Link>
+                  ) : null}
+                  <button type="button" className="min-h-11 text-sm font-medium underline"
+                    aria-expanded={flaggedId === item.id}
+                    onClick={() => setFlaggedId((current) => current === item.id ? null : item.id)}>
+                    Something wrong?
+                  </button>
+                </div>
+                {flaggedId === item.id ? (
+                  <div className="mt-2 space-y-2 rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm">
+                    {canonicalCorrectionForEvidence(item) && returnState ? (
+                      <>
+                        <p className="font-semibold">{canonicalCorrectionForEvidence(item)?.title}</p>
+                        <p className="text-xs leading-5 text-zinc-600">{canonicalCorrectionForEvidence(item)?.instructions}</p>
+                        <Link className="inline-flex min-h-10 items-center font-medium underline"
+                          to={prefixedPath(prefix, canonicalCorrectionForEvidence(item)!.destination)}
+                          state={returnState}>
+                          Open canonical source for review
+                        </Link>
+                      </>
+                    ) : (
+                      <p className="text-xs leading-5 text-zinc-600">
+                        This is a calculated result, imported observation, or other source
+                        without a verified direct-edit route here. Inspect the source where
+                        available; a chat reply cannot change the underlying record.
+                      </p>
+                    )}
+                    <button type="button" className="block min-h-10 font-medium underline"
+                      onClick={() => {
+                        onDraftFollowUp(correctionFollowUpDraft(item.label))
+                        setFlaggedId(null)
+                      }}>
+                      Draft a follow-up about the interpretation
+                    </button>
+                  </div>
                 ) : null}
               </li>
             ))}
