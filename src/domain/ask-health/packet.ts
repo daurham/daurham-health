@@ -85,7 +85,7 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
     addPatterns(input.patterns, push)
   }
   addStableProfile(input.stableProfile ?? null, input.question, input.asOf, push)
-  addClinicalProfile(input.profile ?? null, input.question, push)
+  addClinicalProfile(input.profile ?? null, input.question, push, input.contextMode)
   if (input.intelligence) {
     addSharedIntelligence(input.intelligence, push, limitations)
   }
@@ -1246,7 +1246,7 @@ export function selectAskHealthProfileTextFields(
   return relevant
 }
 
-function addClinicalProfile(profile: AskClinicalProfileInput | null, question: string, push: (item: PushItem) => void) {
+function addClinicalProfile(profile: AskClinicalProfileInput | null, question: string, push: (item: PushItem) => void, mode?: AskHealthPacketInput['contextMode']) {
   if (!profile) return
   // Explicit owner context only. Never invent a binary range when unset or
   // the individual's physiology is not represented by the given formula.
@@ -1286,7 +1286,11 @@ function addClinicalProfile(profile: AskClinicalProfileInput | null, question: s
     })
   }
 
-  const selectedText = selectAskHealthProfileTextFields(question)
+  const selectedText = mode === 'deep'
+    ? ['persistentHealthContext', 'trainingLimitations', 'dietaryContext']
+    : mode === 'personalized'
+      ? ['persistentHealthContext', ...selectAskHealthProfileTextFields(question)]
+      : selectAskHealthProfileTextFields(question)
   if (selectedText.includes('persistentHealthContext'))
     addText('clinical.persistent_context', 'Persistent health context', profile.persistentHealthContext, 1)
   if (selectedText.includes('trainingLimitations'))
@@ -1294,7 +1298,12 @@ function addClinicalProfile(profile: AskClinicalProfileInput | null, question: s
   if (selectedText.includes('dietaryContext'))
     addText('clinical.dietary_context', 'Dietary context', profile.dietaryContext, 2)
 
-  selectAskHealthConditions(profile, question).forEach(({ condition: item, index }) => {
+  const conditions = mode === 'deep'
+    ? profile.conditions.map((condition, index) => ({ condition, index })).slice(0, 12)
+    : mode === 'personalized'
+      ? profile.conditions.map((condition, index) => ({ condition, index })).filter(({ condition }) => condition.status === 'active').slice(0, 8)
+      : selectAskHealthConditions(profile, question)
+  conditions.forEach(({ condition: item, index }) => {
     push({
       id: 'clinical.condition.' + index,
       domain: 'clinical_context',
@@ -1313,7 +1322,10 @@ function addClinicalProfile(profile: AskClinicalProfileInput | null, question: s
     })
   })
 
-  selectAskHealthAllergies(profile, question).forEach(({ allergy: item, index }) => {
+  const allergies = mode === 'deep' || mode === 'personalized'
+    ? profile.allergies.map((allergy, index) => ({ allergy, index })).slice(0, 12)
+    : selectAskHealthAllergies(profile, question)
+  allergies.forEach(({ allergy: item, index }) => {
     push({
       id: `clinical.allergy.${index}`,
       domain: 'clinical_context',
@@ -1330,7 +1342,12 @@ function addClinicalProfile(profile: AskClinicalProfileInput | null, question: s
     })
   })
 
-  selectAskHealthMedications(profile, question).forEach(({ medication: item, index }) => {
+  const medications = mode === 'deep'
+    ? profile.medications.map((medication, index) => ({ medication, index })).slice(0, 12)
+    : mode === 'personalized'
+      ? profile.medications.map((medication, index) => ({ medication, index })).filter(({ medication }) => medication.status === 'active').slice(0, 8)
+      : selectAskHealthMedications(profile, question)
+  medications.forEach(({ medication: item, index }) => {
     push({
       id: `clinical.medication.${index}`,
       domain: 'clinical_context',

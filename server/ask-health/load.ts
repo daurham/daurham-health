@@ -77,6 +77,7 @@ export async function loadAskHealthPacketInput(input: {
     period: { start: period.start, end: period.end },
     generatedAt: input.generatedAt,
     question: input.question,
+    contextMode: input.contextMode,
     overview,
     activity,
     sleep,

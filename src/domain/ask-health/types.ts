@@ -11,6 +11,7 @@ import type { AskLens } from './config.js'
 import type { AskNutritionIntegrity } from './nutrition-integrity.js'
 import type { FocusedTrainingEvidence } from './focused-training.js'
 import type { FocusedDigestiveEvidence } from './focused-digestive.js'
+import type { AskContextMode } from './config.js'
 
 export type AskEvidenceCoverage = Record<string, number | string | null>
 
@@ -127,6 +128,7 @@ export type AskHealthPacketInput = {
   period: { start: string; end: string }
   generatedAt: string
   question: string
+  contextMode?: AskContextMode
   overview: ProgressOverview | null
   activity: ActivityProgressView | null
   sleep: SleepProgressView | null
