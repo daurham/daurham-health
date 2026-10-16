@@ -113,6 +113,8 @@ export async function loadAskHealthPacketInput(input: {
       sets: rows.sets,
       start: period.start,
       end: period.end,
+      today,
+      asOf: input.asOf,
     }),
     context: contextSnapshot(contexts),
     patterns,
