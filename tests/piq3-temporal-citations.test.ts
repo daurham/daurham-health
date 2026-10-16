@@ -132,6 +132,34 @@ describe('PIQ-3 historical citation period validator', () => {
     expect(invalid.blocks[0]?.text).not.toContain('0 ml')
   })
 
+  it('requires the cited metric domain to match the explicitly stated historical claim', () => {
+    const q = 'What was my bench press on 2026-10-06?'
+    const hydrationOnDay = { ...aDay, id: 'hydration.day.same-date' }
+    const mismatched = groundHistoricalAnswer(
+      answer([item('You recorded 86 kg of bench press strength.', [hydrationOnDay.id])]),
+      packet([hydrationOnDay]), q,
+    )
+    expect(mismatched.blocks[0]?.text).toContain('cannot verify')
+    const supported = groundHistoricalAnswer(
+      answer([item('You recorded 86 kg of bench press strength.', [dated.id])]),
+      packet([dated]), q,
+    )
+    expect(supported.blocks[0]?.text).toContain('86 kg')
+  })
+
+  it('requires both named metric domains for a combined historical observation claim', () => {
+    const q = 'How much water did I drink and what bowel events occurred last week?'
+    const bowel = { ...windowCoverage, id: 'digestive.focus.coverage.bowel', domain: 'bowel' }
+    const claim = item('You recorded water and bowel events last week.', [windowCoverage.id])
+    const missingBowel = groundHistoricalAnswer(answer([claim]), packet([windowCoverage, bowel]), q)
+    expect(missingBowel.blocks[0]?.text).toContain('cannot verify')
+    const both = groundHistoricalAnswer(
+      answer([item(claim.text, [windowCoverage.id, bowel.id])]),
+      packet([windowCoverage, bowel]), q,
+    )
+    expect(both.blocks[0]?.text).toEqual(claim.text)
+  })
+
   it('does not delete uncertainty, conditional advice or legitimate cross-domain explanations', () => {
     expect(affirmativeOwnerMetricClaim('Your recorded water might underestimate true intake.')).toBe(false)
     expect(affirmativeOwnerMetricClaim('You could lift 80 kg next month.')).toBe(false)
