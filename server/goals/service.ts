@@ -727,7 +727,12 @@ export async function listGoals() {
   return { goals, asOf, catalog: await loadCatalog(sql) }
 }
 
-export async function listGoalAskSnapshots(asOf: string) {
+export async function listGoalAskSnapshots(asOf: string, healthToday?: string) {
+  // This API supplies CURRENT goal versions and lifecycle, NOT an effective-
+  // dated Goal history. Never manufacture earlier target-state outcomes from
+  // today's active versions even if the point measurements are as-of-safe.
+  const today = healthToday ?? await currentHealthDate()
+  if (asOf !== today) return []
   const [sql, timezone] = await Promise.all([getSql(), healthCalendarTimeZone()])
   const rows = await readGoalRows(sql)
   const goals = []
