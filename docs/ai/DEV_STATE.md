@@ -505,3 +505,8 @@ Added unapplied migration `0056_primary_goal_intent_events.sql` and portable can
 ## 2026-10-15 PIQ-2.3 safe owner-goal focus tie-break
 
 Goal Control now reads the dated owner goal priority and may select its existing qualified due-goal Weekly Coach focus over another due-goal focus, with exact evidence references and active/unmet/current checks. Goal Overview identifies the explicitly owner-selected active goal and the tie-break reason. Does not invent advice or override non-goal focus. Branch-only tests and CI required; migration 0056 unapplied and owner QA pending.
+
+
+## 2026-10-15 PIQ-2.4 named supplements in Ask Health — work branch
+
+Question-specific Ask Health evidence now reads existing owner-saved supplement lifecycle/schedule/adherence and keeps a strict planned vs taken distinction, with the packet range capped at its as-of date. Named supplement questions are included independent of UI lens; unrelated questions remain aggregate. No new migration, Gemini call, live records or main promotion; CI and owner iOS QA tracked in `docs/ai/PIQ_PROGRESS.md`.

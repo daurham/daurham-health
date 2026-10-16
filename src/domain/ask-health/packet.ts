@@ -1,4 +1,5 @@
-import { resolveScheduleRange } from '../supplements/resolve.js'
+import { lifecycleStatusOnDate, resolveScheduleRange } from '../supplements/resolve.js'
+import { formatWeekdayMask } from '../supplements/weekday.js'
 import type { OccurrenceState } from '../supplements/types.js'
 import { ASK_HEALTH_PACKET_VERSION, ASK_PACKET_MAX_CHARS, type AskLens } from './config.js'
 import { MIN_VERIFIED_NUTRITION_TARGET_DAYS } from './nutrition-integrity.js'
@@ -66,7 +67,7 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
   if (wants.training) {
     addTraining(input, push, wants.exerciseDetail)
   }
-  if (wants.supplements) {
+  if (wants.supplements || questionMentionsSavedSupplement(input)) {
     addSupplements(input, push)
   }
   if (wants.goals) {
@@ -721,25 +722,67 @@ function addTraining(input: AskHealthPacketInput, push: (item: PushItem) => void
   }
 }
 
+/** A name query or a request to list one's recorded supplements merits an
+ * itemized source summary, without flooding unrelated general questions.
+ */
+function questionMentionsSavedSupplement(input: AskHealthPacketInput): boolean {
+  const question = input.question.toLowerCase()
+  return input.supplements.some((item) =>
+    item.name.trim().length >= 3 && question.includes(item.name.trim().toLowerCase()))
+}
+
 function addSupplements(input: AskHealthPacketInput, push: (item: PushItem) => void) {
-  if (input.supplements.length === 0) {
-    return
-  }
+  if (input.supplements.length === 0) return
+  // A caller's range must never make a future entry appear as observed.
+  const end = input.period.end < input.asOf ? input.period.end : input.asOf
+  if (end < input.period.start) return
   const totals = { taken: 0, skipped: 0, unknown: 0, paused: 0, notScheduled: 0 }
+  const question = input.question.toLowerCase()
+  const names = input.supplements.filter((item) =>
+    item.name.trim().length >= 3 && question.includes(item.name.trim().toLowerCase()))
+  const asksInventory = /\b(?:my|recorded|saved)\b[\s\S]{0,36}\b(?:supplements?|vitamins?|doses?|regimen)\b|\b(?:supplements?|vitamins?)\b[\s\S]{0,36}\b(?:taking|take|scheduled|use|recorded|saved)\b/i.test(input.question)
+  const selected = (names.length > 0 ? names : asksInventory ? input.supplements : []).slice(0, 4)
   for (const supplement of input.supplements) {
     const states = resolveScheduleRange({
       schedules: supplement.schedules,
       events: supplement.events,
       adherence: supplement.adherence,
       start: input.period.start,
-      end: input.period.end,
+      end,
     })
     tally(states, totals)
+    if (!selected.includes(supplement)) continue
+
+    const counts = { taken: 0, skipped: 0, unknown: 0, paused: 0, notScheduled: 0 }
+    tally(states, counts)
+    const currentStatus = lifecycleStatusOnDate(supplement.events, end)
+    const schedules = supplement.schedules
+      .filter((schedule) => schedule.effectiveFrom <= end &&
+        (schedule.effectiveThrough == null || schedule.effectiveThrough >= end))
+      .sort((left, right) => left.sortOrder - right.sortOrder || left.id.localeCompare(right.id))
+    const regimen = schedules.length === 0
+      ? 'No saved schedule is effective on this date.'
+      : schedules.slice(0, 4).map((schedule) =>
+        `${schedule.doseAmount} ${schedule.doseUnit} (${formatWeekdayMask(schedule.weekdayMask)}), effective from ${schedule.effectiveFrom}${schedule.effectiveThrough ? ` through ${schedule.effectiveThrough}` : ''}`
+      ).join('; ') + (schedules.length > 4 ? `; ${schedules.length - 4} additional schedule slots` : '')
+    const scheduled = counts.taken + counts.skipped + counts.unknown
+    push({
+      id: `supplements.recorded.${supplement.id}`,
+      domain: 'supplements',
+      label: supplement.name,
+      value: currentStatus ?? 'unknown',
+      unit: null,
+      text: `Saved supplement lifecycle on ${end}: ${currentStatus ?? 'not recorded'}. Planned regimen: ${regimen} Within ${input.period.start} through ${end}: ${counts.taken} self-reported taken, ${counts.skipped} skipped, ${counts.unknown} unknown scheduled occurrences; ${counts.paused} paused. Scheduled or unknown does not mean taken. This is recorded usage, not proof of ingestion or efficacy.`,
+      coverage: { scheduled, taken: counts.taken, skipped: counts.skipped, unknown: counts.unknown, paused: counts.paused },
+      detailPath: '/supplements',
+      userEntered: true,
+      substantive: schedules.length > 0 || counts.taken > 0,
+      provenance: 'owner_saved_supplement_schedule_and_adherence',
+      priority: 1,
+    })
   }
   const scheduled = totals.taken + totals.skipped + totals.unknown
-  if (scheduled === 0 && totals.paused === 0) {
-    return
-  }
+  if (scheduled === 0 && totals.paused === 0) return
   push({
     id: 'supplements.adherence',
     domain: 'supplements',

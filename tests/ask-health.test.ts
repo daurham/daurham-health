@@ -433,6 +433,72 @@ describe('ask health evidence', () => {
     expect(packet.clarification).toContain('Bench Dip')
   })
 
+  it('PIQ-2.4 answers a named supplement question without treating a schedule as adherence or leaking future logs', () => {
+    const creatine: AskHealthPacketInput['supplements'][number] = {
+      id: 'creatine-1', name: 'Creatine monohydrate', sortOrder: 0,
+      schedules: [{
+        id: 'dose-1', supplementId: 'creatine-1', slotLabel: null,
+        doseAmount: 5, doseUnit: 'g', weekdayMask: EVERY_DAY_MASK,
+        effectiveFrom: '2026-09-01', effectiveThrough: null, sortOrder: 0,
+      }],
+      events: [{ effectiveDate: '2026-09-01', status: 'active' }],
+      adherence: [
+        { scheduleId: 'dose-1', scheduledDate: '2026-09-13', status: 'taken', actualDoseAmount: 5, actualDoseUnit: 'g' },
+        { scheduleId: 'dose-1', scheduledDate: '2026-09-15', status: 'taken', actualDoseAmount: 5, actualDoseUnit: 'g' },
+      ],
+    }
+    const input = packetInput({
+      lens: 'training',
+      question: 'What is my creatine monohydrate dose, and have I taken it?',
+      asOf: '2026-09-14',
+      period: { start: '2026-09-13', end: '2026-09-15' },
+      supplements: [creatine],
+    })
+    const packet = buildAskHealthEvidencePacket(input)
+    const found = packet.evidence.find((fact) => fact.id === 'supplements.recorded.creatine-1')
+    expect(found).toMatchObject({
+      label: 'Creatine monohydrate', value: 'active', userEntered: true,
+      provenance: 'owner_saved_supplement_schedule_and_adherence',
+      coverage: { scheduled: 2, taken: 1, skipped: 0, unknown: 1 },
+    })
+    expect(found?.text).toContain('5 g (Every day)')
+    expect(found?.text).toContain('through 2026-09-14')
+    expect(found?.text).toContain('Scheduled or unknown does not mean taken.')
+    expect(found?.text).not.toContain('through 2026-09-15')
+    expect(packet.evidence.find((fact) => fact.id === 'supplements.adherence')?.coverage)
+      .toMatchObject({ taken: 1, unknown: 1 })
+    expect(buildAskHealthEvidencePacket({ ...input, question: 'How does my bench press look?' })
+      .evidence.some((fact) => fact.id === 'supplements.recorded.creatine-1')).toBe(false)
+  })
+
+  it('PIQ-2.4 distinguishes paused status and a saved supplement inventory from actual intake', () => {
+    const vitamin: AskHealthPacketInput['supplements'][number] = {
+      id: 'vitamin-a', name: 'Vitamin C', sortOrder: 0,
+      schedules: [{
+        id: 'dose-vitamin', supplementId: 'vitamin-a', slotLabel: 'Morning',
+        doseAmount: 500, doseUnit: 'mg', weekdayMask: EVERY_DAY_MASK,
+        effectiveFrom: '2026-09-10', effectiveThrough: null, sortOrder: 0,
+      }],
+      events: [
+        { effectiveDate: '2026-09-10', status: 'active' },
+        { effectiveDate: '2026-09-14', status: 'paused' },
+      ],
+      adherence: [],
+    }
+    const packet = buildAskHealthEvidencePacket(packetInput({
+      question: 'Which supplements am I taking?',
+      asOf: '2026-09-14',
+      period: { start: '2026-09-13', end: '2026-09-14' },
+      supplements: [vitamin],
+    }))
+    const detail = packet.evidence.find((item) => item.id === 'supplements.recorded.vitamin-a')
+    expect(detail?.value).toBe('paused')
+    expect(detail?.coverage).toMatchObject({ scheduled: 1, taken: 0, skipped: 0, unknown: 1, paused: 1 })
+    expect(detail?.text).toContain('Planned regimen: 500 mg')
+    expect(detail?.text).toContain('0 self-reported taken')
+    expect(detail?.text).toContain('This is recorded usage, not proof of ingestion or efficacy.')
+  })
+
   it('keeps owner notes untrusted, allows uncited general context, and rejects fabricated evidence refs', () => {
     const packet = buildAskHealthEvidencePacket(
       packetInput({

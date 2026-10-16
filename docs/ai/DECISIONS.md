@@ -803,3 +803,8 @@ Avoid hardcoding fat loss or inferring primary intent from existing targets, app
 ## Decision: owner priority is a constrained tie-break, not a fabricated Health action (PIQ-2.3, 2026-10-15)
 
 The effective-dated owner-selected primary goal may win **among existing, qualified due-goal review cards** when the default focus is already a goal review. It must not manufacture a focus from a goal label, re-rank a safety action outside this group, activate an archived/completed goal, or leak a future owner choice into earlier Health dates. Verify exact candidate identity and goal citation to prevent unrelated generic evidence from becoming owner-prioritized advice. Expose that prioritization in Goal Overview so it is inspectable. This is a small owner-intent integration, not a full mission or tradeoff policy; QA and production migrations remain gated.
+
+
+## Decision: supplement schedule is not proof of supplement use (PIQ-2.4, 2026-10-15)
+
+Ask Health must distinguish intended owner-saved dose and weekday cadence from an explicitly logged taken/skipped occurrence and an unrecorded unknown. Show the named supplement and effective-as-of lifecycle only when relevant to the question or an explicit saved-supplement inventory request; do not over-send sensitive owner context on unrelated questions. Cap the observed window at as-of, exclude future/historical contamination, identify self-report provenance, and do not infer causality, efficacy or adherence from a schedule. Existing canonical schedules and events remain the source of truth; never promote conversation-derived facts without owner confirmation.
