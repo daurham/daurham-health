@@ -465,3 +465,8 @@ Goal Control now requires the loaded 30-day source frame to agree with its decla
 ## 2026-10-15 PIQ-1.6 leave-one-pair-out evidence disclosure — work branch
 
 Added descriptive matched-pair deletion sensitivity to Goal Overview's verified observational relationships, with direction-category changes and an unknown result when deletion makes rho undefined. Synthetic and SSR tests protect source-gating and meaning. No schema migration, provider call, owner-data write, merge or deployment. Full CI and owner acceptance tracked in `PIQ_PROGRESS.md`.
+
+
+## 2026-10-15 PIQ-1.6 readable relationship evidence — work branch
+
+The Goal Overview relationship cards now show short observational summaries, verification state, count and count-grade by default, while nested closed native details preserve full selection/coverage/statistical limitations and sensitivity diagnostics. Source links and stale-evidence warnings remain visible. No data/calculation change; tests and full CI must pass before owner QA. No main/prod action.

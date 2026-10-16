@@ -1381,3 +1381,16 @@ Synthetic 16-pair regressions mutate the frame and day count while preserving th
 **Tests:** Synthetic matched-date data where the leave-one-out descriptive sign changes; strictly ranked data with no sign change; a series that becomes constant after omission; and UI integration that withholds numeric influence after a stale source snapshot. No migration, Gemini/provider call, production owner-data write or `main` promotion.
 
 **Still open:** Source-revision atomicity across SQL reads, uncertainty under serial dependence, multiple-testing correction or abstention, verification of current owner data on a real device, and separately gated production migration 0054.
+
+
+## PIQ-1.6 — Progressive disclosure for observational relationship evidence (2026-10-15)
+
+**State:** Bounded work-branch UI change requiring green CI and authenticated owner device QA. **0/9 PIQ phases owner-accepted.**
+
+**Problem:** PIQ-1.6 provenance and statistical integrity checks accumulated a dense wall of technical explanations for each observed relationship. That defeated Coach/Goal Overview's intended at-a-glance usefulness and could make evidence grade, observational rho, and intervention guidance appear interchangeable.
+
+**Contract:** Keep Goal Overview's top-level `Observed relationships` disclosure closed as before, and inside it display each relationship's *observed summary*, loaded-source verified-versus-historical status, matched/date-pair count, and a specifically named non-statistical count grade. Preserve the visible fail-closed warning if the source isn't verified. Move screening-selection diagnostics and each relationship's long-form coverage, original Spearman coefficient, clustering, time-difference comparison, single-pair sensitivity, window, and per-source provenance into independent **closed-by-default native `<details>`** panels. Keep source review links directly reachable from each card. No science/safety information removed; no change to upstream evidence eligibility, coefficient, model prompts, ranking, interventions or stored historical owner data.
+
+**Regression:** Existing factual synthetic 12-pair SSR validates verified and invalid historical associations; add assertions that the compact default status remains visible, both in-card technical detail and selection rationale use closed native disclosures, the unverified warning stays outside the technical panel, and the original sensitivity calculations and links remain in SSR output. No new schema, provider call, prod data write or `main` merge.
+
+**Still open:** Actual owner iOS readability/accessibility acceptance, source-event revision atomicity between SQL reads, formal temporal-dependence/multiple-testing interpretation, and approved production migration 0054 preflight. Next: finish CI for this branch-only UI slice before advancing PIQ program phases.

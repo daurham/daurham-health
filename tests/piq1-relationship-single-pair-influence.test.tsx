@@ -73,6 +73,14 @@ describe('PIQ-1.6 single-pair influence, descriptive only', () => {
     expect(related.evidence?.singlePairSensitivity?.testedRemovals).toBe(12)
     const goodHtml = renderToStaticMarkup(<MemoryRouter><GoalControlCard state={good} /></MemoryRouter>)
     expect(goodHtml).toContain('Single-pair influence: omitting each of 12 matched pairs')
+    expect(goodHtml).toContain('Observed relationships (')
+    expect(goodHtml).toContain('Verified against loaded readings')
+    expect(goodHtml).toContain('How Health selected these patterns</summary>')
+    expect(goodHtml).toMatch(/<details[^>]*><summary[^>]*>Evidence and sensitivity checks<\/summary>[\s\S]*?Single-pair influence:/)
+    // The technical statistics and screening context remain available in
+    // native closed-by-default disclosure elements, not the default scan.
+    expect(goodHtml).not.toMatch(/<details[^>]* open(?:=|>)/)
+    expect(goodHtml).toContain('Review source 1</a>')
 
     const modified = { ...snapshot, asOf: '2026-10-14' }
     const stale = buildGoalControlState({ asOf, intelligence: modified, brief, goals })
@@ -81,5 +89,8 @@ describe('PIQ-1.6 single-pair influence, descriptive only', () => {
     const badHtml = renderToStaticMarkup(<MemoryRouter><GoalControlCard state={stale} /></MemoryRouter>)
     expect(badHtml).toContain('Single-pair influence: unavailable')
     expect(badHtml).not.toContain('omitting each of 12 matched pairs')
+    expect(badHtml).toContain('Historical / unverified')
+    expect(badHtml).toContain('Its reported coefficient, strength and precise date diagnostics are withheld')
+    expect(badHtml).toContain('Evidence and sensitivity checks</summary>')
   })
 })

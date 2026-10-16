@@ -124,6 +124,8 @@ export function GoalControlCard({
             These are associations in recorded data, not evidence that changing one factor will change another.
             Other factors, missing records, and day-to-day variation may explain the patterns.
           </p>
+          <details className="mt-2 rounded-md border border-zinc-100 px-2 py-1.5">
+            <summary className="cursor-pointer font-medium text-zinc-700">How Health selected these patterns</summary>
           {state.relationships[0]?.evidence?.screening ? (
             <p className="mt-1">
               Selection context: {state.relationships[0].evidence.screening.evaluatedPairs} candidate relationship definitions examined;
@@ -137,13 +139,15 @@ export function GoalControlCard({
           ) : (
             <p className="mt-1">Relationship screening counts are unavailable; selected patterns are not independently verified.</p>
           )}
+          </details>
           <ol className="mt-2 space-y-3">
             {state.relationships.map((item) => (
               <li key={item.id} className="rounded-md border border-zinc-100 p-2">
                 <p className="font-medium text-zinc-800">{item.summary}</p>
-                <p className="mt-1">Matched-pair count grade: {item.confidence} · {item.sampleSize} {item.evidence?.coefficientVerified ? 'matched' : 'previously reported'} date pairs
-                  {item.evidence ? ` · screening minimum ${item.evidence.requiredPairs} pairs` : ''}.
-                  This grade describes sample availability, not statistical certainty.
+                <p className="mt-1">
+                  {item.evidence?.coefficientVerified ? 'Verified against loaded readings' : 'Historical / unverified'}
+                  {' '}· {item.sampleSize} {item.evidence?.coefficientVerified ? 'matched' : 'previously reported'} date pairs
+                  {' '}· matched-pair count grade: {item.confidence} (not statistical certainty).
                 </p>
                 {item.evidence ? (
                   <>
@@ -156,6 +160,8 @@ export function GoalControlCard({
                         until the source evidence is refreshed; no change to a health target is justified.
                       </p>
                     ) : null}
+                    <details className="mt-2 rounded-md border border-zinc-100 px-2 py-1.5">
+                      <summary className="cursor-pointer font-medium text-zinc-700">Evidence and sensitivity checks</summary>
                     {item.evidence.pairCoverage ? (
                       <p className="mt-1">
                         Pairing opportunity: {item.evidence.pairCoverage.matchedPairs} of
@@ -236,6 +242,7 @@ export function GoalControlCard({
                         ))}
                       </ul>
                     ) : <p className="mt-1">Source observation counts are unavailable; do not infer complete or zero tracking.</p>}
+                    </details>
                   </>
                 ) : <p className="mt-1">Matched-date window and source provenance are unavailable.</p>}
                 <div className="mt-1 flex flex-wrap gap-2">

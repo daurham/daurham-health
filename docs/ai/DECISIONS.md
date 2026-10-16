@@ -773,3 +773,8 @@ Require exact loaded frame row continuity, expected 30-day source range, and tru
 ## Decision: explain single-pair influence without statistical promises (PIQ-1.6, 2026-10-15)
 
 A selected correlation can be reproducible yet depend on one matched observation. Goal Overview may describe a bounded 10–31-pair leave-one-out Spearman coefficient range only after present-tense source verification. Use the existing neutral sign boundary and disclose shifts; if deleting a pair yields a constant or undefined series, withhold the entire range instead of labeling it stable. This is **not** a confidence interval or a p-value, must not infer independence, and does not change upstream ranking or health recommendations. Authenticated owner QA, statistical calibration and upstream SQL revision coherence remain separate gates.
+
+
+## Decision: progressive disclosure without suppressing safety caveats (PIQ-1.6, 2026-10-15)
+
+An evidence explanation needs two reading depths: a concise observational statement plus truthful loaded-source verification/count-grade, and on demand the full screening/coverage/sensitivity diagnostics. Keep native disclosure panels closed by default so advanced statistics do not visually swamp the owner's immediate decision, while keeping stale/unverified warnings and source navigation immediately visible. Do not change verification gates, coefficients, ranking or interventions, and never use a collapsed detail to conceal an actionable safety warning.
