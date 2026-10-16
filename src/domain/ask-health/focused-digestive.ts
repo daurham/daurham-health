@@ -1,4 +1,5 @@
 import type { HealthIntelligenceSnapshot, IntelligenceObservation } from '../intelligence/shared.js'
+import { addCalendarDays } from '../training-plan.js'
 
 /** PIQ-3.3: question-relevant observations from the *already-loaded*,
  * quality-gated owner intelligence snapshot. Never re-query private records.
@@ -22,6 +23,8 @@ export type FocusedDigestiveMetric = {
 export type FocusedDigestiveEvidence = {
   start: string
   end: string
+  /** One unambiguous calendar day requested in the question, if recognized. */
+  requestedDate?: { date: string; inSelectedRange: boolean } | null
   fiber: FocusedDigestiveMetric
   hydration: FocusedDigestiveMetric
   bowel: FocusedDigestiveMetric
@@ -64,6 +67,26 @@ export function attachBristolTypes(
     },
   }
 }
+/** Restrict date-specific answers to the requested Health calendar day.
+ * Do not pick a day when several dates are compared or a date is invalid.
+ * Relative labels anchor to the instance's local Health calendar, not UTC.
+ */
+export function requestedDigestiveCalendarDay(question: string, today: string): string | null {
+  const dates = question.match(/\b\d{4}-\d{2}-\d{2}\b/g) ?? []
+  const valid = dates.filter((date) => {
+    const parsed = new Date(date + 'T00:00:00.000Z')
+    return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === date
+  })
+  // An invalid or ambiguous explicit date must not silently become "recent".
+  if (valid.length !== dates.length) return null
+  const relative = [
+    ...(/\byesterday\b/i.test(question) ? [addCalendarDays(today, -1)] : []),
+    ...(/\btoday\b/i.test(question) ? [today] : []),
+  ]
+  const requested = [...new Set([...valid, ...relative])]
+  return requested.length === 1 ? requested[0]! : null
+}
+
 const SAMPLE_DAYS = 3
 
 function recent<T extends { date: string }>(items: readonly T[]): T[] {
@@ -98,6 +121,17 @@ export function focusDigestiveContext(input: {
   const topics = digestiveQuestionTopics(input.question)
   if (!input.includeBroadContext && !topics.fiber && !topics.hydration && !topics.bowel) return null
   const { snapshot, today } = input
+  const askedDate = requestedDigestiveCalendarDay(input.question, today)
+  const requestedDate = askedDate == null ? null : {
+    date: askedDate,
+    inSelectedRange: askedDate >= snapshot.period.start &&
+      askedDate <= snapshot.period.end && askedDate <= snapshot.asOf && askedDate <= today,
+  }
+  // For a dated question, never substitute recent unrelated days if the
+  // requested date is absent or falls outside the selected evidence window.
+  const sample = (observations: IntelligenceObservation[]) =>
+    requestedDate ? observations.filter((item) =>
+      requestedDate.inSelectedRange && item.date === requestedDate.date) : recent(observations)
   const fiberAll = observationDates(snapshot, 'nutrition.fiber_g', today)
   const fiberStatus = snapshot.coverage.find((c) => c.key === 'nutrition.fiber_g')?.completenessCheck
   // Do not infer full-day intake from food items, even if all entries have
@@ -110,7 +144,7 @@ export function focusDigestiveContext(input: {
   const bowel = observationDates(snapshot, 'bowel.count', today)
   const present = (kind: FocusedDigestiveMetric['kind'], source: IntelligenceObservation[]): FocusedDigestiveMetric => ({
     kind, recordedDays: source.length,
-    observations: recent(source).map((o) => ({
+    observations: sample(source).map((o) => ({
       date: o.date, value: o.value, sourceIds: [...o.sourceIds].sort(),
       provisional: o.date === today,
     })),
@@ -120,7 +154,7 @@ export function focusDigestiveContext(input: {
     recordedDays: fiberAll.length,
     verifiedDays: verified.length,
     verificationStatus: fiberStatus === 'available' ? 'available' : 'unavailable',
-    observations: recent(verified).map((o) => ({
+    observations: sample(verified).map((o) => ({
       date: o.date, value: o.value, sourceIds: [...o.sourceIds].sort(),
       provisional: false,
     })),
@@ -128,6 +162,7 @@ export function focusDigestiveContext(input: {
   return {
     start: snapshot.period.start,
     end: snapshot.period.end,
+    requestedDate,
     fiber: fiberMetric,
     hydration: present('hydration', water),
     bowel: present('bowel', bowel),
