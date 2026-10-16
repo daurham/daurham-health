@@ -34,6 +34,7 @@ import { readMaintenanceDecisionSnapshot } from '../intelligence/maintenance-rev
 import { readCurrentWeightGoalMode } from './current-weight-goal.js'
 import { verifiedCurrentWeightGoalMode } from '../../src/domain/ask-health/verified-weight-goal.js'
 import { screenExercisePreservationReview } from '../../src/domain/ask-health/exercise-preservation-review.js'
+import { screenWeightGoalObservation } from '../../src/domain/ask-health/weight-goal-observation.js'
 import { loadTrainingProgressionState } from '../intelligence/training-progression.js'
 
 export async function loadAskHealthPacketInput(input: {
@@ -199,6 +200,10 @@ export async function loadAskHealthPacketInput(input: {
     focusedWeightEnergy.exercisePreservationReview = screenExercisePreservationReview({
       asOf:input.asOf, today,
       settings:focusedWeightEnergy.currentSettings,training:currentTrainingRead,
+    })
+    focusedWeightEnergy.weightGoalObservation = screenWeightGoalObservation({
+      asOf:input.asOf,today,snapshot:intelligenceSnapshot,
+      read:currentGoalRead,settings:focusedWeightEnergy.currentSettings,
     })
   }
   return {

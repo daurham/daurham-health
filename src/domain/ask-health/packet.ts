@@ -659,6 +659,31 @@ function addFocusedWeightEnergy(
     },
     detailPath:'/training',userEntered:false,substantive:false,priority:1,
   })
+  const goalObs=focus.weightGoalObservation
+  const goalObsSummary=goalObs.state==='all_recorded_above_boundary'
+    ? 'Three recent usual-condition recorded weights are all above the current goal boundary. '
+    :goalObs.state==='all_recorded_below_boundary'
+      ? 'Three recent usual-condition recorded weights are all below the current goal boundary. '
+      :goalObs.state==='all_recorded_within_boundary'
+        ? 'Three recent usual-condition recorded weights fall within the configured goal boundary. '
+        :goalObs.state==='mixed_recorded_sides'
+          ? 'Three recent usual-condition recorded weights fall on different sides of the current goal boundary. '
+          :goalObs.state==='no_active_goal'
+            ? 'No active weight goal was attested during this read. '
+            :'A recent comparable recorded-weight-to-goal-boundary check is unavailable or insufficient. '
+  push({
+    id:'weight_energy.goal_observation',domain:'body',
+    label:'Read-only recorded weight versus versioned goal boundary',
+    value:null,unit:null,period,
+    text:goalObsSummary+
+      'This is a comparison of saved measurements, not a determination of Goal Control target status, body-fat progress, plateau, or a safe calorie change. '+
+      'The weight rows are not independently revision-attested; a later correction may change this description.',
+    coverage:{
+      relation:goalObs.state,comparableWeightDays:goalObs.comparableWeightDays,
+      sampledSpanDays:goalObs.sampledSpanDays,
+    },
+    detailPath:'/goals',userEntered:false,substantive:false,priority:1,
+  })
   const settings = focus.currentSettings
   const settingsExplanation = settings.state === 'consistent_read'
     ? 'A read-time current-settings revision was consistent across two checks. At that moment the owner ' +
@@ -687,7 +712,7 @@ function addFocusedWeightEnergy(
     id:'weight_energy.decision_boundary',
     domain:'intelligence',label:'Plateau, calorie-change and strength-preservation decision boundary',
     value:null,unit:null,period,
-    text:'This Ask Health screen has NOT established whether a weight goal is unmet, target suitability, or comparable strength-performance outcomes. '+
+    text:'This Ask Health screen has NOT established whether a weight goal is truly met, target suitability, or preserved strength-performance outcomes. '+
       settingsExplanation + goalSummary +
       'Therefore it CANNOT classify an owner-specific weight-loss plateau, certify that strength is preserved, or recommend any calorie cut. '+
       'Logged training session dates are activity records, not evidence of stable lifting performance. Recorded hunger/energy/soreness ratings are context, not proof of adequate recovery. '+
@@ -700,6 +725,7 @@ function addFocusedWeightEnergy(
       decisionVerification:focus.decisionVerification,
       currentSettingsCheck:settings.state,
       currentWeightGoalMode:goalMode,
+      recordedWeightBoundaryRelation:goalObs.state,
       calorieTargetState:settings.calorieTargetState,
       relevantExperimentCount:settings.relevantExperimentCount,
       strengthPreservation:focus.strengthPreservation,
