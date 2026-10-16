@@ -1584,3 +1584,17 @@ Ask Health now exposes a user-initiated, collapsed “Something wrong?” action
 The return uses validated React Router location.state (the original owner question plus selected lens/range), without putting the question into URL query params, localStorage, analytics or a new backend record. Returning to Ask Health restores an **unsent draft** and explains that a new Ask call is necessary to recompute using current canonical evidence. No automatic model request or asserted correction occurs. A separate “Draft a follow-up about the interpretation” action raises a question about AI reasoning but does not assert or store an owner fact. This is a narrow canonical workflow, not a universal record editor.
 
 Regression suite covers exact profile/nutrition allowlists, unsafe/unknown path rejection, malformed and oversized route state, and no verified medical assertion in the follow-up draft. Full CI, authenticated navigation/mobile UX, source-save/re-answer end to end, live PostgreSQL multitab concurrency and broader canonical editor support remain release gates.
+
+
+## PIQ-2.5 — Real PostgreSQL profile CAS and release-readiness checkpoint (2026-10-15)
+
+**Status:** Work branch code validated; **0/9 PIQ phases owner accepted**. Last tested code commit d115aa820075af6d1f2383d9a8fdbd28424242ff. No production migration or main merge.
+
+**Real SQL verification, not just mocked queries:**
+- [Isolated PostgreSQL 16 workflow 38850472289](https://github.com/daurham/daurham-health/actions/runs/38850472289): **SUCCESS** at d115aa820. Replayed migrations 0001 through 0056 into a disposable schema. A new test calls actual server Health Profile read/write functions with two independent PostgreSQL clients, checking one-winner concurrent singleton insertion and same-version updates, stale HTTP 409 without overwrites, preservation of omitted fields, explicit null and array clearing, and increasing millisecond-visible timestamps. An optional SQL adapter injection exists only for this isolated test path; existing production calls still use getSql().
+- [Full app validation workflow 38850472327](https://github.com/daurham/daurham-health/actions/runs/38850472327): **SUCCESS** at d115aa820 (TypeScript, ESLint, full Vitest suite, build).
+- Neither workflow accessed owner records, production Neon/Vercel services, Gemini usage, or production calorie targets.
+
+**Production identity still blocked, not inferred:** Connected Vercel listed the Health project, but deployment inspection returned HTTP 403 for its actual team scope, and no authenticated CLI fallback was available. Connected Neon project listing returned an empty array. The live deployment SHA, active database identity and applied schema_migrations filenames therefore remain UNKNOWN.
+
+**Remaining release gates, ordered:** (1) Authorized read-only deployment SHA and production migration-head reconciliation. (2) Verified schema clone / migration and restore rehearsal with the actual target identified; no live migration without explicit owner approval. (3) Authenticated iPhone tests for Health Profile competing tabs, Nutrition corrections/day completeness, cited-fact source editor and save-then-reask behavior, primary goal and Coach safety. (4) Owner-scored true-answer quality, clinical-safety and cost baseline for PIQ-0/2 acceptance. Do not migrate, merge, change targets, or mark any phase accepted based solely on green CI.
