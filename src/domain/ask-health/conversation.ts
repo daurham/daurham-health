@@ -8,6 +8,9 @@ import {
   ASK_QUESTION_MAX,
   ASK_TURN_MAX,
   type AskLens,
+  ASK_CONTEXT_MODES,
+  DEFAULT_ASK_CONTEXT_MODE,
+  type AskContextMode,
 } from './config.js'
 import type { AskTurn } from './types.js'
 
@@ -17,6 +20,7 @@ export type ParsedAskRequest = {
   range: '30d' | '90d' | '6m' | '1y' | 'all'
   asOf: string
   conversation: AskTurn[]
+  contextMode: AskContextMode
 }
 
 export function parseAskHealthRequest(
@@ -49,13 +53,17 @@ export function parseAskHealthRequest(
   if (asOf > today) {
     return { ok: false, error: 'asOf cannot be in the future.' }
   }
+  const contextMode = record.contextMode === undefined ? DEFAULT_ASK_CONTEXT_MODE : record.contextMode
+  if (typeof contextMode !== 'string' || !(ASK_CONTEXT_MODES as readonly string[]).includes(contextMode)) {
+    return { ok: false, error: 'Invalid Ask Health context mode.' }
+  }
   const bounded = boundConversation(record.conversation)
   if (!bounded.ok) {
     return bounded
   }
   return {
     ok: true,
-    value: { question, lens: lens as AskLens, range, asOf, conversation: bounded.turns },
+    value: { question, lens: lens as AskLens, range, asOf, conversation: bounded.turns, contextMode: contextMode as AskContextMode },
   }
 }
 

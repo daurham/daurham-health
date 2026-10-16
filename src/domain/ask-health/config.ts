@@ -5,6 +5,14 @@ export const ASK_HEALTH_REQUEST_TYPE = 'ask_health'
 export const ASK_LENSES = ['general', 'training', 'nutrition', 'recovery', 'experiments'] as const
 export type AskLens = (typeof ASK_LENSES)[number]
 
+/** Owner controls private-context access explicitly; labels are public UI metadata. */
+export const ASK_CONTEXT_MODES = ['smart', 'personalized', 'deep', 'general_only'] as const
+export type AskContextMode = (typeof ASK_CONTEXT_MODES)[number]
+export const DEFAULT_ASK_CONTEXT_MODE: AskContextMode = 'personalized'
+export const ASK_CONTEXT_MODE_LABELS: Record<AskContextMode, string> = {
+  smart: 'Smart', personalized: 'Personalized', deep: 'Deep Dive', general_only: 'General Only',
+}
+
 export const ASK_QUESTION_MAX = 1000
 export const ASK_TURN_MAX = 2000
 export const ASK_CONVERSATION_KEEP = 6

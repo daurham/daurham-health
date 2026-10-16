@@ -1,4 +1,4 @@
-import type { AskLens } from '@/domain/ask-health'
+import type { AskLens, AskContextMode } from '@/domain/ask-health'
 import type { AskHealthResponseDiagnostic } from '@/domain/ask-health/diagnostics'
 import type { AskEvidence, AskHealthAnswer } from '@/domain/ask-health'
 import type { ProgressRange } from '@/domain/progress'
@@ -11,6 +11,8 @@ export type AskHealthResponse = {
   meta: {
     packetVersion: string
     promptVersion: string
+    contextMode?: AskContextMode
+    evidenceOverview?: { availableCount: number; domains: string[]; omittedCount: number; limited: boolean }
     answerScope?: 'general' | 'personal' | 'urgent_safety'
     provider: string
     model: string
@@ -30,6 +32,7 @@ export type AskHealthResponse = {
 export async function askHealth(input: {
   question: string
   lens: AskLens
+  contextMode: AskContextMode
   range: ProgressRange
   asOf: string
   conversation: Array<{ role: 'user' | 'assistant'; text: string }>

@@ -1,4 +1,4 @@
-export { ASK_HEALTH_PACKET_VERSION, ASK_HEALTH_PROMPT_VERSION, ASK_HEALTH_REQUEST_TYPE, ASK_LENSES, ASK_LENS_LABELS } from './config.js'
+export { ASK_HEALTH_PACKET_VERSION, ASK_HEALTH_PROMPT_VERSION, ASK_HEALTH_REQUEST_TYPE, ASK_LENSES, ASK_LENS_LABELS, ASK_CONTEXT_MODES, ASK_CONTEXT_MODE_LABELS, DEFAULT_ASK_CONTEXT_MODE } from './config.js'
 export { ASK_SUGGESTIONS } from './suggestions.js'
 export { routeAskHealthIntent } from './intent.js'
 export { detectImmediateSafety, immediateSafetyAnswer } from './immediate-safety.js'
@@ -27,4 +27,4 @@ export type {
   AskPatternInput,
   AskTurn,
 } from './types.js'
-export type { AskLens } from './config.js'
+export type { AskLens, AskContextMode } from './config.js'

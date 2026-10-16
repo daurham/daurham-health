@@ -1,6 +1,6 @@
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useState } from 'react'
-import { ASK_LENS_LABELS, ASK_SUGGESTIONS, type AskLens, type AskTurn } from '@/domain/ask-health'
+import { ASK_LENS_LABELS, ASK_SUGGESTIONS, ASK_CONTEXT_MODES, ASK_CONTEXT_MODE_LABELS, DEFAULT_ASK_CONTEXT_MODE, type AskLens, type AskTurn, type AskContextMode } from '@/domain/ask-health'
 import type { ProgressRange } from '@/domain/progress'
 import { primaryButtonClass, quietButtonClass, useHealthCalendarDate } from '@/lib'
 import { ProgressRangeControl } from '@/features/progress/ProgressRangeControl'
@@ -36,6 +36,7 @@ export function AskHealthPage() {
   const [lens, setLens] = useState<AskLens>(() => returningCorrection?.lens ?? initialLens(params.get('lens')))
   const [range, setRange] = useState<ProgressRange>(() => returningCorrection?.range ?? initialRange(params.get('range')))
   const [draft, setDraft] = useState(() => returningCorrection?.question ?? params.get('question') ?? '')
+  const [contextMode, setContextMode] = useState<AskContextMode>(DEFAULT_ASK_CONTEXT_MODE)
   const [turns, setTurns] = useState<AskTurn[]>([])
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -58,6 +59,7 @@ export function AskHealthPage() {
       const response = await askHealth({
         question: trimmed,
         lens,
+        contextMode,
         range,
         asOf: today,
         conversation: turns.slice(-6),
@@ -126,6 +128,30 @@ export function AskHealthPage() {
           </button>
         ))}
       </div>
+      <div className="space-y-2">
+        <label htmlFor="ask-context-mode" className="block text-sm font-medium text-zinc-800">Context mode</label>
+        <select id="ask-context-mode" value={contextMode}
+          onChange={(event) => {
+            setContextMode(event.target.value as AskContextMode)
+            setTurns([])
+            setLatest(null)
+            setError(null)
+          }}
+          className="min-h-11 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm">
+          {ASK_CONTEXT_MODES.map((mode) => (
+            <option key={mode} value={mode}>{ASK_CONTEXT_MODE_LABELS[mode]}</option>
+          ))}
+        </select>
+        <p className="text-xs leading-5 text-zinc-600">
+          {contextMode === 'smart'
+            ? 'Automatically uses records when the question calls for them. May omit personal data for general questions.'
+            : contextMode === 'personalized'
+              ? 'Always consider relevant saved Health evidence—even for general-looking questions.'
+              : contextMode === 'deep'
+                ? 'Broader cross-domain review using the selected date range. Still bounded; omitted evidence is disclosed. May use more AI tokens.'
+                : 'Educational answer only; saved Health records and prior private conversation are not sent.'}
+        </p>
+      </div>
       <ProgressRangeControl range={range} onChange={setRange} />
       {turns.length === 0 && !latest ? (
         <div className="space-y-2">
@@ -156,6 +182,23 @@ export function AskHealthPage() {
         ) : null}
         {latest?.meta.answerScope === 'general' ? (
           <p className="text-xs text-zinc-600" role="status">General health education · no personal Health records used{latest.meta.cached ? ' · reused answer' : ''}</p>
+        ) : null}
+        {latest?.meta.evidenceOverview ? (
+          <details className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+            <summary className="cursor-pointer text-sm font-medium text-zinc-800">
+              What Health AI considered · {latest.meta.evidenceOverview.availableCount} supplied facts
+            </summary>
+            <p className="mt-2 text-xs leading-5 text-zinc-600">
+              {latest.meta.answerScope === 'general' || latest.meta.answerScope === 'urgent_safety'
+                ? 'No personal Health records were included.'
+                : 'Evidence domains: ' + (latest.meta.evidenceOverview.domains.join(', ') || 'none available') + '.'}
+              {latest.meta.evidenceOverview.limited
+                ? ' Some candidate facts were excluded by the packet size limit; this is not the full history.' : ''}
+              {latest.meta.evidenceOverview.omittedCount > 0
+                ? ' Omitted candidate facts: ' + latest.meta.evidenceOverview.omittedCount + '.' : ''}
+            </p>
+            <p className="mt-1 text-xs text-zinc-600">The answer cites specific facts it used; supplying context does not mean every supplied record influenced the answer.</p>
+          </details>
         ) : null}
         {latest ? <AskHealthContextSummary context={latest.meta.context} /> : null}
         {latest && asked ? (
