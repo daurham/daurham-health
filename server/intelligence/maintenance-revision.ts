@@ -7,6 +7,7 @@ import { compareMaintenanceDecisionRevisions } from '../../src/domain/maintenanc
  *  - every active goal's lifecycle, version ID and current target definition;
  *  - as-of effective-dated explicit owner primary-goal intent (incl. clear);
  *  - active or soon-scheduled experiment IDs/status/windows;
+ *  - recent finalized experiment results and evaluated outcome requirements;
  *  - the corresponding immutable-protocol requirement roles, kinds and selectors
  *    (included to detect even incorrect external requirement mutations).
  *
@@ -65,6 +66,23 @@ WITH current_target AS (
    WHERE e.status = 'active'
       OR (e.status = 'scheduled' AND e.window_start <= $1::date + 14
           AND e.window_end >= $1::date)
+), recent_result_sources AS (
+ SELECT COALESCE(jsonb_agg(
+   jsonb_build_array(r.id::text,r.experiment_id::text,
+     r.protocol_version_id::text,e.protocol_version_id::text,e.status,
+     r.status,r.classification,r.protocol_attestation,r.stopped_for_safety,
+     r.window_start::text,r.planned_window_end::text,r.effective_end_date::text,
+     r.evidence_fingerprint,r.created_at::text,r.invalidated_at::text,
+     p.id::text,p.role,p.domain,p.requirement_kind,p.selector,p.required,
+     q.id::text,q.evaluation_status,q.criterion_status,q.summary)
+   ORDER BY r.id::text,p.id::text
+ ),'[]'::jsonb) AS state
+ FROM experiment_results r
+ JOIN experiments e ON e.id=r.experiment_id
+ LEFT JOIN lab_protocol_requirements p ON p.protocol_version_id=r.protocol_version_id
+ LEFT JOIN experiment_result_requirements q
+   ON q.experiment_result_id=r.id AND q.requirement_id=p.id
+ WHERE r.effective_end_date BETWEEN $1::date - 27 AND $1::date
 )
 SELECT (SELECT calories_target FROM current_target) AS calorie_target,
        (SELECT active_count FROM relevant_experiments) AS experiment_count,
@@ -74,6 +92,7 @@ SELECT (SELECT calories_target FROM current_target) AS calorie_target,
          'primary_intent', (SELECT to_jsonb(i) FROM primary_intent i),
          'experiments', (SELECT state FROM relevant_experiments),
          'experiment_requirements', (SELECT state FROM relevant_requirements),
+         'recent_results', (SELECT state FROM recent_result_sources),
          'profile', (SELECT to_jsonb(p) FROM health_profile p WHERE singleton_id = 1)
        )::text) AS decision_revision
 `

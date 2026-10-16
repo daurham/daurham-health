@@ -756,6 +756,29 @@ function addFocusedWeightEnergy(
       noDeclaredOutcomeExperiments:outcome.noDeclaredOutcomeExperiments},
     detailPath:'/lab',userEntered:false,substantive:false,priority:1,
   })
+  const finalized=focus.recentExperimentResultReview
+  const finalizedText=finalized.state==='none_recent'
+    ? 'No finalized Personal Lab results with end dates in the previous 28 Health-local days were found; earlier and unfinalized experiments are outside this scope. '
+    :finalized.state==='recent_direct_observation'
+      ? 'A recent valid, protocol-followed and interpretable Personal Lab result recorded an available declared weight/calorie outcome. '
+      :finalized.state==='recent_non_direct_or_limited'
+        ? 'Recent finalized results were limited, inconclusive, invalidated or did not record an interpretable direct weight/calorie outcome. '
+        :finalized.state==='mixed_recent_results'
+          ? 'Recent finalized results include a mix of direct observations and limited, non-direct or invalidated results. '
+          : 'Recent Personal Lab result integrity is UNKNOWN because a consistent bounded source read was not verified. '
+  push({
+    id:'weight_energy.recent_experiment_results',domain:'experiments',
+    label:'Recent finalized Personal Lab result integrity (not efficacy)',
+    value:null,unit:null,period,
+    text:finalizedText+
+      'A result classification does not establish weight direction, effect size, causality, strength retention or a safe calorie change.',
+    coverage:{resultReviewState:finalized.state,recentFinalizations:finalized.recentFinalizations,
+      interpretableDirectMetricResults:finalized.interpretableDirectMetricResults,
+      interpretableOtherResults:finalized.interpretableOtherResults,
+      limitedOrInconclusiveResults:finalized.limitedOrInconclusiveResults,
+      invalidatedResults:finalized.invalidatedResults},
+    detailPath:'/lab',userEntered:false,substantive:false,priority:1,
+  })
   const settings = focus.currentSettings
   const settingsExplanation = settings.state === 'consistent_read'
     ? 'A read-time current-settings revision was consistent across two checks. At that moment the owner ' +
@@ -785,7 +808,7 @@ function addFocusedWeightEnergy(
     domain:'intelligence',label:'Plateau, calorie-change and strength-preservation decision boundary',
     value:null,unit:null,period,
     text:'This Ask Health screen has NOT established whether a weight goal is truly met, target suitability, or preserved strength-performance outcomes. '+
-      settingsExplanation + goalSummary + prioritySummary + timingText + outcomeSummary +
+      settingsExplanation + goalSummary + prioritySummary + timingText + outcomeSummary + finalizedText +
       'Therefore it CANNOT classify an owner-specific weight-loss plateau, certify that strength is preserved, or recommend any calorie cut. '+
       'Logged training session dates are activity records, not evidence of stable lifting performance. Recorded hunger/energy/soreness ratings are context, not proof of adequate recovery. '+
       'Carbohydrate/sodium shifts, fluid balance, bowel changes, weigh-in conditions and supplements may confound short-term scale readings; none is established as this owner’s cause here. '+
@@ -803,6 +826,7 @@ function addFocusedWeightEnergy(
       relevantExperimentCount:settings.relevantExperimentCount,
       experimentTimingState:timing.state,
       experimentOutcomeRelevance:outcome.state,
+      recentFinalizedResultReview:finalized.state,
       strengthPreservation:focus.strengthPreservation,
     },
     detailPath:'/goals',userEntered:false,substantive:false,priority:0,
