@@ -125,6 +125,8 @@ export type AskHealthPacketInput = {
   lens: AskLens
   range: ProgressRange
   asOf: string
+  /** Actual Health-local current date, not the historical asOf selection. */
+  healthToday?: string
   period: { start: string; end: string }
   generatedAt: string
   question: string
@@ -155,6 +157,8 @@ export type AskHealthPacket = {
   rangeStart: string
   rangeEnd: string
   asOf: string
+  /** Health-local current date when known; never substitute selected asOf. */
+  healthToday?: string
   generatedAt: string
   evidence: AskEvidence[]
   limitations: AskLimitation[]
