@@ -33,6 +33,8 @@ import { screenWeightEnergyCurrentSettings } from '../../src/domain/ask-health/w
 import { readMaintenanceDecisionSnapshot } from '../intelligence/maintenance-revision.js'
 import { readCurrentWeightGoalMode } from './current-weight-goal.js'
 import { verifiedCurrentWeightGoalMode } from '../../src/domain/ask-health/verified-weight-goal.js'
+import { screenExercisePreservationReview } from '../../src/domain/ask-health/exercise-preservation-review.js'
+import { loadTrainingProgressionState } from '../intelligence/training-progression.js'
 
 export async function loadAskHealthPacketInput(input: {
   lens: AskHealthPacketInput['lens']
@@ -76,7 +78,12 @@ export async function loadAskHealthPacketInput(input: {
       }) : null
   const capturedDecision = focusedWeightEnergy && input.asOf === today
     ? await readMaintenanceDecisionSnapshot(input.asOf) : null
-  const currentGoalRead = capturedDecision ? await readCurrentWeightGoalMode(input.asOf) : null
+  const [currentGoalRead, currentTrainingRead] = capturedDecision?.status === 'available'
+    ? await Promise.all([
+        readCurrentWeightGoalMode(input.asOf),
+        loadTrainingProgressionState(input.asOf).catch(() => null),
+      ])
+    : [null, null]
   const activity = buildActivityProgressView(
     activityRows.filter((row) => row.date <= input.asOf),
     { range: input.range, asOf: input.asOf, today, timezone },
@@ -189,6 +196,10 @@ export async function loadAskHealthPacketInput(input: {
     focusedWeightEnergy.currentSettings.weightGoalMode = verifiedCurrentWeightGoalMode(
       currentGoalRead, focusedWeightEnergy.currentSettings,
     )
+    focusedWeightEnergy.exercisePreservationReview = screenExercisePreservationReview({
+      asOf:input.asOf, today,
+      settings:focusedWeightEnergy.currentSettings,training:currentTrainingRead,
+    })
   }
   return {
     lens: input.lens,

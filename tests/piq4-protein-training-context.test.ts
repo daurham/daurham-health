@@ -3,6 +3,8 @@ import { buildHealthIntelligenceSnapshot,type IntelligenceObservation } from '..
 import { addCalendarDays } from '../src/domain/training-plan.js'
 import { screenProteinTrainingContext } from '../src/domain/ask-health/protein-training-context.js'
 import { screenWeightEnergyCurrentSettings, type WeightEnergyCurrentSettings } from '../src/domain/ask-health/weight-energy-current-settings.js'
+import { screenExercisePreservationReview, type ExercisePreservationReview } from '../src/domain/ask-health/exercise-preservation-review.js'
+import type { TrainingProgressionState, TrainingProgressionSeries } from '../src/domain/training-progression.js'
 import { focusWeightEnergyContext } from '../src/domain/ask-health/focused-weight-energy.js'
 import { buildAskHealthEvidencePacket,packetFingerprintMaterial } from '../src/domain/ask-health/packet.js'
 import type { AskHealthPacketInput } from '../src/domain/ask-health/types.js'
@@ -48,12 +50,13 @@ function data(opts:Options={}){
 }
 function inspect(opts:Options={},question='Why has my weight loss stalled?',
   contextMode:'personalized'|'deep'|'general_only'='personalized',
-  settings?:WeightEnergyCurrentSettings){
+  settings?:WeightEnergyCurrentSettings,review?:ExercisePreservationReview){
  const x=data(opts)
  const focus=contextMode==='general_only'?null:focusWeightEnergyContext({
   question,snapshot:x.snapshot,today,includeBroadContext:contextMode==='deep',
  })
  if (focus && settings) focus.currentSettings=settings
+ if (focus && review) focus.exercisePreservationReview=review
  const input:AskHealthPacketInput={question,contextMode,lens:'general',range:'90d',
   asOf:today,period:{start,end:today},generatedAt:today+'T18:00:00Z',
   overview:null,activity:null,sleep:null,goals:[],experiments:[],benchmarks:[],
@@ -213,4 +216,82 @@ describe('PIQ-4.2 owner-settings snapshot is a non-decision consistency guard',(
      screenWeightEnergyCurrentSettings(baseline,{...baseline,revision:'c'.repeat(32)})).packet
    expect(packetFingerprintMaterial(stable)).not.toBe(packetFingerprintMaterial(changed))
  })
+})
+
+describe('PIQ-4.2 exercise-matched performance flags remain review-only',()=>{
+  const settings:WeightEnergyCurrentSettings={
+    state:'consistent_read',calorieTargetState:'configured',
+    relevantExperimentCount:0,
+  }
+  const series=(patch:Partial<TrainingProgressionSeries>={}):TrainingProgressionSeries=>({
+    exerciseId:'private-exercise',exerciseName:'Private lift',metric:'e1rm_kg',
+    state:'declining',confidence:'high',exposureCount:4,latestDate:'2026-10-14',
+    recentValue:55,priorValue:60,changePct:-8,recentRelativeStrength:null,
+    recentAverageRir:null,recentAverageRpe:null,recentHardSets:5,
+    limitationKinds:[],explanation:'synthetic',
+    ...patch,
+  })
+  const training=(rows:TrainingProgressionSeries[]):TrainingProgressionState=>({
+    version:'training-progression-v1',asOf:today,window:{start:start,end:today},
+    summary:'fixture',series:rows,movementExposure:[],muscleExposure:[],
+    goalRelationships:[],primaryOpportunity:null,
+  })
+  it('flags qualified recent exact-exercise decline as preliminary, never preserved muscle',()=>{
+    const review=screenExercisePreservationReview({
+      today,asOf:today,settings,training:training([series()]),
+    })
+    expect(review).toEqual({
+      state:'possible_decline_for_review',qualifiedRecentSeries:1,possibleDeclineExercises:1,
+    })
+    const packet=inspect({},'Why has my weight loss stalled?','personalized',settings,review).packet
+    const item=packet.evidence.find(e=>e.id==='weight_energy.training_preservation_boundary')
+    expect(item?.substantive).toBe(false)
+    expect(item?.coverage).toMatchObject({
+      exerciseReviewState:'possible_decline_for_review',possibleDeclineExercises:1,
+      strengthPreservation:'not_verified',
+    })
+    expect(item?.text).toContain('preliminary recent performance-decline')
+    expect(item?.text).toContain('remain unauthorized')
+    expect(JSON.stringify(item)).not.toContain('Private lift')
+    expect(JSON.stringify(item)).not.toContain('private-exercise')
+  })
+  it('clean qualified series is NOT proven muscle preservation',()=>{
+    const r=screenExercisePreservationReview({
+      today,asOf:today,settings,training:training([series({state:'progressing',changePct:5})]),
+    })
+    expect(r).toMatchObject({state:'no_qualified_decline_flag',qualifiedRecentSeries:1,
+      possibleDeclineExercises:0})
+    const item=inspect({},'Why has my weight stalled?','personalized',settings,r)
+      .packet.evidence.find(e=>e.id==='weight_energy.training_preservation_boundary')
+    expect(item?.text).toContain('does NOT establish preserved strength or muscle')
+    expect(item?.coverage?.strengthPreservation).toBe('not_verified')
+  })
+  it('stale, source-unavailable and poor-confidence exercise exposure fail closed',()=>{
+    for(const data of [null,training([series({latestDate:'2026-09-15'})]),
+      training([series({exposureCount:3})]),training([series({confidence:'low'})])]){
+      const result=screenExercisePreservationReview({today,asOf:today,settings,training:data})
+      expect(['unavailable','limited_evidence']).toContain(result.state)
+      expect(result.possibleDeclineExercises).not.toBe(1)
+    }
+    expect(screenExercisePreservationReview({
+      today,asOf:today,settings:{...settings,state:'changed_during_read'},
+      training:training([series()]),
+    })).toMatchObject({state:'unavailable',possibleDeclineExercises:null})
+    expect(screenExercisePreservationReview({
+      today,asOf:'2026-10-10',settings,training:training([series()]),
+    }).state).toBe('unavailable')
+  })
+  it('selected evidence fingerprint changes on a genuinely qualified exercise flag',()=>{
+    const down=screenExercisePreservationReview({
+      today,asOf:today,settings,training:training([series()]),
+    })
+    const normal=screenExercisePreservationReview({
+      today,asOf:today,settings,training:training([series({state:'stable',changePct:0})]),
+    })
+    const a=inspect({},'Why has my weight stalled?','personalized',settings,down).packet
+    const b=inspect({},'Why has my weight stalled?','personalized',settings,normal).packet
+    expect(packetFingerprintMaterial(a)).not.toBe(packetFingerprintMaterial(b))
+    expect(inspect({},'Why has my weight stalled?','general_only',settings,down)
+      .packet.evidence.some(e=>e.id.startsWith('weight_energy.'))).toBe(false)
+  })
 })
