@@ -16,6 +16,7 @@ const base = {
   lens: 'recovery',
   range: '30d',
   asOf: '2026-10-14',
+  healthToday: '2026-10-14',
   period: { start: '2026-09-15', end: '2026-10-14' },
   generatedAt: '2026-10-14T18:00:00.000Z',
   question: 'How did I sleep?',

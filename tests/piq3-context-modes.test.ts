@@ -23,7 +23,7 @@ const makeProvider = () => vi.fn(async (req: Parameters<AskHealthProvider>[0]) =
 }))
 function inputFor(question = q): AskHealthPacketInput {
   return {
-    ...params, question, period: { start: '2026-09-16', end: date },
+    ...params, question, healthToday:date, period: { start: '2026-09-16', end: date },
     overview: null, activity: null, sleep: null, context: null, patterns: [],
     goals: [{
       id: 'synthetic-owner-goal', kind: 'body_metric', lifecycle: 'active',
