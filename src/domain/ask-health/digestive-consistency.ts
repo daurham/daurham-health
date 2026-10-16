@@ -122,8 +122,9 @@ export function digestivePairingSourcesAgree(input: {
     }
     return [...pairs].sort()
   }
-  const expected = tags(input.expectedContexts.flatMap(day =>
-    day.tags.map(tag => ({date:day.contextDate,tag_key:tag}))))
+  const expected = tags(input.expectedContexts
+    .filter(day => day.contextDate >= scope.start && day.contextDate <= scope.end && day.contextDate < today)
+    .flatMap(day => day.tags.map(tag => ({date:day.contextDate,tag_key:tag}))))
   const reread = tags(input.contextTagRows)
   return expected != null && reread != null &&
     expected.length === reread.length && expected.every((row,i)=>row===reread[i])

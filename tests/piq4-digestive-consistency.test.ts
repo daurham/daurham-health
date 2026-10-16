@@ -60,6 +60,22 @@ describe('PIQ-4.1 optimistic source reread (synthetic only)',()=>{
     const a=make();a.expectedContexts.push({contextDate:'2026-10-11',tags:[]})
     expect(digestivePairingSourcesAgree(a)).toBe(true)
   })
+  it('ignores historical context outside the exact selected date window and provisional today',()=>{
+    const a=make()
+    a.expectedContexts.push({contextDate:'2026-09-30',tags:['travel']})
+    a.expectedContexts.push({contextDate:today,tags:['travel']})
+    expect(digestivePairingSourcesAgree(a)).toBe(true)
+    // Old records outside the requested period do not belong in the recheck.
+    const b=make()
+    b.scope={start:'2026-10-09',end:'2026-10-11',calendarDays:3}
+    expect(digestivePairingSourcesAgree(b)).toBe(true)
+    const c=make()
+    c.scope={start:'2026-10-11',end:'2026-10-12',calendarDays:2}
+    c.verifiedFiberRows=[]
+    c.waterRows=[]
+    c.contextTagRows=[]
+    expect(digestivePairingSourcesAgree(c)).toBe(true)
+  })
   it('fails closed on invalid scope, duplicate IDs or unexpected future data',()=>{
     const a=make();a.scope={start:'2026-01-01',end:today,calendarDays:289}
     expect(digestivePairingSourcesAgree(a)).toBe(false)

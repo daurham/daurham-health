@@ -36,3 +36,7 @@ For Bristol-plus-fiber/water/Deep Dive reasoning only, `server/ask-health/digest
 3. Saved date+tag keys in the bounded window (no context note text or diagnosis inference).
 
 The pure `digestivePairingSourcesAgree` rejects mismatched IDs, values, days, newly added/removed tags, duplicated rows, unavailable SQL, or stale completeness. On a conflict, bowel-only verified evidence is kept but derived cross-domain pairing and cross-domain sample evidence are suppressed with a neutral limitation. These rereads are **not one repeatable-read transaction** and cannot detect a modification after the final query; broader snapshot atomicity is a separate release gate. All source reread rows are server-side; no new raw identifiers or notes enter the model's packet.
+
+### Historical context boundary
+
+The original Ask Health context loader selects the entire progress period. The optimistic recheck compares ONLY tags within the exact requested bowel window, excluding provisional today; unrelated earlier/later tags are not an inconsistency. Synthetic tests exercise full range, narrower historical window, outside records and today. This does not assert absence of unrecorded confounders.
