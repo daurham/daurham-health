@@ -114,7 +114,7 @@ export async function loadAskHealthPacketInput(input: {
         if (expectedIds == null) throw new Error('bowel identity snapshot unavailable')
         const sql = await getSql()
         const dailyRows = (await sql.query(
-          `SELECT bowel_date::text AS date,
+          `SELECT events.bowel_date::text AS date,
              count(*)::int AS event_count,
              count(*) FILTER (WHERE bristol_type BETWEEN 1 AND 7)::int AS typed_count,
              count(*) FILTER (WHERE bristol_type IN (1,2))::int AS hard_count,
