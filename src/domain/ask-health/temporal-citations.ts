@@ -55,7 +55,7 @@ export function affirmativeOwnerMetricClaim(text: string): boolean {
   const owner = /\b(?:you|your|yours|my|mine|i|the owner|health logs|your records|your logs)\b/i
   // Recognize unsupported measurement forms too, so a plausible personal
   // claim cannot bypass grounding merely by writing "liters" or "%".
-  const quantity = /\b\d[\d,.]*\s*(?:kg|kilograms?|lbs?|pounds?|g|grams?|ml|milliliters?|kcal|calories|steps?|reps?|times?|sessions?|movements?|minutes?|hours?|mg|milligrams?|liters?|litres?|ounces?|oz)\b|\b\d[\d,.]*\s*%/i
+  const quantity = /\b\d[\d,.]*\s*(?:kg|kilograms?|lbs?|pounds?|g|grams?|ml|milliliters?|kcal|calories|steps?|reps?|times?|sessions?|movements?|minutes?|hours?|mg|milligrams?|liters?|litres?|l|ounces?|oz)\b|\b\d[\d,.]*\s*%/i
   const factVerb = /\b(?:recorded|logged|measured|averaged|lifted|completed|consumed|totaled|totalled|performed|improved|increased|decreased)\b/i
   const unsure = /\b(?:cannot|can't|not enough|unknown|uncertain|unavailable|insufficient|missing|unverified|no reliable|not proven|did not|does not|didn't)\b/i
   const conditional = /\b(?:could|might|may|should|would|if|consider|recommend|suggest|hypothetical|typically|generally)\b/i
@@ -164,8 +164,11 @@ export function unsupportedHistoricalMeasurement(text: string): boolean {
     // Reject a detached final fragment, e.g. the "5 g" inside "1,5 g".
     if (position > 0 && /[\d,.-]/.test(text[position - 1]!)) return true
   }
-  if (/\b-?\d[\d,.]*\s*(?:milligrams?|mg|liters?|litres?|ounces?|oz|fl\.?\s*oz|cups?)\b/i.test(text)) return true
+  if (/\b-?\d[\d,.]*\s*(?:milligrams?|mg|liters?|litres?|l|ounces?|oz|fl\.?\s*oz|cups?)\b/i.test(text)) return true
   if (/\b-?\d[\d,.]*\s*%/.test(text)) return true
+  // Space-grouped thousands are locale-dependent: do not certify a partial
+  // "234 steps" substring of a claimed "1 234 steps" value.
+  if (/\b\d{1,3}(?:[ \u00a0]\d{3})+\s*(?:kg|g|ml|lbs?|kcal|calories?|reps?|steps?|sessions?|movements?)\b/i.test(text)) return true
   if (/(?:^|[^\w])(?:\.\d+|\d+\.)\s*(?:kg|g|ml|lbs?|kcal|calories?|reps?|steps?|sessions?|movements?)\b/i.test(text)) return true
   return false
 }
