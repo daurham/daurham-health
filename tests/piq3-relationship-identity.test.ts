@@ -136,6 +136,7 @@ describe('PIQ-3 relationship pairing and lag identity audit', () => {
       'Your water and bowel observations correlated on all recorded days last month.',
       'Your water and bowel observations were correlated without exception last month.',
       'Your water and bowel observations were statistically significant last month.',
+      'Your water and bowel observations were significantly correlated last month.',
       'Your water and bowel observations showed a proven correlation last month.',
     ]) withheld(wording, [waterBowelSame])
     // A seven-day claim can never be certified by a 14-pair sample,
