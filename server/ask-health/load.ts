@@ -76,7 +76,7 @@ export async function loadAskHealthPacketInput(input: {
       }) : null
   const capturedDecision = focusedWeightEnergy && input.asOf === today
     ? await readMaintenanceDecisionSnapshot(input.asOf) : null
-  const currentGoalRead = capturedDecision ? await readCurrentWeightGoalMode() : null
+  const currentGoalRead = capturedDecision ? await readCurrentWeightGoalMode(input.asOf) : null
   const activity = buildActivityProgressView(
     activityRows.filter((row) => row.date <= input.asOf),
     { range: input.range, asOf: input.asOf, today, timezone },
