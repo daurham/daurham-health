@@ -173,6 +173,21 @@ export async function explainAskHealth(input: {
     })
   }
   const intent = routeAskHealthIntent(input.question, input.conversation)
+  if (contextMode === 'general_only' &&
+      (intent.intent === 'personal_metric' || intent.intent === 'personal_trend' ||
+       intent.intent === 'historical_reference')) {
+    // General Only is an explicit instruction not to consult personal records.
+    // A data-dependent owner metric has no honest educational numerical answer.
+    // Do not spend AI budget asking a model to guess the owner's history.
+    return responseFor({ packet: blankGeneralAskPacket(input.packet) }, {
+      answer: {
+        blocks: [{ text: 'General Only cannot check your personal measurements or history. Choose Personalized or Deep Dive, then ask again to use saved Health evidence.', evidenceRefs: [] }],
+        limitations: [],
+        followUps: [],
+      },
+      provider: 'health', model: 'deterministic', cached: false, general: true, contextMode,
+    })
+  }
   const general = contextMode === 'general_only' || (contextMode === 'smart' && intent.route === 'general')
   // Also sanitize direct callers supplying an owner packet for a purely
   // educational prompt. No private record or prior personal chat reaches AI.

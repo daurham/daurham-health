@@ -62,8 +62,24 @@ describe('PIQ-3 explicit Context Mode request contract', () => {
       answerScope: 'general', contextMode: 'general_only', evidenceOverview: { availableCount: 0, domains: [] },
     })
     expect(result.evidence).toEqual([])
-    expect(stub.mock.calls[0]![0].evidenceIds).toEqual([])
-    expect(stub.mock.calls[0]![0].user).not.toContain('CONVERSATION CONTEXT')
+    expect(stub).not.toHaveBeenCalled()
+    expect(result.answer.blocks[0]?.text).toContain('Choose Personalized or Deep Dive')
+  })
+
+
+  it('General Only cannot infer the owner\'s personal metric or trend, even with budget remaining', async () => {
+    load.mockReset()
+    const stub = makeProvider()
+    const gate = fakeGate()
+    for (const question of ['What is my current height?', 'Has my strength improved?']) {
+      const result = await answerAskHealth({ ...params, question, contextMode: 'general_only',
+        provider: stub, gate, now: 1000 })
+      expect(result.meta).toMatchObject({ answerScope: 'general', contextMode: 'general_only',
+        provider: 'health', evidenceOverview: { availableCount: 0, items: [] } })
+      expect(result.answer.blocks[0]?.text).toContain('cannot check your personal')
+    }
+    expect(load).not.toHaveBeenCalled()
+    expect(stub).not.toHaveBeenCalled()
   })
 
   it('General Only scrubs a mistakenly passed personal packet AND private conversation', async () => {
