@@ -4,6 +4,7 @@ import type { OccurrenceState } from '../supplements/types.js'
 import { ASK_HEALTH_PACKET_VERSION, ASK_PACKET_MAX_CHARS, type AskLens } from './config.js'
 import { MIN_VERIFIED_NUTRITION_TARGET_DAYS } from './nutrition-integrity.js'
 import { digestiveQuestionTopics } from './focused-digestive.js'
+import type { FocusedWeightEnergyEvidence } from './focused-weight-energy.js'
 import { deriveDigestiveSampleScreen } from './digestive-screen.js'
 import { digestivePacketGuard, guardedDigestiveIntelligence, type DigestivePacketGuard } from './digestive-packet-guard.js'
 import type {
@@ -74,6 +75,7 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
   }
   addFocusedTraining(input, push)
   addFocusedDigestive(input, push, digestiveGuard)
+  addFocusedWeightEnergy(input.focusedWeightEnergy ?? null, input.contextMode, push)
   if (wants.supplements || questionMentionsSavedSupplement(input)) {
     addSupplements(input, push)
   }
@@ -335,6 +337,86 @@ function addBody(
       })
     }
   }
+}
+
+/**
+ * PIQ-4.2 begins with a bounded descriptive context, not a Coach decision.
+ * The read-time owner goal version, actual strength trend, target/experiment
+ * safety and calibration outcomes have NOT been attested by this data path.
+ * Always keep evidence quality distinct from a recommendation.
+ */
+function addFocusedWeightEnergy(
+  focus: FocusedWeightEnergyEvidence | null,
+  contextMode: AskHealthPacketInput['contextMode'],
+  push: (item: PushItem) => void,
+): void {
+  if (!focus || contextMode === 'general_only') return
+  const estimate = focus.estimate
+  const period = {start:focus.start,end:focus.end}
+  const quality = estimate.quality
+  const sufficient = estimate.state === 'available' &&
+    estimate.observedMaintenanceKcal != null &&
+    estimate.weightSlopeKgPerWeek != null && estimate.period != null
+  push({
+    id:'weight_energy.quality',
+    domain:'body',
+    label:'Weight and confirmed-intake evidence readiness',
+    value:null,unit:null,period,
+    text: sufficient
+      ? 'The existing maintenance engine found a recent aligned window with enough owner-confirmed complete food days and comparable weight measurements for a descriptive energy-balance estimate. These records cannot prove that all intake was captured or that a flat scale means fat loss stopped.'
+      : 'A weight/intake energy-balance estimate is withheld: '+estimate.explanation+' Missing food or weight observations are UNKNOWN, not zero; a logged calorie average alone is not a verified daily intake or measured energy deficit.',
+    coverage:{
+      verifiedCompleteCalorieDays:focus.qualifiedWholeDayCalories,
+      calendarDays:quality.nutrition.calendarDays,
+      comparableWeightMeasurements:quality.body.usedMeasurements,
+      weightSpanDays:quality.body.spanDays,
+      estimateState:estimate.state,
+      estimateConfidence:estimate.confidence,
+    },
+    detailPath:'/progress/body',userEntered:false,substantive:false,
+    priority:0,
+  })
+  if (sufficient) push({
+    id:'weight_energy.observed_balance',
+    domain:'body',label:'Observed energy-balance estimate (not measured TDEE)',
+    value:estimate.observedMaintenanceKcal,unit:'estimated kcal/day',
+    period,
+    text:'From '+estimate.period!.start+' through '+estimate.period!.end+
+      ', the existing maintenance engine aligned owner-confirmed, source-reliable completed food days with comparable weight measurements. '+
+      'Mean recorded calories across eligible dates: '+estimate.averageIntakeKcal+
+      ' kcal/day; robust weight trend: '+Math.round(estimate.weightSlopeKgPerWeek!*1000)/1000+
+      ' kg/week; approximate energy-balance maintenance estimate: '+estimate.observedMaintenanceKcal+
+      ' kcal/day (uncertain range '+estimate.rangeLowKcal+'–'+estimate.rangeHighKcal+
+      '). This is NOT a measured TDEE, energy requirement, verified calorie deficit, fat-loss result, or safe new calorie target.',
+    coverage:{
+      verifiedCompleteCalorieDays:focus.qualifiedWholeDayCalories,
+      comparableWeightMeasurements:quality.body.usedMeasurements,
+      selectedWindowDays:estimate.period!.days,
+      rangeLowKcal:estimate.rangeLowKcal,
+      rangeHighKcal:estimate.rangeHighKcal,
+      recordedAverageIntakeKcal:estimate.averageIntakeKcal,
+      weightSlopeKgPerWeek:estimate.weightSlopeKgPerWeek,
+    },
+    confidence:estimate.confidence,provenance:'derived_from_owner_confirmed_data',
+    detailPath:'/progress/body',userEntered:false,substantive:true,priority:1,
+  })
+  push({
+    id:'weight_energy.decision_boundary',
+    domain:'intelligence',label:'Plateau, calorie-change and strength-preservation decision boundary',
+    value:null,unit:null,period,
+    text:'This Ask Health screen has NOT verified the active weight-goal direction/version, current calorie target/revision, planned experiments, or comparable strength-performance outcomes. Therefore it CANNOT classify an owner-specific weight-loss plateau, certify that strength is preserved, or recommend any calorie cut. '+
+      'Logged training session dates are activity records, not evidence of stable lifting performance. Recorded hunger/energy/soreness ratings are context, not proof of adequate recovery. '+
+      'Carbohydrate/sodium shifts, fluid balance, bowel changes, weigh-in conditions and supplements may confound short-term scale readings; none is established as this owner’s cause here. '+
+      'A decision requires the separate current-versions Goal Control/maintenance safety review or an owner-approved Personal Lab calibration.',
+    coverage:{
+      recordedTrainingSessionDays:focus.trainingSessionDays,
+      recordedWellnessCheckinDays:focus.wellnessCheckinDays,
+      goalVerification:focus.goalVerification,
+      decisionVerification:focus.decisionVerification,
+      strengthPreservation:focus.strengthPreservation,
+    },
+    detailPath:'/goals',userEntered:false,substantive:false,priority:0,
+  })
 }
 
 function matchedBodyKeys(question: string): string[] {

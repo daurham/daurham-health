@@ -11,6 +11,7 @@ import type { AskLens } from './config.js'
 import type { AskNutritionIntegrity } from './nutrition-integrity.js'
 import type { FocusedTrainingEvidence } from './focused-training.js'
 import type { FocusedDigestiveEvidence } from './focused-digestive.js'
+import type { FocusedWeightEnergyEvidence } from './focused-weight-energy.js'
 import type { AskContextMode } from './config.js'
 
 export type AskEvidenceCoverage = Record<string, number | string | null>
@@ -142,6 +143,7 @@ export type AskHealthPacketInput = {
   patterns: readonly AskPatternInput[]
   focusedTraining?: FocusedTrainingEvidence | null
   focusedDigestive?: FocusedDigestiveEvidence | null
+  focusedWeightEnergy?: FocusedWeightEnergyEvidence | null
   stableProfile?: AskStableProfileInput | null
   profile?: AskClinicalProfileInput | null
   intelligence?: RoutedHealthIntelligence | null
