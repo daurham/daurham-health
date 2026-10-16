@@ -145,7 +145,7 @@ describe('PIQ-0 evidence load boundary and corrected-source cache', () => {
   })
 
   it('T48 KNOWN LIMITATION: a corrected fact omitted by a tight packet cap does not alter its cache fingerprint', () => {
-    const question = 'Which active medication could be relevant?'
+    const question = 'Which of my active medications could be relevant?'
     const original = Array.from({ length: 16 }, (_, index) => ({
       name: index === 15 ? 'Synthetic Example A' : 'Synthetic Other ' + index,
       dose: null, frequency: null, status: 'active' as const,

@@ -68,7 +68,7 @@ describe('I10 passive recovery and clinical context', () => {
       asOf: '2026-10-07',
       period: { start: '2026-09-08', end: '2026-10-07' },
       generatedAt: '2026-10-07T18:00:00.000Z',
-      question: 'Could my known context matter here?',
+      question: 'Could my known conditions, allergies, and medications affect my recovery?',
       overview: null,
       activity: null,
       sleep: null,
