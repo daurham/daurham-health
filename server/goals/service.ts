@@ -378,9 +378,10 @@ async function loadEvidence(
     adherence: null,
   }
   if (row.goal_kind === 'body_metric' && row.body_metric_key) {
-    empty.body = await loadBodyGoalPointAsOf(sql, row.body_metric_key, timezone, asOf)
+    const point=await loadBodyGoalPointAsOf(sql, row.body_metric_key, timezone, asOf)
+    empty.body=point
     if(capture&&row.body_metric_key==='weight')
-      capture.bodyWeightSourceRevision=empty.body?.sourceRevision??null
+      capture.bodyWeightSourceRevision=point?.sourceRevision??null
   }
   if (row.goal_kind === 'strength_e1rm' && row.exercise_definition_id) {
     const exercises = (await sql.query(
