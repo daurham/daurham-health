@@ -103,6 +103,7 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
     rangeStart: period.start,
     rangeEnd: period.end,
     asOf: input.asOf,
+    ...(input.healthToday ? { healthToday: input.healthToday } : {}),
     generatedAt: input.generatedAt,
     evidence,
     limitations: limitations.filter((item) => evidence.some((fact) => fact.id === item.evidenceId)),
@@ -151,6 +152,7 @@ export function packetFingerprintMaterial(packet: AskHealthPacket): string {
     rangeStart: packet.rangeStart,
     rangeEnd: packet.rangeEnd,
     asOf: packet.asOf,
+    healthToday: packet.healthToday ?? null,
     evidence: packet.evidence.map((item) => ({
       id: item.id,
       value: item.value,
