@@ -130,8 +130,12 @@ export function digestDateSelection(
   // conservative unsupported-pattern recognizer also identifies them.
   const periodCount = Number(Boolean(trailing)) + Number(Boolean(week)) + Number(Boolean(month))
   const unexpectedPeriod = unsupportedPeriod && periodCount === 0
-  if (valid.length !== dates.length || ambiguousFormat || requested.length > 1 ||
-      (requested.length > 0 && periodCount > 0) || periodCount > 1) {
+  // A range starting "since/from" or a comparison is not synonymous with
+  // the single date/week/month it happens to mention.
+  const relational = /\b(?:since|between|from|until|through|versus|vs\.?|compared?\s+(?:to|with))\b/i.test(question)
+  const namedMonth = /\b(?:in|during|last|this|next|since|from|through|until)\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b|\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{4}\b/i.test(question)
+  if (valid.length !== dates.length || ambiguousFormat || namedMonth || relational ||
+      requested.length > 1 || (requested.length > 0 && periodCount > 0) || periodCount > 1) {
     return { date: null, window: null, issue: 'invalid_or_ambiguous' }
   }
   if (requested.length === 1) return { date: requested[0]!, window: null, issue: null }
