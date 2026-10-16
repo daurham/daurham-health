@@ -731,7 +731,9 @@ function addFocusedDigestive(input: AskHealthPacketInput, push: (item: PushItem)
         : metric.recordedDays + ' day(s) with explicit bowel observations. Only an explicit no-bowel entry means zero; absent logs mean unknown.'
 
     const requested = focus.requestedDate
-    const requestedDayNote = !requested ? '' : !requested.inSelectedRange
+    const requestedDayNote = focus.dateSelectionIssue
+      ? ' The question names a calendar date or period that cannot safely be resolved to one day. No recent-day observations were substituted. For a specific day, ask with YYYY-MM-DD inside the selected window.'
+      : !requested ? '' : !requested.inSelectedRange
       ? ' Requested ' + requested.date + ' is outside the selected ' + focus.start +
         '–' + focus.end + ' evidence window or after the as-of date; Health did not retrieve that day.'
       : metric.observations.length === 0
