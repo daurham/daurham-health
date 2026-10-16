@@ -15,6 +15,14 @@ export type TemporalCitationScope = { start: string; end: string }
  * the actual Health-local date. A selected historical asOf is NOT "today".
  * Direct/legacy packet callers with no healthToday conservatively skip these.
  */
+export function historicalDateIssue(
+  question: string, asOf: string, healthToday?: string,
+): 'invalid_or_ambiguous' | 'unsupported_period' | null {
+  // Do not resolve relative days against a selected historical asOf.
+  if (/\b(?:today|yesterday)\b/i.test(question) && !healthToday) return null
+  return digestDateSelection(question, healthToday ?? asOf, asOf).issue
+}
+
 export function temporalCitationScope(
   question: string, asOf: string, healthToday?: string,
 ): TemporalCitationScope | null {
@@ -246,17 +254,66 @@ function numericEvidenceSupports(
   })
 }
 
+/** No observational packet, including a valid relationship statistic, proves
+ * a personal cause. Only unmistakably asserted owner causation is blocked;
+ * explicit uncertainty/negation and educational mechanism statements remain.
+ */
+export function definitiveOwnerCause(text: string): boolean {
+  if (!/\b(?:you|your|yours|my|mine|i|myself|owner'?s)\b/i.test(text)) return false
+  if (/\b(?:may|might|could|possibly|potentially|perhaps|hypothes(?:is|ized)|hypothetical|cannot|can't|not|no proof|no evidence|doesn't|didn't|uncertain|unknown|insufficient|plausible|suggests?)\b/i.test(text)) return false
+  return /\b(?:caused|causing|triggered|triggering|led to|resulted in|responsible for|explains? why|because of|due to|cured|fixed|prevented)\b/i.test(text) ||
+    (/\b(?:therefore|which is why)\b/i.test(text) && explicitlyClaimedMetricDomains(text).length > 1)
+}
+
+/** Descriptive owner-specific association is separate from two independently
+ * recorded metrics. An assertion that they moved together requires an actual
+ * relationship calculation, not a pair of date-aligned source values.
+ */
+export function affirmativeOwnerAssociation(text: string): boolean {
+  if (!/\b(?:you|your|yours|my|mine|i|owner'?s)\b/i.test(text)) return false
+  if (/\b(?:not|cannot|can't|didn't|doesn't|unknown|uncertain|no evidence|insufficient|hypothetical|could|might|may|possibly|potentially)\b/i.test(text)) return false
+  return /\b(?:correlat(?:e|es|ed|ion|ions)|associat(?:ed|ion)|linked|tracked (?:with|alongside)|moved together|rose together|fell together|inversely related)\b/i.test(text) ||
+    /\b(?:on days (?:when|with)|whenever)\b/i.test(text) &&
+      explicitlyClaimedMetricDomains(text).length > 1
+}
+
+function relationshipCitationSupports(
+  ids: readonly string[],
+  evidence: ReadonlyMap<string, AskEvidence>,
+  scope: TemporalCitationScope | null,
+): boolean {
+  return ids.some((id) => {
+    const source = evidence.get(id)
+    return Boolean(source && source.id.startsWith('intelligence.relationship.') &&
+      source.domain === 'intelligence' && source.substantive &&
+      (scope == null || citationCoversHistoricalScope(source, scope)))
+  })
+}
+
 export function groundHistoricalAnswer(
   answer: AskHealthAnswer,
   packet: Pick<AskHealthPacket, 'asOf' | 'healthToday' | 'evidence'>,
   question: string,
 ): AskHealthAnswer {
   const scope = temporalCitationScope(question, packet.asOf, packet.healthToday)
-  if (!scope) return answer
+  const dateIssue = historicalDateIssue(question, packet.asOf, packet.healthToday)
   const byId = new Map(packet.evidence.map((item) => [item.id, item]))
+  if (!scope && !dateIssue && !answer.blocks.concat(answer.limitations).some((block) =>
+    definitiveOwnerCause(block.text) || affirmativeOwnerAssociation(block.text))) return answer
   let withheld = 0
   const keep = (block: AskHealthAnswer['blocks'][number]) => {
+    if (definitiveOwnerCause(block.text) ||
+        (affirmativeOwnerAssociation(block.text) &&
+         !relationshipCitationSupports(block.evidenceRefs, byId, scope))) {
+      withheld += 1
+      return false
+    }
     if (!affirmativeOwnerMetricClaim(block.text)) return true
+    if (dateIssue) {
+      withheld += 1
+      return false
+    }
+    if (!scope) return true
     if (unsupportedHistoricalMeasurement(block.text)) {
       withheld += 1
       return false
@@ -286,9 +343,13 @@ export function groundHistoricalAnswer(
   const blocks = answer.blocks.filter(keep)
   const limitations = answer.limitations.filter(keep)
   if (!withheld) return answer
-  const message = 'A personal historical measurement or trend statement was withheld because the cited date, metric domain, or recorded numeric value did not establish the requested ' +
-    scope.start + (scope.end === scope.start ? ' date.' : ' through ' + scope.end + ' window.') +
-    ' Health has not verified that statement for this period; check the saved records or choose a wider evidence range.'
+  const message = dateIssue
+    ? 'A personal historical claim was withheld because the requested date or period is ambiguous or unsupported. Ask for one YYYY-MM-DD or a supported week/month; the selected-range records cannot resolve this comparison automatically.'
+    : scope
+      ? 'A personal historical claim was withheld because its cited date, metric domain, numeric value, or association was not established for the requested ' +
+        scope.start + (scope.end === scope.start ? ' date.' : ' through ' + scope.end + ' window.') +
+        ' An observational association does not prove a cause.'
+      : 'An owner-specific causal or relationship claim was withheld because the supplied evidence cannot establish causation or did not include a qualifying personal relationship calculation.'
   return {
     blocks: blocks.length > 0
       ? blocks
