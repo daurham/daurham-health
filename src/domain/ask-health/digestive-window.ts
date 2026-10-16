@@ -27,6 +27,8 @@ export type DigestiveBowelWindow =
     provisionalDays: number
     /** Dates with an explicit bowel observation, not a daily diary guarantee. */
     observedDates: string[]
+    /** Reconciled, read-only per-day typed counts. Never ship these as raw owner records. */
+    typedDays: BowelDateCountRow[]
   }
   | {
     status: 'unavailable'
@@ -132,5 +134,6 @@ export function summarizeBowelWindow(
     unobservedDays: scope.calendarDays - observedDates.length,
     provisionalDays: observedDates.includes(today) ? 1 : 0,
     observedDates,
+    typedDays: [...aggregates.values()].sort((a,b) => a.date.localeCompare(b.date)).map(row => ({ ...row })),
   }
 }

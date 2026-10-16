@@ -990,6 +990,76 @@ function addFocusedDigestive(input: AskHealthPacketInput, push: (item: PushItem)
     }
   }
 
+  // PIQ-4.1: coverage only, not a personal correlation. Typed bowel events
+  // align to same-day, 1-day or 2-day *earlier* exposure observations. The
+  // prompts and AI are forbidden from turning paired counts into causality.
+  const pairing = focus.digestivePairing
+  if (pairing && input.contextMode !== 'general_only' &&
+      (input.contextMode === 'deep' || topics.bowel && (topics.fiber || topics.hydration))) {
+    const showFiber = input.contextMode === 'deep' || topics.fiber
+    const showWater = input.contextMode === 'deep' || topics.hydration
+    const rows = [
+      ...(showFiber ? [{ key: 'fiber', label: 'verified whole-day fiber',
+        entries: pairing.fiber, status: pairing.fiberVerification }] : []),
+      ...(showWater ? [{ key: 'water', label: 'logged water events',
+        entries: pairing.loggedWater, status: 'logged-only' }] : []),
+    ]
+    for (const row of rows) {
+      const line = row.entries.map(lag => lag.lagDays + '-day lag: ' +
+        lag.pairedDays + ' aligned date pair(s) in ' + lag.pairedCalendarWeeks +
+        ' calendar week(s)').join('; ')
+      const candidates = row.entries.filter(lag => lag.maturity === 'candidate_for_review')
+      push({
+        id: 'digestive.pairing.coverage.' + row.key,
+        domain: row.key === 'fiber' ? 'nutrition' : 'hydration',
+        label: row.label + ' and typed Bristol matching-date coverage',
+        value: null,
+        unit: null,
+        period: { start: pairing.scope.start, end: pairing.scope.end },
+        text: 'Pre-registered comparisons: ' + line + '. Starting from ' +
+          pairing.recordedBowelDays + ' recorded movement day(s), ' +
+          pairing.fullyTypedBowelDays + ' past day(s) have complete saved Bristol types; ' +
+          pairing.partiallyTypedBowelDays + ' past day(s) have incomplete types and ' +
+          pairing.provisionalBowelDaysExcluded + ' current-day bowel entries are provisional and excluded.' +
+          ' Exposure date precedes or matches each bowel-observation date (0, 1 or 2 days).' +
+          (row.key === 'water'
+            ? ' Water event logs are NOT total daily fluid intake, so these pairs cannot qualify for a personal hydration/stool correlation.'
+            : row.status === 'unavailable'
+              ? ' Fiber whole-day verification is unavailable: no personal fiber relationship may be claimed.'
+              : candidates.length
+                ? ' Pair counts reached the minimum screening thresholds for a later controlled evidence review, NOT for a claim of association.'
+                : ' Too few reliable, time-separated date pairs for even a candidate relationship review.') +
+          ' The same logged day can appear in more than one lag; those lags are NOT independent replications.' +
+          ' Neither matching dates nor any displayed pair count is a correlation, cause, diagnosis or rationale to change calorie intake.' +
+          ' Missing records are unknown, not zero.',
+        coverage: {
+          qualifiedBowelDays: pairing.fullyTypedBowelDays,
+          provisionalBowelDaysExcluded: pairing.provisionalBowelDaysExcluded,
+          minimumPairsForReview: 12,
+          minimumWeeksForReview: 4,
+          sameDayPairs: row.entries[0]?.pairedDays ?? 0,
+          nextDayPairs: row.entries[1]?.pairedDays ?? 0,
+          twoDayPairs: row.entries[2]?.pairedDays ?? 0,
+          ...(focus.requestedWindow ? {
+            requestedWindowStart: pairing.scope.start,
+            requestedWindowEnd: pairing.scope.end,
+            requestedWindowScope: 'in_range',
+          } : {}),
+          ...(focus.requestedDate ? {
+            requestedDate: focus.requestedDate.date,
+            requestedDateScope: 'in_range',
+            selectedDays: pairing.fullyTypedBowelDays,
+          } : {}),
+        },
+        detailPath: row.key === 'fiber' ? '/nutrition' : '/today',
+        userEntered: false,
+        substantive: false,
+        provenance: 'quality_screen_only_no_association',
+        priority: 1,
+      })
+    }
+  }
+
 }
 
 function addTraining(input: AskHealthPacketInput, push: (item: PushItem) => void, detail: boolean) {

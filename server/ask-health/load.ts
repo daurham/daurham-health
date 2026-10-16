@@ -23,6 +23,7 @@ import { getHealthProfile } from '../profile/service.js'
 import { focusTrainingWorkingSets } from '../../src/domain/ask-health/focused-training.js'
 import { attachBristolTypes, digestiveQuestionTopics, focusDigestiveContext } from '../../src/domain/ask-health/focused-digestive.js'
 import { selectDigestiveBowelWindow, summarizeBowelWindow, type DigestiveBowelWindow } from '../../src/domain/ask-health/digestive-window.js'
+import { screenDigestiveLagReadiness } from '../../src/domain/ask-health/digestive-pairing.js'
 import type { AskContextMode } from '../../src/domain/ask-health/config.js'
 
 export async function loadAskHealthPacketInput(input: {
@@ -131,7 +132,9 @@ export async function loadAskHealthPacketInput(input: {
         }
       }
     }
-    focusedDigestive = { ...focusedDigestive, bowelWindow }
+    focusedDigestive = { ...focusedDigestive, bowelWindow,
+      digestivePairing: screenDigestiveLagReadiness(intelligenceSnapshot, bowelWindow, today),
+    }
   }
   return {
     lens: input.lens,

@@ -1,6 +1,7 @@
 import type { HealthIntelligenceSnapshot, IntelligenceObservation } from '../intelligence/shared.js'
 import { addCalendarDays, weekStartMonday } from '../training-plan.js'
 import type { DigestiveBowelWindow } from './digestive-window.js'
+import type { DigestivePairingReadiness } from './digestive-pairing.js'
 
 /** PIQ-3.3: question-relevant observations from the *already-loaded*,
  * quality-gated owner intelligence snapshot. Never re-query private records.
@@ -49,6 +50,7 @@ export type FocusedDigestiveEvidence = {
   bowel: FocusedDigestiveMetric
   /** Full-window totals are separate from the existing three sampled example days. */
   bowelWindow?: DigestiveBowelWindow | null
+  digestivePairing?: DigestivePairingReadiness | null
 }
 
 /** Share terminology between retrieval and the evidence filter. A question
