@@ -14,6 +14,7 @@ import {
   type AskTurn,
 } from '../../src/domain/ask-health/index.js'
 import { validateAskHealthAnswer } from '../../src/domain/ask-health/validate.js'
+import { groundHistoricalAnswer } from '../../src/domain/ask-health/temporal-citations.js'
 import { describeAskHealthResponsePath, type AskHealthResponseDiagnostic } from '../../src/domain/ask-health/diagnostics.js'
 import type { AskEvidence } from '../../src/domain/ask-health/types.js'
 import { NutritionInterpretError } from '../../src/domain/nutrition/interpret.js'
@@ -247,9 +248,12 @@ export async function explainAskHealth(input: {
       decision.reason === 'budget' ? 'ASK_HEALTH_BUDGET_EXCEEDED' : 'ASK_HEALTH_RATE_LIMIT')
   }
   if (decision.cached) {
+    // Defensive against older cache entries or future scope-rule changes.
+    const cachedAnswer = general ? decision.cached.answer :
+      groundHistoricalAnswer(decision.cached.answer, work.packet, work.question)
     return {
-      answer: decision.cached.answer,
-      evidence: citedEvidence(work.packet, decision.cached.answer),
+      answer: cachedAnswer,
+      evidence: citedEvidence(work.packet, cachedAnswer),
       meta: metaFor(work, { provider: 'gemini', model: work.model, cached: true, general, contextMode }),
     }
   }
@@ -302,9 +306,11 @@ export async function explainAskHealth(input: {
     console.error(`ask-health failure stage=validation reason=${validated.error} model=${generated.model}`)
     throw new HttpError(502, FAILURE, undefined, 'ASK_HEALTH_INVALID_RESPONSE')
   }
-  work.gate.store(key, { answer: validated.answer, evidence: citedEvidence(work.packet, validated.answer) })
+  const finalAnswer = general ? validated.answer :
+    groundHistoricalAnswer(validated.answer, work.packet, work.question)
+  work.gate.store(key, { answer: finalAnswer, evidence: citedEvidence(work.packet, finalAnswer) })
   return responseFor(work, {
-    answer: validated.answer,
+    answer: finalAnswer,
     provider: 'gemini',
     model: generated.model,
     cached: false,
