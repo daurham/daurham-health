@@ -166,9 +166,17 @@ describe('PIQ-3.3 bounded digestive calendar windows and honest missingness', ()
     expect(facts.some(x => x.id.startsWith('digestive.focus.hydration.'))).toBe(false)
   })
 
-  it('has no invented zero aggregate for a window with no observed events', () => {
-    const { focus, facts } = context('How much water last week?', 'personalized', '2026-10-12')
-    expect(focus?.hydration.windowSummary).toBeUndefined()
+  it('has a null, not zero, aggregate for an in-scope window with no observed events', () => {
+    const { focus, facts } = context('How much water last week?', 'personalized', '2026-09-01', '2026-09-20')
+    expect(focus?.requestedWindow).toMatchObject({
+      start: '2026-09-07', end: '2026-09-13', inSelectedRange: true,
+    })
+    expect(focus?.hydration.windowSummary).toMatchObject({
+      calendarDays: 7, daysWithObservations: 0,
+      summedRecordedValue: null, meanPerObservedDay: null,
+    })
+    expect(facts.find(x => x.id === 'digestive.focus.coverage.hydration')?.text)
+      .toContain('no event sum can be calculated')
     expect(facts.some(x => x.id.startsWith('digestive.focus.hydration.'))).toBe(false)
   })
 
@@ -189,6 +197,10 @@ describe('PIQ-3.3 bounded digestive calendar windows and honest missingness', ()
       'How much water last 2 weeks?', 'How much water last week and this month?',
       'How much water on 2026-10-06 last week?',
       'How much water 10/06/2026 last week?',
+      'How much water since last month?',
+      'How much water since 2026-10-06?',
+      'How much water in July?',
+      'How much water September 2026?',
     ]) {
       expect(digestDateSelection(question, today).issue).not.toBeNull()
       const { facts } = context(question)
