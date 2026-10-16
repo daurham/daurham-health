@@ -783,3 +783,8 @@ An evidence explanation needs two reading depths: a concise observational statem
 ## Decision: observational source coverage must reconcile with the loaded evidence (PIQ-1.6, 2026-10-15)
 
 A reproducible numeric Spearman relationship does not authorize reporting inconsistent observed-day, eligible-day or source provenance claims. The two cited signals must have exactly one coverage record each; cross-check count and provenance metadata, label, grade and percentage against the same loaded day frame and withhold numeric interpretation when they disagree. Keep links and historical context. Never treat external excluded-observation counts as if the frame could verify excluded raw records, nor confuse these checks with source-event atomicity, significance or causality. No new migration.
+
+
+## Decision: sex-specific physiology must be explicit owner context (PIQ-2.1, 2026-10-15)
+
+Use nullable `health_profile.sex_for_physiology` (`male`, `female`, `other`) as a narrowly scoped optional input for relevant physiological reference ranges—not as gender identity, an inference from text, or a universal formula selection. Default NULL in every new deployment; never seed this owner's profile or fork from code. Settings supports correction and clearing; legacy clients that omit the field must retain its saved value. Share the verified owner-entered fact with current-date Ask Health evidence only, with provenance and a Settings link. When unset or no binary formula maps appropriately, use an individualized clinical evaluation/ask rather than inventing values. Do not alter formulas implicitly. Owner approval and migration 0055 are required for production.

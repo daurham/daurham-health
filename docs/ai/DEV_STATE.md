@@ -480,3 +480,8 @@ Goal Overview now rechecks each displayed observational relationship against the
 ## 2026-10-15 PIQ-1.6 cited source coverage consistency — work branch
 
 Goal Overview now verifies raw per-source observed/eligible counts, provenance and count grade against the current loaded snapshot before exposing selected observational relation precision. Missing, duplicated and mismatched coverage reports retire present-tense rho, grade and source evidence; historical links remain. Synthetic nutrition and sleep tests added. No provider, schema, owner data, production or main mutations. CI and owner device QA remain open.
+
+
+## 2026-10-15 PIQ-2.1 physiological reference-sex field — work branch
+
+New nullable owner-selected `sex_for_physiology` profile field with portable backup, Settings editor, and owner-entered current-day Ask Health context. No default male on new installs; unset and individually reviewed values never choose a binary formula automatically. Server omitted input preserves current value, explicit null clears it. Requires unapplied migration 0055 after 0053/0054, CI, and owner QA/approval. No main deployment or real owner profile modifications.

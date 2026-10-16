@@ -23,6 +23,7 @@ function splitHeight(heightCm: number | null): { feet: string; inches: string } 
 
 function profileSummary(profile: HealthProfile, today: string): string {
   const parts: string[] = []
+  if (profile.sexForPhysiology != null) parts.push('Physiology: ' + (profile.sexForPhysiology === 'other' ? 'individual review' : profile.sexForPhysiology))
   if (profile.dateOfBirth) {
     try {
       parts.push(`Age ${ageYearsOnDate(profile.dateOfBirth, today)}`)
@@ -58,6 +59,7 @@ export function HealthProfileSection() {
   const [profile, setProfile] = useState<HealthProfile | null>(null)
   const [editing, setEditing] = useState(false)
   const [dateOfBirth, setDateOfBirth] = useState('')
+  const [sexForPhysiology, setSexForPhysiology] = useState<HealthProfile['sexForPhysiology']>(null)
   const [feet, setFeet] = useState('')
   const [inches, setInches] = useState('')
   const [persistentHealthContext, setPersistentHealthContext] = useState('')
@@ -73,6 +75,7 @@ export function HealthProfileSection() {
   function loadDraft(next: HealthProfile) {
     const height = splitHeight(next.heightCm)
     setDateOfBirth(next.dateOfBirth ?? '')
+    setSexForPhysiology(next.sexForPhysiology)
     setFeet(height.feet)
     setInches(height.inches)
     setPersistentHealthContext(next.persistentHealthContext ?? '')
@@ -119,6 +122,7 @@ export function HealthProfileSection() {
           : (feetValue ?? 0) * 12 + (inchesValue ?? 0)
       const next = await saveHealthProfile({
         dateOfBirth: dateOfBirth || null,
+        sexForPhysiology,
         heightCm: totalInches == null ? null : Math.round(inchesToCentimeters(totalInches) * 10) / 10,
         persistentHealthContext,
         trainingLimitations,
@@ -176,6 +180,27 @@ export function HealthProfileSection() {
 
       {editing ? (
         <div className="space-y-5 border-t border-zinc-100 pt-4">
+          <div className="space-y-2">
+            <label htmlFor="profile-physiology-sex" className="block text-sm font-medium text-zinc-700">
+              Sex used for physiological reference ranges
+            </label>
+            <select
+              id="profile-physiology-sex"
+              value={sexForPhysiology ?? ''}
+              onChange={(event) => setSexForPhysiology(event.target.value === '' ? null : event.target.value as HealthProfile['sexForPhysiology'])}
+              className="min-h-11 w-full rounded-md border border-zinc-300 px-3 text-base sm:max-w-sm"
+            >
+              <option value="">Not set — ask when relevant</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+              <option value="other">Other / reference range needs individual review</option>
+            </select>
+            <p className="text-xs leading-5 text-zinc-500">
+              Optional, owner-entered context for sex-specific clinical reference ranges and equations.
+              This does not describe gender identity or automatically select a medical calculation.
+              When unset or not represented by a formula, Health must not guess.
+            </p>
+          </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="text-sm font-medium text-zinc-700">
               Date of birth

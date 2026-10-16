@@ -118,7 +118,7 @@ describe('shared motion', () => {
     expect(readFileSync('src/features/progress/ProgressCharts.tsx', 'utf8')).toContain('var(--chart-ink)')
     expect(readFileSync('src/features/progress/ActivitySleepCharts.tsx', 'utf8')).toContain('var(--chart-ink)')
     expect(pkg).not.toMatch(/framer-motion|gsap|"motion"/)
-    expect(readFileSync('server/backup/inventory.ts', 'utf8')).toContain("LATEST_SCHEMA_MIGRATION = '0054_coach_plateau_active_unique.sql'")
+    expect(readFileSync('server/backup/inventory.ts', 'utf8')).toContain("LATEST_SCHEMA_MIGRATION = '0055_profile_physio_sex.sql'")
     expect(readFileSync('index.html', 'utf8')).toContain("setAttribute('data-health-palette', palette)")
     expect(readFileSync('src/demo/dataset.ts', 'utf8')).not.toContain('healthFetch')
     expect(readFileSync('src/index.css', 'utf8')).not.toContain('requestAnimationFrame')

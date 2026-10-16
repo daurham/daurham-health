@@ -4,6 +4,7 @@ import { currentHealthDate } from '../health-time.js'
 import { HttpError } from '../http.js'
 
 type ProfileRow = {
+  sex_for_physiology: 'male' | 'female' | 'other' | null
   date_of_birth: string | Date | null
   height_cm: string | number | null
   persistent_health_context: string | null
@@ -30,6 +31,7 @@ function isoInstant(value: string | Date | null): string | null {
 
 function emptyProfile() {
   return healthProfileSchema.parse({
+    sexForPhysiology: null,
     dateOfBirth: null,
     heightCm: null,
     persistentHealthContext: null,
@@ -46,7 +48,8 @@ function emptyProfile() {
 export async function getHealthProfile() {
   const sql = await getSql()
   const rows = (await sql.query(
-    `SELECT date_of_birth::text AS date_of_birth,
+    `SELECT sex_for_physiology,
+            date_of_birth::text AS date_of_birth,
             height_cm::text AS height_cm,
             persistent_health_context,
             training_limitations,
@@ -63,6 +66,7 @@ export async function getHealthProfile() {
   const row = rows[0]
   if (!row) return emptyProfile()
   return healthProfileSchema.parse({
+    sexForPhysiology: row.sex_for_physiology,
     dateOfBirth: isoDate(row.date_of_birth),
     heightCm: row.height_cm == null ? null : Number(row.height_cm),
     persistentHealthContext: row.persistent_health_context,
@@ -99,6 +103,7 @@ export async function putHealthProfile(body: unknown) {
   }
 
   const current = await getHealthProfile()
+  const sexForPhysiology = input.sexForPhysiology === undefined ? current.sexForPhysiology : input.sexForPhysiology
   const clinicalConditions = input.clinicalConditions ?? current.clinicalConditions
   const clinicalAllergies = input.clinicalAllergies ?? current.clinicalAllergies
   const clinicalMedications = input.clinicalMedications ?? current.clinicalMedications
@@ -106,6 +111,7 @@ export async function putHealthProfile(body: unknown) {
   await sql.query(
     `INSERT INTO health_profile (
        singleton_id,
+       sex_for_physiology,
        date_of_birth,
        height_cm,
        persistent_health_context,
@@ -118,9 +124,10 @@ export async function putHealthProfile(body: unknown) {
        created_at,
        updated_at
      ) VALUES (
-       1, $1::date, $2::numeric, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9::jsonb, now(), now()
+       1, $1::text, $2::date, $3::numeric, $4, $5, $6, $7, $8::jsonb, $9::jsonb, $10::jsonb, now(), now()
      )
      ON CONFLICT (singleton_id) DO UPDATE SET
+       sex_for_physiology = EXCLUDED.sex_for_physiology,
        date_of_birth = EXCLUDED.date_of_birth,
        height_cm = EXCLUDED.height_cm,
        persistent_health_context = EXCLUDED.persistent_health_context,
@@ -132,6 +139,7 @@ export async function putHealthProfile(body: unknown) {
        clinical_medications = EXCLUDED.clinical_medications,
        updated_at = now()`,
     [
+      sexForPhysiology,
       input.dateOfBirth,
       input.heightCm,
       input.persistentHealthContext,

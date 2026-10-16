@@ -8,6 +8,7 @@ export function askClinicalProfileForDate(
 ): AskClinicalProfileInput | null {
   if (asOf !== today) return null
   return {
+    sexForPhysiology: profile.sexForPhysiology,
     persistentHealthContext: profile.persistentHealthContext,
     trainingLimitations: profile.trainingLimitations,
     dietaryContext: profile.dietaryContext,

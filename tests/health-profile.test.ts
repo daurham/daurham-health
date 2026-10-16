@@ -3,6 +3,7 @@ import {
   ageYearsOnDate,
   centimetersToInches,
   healthProfileInputSchema,
+  healthProfileSchema,
   inchesToCentimeters,
 } from '../src/domain/health-profile.ts'
 
@@ -20,6 +21,21 @@ describe('Health Profile domain', () => {
     const cm = inchesToCentimeters(70)
     expect(cm).toBeCloseTo(177.8, 5)
     expect(centimetersToInches(cm)).toBeCloseTo(70, 5)
+  })
+
+  it('preserves optional physiological reference sex, explicit clears and portable defaults', () => {
+    expect(healthProfileInputSchema.parse({}).sexForPhysiology).toBeUndefined()
+    expect(healthProfileInputSchema.parse({ sexForPhysiology: null }).sexForPhysiology).toBeNull()
+    expect(healthProfileInputSchema.parse({ sexForPhysiology: 'male' }).sexForPhysiology).toBe('male')
+    expect(healthProfileInputSchema.parse({ sexForPhysiology: 'female' }).sexForPhysiology).toBe('female')
+    expect(healthProfileInputSchema.parse({ sexForPhysiology: 'other' }).sexForPhysiology).toBe('other')
+    expect(healthProfileInputSchema.safeParse({ sexForPhysiology: 'unknown' }).success).toBe(false)
+    expect(healthProfileInputSchema.safeParse({ sexForPhysiology: 'MALE' }).success).toBe(false)
+    const legacy = healthProfileSchema.parse({ dateOfBirth: null, heightCm: null,
+      persistentHealthContext: null, trainingLimitations: null, dietaryContext: null,
+      bodyMeasurementProtocol: null, clinicalConditions: [], clinicalAllergies: [],
+      clinicalMedications: [], updatedAt: null })
+    expect(legacy.sexForPhysiology).toBeNull()
   })
 
   it('distinguishes omitted clinical arrays from an explicit clear', () => {

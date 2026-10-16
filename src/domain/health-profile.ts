@@ -36,7 +36,11 @@ const clinicalConditionsSchema = z.array(clinicalConditionSchema).max(50)
 const clinicalAllergiesSchema = z.array(clinicalAllergySchema).max(50)
 const clinicalMedicationsSchema = z.array(clinicalMedicationSchema).max(100)
 
+export const sexForPhysiologySchema = z.enum(['male', 'female', 'other'])
+export type SexForPhysiology = z.infer<typeof sexForPhysiologySchema>
+
 export const healthProfileSchema = z.object({
+  sexForPhysiology: sexForPhysiologySchema.nullable().default(null),
   dateOfBirth: isoDateSchema.nullable(),
   heightCm: z.number().min(50).max(250).nullable(),
   persistentHealthContext: z.string().nullable(),
@@ -51,6 +55,8 @@ export const healthProfileSchema = z.object({
 export type HealthProfile = z.infer<typeof healthProfileSchema>
 
 export const healthProfileInputSchema = z.object({
+  // Omitted means retain the stored setting; explicit null means unset.
+  sexForPhysiology: sexForPhysiologySchema.nullable().optional(),
   dateOfBirth: z.union([isoDateSchema, z.null()]).optional().default(null),
   heightCm: z.union([z.number().min(50).max(250), z.null()]).optional().default(null),
   persistentHealthContext: boundedOptionalText(2000),

@@ -98,7 +98,7 @@ function serializedConfirmation(row: Record<string, unknown>): BackupRow {
   })) as BackupRow
 }
 
-describe.skipIf(!url)('PIQ-1.1 full 0001–0054 migration-chain and backup on isolated PostgreSQL', () => {
+describe.skipIf(!url)('PIQ-1.1 full 0001–0055 migration-chain and backup on isolated PostgreSQL', () => {
   beforeAll(async () => {
     if (!url) return
     await client.connect()
@@ -107,7 +107,7 @@ describe.skipIf(!url)('PIQ-1.1 full 0001–0054 migration-chain and backup on is
     await client.query('CREATE TABLE schema_migrations (filename text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())')
     const migrations = await inspectMigrations()
     expect(migrations.at(-1)?.filename).toBe(LATEST_SCHEMA_MIGRATION)
-    expect(migrations).toHaveLength(54)
+    expect(migrations).toHaveLength(55)
     for (const migration of migrations) {
       await client.query('BEGIN')
       try {
@@ -135,12 +135,35 @@ describe.skipIf(!url)('PIQ-1.1 full 0001–0054 migration-chain and backup on is
 
   it('applied each migration exactly once without creating historical owner confirmations', async () => {
     const history = await client.query('SELECT filename FROM schema_migrations ORDER BY filename')
-    expect(history.rowCount).toBe(54)
+    expect(history.rowCount).toBe(55)
     expect(history.rows.at(-1)?.filename).toBe(LATEST_SCHEMA_MIGRATION)
     const count = await client.query('SELECT count(*)::int AS count FROM nutrition_day_completeness')
     expect(count.rows[0].count).toBe(0)
     const unreviewed = await getNutritionDayCompleteness(date, adapter, today)
     expect(unreviewed.assessment).toMatchObject({ state: 'unknown', eligibleForMaintenance: false })
+  })
+
+  it('PIQ-2.1: physiological sex is unset by default, owner-editable, and validated in PostgreSQL', async () => {
+    await client.query('BEGIN')
+    try {
+      await client.query('INSERT INTO health_profile (singleton_id) VALUES (1)')
+      const initial = await client.query('SELECT sex_for_physiology FROM health_profile WHERE singleton_id = 1')
+      expect(initial.rows[0]?.sex_for_physiology).toBeNull()
+      for (const value of ['male', 'female', 'other', null]) {
+        await client.query('UPDATE health_profile SET sex_for_physiology = $1 WHERE singleton_id = 1', [value])
+        const current = await client.query('SELECT sex_for_physiology FROM health_profile WHERE singleton_id = 1')
+        expect(current.rows[0]?.sex_for_physiology).toBe(value)
+      }
+      await client.query('SAVEPOINT invalid_physio_sex')
+      await expect(client.query(
+        "UPDATE health_profile SET sex_for_physiology = 'MALE' WHERE singleton_id = 1",
+      )).rejects.toMatchObject({ code: '23514' })
+      await client.query('ROLLBACK TO SAVEPOINT invalid_physio_sex')
+      const rows = await client.query('SELECT sex_for_physiology FROM health_profile WHERE singleton_id = 1')
+      expect(rows.rows[0]?.sex_for_physiology).toBeNull()
+    } finally {
+      await client.query('ROLLBACK')
+    }
   })
 
   it('restores the owner confirmation row after a full-format archive validates', async () => {

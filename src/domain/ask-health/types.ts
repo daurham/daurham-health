@@ -82,6 +82,8 @@ export type AskPatternInput = {
 }
 
 export type AskClinicalProfileInput = {
+  /** Explicit owner-entered sex applicable to reference ranges; not gender identity. */
+  sexForPhysiology?: 'male' | 'female' | 'other' | null
   persistentHealthContext: string | null
   trainingLimitations: string | null
   dietaryContext: string | null

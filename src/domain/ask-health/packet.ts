@@ -894,6 +894,25 @@ function addContext(context: AskContextInput | null, push: (item: PushItem) => v
 
 function addClinicalProfile(profile: AskClinicalProfileInput | null, push: (item: PushItem) => void) {
   if (!profile) return
+  // Explicit owner context only. Never invent a binary range when unset or
+  // the individual's physiology is not represented by the given formula.
+  if (profile.sexForPhysiology != null) {
+    push({
+      id: 'clinical.sex_for_physiology',
+      domain: 'clinical_context',
+      label: 'Sex for physiological reference ranges',
+      value: profile.sexForPhysiology,
+      unit: null,
+      text: profile.sexForPhysiology === 'other'
+        ? 'Owner selected individual review for sex-dependent clinical ranges. Do not infer a binary category.'
+        : 'Owner-entered physiological reference sex: ' + profile.sexForPhysiology + '. This does not state gender identity.',
+      coverage: { source: 'owner_entered' },
+      detailPath: '/settings#health-profile',
+      userEntered: true,
+      substantive: true,
+      priority: 1,
+    })
+  }
   const addText = (id: string, label: string, text: string | null, priority: number) => {
     if (!text?.trim()) return
     push({
