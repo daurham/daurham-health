@@ -8,6 +8,7 @@ import { UNCHECKED_WEIGHT_GOAL_OBSERVATION, type WeightGoalObservation } from '.
 import { UNCHECKED_PRIMARY_WEIGHT_GOAL_PRIORITY, type PrimaryWeightGoalPriority } from './primary-weight-goal-intent.js'
 import { UNCHECKED_EXPERIMENT_TIMING, type ExperimentTimingReview } from './experiment-timing-review.js'
 import { UNCHECKED_EXPERIMENT_OUTCOME, type ExperimentOutcomeReview } from './experiment-outcome-review.js'
+import { UNCHECKED_RECENT_RESULT, type RecentExperimentResultReview } from './recent-experiment-result-review.js'
 
 /**
  * PIQ-4.2 FIRST SLICE — purely descriptive, explicitly bounded weight/intake
@@ -50,6 +51,8 @@ export type FocusedWeightEnergyEvidence = {
   experimentTimingReview: ExperimentTimingReview
   /** Typed protocol outcome relevance, never an effect estimate. */
   experimentOutcomeReview: ExperimentOutcomeReview
+  /** Recent finalized result integrity, not experiment efficacy. */
+  recentExperimentResultReview: RecentExperimentResultReview
   /** Distinguishes "not checked" from a positive safety finding. */
   goalVerification: 'not_checked'
   decisionVerification: 'not_checked'
@@ -138,6 +141,7 @@ export function focusWeightEnergyContext(input: {
     primaryGoalPriority: {...UNCHECKED_PRIMARY_WEIGHT_GOAL_PRIORITY},
     experimentTimingReview: {...UNCHECKED_EXPERIMENT_TIMING},
     experimentOutcomeReview: {...UNCHECKED_EXPERIMENT_OUTCOME},
+    recentExperimentResultReview: {...UNCHECKED_RECENT_RESULT},
     goalVerification: 'not_checked',
     decisionVerification: 'not_checked',
     strengthPreservation: 'not_verified',

@@ -42,6 +42,8 @@ import { readCurrentExperimentWindows } from './current-experiment-windows.js'
 import { screenExperimentTimingReview } from '../../src/domain/ask-health/experiment-timing-review.js'
 import {readCurrentExperimentOutcomes} from './current-experiment-outcomes.js'
 import {screenExperimentOutcomeReview} from '../../src/domain/ask-health/experiment-outcome-review.js'
+import {readRecentExperimentResults} from './recent-experiment-results.js'
+import {screenRecentExperimentResults} from '../../src/domain/ask-health/recent-experiment-result-review.js'
 import { loadTrainingProgressionState } from '../intelligence/training-progression.js'
 
 export async function loadAskHealthPacketInput(input: {
@@ -98,8 +100,12 @@ export async function loadAskHealthPacketInput(input: {
           readCurrentExperimentWindows(input.asOf),
         ])
       : [null, null, null, null]
-  const currentExperimentOutcomes = currentExperimentWindows?.status === 'available'
-    ? await readCurrentExperimentOutcomes(currentExperimentWindows) : null
+  const [currentExperimentOutcomes,recentExperimentRead] = await Promise.all([
+    currentExperimentWindows?.status === 'available'
+      ? readCurrentExperimentOutcomes(currentExperimentWindows) : Promise.resolve(null),
+    capturedDecision?.status === 'available'
+      ? readRecentExperimentResults(input.asOf) : Promise.resolve(null),
+  ])
   const activity = buildActivityProgressView(
     activityRows.filter((row) => row.date <= input.asOf),
     { range: input.range, asOf: input.asOf, today, timezone },
@@ -233,6 +239,10 @@ export async function loadAskHealthPacketInput(input: {
       settings:focusedWeightEnergy.currentSettings,
       timing:focusedWeightEnergy.experimentTimingReview,
       windows:currentExperimentWindows,outcomes:currentExperimentOutcomes,
+    })
+    focusedWeightEnergy.recentExperimentResultReview = screenRecentExperimentResults({
+      asOf:input.asOf,today,
+      settings:focusedWeightEnergy.currentSettings,read:recentExperimentRead,
     })
   }
   return {
