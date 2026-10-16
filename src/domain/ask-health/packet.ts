@@ -801,7 +801,7 @@ function addFocusedWeightEnergy(
     value:null,unit:null,period,
     text:canonicalText+
       'Deadline attention is descriptive; a past or due deadline with missing observation is NOT proof the goal is unmet. '+
-      'A matching latest-point fingerprint is only an optimistic read-time check, NOT a transaction lock or verification of the complete historical projection series. No plateau, efficacy, clinical urgency or calorie intervention follows.',
+      'A matching latest-point fingerprint is only an optimistic read-time check, NOT a transaction lock; the historical projection series is not atomically versioned with this decision. No plateau, efficacy, clinical urgency or calorie intervention follows.',
     coverage:{
       canonicalGoalReview:canonical.state,
       reportedTargetState:canonical.targetReport,
