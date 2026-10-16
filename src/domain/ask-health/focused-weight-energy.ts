@@ -47,7 +47,7 @@ const WEIGHT_ENERGY_QUESTION =
 // A dated question needs *that* interval's observation, never an unrelated
 // trailing-28d energy estimate. PIQ-4.2 historical scope is deferred.
 const EXPLICIT_HISTORY =
-  /\b\d{4}-\d{2}-\d{2}\b|\b(?:yesterday|last week|last month|last year|previous week|previous month|past \d+ days?|last \d+ days?)\b/i
+  /\b\d{4}-\d{2}-\d{2}\b|\b(?:yesterday|this week|this month|last week|last month|last year|previous week|previous month|past \d+ days?|last \d+ days?)\b/i
 
 export function focusWeightEnergyContext(input: {
   question: string

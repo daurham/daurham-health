@@ -128,7 +128,9 @@ describe('PIQ-4.2 recorded protein and training context is NOT strength preserva
  })
  it('never leaks current protein context into historical questions or General Only',()=>{
   for(const q of ['How much protein and weight yesterday?',
-   'Why did my scale stall last week?']){
+   'Why did my scale stall last week?',
+   'Why did my weight loss stall this week?',
+   'Why did my weight loss stall this month?']){
    const x=inspect({},q)
    expect(x.focus).toBeNull()
    expect(x.packet.evidence.some(e=>e.id==='weight_energy.protein_training_context'))
