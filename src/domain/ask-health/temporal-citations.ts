@@ -1,5 +1,6 @@
 import { digestDateSelection } from './focused-digestive.js'
-import { registeredRelationshipSpec, type IntelligenceSignalKey } from '../intelligence/shared.js'
+import { registeredRelationshipSpec, relationshipScreeningMetadataMatchesDefinition, type IntelligenceSignalKey } from '../intelligence/shared.js'
+import { associationStrength } from '../intelligence/spearman.js'
 import type { AskEvidence, AskHealthAnswer, AskHealthPacket } from './types.js'
 
 /** Conservative structural safeguard, not a semantic fact checker.
@@ -308,19 +309,38 @@ export function claimedRelationshipSignals(text: string): IntelligenceSignalKey[
   }).sort((a, b) => a.offset - b.offset).map(({ key }) => key)
 }
 
-function claimRelationshipLag(text: string): number | null {
+/** Correlations are daily-pair statistics, not timestamps for an event.
+ * If the model says something temporally precise which the registered
+ * daily pair cannot establish, refuse rather than guessing a 0/1 day lag.
+ */
+function claimRelationshipLag(text: string): number | 'unsupported' | null {
   const sameDay = /\b(?:same[ -]day|on (?:the )?same (?:tracked )?day|on days (?:when|with)|whenever)\b/i.test(text)
   const nextDay = /\b(?:next[ -](?:day|night)|following (?:day|night)|day after|night after|next morning)\b/i.test(text)
-  if (sameDay && nextDay) return -1 // contradictory, fail closed
+  const unsupported = /\b(?:previous (?:day|night)|prior (?:day|night)|day before|night before|two or more days|several days|days later|days apart|day(?:s)? earlier|following week|next week|same week|after a few days|over the next few days|immediately|right after|without delay|within \d+ (?:hours?|days?)|\d+[ -]day lag|over \d+ days?)\b/i.test(text)
+  if (unsupported || (sameDay && nextDay)) return 'unsupported'
   if (sameDay) return 0
   if (nextDay) return 1
   return null
 }
 
-/** A real computed correlation is bound to one registered pair, its direction
- * and its lag. Neither two independent totals nor another valid correlation
- * can support that interpretation. Cached old packets missing identity fail
- * closed instead of importing a relationship from neighboring evidence.
+/** Aggregate rho cannot imply every recorded date had the effect. Equally,
+ * a sample association does not certify significance or causal certainty.
+ */
+function unsupportedRelationshipInterpretation(text: string): boolean {
+  return /\b(?:every (?:single )?(?:day|time)|each (?:day|time)|all (?:recorded |logged )?days|always|without exception|throughout (?:the|every) (?:week|month|period)|statistically significant|significant p[ -]?value|p[ -]?value|proved|proven|guaranteed|conclusively)\b/i.test(text)
+}
+
+function claimedRelationshipStrength(text: string): 'weak' | 'moderate' | 'strong' | null {
+  const match = /\b(weak(?:ly)?|moderate(?:ly)?|strong(?:ly)?)\s+(?:positive(?:ly)?\s+|negative(?:ly)?\s+)?(?:correlat\w*|associat\w*|linked|relationship)\b/i.exec(text)
+  if (!match) return null
+  const raw = (match[1] ?? '').toLowerCase()
+  return raw.startsWith('weak') ? 'weak' : raw.startsWith('moderate') ? 'moderate' : 'strong'
+}
+
+/** A real computed correlation must match its registered recipe, have a
+ * verifiable set of paired dates and remain descriptive. A source's selected
+ * range is not proof of complete log coverage; a coefficient is not a
+ * day-by-day effect or a clinical significance result.
  */
 function relationshipCitationSupports(
   ids: readonly string[],
@@ -329,12 +349,14 @@ function relationshipCitationSupports(
   claim: string,
 ): boolean {
   const namedSignals = claimedRelationshipSignals(claim)
-  if (namedSignals.length !== 2) return false
+  if (namedSignals.length !== 2 || unsupportedRelationshipInterpretation(claim)) return false
   const mentionedLag = claimRelationshipLag(claim)
+  if (mentionedLag === 'unsupported') return false
   const rho = /\b(?:spearman(?:'s)?\s*(?:rho)?|rho)\s*(?:of|=|:|was|is)?\s*(-?\d+(?:\.\d+)?)/i.exec(claim)
   const assertedRho = rho ? Number(rho[1]) : null
   const positive = /\b(?:positively correlated|positive correlation)\b/i.test(claim)
   const negative = /\b(?:negatively correlated|negative correlation|inverse(?:ly)? (?:association|correlation))\b/i.test(claim)
+  const strength = claimedRelationshipStrength(claim)
   return ids.some((id) => {
     const source = evidence.get(id)
     if (!source || !source.id.startsWith('intelligence.relationship.') ||
@@ -342,18 +364,38 @@ function relationshipCitationSupports(
         source.unit !== 'Spearman rho' || typeof source.value !== 'number' ||
         !Number.isFinite(source.value) || Math.abs(source.value) > 1 ||
         (scope != null && !citationCoversHistoricalScope(source, scope))) return false
-    const spec = registeredRelationshipSpec(source.id.slice('intelligence.relationship.'.length))
-    if (!spec || !source.coverage || source.coverage.xKey !== spec.xKey ||
-        source.coverage.yKey !== spec.yKey || source.coverage.lagDays !== spec.lagDays ||
-        typeof source.coverage.pairedObservations !== 'number' ||
-        typeof source.coverage.requiredObservations !== 'number' ||
-        source.coverage.pairedObservations < source.coverage.requiredObservations ||
-        source.coverage.requiredObservations < 10) return false
+    const relationId = source.id.slice('intelligence.relationship.'.length)
+    const spec = registeredRelationshipSpec(relationId)
+    const c = source.coverage
+    if (!spec || !c || c.xKey !== spec.xKey || c.yKey !== spec.yKey ||
+        c.lagDays !== spec.lagDays ||
+        typeof c.pairedObservations !== 'number' ||
+        typeof c.requiredObservations !== 'number' ||
+        typeof c.pairedDateCount !== 'number' ||
+        typeof c.selectedCalendarDays !== 'number' ||
+        !Number.isSafeInteger(c.pairedObservations) ||
+        !Number.isSafeInteger(c.pairedDateCount) ||
+        !Number.isSafeInteger(c.selectedCalendarDays) ||
+        c.pairedDateCount !== c.pairedObservations ||
+        c.pairedObservations > c.selectedCalendarDays ||
+        c.selectedCalendarDays <= 0) return false
+    if (!source.evidenceDates ||
+        new Set(source.evidenceDates).size < c.pairedObservations ||
+        !source.evidenceDates.every(d => /^\d{4}-\d{2}-\d{2}$/.test(d))) return false
+    const confidence = source.confidence
+    if (confidence !== 'high' && confidence !== 'moderate' &&
+        confidence !== 'limited' && confidence !== 'unknown') return false
+    if (!relationshipScreeningMetadataMatchesDefinition({
+      id: relationId, xKey: spec.xKey, yKey: spec.yKey, lagDays: spec.lagDays,
+      sampleSize: c.pairedObservations, requiredSampleSize: c.requiredObservations,
+      confidence, state: 'available', rho: source.value,
+    })) return false
     if (!namedSignals.includes(spec.xKey) || !namedSignals.includes(spec.yKey)) return false
     if (mentionedLag !== null && spec.lagDays !== mentionedLag) return false
     if (mentionedLag === 1 && namedSignals[0] !== spec.xKey) return false
     if (assertedRho !== null && !closelyMatches(assertedRho, source.value)) return false
-    if (positive && source.value <= 0 || negative && source.value >= 0) return false
+    if ((positive && source.value <= 0) || (negative && source.value >= 0)) return false
+    if (strength !== null && associationStrength(source.value) !== strength) return false
     return true
   })
 }
