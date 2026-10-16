@@ -59,7 +59,7 @@ function packet(value: NonNullable<ReturnType<typeof focusDigestiveContext>>) {
 describe('PIQ-3.3 focused digestive evidence', () => {
   it('selects context only for digestive, water and fiber questions', () => {
     expect(focusDigestiveContext({ question: 'How is my bench press?', snapshot: snapshot(), today })).toBeNull()
-    for (const q of ['Am I getting enough fiber?', 'Why am I constipated?', 'What are my Bristol stool logs?', 'How much water intake did I log?']) {
+    for (const q of ['Am I getting enough fiber?', 'Why am I constipated?', 'What are my Bristol stool logs?', 'How much water intake did I log?', 'Why do I have hard stools?', 'How many bowel movements have I logged?']) {
       expect(focusDigestiveContext({ question: q, snapshot: snapshot(), today })).not.toBeNull()
     }
   })
