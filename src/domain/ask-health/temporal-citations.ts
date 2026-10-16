@@ -275,8 +275,8 @@ export function affirmativeOwnerAssociation(text: string): boolean {
   if (!/\b(?:you|your|yours|my|mine|i|owner'?s)\b/i.test(text)) return false
   if (/\b(?:not|cannot|can't|didn't|doesn't|unknown|uncertain|no evidence|insufficient|hypothetical|could|might|may|possibly|potentially)\b/i.test(text)) return false
   return /\b(?:correlat(?:e|es|ed|ion|ions)|associat(?:ed|ion)|linked|tracked (?:with|alongside)|moved together|rose together|fell together|inversely related)\b/i.test(text) ||
-    /\b(?:on days (?:when|with)|whenever)\b/i.test(text) &&
-      explicitlyClaimedMetricDomains(text).length > 1
+    (/\b(?:on days (?:when|with)|whenever|statistically significant|significant relationship)\b/i.test(text) &&
+      claimedRelationshipSignals(text).length >= 2)
 }
 
 /** Only unambiguous named signals are eligible to support a relationship
@@ -327,7 +327,7 @@ function claimRelationshipLag(text: string): number | 'unsupported' | null {
  * a sample association does not certify significance or causal certainty.
  */
 function unsupportedRelationshipInterpretation(text: string): boolean {
-  return /\b(?:every (?:single )?(?:day|time)|each (?:day|time)|all (?:recorded |logged )?days|always|without exception|throughout (?:the|every) (?:week|month|period)|statistically significant|significant p[ -]?value|p[ -]?value|proved|proven|guaranteed|conclusively)\b/i.test(text)
+  return /\b(?:every (?:single )?(?:day|time)|each (?:day|time)|all (?:recorded |logged )?days|always|without exception|throughout (?:the|every) (?:week|month|period)|statistically significant|significantly correlated|significant correlation|significant relationship|significant p[ -]?value|p[ -]?value|proved|proven|guaranteed|conclusively)\b/i.test(text)
 }
 
 function claimedRelationshipStrength(text: string): 'weak' | 'moderate' | 'strong' | null {
