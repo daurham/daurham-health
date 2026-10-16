@@ -5,6 +5,7 @@ import { ASK_HEALTH_PACKET_VERSION, ASK_PACKET_MAX_CHARS, type AskLens } from '.
 import { MIN_VERIFIED_NUTRITION_TARGET_DAYS } from './nutrition-integrity.js'
 import { digestiveQuestionTopics } from './focused-digestive.js'
 import { deriveDigestiveSampleScreen } from './digestive-screen.js'
+import { digestivePacketGuard, guardedDigestiveIntelligence, type DigestivePacketGuard } from './digestive-packet-guard.js'
 import type {
   AskClinicalProfileInput,
   AskStableProfileInput,
@@ -54,10 +55,12 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
 
   const lens = input.lens
   const wants = lensWants(lens)
+  const digestiveGuard = digestivePacketGuard(input)
+  const intelligence = guardedDigestiveIntelligence(input.intelligence, digestiveGuard)
   if (wants.body) {
     addBody(input, push, limitations, wants.bodyDetail)
   }
-  if (wants.nutrition) {
+  if (wants.nutrition && !digestiveGuard.crossSourceConflict) {
     addNutrition(input, push, limitations)
   }
   if (wants.activity) {
@@ -70,7 +73,7 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
     addTraining(input, push, wants.exerciseDetail)
   }
   addFocusedTraining(input, push)
-  addFocusedDigestive(input, push)
+  addFocusedDigestive(input, push, digestiveGuard)
   if (wants.supplements || questionMentionsSavedSupplement(input)) {
     addSupplements(input, push)
   }
@@ -80,7 +83,7 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
   if (wants.lab) {
     addLab(input, push)
   }
-  if (wants.context) {
+  if (wants.context && !digestiveGuard.crossSourceConflict) {
     addContext(input.context, push)
   }
   if (wants.patterns) {
@@ -88,8 +91,8 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
   }
   addStableProfile(input.stableProfile ?? null, input.question, input.asOf, push, input.contextMode === 'deep')
   addClinicalProfile(input.profile ?? null, input.question, push, input.contextMode)
-  if (input.intelligence) {
-    addSharedIntelligence(input.intelligence, input.period, push, limitations)
+  if (intelligence) {
+    addSharedIntelligence(intelligence, input.period, push, limitations)
   }
 
   const maxChars = input.maxChars ?? ASK_PACKET_MAX_CHARS
@@ -109,8 +112,8 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
     evidence,
     limitations: limitations.filter((item) => evidence.some((fact) => fact.id === item.evidenceId)),
     contextSummary: {
-      knows: input.intelligence?.knows ?? [],
-      missing: input.intelligence?.missing ?? [],
+      knows: intelligence?.knows ?? [],
+      missing: intelligence?.missing ?? [],
     },
     clarification,
     evidenceSelectionAudit: {
@@ -736,7 +739,7 @@ function addFocusedTraining(input: AskHealthPacketInput, push: (item: PushItem) 
  * is logged events and bowel zero requires an explicit owner report. Missing
  * days are never interpreted as zero, and nothing here infers causation.
  */
-function addFocusedDigestive(input: AskHealthPacketInput, push: (item: PushItem) => void): void {
+function addFocusedDigestive(input: AskHealthPacketInput, push: (item: PushItem) => void, guard: DigestivePacketGuard): void {
   const focus = input.focusedDigestive
   if (!focus) return
   const metrics = [
@@ -764,7 +767,8 @@ function addFocusedDigestive(input: AskHealthPacketInput, push: (item: PushItem)
   for (const { key, metric, unit, path } of metrics) {
     // Source aggregates may have changed after the first intelligence query.
     // Bowel totals are separately reconciled, so preserve bowel-only evidence.
-    if (focus.digestiveConsistencyIssue && key !== 'bowel') continue
+    if (guard.crossSourceConflict && key !== 'bowel') continue
+    if (guard.bowelIdentityConflict && key === 'bowel') continue
     // Default Personal/Smart is minimum-necessary context; Deep Dive
     // deliberately includes all bounded cross-domain signals on opt-in.
     if (input.contextMode !== 'deep' && !topics[key]) continue
@@ -894,7 +898,9 @@ function addFocusedDigestive(input: AskHealthPacketInput, push: (item: PushItem)
   // PIQ-4.1: precise, sample-scoped derived observation only for questions
   // explicitly connecting bowel symptoms with nutrition/water. Never imply
   // a whole-window association from independently truncated 3-day examples.
-  if (!focus.digestiveConsistencyIssue && input.contextMode !== 'general_only' && topics.bowel && (topics.fiber || topics.hydration)) {
+  if (!guard.crossSourceConflict && !guard.bowelIdentityConflict &&
+      focus.bowelWindow?.status !== 'unavailable' &&
+      input.contextMode !== 'general_only' && topics.bowel && (topics.fiber || topics.hydration)) {
     const screen = deriveDigestiveSampleScreen(focus)
     if (screen) {
       const hardText = screen.hardTypedEvents > 0
@@ -1012,7 +1018,8 @@ function addFocusedDigestive(input: AskHealthPacketInput, push: (item: PushItem)
   // align to same-day, 1-day or 2-day *earlier* exposure observations. The
   // prompts and AI are forbidden from turning paired counts into causality.
   const pairing = focus.digestivePairing
-  if (pairing && input.contextMode !== 'general_only' &&
+  if (pairing && !guard.crossSourceConflict && !guard.bowelIdentityConflict &&
+      input.contextMode !== 'general_only' &&
       (input.contextMode === 'deep' || topics.bowel && (topics.fiber || topics.hydration))) {
     const showFiber = input.contextMode === 'deep' || topics.fiber
     const showWater = input.contextMode === 'deep' || topics.hydration
