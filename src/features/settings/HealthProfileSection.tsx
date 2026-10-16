@@ -8,6 +8,7 @@ import {
 } from '@/domain/health-profile'
 import { primaryButtonClass, quietButtonClass, useHealthCalendarDate } from '@/lib'
 import { fetchHealthProfile, saveHealthProfile, HealthProfileConflictError } from './api'
+import { CorrectionReturnBanner } from '@/features/ask-health/CorrectionReturnBanner'
 import { MAX_OWNER_NOTE_DRAFT, mergeReviewedOwnerNote } from '@/domain/ask-health/owner-note-review'
 
 type Condition = HealthProfile['clinicalConditions'][number]
@@ -203,6 +204,8 @@ export function HealthProfileSection({ ownerNoteDraft = null }: { ownerNoteDraft
           </button>
         ) : null}
       </div>
+
+      <CorrectionReturnBanner />
 
       {error ? (
         <div role="alert" className="space-y-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
