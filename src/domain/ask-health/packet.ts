@@ -100,7 +100,14 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
   }
 
   const maxChars = input.maxChars ?? ASK_PACKET_MAX_CHARS
-  const evidence = trimEvidence(drafts, maxChars)
+  // PIQ-4.2: a named one-day question must NEVER inherit unrelated current
+  // goals, undated nutrition/body averages, multiweek intelligence or notes.
+  // Retain just the request's exact-date evidence and the neutral range label.
+  const selectedDrafts = input.focusedWeightEnergyDay
+    ? drafts.filter(item => item.id === 'ask.range' ||
+        item.id.startsWith('weight_energy.historical_day.'))
+    : drafts
+  const evidence = trimEvidence(selectedDrafts, maxChars)
   const selectedIds = new Set(evidence.map((item) => item.id))
   const clarification = exerciseClarification(input)
   const selectedSerializedChars = JSON.stringify(evidence).length
@@ -116,8 +123,8 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
     evidence,
     limitations: limitations.filter((item) => evidence.some((fact) => fact.id === item.evidenceId)),
     contextSummary: {
-      knows: intelligence?.knows ?? [],
-      missing: intelligence?.missing ?? [],
+      knows: input.focusedWeightEnergyDay ? [] : intelligence?.knows ?? [],
+      missing: input.focusedWeightEnergyDay ? [] : intelligence?.missing ?? [],
     },
     clarification,
     evidenceSelectionAudit: {
@@ -368,7 +375,8 @@ function addHistoricalWeightEnergyDay(
         ? 'Requested '+day.date+' is the current Health day and cannot be treated as a completed historical day.'
         :'On '+day.date+', saved weight and verified completed-day food intake are checked independently. Missing or unverified observations are UNKNOWN, not zero. A single date cannot establish a trend, energy deficit, fat-loss result or calorie target.',
     coverage:{requestedDate:day.date,requestedDateScope:day.scope,
-      savedWeight:day.weightKg!=null,verifiedCompleteCalories:day.verifiedCaloriesKcal!=null},
+      savedWeight:day.weightKg!=null?'observed':'unavailable',
+      verifiedCompleteCalories:day.verifiedCaloriesKcal!=null?'verified_complete':'unavailable'},
     detailPath:'/progress/body',userEntered:false,substantive:false,priority:0,
   })
   if(day.scope!=='in_range')return

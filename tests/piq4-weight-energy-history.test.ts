@@ -52,6 +52,7 @@ describe('PIQ-4.2 historical one-day source boundary',()=>{
     expect(r.packet.evidence.some(x=>x.id==='weight_energy.observed_balance')).toBe(false)
     expect(JSON.stringify(r.packet)).not.toContain('1900 kcal')
     expect(JSON.stringify(r.packet)).not.toContain('food1')
+    expect(r.packet.contextSummary).toEqual({knows:[],missing:[]})
   })
   it('withholds unsupported calorie number on unverified days or inconsistent source IDs',()=>{
     for(const o of [{unverified:true},{badIds:true}]){
@@ -59,7 +60,7 @@ describe('PIQ-4.2 historical one-day source boundary',()=>{
       expect(r.day?.verifiedCaloriesKcal).toBeNull()
       expect(r.packet.evidence.some(x=>x.id==='weight_energy.historical_day.calories')).toBe(false)
       expect(r.packet.evidence.find(x=>x.id==='weight_energy.historical_day.coverage')?.coverage)
-        .toMatchObject({verifiedCompleteCalories:false})
+        .toMatchObject({verifiedCompleteCalories:'unavailable'})
     }
   })
   it('never substitutes later weight and identifies noncomparable conditions',()=>{
