@@ -149,6 +149,9 @@ export function AskHealthPage() {
               {turn.text}
             </p>
           ))}
+        {latest?.meta.answerScope === 'general' ? (
+          <p className="text-xs text-zinc-600" role="status">General health education · no personal Health records used{latest.meta.cached ? ' · reused answer' : ''}</p>
+        ) : null}
         {latest ? <AskHealthContextSummary context={latest.meta.context} /> : null}
         {latest && asked ? (
           <AskHealthAnswerView key={answerRevision} answer={latest.answer} evidence={latest.evidence}

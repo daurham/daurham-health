@@ -58,7 +58,7 @@ function fakeProvider(answer: string) {
 }
 
 describe('PIQ-0 Ask Health executable baseline — synthetic data only', () => {
-  it('T01 KNOWN GAP: general physiology question with no owner evidence takes the wrong early-exit path', async () => {
+  it('T01 FIXED: general physiology without owner evidence invokes a bounded, uncited education answer', async () => {
     const question = 'What does creatine do?'
     const packet = buildAskHealthEvidencePacket(packetInput(question))
     const stub = fakeProvider('Creatine supports short-duration high-intensity performance.')
@@ -67,11 +67,11 @@ describe('PIQ-0 Ask Health executable baseline — synthetic data only', () => {
       gate: createAskHealthGate(), now: 1_000,
     })
 
-    // This is intentionally a failing PRODUCT scenario recorded as a green
-    // BASELINE diagnosis. Future PIQ-3 must reverse this observed behavior.
-    expect(stub).not.toHaveBeenCalled()
-    expect(result.answer.blocks[0]?.text).toContain('Not enough Health evidence')
-    expect(result.meta.diagnostic.path).toBe('packet_no_substantive_evidence')
+    expect(stub).toHaveBeenCalledTimes(1)
+    expect(result.answer.blocks[0]?.text).toContain('short-duration')
+    expect(result.answer.blocks[0]?.evidenceRefs).toEqual([])
+    expect(result.meta.answerScope).toBe('general')
+    expect(result.meta.diagnostic.path).toBe('general_model_answer')
     expect(result.meta.diagnostic.substantiveEvidenceCount).toBe(0)
   })
 

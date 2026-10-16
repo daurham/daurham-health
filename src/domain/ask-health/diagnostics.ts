@@ -38,6 +38,8 @@ export type AskHealthResponsePath =
   | 'packet_no_substantive_evidence'
   | 'model_answer'
   | 'cache_hit'
+  | 'general_model_answer'
+  | 'general_cache_hit'
 
 export type AskHealthResponseDiagnostic = {
   path: AskHealthResponsePath
@@ -52,16 +54,16 @@ export type AskHealthResponseDiagnostic = {
 
 export function describeAskHealthResponsePath(
   packet: AskHealthPacket,
-  result: { provider: string; cached: boolean },
+  result: { provider: string; cached: boolean; general?: boolean },
 ): AskHealthResponseDiagnostic {
   const path: AskHealthResponsePath =
     result.provider === 'health'
       ? packet.clarification
         ? 'clarification_required'
         : 'packet_no_substantive_evidence'
-      : result.cached
-        ? 'cache_hit'
-        : 'model_answer'
+      : result.general
+        ? result.cached ? 'general_cache_hit' : 'general_model_answer'
+        : result.cached ? 'cache_hit' : 'model_answer'
   return {
     path,
     packetEvidenceCount: packet.evidence.length,

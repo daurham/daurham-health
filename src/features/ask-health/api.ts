@@ -11,6 +11,7 @@ export type AskHealthResponse = {
   meta: {
     packetVersion: string
     promptVersion: string
+    answerScope?: 'general' | 'personal'
     provider: string
     model: string
     cached: boolean
