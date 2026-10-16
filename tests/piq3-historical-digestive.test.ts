@@ -104,7 +104,7 @@ describe('PIQ-3.3 specific historical digestive day retrieval', () => {
       'Compare water on 2026-10-03 and 2026-10-14',
       'How much water on 10/03/2026?',
       'How much water October 3?',
-      'How much water last week?',
+      'How much water last year?',
     ]) {
       const resolved = digestDateSelection(question, today)
       expect(resolved.date).toBeNull()
