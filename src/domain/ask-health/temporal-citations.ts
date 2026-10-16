@@ -79,6 +79,12 @@ export function explicitlyClaimedMetricDomains(text: string): string[] {
 }
 
 type RecordedQuantity = { value: number; unit: 'kg' | 'lb' | 'g' | 'ml' | 'kcal' | 'reps' | 'steps' | 'sessions' | 'movements' }
+type Nutrient = 'fiber' | 'protein' | 'carbs' | 'fat' | 'sodium'
+type QualifiedQuantity = RecordedQuantity & {
+  nutrient: Nutrient | null
+  aggregation: 'mean' | 'sum' | null
+  liftKind: 'estimated' | 'load' | null
+}
 
 function recordedUnit(raw: string): RecordedQuantity['unit'] | null {
   if (/^(?:kg|kilogram)/i.test(raw)) return 'kg'
@@ -93,17 +99,52 @@ function recordedUnit(raw: string): RecordedQuantity['unit'] | null {
   return null
 }
 
-/** Intentionally excludes unqualified numbers, dates, percentages, macros in
- * different units, medication doses, and inferred conversions. Claim-value
- * comparison applies only to literal supported measurement-unit phrases.
+function nutrientName(raw: string): Nutrient {
+  const value = raw.toLowerCase()
+  if (value === 'fiber' || value === 'fibre') return 'fiber'
+  if (value === 'carb' || value === 'carbs' || value.startsWith('carbohydrate')) return 'carbs'
+  return value as Nutrient
+}
+
+/** Read precisely typed units, allowing standard 1,234.5 grouping without
+ * interpreting comma-delimited date fragments as owner measurements. Context
+ * is localized to EACH number; two values in one block can be a sum and mean,
+ * or a lifted load and derived 1RM, without confusing them.
+ */
+function qualifiedOwnerQuantities(text: string): QualifiedQuantity[] {
+  const pattern = /\b((?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?)\s*(kilograms?|kg|pounds?|lbs?|grams?|g|millilit(?:ers?|res?)|ml|kcal|calories?|reps?|steps?|sessions?|movements?)\b/gi
+  const matches = [...text.matchAll(pattern)]
+  const qualifiers = (text: string) => {
+    const words = [...text.matchAll(/\b(averag(?:e|ed|ing)|mean|total(?:ed)?|sum(?:med)?|estimated|estimate|e1rm|1rm|one.rep max|lifted|load(?:ed)?)\b/gi)]
+    return words.at(-1)?.[1]?.toLowerCase() ?? null
+  }
+  return matches.flatMap((match, i) => {
+    const value = Number((match[1] ?? '').replaceAll(',', ''))
+    const unit = recordedUnit(match[2] ?? '')
+    if (!unit || !Number.isFinite(value)) return []
+    const offset = match.index ?? 0
+    const priorEnd = i > 0 ? (matches[i - 1]!.index ?? 0) + matches[i - 1]![0].length : 0
+    const before = text.slice(Math.max(priorEnd, offset - 120), offset)
+    const after = text.slice(offset + match[0].length, offset + match[0].length + 35)
+    const nutrientAfter = /^\s*(?:(?:of|in)\s+)?(fiber|fibre|protein|carbs?|carbohydrates?|fat|sodium)\b/i.exec(after)
+    const nutrientBefore = [...before.matchAll(/\b(fiber|fibre|protein|carbs?|carbohydrates?|fat|sodium)\b/gi)].at(-1)?.[1]
+    const nutrient = unit === 'g' && (nutrientAfter?.[1] || nutrientBefore)
+      ? nutrientName(nutrientAfter?.[1] ?? nutrientBefore!) : null
+    const near = qualifiers(before)
+    const afterRate = /^\s*per\s+(?:(?:logged|observed|verified)\s+)?(?:day|date)\b/i.test(after)
+    const aggregation = afterRate || /^(?:averag|mean)/.test(near ?? '') ? 'mean'
+      : /^(?:total|sum)/.test(near ?? '') ? 'sum' : null
+    const liftKind = /^(?:estimated|estimate|e1rm|1rm|one.rep max)/.test(near ?? '') ? 'estimated'
+      : /^(?:lifted|load)/.test(near ?? '') ? 'load' : null
+    return [{ value, unit, nutrient, aggregation, liftKind }]
+  })
+}
+
+/** Exposes supported literal quantities without prose qualifiers; numbers
+ * with other units or unsupported conversions remain outside this audit.
  */
 export function literalOwnerQuantities(text: string): RecordedQuantity[] {
-  const pattern = /\b(\d+(?:\.\d+)?)\s*(kilograms?|kg|pounds?|lbs?|grams?|g|millilit(?:ers?|res?)|ml|kcal|calories?|reps?|steps?|sessions?|movements?)\b/gi
-  return [...text.matchAll(pattern)].flatMap((match) => {
-    const value = Number(match[1])
-    const unit = recordedUnit(match[2] ?? '')
-    return unit && Number.isFinite(value) ? [{ value, unit }] : []
-  })
+  return qualifiedOwnerQuantities(text).map(({ value, unit }) => ({ value, unit }))
 }
 
 function closelyMatches(a: number, b: number): boolean {
@@ -113,14 +154,29 @@ function closelyMatches(a: number, b: number): boolean {
   return Math.abs(a - b) < 0.051
 }
 
+/** Domain alone is not sufficient: two nutrition facts can both be measured
+ * in grams yet describe entirely different nutrients.
+ */
+function matchesNutrientSource(source: AskEvidence, nutrient: Nutrient | null): boolean {
+  if (!nutrient) return true
+  if (source.domain !== 'nutrition') return false
+  if (nutrient === 'fiber') {
+    return source.id.startsWith('digestive.focus.fiber.') ||
+      source.id === 'digestive.focus.coverage.fiber' || source.id === 'nutrition.fiber'
+  }
+  return source.id === 'nutrition.' + nutrient
+}
+
 function numericEvidenceSupports(
-  quantity: RecordedQuantity,
+  quantity: QualifiedQuantity,
   sources: readonly AskEvidence[],
   claim: string,
   windowAggregate: boolean,
 ): boolean {
-  const mean = /\b(?:averag(?:e|ed)|mean|per (?:logged|verified|observed) day)\b/i.test(claim)
-  const candidate = sources.some((source) => {
+  const mean = quantity.aggregation === 'mean' ||
+    (quantity.aggregation === null && /\b(?:averag(?:e|ed)|mean|per (?:logged|verified|observed) day)\b/i.test(claim))
+  return sources.some((source) => {
+    if (!matchesNutrientSource(source, quantity.nutrient)) return false
     const c = source.coverage
     // A requested window aggregate has no complete-day numeric backing
     // unless the source explicitly carries a recorded sum or conditional mean.
@@ -134,13 +190,11 @@ function numericEvidenceSupports(
     }
     const ownUnit = recordedUnit(source.unit ?? '')
     if (source.id.startsWith('training.focus.set.')) {
-      const estimate = /\b(?:estimated|estimate|e1rm|1rm|one.rep max)\b/i.test(claim)
-      const load = /\b(?:load(?:ed)?|working weight|weight lifted|lifted)\b/i.test(claim)
       if (quantity.unit === 'kg') {
         // Distinct physical quantities, even though both are measured in kg.
-        if (load && !estimate) return typeof c?.recordedLoadKg === 'number' &&
+        if (quantity.liftKind === 'load') return typeof c?.recordedLoadKg === 'number' &&
           closelyMatches(quantity.value, c.recordedLoadKg)
-        if (estimate) return typeof source.value === 'number' && ownUnit === 'kg' &&
+        if (quantity.liftKind === 'estimated') return typeof source.value === 'number' && ownUnit === 'kg' &&
           closelyMatches(quantity.value, source.value)
         return (typeof c?.recordedLoadKg === 'number' &&
           closelyMatches(quantity.value, c.recordedLoadKg)) ||
@@ -157,7 +211,6 @@ function numericEvidenceSupports(
     return ownUnit === quantity.unit &&
       typeof source.value === 'number' && closelyMatches(quantity.value, source.value)
   })
-  return candidate
 }
 
 export function groundHistoricalAnswer(
@@ -183,7 +236,7 @@ export function groundHistoricalAnswer(
       return [cited]
     })
     const domains = explicitlyClaimedMetricDomains(block.text)
-    const values = literalOwnerQuantities(block.text)
+    const values = qualifiedOwnerQuantities(block.text)
     const hasVerifiedValue = values.every((quantity) => numericEvidenceSupports(
       quantity, relevant, block.text, windowAggregate,
     ))
