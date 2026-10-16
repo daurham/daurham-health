@@ -520,3 +520,8 @@ Ask Health now matches an exact saved supplement name or a conservative primary 
 ## 2026-10-15 PIQ-2.4 Ask medication evidence selection — work branch
 
 Ask Health medication evidence is now question-scoped: names, explicitly owner-asked treatment/interactions, or active records for personal GI/recovery symptoms. Source status/dose remain explicitly owner-entered and never proof of ingestion or diagnosis. Synthetic packet tests and progress gates are in \`PIQ_PROGRESS.md\`. No schema, provider calls, production modification or main merge.
+
+
+## 2026-10-15 PIQ-2.4 saved allergy question gating — work branch
+
+The Ask Health evidence packet now selects owner-saved allergy records only for explicitly personal allergy questions, exact named allergens in personal context, or personal food/medicine/supplement decisions. Unrelated general and Training requests no longer receive the allergy list. Facts are labeled current owner-entered, not verified diagnoses/exposures. Synthetic tests, CI and release gating recorded in PIQ_PROGRESS.md. No SQL, Gemini, production or main updates.

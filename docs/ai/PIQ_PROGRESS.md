@@ -1516,3 +1516,16 @@ Synthetic 16-pair regressions mutate the frame and day count while preserving th
 **Tests:** Synthetic Ask Health packet tests cover an unrelated bench-press question, general pharmacology, a named medication across lenses, explicit personal interaction/inventory question, current active personal constipation/bloating context, inactive history, false ingredient-like name and no causal/taken implication. No additional database read, schema migration, Gemini call, medical-profile edit, owner-data mutation or main promotion.
 
 **Not in scope:** Interaction screening by a validated clinical database, prescription verification, medication start/stop dating beyond today's saved profile, and clinical confirmation of actual adherence. Separate owner iOS QA and provider evidence selection remain release gates.
+
+
+## PIQ-2.4 — Question-scoped saved allergy context (2026-10-15)
+
+**State:** Bounded branch-only packet selection slice; full CI and authenticated owner-device QA are release gates. **0/9 PIQ phases owner-accepted.**
+
+**Gap:** Ask Health added every recorded allergy and reaction to every question, even unrelated general or Training questions. That over-shared private clinical context and could be misread as a verified allergy diagnosis.
+
+**Contract:** Current-day owner-saved allergies are now selected only for a question that explicitly asks about the owner's allergy/reaction history, names an exact saved substance in a personalized question, or requests personal food, medicine or supplement guidance where exposure might matter. Broad general science and unrelated Training/recovery prompts receive no itemized allergy entries. Stable original record indices, saved severity/reaction (including unknown/null), owner-entered provenance and a Health Profile correction link are preserved. Each source explicitly says it is a current owner-entered record, **not** a verified diagnosis or proof of exposure. A personal meal or medication decision can receive relevant saved allergy context without requiring the owner to remember to mention allergies first.
+
+**Tests:** New synthetic Ask Health evidence regression covers generic and unrelated privacy exclusion, exact name resolution without fuzzy allergy inference, explicit saved-inventory requests, personal food/medicine/supplement decisions, unknown severity and provenance, empty records and source index stability. No new SQL, external provider call, schema change, owner record mutation or main promotion.
+
+**Remaining:** Conditions and undated persistent clinical text still need independently justified question-level minimization; validated allergen synonyms, interaction screening, time-versioned owner allergy updates and owner-verified clinical provenance are out of scope. PIQ-2.4 and earlier PIQ phases still require owner acceptance.

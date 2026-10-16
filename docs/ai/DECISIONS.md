@@ -818,3 +818,8 @@ To answer short named-regimen questions without guessing, select a saved supplem
 ## PIQ-2.4: saved medications are selected by question, not indiscriminately (2026-10-15)
 
 Use the existing owner-authenticated current-day profile as source truth, but do not attach every medication detail to unrelated Ask Health questions. Provide name-matched records, owner-requested lists/interactions, or active status only for relevant personal symptom context. Preserve inactive named records with their saved statuses, retain the recorded-vs-taken/causal distinction, and never claim medical interactions or adherence without validated evidence. No new schema, provider call or canonical write; CI and owner review are required before release.
+
+
+## Decision: Ask Health must minimize and label owner allergy evidence (PIQ-2.4, 2026-10-15)
+
+Allergy entries are current owner-entered statements, not medically verified diagnoses or historical reactions. Do not send them with unrelated general explanations or fitness questions. Include explicitly requested personal allergy inventory, a matching recorded allergen with an owner-specific question, or owner-directed food/drug/supplement exposure planning where safety context matters. Match saved substance names exactly at token boundaries rather than guessing synonyms; retain original record indices and nullable severity/reaction detail with precise provenance. Never infer an exposure or medication interaction from the record alone. No provider, database, owner profile or production edits.

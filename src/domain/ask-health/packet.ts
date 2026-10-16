@@ -1052,6 +1052,33 @@ export function selectAskHealthMedications(
   return []
 }
 
+/** Minimize disclosure of owner-saved allergies in Ask Health evidence.
+ * An allergy is clinically relevant for owner-specific food/drug decisions,
+ * an explicit personal allergy inventory, or a named substance, not a
+ * general explanation. Stable original indices preserve source identity.
+ */
+export function selectAskHealthAllergies(
+  profile: AskClinicalProfileInput,
+  question: string,
+): Array<{ index: number; allergy: AskClinicalProfileInput['allergies'][number] }> {
+  const records = profile.allergies.map((allergy, index) => ({ allergy, index }))
+  const personal = /\b(?:my|mine|me|i|myself)\b/i.test(question)
+  if (!personal) return []
+  const inventory = /\b(?:allerg(?:y|ies|ic|ens?)|intoleran\w*|reactions?)\b/i.test(question)
+  const words = ' ' + (question.toLowerCase().match(/[a-z0-9]+/g) ?? []).join(' ') + ' '
+  const named = records.filter(({ allergy }) => {
+    const substance = allergy.substance.toLowerCase().match(/[a-z0-9]+/g) ?? []
+    return substance.length > 0 && words.includes(' ' + substance.join(' ') + ' ')
+  })
+  if (named.length > 0) return named.slice(0, 12)
+  if (inventory) return records.slice(0, 12)
+  // Food, medicine and supplement recommendations could expose the owner to
+  // a saved allergen even when they did not mention "allergy" explicitly.
+  const isDecision = /\b(?:can|should|could|may|safe|safely|recommend|plan|cook|eat|try|take|start|use|have|make|choose)\b/i.test(question)
+  const isExposure = /\b(?:foods?|meals?|dinner|breakfast|lunch|recipes?|ingredients?|diet|eating|cook|snacks?|supplements?|medications?|medicines?|drugs?|prescriptions?|doses?|take|eat)\b/i.test(question)
+  return isDecision && isExposure ? records.slice(0, 12) : []
+}
+
 function addClinicalProfile(profile: AskClinicalProfileInput | null, question: string, push: (item: PushItem) => void) {
   if (!profile) return
   // Explicit owner context only. Never invent a binary range when unset or
@@ -1110,15 +1137,16 @@ function addClinicalProfile(profile: AskClinicalProfileInput | null, question: s
     })
   })
 
-  profile.allergies.slice(0, 12).forEach((item, index) => {
+  selectAskHealthAllergies(profile, question).forEach(({ allergy: item, index }) => {
     push({
       id: `clinical.allergy.${index}`,
       domain: 'clinical_context',
       label: `Allergy · ${item.substance}`,
       value: item.severity,
       unit: null,
-      text: `Owner-entered allergy: ${item.substance}. Severity: ${item.severity}.${item.reaction ? ` Reaction: ${clip(item.reaction)}` : ''}`,
-      coverage: { severity: item.severity },
+      text: `Current owner-entered allergy record: ${item.substance}. Saved severity: ${item.severity}.${item.reaction ? ` Saved reaction: ${clip(item.reaction)}.` : ''} This is not an independently verified diagnosis or proof of an exposure.`,
+      coverage: { severity: item.severity, source: 'current_owner_profile' },
+      provenance: 'owner_profile_current',
       detailPath: '/settings#health-profile',
       userEntered: true,
       substantive: true,
