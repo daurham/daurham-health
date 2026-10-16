@@ -9,7 +9,7 @@ import { goalTargetState } from '../src/domain/goal-status.js'
 
 const AS_OF = '2026-10-16'
 const sql = (rows:unknown) => ({
-  query: vi.fn(async (_statement:string,_args:unknown[]) => rows),
+  query: vi.fn(async () => rows),
 }) as unknown as Sql & { query: ReturnType<typeof vi.fn> }
 
 describe('PIQ-4.2 Goal Control point observations are bounded by Health as-of', () => {
