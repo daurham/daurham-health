@@ -124,7 +124,7 @@ function numericEvidenceSupports(
     const c = source.coverage
     // A requested window aggregate has no complete-day numeric backing
     // unless the source explicitly carries a recorded sum or conditional mean.
-    if (windowAggregate) {
+    if (windowAggregate && !(source.domain === 'training' && quantity.unit === 'sessions')) {
       const expectedUnit = source.domain === 'hydration' ? 'ml'
         : source.domain === 'nutrition' ? 'g'
         : source.domain === 'bowel' ? 'movements' : null
@@ -133,20 +133,29 @@ function numericEvidenceSupports(
       return typeof number === 'number' && closelyMatches(quantity.value, number)
     }
     const ownUnit = recordedUnit(source.unit ?? '')
-    if (ownUnit === quantity.unit &&
-        typeof source.value === 'number' && closelyMatches(quantity.value, source.value)) {
-      return true
-    }
-    // A representative comparable training set includes separately typed
-    // load and reps. Never mistake its estimated 1RM for the recorded load.
     if (source.id.startsWith('training.focus.set.')) {
-      if (quantity.unit === 'kg' && !/\b(?:estimated|estimate|e1rm|1rm|one.rep max)\b/i.test(claim) &&
-          typeof c?.recordedLoadKg === 'number' &&
-          closelyMatches(quantity.value, c.recordedLoadKg)) return true
-      if (quantity.unit === 'reps' && typeof c?.reps === 'number' &&
-          closelyMatches(quantity.value, c.reps)) return true
+      const estimate = /\b(?:estimated|estimate|e1rm|1rm|one.rep max)\b/i.test(claim)
+      const load = /\b(?:load(?:ed)?|working weight|weight lifted|lifted)\b/i.test(claim)
+      if (quantity.unit === 'kg') {
+        // Distinct physical quantities, even though both are measured in kg.
+        if (load && !estimate) return typeof c?.recordedLoadKg === 'number' &&
+          closelyMatches(quantity.value, c.recordedLoadKg)
+        if (estimate) return typeof source.value === 'number' && ownUnit === 'kg' &&
+          closelyMatches(quantity.value, source.value)
+        return (typeof c?.recordedLoadKg === 'number' &&
+          closelyMatches(quantity.value, c.recordedLoadKg)) ||
+          (typeof source.value === 'number' && ownUnit === 'kg' &&
+            closelyMatches(quantity.value, source.value))
+      }
+      if (quantity.unit === 'reps') return typeof c?.reps === 'number' &&
+        closelyMatches(quantity.value, c.reps)
     }
-    return false
+    if (windowAggregate && source.domain === 'training' && quantity.unit === 'sessions') {
+      return typeof c?.eligibleAppearances === 'number' &&
+        closelyMatches(quantity.value, c.eligibleAppearances)
+    }
+    return ownUnit === quantity.unit &&
+      typeof source.value === 'number' && closelyMatches(quantity.value, source.value)
   })
   return candidate
 }
