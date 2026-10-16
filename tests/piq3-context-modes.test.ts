@@ -67,7 +67,7 @@ describe('PIQ-3 explicit Context Mode request contract', () => {
   })
 
   it('General Only scrubs a mistakenly passed personal packet AND private conversation', async () => {
-    const packet = buildAskHealthEvidencePacket(inputFor())
+    const packet = buildAskHealthEvidencePacket({ ...inputFor(), lens: 'general' })
     expect(packet.evidence.some(x => x.substantive)).toBe(true)
     const stub = makeProvider()
     const result = await explainAskHealth({ packet, question: q, contextMode: 'general_only',
@@ -87,7 +87,7 @@ describe('PIQ-3 explicit Context Mode request contract', () => {
       ...params, contextMode: 'personalized', provider: stub, gate: fakeGate(),
     })
     expect(load).toHaveBeenCalledOnce()
-    expect(load.mock.calls[0]![0].lens).toBe('training')
+    expect(load.mock.calls[0]![0].lens).toBe('general')
     expect(result.meta.answerScope).toBe('personal')
     expect(result.meta.contextMode).toBe('personalized')
     expect(result.meta.evidenceOverview.availableCount).toBeGreaterThan(1)
