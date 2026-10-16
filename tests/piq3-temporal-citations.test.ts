@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { AskEvidence, AskHealthAnswer, AskHealthPacket } from '../src/domain/ask-health/types.js'
 import {
   affirmativeOwnerMetricClaim, citationCoversHistoricalScope,
-  groundHistoricalAnswer, temporalCitationScope,
+  groundHistoricalAnswer, temporalCitationScope, literalOwnerQuantities,
 } from '../src/domain/ask-health/temporal-citations.js'
 import { explainAskHealth } from '../server/ask-health/service.js'
 import { createAskHealthGate } from '../server/ask-health/gate.js'
@@ -168,6 +168,103 @@ describe('PIQ-3 historical citation period validator', () => {
     const q = 'How much did I bench on 2026-10-06?'
     const cautious = answer([item('Your logged strength is unknown for this date.', [range.id])])
     expect(groundHistoricalAnswer(cautious, packet([range]), q)).toBe(cautious)
+  })
+
+  it('checks literal canonical values even when source ID, date and domain all match', () => {
+    const q = 'What was my barbell bench press on 2026-10-06?'
+    const wrong = groundHistoricalAnswer(
+      answer([item('You recorded 99 kg estimated bench strength.', [dated.id])]),
+      packet([dated]), q,
+    )
+    expect(wrong.blocks[0]?.text).toContain('cannot verify')
+    expect(wrong.limitations[0]?.text).toContain('recorded numeric value')
+    const right = groundHistoricalAnswer(
+      answer([item('You recorded 86 kg estimated bench strength.', [dated.id])]),
+      packet([dated]), q,
+    )
+    expect(right.blocks[0]?.text).toContain('86 kg')
+    expect(right.limitations).toEqual([])
+  })
+
+  it('separates canonical working load and estimated 1RM even when units match', () => {
+    const source: AskEvidence = {
+      ...dated, value: 93.3,
+      coverage: { reps: 5, recordedLoadKg: 80 },
+      text: 'Owner logged 80 kg x 5 reps, estimated 1RM 93.3 kg',
+    }
+    const q = 'How did I train on 2026-10-06?'
+    const supported = [
+      'You lifted 80 kg in a working set.',
+      'Your estimated 1RM was 93.3 kg.',
+      'You completed 5 reps.',
+    ]
+    for (const message of supported) {
+      const result = groundHistoricalAnswer(answer([item(message, [source.id])]), packet([source]), q)
+      expect(result.blocks[0]?.text).toBe(message)
+    }
+    for (const message of ['You lifted 93.3 kg.', 'Your estimated 1RM was 80 kg.', 'You completed 9 reps.']) {
+      expect(groundHistoricalAnswer(answer([item(message, [source.id])]), packet([source]), q)
+        .blocks[0]?.text).toContain('cannot verify')
+    }
+  })
+
+  it('requires correct water window sum versus conditional observed-day mean', () => {
+    const q = 'How much water did I log last week?'
+    const evidence = { ...windowCoverage, coverage: {
+      ...windowCoverage.coverage, meanPerObservedDay: 900,
+    }}
+    for (const message of [
+      'You logged a total of 1800 ml of water last week.',
+      'You averaged 900 ml of logged water per observed day last week.',
+    ]) {
+      expect(groundHistoricalAnswer(answer([item(message, [evidence.id])]), packet([evidence]), q)
+        .blocks[0]?.text).toEqual(message)
+    }
+    for (const message of [
+      'You logged a total of 900 ml of water last week.',
+      'You averaged 1800 ml of logged water per observed day last week.',
+      'You logged a total of 900 g of fiber last week.',
+    ]) {
+      expect(groundHistoricalAnswer(answer([item(message, [evidence.id])]), packet([evidence]), q)
+        .blocks[0]?.text).toContain('cannot verify')
+    }
+  })
+
+  it('requires every supported numeric assertion in a block to match a cited value', () => {
+    const source: AskEvidence = { ...dated, value: 93.3, coverage: { reps: 5, recordedLoadKg: 80 }}
+    const q = 'How did my barbell bench press go on 2026-10-06?'
+    const good = 'You lifted 80 kg for 5 reps.'
+    expect(groundHistoricalAnswer(answer([item(good, [source.id])]), packet([source]), q)
+      .blocks[0]?.text).toEqual(good)
+    const bad = 'You lifted 80 kg for 9 reps.'
+    expect(groundHistoricalAnswer(answer([item(bad, [source.id])]), packet([source]), q)
+      .blocks[0]?.text).toContain('cannot verify')
+    expect(literalOwnerQuantities('You lifted 80 kg for 5 reps, 2026-10-06.'))
+      .toEqual([{ value: 80, unit: 'kg' }, { value: 5, unit: 'reps' }])
+  })
+
+  it('uses the Health-local today for yesterday, never the selected historical asOf', () => {
+    expect(temporalCitationScope('How much water yesterday?', '2026-10-09', '2026-10-15'))
+      .toEqual({ start: '2026-10-14', end: '2026-10-14' })
+    expect(temporalCitationScope('How much water today?', '2026-10-09', '2026-10-15'))
+      .toEqual({ start: '2026-10-15', end: '2026-10-15' })
+    expect(temporalCitationScope('How much water yesterday?', '2026-10-09'))
+      .toBeNull()
+    const recent: AskEvidence = {
+      ...aDay, id: 'hydration.focus.2026-10-14', value: 600,
+      evidenceDates: ['2026-10-14'], period: { start: '2026-10-14', end: '2026-10-14' },
+    }
+    const packetForYesterday = { ...packet([recent, aDay]), healthToday: '2026-10-15' }
+    const valid = groundHistoricalAnswer(
+      answer([item('You logged 600 ml of water yesterday.', [recent.id])]),
+      packetForYesterday, 'How much water did I log yesterday?',
+    )
+    expect(valid.blocks[0]?.text).toContain('600 ml')
+    const invalid = groundHistoricalAnswer(
+      answer([item('You logged 800 ml of water yesterday.', [aDay.id])]),
+      packetForYesterday, 'How much water did I log yesterday?',
+    )
+    expect(invalid.blocks[0]?.text).toContain('cannot verify')
   })
 
   it('does not call Gemini again for a historical citation mismatch, and caches only the safe answer', async () => {
