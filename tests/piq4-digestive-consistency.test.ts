@@ -4,6 +4,8 @@ import { digestivePairingSourcesAgree } from '../src/domain/ask-health/digestive
 import { buildAskHealthEvidencePacket } from '../src/domain/ask-health/packet.js'
 import { focusDigestiveContext } from '../src/domain/ask-health/focused-digestive.js'
 import type { AskHealthPacketInput } from '../src/domain/ask-health/types.js'
+import { DIGESTIVE_PAIRING_SOURCE_RECHECK_SQL, recheckDigestivePairingSources } from '../server/ask-health/digestive-consistency.js'
+import type { Sql } from '../server/db.js'
 const today='2026-10-16',start='2026-10-01',date='2026-10-10'
 const observations:IntelligenceObservation[]=[
   {key:'nutrition.calories',date,value:650,unit:'kcal',sourceIds:['f1'],quality:'high_confidence',provenance:'owner'},
@@ -98,5 +100,62 @@ describe('PIQ-4.1 optimistic source reread (synthetic only)',()=>{
     expect(evidence.some(x=>x.id==='digestive.pairing.coverage.fiber')).toBe(false)
     expect(evidence.some(x=>x.id==='digestive.focus.fiber.'+date)).toBe(false)
     expect(evidence.some(x=>x.id==='digestive.focus.hydration.'+date)).toBe(false)
+  })
+})
+
+describe('PIQ-4.1 single-statement source recheck contract',()=>{
+  function mockSql(rows:unknown, captures:{queries:Array<{text:string,params:unknown[]}>}):Sql {
+    return {query:async(text:string,params:unknown[])=>{
+      captures.queries.push({text,params})
+      return rows
+    }} as unknown as Sql
+  }
+  const result=()=>[{
+    fiber_rows:[{date,source_ids:['f1'],calories:'650',fiber:'18',missing_fiber:0}],
+    water_rows:[{date,source_ids:['w1'],amount_ml:'740'}],
+    context_tag_rows:[{date,tag_key:'travel'}],
+  }]
+  it('reads revision-checked nutrition, logged water and context in ONE SQL statement',async()=>{
+    const capture={queries:[] as Array<{text:string,params:unknown[]}>}
+    expect(await recheckDigestivePairingSources({
+      snapshot,scope,today,contexts:[{contextDate:date,tags:['travel']}],
+      sqlOverride:mockSql(result(),capture),
+    })).toBe(true)
+    expect(capture.queries).toHaveLength(1)
+    expect(capture.queries[0]?.params).toEqual([start,today,today])
+    expect(capture.queries[0]?.text).toBe(DIGESTIVE_PAIRING_SOURCE_RECHECK_SQL)
+    expect(DIGESTIVE_PAIRING_SOURCE_RECHECK_SQL).toMatch(/WITH verified_nutrition AS/)
+    expect(DIGESTIVE_PAIRING_SOURCE_RECHECK_SQL).toMatch(/entry_revision = current_source\.revision/)
+    expect(DIGESTIVE_PAIRING_SOURCE_RECHECK_SQL).toMatch(/water_rows AS/)
+    expect(DIGESTIVE_PAIRING_SOURCE_RECHECK_SQL).toMatch(/context_tag_rows AS/)
+    expect(DIGESTIVE_PAIRING_SOURCE_RECHECK_SQL).toMatch(/\$3::date/)
+    expect(DIGESTIVE_PAIRING_SOURCE_RECHECK_SQL).not.toMatch(/\b(?:INSERT|UPDATE|DELETE|ALTER|DROP|TRUNCATE)\s+(?:INTO|FROM|TABLE|DATABASE)/i)
+    expect(DIGESTIVE_PAIRING_SOURCE_RECHECK_SQL).not.toMatch(/SELECT .*\bnote\b/i)
+  })
+  it('fails closed for missing, partial, malformed, duplicate or corrupted aggregate responses',async()=>{
+    const cases:unknown[]=[
+      [],[{},{}],[{}],
+      [{fiber_rows:[],water_rows:[]}],
+      [{fiber_rows:null,water_rows:[],context_tag_rows:[]}],
+      [{fiber_rows:[],water_rows:[null],context_tag_rows:[]}],
+      [{fiber_rows:'[]',water_rows:[],context_tag_rows:[]}],
+      [{...result()[0],water_rows:[{date,source_ids:['w1'],amount_ml:'900'}]}],
+    ]
+    for(const rows of cases){
+      const capture={queries:[] as Array<{text:string,params:unknown[]}>}
+      expect(await recheckDigestivePairingSources({
+        snapshot,scope,today,contexts:[{contextDate:date,tags:['travel']}],
+        sqlOverride:mockSql(rows,capture),
+      })).toBe(false)
+      expect(capture.queries).toHaveLength(1)
+    }
+  })
+  it('never performs a query for unbounded or out-of-period requests',async()=>{
+    const capture={queries:[] as Array<{text:string,params:unknown[]}>}
+    expect(await recheckDigestivePairingSources({
+      snapshot,scope:{start:'2026-01-01',end:today,calendarDays:289},today,contexts:[],
+      sqlOverride:mockSql(result(),capture),
+    })).toBe(false)
+    expect(capture.queries).toHaveLength(0)
   })
 })
