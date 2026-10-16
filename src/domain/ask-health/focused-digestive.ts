@@ -132,9 +132,12 @@ export function digestDateSelection(
   const unexpectedPeriod = /\b(?:last|past|previous|this|next)\s+(?:year|few\s+days|(?:\d+\s+)?weeks?|(?:\d+\s+)?months?|(?:\d+\s+)?years?)\b/i.test(remaining)
     || /\b(?:last|past|previous|this|next)\s+\d+\s+days?\b/i.test(remaining)
   const periodCount = Number(Boolean(trailing)) + Number(Boolean(week)) + Number(Boolean(month))
-  // A range starting "since/from" or a comparison is not synonymous with
-  // the single date/week/month it happens to mention.
-  const relational = /\b(?:since|between|from|until|through|versus|vs\.?|compared?\s+(?:to|with))\b/i.test(question)
+  // A genuinely temporal "from DATE/PERIOD" is a range, not a single
+  // requested day. Plain causal "from" ("stools from low fiber?") is NOT a
+  // historical date expression and must not suppress useful dated evidence.
+  const temporalFrom = /\bfrom\s+(?:(?:\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}\/\d{2,4})\b|(?:today|yesterday|tomorrow)\b|(?:last|past|previous|this|next)\s+(?:\d+\s+days?|weeks?|months?|years?)\b)/i.test(question)
+  const relational = temporalFrom ||
+    /\b(?:since|between|until|through|versus|vs\.?|compared?\s+(?:to|with))\b/i.test(question)
   const namedMonth = /\b(?:in|during|last|this|next|since|from|through|until)\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b|\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{4}\b/i.test(question)
   if (valid.length !== dates.length || ambiguousFormat || namedMonth || relational ||
       requested.length > 1 || (requested.length > 0 && periodCount > 0) || periodCount > 1 ||

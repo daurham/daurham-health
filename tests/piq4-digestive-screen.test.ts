@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildHealthIntelligenceSnapshot, type IntelligenceObservation } from '../src/domain/intelligence/shared.js'
-import { attachBristolTypes, focusDigestiveContext } from '../src/domain/ask-health/focused-digestive.js'
+import { attachBristolTypes, digestDateSelection, focusDigestiveContext } from '../src/domain/ask-health/focused-digestive.js'
 import { deriveDigestiveSampleScreen } from '../src/domain/ask-health/digestive-screen.js'
 import { buildAskHealthEvidencePacket } from '../src/domain/ask-health/packet.js'
 import type { AskHealthPacketInput } from '../src/domain/ask-health/types.js'
@@ -45,6 +45,15 @@ function evidence(mode: AskContextMode, q=question, observations=events,
 }
 
 describe('PIQ-4.1 sampled digestive screen (synthetic only)', () => {
+  it('distinguishes a causal from-question from a historical from-date range', () => {
+    expect(digestDateSelection(question, today).issue).toBeNull()
+    expect(digestDateSelection('Were my hard stools from low fiber last week?', today).issue).toBeNull()
+    expect(digestDateSelection('How much water from 2026-10-02 to 2026-10-08?', today).issue)
+      .not.toBeNull()
+    expect(digestDateSelection('How much water from last week through today?', today).issue)
+      .not.toBeNull()
+  })
+
   it('detects hard Bristol observations as a *sample*, not a personal cause', () => {
     const screen = deriveDigestiveSampleScreen(fixture())!
     expect(screen).toMatchObject({
