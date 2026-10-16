@@ -179,6 +179,7 @@ export async function explainAskHealth(input: {
       provider: 'health',
       model: 'deterministic',
       cached: false,
+      contextMode,
     })
   }
   const canExplainWithoutOwnerFacts = contextMode !== 'smart' &&
@@ -189,6 +190,7 @@ export async function explainAskHealth(input: {
       provider: 'health',
       model: 'deterministic',
       cached: false,
+      contextMode,
     })
   }
   const key = askHealthCacheKey([

@@ -208,4 +208,34 @@ describe('PIQ-3 explicit Context Mode request contract', () => {
     })).rejects.toMatchObject({ statusCode: 429, code: 'ASK_HEALTH_BUDGET_EXCEEDED' })
     expect(stub).toHaveBeenCalledTimes(3)
   })
+  it('keeps requested mode in early missing-evidence metadata and never calls AI', async () => {
+    const question = 'What is my current height?'
+    const empty = buildAskHealthEvidencePacket({ ...inputFor(question), goals: [] })
+    const stub = makeProvider()
+    const result = await explainAskHealth({
+      packet: empty, question, conversation: [], contextMode: 'deep',
+      provider: stub, gate: fakeGate(), model: 'piq-stub', now: 1000,
+    })
+    expect(stub).not.toHaveBeenCalled()
+    expect(result.meta.contextMode).toBe('deep')
+    expect(result.meta.answerScope).toBe('personal')
+    expect(result.answer.blocks[0]?.text).toContain('Not enough Health evidence')
+  })
+
+  it('models see the exact evidence-truncation audit without implied full database access', async () => {
+    const packet = buildAskHealthEvidencePacket({ ...inputFor(), lens: 'general', maxChars: 700 })
+    const stub = makeProvider()
+    const result = await explainAskHealth({
+      packet, question: q, conversation: [], contextMode: 'deep',
+      provider: stub, gate: fakeGate(), model: 'piq-stub', now: 1000,
+    })
+    const message = stub.mock.calls[0]![0].user
+    expect(message).toContain('"evidenceScope"')
+    expect(message).toContain('"truncated":true')
+    expect(result.meta.evidenceOverview.limited).toBe(true)
+    expect(result.meta.evidenceOverview.omittedCount).toBeGreaterThan(0)
+    expect(stub.mock.calls[0]![0].system).toContain('NEVER claim to have reviewed the full database')
+  })
+
+
 })

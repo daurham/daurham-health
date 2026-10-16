@@ -73,6 +73,14 @@ export function askHealthUserPrompt(input: {
       asOf: input.packet.asOf,
       limitations: input.packet.limitations,
       contextSummary: input.packet.contextSummary,
+      evidenceScope: {
+        candidateCount: input.packet.evidenceSelectionAudit?.candidateCount ?? input.packet.evidence.length,
+        suppliedCount: input.packet.evidence.length,
+        omittedCandidateCount: input.packet.evidenceSelectionAudit?.removedCount ?? 0,
+        omittedSubstantiveCount: input.packet.evidenceSelectionAudit?.removedSubstantiveCount ?? 0,
+        truncated: (input.packet.evidenceSelectionAudit?.removedCount ?? 0) > 0 ||
+          Boolean(input.packet.evidenceSelectionAudit?.exceedsMaxChars),
+      },
       evidence: evidenceForModel(input.packet.evidence),
     }),
     'QUESTION:',
