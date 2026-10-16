@@ -15,6 +15,8 @@ export type FocusedDigestiveMetric = {
     sourceIds: string[]
     /** Hydration is an event sum; zero bowel movements requires explicit entry. */
     provisional: boolean
+    /** Explicit stool types from individually saved bowel events, if retrieved. */
+    bristolTypes?: number[]
   }>
 }
 export type FocusedDigestiveEvidence = {
@@ -25,8 +27,43 @@ export type FocusedDigestiveEvidence = {
   bowel: FocusedDigestiveMetric
 }
 
-const DIGESTIVE_QUESTION =
-  /\b(?:fib(?:er|re)|constipat\w*|bowels?|stools?|poop\w*|bristol|hydrat\w*|water(?:\s+intake)?|fluid intake|drinking enough)\b/i
+/** Share terminology between retrieval and the evidence filter. A question
+ * about bowel counts alone must not reveal unrelated fiber/water details. */
+export function digestiveQuestionTopics(question: string): {
+  fiber: boolean; hydration: boolean; bowel: boolean
+} {
+  const symptom = /\b(?:constipat\w*|diarrh\w*|hard stools?|pellet[- ]?like stools?)\b/i.test(question)
+  return {
+    fiber: symptom || /\bfib(?:er|re)\b/i.test(question),
+    hydration: symptom || /\b(?:hydrat\w*|water|fluid intake|drinking enough)\b/i.test(question),
+    bowel: symptom || /\b(?:bowels?|stools?|poop\w*|bristol)\b/i.test(question),
+  }
+}
+
+/** Join only canonical saved events already referenced by the selected days.
+ * Never infer stool type from bowel count, symptoms, or missing records.
+ */
+export function attachBristolTypes(
+  focus: FocusedDigestiveEvidence | null,
+  events: readonly { id: string; date: string; bristolType: number }[],
+): FocusedDigestiveEvidence | null {
+  if (!focus) return null
+  const eventById = new Map(events.map((event) => [event.id, event]))
+  return {
+    ...focus,
+    bowel: {
+      ...focus.bowel,
+      observations: focus.bowel.observations.map((day) => ({
+        ...day,
+        bristolTypes: day.sourceIds.flatMap((id) => {
+          const event = eventById.get(id)
+          return event && event.date === day.date && Number.isInteger(event.bristolType) &&
+            event.bristolType >= 1 && event.bristolType <= 7 ? [event.bristolType] : []
+        }),
+      })),
+    },
+  }
+}
 const SAMPLE_DAYS = 3
 
 function recent<T extends { date: string }>(items: readonly T[]): T[] {
@@ -58,7 +95,8 @@ export function focusDigestiveContext(input: {
    * when a vague question has no digestive terminology. */
   includeBroadContext?: boolean
 }): FocusedDigestiveEvidence | null {
-  if (!input.includeBroadContext && !DIGESTIVE_QUESTION.test(input.question)) return null
+  const topics = digestiveQuestionTopics(input.question)
+  if (!input.includeBroadContext && !topics.fiber && !topics.hydration && !topics.bowel) return null
   const { snapshot, today } = input
   const fiberAll = observationDates(snapshot, 'nutrition.fiber_g', today)
   const fiberStatus = snapshot.coverage.find((c) => c.key === 'nutrition.fiber_g')?.completenessCheck
