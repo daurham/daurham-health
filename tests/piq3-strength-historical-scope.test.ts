@@ -42,7 +42,11 @@ function packet(question: string, asOf = today, evidenceStart = start) {
     generatedAt: today + 'T18:00:00.000Z',
     // The range-wide count below MUST NOT leak into a dated named-lift question.
     overview: {
-      training: { workouts: { status: 'available', value: { count: 99 } }, sessions: [] },
+      training: {
+        workouts: { status: 'available', value: { count: 99 } },
+        consistency: { status: 'insufficient_data', observations: 0 },
+        sessions: [],
+      },
       exercises: [],
     } as unknown as ProgressOverview,
     activity: null, sleep: null, goals: [], experiments: [], benchmarks: [],
