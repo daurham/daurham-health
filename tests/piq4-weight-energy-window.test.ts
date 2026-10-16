@@ -176,7 +176,7 @@ describe('PIQ-4.2 exact requested historical interval boundary (synthetic)',()=>
   })
   it('re-fingerprints a corrected distribution even when the numeric mean stays equal',()=>{
     const q='How many calories last week?'
-    const records=[...base,record('nutrition.calories','2026-10-09',1900,'high_confidence')]
+    const records=[...base,record('nutrition.calories','2026-10-09',2000,'high_confidence')]
     const a=inspect(q,records,{verified:['2026-10-05','2026-10-06','2026-10-07']})
     const b=inspect(q,records,{verified:['2026-10-05','2026-10-06','2026-10-09']})
     expect(a.window?.verifiedCalorieMeanKcal).toBe(b.window?.verifiedCalorieMeanKcal)
