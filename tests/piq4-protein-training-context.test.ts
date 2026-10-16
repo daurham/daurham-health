@@ -176,7 +176,7 @@ describe('PIQ-4.2 owner-settings snapshot is a non-decision consistency guard',(
    })
    expect(changed).toMatchObject({state:'changed_during_read',
      calorieTargetState:'unknown',relevantExperimentCount:null})
-   const fact=inspect({},'Why is my weight stable?','personalized',changed)
+   const fact=inspect({},'Why has my weight stalled?','personalized',changed)
      .packet.evidence.find(e=>e.id==='weight_energy.decision_boundary')
    expect(fact?.text).toContain('UNKNOWN')
    expect(fact?.coverage?.relevantExperimentCount).toBeNull()
