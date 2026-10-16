@@ -20,6 +20,7 @@ import { healthTimeContext } from '../health-time.js'
 import { routeHealthIntelligence } from '../../src/domain/intelligence/shared.js'
 import { loadHealthIntelligenceSnapshot } from '../intelligence/snapshot.js'
 import { getHealthProfile } from '../profile/service.js'
+import { focusTrainingWorkingSets } from '../../src/domain/ask-health/focused-training.js'
 
 export async function loadAskHealthPacketInput(input: {
   lens: AskHealthPacketInput['lens']
@@ -79,6 +80,13 @@ export async function loadAskHealthPacketInput(input: {
     experiments,
     benchmarks,
     supplements,
+    focusedTraining: focusTrainingWorkingSets({
+      question: input.question,
+      exercises: rows.exercises,
+      sets: rows.sets,
+      start: period.start,
+      end: period.end,
+    }),
     context: contextSnapshot(contexts),
     patterns,
     stableProfile: askStableProfileForDate(profile, input.asOf, today),

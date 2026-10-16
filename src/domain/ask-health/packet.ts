@@ -67,6 +67,7 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
   if (wants.training) {
     addTraining(input, push, wants.exerciseDetail)
   }
+  addFocusedTraining(input, push)
   if (wants.supplements || questionMentionsSavedSupplement(input)) {
     addSupplements(input, push)
   }
@@ -648,6 +649,55 @@ function addSleep(input: AskHealthPacketInput, push: (item: PushItem) => void, l
     substantive: source.canonicalNights > 0,
     priority: 2,
   })
+}
+
+
+/** PIQ-3.3: bounded exercise-specific canonical working set evidence.
+ * No inferred training progression from workout counts and no cross-exercise
+ * load comparisons. Each appearance uses the same high-confidence strength
+ * estimator as Progress; missing comparable sets are not zero performance.
+ */
+function addFocusedTraining(input: AskHealthPacketInput, push: (item: PushItem) => void): void {
+  const focus = input.focusedTraining
+  if (!focus) return
+  const detailPath = '/progress/strength/' + focus.exerciseId
+  push({
+    id: 'training.focus.coverage.' + focus.exerciseId,
+    domain: 'training',
+    label: focus.exerciseName + ' comparable strength coverage',
+    value: focus.eligibleAppearances,
+    unit: 'sessions',
+    text: focus.eligibleAppearances === 0
+      ? 'No eligible high-confidence loaded working sets for this exercise in the selected range; missing comparable data is not zero performance.'
+      : 'High-confidence comparable working-set appearances in the selected range. Up to six most recent appearances are shown. Estimates are from logged sets, not directly measured maximum lifts.',
+    coverage: {
+      eligibleAppearances: focus.eligibleAppearances,
+      shownAppearances: focus.appearances.length,
+    },
+    detailPath,
+    userEntered: false,
+    substantive: focus.eligibleAppearances > 0,
+    priority: 1,
+  })
+  for (const item of focus.appearances) {
+    push({
+      id: 'training.focus.set.' + item.setId,
+      domain: 'training',
+      label: focus.exerciseName + ' working set on ' + item.date,
+      value: item.estimated1RmKg,
+      unit: 'kg estimated 1RM',
+      text: item.date + ': representative high-confidence working set for ' + focus.exerciseName +
+        ': ' + item.weightKg + ' kg × ' + item.reps + ' reps, estimated 1RM ' +
+        item.estimated1RmKg + ' kg (Epley; not directly tested).',
+      coverage: { reps: item.reps, recordedLoadKg: item.weightKg },
+      detailPath,
+      userEntered: false,
+      substantive: true,
+      provenance: 'owner',
+      evidenceDates: [item.date],
+      priority: 1,
+    })
+  }
 }
 
 function addTraining(input: AskHealthPacketInput, push: (item: PushItem) => void, detail: boolean) {
