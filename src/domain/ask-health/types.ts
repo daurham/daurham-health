@@ -10,6 +10,7 @@ import type { IntelligenceContextItem, RoutedHealthIntelligence } from '../intel
 import type { AskLens } from './config.js'
 import type { AskNutritionIntegrity } from './nutrition-integrity.js'
 import type { FocusedTrainingEvidence } from './focused-training.js'
+import type { FocusedDigestiveEvidence } from './focused-digestive.js'
 
 export type AskEvidenceCoverage = Record<string, number | string | null>
 
@@ -136,6 +137,7 @@ export type AskHealthPacketInput = {
   context: AskContextInput | null
   patterns: readonly AskPatternInput[]
   focusedTraining?: FocusedTrainingEvidence | null
+  focusedDigestive?: FocusedDigestiveEvidence | null
   stableProfile?: AskStableProfileInput | null
   profile?: AskClinicalProfileInput | null
   intelligence?: RoutedHealthIntelligence | null
