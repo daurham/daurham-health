@@ -10,6 +10,7 @@ SELECT g.id::text AS id, v.id::text AS version_id, v.target_mode,
 FROM goals g LEFT JOIN goal_versions v ON v.goal_id=g.id AND v.is_current
 WHERE g.status='active' AND g.goal_kind='body_metric' AND g.body_metric_key='weight'
   AND g.started_on <= $1::date
+  AND g.archived_at IS NULL
 ORDER BY g.id LIMIT 2
 `
 export type GoalRead =
