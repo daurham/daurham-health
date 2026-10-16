@@ -550,3 +550,8 @@ One narrow Ask Health clarification is eligible only for personal diet/weight tr
 ## 2026-10-15 PIQ-2.5 canonical correction routing — work branch
 
 Ask Health now offers an evidence-level “Something wrong?” review. Verified Health Profile and Nutrition evidence only can deep link to their original editors; unknown/imported/derived evidence is inspect-only. Source editors display a save-first, return-to-Ask banner. The original question/lens/range move via bounded transient router state, rehydrate an unsent question and require an explicit Ask for current records; no chat-based canonical write or unsolicited Gemini call. Settings #health-profile hash scroll is now supported. Added pure allowlist/state regressions. CI and device acceptance pending. Main, prod and schema unchanged.
+
+
+## 2026-10-15 PIQ migration-preflight safety checkpoint
+
+Read-only npm run migration:preflight added; reads schema_migrations and pg_catalog metadata only, prints migration filenames/status and returns nonzero for pending or blocked histories. Existing npm run migrate now checks migration history BEFORE creating its tracking table or applying SQL. Unknown migration filenames, out-of-order applied history, backup inventory mismatch, and occupied schemas without tracked history block writes; fresh empty schemas may initialize. Isolated Postgres CI 38851338365 and full app CI 38851338346 passed on code commit f77f2783. Live Neon/Vercel environment identities remain unverified. No production change, migration, owner health data access or phase acceptance.
