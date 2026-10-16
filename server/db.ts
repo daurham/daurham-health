@@ -1,5 +1,6 @@
 import { neon, type NeonQueryFunction } from '@neondatabase/serverless'
 import { loadLocalEnv } from './env.js'
+import { assertDatabaseBindingIfEnabled } from './database-binding.js'
 
 export type Sql = NeonQueryFunction<false, false>
 
@@ -17,6 +18,7 @@ export async function getDatabaseUrl(): Promise<string> {
   if (typeof url !== 'string' || url.trim() === '') {
     throw new Error('Missing required environment variable: DATABASE_URL')
   }
+  assertDatabaseBindingIfEnabled(process.env)
   return url
 }
 

@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "migrate": "tsx server/migrate.ts",
     "migration:preflight": "tsx server/migration-preflight.ts",
+    "database:binding-preflight": "tsx server/database-binding-preflight.ts",
     "nutrition:legacy-preview": "tsx server/nutrition/legacy-cli.ts",
     "apple-health:preview": "tsx server/apple-health/cli.ts",
     "apple-health:compact-preview": "tsx server/apple-health/compact-cli.ts",
