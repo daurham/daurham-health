@@ -364,6 +364,7 @@ async function loadEvidence(
   target: GoalTarget,
   asOf: string,
   timezone: string,
+  capture?:{bodyWeightSourceRevision:string|null},
 ): Promise<GoalEvidence> {
   const empty: Omit<Parameters<typeof goalEvidence>[0], 'goalKind' | 'target' | 'asOf'> = {
     body: null,
@@ -377,7 +378,10 @@ async function loadEvidence(
     adherence: null,
   }
   if (row.goal_kind === 'body_metric' && row.body_metric_key) {
-    empty.body = await loadBodyGoalPointAsOf(sql, row.body_metric_key, timezone, asOf)
+    const point=await loadBodyGoalPointAsOf(sql, row.body_metric_key, timezone, asOf)
+    empty.body=point
+    if(capture&&row.body_metric_key==='weight')
+      capture.bodyWeightSourceRevision=point?.sourceRevision??null
   }
   if (row.goal_kind === 'strength_e1rm' && row.exercise_definition_id) {
     const exercises = (await sql.query(
@@ -746,10 +750,15 @@ export async function listGoalAskSnapshots(asOf: string, healthToday?: string) {
       continue
     }
     const target = targetFrom(current)
-    const evidence = await loadEvidence(sql, row, target, asOf, timezone)
+    const sourceCapture:{bodyWeightSourceRevision:string|null}={
+      bodyWeightSourceRevision:null,
+    }
+    const evidence = await loadEvidence(sql, row, target, asOf, timezone, sourceCapture)
     const derived = await deriveGoalStatus(sql, row, current, evidence, asOf)
     goals.push({
       id: row.id,
+      bodyWeightSourceRevision:row.goal_kind==='body_metric'&&
+        row.body_metric_key==='weight'?sourceCapture.bodyWeightSourceRevision:undefined,
       kind: row.goal_kind,
       lifecycle: row.status,
       label: goalDisplayName({
