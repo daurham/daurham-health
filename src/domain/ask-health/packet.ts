@@ -4,6 +4,7 @@ import type { OccurrenceState } from '../supplements/types.js'
 import { ASK_HEALTH_PACKET_VERSION, ASK_PACKET_MAX_CHARS, type AskLens } from './config.js'
 import { MIN_VERIFIED_NUTRITION_TARGET_DAYS } from './nutrition-integrity.js'
 import { digestiveQuestionTopics } from './focused-digestive.js'
+import { deriveDigestiveSampleScreen } from './digestive-screen.js'
 import type {
   AskClinicalProfileInput,
   AskStableProfileInput,
@@ -867,6 +868,54 @@ function addFocusedDigestive(input: AskHealthPacketInput, push: (item: PushItem)
         substantive: true,
         evidenceDates: [day.date],
         provenance: isFiber ? 'owner_confirmed_reliable' : 'owner_logged',
+        priority: 1,
+      })
+    }
+  }
+
+  // PIQ-4.1: precise, sample-scoped derived observation only for questions
+  // explicitly connecting bowel symptoms with nutrition/water. Never imply
+  // a whole-window association from independently truncated 3-day examples.
+  if (input.contextMode !== 'general_only' && topics.bowel && (topics.fiber || topics.hydration)) {
+    const screen = deriveDigestiveSampleScreen(focus)
+    if (screen) {
+      const hardText = screen.hardTypedEvents > 0
+        ? screen.hardTypedEvents + ' of ' + screen.typedEvents +
+          ' selected event records with saved Bristol type are type 1–2 (hard-stool range).'
+        : 'None of the ' + screen.typedEvents +
+          ' selected event records with saved Bristol type are type 1–2; this does not exclude other unobserved hard stools.'
+      push({
+        id: 'digestive.screen.sampled_bristol',
+        domain: 'bowel',
+        label: 'Bristol-type sample screen (not a diagnosis)',
+        value: screen.hardTypedEvents,
+        unit: 'typed events in hard-stool range',
+        text: 'On at most three selected dated bowel-observation days, ' + hardText +
+          ' Other selected event records without a type: ' + screen.untypedEventRecords +
+          '; explicit no-movement day records: ' + screen.explicitZeroDays + '.' +
+          ' In the independently capped displayed examples, same-date logged water appears on ' +
+          screen.daysAlsoShowingLoggedWater + ' bowel day(s) and verified whole-day fiber on ' +
+          screen.daysAlsoShowingVerifiedFiber + ' bowel day(s).' +
+          (screen.provisionalBowelDays > 0 ? ' One or more selected bowel days are still provisional.' : '') +
+          ' These examples are not a complete stool history or enough to prove a personal water/fiber relationship;' +
+          ' missing logs are unknown, and logged water is not total fluid consumption.' +
+          ' A hard-stool report is an observation, not proof of dehydration, a nutrition deficiency,' +
+          ' a medication effect, or a clinical diagnosis.',
+        coverage: {
+          sampledBowelDays: screen.sampledBowelDays,
+          typedEvents: screen.typedEvents,
+          hardTypedEvents: screen.hardTypedEvents,
+          untypedEventRecords: screen.untypedEventRecords,
+          explicitZeroDays: screen.explicitZeroDays,
+          coincidentWaterExampleDays: screen.daysAlsoShowingLoggedWater,
+          coincidentVerifiedFiberExampleDays: screen.daysAlsoShowingVerifiedFiber,
+          provisionalBowelDays: screen.provisionalBowelDays,
+        },
+        detailPath: '/today',
+        evidenceDates: screen.typedEvidenceDates,
+        provenance: 'derived_from_selected_owner_logged_events',
+        userEntered: false,
+        substantive: true,
         priority: 1,
       })
     }
