@@ -10,6 +10,7 @@ import { UNCHECKED_EXPERIMENT_TIMING, type ExperimentTimingReview } from './expe
 import { UNCHECKED_EXPERIMENT_OUTCOME, type ExperimentOutcomeReview } from './experiment-outcome-review.js'
 import { UNCHECKED_RECENT_RESULT, type RecentExperimentResultReview } from './recent-experiment-result-review.js'
 import { UNCHECKED_WEIGHT_ENERGY_RECONCILIATION, type WeightEnergyReconciliation } from './weight-energy-reconciliation.js'
+import { UNCHECKED_CANONICAL_GOAL_STATUS, type CanonicalGoalStatusReview } from './canonical-goal-status-review.js'
 
 /**
  * PIQ-4.2 FIRST SLICE — purely descriptive, explicitly bounded weight/intake
@@ -56,6 +57,8 @@ export type FocusedWeightEnergyEvidence = {
   recentExperimentResultReview: RecentExperimentResultReview
   /** Read-only cross-signal reconciliation; never a calorie decision gate. */
   reconciliation: WeightEnergyReconciliation
+  /** Exact-ID/version current Goal Control report; measurement sources NOT locked. */
+  canonicalGoalStatus: CanonicalGoalStatusReview
   /** Distinguishes "not checked" from a positive safety finding. */
   goalVerification: 'not_checked'
   decisionVerification: 'not_checked'
@@ -146,6 +149,7 @@ export function focusWeightEnergyContext(input: {
     experimentOutcomeReview: {...UNCHECKED_EXPERIMENT_OUTCOME},
     recentExperimentResultReview: {...UNCHECKED_RECENT_RESULT},
     reconciliation: {...UNCHECKED_WEIGHT_ENERGY_RECONCILIATION},
+    canonicalGoalStatus: {...UNCHECKED_CANONICAL_GOAL_STATUS},
     goalVerification: 'not_checked',
     decisionVerification: 'not_checked',
     strengthPreservation: 'not_verified',

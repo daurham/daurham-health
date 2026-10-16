@@ -760,6 +760,7 @@ export async function listGoalAskSnapshots(asOf: string, healthToday?: string) {
         supplementName: row.supplement_name,
       }),
       targetText: formatGoalTarget(target),
+      versionId: current.id,
       targetState: derived.goalStatus.targetState,
       deadlineState: derived.goalStatus.deadlineState,
       projectionState: derived.projection?.state ?? null,

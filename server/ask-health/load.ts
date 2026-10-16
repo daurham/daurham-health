@@ -45,6 +45,7 @@ import {screenExperimentOutcomeReview} from '../../src/domain/ask-health/experim
 import {readRecentExperimentResults} from './recent-experiment-results.js'
 import {screenRecentExperimentResults} from '../../src/domain/ask-health/recent-experiment-result-review.js'
 import {reconcileWeightEnergyEvidence} from '../../src/domain/ask-health/weight-energy-reconciliation.js'
+import {reviewCanonicalSelectedGoal} from '../../src/domain/ask-health/canonical-goal-status-review.js'
 import { loadTrainingProgressionState } from '../intelligence/training-progression.js'
 
 export async function loadAskHealthPacketInput(input: {
@@ -245,8 +246,16 @@ export async function loadAskHealthPacketInput(input: {
       asOf:input.asOf,today,
       settings:focusedWeightEnergy.currentSettings,read:recentExperimentRead,
     })
+    focusedWeightEnergy.canonicalGoalStatus = reviewCanonicalSelectedGoal({
+      asOf:input.asOf,today,
+      settings:focusedWeightEnergy.currentSettings,
+      priority:focusedWeightEnergy.primaryGoalPriority,
+      read:currentGoalRead,snapshots:goals,
+      observation:focusedWeightEnergy.weightGoalObservation,
+    })
     focusedWeightEnergy.reconciliation = reconcileWeightEnergyEvidence({
       asOf:input.asOf,today,
+      canonicalGoal:focusedWeightEnergy.canonicalGoalStatus,
       settings:focusedWeightEnergy.currentSettings,
       goalObservation:focusedWeightEnergy.weightGoalObservation,
       primaryGoal:focusedWeightEnergy.primaryGoalPriority,

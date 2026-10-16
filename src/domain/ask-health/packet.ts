@@ -779,6 +779,34 @@ function addFocusedWeightEnergy(
       invalidatedResults:finalized.invalidatedResults},
     detailPath:'/lab',userEntered:false,substantive:false,priority:1,
   })
+  const canonical=focus.canonicalGoalStatus
+  const canonicalText=canonical.state==='canonical_reported'
+    ? 'Goal Control reports '+canonical.targetReport+' for the exact current selected goal version; its measurements are not independently revision-locked. '
+    :canonical.state==='measurement_disagreement'
+      ? 'Recent comparable weigh-ins and Goal Control’s reported current target state disagree; review measurement timing and sources. '
+      :canonical.state==='version_mismatch'
+        ? 'Goal Control and the selected active goal do not have a matching current identity/version; the reported status is WITHHELD. '
+        :canonical.state==='canonical_target_unknown'
+          ? 'Goal Control does not have a usable current target observation, so satisfaction and missed deadlines are NOT verified. '
+          :canonical.state==='primary_not_weight'
+            ? 'No active weight goal was selected as primary; this screen withholds weight-goal achievement and urgency. '
+            : 'Exact selected-goal status or source versions could not be reconciled. '
+  push({
+    id:'weight_energy.canonical_goal_status',domain:'goals',
+    label:'Goal Control current-version report and deadline evidence boundary',
+    value:null,unit:null,period,
+    text:canonicalText+
+      'Deadline attention is descriptive; a past or due deadline with missing observation is NOT proof the goal is unmet. '+
+      'The latest goal observation is not atomically versioned with the decision fingerprint; no plateau, efficacy, clinical urgency or calorie intervention follows.',
+    coverage:{
+      canonicalGoalReview:canonical.state,
+      reportedTargetState:canonical.targetReport,
+      deadlineAttention:canonical.deadlineAttention,
+      measurementRevision:canonical.measurementRevision,
+      intervention:canonical.intervention,
+    },
+    detailPath:'/goals',userEntered:false,substantive:false,priority:0,
+  })
   const combined=focus.reconciliation
   const summary=combined.state==='goal_source_conflict'
     ? 'The selected primary weight goal disagrees with the attested active-goal identity or recorded goal evidence. Review Goal Control before interpreting direction. '
@@ -835,7 +863,7 @@ function addFocusedWeightEnergy(
     domain:'intelligence',label:'Plateau, calorie-change and strength-preservation decision boundary',
     value:null,unit:null,period,
     text:'This Ask Health screen has NOT established whether a weight goal is truly met, target suitability, or preserved strength-performance outcomes. '+
-      settingsExplanation + goalSummary + prioritySummary + timingText + outcomeSummary + finalizedText + summary +
+      settingsExplanation + goalSummary + prioritySummary + timingText + outcomeSummary + finalizedText + canonicalText + summary +
       'Therefore it CANNOT classify an owner-specific weight-loss plateau, certify that strength is preserved, or recommend any calorie cut. '+
       'Logged training session dates are activity records, not evidence of stable lifting performance. Recorded hunger/energy/soreness ratings are context, not proof of adequate recovery. '+
       'Carbohydrate/sodium shifts, fluid balance, bowel changes, weigh-in conditions and supplements may confound short-term scale readings; none is established as this owner’s cause here. '+
@@ -855,6 +883,8 @@ function addFocusedWeightEnergy(
       experimentOutcomeRelevance:outcome.state,
       recentFinalizedResultReview:finalized.state,
       crossSignalReconciliation:combined.state,
+      currentSelectedCanonicalGoal:canonical.state,
+      currentCanonicalDeadline:canonical.deadlineAttention,
       calorieChangeAuthorization:combined.calorieAdjustment,
       strengthPreservation:focus.strengthPreservation,
     },
