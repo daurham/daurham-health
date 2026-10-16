@@ -24,6 +24,7 @@ import { focusTrainingWorkingSets } from '../../src/domain/ask-health/focused-tr
 import { attachBristolTypes, digestiveQuestionTopics, focusDigestiveContext } from '../../src/domain/ask-health/focused-digestive.js'
 import { bowelSnapshotEventIds, selectDigestiveBowelWindow, summarizeBowelWindow, type DigestiveBowelWindow } from '../../src/domain/ask-health/digestive-window.js'
 import { screenDigestiveLagReadiness } from '../../src/domain/ask-health/digestive-pairing.js'
+import { recheckDigestivePairingSources } from './digestive-consistency.js'
 import type { AskContextMode } from '../../src/domain/ask-health/config.js'
 
 export async function loadAskHealthPacketInput(input: {
@@ -142,10 +143,23 @@ export async function loadAskHealthPacketInput(input: {
         }
       }
     }
-    focusedDigestive = { ...focusedDigestive, bowelWindow,
-      digestivePairing: screenDigestiveLagReadiness(intelligenceSnapshot, bowelWindow, today, contexts.map(row => ({
-        contextDate: row.contextDate, tags: row.tags,
-      }))),
+    const needsPairedEvidence = bowelWindow.status === 'available' &&
+      (input.contextMode === 'deep' || topics.bowel && (topics.fiber || topics.hydration))
+    const contextTags = contexts.map(row => ({
+      contextDate: row.contextDate, tags: row.tags,
+    }))
+    const sourcesAgree = !needsPairedEvidence || await recheckDigestivePairingSources({
+      snapshot: intelligenceSnapshot,
+      scope: selectedBowelWindow.scope,
+      today,
+      contexts: contextTags,
+    })
+    focusedDigestive = {
+      ...focusedDigestive, bowelWindow,
+      digestivePairing: sourcesAgree && needsPairedEvidence
+        ? screenDigestiveLagReadiness(intelligenceSnapshot, bowelWindow, today, contextTags)
+        : null,
+      digestiveConsistencyIssue: !sourcesAgree ? 'changed_or_unavailable' : null,
     }
   }
   return {

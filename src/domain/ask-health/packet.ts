@@ -746,7 +746,25 @@ function addFocusedDigestive(input: AskHealthPacketInput, push: (item: PushItem)
   ] as const
 
   const topics = digestiveQuestionTopics(input.question)
+  if (focus.digestiveConsistencyIssue && (input.contextMode === 'deep' ||
+      topics.bowel && (topics.fiber || topics.hydration))) {
+    push({
+      id: 'digestive.source_consistency.unavailable',
+      domain: 'intelligence',
+      label: 'Digestive paired-source consistency unverified',
+      value: null,unit:null,
+      period:{start:focus.bowelWindow?.scope.start ?? focus.start,
+        end:focus.bowelWindow?.scope.end ?? focus.end},
+      text: 'Verified fiber, logged water or dated context could not be matched across the request reads. ' +
+        'Any cross-domain digestive interpretation and logged fiber/water examples are withheld; try a fresh question after records settle. ' +
+        'This does not indicate that an unlogged day is zero or establish any personal relationship.',
+      coverage:null, detailPath:'/today',userEntered:false,substantive:false,priority:0,
+    })
+  }
   for (const { key, metric, unit, path } of metrics) {
+    // Source aggregates may have changed after the first intelligence query.
+    // Bowel totals are separately reconciled, so preserve bowel-only evidence.
+    if (focus.digestiveConsistencyIssue && key !== 'bowel') continue
     // Default Personal/Smart is minimum-necessary context; Deep Dive
     // deliberately includes all bounded cross-domain signals on opt-in.
     if (input.contextMode !== 'deep' && !topics[key]) continue
@@ -876,7 +894,7 @@ function addFocusedDigestive(input: AskHealthPacketInput, push: (item: PushItem)
   // PIQ-4.1: precise, sample-scoped derived observation only for questions
   // explicitly connecting bowel symptoms with nutrition/water. Never imply
   // a whole-window association from independently truncated 3-day examples.
-  if (input.contextMode !== 'general_only' && topics.bowel && (topics.fiber || topics.hydration)) {
+  if (!focus.digestiveConsistencyIssue && input.contextMode !== 'general_only' && topics.bowel && (topics.fiber || topics.hydration)) {
     const screen = deriveDigestiveSampleScreen(focus)
     if (screen) {
       const hardText = screen.hardTypedEvents > 0

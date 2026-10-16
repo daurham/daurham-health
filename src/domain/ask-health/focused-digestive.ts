@@ -51,6 +51,8 @@ export type FocusedDigestiveEvidence = {
   /** Full-window totals are separate from the existing three sampled example days. */
   bowelWindow?: DigestiveBowelWindow | null
   digestivePairing?: DigestivePairingReadiness | null
+  /** Independent source reread could not confirm same paired-input facts. */
+  digestiveConsistencyIssue?: 'changed_or_unavailable' | null
 }
 
 /** Share terminology between retrieval and the evidence filter. A question
