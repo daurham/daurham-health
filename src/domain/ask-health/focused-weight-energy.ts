@@ -2,6 +2,7 @@ import { buildMaintenanceState, type MaintenanceEstimate, type ScaleNoiseFactor 
 import { addCalendarDays } from '../training-plan.js'
 import type { HealthIntelligenceSnapshot } from '../intelligence/shared.js'
 import { screenProteinTrainingContext, type ProteinTrainingContext } from './protein-training-context.js'
+import { UNCHECKED_WEIGHT_ENERGY_SETTINGS, type WeightEnergyCurrentSettings } from './weight-energy-current-settings.js'
 
 /**
  * PIQ-4.2 FIRST SLICE — purely descriptive, explicitly bounded weight/intake
@@ -32,6 +33,8 @@ export type FocusedWeightEnergyEvidence = {
    */
   qualifiedScaleContext: Array<Pick<ScaleNoiseFactor,
     'id' | 'kind' | 'title' | 'detail' | 'dates' | 'detailPath'>>
+  /** Read-time current target/experiment revision status, NOT permission to adjust calories. */
+  currentSettings: WeightEnergyCurrentSettings
   /** Distinguishes "not checked" from a positive safety finding. */
   goalVerification: 'not_checked'
   decisionVerification: 'not_checked'
@@ -114,6 +117,7 @@ export function focusWeightEnergyContext(input: {
       .map(({id,kind,title,detail,dates,detailPath}) => ({
         id,kind,title,detail,dates,detailPath,
       })),
+    currentSettings: {...UNCHECKED_WEIGHT_ENERGY_SETTINGS},
     goalVerification: 'not_checked',
     decisionVerification: 'not_checked',
     strengthPreservation: 'not_verified',

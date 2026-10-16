@@ -637,11 +637,25 @@ function addFocusedWeightEnergy(
     },
     detailPath:'/training',userEntered:false,substantive:false,priority:1,
   })
+  const settings = focus.currentSettings
+  const settingsExplanation = settings.state === 'consistent_read'
+    ? 'A read-time current-settings revision was consistent across two checks. At that moment the owner ' +
+      (settings.calorieTargetState === 'configured'
+        ? 'had a configured calorie target' : 'had no configured calorie target') +
+      ' and ' + settings.relevantExperimentCount +
+      ' active or soon-scheduled experiment(s) in the maintenance review window. ' +
+      'A configured target is NOT measured energy expenditure, a clinically safe level, or permission to change it. ' +
+      'A matched revision fingerprints active goal versions but does not establish weight-goal direction. '
+    : settings.state === 'changed_during_read'
+      ? 'Current settings changed during the read. Target and experiment state are UNKNOWN until refreshed; do not assume no experiments. '
+      : 'The current calorie target, goal revisions and active or soon-scheduled experiment state were not verified by this screen; missing values are UNKNOWN, not absent. '
   push({
     id:'weight_energy.decision_boundary',
     domain:'intelligence',label:'Plateau, calorie-change and strength-preservation decision boundary',
     value:null,unit:null,period,
-    text:'This Ask Health screen has NOT verified the active weight-goal direction/version, current calorie target/revision, planned experiments, or comparable strength-performance outcomes. Therefore it CANNOT classify an owner-specific weight-loss plateau, certify that strength is preserved, or recommend any calorie cut. '+
+    text:'This Ask Health screen has NOT verified the active weight-goal direction, target suitability, or comparable strength-performance outcomes. '+
+      settingsExplanation +
+      'Therefore it CANNOT classify an owner-specific weight-loss plateau, certify that strength is preserved, or recommend any calorie cut. '+
       'Logged training session dates are activity records, not evidence of stable lifting performance. Recorded hunger/energy/soreness ratings are context, not proof of adequate recovery. '+
       'Carbohydrate/sodium shifts, fluid balance, bowel changes, weigh-in conditions and supplements may confound short-term scale readings; none is established as this owner’s cause here. '+
       'A decision requires the separate current-versions Goal Control/maintenance safety review or an owner-approved Personal Lab calibration.',
@@ -650,6 +664,9 @@ function addFocusedWeightEnergy(
       recordedWellnessCheckinDays:focus.wellnessCheckinDays,
       goalVerification:focus.goalVerification,
       decisionVerification:focus.decisionVerification,
+      currentSettingsCheck:settings.state,
+      calorieTargetState:settings.calorieTargetState,
+      relevantExperimentCount:settings.relevantExperimentCount,
       strengthPreservation:focus.strengthPreservation,
     },
     detailPath:'/goals',userEntered:false,substantive:false,priority:0,

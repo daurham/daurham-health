@@ -2,6 +2,7 @@ import { describe,expect,it } from 'vitest'
 import { buildHealthIntelligenceSnapshot,type IntelligenceObservation } from '../src/domain/intelligence/shared.js'
 import { addCalendarDays } from '../src/domain/training-plan.js'
 import { screenProteinTrainingContext } from '../src/domain/ask-health/protein-training-context.js'
+import { screenWeightEnergyCurrentSettings, type WeightEnergyCurrentSettings } from '../src/domain/ask-health/weight-energy-current-settings.js'
 import { focusWeightEnergyContext } from '../src/domain/ask-health/focused-weight-energy.js'
 import { buildAskHealthEvidencePacket,packetFingerprintMaterial } from '../src/domain/ask-health/packet.js'
 import type { AskHealthPacketInput } from '../src/domain/ask-health/types.js'
@@ -46,11 +47,13 @@ function data(opts:Options={}){
  return {snapshot,verified}
 }
 function inspect(opts:Options={},question='Why has my weight loss stalled?',
-  contextMode:'personalized'|'deep'|'general_only'='personalized'){
+  contextMode:'personalized'|'deep'|'general_only'='personalized',
+  settings?:WeightEnergyCurrentSettings){
  const x=data(opts)
  const focus=contextMode==='general_only'?null:focusWeightEnergyContext({
   question,snapshot:x.snapshot,today,includeBroadContext:contextMode==='deep',
  })
+ if (focus && settings) focus.currentSettings=settings
  const input:AskHealthPacketInput={question,contextMode,lens:'general',range:'90d',
   asOf:today,period:{start,end:today},generatedAt:today+'T18:00:00Z',
   overview:null,activity:null,sleep:null,goals:[],experiments:[],benchmarks:[],
@@ -146,5 +149,66 @@ describe('PIQ-4.2 recorded protein and training context is NOT strength preserva
    today,verifiedCalorieDates:x.verified,
   })
   expect(f.strengthOutcome).toBe('not_verified')
+ })
+})
+
+describe('PIQ-4.2 owner-settings snapshot is a non-decision consistency guard',()=>{
+ const baseline={status:'available' as const,currentCalorieTarget:2200,
+   activeExperimentCount:1,revision:'a'.repeat(32)}
+ it('describes a consistent current revision without claiming weight-goal approval',()=>{
+   const s=screenWeightEnergyCurrentSettings(baseline,{...baseline})
+   expect(s).toEqual({state:'consistent_read',calorieTargetState:'configured',relevantExperimentCount:1})
+   const packet=inspect({},'Why has my weight stalled?','personalized',s).packet
+   const fact=packet.evidence.find(e=>e.id==='weight_energy.decision_boundary')
+   expect(fact?.substantive).toBe(false)
+   expect(fact?.coverage).toMatchObject({
+     currentSettingsCheck:'consistent_read',calorieTargetState:'configured',
+     relevantExperimentCount:1,goalVerification:'not_checked',decisionVerification:'not_checked',
+   })
+   expect(fact?.text).toContain('NOT measured energy expenditure')
+   expect(fact?.text).toContain('CANNOT classify')
+   expect(JSON.stringify(fact)).not.toContain(baseline.revision)
+   expect(JSON.stringify(fact)).not.toContain('2200')
+ })
+ it('withholds both target and experiment count if a goal version changes but totals remain equal',()=>{
+   const changed=screenWeightEnergyCurrentSettings(baseline,{
+     ...baseline,revision:'b'.repeat(32),
+   })
+   expect(changed).toMatchObject({state:'changed_during_read',
+     calorieTargetState:'unknown',relevantExperimentCount:null})
+   const fact=inspect({},'Why is my weight stable?','personalized',changed)
+     .packet.evidence.find(e=>e.id==='weight_energy.decision_boundary')
+   expect(fact?.text).toContain('UNKNOWN')
+   expect(fact?.coverage?.relevantExperimentCount).toBeNull()
+ })
+ it('failed or malformed reads do not equate missing DB rows to no experiment',()=>{
+   const unavailable={status:'unavailable' as const,currentCalorieTarget:null,
+     activeExperimentCount:0,revision:null}
+   for(const read of [unavailable,{...baseline,activeExperimentCount:-1},
+     {...baseline,revision:null}]){
+     expect(screenWeightEnergyCurrentSettings(baseline,read)).toMatchObject({
+       state:'unavailable',calorieTargetState:'unknown',relevantExperimentCount:null,
+     })
+   }
+ })
+ it('no target is distinct from unavailable, but never represents a safe clinical target',()=>{
+   const noTarget={...baseline,currentCalorieTarget:null,activeExperimentCount:0}
+   expect(screenWeightEnergyCurrentSettings(noTarget,noTarget)).toMatchObject({
+     state:'consistent_read',calorieTargetState:'not_configured',relevantExperimentCount:0,
+   })
+ })
+ it('General Only and historical questions never include settings-bound private evidence',()=>{
+   const screen=screenWeightEnergyCurrentSettings(baseline,baseline)
+   for(const x of [inspect({},'Why has my weight stalled?','general_only',screen),
+     inspect({},'Why was I plateauing last week?','personalized',screen)]){
+     expect(x.packet.evidence.find(e=>e.id==='weight_energy.decision_boundary')).toBeUndefined()
+   }
+ })
+ it('a settings revision changes the selected evidence and cached answer fingerprint',()=>{
+   const stable=inspect({},'Why has my weight stalled?','personalized',
+     screenWeightEnergyCurrentSettings(baseline,baseline)).packet
+   const changed=inspect({},'Why has my weight stalled?','personalized',
+     screenWeightEnergyCurrentSettings(baseline,{...baseline,revision:'c'.repeat(32)})).packet
+   expect(packetFingerprintMaterial(stable)).not.toBe(packetFingerprintMaterial(changed))
  })
 })

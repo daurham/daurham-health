@@ -29,6 +29,8 @@ import { focusWeightEnergyContext } from '../../src/domain/ask-health/focused-we
 import { focusHistoricalWeightEnergyDay } from '../../src/domain/ask-health/focused-weight-energy-history.js'
 import { focusHistoricalWeightEnergyWindow } from '../../src/domain/ask-health/focused-weight-energy-window.js'
 import type { AskContextMode } from '../../src/domain/ask-health/config.js'
+import { screenWeightEnergyCurrentSettings } from '../../src/domain/ask-health/weight-energy-current-settings.js'
+import { readMaintenanceDecisionSnapshot } from '../intelligence/maintenance-revision.js'
 
 export async function loadAskHealthPacketInput(input: {
   lens: AskHealthPacketInput['lens']
@@ -62,6 +64,16 @@ export async function loadAskHealthPacketInput(input: {
     loadHealthIntelligenceSnapshot({ range: input.range, asOf: input.asOf }),
     getHealthProfile(),
   ])
+  // Only a current, owner-personalized, non-historical weight question
+  // triggers additional read-only decision-setting checks. General Only,
+  // historical as-of and unrelated questions never perform these queries.
+  const focusedWeightEnergy = input.contextMode !== 'general_only'
+    ? focusWeightEnergyContext({
+        question: input.question, snapshot: intelligenceSnapshot, today,
+        includeBroadContext: input.contextMode === 'deep',
+      }) : null
+  const capturedDecision = focusedWeightEnergy && input.asOf === today
+    ? await readMaintenanceDecisionSnapshot(input.asOf) : null
   const activity = buildActivityProgressView(
     activityRows.filter((row) => row.date <= input.asOf),
     { range: input.range, asOf: input.asOf, today, timezone },
@@ -165,6 +177,13 @@ export async function loadAskHealthPacketInput(input: {
       digestiveConsistencyIssue: !sourcesAgree ? 'changed_or_unavailable' : null,
     }
   }
+  // Bracket other retrieval work with a fresh read. A failed/changed view
+  // remains UNKNOWN rather than claiming no experiments or a safe target.
+  if (focusedWeightEnergy && capturedDecision) {
+    focusedWeightEnergy.currentSettings = screenWeightEnergyCurrentSettings(
+      capturedDecision, await readMaintenanceDecisionSnapshot(input.asOf),
+    )
+  }
   return {
     lens: input.lens,
     range: input.range,
@@ -186,13 +205,7 @@ export async function loadAskHealthPacketInput(input: {
       ? focusHistoricalWeightEnergyWindow({question:input.question,snapshot:intelligenceSnapshot,today}) : null,
     focusedWeightEnergyDay: input.contextMode !== 'general_only'
       ? focusHistoricalWeightEnergyDay({question:input.question,snapshot:intelligenceSnapshot,today}) : null,
-    focusedWeightEnergy: input.contextMode !== 'general_only'
-      ? focusWeightEnergyContext({
-          question: input.question,
-          snapshot: intelligenceSnapshot,
-          today,
-          includeBroadContext: input.contextMode === 'deep',
-        }) : null,
+    focusedWeightEnergy,
     focusedTraining: focusTrainingWorkingSets({
       question: input.question,
       exercises: rows.exercises,
