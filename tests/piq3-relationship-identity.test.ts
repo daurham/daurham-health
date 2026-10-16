@@ -1,0 +1,157 @@
+import { describe, expect, it, vi } from 'vitest'
+import type { AskEvidence, AskHealthAnswer, AskHealthPacket } from '../src/domain/ask-health/types.js'
+import { registeredRelationshipSpec } from '../src/domain/intelligence/shared.js'
+import {
+  claimedRelationshipSignals, groundHistoricalAnswer,
+} from '../src/domain/ask-health/temporal-citations.js'
+import { explainAskHealth } from '../server/ask-health/service.js'
+import { createAskHealthGate } from '../server/ask-health/gate.js'
+
+const asOf = '2026-10-15'
+const window = { start: '2026-10-05', end: '2026-10-11' }
+const question = 'Were my logged water and bowel movements correlated last week?'
+function relationship(id: string, rho = 0.64): AskEvidence {
+  const spec = registeredRelationshipSpec(id)
+  if (!spec) throw Error('unknown synthetic relationship')
+  return {
+    id: 'intelligence.relationship.' + id,
+    domain: 'intelligence',
+    label: 'Personal relationship',
+    value: rho, unit: 'Spearman rho', text: 'Verified screened association only; not causal.',
+    period: window, coverage: {
+      pairedObservations: 14, requiredObservations: spec.xKey === 'activity.steps' ? 14 : 10,
+      xKey: spec.xKey, yKey: spec.yKey, lagDays: spec.lagDays,
+    },
+    evidenceDates: ['2026-10-06', '2026-10-07'], detailPath: '/progress',
+    userEntered: false, substantive: true, confidence: 'high',
+  }
+}
+const waterBowelSame = relationship('shared:hydration:bowel:same_day')
+const waterBowelNext = relationship('shared:hydration:bowel:next_day', 0.44)
+const fiberBowelSame = relationship('shared:fiber:bowel:same_day')
+const sleepEnergy = relationship('shared:sleep:energy', -0.42)
+const packet = (evidence: AskEvidence[]): AskHealthPacket => ({
+  packetVersion: 'ask-health-evidence-v2', range: '90d', lens: 'general',
+  rangeStart: '2026-09-01', rangeEnd: asOf, asOf, healthToday: asOf,
+  generatedAt: '2026-10-15T17:00:00.000Z',
+  evidence, contextSummary: { knows: [], missing: [] }, limitations: [], clarification: null,
+})
+const item = (text: string, evidenceRefs: string[]) => ({ text, evidenceRefs })
+const answer = (...blocks: AskHealthAnswer['blocks']): AskHealthAnswer => ({
+  blocks, limitations: [], followUps: [],
+})
+const audit = (statement: string, cited: AskEvidence[], prompt = question) =>
+  groundHistoricalAnswer(answer(item(statement, cited.map(s => s.id))), packet(cited), prompt)
+const accepted = (statement: string, cited: AskEvidence[], q?: string) => {
+  const result = audit(statement, cited, q)
+  expect(result.blocks[0]?.text).toBe(statement)
+  expect(result.limitations).toEqual([])
+}
+const withheld = (statement: string, cited: AskEvidence[], q?: string) => {
+  const result = audit(statement, cited, q)
+  expect(result.blocks[0]?.text).toContain('cannot verify')
+  expect(result.limitations).toHaveLength(1)
+}
+
+describe('PIQ-3 relationship pairing and lag identity audit', () => {
+  it('binds every registered relationship to its exact screened signals and lag', () => {
+    expect(registeredRelationshipSpec('shared:hydration:bowel:same_day')).toEqual({
+      xKey: 'hydration.ml', yKey: 'bowel.count', lagDays: 0,
+    })
+    expect(registeredRelationshipSpec('shared:hydration:bowel:next_day')).toEqual({
+      xKey: 'hydration.ml', yKey: 'bowel.count', lagDays: 1,
+    })
+    expect(registeredRelationshipSpec('unregistered:fake')).toBeNull()
+    expect(claimedRelationshipSignals('Your logged water, fiber and bowel records')).toEqual([
+      'hydration.ml', 'bowel.count', 'nutrition.fiber_g',
+    ])
+  })
+
+  it('rejects unrelated valid relationships instead of accepting any cited rho', () => {
+    const claim = 'Your logged water and bowel events were correlated last week.'
+    accepted(claim, [waterBowelSame])
+    withheld(claim, [fiberBowelSame])
+    withheld(claim, [sleepEnergy])
+    withheld(claim, [fiberBowelSame, sleepEnergy])
+    accepted('Your logged fiber and bowel movements were correlated last week.', [fiberBowelSame])
+    withheld('Your water, fiber and bowel movements were correlated last week.', [waterBowelSame, fiberBowelSame])
+    withheld('Your Health records were correlated last week.', [waterBowelSame])
+  })
+
+  it('validates same-day versus following-day claims and next-day direction', () => {
+    accepted('Your water and bowel observations were correlated on the same day last week.', [waterBowelSame])
+    withheld('Your water and bowel observations were correlated on the same day last week.', [waterBowelNext])
+    accepted('Your water and bowel observations were correlated the next day last week.', [waterBowelNext])
+    withheld('Your water and bowel observations were correlated the next day last week.', [waterBowelSame])
+    withheld('Your bowel and water observations were correlated the next day last week.', [waterBowelNext])
+    withheld('Your water and bowel were correlated on the same day and the next day last week.', [waterBowelSame, waterBowelNext])
+    // If the answer does not name a timing claim, either lag may be cited.
+    accepted('Your water and bowel observations were correlated last week.', [waterBowelNext])
+  })
+
+  it('requires the cited identity and statistical metadata to agree with the registry', () => {
+    const claim = 'Your water and bowel observations were correlated last week.'
+    const wrongPair = { ...waterBowelSame, coverage: { ...waterBowelSame.coverage, xKey: 'nutrition.fiber_g' } }
+    const wrongLag = { ...waterBowelSame, coverage: { ...waterBowelSame.coverage, lagDays: 1 } }
+    const noKeys = { ...waterBowelSame, coverage: { lagDays: 0, pairedObservations: 14, requiredObservations: 10 } }
+    const tooFew = { ...waterBowelSame, coverage: { ...waterBowelSame.coverage, pairedObservations: 2 } }
+    const madeUp = { ...waterBowelSame, id: 'intelligence.relationship.does:not:exist' }
+    const missing = { ...waterBowelSame, substantive: false }
+    const stale = { ...waterBowelSame, evidenceDates: ['2026-09-13'] }
+    for (const source of [wrongPair, wrongLag, noKeys, tooFew, madeUp, missing, stale]) {
+      withheld(claim, [source])
+    }
+    accepted(claim, [waterBowelSame])
+  })
+
+  it('does not flip the sign or invent the magnitude of rho', () => {
+    accepted('Your water and bowel records were positively correlated (Spearman rho 0.64) last week.', [waterBowelSame])
+    withheld('Your water and bowel records were negatively correlated (Spearman rho -0.64) last week.', [waterBowelSame])
+    withheld('Your water and bowel records were positively correlated (Spearman rho 0.94) last week.', [waterBowelSame])
+    accepted('Your sleep and energy levels were negatively correlated last week.', [sleepEnergy])
+    withheld('Your sleep and energy levels were positively correlated last week.', [sleepEnergy])
+  })
+
+  it('keeps uncertainty and independently supported education without inventing associations', () => {
+    const claim = 'Your water and bowel records might be associated, but the current evidence does not establish this.'
+    const result = audit(claim, [])
+    expect(result.blocks[0]?.text).toBe(claim)
+    const raw = answer(
+      item('Your water and bowel observations were correlated last week.', [fiberBowelSame.id]),
+      item('A correlation cannot establish that drinking more water caused a bowel change.', []),
+    )
+    const safe = groundHistoricalAnswer(raw, packet([fiberBowelSame]), question)
+    expect(safe.blocks).toEqual([raw.blocks[1]])
+    expect(safe.limitations).toHaveLength(1)
+  })
+
+  it('sanitizes unsupported pair on initial model reply and cached answer with no second call', async () => {
+    const wrong = 'Your water and bowel records were correlated last week.'
+    const correct = 'Your fiber and bowel records were correlated last week.'
+    const provider = vi.fn(async () => ({
+      text: JSON.stringify({
+        blocks: [
+          { text: wrong, evidence_refs: [fiberBowelSame.id] },
+          { text: correct, evidence_refs: [fiberBowelSame.id] },
+          { text: 'Correlations cannot prove causation.', evidence_refs: [] },
+        ],
+        limitations: [], follow_ups: [],
+      }),
+      model: 'piq-synthetic', inputTokens: 25, outputTokens: 30,
+    }))
+    const gate = createAskHealthGate({ minIntervalMs: 0, budgetUsd: 100 })
+    const opts = {
+      packet: packet([fiberBowelSame]), question, conversation: [], contextMode: 'personalized' as const,
+      provider, gate, model: 'piq-synthetic', now: 1_000,
+    }
+    const first = await explainAskHealth(opts)
+    expect(provider).toHaveBeenCalledTimes(1)
+    expect(first.answer.blocks.map(b => b.text)).toEqual([correct, 'Correlations cannot prove causation.'])
+    expect(first.answer.limitations).toHaveLength(1)
+    expect(first.evidence.map(e => e.id)).toEqual([fiberBowelSame.id])
+    const cached = await explainAskHealth({ ...opts, now: 2_000 })
+    expect(cached.meta.cached).toBe(true)
+    expect(cached.answer).toEqual(first.answer)
+    expect(provider).toHaveBeenCalledTimes(1)
+  })
+})
