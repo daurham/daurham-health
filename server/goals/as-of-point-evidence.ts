@@ -21,7 +21,7 @@ SELECT metrics.value::text AS value, metrics.unit,
 `
 export async function loadBodyGoalPointAsOf(
   sql: Sql, metricKey: string, timezone: string, asOf: string,
-): Promise<{ value: number; unit: string; observedOn: string; sourceRevision: string | null } | null> {
+): Promise<{ value: number; unit: string; observedOn: string; sourceRevision?: string } | null> {
   const rows = await sql.query(BODY_GOAL_AS_OF_SQL, [metricKey, timezone, asOf]) as Array<{
     value: string | number; unit: string; measured_at: string; timezone: string | null
     metric_id?:string;session_id?:string;metric_updated_at?:string;session_updated_at?:string
@@ -43,7 +43,8 @@ export async function loadBodyGoalPointAsOf(
       metricKey,item.metric_id,item.session_id,String(item.value),item.unit,
       item.measured_at,item.timezone,item.metric_updated_at,item.session_updated_at,
     ])).digest('hex'):null
-  return { value, unit: item.unit, observedOn: localDate, sourceRevision }
+  return { value, unit: item.unit, observedOn: localDate,
+    ...(sourceRevision?{sourceRevision}:{}) }
 }
 
 /** Workout dates are DATE; use only sets on/before the requested date. */
