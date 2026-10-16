@@ -8,6 +8,7 @@ import { getNutritionDayCompleteness, saveNutritionDayCompleteness } from '../se
 import { readMaintenanceDecisionSnapshot, isMaintenanceDecisionRevisionCurrent } from '../server/intelligence/maintenance-revision.js'
 import { activeCalorieDecisionInRevision, dueFollowUps, requireCurrentCalorieRecommendation, surfaceDraft, writeCoachRecommendationResponse, writeCoachRecommendationOutcome } from '../server/intelligence/coach-intelligence.js'
 import { randomUUID } from 'node:crypto'
+import { readPrimaryGoalIntent, savePrimaryGoalIntent } from '../server/goals/primary-intent.js'
 import { PERFORMED_STRENGTH_EXERCISES_SQL } from '../server/training/plan-service.js'
 import { buildTrainingWeekQualification, buildTrainingRoutineCredits, type PerformedExerciseEvidence } from '../src/domain/training-qualification.js'
 import { buildTrainingProgressSummary } from '../src/domain/training-progress-summary.js'
@@ -141,6 +142,42 @@ describe.skipIf(!url)('PIQ-1.1 full 0001–0055 migration-chain and backup on is
     expect(count.rows[0].count).toBe(0)
     const unreviewed = await getNutritionDayCompleteness(date, adapter, today)
     expect(unreviewed.assessment).toMatchObject({ state: 'unknown', eligibleForMaintenance: false })
+  })
+
+  it('PIQ-2.3: owner-selected primary goal has immutable revisions and no inferred default', async () => {
+    await client.query('BEGIN')
+    try {
+      const unset = await readPrimaryGoalIntent(adapter, '2026-10-15')
+      expect(unset).toMatchObject({ version: 0, source: 'unset', primaryGoalId: null })
+      const goalId = randomUUID()
+      const source = await client.query("SELECT id FROM data_sources WHERE key = 'manual' LIMIT 1")
+      expect(source.rowCount).toBe(1)
+      await client.query(
+        `INSERT INTO goals (id, goal_kind, status, started_on, source_id)
+         VALUES ($1::uuid, 'training_frequency', 'active', '2026-10-15', $2::uuid)`,
+        [goalId, source.rows[0].id],
+      )
+      const one = await savePrimaryGoalIntent(
+        adapter, '2026-10-15', { primaryGoalId: goalId, expectedVersion: 0 },
+      )
+      expect(one).toMatchObject({ primaryGoalId: goalId, version: 1, source: 'owner' })
+      await expect(savePrimaryGoalIntent(
+        adapter, '2026-10-15', { primaryGoalId: null, expectedVersion: 0 },
+      )).rejects.toMatchObject({ statusCode: 409 })
+      const two = await savePrimaryGoalIntent(
+        adapter, '2026-10-16', { primaryGoalId: null, expectedVersion: 1 },
+      )
+      expect(two).toMatchObject({ primaryGoalId: null, version: 2, source: 'owner' })
+      expect((await readPrimaryGoalIntent(adapter, '2026-10-15')).primaryGoalId).toBe(goalId)
+      expect((await readPrimaryGoalIntent(adapter, '2026-10-16')).primaryGoalId).toBeNull()
+      expect(await readPrimaryGoalIntent(adapter, '2026-10-14')).toMatchObject({
+        source: 'unset', version: 0,
+      })
+      const events = await client.query('SELECT version FROM primary_goal_intent_events ORDER BY version')
+      expect(events.rows.map((row) => row.version)).toEqual([1, 2])
+    } finally {
+      await client.query('ROLLBACK')
+    }
   })
 
   it('PIQ-2.1: physiological sex is unset by default, owner-editable, and validated in PostgreSQL', async () => {

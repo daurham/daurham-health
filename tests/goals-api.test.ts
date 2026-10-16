@@ -100,6 +100,10 @@ describe('goal API auth', () => {
     const wrongProjection = await call('POST', `/api/goals/${GOAL}/projection`, owner, {})
     expect(wrongProjection.status()).toBe(405)
     expect(matchGoalRoute('/api/goals')?.kind).toBe('list')
+    expect(matchGoalRoute('/api/goals/priority')?.kind).toBe('priority')
+    expect((await call('GET', '/api/goals/priority', null)).status()).toBe(401)
+    expect((await call('PUT', '/api/goals/priority', { id: 'someone', email: 'other@example.com' },
+      { expectedVersion: 0, primaryGoalId: null })).status()).toBe(403)
     expect(matchHealthApiRoute('/api/goals')).toBe('goals')
     expect(readFileSync('server/handlers/goals.ts', 'utf8')).not.toContain('APPLE_HEALTH_SYNC_TOKEN')
   })

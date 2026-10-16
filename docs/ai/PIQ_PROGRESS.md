@@ -1453,3 +1453,18 @@ Synthetic 16-pair regressions mutate the frame and day count while preserving th
 **Tests:** Server-rendered collapsed state must expose no personal profile details, synthetic known-data and unset-data summaries must retain source values/derived-age distinctions. No schema/provider call in test, no automatic profile read on initial render, no production mutation or `main` merge.
 
 **Still open:** On-device interaction, validation of the owner's actual profile selection after approved production migration 0055, source-event revision atomicity, audit of clinically appropriate formulas and effective-dated medical history. PIQ-2.2 full owner acceptance remains gated.
+
+
+## PIQ-2.3 — Owner-selected primary recorded goal, effective-dated v1 (2026-10-15)
+
+**State:** Bounded PIQ work-branch implementation; full CI, disposable PostgreSQL and owner device acceptance required. **0/9 PIQ phases owner-accepted.**
+
+**Gap:** Previously Goal Control and Coach could promote a weekly focus from coalesced signals without knowing which of the owner's *recorded active goals* was primary. The app lacked any affirmative, date-scoped priority record. An inferred weight or workout goal must never masquerade as owner intent.
+
+**Contract:** New migration `0056_primary_goal_intent_events.sql` creates an append-only owner-source priority history with a unique integer revision, optional UUID of a saved active goal, effective Health date and recording timestamp. No rows are seeded, so every new and existing owner has an explicit **unset** default. Goals shows a small primary-goal selector over currently active, unarchived goals; saving requires an expected revision and creates one event. Explicitly clearing the priority creates an event with a null choice. The single-statement insert checks the latest revision and active goal identity; a concurrent revision uniqueness collision becomes a safe 409. Past records retain their goal UUID even if a goal is later archived or deleted; historical as-of reads use only effective-on-or-before owner choices. A stored preference is portable in the full and portable backup inventories. PUT/GET is owner-authenticated at `/api/goals/priority`.
+
+**Deliberate limit:** This stores and shows the owner's chosen **existing measurable goal**; it does not yet encode a complete lifestyle mission such as “lose fat while preserving strength,” non-negotiable restrictions, secondary objectives, planned phase, or acceptable trade-offs. It does **not** automatically re-rank Coach or modify health targets. Those require explicit evidence-aware integration and owner acceptance in later PIQ-2.3 slices. The UI discloses this. No background writes, Gemini calls or inferred primary objective.
+
+**Verification:** Domain tests cover unset, future/history leakage, multiple same-day owner choices, clear, invalid selection and optimistic-write protection. Disposable PostgreSQL migration-chain tests verify real active-goal selection, stale-tab denial and as-of history with transaction rollback. Full TypeScript/lint/Vitest/build, backup round-trip and authenticated phone QA remain the current commit's gates.
+
+**Release gate:** Migration 0056 follows unapplied PIQ migration 0053–0055. No production migration or main promotion without explicit owner approval, schema and backup review, and acknowledgement that the new priority is a deliberate fresh owner selection, never a backfilled assumption.

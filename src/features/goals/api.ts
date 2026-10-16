@@ -1,5 +1,6 @@
 import { healthFetch, readApiError } from '@/lib'
 import type { GoalProjection } from '@/domain/goal-projection'
+import type { PrimaryGoalIntent } from '@/domain/primary-goal-intent'
 
 export type GoalVersionView = {
   id: string
@@ -137,4 +138,15 @@ export function changeGoalStatus(id: string, action: 'pause' | 'resume' | 'compl
 
 export function fetchGoalProjection(id: string): Promise<GoalProjection> {
   return send(`/api/goals/${id}/projection`, 'GET')
+}
+
+export function fetchPrimaryGoalIntent(): Promise<PrimaryGoalIntent> {
+  return send('/api/goals/priority', 'GET')
+}
+
+export function savePrimaryGoalIntent(body: {
+  primaryGoalId: string | null
+  expectedVersion: number
+}): Promise<PrimaryGoalIntent> {
+  return send('/api/goals/priority', 'PUT', body)
 }

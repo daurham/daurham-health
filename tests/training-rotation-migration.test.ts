@@ -12,7 +12,7 @@ describe('Training rotation owner decisions', () => {
     expect(migration).toContain('UNIQUE (plan_version_id, routine_code, generation)')
     expect(migration).not.toContain('DELETE FROM workout_sessions')
     expect(migration).not.toContain('UPDATE workout_sessions')
-    expect(inventory).toContain("LATEST_SCHEMA_MIGRATION = '0055_profile_physio_sex.sql'")
+    expect(inventory).toContain("LATEST_SCHEMA_MIGRATION = '0056_primary_goal_intent_events.sql'")
     expect(inventory).toContain("name: 'training_plan_rotation_anchors'")
     expect(inventory).toContain("name: 'training_plan_block_ends'")
   })

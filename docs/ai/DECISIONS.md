@@ -793,3 +793,8 @@ Use nullable `health_profile.sex_for_physiology` (`male`, `female`, `other`) as 
 ## Decision: separate permanent birth-date backcasting from undated current profile measurements (PIQ-2.2, 2026-10-15)
 
 DOB is an owner-entered lifetime fact; calendar age may be deterministically calculated for any selected date on/after DOB and no later than today, while explicitly citing that the saved birth date is known from the **current profile**, not proof of the historical record. The current singleton height has no effective date and must not be silently backdated. Ask Health includes birth date/derived age and today's height only when pertinent to the question. Current medications, clinical statuses, sex-reference settings and other mutable profile claims remain excluded from historical evidence pending a versioned owner-approved history model. This policy changes neither stored owner facts nor clinical calculations.
+
+
+## Decision: priority belongs to an explicit owner-recorded goal event (PIQ-2.3, 2026-10-15)
+
+Avoid hardcoding fat loss or inferring primary intent from existing targets, app usage, weigh-ins or weekly-focus rank. Version the owner's explicit selection of a canonical **active** goal using an effective Health date; archive/clear events preserve old intent without rewriting history. Keep individual goal targets and interventions unchanged until separately grounded prioritization work is accepted. Optimistic revision checks and PostgreSQL version uniqueness prevent stale-tab preference overwrites. Do not overstate this first measurable-goal selector as a complete mission/constraints editor.

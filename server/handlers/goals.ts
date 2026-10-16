@@ -11,17 +11,20 @@ import { parseProjectionAsOf } from '../../src/domain/goal-projection.js'
 import { withOwnerAuth } from '../auth/with-owner.js'
 import { HttpError, readJsonBody, requestApiPathname, sendJson, type ApiRequest, type ApiResponse } from '../http.js'
 import { currentHealthDate } from '../health-time.js'
+import { getOwnerPrimaryGoalIntent, updateOwnerPrimaryGoalIntent } from '../goals/primary-intent.js'
 
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}'
 const ITEM = new RegExp(`^/api/goals/(${UUID})(?:/(pause|resume|complete|reopen|versions|projection))?$`, 'i')
 
 export function matchGoalRoute(pathname: string):
   | { kind: 'list' }
+  | { kind: 'priority' }
   | { kind: 'item'; id: string; action: 'pause' | 'resume' | 'complete' | 'reopen' | 'versions' | 'projection' | null }
   | null {
   if (pathname === '/api/goals') {
     return { kind: 'list' }
   }
+  if (pathname === '/api/goals/priority') return { kind: 'priority' }
   const match = ITEM.exec(pathname)
   if (!match?.[1]) {
     return null
@@ -37,6 +40,19 @@ export async function handleGoals(req: ApiRequest, res: ApiResponse): Promise<vo
   const route = matchGoalRoute(requestApiPathname(req))
   if (!route) {
     throw new HttpError(404, 'Not found')
+  }
+  if (route.kind === 'priority') {
+    if (req.method === 'GET') {
+      sendJson(res, 200, await getOwnerPrimaryGoalIntent())
+      return
+    }
+    if (req.method === 'PUT') {
+      sendJson(res, 200, await updateOwnerPrimaryGoalIntent(await readJsonBody(req)))
+      return
+    }
+    res.setHeader('Allow', 'GET, PUT')
+    sendJson(res, 405, { error: 'Method not allowed' })
+    return
   }
   if (route.kind === 'list') {
     if (req.method === 'GET') {

@@ -1,6 +1,6 @@
 export const BACKUP_FORMAT = 'daurham-health-backup'
 export const BACKUP_FORMAT_VERSION = 1
-export const LATEST_SCHEMA_MIGRATION = '0055_profile_physio_sex.sql'
+export const LATEST_SCHEMA_MIGRATION = '0056_primary_goal_intent_events.sql'
 export const PORTABLE_EXPORT_BYTE_LIMIT = 3_500_000
 
 export type ColumnKind = 'uuid' | 'text' | 'date' | 'timestamptz' | 'numeric' | 'int' | 'bool' | 'json' | 'bytea'
@@ -1136,6 +1136,22 @@ export const BACKUP_TABLES: readonly BackupTable[] = [
       col('notes', 'text'),
       col('source_id', 'uuid'),
       col('created_at', 'timestamptz'),
+    ],
+  }),
+  table({
+    name: 'primary_goal_intent_events',
+    backupClass: 'canonical',
+    primaryKey: ['id'],
+    seeded: false,
+    portable: true,
+    references: [],
+    columns: [
+      col('id', 'uuid'),
+      col('version', 'int'),
+      col('primary_goal_id', 'uuid'),
+      col('effective_from', 'date'),
+      col('source', 'text'),
+      col('recorded_at', 'timestamptz'),
     ],
   }),
   table({

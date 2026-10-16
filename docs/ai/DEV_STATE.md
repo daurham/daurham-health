@@ -495,3 +495,8 @@ Ask Health's existing owner profile load now conditionally exposes owner-entered
 ## 2026-10-15 PIQ-2.2 known profile inventory — work branch
 
 Ask Health has a collapsed, on-demand "What Health knows about me" inventory using the existing authenticated Health Profile GET. It shows saved fields, derived age, per-profile last update and a direct Settings edit link, without loading owner data before expansion or inferring unset values. Synthetic UI tests verify default privacy and presented field semantics. CI + real owner iOS QA required.
+
+
+## 2026-10-15 PIQ-2.3 owner primary-goal intent slice — work branch
+
+Added unapplied migration `0056_primary_goal_intent_events.sql` and portable canonical event history; owner-authenticated GET/PUT `/api/goals/priority`; Goals-page picker with clear/unset state and revision-aware writes. Only an explicitly selected active goal becomes primary; no impact on Coach logic or numerical targets yet. Tests verify date-scoped history, stale versions and disposable PostgreSQL data. New migration requires owner-gated production deployment after previous PIQ schema changes.

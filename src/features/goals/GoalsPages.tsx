@@ -7,6 +7,7 @@ import type { GoalProjection } from '@/domain/goal-projection'
 import { milesToMeters, metersToMiles } from '@/domain/units'
 import { dangerButtonClass, LoadErrorNotice, primaryButtonClass, quietButtonClass, secondaryButtonClass, useHealthCalendarDate } from '@/lib'
 import { changeGoalStatus, createGoal, fetchGoal, fetchGoals, removeGoal, reviseGoal, type GoalCatalog, type GoalView } from './api'
+import { PrimaryGoalPanel } from './PrimaryGoalPanel'
 
 const fieldClass = 'w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm'
 
@@ -245,6 +246,7 @@ export function GoalsPage() {
         <p className="mt-1 text-sm text-zinc-600">The target you chose, and how current evidence sits against it.</p>
       </div>
       {status === 'error' && error ? <LoadErrorNotice message={error} onRetry={reload} /> : null}
+      {status === 'ready' ? <PrimaryGoalPanel goals={goals} /> : null}
       {groups.map(([label, items]) => (
         <section key={label} className="space-y-3">
           <h2 className="text-sm font-semibold text-zinc-700">{label}</h2>
