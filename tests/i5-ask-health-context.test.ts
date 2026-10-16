@@ -50,7 +50,7 @@ describe('I5 Ask Health shared context', () => {
 
     expect(packet.packetVersion).toBe('ask-health-evidence-v2')
     expect(ASK_HEALTH_PACKET_VERSION).toBe('ask-health-evidence-v2')
-    expect(ASK_HEALTH_PROMPT_VERSION).toBe('ask-health-v6')
+    expect(ASK_HEALTH_PROMPT_VERSION).toBe('ask-health-v7')
     expect(packet.evidence.some((item) => item.id.includes('shared:hydration:bowel:next_day') && item.substantive)).toBe(true)
     expect(packet.contextSummary.knows.some((item) => item.label === 'Personal relationship')).toBe(true)
     expect(packet.contextSummary.missing.some((item) => item.key === 'nutrition.fiber_g')).toBe(true)
