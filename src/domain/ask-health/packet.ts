@@ -6,6 +6,7 @@ import { MIN_VERIFIED_NUTRITION_TARGET_DAYS } from './nutrition-integrity.js'
 import { digestiveQuestionTopics } from './focused-digestive.js'
 import type { FocusedWeightEnergyEvidence } from './focused-weight-energy.js'
 import type { HistoricalWeightEnergyDay } from './focused-weight-energy-history.js'
+import type { HistoricalWeightEnergyWindow } from './focused-weight-energy-window.js'
 import { deriveDigestiveSampleScreen } from './digestive-screen.js'
 import { digestivePacketGuard, guardedDigestiveIntelligence, type DigestivePacketGuard } from './digestive-packet-guard.js'
 import type {
@@ -78,6 +79,7 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
   addFocusedDigestive(input, push, digestiveGuard)
   addFocusedWeightEnergy(input.focusedWeightEnergy ?? null, input.contextMode, push)
   addHistoricalWeightEnergyDay(input.focusedWeightEnergyDay ?? null, input.contextMode, push)
+  addHistoricalWeightEnergyWindow(input.focusedWeightEnergyWindow ?? null, input.contextMode, push)
   if (wants.supplements || questionMentionsSavedSupplement(input)) {
     addSupplements(input, push)
   }
@@ -106,7 +108,10 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
   const selectedDrafts = input.focusedWeightEnergyDay
     ? drafts.filter(item => item.id === 'ask.range' ||
         item.id.startsWith('weight_energy.historical_day.'))
-    : drafts
+    : input.focusedWeightEnergyWindow
+      ? drafts.filter(item => item.id === 'ask.range' ||
+          item.id.startsWith('weight_energy.historical_window.'))
+      : drafts
   const evidence = trimEvidence(selectedDrafts, maxChars)
   const selectedIds = new Set(evidence.map((item) => item.id))
   const clarification = exerciseClarification(input)
@@ -123,8 +128,8 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
     evidence,
     limitations: limitations.filter((item) => evidence.some((fact) => fact.id === item.evidenceId)),
     contextSummary: {
-      knows: input.focusedWeightEnergyDay ? [] : intelligence?.knows ?? [],
-      missing: input.focusedWeightEnergyDay ? [] : intelligence?.missing ?? [],
+      knows: input.focusedWeightEnergyDay || input.focusedWeightEnergyWindow ? [] : intelligence?.knows ?? [],
+      missing: input.focusedWeightEnergyDay || input.focusedWeightEnergyWindow ? [] : intelligence?.missing ?? [],
     },
     clarification,
     evidenceSelectionAudit: {
@@ -358,6 +363,84 @@ function addBody(
  * The named day is the ONLY allowed evidence interval; do not substitute
  * later samples or an unrelated trailing maintenance estimate.
  */
+/**
+ * PIQ-4.2 named-window evidence: never reuse the latest all-range weight
+ * trend, daily food fragment, global calorie target or current profile.
+ */
+function addHistoricalWeightEnergyWindow(
+  window: HistoricalWeightEnergyWindow | null,
+  mode: AskHealthPacketInput['contextMode'],
+  push: (item: PushItem) => void,
+): void {
+  if (!window || mode === 'general_only') return
+  const period={start:window.start,end:window.end}
+  const usable=window.scope==='in_range'
+  const outOfRange=window.scope==='out_of_range'
+  push({
+    id:'weight_energy.historical_window.coverage',
+    domain:'body',label:'Requested historical weight and recorded intake interval',
+    value:null,unit:null,period,
+    text:!usable
+      ? outOfRange
+        ? 'The named interval is not wholly within the selected evidence range and as-of date. No partial interval or recent substitute was used. Select a wider history range.'
+        : 'The requested historical interval is ambiguous or unsupported. No recent or arbitrary interval was substituted; ask about one supported calendar window.'
+      : 'Selected '+window.label+' ('+window.start+' through '+window.end+
+        '): '+window.completedDays+' completed calendar day(s), '+window.verifiedCalorieDays+
+        ' with reliable owner-confirmed whole-day calorie logs, and '+window.recordedWeightDays+
+        ' saved weight-observation day(s). Unlogged and unverified days are UNKNOWN, not zero.'+
+        (window.provisionalTodayExcluded
+          ? ' Today was excluded from all completed-day calculations.' : '')+
+        ' Recorded intake is not measured expenditure; changes in scale weight are not proven changes in body fat.',
+    coverage:{requestedWindowStart:window.start,requestedWindowEnd:window.end,
+      requestedWindowScope:window.scope,selectedCalendarDays:window.calendarDays,
+      completedCalendarDays:window.completedDays,
+      verifiedCompleteCalorieDays:window.verifiedCalorieDays,
+      savedWeightDays:window.recordedWeightDays,
+      comparableWeightDays:window.comparableWeightDays,
+      provisionalTodayExcluded:window.provisionalTodayExcluded},
+    detailPath:'/progress/body',userEntered:false,substantive:false,priority:0,
+  })
+  if(!usable)return
+  if(window.verifiedCalorieMeanKcal!=null)push({
+    id:'weight_energy.historical_window.calories',domain:'nutrition',
+    label:'Recorded calorie mean on verified complete dates in requested interval',
+    value:window.verifiedCalorieMeanKcal,unit:'kcal/verified date',period,
+    text:'Across '+window.verifiedCalorieDays+' source-reliable owner-confirmed completed food day(s) '+
+      'inside the requested interval, recorded calories averaged '+
+      Math.round(window.verifiedCalorieMeanKcal)+' kcal per verified date; this is NOT '+
+      'a calendar-day average, an intake deficit, total expenditure or a reason to change a calorie target.',
+    coverage:{verifiedCompleteCalorieDays:window.verifiedCalorieDays,
+      selectedCalendarDays:window.calendarDays},
+    detailPath:'/nutrition',userEntered:false,substantive:true,priority:1,
+  })
+  if(window.observedWeightChangeKg!=null)push({
+    id:'weight_energy.historical_window.weight_change',domain:'body',
+    label:'Observed scale-weight change between comparable sampled endpoints',
+    value:window.observedWeightChangeKg,unit:'kg',period,
+    text:'Saved usual-condition weigh-ins cover both ends of this requested interval '+
+      'with '+window.comparableWeightDays+' comparable observation day(s) spanning '+
+      window.observedWeightSpanDays+' days. The difference between the earliest and '+
+      'latest qualifying weights is '+Math.round(window.observedWeightChangeKg*1000)/1000+
+      ' kg. It is not fat loss/gain, a biological plateau, a daily slope, or a validated calorie-adjustment trigger.',
+    coverage:{comparableWeightDays:window.comparableWeightDays,
+      comparableSpanDays:window.observedWeightSpanDays,
+      boundaryCoverage:window.boundaryCoverage},
+    detailPath:'/progress/body',userEntered:false,substantive:true,priority:1,
+  })
+  if(window.observedWeightChangeKg==null)push({
+    id:'weight_energy.historical_window.weight_unavailable',domain:'body',
+    label:'Comparable interval weight change unavailable',
+    value:null,unit:null,period,
+    text:'A weight change was withheld. At least three usual-condition weigh-ins, '+
+      'at least six days apart in total and within two days of each window end are needed '+
+      'for a bounded observation comparison. Missing or differently recorded weigh-ins '+
+      'cannot be treated as stable scale weight.',
+    coverage:{comparableWeightDays:window.comparableWeightDays,
+      boundaryCoverage:window.boundaryCoverage},
+    detailPath:'/progress/body',userEntered:false,substantive:false,priority:1,
+  })
+}
+
 function addHistoricalWeightEnergyDay(
   day: HistoricalWeightEnergyDay | null,
   mode: AskHealthPacketInput['contextMode'],
