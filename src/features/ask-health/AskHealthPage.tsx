@@ -1,4 +1,4 @@
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useState } from 'react'
 import { ASK_LENS_LABELS, ASK_SUGGESTIONS, type AskLens, type AskTurn } from '@/domain/ask-health'
 import type { ProgressRange } from '@/domain/progress'
@@ -10,6 +10,7 @@ import { askHealth } from './api'
 import { AskHealthAnswerView } from './AnswerView'
 import { ExternalResearch } from './ExternalResearch'
 import { KnownProfilePanel } from './KnownProfilePanel'
+import { readAskCorrectionState } from '@/domain/ask-health/corrections'
 import { OptionalClarification } from './OptionalClarification'
 
 const LENSES = ['general', 'training', 'nutrition', 'recovery', 'experiments'] as const
@@ -28,15 +29,18 @@ function initialRange(value: string | null): ProgressRange {
 export function AskHealthPage() {
   const today = useHealthCalendarDate()
   const navigate = useNavigate()
+  const location = useLocation()
+  const returningCorrection = readAskCorrectionState(location.state)
   const prefix = useAppPathPrefix()
   const [params] = useSearchParams()
-  const [lens, setLens] = useState<AskLens>(() => initialLens(params.get('lens')))
-  const [range, setRange] = useState<ProgressRange>(() => initialRange(params.get('range')))
-  const [draft, setDraft] = useState(() => params.get('question') ?? '')
+  const [lens, setLens] = useState<AskLens>(() => returningCorrection?.lens ?? initialLens(params.get('lens')))
+  const [range, setRange] = useState<ProgressRange>(() => returningCorrection?.range ?? initialRange(params.get('range')))
+  const [draft, setDraft] = useState(() => returningCorrection?.question ?? params.get('question') ?? '')
   const [turns, setTurns] = useState<AskTurn[]>([])
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [latest, setLatest] = useState<Awaited<ReturnType<typeof askHealth>> | null>(null)
+  const [returnNotice, setReturnNotice] = useState(Boolean(returningCorrection))
   const [asked, setAsked] = useState<string | null>(null)
   const [noteOpen, setNoteOpen] = useState(false)
   const [ownerNote, setOwnerNote] = useState('')
@@ -49,6 +53,7 @@ export function AskHealthPage() {
     }
     setPending(true)
     setError(null)
+    setReturnNotice(false)
     try {
       const response = await askHealth({
         question: trimmed,
@@ -85,6 +90,7 @@ export function AskHealthPage() {
           onClick={() => {
             setTurns([])
             setLatest(null)
+            setReturnNotice(false)
             setAsked(null)
             setError(null)
             setDraft('')
@@ -95,6 +101,12 @@ export function AskHealthPage() {
           New chat
         </button>
       </div>
+      {returnNotice ? (
+        <p role="status" className="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700">
+          Review your original question below and press Ask to reassess it using the current saved records.
+          No AI request was made; Health does not assume you changed a source.
+        </p>
+      ) : null}
       <KnownProfilePanel today={today} />
       <div className="flex gap-1 overflow-x-auto" role="group" aria-label="Ask Health lens">
         {LENSES.map((item) => (
@@ -138,7 +150,11 @@ export function AskHealthPage() {
             </p>
           ))}
         {latest ? <AskHealthContextSummary context={latest.meta.context} /> : null}
-        {latest ? <AskHealthAnswerView answer={latest.answer} evidence={latest.evidence} /> : null}
+        {latest && asked ? (
+          <AskHealthAnswerView key={answerRevision} answer={latest.answer} evidence={latest.evidence}
+            correctionContext={{ question: asked, lens: latest.meta.lens, range: latest.meta.range }}
+            onDraftFollowUp={setDraft} />
+        ) : null}
         {latest && asked ? <ExternalResearch question={asked} /> : null}
       </div>
       {latest && asked ? (
