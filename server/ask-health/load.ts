@@ -21,6 +21,7 @@ import { routeHealthIntelligence } from '../../src/domain/intelligence/shared.js
 import { loadHealthIntelligenceSnapshot } from '../intelligence/snapshot.js'
 import { getHealthProfile } from '../profile/service.js'
 import { focusTrainingWorkingSets } from '../../src/domain/ask-health/focused-training.js'
+import { focusDigestiveContext } from '../../src/domain/ask-health/focused-digestive.js'
 
 export async function loadAskHealthPacketInput(input: {
   lens: AskHealthPacketInput['lens']
@@ -80,6 +81,7 @@ export async function loadAskHealthPacketInput(input: {
     experiments,
     benchmarks,
     supplements,
+    focusedDigestive: focusDigestiveContext({ question: input.question, snapshot: intelligenceSnapshot, today }),
     focusedTraining: focusTrainingWorkingSets({
       question: input.question,
       exercises: rows.exercises,
