@@ -100,6 +100,7 @@ export function AskHealthPage() {
         <button
           type="button"
           className={quietButtonClass}
+          disabled={pending}
           onClick={() => {
             setTurns([])
             setLatest(null)
@@ -127,6 +128,7 @@ export function AskHealthPage() {
             key={item}
             type="button"
             aria-pressed={item === lens}
+            disabled={pending}
             className={`min-h-10 shrink-0 rounded-md px-3 text-sm font-medium ${item === lens ? 'bg-zinc-900 text-white' : 'text-zinc-600'}`}
             onClick={() => {
               setLens(item)
@@ -185,6 +187,7 @@ export function AskHealthPage() {
               key={suggestion}
               type="button"
               className="block min-h-11 w-full rounded-lg border border-zinc-200 bg-white px-3 text-left text-sm text-zinc-800"
+              disabled={pending}
               onClick={() => setDraft(suggestion)}
             >
               {suggestion}
@@ -320,6 +323,7 @@ export function AskHealthPage() {
         </label>
         <textarea
           id="ask-health-question"
+          disabled={pending}
           value={draft}
           maxLength={1000}
           rows={3}
