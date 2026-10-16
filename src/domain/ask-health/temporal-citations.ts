@@ -302,7 +302,10 @@ export function claimedRelationshipSignals(text: string): IntelligenceSignalKey[
     ['training.sessions', /\b(?:training sessions?|workout sessions?)\b/i],
     ['body.weight_kg', /\b(?:body weight|weigh(?:ed|t)?)\b/i],
   ]
-  return patterns.filter(([, pattern]) => pattern.test(text)).map(([key]) => key)
+  return patterns.flatMap(([key, pattern]) => {
+    const match = pattern.exec(text)
+    return match ? [{ key, offset: match.index }] : []
+  }).sort((a, b) => a.offset - b.offset).map(({ key }) => key)
 }
 
 function claimRelationshipLag(text: string): number | null {
