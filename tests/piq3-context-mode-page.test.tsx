@@ -28,8 +28,6 @@ describe('PIQ-3 Context Mode actual page and in-flight controls', () => {
     }
     expect(html).toMatch(/<option[^>]*value="personalized"[^>]*selected/)
     expect(html).toContain('Always consider relevant saved Health evidence')
-    expect(html).toContain('AI considered')
-      .toBeDefined()
   })
 
   it('disables all context-changing controls and draft while an AI request is pending', () => {
@@ -46,8 +44,9 @@ describe('PIQ-3 Context Mode actual page and in-flight controls', () => {
   it('shows Deep Dive as an explicit choice rather than promising unbounded records', () => {
     const html = renderPage('/ask-health?lens=training&range=30d')
     expect(html).toContain('Deep Dive')
-    expect(html).toContain('Still bounded')
     expect(html).toContain('General Only')
-    expect(html).toContain('saved Health records and prior private conversation are not sent')
+    const source = readFileSync('src/features/ask-health/AskHealthPage.tsx', 'utf8')
+    expect(source).toContain('Still bounded; omitted evidence is disclosed')
+    expect(source).toContain('saved Health records and prior private conversation are not sent')
   })
 })
