@@ -1394,3 +1394,16 @@ Synthetic 16-pair regressions mutate the frame and day count while preserving th
 **Regression:** Existing factual synthetic 12-pair SSR validates verified and invalid historical associations; add assertions that the compact default status remains visible, both in-card technical detail and selection rationale use closed native disclosures, the unverified warning stays outside the technical panel, and the original sensitivity calculations and links remain in SSR output. No new schema, provider call, prod data write or `main` merge.
 
 **Still open:** Actual owner iOS readability/accessibility acceptance, source-event revision atomicity between SQL reads, formal temporal-dependence/multiple-testing interpretation, and approved production migration 0054 preflight. Next: finish CI for this branch-only UI slice before advancing PIQ program phases.
+
+
+## PIQ-1.6 — Registered relationship screening metadata verification (2026-10-15)
+
+**State:** Bounded PIQ work-branch change awaiting full CI and owner-authenticated device QA. **0/9 phases owner-accepted.**
+
+**Failure:** Goal Overview could faithfully reproduce a reported Spearman coefficient and cited dates while its accompanying definition had drifted: the stated X/Y signal pair, lag, original minimum matched pairs, display threshold, `available` status or count-derived grade might no longer match the canonical registered relationship. A reproducible historical number alone must not certify the present interpretation.
+
+**Contract:** Before exposing present-tense observational rho, strength or precision, verify the saved relationship ID still identifies the current canonical X/Y signal pair, lag, required minimum count, minimum observed pairs, 0.2 absolute-rho display floor, `available` state and source count-based grade. Reuse the same in-memory registry and count-grade function that create the source association, rather than reimplementing threshold magic numbers in Goal Control. The existing exact pair coefficient, source quality, nutrition completeness, source-window, label and calendar-frame checks remain mandatory. If screening metadata no longer qualifies, retain its old summary and links as historical/unverified, but withhold the numeric coefficient, grade, pair opportunity and sensitivity diagnostics. The UI explains that the screening definition/grade did not verify; no owner input or canonical evidence is changed.
+
+**Regression:** Synthetic 16-pair association matches the registry and remains verified. Mutate only the required-pair threshold or grade with identical source values and rho: numerical interpretation must be withheld in domain output and SSR. Pure negative checks cover stale relationship ID, X/Y keys, lag, non-integer pair count, below-minimum count, display state and insufficient rho. This is a read-time defensive consistency check, not independently valid uncertainty estimation or atomic source-revision evidence.
+
+**Outstanding:** Canonical SQL source-event revision atomicity, adjustment for serial dependence and multiple screened candidate relationships, authenticated mobile QA, and owner-gated production migration 0054. No Gemini calls, new migration, production writes or main promotion in this task.

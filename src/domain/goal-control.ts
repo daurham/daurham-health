@@ -1,5 +1,5 @@
 import { addCalendarDays, type TrainingDayIntent } from './training-plan.js'
-import type { HealthIntelligenceSnapshot, IntelligenceConfidence, IntelligenceCoverage, IntelligenceSignalKey } from './intelligence/shared.js'
+import { relationshipScreeningMetadataMatchesDefinition, type HealthIntelligenceSnapshot, type IntelligenceConfidence, type IntelligenceCoverage, type IntelligenceSignalKey } from './intelligence/shared.js'
 import type { WeeklyCandidate, WeeklyCoachBrief, WeeklyGoalSnapshot, WeeklyTrainingPlanSnapshot } from './weekly-coach/types.js'
 import type { MaintenanceState } from './maintenance.js'
 import type { TrainingProgressionState } from './training-progression.js'
@@ -674,6 +674,7 @@ function relationshipsFor(
         item.evidenceDates, item.sampleSize, item.lagDays, sourceWindow,
       )
       const coefficientVerified = snapshotCurrent && !!calendarCoverage &&
+        relationshipScreeningMetadataMatchesDefinition(item) &&
         relationshipCoefficientMatchesFrame(snapshot.frame, item) &&
         relationshipNutritionPairsRemainEligible(snapshot.frame, item) &&
         relationshipReportedLabelsMatchCoefficient(item)
@@ -693,7 +694,7 @@ function relationshipsFor(
         summary: coefficientVerified ? item.summary
           : !snapshotCurrent
             ? 'Previously reported observational relationship; its source snapshot does not match the requested Health date or has an invalid observation window.'
-            : 'Previously reported observational relationship; its coefficient or interpretation labels could not be verified against the current paired readings, or cited nutrition days no longer qualify.',
+            : 'Previously reported observational relationship; its coefficient or interpretation labels could not be verified against the current paired readings, its registered screening rule changed, or cited nutrition days no longer qualify.',
         confidence: coefficientVerified ? item.confidence : 'unknown',
         sampleSize: item.sampleSize,
         detailPaths: [...item.detailPaths],

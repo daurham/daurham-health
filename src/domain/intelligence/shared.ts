@@ -205,6 +205,29 @@ const RELATIONSHIPS: Array<{
   { id: 'shared:steps:sleep:next_night', xKey: 'activity.steps', yKey: 'sleep.total_minutes', lagDays: 1, minPairs: 14 },
 ]
 
+/** Recheck the *registered* screening recipe separately from verifying rho.
+ * A mathematically reproducible coefficient cannot validate a stale signal
+ * pairing, lag, sample threshold, display floor or count-derived grade.
+ * This does NOT establish statistical confidence or a causal effect.
+ */
+export function relationshipScreeningMetadataMatchesDefinition(
+  relation: Pick<IntelligenceRelationship, 'id' | 'xKey' | 'yKey' | 'lagDays' |
+    'sampleSize' | 'requiredSampleSize' | 'confidence' | 'state' | 'rho'>,
+): boolean {
+  const spec = RELATIONSHIPS.find((item) => item.id === relation.id)
+  const rho = relation.rho
+  return spec != null &&
+    relation.xKey === spec.xKey &&
+    relation.yKey === spec.yKey &&
+    relation.lagDays === spec.lagDays &&
+    relation.requiredSampleSize === spec.minPairs &&
+    Number.isSafeInteger(relation.sampleSize) &&
+    relation.sampleSize >= spec.minPairs &&
+    relation.confidence === confidenceFromSample(relation.sampleSize) &&
+    relation.state === 'available' &&
+    rho != null && Number.isFinite(rho) && Math.abs(rho) <= 1 && Math.abs(rho) >= 0.2
+}
+
 const INTERVENTION_KEYS: IntelligenceSignalKey[] = [
   'nutrition.calories',
   'nutrition.protein_g',

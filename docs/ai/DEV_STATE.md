@@ -470,3 +470,8 @@ Added descriptive matched-pair deletion sensitivity to Goal Overview's verified 
 ## 2026-10-15 PIQ-1.6 readable relationship evidence — work branch
 
 The Goal Overview relationship cards now show short observational summaries, verification state, count and count-grade by default, while nested closed native details preserve full selection/coverage/statistical limitations and sensitivity diagnostics. Source links and stale-evidence warnings remain visible. No data/calculation change; tests and full CI must pass before owner QA. No main/prod action.
+
+
+## 2026-10-15 PIQ-1.6 registered association screening guard — work branch
+
+Goal Overview now rechecks each displayed observational relationship against the current shared source registry (signal pair, lag, minimum matched count, 0.2 display floor and count grade), in addition to the existing exact-source coefficient/calendar/quality verification. A drifted definition with unchanged numeric rho cannot receive verified present-tense details. Regression tests and CI required; owner iOS and full source-revision atomicity still pending. No schema, provider, production or main changes.
