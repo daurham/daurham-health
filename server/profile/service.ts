@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { healthProfileInputSchema, healthProfileSchema, ageYearsOnDate } from '../../src/domain/health-profile.js'
-import { getSql } from '../db.js'
+import { getSql, type Sql } from '../db.js'
 import { currentHealthDate } from '../health-time.js'
 import { HttpError } from '../http.js'
 
@@ -46,8 +46,8 @@ function emptyProfile() {
   })
 }
 
-export async function getHealthProfile() {
-  const sql = await getSql()
+export async function getHealthProfile(sqlOverride?: Sql) {
+  const sql = sqlOverride ?? await getSql()
   const rows = (await sql.query(
     `SELECT sex_for_physiology,
             date_of_birth::text AS date_of_birth,
@@ -86,7 +86,7 @@ const profileWriteSchema = healthProfileInputSchema.extend({
   expectedUpdatedAt: z.string().datetime({ offset: true }).nullable(),
 })
 
-export async function putHealthProfile(body: unknown) {
+export async function putHealthProfile(body: unknown, sqlOverride?: Sql) {
   const parsed = profileWriteSchema.safeParse(body)
   if (!parsed.success) {
     if (body && typeof body === 'object' && !Object.prototype.hasOwnProperty.call(body, 'expectedUpdatedAt')) {
@@ -118,7 +118,7 @@ export async function putHealthProfile(body: unknown) {
     JSON.stringify(input.clinicalAllergies ?? []),
     JSON.stringify(input.clinicalMedications ?? []),
   ]
-  const sql = await getSql()
+  const sql = sqlOverride ?? await getSql()
   let rows: Array<{ singleton_id: number }>
   if (input.expectedUpdatedAt === null) {
     rows = await sql.query(
@@ -156,5 +156,5 @@ export async function putHealthProfile(body: unknown) {
       'Health Profile changed elsewhere. Your draft was not saved. Reload and review before saving.',
       undefined, 'PROFILE_STALE_WRITE')
   }
-  return getHealthProfile()
+  return getHealthProfile(sqlOverride)
 }
