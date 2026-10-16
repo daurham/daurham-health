@@ -1,4 +1,5 @@
 import { loadLocalEnv } from '../env.js'
+import { assertAuthBindingIfEnabled } from './binding.js'
 import { HttpError } from '../http.js'
 
 export type NeonAuthProxyConfig = {
@@ -31,6 +32,9 @@ export async function getNeonAuthProxyConfig(
   if (!cookieSecret || cookieSecret.length < 32) {
     throw new HttpError(503, 'Health authentication is not configured')
   }
+
+  // Explicit opt-in: validate the deployment's Auth destination without disclosing its URL.
+  assertAuthBindingIfEnabled(env)
 
   return {
     authBaseUrl,
