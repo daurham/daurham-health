@@ -8,8 +8,8 @@ import { explainAskHealth } from '../server/ask-health/service.js'
 import { createAskHealthGate } from '../server/ask-health/gate.js'
 
 const asOf = '2026-10-15'
-const window = { start: '2026-10-05', end: '2026-10-11' }
-const question = 'Were my logged water and bowel movements correlated last week?'
+const window = { start: '2026-09-01', end: '2026-09-30' }
+const question = 'Were my logged water and bowel movements correlated last month?'
 function relationship(id: string, rho = 0.64): AskEvidence {
   const spec = registeredRelationshipSpec(id)
   if (!spec) throw Error('unknown synthetic relationship')
@@ -19,10 +19,13 @@ function relationship(id: string, rho = 0.64): AskEvidence {
     label: 'Personal relationship',
     value: rho, unit: 'Spearman rho', text: 'Verified screened association only; not causal.',
     period: window, coverage: {
-      pairedObservations: 14, requiredObservations: spec.xKey === 'activity.steps' ? 14 : 10,
+      pairedObservations: 14, pairedDateCount: 14, selectedCalendarDays: 30,
+      requiredObservations: spec.xKey === 'activity.steps' ? 14 : 10,
       xKey: spec.xKey, yKey: spec.yKey, lagDays: spec.lagDays,
     },
-    evidenceDates: ['2026-10-06', '2026-10-07'], detailPath: '/progress',
+    evidenceDates: Array.from({ length: spec.lagDays === 1 ? 15 : 14 }, (_, i) =>
+      '2026-09-' + String(i + 1).padStart(2, '0')),
+    detailPath: '/progress',
     userEntered: false, substantive: true, confidence: 'high',
   }
 }
@@ -68,29 +71,29 @@ describe('PIQ-3 relationship pairing and lag identity audit', () => {
   })
 
   it('rejects unrelated valid relationships instead of accepting any cited rho', () => {
-    const claim = 'Your logged water and bowel events were correlated last week.'
+    const claim = 'Your logged water and bowel events were correlated last month.'
     accepted(claim, [waterBowelSame])
     withheld(claim, [fiberBowelSame])
     withheld(claim, [sleepEnergy])
     withheld(claim, [fiberBowelSame, sleepEnergy])
-    accepted('Your logged fiber and bowel movements were correlated last week.', [fiberBowelSame])
-    withheld('Your water, fiber and bowel movements were correlated last week.', [waterBowelSame, fiberBowelSame])
-    withheld('Your Health records were correlated last week.', [waterBowelSame])
+    accepted('Your logged fiber and bowel movements were correlated last month.', [fiberBowelSame])
+    withheld('Your water, fiber and bowel movements were correlated last month.', [waterBowelSame, fiberBowelSame])
+    withheld('Your Health records were correlated last month.', [waterBowelSame])
   })
 
   it('validates same-day versus following-day claims and next-day direction', () => {
-    accepted('Your water and bowel observations were correlated on the same day last week.', [waterBowelSame])
-    withheld('Your water and bowel observations were correlated on the same day last week.', [waterBowelNext])
-    accepted('Your water and bowel observations were correlated the next day last week.', [waterBowelNext])
-    withheld('Your water and bowel observations were correlated the next day last week.', [waterBowelSame])
-    withheld('Your bowel and water observations were correlated the next day last week.', [waterBowelNext])
-    withheld('Your water and bowel were correlated on the same day and the next day last week.', [waterBowelSame, waterBowelNext])
+    accepted('Your water and bowel observations were correlated on the same day last month.', [waterBowelSame])
+    withheld('Your water and bowel observations were correlated on the same day last month.', [waterBowelNext])
+    accepted('Your water and bowel observations were correlated the next day last month.', [waterBowelNext])
+    withheld('Your water and bowel observations were correlated the next day last month.', [waterBowelSame])
+    withheld('Your bowel and water observations were correlated the next day last month.', [waterBowelNext])
+    withheld('Your water and bowel were correlated on the same day and the next day last month.', [waterBowelSame, waterBowelNext])
     // If the answer does not name a timing claim, either lag may be cited.
-    accepted('Your water and bowel observations were correlated last week.', [waterBowelNext])
+    accepted('Your water and bowel observations were correlated last month.', [waterBowelNext])
   })
 
   it('requires the cited identity and statistical metadata to agree with the registry', () => {
-    const claim = 'Your water and bowel observations were correlated last week.'
+    const claim = 'Your water and bowel observations were correlated last month.'
     const wrongPair = { ...waterBowelSame, coverage: { ...waterBowelSame.coverage, xKey: 'nutrition.fiber_g' } }
     const wrongLag = { ...waterBowelSame, coverage: { ...waterBowelSame.coverage, lagDays: 1 } }
     const noKeys = { ...waterBowelSame, coverage: { lagDays: 0, pairedObservations: 14, requiredObservations: 10 } }
@@ -105,11 +108,11 @@ describe('PIQ-3 relationship pairing and lag identity audit', () => {
   })
 
   it('does not flip the sign or invent the magnitude of rho', () => {
-    accepted('Your water and bowel records were positively correlated (Spearman rho 0.64) last week.', [waterBowelSame])
-    withheld('Your water and bowel records were negatively correlated (Spearman rho -0.64) last week.', [waterBowelSame])
-    withheld('Your water and bowel records were positively correlated (Spearman rho 0.94) last week.', [waterBowelSame])
-    accepted('Your sleep and energy levels were negatively correlated last week.', [sleepEnergy])
-    withheld('Your sleep and energy levels were positively correlated last week.', [sleepEnergy])
+    accepted('Your water and bowel records were positively correlated (Spearman rho 0.64) last month.', [waterBowelSame])
+    withheld('Your water and bowel records were negatively correlated (Spearman rho -0.64) last month.', [waterBowelSame])
+    withheld('Your water and bowel records were positively correlated (Spearman rho 0.94) last month.', [waterBowelSame])
+    accepted('Your sleep and energy levels were negatively correlated last month.', [sleepEnergy])
+    withheld('Your sleep and energy levels were positively correlated last month.', [sleepEnergy])
   })
 
   it('keeps uncertainty and independently supported education without inventing associations', () => {
@@ -117,7 +120,7 @@ describe('PIQ-3 relationship pairing and lag identity audit', () => {
     const result = audit(claim, [])
     expect(result.blocks[0]?.text).toBe(claim)
     const raw = answer(
-      item('Your water and bowel observations were correlated last week.', [fiberBowelSame.id]),
+      item('Your water and bowel observations were correlated last month.', [fiberBowelSame.id]),
       item('A correlation cannot establish that drinking more water caused a bowel change.', []),
     )
     const safe = groundHistoricalAnswer(raw, packet([fiberBowelSame]), question)
@@ -126,8 +129,8 @@ describe('PIQ-3 relationship pairing and lag identity audit', () => {
   })
 
   it('sanitizes unsupported pair on initial model reply and cached answer with no second call', async () => {
-    const wrong = 'Your water and bowel records were correlated last week.'
-    const correct = 'Your fiber and bowel records were correlated last week.'
+    const wrong = 'Your water and bowel records were correlated last month.'
+    const correct = 'Your fiber and bowel records were correlated last month.'
     const provider = vi.fn(async () => ({
       text: JSON.stringify({
         blocks: [
