@@ -25,6 +25,8 @@ export type FocusedDigestiveEvidence = {
   end: string
   /** One unambiguous calendar day requested in the question, if recognized. */
   requestedDate?: { date: string; inSelectedRange: boolean } | null
+  /** Unresolvable calendar scope: suppress recent samples rather than imply they answer it. */
+  dateSelectionIssue?: 'invalid_or_ambiguous' | 'unsupported_period' | null
   fiber: FocusedDigestiveMetric
   hydration: FocusedDigestiveMetric
   bowel: FocusedDigestiveMetric
@@ -67,24 +69,37 @@ export function attachBristolTypes(
     },
   }
 }
-/** Restrict date-specific answers to the requested Health calendar day.
- * Do not pick a day when several dates are compared or a date is invalid.
- * Relative labels anchor to the instance's local Health calendar, not UTC.
+/** Resolve single-day requests only. Multi-day and ambiguous references must
+ * never be silently approximated with a few recent observations.
+ * Relative labels use the owner instance's local Health calendar, not UTC.
  */
-export function requestedDigestiveCalendarDay(question: string, today: string): string | null {
+export function digestDateSelection(
+  question: string,
+  today: string,
+): { date: string | null; issue: 'invalid_or_ambiguous' | 'unsupported_period' | null } {
   const dates = question.match(/\b\d{4}-\d{2}-\d{2}\b/g) ?? []
   const valid = dates.filter((date) => {
     const parsed = new Date(date + 'T00:00:00.000Z')
     return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === date
   })
-  // An invalid or ambiguous explicit date must not silently become "recent".
-  if (valid.length !== dates.length) return null
   const relative = [
     ...(/\byesterday\b/i.test(question) ? [addCalendarDays(today, -1)] : []),
     ...(/\btoday\b/i.test(question) ? [today] : []),
   ]
   const requested = [...new Set([...valid, ...relative])]
-  return requested.length === 1 ? requested[0]! : null
+  const unsupported = /\b\d{1,2}\/\d{1,2}\/\d{2,4}\b|\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2}\b/i.test(question)
+  if (valid.length !== dates.length || unsupported || requested.length > 1) {
+    return { date: null, issue: 'invalid_or_ambiguous' }
+  }
+  if (requested.length === 1) return { date: requested[0]!, issue: null }
+  if (/\b(?:last|past|previous)\s+(?:\d+\s+days?|week|month|year|few\s+days)\b|\b(?:this|next)\s+(?:week|month|year)\b/i.test(question)) {
+    return { date: null, issue: 'unsupported_period' }
+  }
+  return { date: null, issue: null }
+}
+
+export function requestedDigestiveCalendarDay(question: string, today: string): string | null {
+  return digestDateSelection(question, today).date
 }
 
 const SAMPLE_DAYS = 3
@@ -121,7 +136,8 @@ export function focusDigestiveContext(input: {
   const topics = digestiveQuestionTopics(input.question)
   if (!input.includeBroadContext && !topics.fiber && !topics.hydration && !topics.bowel) return null
   const { snapshot, today } = input
-  const askedDate = requestedDigestiveCalendarDay(input.question, today)
+  const dateSelection = digestDateSelection(input.question, today)
+  const askedDate = dateSelection.date
   const requestedDate = askedDate == null ? null : {
     date: askedDate,
     inSelectedRange: askedDate >= snapshot.period.start &&
@@ -130,8 +146,9 @@ export function focusDigestiveContext(input: {
   // For a dated question, never substitute recent unrelated days if the
   // requested date is absent or falls outside the selected evidence window.
   const sample = (observations: IntelligenceObservation[]) =>
-    requestedDate ? observations.filter((item) =>
-      requestedDate.inSelectedRange && item.date === requestedDate.date) : recent(observations)
+    dateSelection.issue ? [] :
+      requestedDate ? observations.filter((item) =>
+        requestedDate.inSelectedRange && item.date === requestedDate.date) : recent(observations)
   const fiberAll = observationDates(snapshot, 'nutrition.fiber_g', today)
   const fiberStatus = snapshot.coverage.find((c) => c.key === 'nutrition.fiber_g')?.completenessCheck
   // Do not infer full-day intake from food items, even if all entries have
@@ -163,6 +180,7 @@ export function focusDigestiveContext(input: {
     start: snapshot.period.start,
     end: snapshot.period.end,
     requestedDate,
+    dateSelectionIssue: dateSelection.issue,
     fiber: fiberMetric,
     hydration: present('hydration', water),
     bowel: present('bowel', bowel),
