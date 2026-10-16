@@ -22,7 +22,14 @@ const scoped = (id: string, domain: string, value: number, sum: number): AskEvid
 const water = scoped('digestive.focus.coverage.hydration', 'hydration', 3, 1800)
 const bowel = scoped('digestive.focus.coverage.bowel', 'bowel', 3, 4)
 const fiber = scoped('digestive.focus.coverage.fiber', 'nutrition', 3, 54)
-const unrelated = scoped('intelligence.relationship.fiber-bowel', 'intelligence', .7, .7)
+const unrelated: AskEvidence = {
+  ...scoped('intelligence.relationship.shared:hydration:bowel:same_day', 'intelligence', .7, .7),
+  unit: 'Spearman rho',
+  coverage: {
+    pairedObservations: 12, requiredObservations: 10, lagDays: 0,
+    xKey: 'hydration.ml', yKey: 'bowel.count',
+  },
+}
 const olderRelationship: AskEvidence = {
   ...unrelated, evidenceDates: ['2026-09-01', '2026-09-05'],
 }
