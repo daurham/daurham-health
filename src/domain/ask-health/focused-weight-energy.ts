@@ -1,4 +1,5 @@
 import { buildMaintenanceState, type MaintenanceEstimate } from '../maintenance.js'
+import { addCalendarDays } from '../training-plan.js'
 import type { HealthIntelligenceSnapshot } from '../intelligence/shared.js'
 
 /**
@@ -71,17 +72,19 @@ export function focusWeightEnergyContext(input: {
   const frame = snapshot.frame.filter(d =>
     d.date >= snapshot.period.start && d.date <= maintenance.completeThrough && d.date < today)
   const span = maintenance.estimate.period
-  const selected = span
-    ? frame.filter(d => d.date >= span.start && d.date <= span.end)
-    : frame.filter(d => d.date >= maintenance.completeThrough.slice(0,7)+'-01')
+  // If no estimate qualified, qualityFor() describes a fallback 28-day
+  // window, NOT all verified days in an arbitrary 90-day history selection.
+  const expectedStart = span?.start ?? addCalendarDays(maintenance.completeThrough, -27)
+  const boundedStart = expectedStart < snapshot.period.start
+    ? snapshot.period.start : expectedStart
+  const selected = frame.filter(d => d.date >= boundedStart && d.date <= maintenance.completeThrough)
   return {
-    start: span?.start ?? snapshot.period.start,
+    start: boundedStart,
     end: span?.end ?? maintenance.completeThrough,
     completeThrough: maintenance.completeThrough,
     estimate: maintenance.estimate,
-    qualifiedWholeDayCalories: span
-      ? [...reliableDates].filter(d => d >= span.start && d <= span.end).length
-      : [...reliableDates].length,
+    qualifiedWholeDayCalories: [...reliableDates].filter(d =>
+      d >= boundedStart && d <= maintenance.completeThrough).length,
     trainingSessionDays: selected.filter(d =>
       (d.signals['training.sessions']?.value ?? 0) > 0).length,
     wellnessCheckinDays: selected.filter(d =>

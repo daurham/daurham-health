@@ -21,3 +21,7 @@ For undated weight/plateau/energy questions or explicitly opted-in Deep Dive, de
 ## Acceptance boundaries and next tasks
 
 Synthetic regression suite must cover observed available/insufficient evidence, absent/unverified source confirmations, uneven food dates, incomparable weigh-ins, selected historical dates, General Only/privacy, explicit Deep Dive breadth, and cache fingerprint. Next slice: separately version-verified active weight goal and preservation/strength evidence, historical-interval windows, sodium/carb/GI competing explanation quality controls and safety-gated owner-reviewed maintenance/calibration options. No generic calorie cuts or supplements changes. Formal PIQ phase acceptance is 0/9 pending owner-real evaluation and isolated Auth/Neon QA. No migration or release authorization.
+
+## 2026-10-16 — Missing estimate must keep fallback quality window aligned
+
+When the 28/21/14-day estimator cannot qualify an interval, it returns a **28-day fallback evidence-quality inventory**. The PIQ-4.2 focused Ask Health packet must count owner-confirmed days and logged Training/wellness context **only within those same recent 28 completed days** (clipped to the explicitly selected snapshot if narrower). A 90-day selection with 12 verified food days *outside* the fallback period must not report "12 of 28" current verified days or imply they support a current maintenance estimate. Added synthetic regression for that exact case. All completed-day and explicit historical question restrictions remain intact.

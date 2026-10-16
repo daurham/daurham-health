@@ -95,6 +95,26 @@ describe('PIQ-4.2 verified weight/intake descriptive evidence (synthetic)',()=>{
      expect(f.packet.evidence.find(e=>e.id==='weight_energy.observed_balance')).toBeUndefined()
    }
  })
+ it('does not count stale 90-day food records in an insufficient recent 28-day quality window',()=>{
+   const older=Array.from({length:12},(_,i)=>addCalendarDays('2026-09-01',i))
+   const historic=buildHealthIntelligenceSnapshot({
+     range:'90d',start,end:today,asOf:today,today,timezone:'America/Phoenix',
+     observations:[
+       ...older.map(day=>sample('nutrition.calories',day,2300,'high_confidence')),
+       ...dates.map(day=>sample('body.weight_kg',day,82,'usual')),
+     ],
+     nutritionVerifiedCompleteDates:new Set(older),
+     nutritionVerificationStatus:'available',
+   })
+   const f=focusWeightEnergyContext({
+     question:'Is my weight loss plateauing?',snapshot:historic,today,
+   })
+   expect(f?.estimate.state).toBe('insufficient_evidence')
+   expect(f?.start).toBe('2026-09-18')
+   expect(f?.end).toBe('2026-10-15')
+   expect(f?.qualifiedWholeDayCalories).toBe(0)
+   expect(f?.estimate.quality.nutrition.calendarDays).toBe(28)
+ })
  it('never leaks a trailing estimate into a historical-day or last-week question',()=>{
    for(const q of ['What was my weight loss on 2026-09-25?',
      'Why did my scale stall last week?', 'Did I have a deficit yesterday?']){
