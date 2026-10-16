@@ -500,3 +500,8 @@ Ask Health has a collapsed, on-demand "What Health knows about me" inventory usi
 ## 2026-10-15 PIQ-2.3 owner primary-goal intent slice — work branch
 
 Added unapplied migration `0056_primary_goal_intent_events.sql` and portable canonical event history; owner-authenticated GET/PUT `/api/goals/priority`; Goals-page picker with clear/unset state and revision-aware writes. Only an explicitly selected active goal becomes primary; no impact on Coach logic or numerical targets yet. Tests verify date-scoped history, stale versions and disposable PostgreSQL data. New migration requires owner-gated production deployment after previous PIQ schema changes.
+
+
+## 2026-10-15 PIQ-2.3 safe owner-goal focus tie-break
+
+Goal Control now reads the dated owner goal priority and may select its existing qualified due-goal Weekly Coach focus over another due-goal focus, with exact evidence references and active/unmet/current checks. Goal Overview identifies the explicitly owner-selected active goal and the tie-break reason. Does not invent advice or override non-goal focus. Branch-only tests and CI required; migration 0056 unapplied and owner QA pending.

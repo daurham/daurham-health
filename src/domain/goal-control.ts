@@ -3,6 +3,7 @@ import { confidenceFromSample, INTELLIGENCE_SIGNAL_REGISTRY, relationshipScreeni
 import type { WeeklyCandidate, WeeklyCoachBrief, WeeklyGoalSnapshot, WeeklyTrainingPlanSnapshot } from './weekly-coach/types.js'
 import type { MaintenanceState } from './maintenance.js'
 import type { TrainingProgressionState } from './training-progression.js'
+import type { PrimaryGoalIntent } from './primary-goal-intent.js'
 import { buildTrainingProgressSummary } from './training-progress-summary.js'
 import { associationStrength, spearmanRho } from './intelligence/spearman.js'
 
@@ -21,6 +22,8 @@ export type GoalControlOpportunity = {
   detailPath: string
   sourceCandidateId: string | null
   evidenceRefs: string[]
+  /** Explicit owner priority broke a tie among already eligible goal reviews. */
+  prioritySource?: 'owner_primary_goal'
 }
 
 export type GoalControlNutritionQuality = {
@@ -59,6 +62,8 @@ export type GoalControlGoal = {
   targetState: string
   deadlineState: string
   detailPath: string
+  /** Set only for an active goal explicitly chosen by the owner. */
+  ownerPrimary?: boolean
 }
 
 /** Derived coverage from the intelligence observation window, not proof
@@ -148,6 +153,7 @@ export type BuildGoalControlInput = {
   trainingPlan?: WeeklyTrainingPlanSnapshot | null
   maintenance?: MaintenanceState | null
   trainingProgression?: TrainingProgressionState | null
+  primaryGoalIntent?: PrimaryGoalIntent | null
 }
 
 export function goalNeedsWeeklyAttention(deadlineState: string): boolean {
@@ -262,6 +268,33 @@ function trainingAdherence(plan?: WeeklyTrainingPlanSnapshot | null): GoalContro
     state,
     detail: progress.detail,
   }
+}
+
+/** Owner priority breaks ties between *existing qualifying goal reviews* only.
+ * It does not invent a recommendation or supersede another domain's focus.
+ */
+export function chooseOwnerPriorityGoalFocus(
+  brief: WeeklyCoachBrief,
+  goals: readonly WeeklyGoalSnapshot[],
+  intent: PrimaryGoalIntent | null | undefined,
+  asOf: string,
+): WeeklyCandidate | null {
+  const selectedId = intent?.source === 'owner' && intent.primaryGoalId &&
+    intent.effectiveFrom != null && intent.effectiveFrom <= asOf ? intent.primaryGoalId : null
+  if (!selectedId || !brief.canGenerate || !brief.focus ||
+      brief.focus.section !== 'focus' ||
+      !['goal_review', 'goal_off_track'].includes(brief.focus.kind)) return null
+  const selectedGoal = goals.find((goal) => goal.id === selectedId &&
+    goal.lifecycle === 'active' && goal.targetState !== 'satisfied' &&
+    goalNeedsWeeklyAttention(goal.deadlineState))
+  if (!selectedGoal) return null
+  const matches = brief.candidates.filter((item) =>
+    item.section === 'focus' && ['goal_review', 'goal_off_track'].includes(item.kind) &&
+    (item.id === `focus:goal:${selectedId}` ||
+      item.id === `focus:goal-off-track:${selectedId}`) &&
+    item.detailPath === `/goals/${selectedId}` &&
+    item.evidenceRefs.includes(`goal:${selectedId}`))
+  return matches.length === 1 ? matches[0] : null
 }
 
 function opportunity(candidate: WeeklyCandidate | null): GoalControlOpportunity | null {
@@ -856,11 +889,22 @@ export function buildGoalControlState(input: BuildGoalControlInput): GoalControl
     targetState: goal.targetState,
     deadlineState: goal.deadlineState,
     detailPath: `/goals/${goal.id}`,
+    ...(goal.lifecycle === 'active' && input.primaryGoalIntent?.source === 'owner' &&
+      input.primaryGoalIntent.primaryGoalId === goal.id &&
+      input.primaryGoalIntent.effectiveFrom != null &&
+      input.primaryGoalIntent.effectiveFrom <= input.asOf
+      ? { ownerPrimary: true } : {}),
   }))
   const confidence = overallConfidence(input.brief, input.intelligence, input.goals)
   // Weekly focus is upstream of Maintenance. Never let a stale or generic
   // candidate override a verified current calorie-action safety decision.
-  const weeklyFocus = opportunity(input.brief.focus)
+  const chosenGoalFocus = chooseOwnerPriorityGoalFocus(
+    input.brief, input.goals, input.primaryGoalIntent, input.asOf,
+  )
+  const weeklyFocus = opportunity(chosenGoalFocus ?? input.brief.focus)
+  if (weeklyFocus && chosenGoalFocus && chosenGoalFocus.id !== input.brief.focus?.id) {
+    weeklyFocus.prioritySource = 'owner_primary_goal'
+  }
   const safeWeeklyFocus = weeklyFocus?.kind === 'review_activity_adjustment'
     ? null // Dependent activity alternative is never a primary standalone decision.
     : weeklyFocus?.kind === 'review_intake_adjustment' &&

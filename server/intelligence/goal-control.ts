@@ -4,6 +4,8 @@ import { loadWeeklyCoachInput } from '../weekly-coach/load.js'
 import { loadHealthIntelligenceSnapshot } from './snapshot.js'
 import { loadMaintenanceState } from './maintenance.js'
 import { loadTrainingProgressionState } from './training-progression.js'
+import { readPrimaryGoalIntent } from '../goals/primary-intent.js'
+import { getSql } from '../db.js'
 
 export async function loadGoalControlState(
   asOf: string,
@@ -15,9 +17,10 @@ export async function loadGoalControlState(
   // One canonical training evaluation serves both Coach and the independent
   // maintenance calorie-safety gate. Do not issue duplicate progression reads.
   const trainingProgressionPromise = loadTrainingProgressionState(asOf)
-  const [maintenance, trainingProgression] = await Promise.all([
+  const [maintenance, trainingProgression, primaryGoalIntent] = await Promise.all([
     loadMaintenanceState({ asOf, snapshot: intelligence, trainingProgressionPromise }),
     trainingProgressionPromise,
+    getSql().then((sql) => readPrimaryGoalIntent(sql, asOf)),
   ])
   return buildGoalControlState({
     asOf,
@@ -27,5 +30,6 @@ export async function loadGoalControlState(
     trainingPlan: weeklyInput.trainingPlan ?? null,
     maintenance,
     trainingProgression,
+    primaryGoalIntent,
   })
 }

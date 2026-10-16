@@ -798,3 +798,8 @@ DOB is an owner-entered lifetime fact; calendar age may be deterministically cal
 ## Decision: priority belongs to an explicit owner-recorded goal event (PIQ-2.3, 2026-10-15)
 
 Avoid hardcoding fat loss or inferring primary intent from existing targets, app usage, weigh-ins or weekly-focus rank. Version the owner's explicit selection of a canonical **active** goal using an effective Health date; archive/clear events preserve old intent without rewriting history. Keep individual goal targets and interventions unchanged until separately grounded prioritization work is accepted. Optimistic revision checks and PostgreSQL version uniqueness prevent stale-tab preference overwrites. Do not overstate this first measurable-goal selector as a complete mission/constraints editor.
+
+
+## Decision: owner priority is a constrained tie-break, not a fabricated Health action (PIQ-2.3, 2026-10-15)
+
+The effective-dated owner-selected primary goal may win **among existing, qualified due-goal review cards** when the default focus is already a goal review. It must not manufacture a focus from a goal label, re-rank a safety action outside this group, activate an archived/completed goal, or leak a future owner choice into earlier Health dates. Verify exact candidate identity and goal citation to prevent unrelated generic evidence from becoming owner-prioritized advice. Expose that prioritization in Goal Overview so it is inspectable. This is a small owner-intent integration, not a full mission or tradeoff policy; QA and production migrations remain gated.

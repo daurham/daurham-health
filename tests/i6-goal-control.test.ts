@@ -1,7 +1,9 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
   GOAL_CONTROL_VERSION,
   buildGoalControlState,
+  chooseOwnerPriorityGoalFocus,
   dailyTrainingQuestAllowed,
   goalNeedsWeeklyAttention,
 } from '../src/domain/goal-control.ts'
@@ -352,5 +354,91 @@ describe('I6 Weekly Coach / Coach alignment rules', () => {
       },
     })
     expect(trainingDay.candidates.find((item) => item.id === 'focus:training-plan:today')?.actionText).toContain('Routine B')
+  })
+})
+
+describe('PIQ-2.3 explicit owner priority resolves only competing qualified goal reviews', () => {
+  const first = candidate({
+    id: 'focus:goal:goal-1', kind: 'goal_review',
+    fact: 'Goal A is due today', detailPath: '/goals/goal-1',
+    evidenceRefs: ['goal:goal-1'],
+  })
+  const second = candidate({
+    id: 'focus:goal:goal-2', kind: 'goal_review',
+    fact: 'Goal B is due today', detailPath: '/goals/goal-2',
+    evidenceRefs: ['goal:goal-2'],
+  })
+  const goals = [
+    goal({ id: 'goal-1', label: 'Goal A', targetState: 'below_target', deadlineState: 'due_today' }),
+    goal({ id: 'goal-2', label: 'Goal B', targetState: 'below_target', deadlineState: 'due_today' }),
+  ]
+  const chosen = {
+    source: 'owner' as const, version: 1,
+    primaryGoalId: 'goal-2', effectiveFrom: '2026-10-01',
+    recordedAt: '2026-10-01 10:00+00',
+  }
+  const weekly = { ...brief(first), candidates: [first, second] }
+
+  it('reorders only existing eligible goal-review cards, and explains the owner source', () => {
+    expect(chooseOwnerPriorityGoalFocus(weekly, goals, chosen, AS_OF)).toEqual(second)
+    const state = buildGoalControlState({
+      asOf: AS_OF, brief: weekly, intelligence: intelligence([]),
+      goals, primaryGoalIntent: chosen,
+    })
+    expect(state.primaryOpportunity).toMatchObject({
+      id: second.id, detailPath: '/goals/goal-2', prioritySource: 'owner_primary_goal',
+    })
+    expect(state.goals.find((item) => item.id === 'goal-2')?.ownerPrimary).toBe(true)
+    expect(state.goals.find((item) => item.id === 'goal-1')?.ownerPrimary).toBeUndefined()
+  })
+
+  it('does not invent a primary choice when unset or explicitly cleared', () => {
+    for (const intent of [undefined, { ...chosen, primaryGoalId: null }]) {
+      expect(chooseOwnerPriorityGoalFocus(weekly, goals, intent, AS_OF)).toBeNull()
+      const state = buildGoalControlState({
+        asOf: AS_OF, brief: weekly, intelligence: intelligence([]),
+        goals, primaryGoalIntent: intent,
+      })
+      expect(state.primaryOpportunity?.id).toBe(first.id)
+      expect(state.goals.some((item) => item.ownerPrimary)).toBe(false)
+    }
+  })
+
+  it('cannot promote a future, archived, completed or no-longer-due goal', () => {
+    const cases = [
+      { intent: { ...chosen, effectiveFrom: '2026-10-09' }, items: goals },
+      { intent: chosen, items: [goals[0], { ...goals[1], lifecycle: 'archived' }] },
+      { intent: chosen, items: [goals[0], { ...goals[1], targetState: 'satisfied' }] },
+      { intent: chosen, items: [goals[0], { ...goals[1], deadlineState: 'projected_before_deadline' }] },
+    ]
+    for (const entry of cases) {
+      expect(chooseOwnerPriorityGoalFocus(weekly, entry.items, entry.intent, AS_OF)).toBeNull()
+    }
+  })
+
+  it('never displaces a non-goal focus or accepts a mismatched citation or duplicate', () => {
+    const safety = candidate({
+      id: 'focus:review:urgent', kind: 'review_capture', detailPath: '/review',
+      evidenceRefs: ['review:urgent'],
+    })
+    expect(chooseOwnerPriorityGoalFocus(
+      { ...weekly, focus: safety }, goals, chosen, AS_OF,
+    )).toBeNull()
+    expect(chooseOwnerPriorityGoalFocus(
+      { ...weekly, candidates: [first, { ...second, evidenceRefs: ['goal:other'] }] },
+      goals, chosen, AS_OF,
+    )).toBeNull()
+    expect(chooseOwnerPriorityGoalFocus(
+      { ...weekly, candidates: [first, second, second] }, goals, chosen, AS_OF,
+    )).toBeNull()
+  })
+
+  it('keeps the server wired to the dated owner intent and Goal Overview disclosure', () => {
+    const server = readFileSync('server/intelligence/goal-control.ts', 'utf8')
+    const view = readFileSync('src/features/goal-control/GoalControlCard.tsx', 'utf8')
+    expect(server).toContain('readPrimaryGoalIntent(sql, asOf)')
+    expect(server).toContain('primaryGoalIntent,')
+    expect(view).toContain('Your chosen primary goal:')
+    expect(view).toContain("opportunity?.prioritySource === 'owner_primary_goal'")
   })
 })

@@ -1468,3 +1468,14 @@ Synthetic 16-pair regressions mutate the frame and day count while preserving th
 **Verification:** Domain tests cover unset, future/history leakage, multiple same-day owner choices, clear, invalid selection and optimistic-write protection. Disposable PostgreSQL migration-chain tests verify real active-goal selection, stale-tab denial and as-of history with transaction rollback. Full TypeScript/lint/Vitest/build, backup round-trip and authenticated phone QA remain the current commit's gates.
 
 **Release gate:** Migration 0056 follows unapplied PIQ migration 0053–0055. No production migration or main promotion without explicit owner approval, schema and backup review, and acknowledgement that the new priority is a deliberate fresh owner selection, never a backfilled assumption.
+
+
+## PIQ-2.3 — Explicit primary goal breaks ties between already-qualified reviews (2026-10-15)
+
+**State:** Bounded branch-only implementation; full CI, authenticated iOS QA and owner acceptance required. **0/9 PIQ phases owner-accepted.**
+
+**Gap:** Saving a primary measurable goal did not influence Goal Control at all; Coach could focus on another due goal without acknowledging the owner's explicitly recorded preference. Conversely, blindly promoting a priority risks fabricating advice, overriding a safety-dependent Maintenance decision, and resurrecting a completed/archived goal.
+
+**Contract:** Goal Control reads the as-of owner priority event from the canonical append-only primary-goal history. Only when Weekly Coach's existing top focus is **already a qualified goal review**, the owner-selected goal is still active/unmet/due and its own exact, unique focus candidate is cited to that goal, the selected goal wins among those goal reviews. No candidate is invented or newly promoted from a mere goal label. A non-goal first action, missing source, stale/future owner selection, archived, satisfied, not-due or duplicate/mismatched evidence does not reorder Coach. Calorie, rest/recovery, completeness and experiment safety gates remain unchanged. Goal Overview identifies the owner's saved active primary goal and explicitly labels when it broke the ranking tie.
+
+**Tests:** Synthetic baseline/cleared preference, two competing due goals, completed/archived/not-due/historical choices, non-goal focus, missing/duplicate/wrong citation and wired read/UI provenance assertions. No database migration, Gemini call, production read/write or `main` merge in this slice. The earlier owner-choice schema migration 0056 remains unapplied to production. Follow-up PIQ-2.3 work may model larger owner missions and constraint hierarchies, but must not infer these from a single measurable priority.

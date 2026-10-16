@@ -54,6 +54,7 @@ export function GoalControlCard({
   }
 
   const opportunity = state.primaryOpportunity
+  const ownerPrimaryGoal = state.goals.find((goal) => goal.ownerPrimary)
   const trainingTrend = opportunity?.kind === 'training_progression'
     ? progressionSeriesForOpportunity(state.trainingProgression, opportunity.id) : null
   return (
@@ -79,6 +80,17 @@ export function GoalControlCard({
           </Link>
         )}
       </div>
+      {ownerPrimaryGoal ? (
+        <p className="mt-2 text-xs text-zinc-600">
+          Your chosen primary goal:{' '}
+          <Link to={prefixedPath(prefix, ownerPrimaryGoal.detailPath)} className="font-medium text-zinc-800 underline underline-offset-2">
+            {ownerPrimaryGoal.label}
+          </Link>.
+          {opportunity?.prioritySource === 'owner_primary_goal'
+            ? ' This review was selected from competing due-goal reviews because you set this priority.'
+            : ' Health still checks whether an action is due and supported by evidence.'}
+        </p>
+      ) : null}
       {state.maintenance?.estimate.state === 'available' && state.maintenance.estimate.observedMaintenanceKcal != null ? (
         <div className="mt-2 text-xs text-zinc-500">
           <p>
