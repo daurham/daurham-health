@@ -44,7 +44,7 @@ export function screenWeightGoalObservation(input:{
     !(goal.targetMode==='at_most'&&boundOk(goal.targetMaxKg)||
       goal.targetMode==='at_least'&&boundOk(goal.targetMinKg)||
       goal.targetMode==='range'&&boundOk(goal.targetMinKg)&&boundOk(goal.targetMaxKg)&&
-        goal.targetMinKg!<=goal.targetMaxKg!))
+        goal.targetMinKg! <= goal.targetMaxKg!))
     return unavailable
   const from=addCalendarDays(input.asOf,-20)
   const weights=input.snapshot.frame.flatMap(day=>{
