@@ -197,6 +197,32 @@ export function AskHealthPage() {
               {latest.meta.evidenceOverview.omittedCount > 0
                 ? ' Omitted candidate facts: ' + latest.meta.evidenceOverview.omittedCount + '.' : ''}
             </p>
+            {latest.meta.evidenceOverview.items.length > 0 ? (
+              <ul className="mt-3 space-y-2" aria-label="Facts supplied to the AI">
+                {latest.meta.evidenceOverview.items.map((item) => (
+                  <li key={item.id} className="rounded-md border border-zinc-200 bg-white p-2 text-xs text-zinc-700">
+                    <span className="font-medium text-zinc-900">{item.label}</span>
+                    <span className="text-zinc-500"> · {item.domain}</span>
+                    {item.dates.length ? <p className="mt-1">Recorded dates: {item.dates.slice(0, 4).join(', ')}{item.dates.length > 4 ? ' and others' : ''}</p> : null}
+                    {item.provenance ? <p className="mt-1">Source: {item.provenance}</p> : null}
+                    <p className="mt-1">
+                      {latest.evidence.some((cited) => cited.id === item.id)
+                        ? 'Referenced in this answer' : 'Supplied as context; not cited in the answer'}
+                    </p>
+                    {item.detailPath?.startsWith('/') && !item.detailPath.startsWith('//') ? (
+                      <a href={prefixedPath(prefix, item.detailPath)} className="mt-1 inline-block min-h-8 font-medium underline">
+                        View source
+                      </a>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            {latest.meta.evidenceOverview.unlistedCount > 0 ? (
+              <p className="mt-2 text-xs text-zinc-600">
+                {latest.meta.evidenceOverview.unlistedCount} additional supplied facts are not individually listed here.
+              </p>
+            ) : null}
             <p className="mt-1 text-xs text-zinc-600">The answer cites specific facts it used; supplying context does not mean every supplied record influenced the answer.</p>
           </details>
         ) : null}

@@ -12,7 +12,21 @@ export type AskHealthResponse = {
     packetVersion: string
     promptVersion: string
     contextMode?: AskContextMode
-    evidenceOverview?: { availableCount: number; domains: string[]; omittedCount: number; limited: boolean }
+    evidenceOverview?: {
+      availableCount: number
+      domains: string[]
+      omittedCount: number
+      limited: boolean
+      items: Array<{
+        id: string
+        label: string
+        domain: string
+        detailPath: string | null
+        dates: string[]
+        provenance: string | null
+      }>
+      unlistedCount: number
+    }
     answerScope?: 'general' | 'personal' | 'urgent_safety'
     provider: string
     model: string

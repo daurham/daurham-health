@@ -52,7 +52,22 @@ export type AskHealthResponse = {
     promptVersion: string
     answerScope: 'general' | 'personal' | 'urgent_safety'
     contextMode: AskContextMode
-    evidenceOverview: { availableCount: number; domains: string[]; omittedCount: number; limited: boolean }
+    evidenceOverview: {
+      availableCount: number
+      domains: string[]
+      omittedCount: number
+      limited: boolean
+      /** Owner-only bounded list of facts supplied to the model, not all DB records. */
+      items: Array<{
+        id: string
+        label: string
+        domain: string
+        detailPath: string | null
+        dates: string[]
+        provenance: string | null
+      }>
+      unlistedCount: number
+    }
     provider: string
     model: string
     cached: boolean
@@ -352,6 +367,15 @@ function metaFor(
       domains: [...new Set(input.packet.evidence.filter(e => e.substantive).map(e => e.domain))].sort(),
       omittedCount: input.packet.evidenceSelectionAudit?.removedCount ?? 0,
       limited: (input.packet.evidenceSelectionAudit?.removedCount ?? 0) > 0 || Boolean(input.packet.evidenceSelectionAudit?.exceedsMaxChars),
+      items: input.packet.evidence.filter(item => item.substantive).slice(0, 24).map(item => ({
+        id: item.id,
+        label: item.label,
+        domain: item.domain,
+        detailPath: item.detailPath,
+        dates: item.evidenceDates ?? [],
+        provenance: item.provenance ?? null,
+      })),
+      unlistedCount: Math.max(0, input.packet.evidence.filter(item => item.substantive).length - 24),
     },
     provider: result.provider,
     model: result.model,

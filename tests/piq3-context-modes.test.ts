@@ -237,5 +237,33 @@ describe('PIQ-3 explicit Context Mode request contract', () => {
     expect(stub.mock.calls[0]![0].system).toContain('NEVER claim to have reviewed the full database')
   })
 
+  it('transparently lists bounded source metadata for the owner, with no values or General Only private records', async () => {
+    const custom = inputFor()
+    const packet = buildAskHealthEvidencePacket({ ...custom, lens: 'general',
+      goals: Array.from({ length: 40 }, (_, index) => ({
+        ...custom.goals[0]!,
+        id: 'fixture-goal-' + index,
+        label: 'Synthetic training goal ' + index,
+      })),
+    })
+    const stub = makeProvider()
+    const gate = fakeGate()
+    const deep = await explainAskHealth({ packet, question: q, conversation: [],
+      provider: stub, gate, model: 'piq-stub', contextMode: 'deep', now: 1000 })
+    expect(deep.meta.evidenceOverview.items.length).toBeLessThanOrEqual(24)
+    expect(deep.meta.evidenceOverview.items.length).toBeGreaterThan(0)
+    expect(deep.meta.evidenceOverview.items.some(item => item.domain === 'goals')).toBe(true)
+    expect(JSON.stringify(deep.meta.evidenceOverview.items)).not.toContain('At most 80 kg')
+    expect(deep.meta.evidenceOverview.unlistedCount).toBeGreaterThanOrEqual(0)
+    const restricted = await explainAskHealth({ packet, question: q,
+      conversation: [{ role: 'user', text: 'Sensitive previous conversation' }],
+      provider: stub, gate, model: 'piq-stub', contextMode: 'general_only', now: 2000 })
+    expect(restricted.meta.evidenceOverview).toMatchObject({
+      availableCount: 0, items: [], unlistedCount: 0, domains: [],
+    })
+    expect(JSON.stringify(restricted)).not.toContain('fixture-goal-')
+    expect(JSON.stringify(restricted)).not.toContain('Sensitive previous conversation')
+  })
+
 
 })
