@@ -593,3 +593,7 @@ Auth branch-binding preflight `1868eea` passed exact GitHub CI run 38933955703; 
 ## 2026-10-16 — PIQ-4.1 first slice passes GitHub CI after natural-language date fix
 
 Code SHA `b3fe08f3bbdfeb4ae8d48055420b28ef0a6e9e7b` passes run 38936040705: npm ci, tsc, ESLint, full Vitest, build. Fix `digestDateSelection` to treat causal "from low fiber" as non-temporal; date-anchored "from YYYY-MM-DD" remains unsupported range. Previous `6c4e402` failed its five new GI tests and was repaired; previous READY Vercel preview is stale and corrected commit was build-rate-limited. No prod release, schema mutation, Auth isolation proof, owner-data test or paid provider call. Engineering PIQ-4.1 partial only; formal PIQ acceptance 0/9.
+
+## 2026-10-16 PIQ-4.1 audited full-window Bristol coverage, CI green
+
+Development code SHA `c065f608d487820a1d78dbc2e3fc963e850b904a`, run 38937759507 all required checks **passed**. New 90-day maximum per selected/requested interval, explicit history date handling, query-scoped aggregate stool types, reconciliation to existing source counts, unknown-vs-explicit-zero separation and no fabricated association. See `docs/ai/PIQ4_DIGESTIVE_WINDOW_CONTRACT.md` and PIQ_PROGRESS. Vercel corrected preview not deployed due build-rate cap; production remains on original main SHA. Schema 0053–0056 unapplied pending authorized DB target. No paid provider/owner-data operations or formal phase acceptance (0/9).
