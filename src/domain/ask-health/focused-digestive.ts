@@ -26,7 +26,7 @@ export type FocusedDigestiveEvidence = {
 }
 
 const DIGESTIVE_QUESTION =
-  /\b(?:fib(?:er|re)|constipat\w*|bowel|stool|poop|bristol|hydrat\w*|water intake|fluid intake|drinking enough)\b/i
+  /\b(?:fib(?:er|re)|constipat\w*|bowels?|stools?|poop\w*|bristol|hydrat\w*|water(?:\s+intake)?|fluid intake|drinking enough)\b/i
 const SAMPLE_DAYS = 3
 
 function recent<T extends { date: string }>(items: readonly T[]): T[] {
