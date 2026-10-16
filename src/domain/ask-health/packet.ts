@@ -625,6 +625,17 @@ function addFocusedWeightEnergy(
     },
     detailPath:'/nutrition',userEntered:false,substantive:false,priority:1,
   })
+  const exerciseReview = focus.exercisePreservationReview
+  const exerciseReviewSummary = exerciseReview.state === 'possible_decline_for_review'
+    ? 'A separate canonical exact-exercise screen has '+exerciseReview.possibleDeclineExercises+
+      ' preliminary recent performance-decline flag(s) among '+exerciseReview.qualifiedRecentSeries+
+      ' qualifying matched-exercise series. Review their training context rather than assuming dieting caused the change. '
+    : exerciseReview.state === 'no_qualified_decline_flag'
+      ? 'A separate canonical exact-exercise screen found no qualifying decline flags among '+
+        exerciseReview.qualifiedRecentSeries+' recent matched-exercise series; this does NOT establish preserved strength or muscle. '
+      : exerciseReview.state === 'limited_evidence'
+        ? 'The separate exact-exercise screen had too few recent, confidently comparable four-exposure series; strength changes remain UNKNOWN. '
+        : 'No reliable current exact-exercise decline screen was available; performance changes remain UNKNOWN. '
   push({
     id:'weight_energy.training_preservation_boundary',
     domain:'intelligence',
@@ -635,11 +646,15 @@ function addFocusedWeightEnergy(
       preservation.trainingDaysWithoutSourceIdentity+
       ' additional positive training signals lack usable event identity and are excluded. '+
       'Training participation does NOT establish comparable resistance, effort, exercise performance, muscle retention, or appropriate recovery. '+
-      'No actual exercise-matched longitudinal performance and current goal/target version were reconciled. '+
-      'A plateau, protein adequacy judgment, or calorie-cut recommendation remains unauthorized.',
+      exerciseReviewSummary +
+      'These are read-only training-record observations without an independently version-checked workout snapshot or a comprehensive recovery assessment. '+
+      'Strength preservation, plateau and protein-adequacy conclusions remain unverified. A calorie-cut recommendation remains unauthorized.',
     coverage:{
       sourceIdentifiedTrainingDays:preservation.sourceIdentifiedTrainingDays,
       unattributedPositiveTrainingSignalDays:preservation.trainingDaysWithoutSourceIdentity,
+      exerciseReviewState:exerciseReview.state,
+      qualifiedRecentExerciseSeries:exerciseReview.qualifiedRecentSeries,
+      possibleDeclineExercises:exerciseReview.possibleDeclineExercises,
       strengthPreservation:'not_verified',
     },
     detailPath:'/training',userEntered:false,substantive:false,priority:1,

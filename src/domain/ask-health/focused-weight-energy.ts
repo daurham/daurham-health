@@ -3,6 +3,7 @@ import { addCalendarDays } from '../training-plan.js'
 import type { HealthIntelligenceSnapshot } from '../intelligence/shared.js'
 import { screenProteinTrainingContext, type ProteinTrainingContext } from './protein-training-context.js'
 import { UNCHECKED_WEIGHT_ENERGY_SETTINGS, type WeightEnergyCurrentSettings } from './weight-energy-current-settings.js'
+import { UNCHECKED_EXERCISE_PRESERVATION, type ExercisePreservationReview } from './exercise-preservation-review.js'
 
 /**
  * PIQ-4.2 FIRST SLICE — purely descriptive, explicitly bounded weight/intake
@@ -35,6 +36,8 @@ export type FocusedWeightEnergyEvidence = {
     'id' | 'kind' | 'title' | 'detail' | 'dates' | 'detailPath'>>
   /** Read-time current target/experiment revision status, NOT permission to adjust calories. */
   currentSettings: WeightEnergyCurrentSettings
+  /** Read-only canonical matched-exercise decline flags, never strength-retention proof. */
+  exercisePreservationReview: ExercisePreservationReview
   /** Distinguishes "not checked" from a positive safety finding. */
   goalVerification: 'not_checked'
   decisionVerification: 'not_checked'
@@ -118,6 +121,7 @@ export function focusWeightEnergyContext(input: {
         id,kind,title,detail,dates,detailPath,
       })),
     currentSettings: {...UNCHECKED_WEIGHT_ENERGY_SETTINGS},
+    exercisePreservationReview: {...UNCHECKED_EXERCISE_PRESERVATION},
     goalVerification: 'not_checked',
     decisionVerification: 'not_checked',
     strengthPreservation: 'not_verified',
