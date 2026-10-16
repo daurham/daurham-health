@@ -9,17 +9,18 @@ const sql=(rows:unknown)=>({query:vi.fn(async()=>rows)} as unknown as Sql)
 describe('PIQ-4.2 source-versioned current weight-goal mode',()=>{
  it('reads only bounded active current-version goal modes',async()=>{
    const db=sql([{id:'a',version_id:'v2',target_mode:'range'}])
-   expect(await readCurrentWeightGoalMode(db)).toMatchObject({status:'available',
+   expect(await readCurrentWeightGoalMode('2026-10-16',db)).toMatchObject({status:'available',
      rows:[{id:'a',versionId:'v2',targetMode:'range'}]})
-   expect(db.query).toHaveBeenCalledWith(CURRENT_WEIGHT_GOAL_MODE_SQL,[])
+   expect(db.query).toHaveBeenCalledWith(CURRENT_WEIGHT_GOAL_MODE_SQL,['2026-10-16'])
    expect(CURRENT_WEIGHT_GOAL_MODE_SQL).toMatch(/v\.is_current/)
+   expect(CURRENT_WEIGHT_GOAL_MODE_SQL).toMatch(/g\.started_on\s*<=\s*\$1::date/)
    expect(CURRENT_WEIGHT_GOAL_MODE_SQL).toMatch(/LIMIT 2/)
    expect(CURRENT_WEIGHT_GOAL_MODE_SQL).not.toMatch(/\b(?:INSERT|UPDATE|DELETE|ALTER|DROP)\s/i)
  })
  it('keeps no active goal distinct from a failed read or invalid current version',async()=>{
    expect(verifiedCurrentWeightGoalMode({status:'available',rows:[]},good)).toBe('none')
-   expect(await readCurrentWeightGoalMode(sql(undefined))).toEqual({status:'unavailable',rows:[]})
-   expect(await readCurrentWeightGoalMode(sql([{id:'a',version_id:null,target_mode:'at_most'}])))
+   expect(await readCurrentWeightGoalMode('2026-10-16',sql(undefined))).toEqual({status:'unavailable',rows:[]})
+   expect(await readCurrentWeightGoalMode('2026-10-16',sql([{id:'a',version_id:null,target_mode:'at_most'}])))
      .toEqual({status:'unavailable',rows:[]})
    expect(verifiedCurrentWeightGoalMode({status:'unavailable',rows:[]},good)).toBe('unavailable')
  })
