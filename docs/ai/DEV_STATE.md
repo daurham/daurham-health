@@ -589,3 +589,7 @@ On PIQ branch, added `src/domain/ask-health/context-range.ts` and a Deep Dive-sp
 ## 2026-10-16 PIQ-4.1 first digestive sample screen — isolated branch
 
 Auth branch-binding preflight `1868eea` passed exact GitHub CI run 38933955703; it remains opt-in and does not prove runtime Auth tenant isolation. First PIQ-4.1 saved-Bristol sample-screen integration landed in `6c4e402`; CI FAILURE at checkpoint: GitHub Actions 38935399299 (exact code SHA 6c4e402587c28eae33c49325124cdacc8f2b9b52). New Vercel preview built READY; production still serves main. All real owner-data QA, migration, paid provider, DB/Auth runtime attestation, encrypted restore and owner acceptance remain blocked. Full-window digestive trend/lag reasoning is **not implemented**; sample co-presence is noncausal.
+
+## 2026-10-16 — PIQ-4.1 first slice passes GitHub CI after natural-language date fix
+
+Code SHA `b3fe08f3bbdfeb4ae8d48055420b28ef0a6e9e7b` passes run 38936040705: npm ci, tsc, ESLint, full Vitest, build. Fix `digestDateSelection` to treat causal "from low fiber" as non-temporal; date-anchored "from YYYY-MM-DD" remains unsupported range. Previous `6c4e402` failed its five new GI tests and was repaired; previous READY Vercel preview is stale and corrected commit was build-rate-limited. No prod release, schema mutation, Auth isolation proof, owner-data test or paid provider call. Engineering PIQ-4.1 partial only; formal PIQ acceptance 0/9.
