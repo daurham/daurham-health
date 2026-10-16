@@ -73,7 +73,9 @@ describe('PIQ-4.1 bounded full-window bowel evidence without causal inference',(
     const {snapshot,focus}=fixture()
     const selection=selectDigestiveBowelWindow(focus,today)!
     if(selection.status!=='ready')throw Error('scope')
-    expect(bowelSnapshotEventIds(snapshot,selection.scope)).toEqual(['a','b'])
+    expect(bowelSnapshotEventIds(snapshot,selection.scope)).toEqual([
+      {id:'a',date:'2026-10-12'}, {id:'b',date:'2026-10-12'},
+    ])
     // Old canonical snapshot contained a+b; current database has a+replacement.
     const mismatched=[{...rows[0]!,matchedEventCount:1}]
     const result=summarizeBowelWindow(snapshot,selection.scope,mismatched,today)
@@ -83,8 +85,44 @@ describe('PIQ-4.1 bounded full-window bowel evidence without causal inference',(
     const nextObs=obs.map(o=>o.key==='bowel.count' && o.date==='2026-10-12'
       ? {...o,sourceIds:['a','replacement']} : o)
     const refreshed=fixture(nextObs)
-    expect(bowelSnapshotEventIds(refreshed.snapshot,selection.scope)).toEqual(['a','replacement'])
+    expect(bowelSnapshotEventIds(refreshed.snapshot,selection.scope)).toEqual([
+      {id:'a',date:'2026-10-12'}, {id:'replacement',date:'2026-10-12'},
+    ])
     expect(summarizeBowelWindow(refreshed.snapshot,selection.scope,rows,today))
+      .toMatchObject({status:'available',movementEvents:2})
+  })
+  it('keeps event-to-date identity when an event is moved instead of only counting its ID',()=>{
+    const records: IntelligenceObservation[]=[
+      {key:'bowel.count',date:'2026-10-12',value:1,unit:'count',
+        provenance:'owner',sourceIds:['event-a']},
+      {key:'bowel.count',date:'2026-10-13',value:1,unit:'count',
+        provenance:'owner',sourceIds:['event-b']},
+    ]
+    const {snapshot,focus}=fixture(records)
+    const selected=selectDigestiveBowelWindow(focus,today)!
+    if(selected.status!=='ready')throw Error('scope')
+    expect(bowelSnapshotEventIds(snapshot,selected.scope)).toEqual([
+      {id:'event-a',date:'2026-10-12'},
+      {id:'event-b',date:'2026-10-13'},
+    ])
+    // The same IDs now exist on opposite dates: a window-only ID set would
+    // accidentally accept both. The SQL matched date+ID joins each to zero.
+    const shifted=[
+      {date:'2026-10-12',eventCount:1,typedCount:1,hardCount:1,matchedEventCount:0},
+      {date:'2026-10-13',eventCount:1,typedCount:1,hardCount:0,matchedEventCount:0},
+    ]
+    expect(summarizeBowelWindow(snapshot,selected.scope,shifted,today))
+      .toMatchObject({status:'unavailable',reason:'source_mismatch'})
+    const refreshed=fixture([
+      {...records[0]!,sourceIds:['event-b']},
+      {...records[1]!,sourceIds:['event-a']},
+    ])
+    expect(bowelSnapshotEventIds(refreshed.snapshot,selected.scope)).toEqual([
+      {id:'event-b',date:'2026-10-12'},
+      {id:'event-a',date:'2026-10-13'},
+    ])
+    const consistent=shifted.map(row => ({...row,matchedEventCount:1}))
+    expect(summarizeBowelWindow(refreshed.snapshot,selected.scope,consistent,today))
       .toMatchObject({status:'available',movementEvents:2})
   })
   it('fails closed for missing, incorrect, or invalid match-count evidence',()=>{

@@ -54,12 +54,12 @@ export type BowelDateCountRow = {
 export function bowelSnapshotEventIds(
   snapshot: HealthIntelligenceSnapshot,
   scope: DigestiveBowelWindowScope,
-): string[] | null {
+): Array<{ id: string; date: string }> | null {
   if (scope.start < snapshot.period.start || scope.end > snapshot.period.end ||
       scope.start > scope.end || scope.end > snapshot.asOf ||
       safeDaySpan(scope.start, scope.end) !== scope.calendarDays ||
       scope.calendarDays > MAX_BOWEL_WINDOW_DAYS) return null
-  const ids: string[] = []
+  const ids: Array<{ id: string; date: string }> = []
   const unique = new Set<string>()
   for (const day of snapshot.frame) {
     if (day.date < scope.start || day.date > scope.end) continue
@@ -70,7 +70,7 @@ export function bowelSnapshotEventIds(
     for (const id of bowel.sourceIds) {
       if (!id || unique.has(id)) return null
       unique.add(id)
-      ids.push(id)
+      ids.push({ id, date: day.date })
       if (ids.length > MAX_BOWEL_WINDOW_EVENT_IDS) return null
     }
   }

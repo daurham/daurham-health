@@ -118,11 +118,14 @@ export async function loadAskHealthPacketInput(input: {
              count(*)::int AS event_count,
              count(*) FILTER (WHERE bristol_type BETWEEN 1 AND 7)::int AS typed_count,
              count(*) FILTER (WHERE bristol_type IN (1,2))::int AS hard_count,
-             count(*) FILTER (WHERE id = ANY($3::uuid[]))::int AS matched_event_count
-           FROM bowel_events
-           WHERE bowel_date >= $1::date AND bowel_date <= $2::date
-           GROUP BY bowel_date ORDER BY bowel_date`,
-          [selectedBowelWindow.scope.start, selectedBowelWindow.scope.end, expectedIds],
+             count(matched.id)::int AS matched_event_count
+           FROM bowel_events events
+           LEFT JOIN unnest($3::uuid[], $4::date[]) AS matched(id, bowel_date)
+             ON matched.id = events.id AND matched.bowel_date = events.bowel_date
+           WHERE events.bowel_date >= $1::date AND events.bowel_date <= $2::date
+           GROUP BY events.bowel_date ORDER BY events.bowel_date`,
+          [selectedBowelWindow.scope.start, selectedBowelWindow.scope.end,
+            expectedIds.map(item => item.id), expectedIds.map(item => item.date)],
         )) as Array<Record<string, unknown>>
         bowelWindow = summarizeBowelWindow(intelligenceSnapshot, selectedBowelWindow.scope,
           dailyRows.map(row => ({
