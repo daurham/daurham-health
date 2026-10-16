@@ -32,7 +32,7 @@ function construct(options:{
       unit:'ml',provenance:'owner',sourceIds:['w'+i],
     })
   }
-  for(const [i,date] of (options.explicitZeroDates??[]).entries()){
+  for(const date of options.explicitZeroDates??[]){
     observations.push({key:'bowel.count',date,value:0,unit:'count',provenance:'owner',
       sourceIds:[]})
   }
