@@ -313,6 +313,11 @@ export function groundHistoricalAnswer(
       withheld += 1
       return false
     }
+    // A relationship statistic is the source for an *association* statement,
+    // not three independent source-domain counts. Numeric values stated in the
+    // same block still need their own date-matched metric evidence.
+    if (affirmativeOwnerAssociation(block.text) &&
+        qualifiedOwnerQuantities(block.text).length === 0) return true
     if (!scope) return true
     if (unsupportedHistoricalMeasurement(block.text)) {
       withheld += 1
