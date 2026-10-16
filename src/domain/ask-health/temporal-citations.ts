@@ -116,10 +116,10 @@ function qualifiedOwnerQuantities(text: string): QualifiedQuantity[] {
   const matches = [...text.matchAll(pattern)]
   const qualifiers = (text: string) => {
     const words = [...text.matchAll(/\b(averag(?:e|ed|ing)|mean|total(?:ed)?|sum(?:med)?|estimated|estimate|e1rm|1rm|one.rep max|lifted|load(?:ed)?)\b/gi)]
-    return words.at(-1)?.[1]?.toLowerCase() ?? null
+    return words[words.length - 1]?.[1]?.toLowerCase() ?? null
   }
   return matches.flatMap((match, i) => {
-    const value = Number((match[1] ?? '').replaceAll(',', ''))
+    const value = Number((match[1] ?? '').replace(/,/g, ''))
     const unit = recordedUnit(match[2] ?? '')
     if (!unit || !Number.isFinite(value)) return []
     const offset = match.index ?? 0
@@ -127,7 +127,8 @@ function qualifiedOwnerQuantities(text: string): QualifiedQuantity[] {
     const before = text.slice(Math.max(priorEnd, offset - 120), offset)
     const after = text.slice(offset + match[0].length, offset + match[0].length + 35)
     const nutrientAfter = /^\s*(?:(?:of|in)\s+)?(fiber|fibre|protein|carbs?|carbohydrates?|fat|sodium)\b/i.exec(after)
-    const nutrientBefore = [...before.matchAll(/\b(fiber|fibre|protein|carbs?|carbohydrates?|fat|sodium)\b/gi)].at(-1)?.[1]
+    const nutrientMatches = [...before.matchAll(/\b(fiber|fibre|protein|carbs?|carbohydrates?|fat|sodium)\b/gi)]
+    const nutrientBefore = nutrientMatches[nutrientMatches.length - 1]?.[1]
     const nutrient = unit === 'g' && (nutrientAfter?.[1] || nutrientBefore)
       ? nutrientName(nutrientAfter?.[1] ?? nutrientBefore!) : null
     const near = qualifiers(before)
