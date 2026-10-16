@@ -147,7 +147,7 @@ export function GoalControlCard({
                 <p className="mt-1">
                   {item.evidence?.coefficientVerified ? 'Verified against loaded readings' : 'Historical / unverified'}.
                   {' '}Matched-pair count grade: {item.confidence} · {item.sampleSize} {item.evidence?.coefficientVerified ? 'matched' : 'previously reported'} date pairs.
-                  {' '}This count grade is not statistical certainty.
+                  {' '}This grade describes sample availability, not statistical certainty.
                 </p>
                 {item.evidence ? (
                   <>
