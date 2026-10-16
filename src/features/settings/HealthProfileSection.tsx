@@ -8,6 +8,7 @@ import {
 } from '@/domain/health-profile'
 import { primaryButtonClass, quietButtonClass, useHealthCalendarDate } from '@/lib'
 import { fetchHealthProfile, saveHealthProfile } from './api'
+import { MAX_OWNER_NOTE_DRAFT, mergeReviewedOwnerNote } from '@/domain/ask-health/owner-note-review'
 
 type Condition = HealthProfile['clinicalConditions'][number]
 type Allergy = HealthProfile['clinicalAllergies'][number]
@@ -54,7 +55,7 @@ function SectionHeader({ title, detail }: { title: string; detail: string }) {
   )
 }
 
-export function HealthProfileSection() {
+export function HealthProfileSection({ ownerNoteDraft = null }: { ownerNoteDraft?: string | null }) {
   const today = useHealthCalendarDate()
   const [profile, setProfile] = useState<HealthProfile | null>(null)
   const [editing, setEditing] = useState(false)
@@ -71,6 +72,31 @@ export function HealthProfileSection() {
   const [medications, setMedications] = useState<Medication[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [reviewNote, setReviewNote] = useState(ownerNoteDraft ?? '')
+  const [reviewConfirmed, setReviewConfirmed] = useState(false)
+  const [reviewError, setReviewError] = useState<string | null>(null)
+  const [stagedOwnerNote, setStagedOwnerNote] = useState(false)
+
+  useEffect(() => {
+    setReviewNote(ownerNoteDraft ?? '')
+    setReviewConfirmed(false)
+    setReviewError(null)
+  }, [ownerNoteDraft])
+
+  function stageReview() {
+    if (!profile || !reviewConfirmed) return
+    const result = mergeReviewedOwnerNote(persistentHealthContext, reviewNote)
+    if (!result.ok) {
+      setReviewError(result.error)
+      return
+    }
+    setPersistentHealthContext(result.text)
+    setStagedOwnerNote(true)
+    setReviewNote('')
+    setReviewConfirmed(false)
+    setReviewError(null)
+    setEditing(true)
+  }
 
   function loadDraft(next: HealthProfile) {
     const height = splitHeight(next.heightCm)
@@ -120,6 +146,13 @@ export function HealthProfileSection() {
         feetValue == null && inchesValue == null
           ? null
           : (feetValue ?? 0) * 12 + (inchesValue ?? 0)
+      if (stagedOwnerNote) {
+        // Best-effort stale-draft check; transactional CAS is still needed.
+        const latestProfile = await fetchHealthProfile()
+        if (latestProfile.updatedAt !== profile?.updatedAt) {
+          throw new Error('Profile changed in another session. Reload and review your note again before saving.')
+        }
+      }
       const next = await saveHealthProfile({
         dateOfBirth: dateOfBirth || null,
         sexForPhysiology,
@@ -150,6 +183,7 @@ export function HealthProfileSection() {
       setProfile(healthProfileSchema.parse(next))
       loadDraft(next)
       setEditing(false)
+      setStagedOwnerNote(false)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Could not save Health Profile')
     } finally {
@@ -177,6 +211,36 @@ export function HealthProfileSection() {
       </div>
 
       {error ? <p role="alert" className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</p> : null}
+
+      {reviewNote ? (
+        <div className="space-y-3 rounded-lg border border-zinc-300 bg-zinc-50 p-3" aria-label="Review owner Health Profile note">
+          <h3 className="text-sm font-semibold text-zinc-900">Review your own health note</h3>
+          <p className="text-xs leading-5 text-zinc-600">
+            This is an unsaved draft from Ask Health. Keep only durable personal
+            context you know is accurate, not a temporary symptom or AI diagnosis.
+          </p>
+          <label htmlFor="owner-note-review" className="block text-sm font-medium text-zinc-800">Proposed persistent context</label>
+          <textarea id="owner-note-review" rows={3} maxLength={MAX_OWNER_NOTE_DRAFT}
+            value={reviewNote} onChange={(event) => { setReviewNote(event.target.value); setReviewConfirmed(false); setReviewError(null) }}
+            className="min-h-24 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm" />
+          <label className="flex items-start gap-2 text-sm text-zinc-800">
+            <input type="checkbox" className="mt-1" checked={reviewConfirmed}
+              onChange={(event) => setReviewConfirmed(event.target.checked)} />
+            <span>I confirm this is my own lasting context, and I want to add it to my Health Profile draft.</span>
+          </label>
+          {reviewError ? <p role="alert" className="text-sm text-red-700">{reviewError}</p> : null}
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className={primaryButtonClass}
+              disabled={!profile || !reviewConfirmed || !reviewNote.trim() || busy}
+              onClick={stageReview}>Add to profile draft</button>
+            <button type="button" className={quietButtonClass}
+              onClick={() => { setReviewNote(''); setReviewConfirmed(false); setReviewError(null) }}>Discard</button>
+          </div>
+          <p className="text-xs text-zinc-500">
+            Staging is not saving. Review the full Health Profile, then press Save profile to persist.
+          </p>
+        </div>
+      ) : null}
 
       {editing ? (
         <div className="space-y-5 border-t border-zinc-100 pt-4">
@@ -411,7 +475,7 @@ export function HealthProfileSection() {
           </label>
 
           <p className="text-xs leading-5 text-zinc-500">
-            Clinical context is owner-entered and can inform explanations, but it is not a diagnosis and does not authorize automatic medication, supplement, or treatment changes. Biological sex is intentionally not collected until a supported calculation actually needs it.
+            Clinical context is owner-entered and can inform explanations, but it is not a diagnosis and does not authorize automatic medication, supplement, or treatment changes. Physiological reference selection is optional and does not establish a medical diagnosis.
           </p>
 
           <div className="flex flex-wrap gap-2">
@@ -425,6 +489,7 @@ export function HealthProfileSection() {
               onClick={() => {
                 if (profile) loadDraft(profile)
                 setEditing(false)
+                setStagedOwnerNote(false)
                 setError(null)
               }}
             >

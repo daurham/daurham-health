@@ -1540,3 +1540,12 @@ Synthetic 16-pair regressions mutate the frame and day count while preserving th
 **Contract:** Only a personal exact-name match or an explicitly personal condition/history inventory selects saved conditions, retaining original indexed IDs, active/resolved/unknown statuses, provenance, and profile correction links. Symptoms alone never imply a condition or retrieve unrelated diagnoses. Persistent general medical narrative is limited to explicit saved-profile/history questions; owner training/injury/recovery questions may receive training limitations; owner diet/GI questions may receive dietary context. Selection occurs in the existing current-date owner profile gate. Labels disclose owner-reported, nonverified and undated status; no causal inference is made. No additional SQL read, provider call, schema migration or source data mutation.
 
 **Regression:** Six synthetic packet scenarios: unrelated privacy exclusion; exact named status and stable ID; owner condition inventory; no symptom-based diagnosis inference; category-specific narrative context; source provenance and no historical certainty. Full CI, owner device QA, PIQ source-revision atomicity, and already queued migrations 0053–0056 remain release gates. No production promotion or main merge.
+
+
+## PIQ-2.4 — Owner-authored note review from Ask Health (2026-10-15)
+
+**State:** Work branch only; CI and authenticated mobile QA pending. **0/9 PIQ phases owner-accepted.**
+
+**Contract:** An opt-in action after Ask Health answers opens a blank, owner-authored 500-character field. Neither AI answers nor user questions are promoted automatically. The owner-authored text transfers via router state (never a URL parameter or provider call), and Settings shows an unsaved editable review with a required owner-confirmation checkbox. Stage into the existing 2,000-character persistent context without destroying previous notes, then independently press Save profile to actually write. Blank, duplicate and overflow notes fail. No auto clinical diagnoses, effective-dated history, or historical adherence invented. A client pre-save refresh detects common stale-tab conflict, but is not server-side atomic compare-and-swap; future PIQ-2.5 work must address this.
+
+**Tests:** New unit cases validate private transfer, forged state, length, duplicate and overflow, with legacy I10 test now explicitly asking for owner-saved inventory. CI/owner device QA and the existing unapplied migrations are rollout gates. No new schema, model token, owner production write or main merge.

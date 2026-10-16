@@ -1,9 +1,11 @@
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useState } from 'react'
 import { ASK_LENS_LABELS, ASK_SUGGESTIONS, type AskLens, type AskTurn } from '@/domain/ask-health'
 import type { ProgressRange } from '@/domain/progress'
 import { primaryButtonClass, quietButtonClass, useHealthCalendarDate } from '@/lib'
 import { ProgressRangeControl } from '@/features/progress/ProgressRangeControl'
+import { prefixedPath, useAppPathPrefix } from '@/lib/app-prefix'
+import { MAX_OWNER_NOTE_DRAFT, makeOwnerNoteReviewState } from '@/domain/ask-health/owner-note-review'
 import { askHealth } from './api'
 import { AskHealthAnswerView } from './AnswerView'
 import { ExternalResearch } from './ExternalResearch'
@@ -24,6 +26,8 @@ function initialRange(value: string | null): ProgressRange {
 
 export function AskHealthPage() {
   const today = useHealthCalendarDate()
+  const navigate = useNavigate()
+  const prefix = useAppPathPrefix()
   const [params] = useSearchParams()
   const [lens, setLens] = useState<AskLens>(() => initialLens(params.get('lens')))
   const [range, setRange] = useState<ProgressRange>(() => initialRange(params.get('range')))
@@ -33,6 +37,8 @@ export function AskHealthPage() {
   const [error, setError] = useState<string | null>(null)
   const [latest, setLatest] = useState<Awaited<ReturnType<typeof askHealth>> | null>(null)
   const [asked, setAsked] = useState<string | null>(null)
+  const [noteOpen, setNoteOpen] = useState(false)
+  const [ownerNote, setOwnerNote] = useState('')
 
   async function submit(question: string) {
     const trimmed = question.trim()
@@ -79,6 +85,8 @@ export function AskHealthPage() {
             setAsked(null)
             setError(null)
             setDraft('')
+            setOwnerNote('')
+            setNoteOpen(false)
           }}
         >
           New chat
@@ -130,6 +138,34 @@ export function AskHealthPage() {
         {latest ? <AskHealthAnswerView answer={latest.answer} evidence={latest.evidence} /> : null}
         {latest && asked ? <ExternalResearch question={asked} /> : null}
       </div>
+      {latest ? (
+        <section className="space-y-2 rounded-lg border border-zinc-200 bg-white p-3">
+          <button type="button" aria-expanded={noteOpen}
+            className="min-h-11 text-left text-sm font-medium text-zinc-800 underline"
+            onClick={() => setNoteOpen((open) => !open)}>
+            Record a lasting fact in my Health Profile
+          </button>
+          {noteOpen ? (
+            <div className="space-y-2">
+              <p className="text-xs leading-5 text-zinc-600">
+                Write a fact you personally affirm. We never copy an AI answer,
+                treat a question as a fact, or save this automatically.
+                Temporary symptoms belong in Daily Context.
+              </p>
+              <label htmlFor="ask-owner-note" className="block text-sm font-medium text-zinc-800">My statement</label>
+              <textarea id="ask-owner-note" rows={3} maxLength={MAX_OWNER_NOTE_DRAFT}
+                value={ownerNote} onChange={(event) => setOwnerNote(event.target.value)}
+                className="min-h-24 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm" />
+              <button type="button" className={quietButtonClass}
+                disabled={!makeOwnerNoteReviewState(ownerNote)}
+                onClick={() => {
+                  const state = makeOwnerNoteReviewState(ownerNote)
+                  if (state) navigate(prefixedPath(prefix, '/settings#health-profile'), { state })
+                }}>Review in Health Profile</button>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
       {latest && latest.answer.followUps.length > 0 ? (
         <div className="flex flex-col gap-2">
           {latest.answer.followUps.map((followUp) => (

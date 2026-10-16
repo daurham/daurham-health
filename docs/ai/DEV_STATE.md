@@ -530,3 +530,8 @@ The Ask Health evidence packet now selects owner-saved allergy records only for 
 ## 2026-10-15 PIQ-2.4 saved condition and free-text context minimization — work branch
 
 Ask Health now routes current owner-entered saved diagnoses by exact personal name or deliberate owner history inventory, and attaches free-text health fields only to a relevant owner-specific question. Evidence discloses saved status, undated provenance and no clinical verification; symptom questions do not imply diagnostic relevance. Six synthetic regressions added. Production, main, owner data and provider calls unchanged; CI/owner review pending.
+
+
+## 2026-10-15 PIQ-2.4 voluntary owner fact draft — work branch
+
+Ask Health now supports owner-authored notes routed privately to an explicit Settings confirmation, staged into existing context and saved only by the original owner-operated profile save. Added conservative bounds, duplicate and overflow protection and pure tests; fixed stale broad-disclosure I10 test semantics. No migrations, AI calls, owner writes or main promotion. Full CI and mobile QA are release gates.

@@ -34,6 +34,7 @@ import {
 } from '@/lib'
 import type { AppleHealthPreview } from '@/domain/apple-health/preview'
 import { HealthProfileSection } from './HealthProfileSection'
+import { readOwnerNoteReviewState } from '@/domain/ask-health/owner-note-review'
 import { AiUsageSection } from './AiUsageSection'
 import {
   commitAppleHealthRecords,
@@ -457,7 +458,7 @@ export function SettingsPage() {
         <p className="mt-1 text-sm text-zinc-600">Owner data sources. Apple Health is not a primary Health destination.</p>
       </div>
 
-      <HealthProfileSection />
+      <HealthProfileSection ownerNoteDraft={readOwnerNoteReviewState(location.state)} />
       <AiUsageSection />
       <AppearanceSection />
       <TrendColorsSection />
