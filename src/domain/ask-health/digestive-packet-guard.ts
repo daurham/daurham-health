@@ -22,7 +22,7 @@ export type DigestivePacketGuard = {
 export function digestivePacketGuard(input: AskHealthPacketInput): DigestivePacketGuard {
   const focus = input.focusedDigestive
   const topics = digestiveQuestionTopics(input.question)
-  const stoolTypeQuestion = topics.bowel && /\b(?:bristol|consisten\w*|constipat\w*|diarrh\w*|hard[ -]?stools?|pellet[- ]?like|soft[ -]?stools?|loose[ -]?stools?|stool[ -]?types?|type[ -]?[1-7])\b/i.test(input.question)
+  const stoolTypeQuestion = topics.bowel && /\b(?:bristol|consisten\w*|constipat\w*|diarrh\w*|hard[ -]?stools?|pellet[- ]?like|rabbit[ -]?pellets?|rabbit[ -]?droppings?|soft[ -]?stools?|loose[ -]?stools?|stool[ -]?types?|type[ -]?[1-7])\b/i.test(input.question)
   return {
     crossSourceConflict: Boolean(focus?.digestiveConsistencyIssue),
     bowelIdentityConflict: Boolean(focus?.bowelWindow?.status === 'unavailable' &&

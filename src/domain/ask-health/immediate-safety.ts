@@ -19,7 +19,12 @@ export function detectImmediateSafety(question: string): ImmediateSafetyKind | n
   const breath = /\b(?:i|we)\s+(?:can(?:not|'t)|could(?: not|n't))\s+breathe\b|\b(?:i(?:'m| am)?|we(?:'re| are)?)\s+(?:have|having|feel|feeling|experiencing)\s+(?:severe\s+)?(?:trouble|difficulty)\s+breathing\b/i
   const bleed = /\b(?:i(?:'m| am)?|we(?:'re| are)?)\s+(?:am\s+)?(?:bleeding heavily|bleeding uncontrollably|experiencing severe bleeding|have uncontrolled bleeding)\b/i
   const stroke = /\b(?:i(?:'m| am)?|we(?:'re| are)?)\s+(?:am\s+)?(?:having|experiencing)\s+(?:a\s+)?stroke\b/i
-  if (chest.test(normalized) || breath.test(normalized) || bleed.test(normalized) || stroke.test(normalized)) {
+  // Narrow PIQ-4.1 digestive red flags: current, explicitly reported
+  // first-person symptoms only. No diagnosis is inferred from saved stool
+  // types, food logs, historical events, or speculative questions.
+  const severeDigestive = /\b(?:i(?:'m| am)\s+(?:vomiting|throwing up)\s+blood|i\s+(?:have|am having|am experiencing)\s+severe\s+(?:abdominal|stomach|belly)\s+pain|i(?:'m| am)\s+(?:passing|having)\s+(?:(?:black(?:\s+and)?\s+)?tarry)\s+stools?)\b/i
+  if (chest.test(normalized) || breath.test(normalized) || bleed.test(normalized) ||
+      stroke.test(normalized) || severeDigestive.test(normalized)) {
     return 'emergency'
   }
   return null

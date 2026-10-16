@@ -60,7 +60,7 @@ export type FocusedDigestiveEvidence = {
 export function digestiveQuestionTopics(question: string): {
   fiber: boolean; hydration: boolean; bowel: boolean
 } {
-  const symptom = /\b(?:constipat\w*|diarrh\w*|hard stools?|pellet[- ]?like stools?)\b/i.test(question)
+  const symptom = /\b(?:constipat\w*|diarrh\w*|hard stools?|pellet[- ]?like stools?|rabbit[ -]?pellets?|rabbit[ -]?droppings?)\b/i.test(question)
   return {
     fiber: symptom || /\bfib(?:er|re)\b/i.test(question),
     hydration: symptom || /\b(?:hydrat\w*|water|fluid intake|drinking enough)\b/i.test(question),

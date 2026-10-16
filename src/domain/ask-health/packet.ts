@@ -955,8 +955,10 @@ function addFocusedDigestive(input: AskHealthPacketInput, push: (item: PushItem)
         id: 'digestive.window.bristol',
         domain: 'bowel',
         label: 'Recorded Bristol pattern in bounded date window',
-        value: full.hardTypedEvents,
-        unit: 'recorded hard Bristol 1–2 events',
+        // A window with NO saved status has no observed outcome at all.
+        // Explicit owner-entered zero days remain distinct and may report zero.
+        value: full.observedDays > 0 ? full.hardTypedEvents : null,
+        unit: full.observedDays > 0 ? 'recorded hard Bristol 1–2 events' : null,
         period: { start: full.scope.start, end: full.scope.end },
         text: 'For ' + full.scope.start + ' through ' + full.scope.end + ' (' +
           full.scope.calendarDays + ' calendar days): bowel activity explicitly logged on ' +
@@ -966,6 +968,7 @@ function addFocusedDigestive(input: AskHealthPacketInput, push: (item: PushItem)
           full.untypedEvents + ' movement event(s) lacked an eligible type.' +
           ' There were ' + full.explicitNoMovementDays + ' separately recorded no-movement day(s); ' +
           full.unobservedDays + ' calendar day(s) had no bowel observation and are UNKNOWN, not zero.' +
+          (full.observedDays === 0 ? ' NO bowel status is saved in this interval: neither a movement count nor a hard-stool outcome is known.' : '') +
           (full.provisionalDays ? ' Today is provisional; it is not a complete observation day.' : '') +
           ' This describes only recorded events, not all bowel movements; no diagnosis or personal water/fiber correlation can be inferred.' +
           ' Logged water does not establish total fluid consumption.',
