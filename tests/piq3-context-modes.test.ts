@@ -81,7 +81,7 @@ describe('PIQ-3 explicit Context Mode request contract', () => {
   })
 
   it('Personalized forces private evidence loading even for a generally worded prompt', async () => {
-    load.mockReset().mockImplementation(async (args: { lens: string }) => inputFor(args.lens === 'general' ? q : q))
+    load.mockReset().mockImplementation(async (args: { lens: 'general' | 'training' }) => ({ ...inputFor(), lens: args.lens }))
     const stub = makeProvider()
     const result = await answerAskHealth({
       ...params, contextMode: 'personalized', provider: stub, gate: fakeGate(),
@@ -155,7 +155,7 @@ describe('PIQ-3 explicit Context Mode request contract', () => {
   })
 
   it('An identical question with different modes has isolated cache keys and no free model bypass', async () => {
-    const packet = buildAskHealthEvidencePacket(inputFor())
+    const packet = buildAskHealthEvidencePacket({ ...inputFor(), lens: 'general' })
     const stub = makeProvider()
     const gate = fakeGate()
     const send = (mode: 'smart' | 'personalized' | 'deep') => explainAskHealth({
