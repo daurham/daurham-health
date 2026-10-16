@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { parseAskHealthRequest, buildAskHealthEvidencePacket, type AskHealthPacketInput } from '../src/domain/ask-health/index.js'
+import { parseAskHealthRequest, buildAskHealthEvidencePacket, packetFingerprintMaterial, type AskHealthPacketInput } from '../src/domain/ask-health/index.js'
 import { answerAskHealth, explainAskHealth, type AskHealthProvider } from '../server/ask-health/service.js'
 import { createAskHealthGate } from '../server/ask-health/gate.js'
 import { buildHealthIntelligenceSnapshot, routeHealthIntelligence } from '../src/domain/intelligence/shared.js'
@@ -93,6 +93,41 @@ describe('PIQ-3 explicit Context Mode request contract', () => {
     expect(result.meta.evidenceOverview.availableCount).toBeGreaterThan(1)
     expect(stub.mock.calls[0]![0].user).toContain('synthetic-owner-goal')
     expect(stub.mock.calls[0]![0].system).toContain('You explain one person')
+  })
+
+  it('Personalized considers active clinical context even when the question has no personal pronoun', () => {
+    const clinical = {
+      sexForPhysiology: null,
+      persistentHealthContext: 'Synthetic health note',
+      trainingLimitations: 'Synthetic lifting restriction',
+      dietaryContext: 'Synthetic dietary restriction',
+      conditions: [
+        { name: 'Condition Alpha', status: 'active' as const },
+        { name: 'Condition Beta', status: 'resolved' as const },
+      ],
+      allergies: [{ substance: 'Synthetic allergen', severity: 'mild' as const, reaction: null }],
+      medications: [
+        { name: 'Medicine Alpha', status: 'active' as const, dose: null, frequency: null },
+        { name: 'Medicine Beta', status: 'paused' as const, dose: null, frequency: null },
+      ],
+    }
+    const base = { ...inputFor(), lens: 'general' as const, profile: clinical }
+    const smart = buildAskHealthEvidencePacket({ ...base, contextMode: 'smart' })
+    const personalized = buildAskHealthEvidencePacket({ ...base, contextMode: 'personalized' })
+    const deep = buildAskHealthEvidencePacket({ ...base, contextMode: 'deep' })
+    const ids = (packet: typeof smart) => packet.evidence.map(x => x.id)
+    expect(ids(smart)).not.toContain('clinical.medication.0')
+    expect(ids(personalized)).toContain('clinical.condition.0')
+    expect(ids(personalized)).toContain('clinical.medication.0')
+    expect(ids(personalized)).toContain('clinical.allergy.0')
+    expect(ids(personalized)).toContain('clinical.persistent_context')
+    expect(ids(personalized)).not.toContain('clinical.condition.1')
+    expect(ids(personalized)).not.toContain('clinical.medication.1')
+    expect(ids(deep)).toContain('clinical.condition.1')
+    expect(ids(deep)).toContain('clinical.medication.1')
+    expect(ids(deep)).toContain('clinical.dietary_context')
+    expect(ids(deep)).toContain('clinical.training_limitations')
+    expect(packetFingerprintMaterial(personalized)).not.toBe(packetFingerprintMaterial(deep))
   })
 
   it('Deep Dive requests cross-domain signals rather than only question-token matches', () => {
