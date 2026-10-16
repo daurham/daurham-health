@@ -1529,3 +1529,14 @@ Synthetic 16-pair regressions mutate the frame and day count while preserving th
 **Tests:** New synthetic Ask Health evidence regression covers generic and unrelated privacy exclusion, exact name resolution without fuzzy allergy inference, explicit saved-inventory requests, personal food/medicine/supplement decisions, unknown severity and provenance, empty records and source index stability. No new SQL, external provider call, schema change, owner record mutation or main promotion.
 
 **Remaining:** Conditions and undated persistent clinical text still need independently justified question-level minimization; validated allergen synonyms, interaction screening, time-versioned owner allergy updates and owner-verified clinical provenance are out of scope. PIQ-2.4 and earlier PIQ phases still require owner acceptance.
+
+
+## PIQ-2.4 — Question-scoped saved conditions and profile notes (2026-10-15)
+
+**State:** Branch-only implementation, full CI and authenticated owner iOS QA required. **0/9 phases owner-accepted.**
+
+**Gap:** Ask Health transmitted all saved diagnoses and three undated free-text health contexts on unrelated questions, risking unnecessary private-data disclosure and unwarranted diagnosis or history assumptions.
+
+**Contract:** Only a personal exact-name match or an explicitly personal condition/history inventory selects saved conditions, retaining original indexed IDs, active/resolved/unknown statuses, provenance, and profile correction links. Symptoms alone never imply a condition or retrieve unrelated diagnoses. Persistent general medical narrative is limited to explicit saved-profile/history questions; owner training/injury/recovery questions may receive training limitations; owner diet/GI questions may receive dietary context. Selection occurs in the existing current-date owner profile gate. Labels disclose owner-reported, nonverified and undated status; no causal inference is made. No additional SQL read, provider call, schema migration or source data mutation.
+
+**Regression:** Six synthetic packet scenarios: unrelated privacy exclusion; exact named status and stable ID; owner condition inventory; no symptom-based diagnosis inference; category-specific narrative context; source provenance and no historical certainty. Full CI, owner device QA, PIQ source-revision atomicity, and already queued migrations 0053–0056 remain release gates. No production promotion or main merge.

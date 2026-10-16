@@ -1079,6 +1079,45 @@ export function selectAskHealthAllergies(
   return isDecision && isExposure ? records.slice(0, 12) : []
 }
 
+
+/** Minimum necessary, current owner-entered conditions. Named records and
+ * explicit saved-history requests are not evidence of a clinical diagnosis.
+ */
+export function selectAskHealthConditions(
+  profile: AskClinicalProfileInput,
+  question: string,
+): Array<{ index: number; condition: AskClinicalProfileInput['conditions'][number] }> {
+  if (!/\b(?:i|me|my|mine|myself)\b/i.test(question)) return []
+  const records = profile.conditions.map((condition, index) => ({ condition, index }))
+  const words = ' ' + (question.toLowerCase().match(/[a-z0-9]+/g) ?? []).join(' ') + ' '
+  const named = records.filter(({ condition }) => {
+    const tokens = condition.name.toLowerCase().match(/[a-z0-9]+/g) ?? []
+    return tokens.length > 0 && words.includes(' ' + tokens.join(' ') + ' ')
+  })
+  if (named.length > 0) return named.slice(0, 12)
+  const ownerInventory =
+    /\bmy\s+(?:(?:recorded|saved|current)\s+)?(?:(?:medical|health)\s+)?(?:conditions?|diagnos(?:is|es)|history|profile|background)\b/i.test(question)
+    || /\b(?:conditions?|diagnos(?:is|es))\b/i.test(question)
+      && /\b(?:saved|recorded|listed|do i have|have i)\b/i.test(question)
+  return ownerInventory ? records.slice(0, 12) : []
+}
+
+/** Unstructured profile notes may contain unrelated sensitive details. */
+export function selectAskHealthProfileTextFields(
+  question: string,
+): Array<'persistentHealthContext' | 'trainingLimitations' | 'dietaryContext'> {
+  if (!/\b(?:i|me|my|mine|myself)\b/i.test(question)) return []
+  const profileRequest = /\bmy\s+(?:medical history|health history|health profile|health context|health background|profile)\b/i.test(question)
+    || /\b(?:what|which|show|list)\b.{0,70}\b(?:health|medical)\s+(?:facts?|background|history|profile|context)\b.{0,70}\b(?:about me|recorded|saved)\b/i.test(question)
+  if (profileRequest) return ['persistentHealthContext', 'trainingLimitations', 'dietaryContext']
+  const training = /\b(?:training|workouts?|exercises?|lifting|lifts?|squats?|bench|running|jogging|hiking|injur(?:y|ies)|rehab|recovery|joint pain|back pain)\b/i.test(question)
+  const diet = /\b(?:nutrition|diet(?:ary)?|foods?|meals?|eating|eat|cook|protein|fiber|fibre|calories|macros?|hydration|water|constipat\w*|diarrh\w*|stools?|bowel\w*|bloat\w*)\b/i.test(question)
+  const relevant: Array<'trainingLimitations' | 'dietaryContext'> = []
+  if (training) relevant.push('trainingLimitations')
+  if (diet) relevant.push('dietaryContext')
+  return relevant
+}
+
 function addClinicalProfile(profile: AskClinicalProfileInput | null, question: string, push: (item: PushItem) => void) {
   if (!profile) return
   // Explicit owner context only. Never invent a binary range when unset or
@@ -1108,8 +1147,10 @@ function addClinicalProfile(profile: AskClinicalProfileInput | null, question: s
       label,
       value: null,
       unit: null,
-      text: clip(text),
-      coverage: null,
+      text: 'Current owner-entered ' + label.toLowerCase() +
+        ' (not a verified clinical finding or dated history): ' + clip(text),
+      coverage: { source: 'current_owner_profile' },
+      provenance: 'owner_profile_current',
       detailPath: '/settings#health-profile',
       userEntered: true,
       substantive: true,
@@ -1117,19 +1158,26 @@ function addClinicalProfile(profile: AskClinicalProfileInput | null, question: s
     })
   }
 
-  addText('clinical.persistent_context', 'Persistent health context', profile.persistentHealthContext, 1)
-  addText('clinical.training_limitations', 'Training limitations', profile.trainingLimitations, 2)
-  addText('clinical.dietary_context', 'Dietary context', profile.dietaryContext, 2)
+  const selectedText = selectAskHealthProfileTextFields(question)
+  if (selectedText.includes('persistentHealthContext'))
+    addText('clinical.persistent_context', 'Persistent health context', profile.persistentHealthContext, 1)
+  if (selectedText.includes('trainingLimitations'))
+    addText('clinical.training_limitations', 'Training limitations', profile.trainingLimitations, 2)
+  if (selectedText.includes('dietaryContext'))
+    addText('clinical.dietary_context', 'Dietary context', profile.dietaryContext, 2)
 
-  profile.conditions.slice(0, 12).forEach((item, index) => {
+  selectAskHealthConditions(profile, question).forEach(({ condition: item, index }) => {
     push({
-      id: `clinical.condition.${index}`,
+      id: 'clinical.condition.' + index,
       domain: 'clinical_context',
       label: item.name,
       value: item.status,
       unit: null,
-      text: `Owner-entered condition: ${item.name}. Status: ${item.status}.`,
-      coverage: { status: item.status },
+      text: 'Current owner-entered condition record: ' + item.name +
+        '. Saved status: ' + item.status +
+        '. This is not an independently verified diagnosis, proof of current symptoms, or evidence of causation.',
+      coverage: { status: item.status, source: 'current_owner_profile' },
+      provenance: 'owner_profile_current',
       detailPath: '/settings#health-profile',
       userEntered: true,
       substantive: true,

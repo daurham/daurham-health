@@ -525,3 +525,8 @@ Ask Health medication evidence is now question-scoped: names, explicitly owner-a
 ## 2026-10-15 PIQ-2.4 saved allergy question gating — work branch
 
 The Ask Health evidence packet now selects owner-saved allergy records only for explicitly personal allergy questions, exact named allergens in personal context, or personal food/medicine/supplement decisions. Unrelated general and Training requests no longer receive the allergy list. Facts are labeled current owner-entered, not verified diagnoses/exposures. Synthetic tests, CI and release gating recorded in PIQ_PROGRESS.md. No SQL, Gemini, production or main updates.
+
+
+## 2026-10-15 PIQ-2.4 saved condition and free-text context minimization — work branch
+
+Ask Health now routes current owner-entered saved diagnoses by exact personal name or deliberate owner history inventory, and attaches free-text health fields only to a relevant owner-specific question. Evidence discloses saved status, undated provenance and no clinical verification; symptom questions do not imply diagnostic relevance. Six synthetic regressions added. Production, main, owner data and provider calls unchanged; CI/owner review pending.
