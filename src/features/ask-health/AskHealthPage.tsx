@@ -12,6 +12,7 @@ import { ExternalResearch } from './ExternalResearch'
 import { KnownProfilePanel } from './KnownProfilePanel'
 import { readAskCorrectionState } from '@/domain/ask-health/corrections'
 import { OptionalClarification } from './OptionalClarification'
+import { deepDiveRangeHint } from '@/domain/ask-health/context-range'
 
 const LENSES = ['general', 'training', 'nutrition', 'recovery', 'experiments'] as const
 
@@ -46,6 +47,16 @@ export function AskHealthPage() {
   const [noteOpen, setNoteOpen] = useState(false)
   const [ownerNote, setOwnerNote] = useState('')
   const [answerRevision, setAnswerRevision] = useState(0)
+  const deepRangeHint = deepDiveRangeHint(contextMode, range)
+
+  function changeRange(next: ProgressRange) {
+    if (pending || next === range) return
+    setRange(next)
+    setTurns([])
+    setLatest(null)
+    setAsked(null)
+    setError(null)
+  }
 
   async function submit(question: string) {
     const trimmed = question.trim()
@@ -152,7 +163,21 @@ export function AskHealthPage() {
                 : 'Educational answer only; saved Health records and prior private conversation are not sent.'}
         </p>
       </div>
-      <ProgressRangeControl range={range} onChange={setRange} />
+      <fieldset disabled={pending}>
+        <ProgressRangeControl range={range} onChange={changeRange} />
+      </fieldset>
+      {deepRangeHint ? (
+        <div className="space-y-2 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-3">
+          <p className="text-xs leading-5 text-zinc-700">{deepRangeHint.message}</p>
+          {deepRangeHint.canExpand ? (
+            <button type="button" disabled={pending}
+              className="min-h-11 text-left text-sm font-medium text-zinc-900 underline"
+              onClick={() => changeRange('all')}>
+              Use all available history for Deep Dive
+            </button>
+          ) : null}
+        </div>
+      ) : null}
       {turns.length === 0 && !latest ? (
         <div className="space-y-2">
           {ASK_SUGGESTIONS[lens].map((suggestion) => (
