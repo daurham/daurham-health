@@ -37,12 +37,12 @@ export function citationCoversHistoricalScope(item: AskEvidence, scope: Temporal
   if (!coverage) return false
   if (scope.start === scope.end &&
       coverage.requestedDate === scope.start && coverage.requestedDateScope === 'in_range') {
-    return (coverage.selectedDays ?? coverage.eligibleAppearances ?? 0) > 0
+    return Number(coverage.selectedDays ?? coverage.eligibleAppearances ?? 0) > 0
   }
   return coverage.requestedWindowStart === scope.start &&
     coverage.requestedWindowEnd === scope.end &&
     coverage.requestedWindowScope === 'in_range' &&
-    (coverage.observedDaysInWindow ?? coverage.eligibleAppearances ?? 0) > 0
+    Number(coverage.observedDaysInWindow ?? coverage.eligibleAppearances ?? 0) > 0
 }
 
 /** High precision rather than a general NLP judge: numeric reported
@@ -70,9 +70,15 @@ export function groundHistoricalAnswer(
   let withheld = 0
   const keep = (block: AskHealthAnswer['blocks'][number]) => {
     if (!affirmativeOwnerMetricClaim(block.text)) return true
+    const windowAggregate = scope.start !== scope.end &&
+      /\b(?:total(?:ed)?|sum(?:med)?|averag(?:e|ed)|throughout|per day|per week|during (?:the|that|last|this)|last week|this week|last month|this month)\b/i.test(block.text)
     const grounded = block.evidenceRefs.some((id) => {
       const cited = byId.get(id)
-      return cited != null && citationCoversHistoricalScope(cited, scope)
+      if (!cited || !citationCoversHistoricalScope(cited, scope)) return false
+      // A single dated set/event cannot substantiate a seven-day aggregate.
+      return !windowAggregate || (cited.coverage?.requestedWindowStart === scope.start &&
+        cited.coverage?.requestedWindowEnd === scope.end &&
+        cited.coverage?.requestedWindowScope === 'in_range')
     })
     if (grounded) return true
     withheld += 1
