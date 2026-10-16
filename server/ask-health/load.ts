@@ -40,6 +40,8 @@ import { readCurrentPrimaryGoalIntent } from './current-primary-goal-intent.js'
 import { screenPrimaryWeightGoalPriority } from '../../src/domain/ask-health/primary-weight-goal-intent.js'
 import { readCurrentExperimentWindows } from './current-experiment-windows.js'
 import { screenExperimentTimingReview } from '../../src/domain/ask-health/experiment-timing-review.js'
+import {readCurrentExperimentOutcomes} from './current-experiment-outcomes.js'
+import {screenExperimentOutcomeReview} from '../../src/domain/ask-health/experiment-outcome-review.js'
 import { loadTrainingProgressionState } from '../intelligence/training-progression.js'
 
 export async function loadAskHealthPacketInput(input: {
@@ -96,6 +98,8 @@ export async function loadAskHealthPacketInput(input: {
           readCurrentExperimentWindows(input.asOf),
         ])
       : [null, null, null, null]
+  const currentExperimentOutcomes = currentExperimentWindows?.status === 'available'
+    ? await readCurrentExperimentOutcomes(currentExperimentWindows) : null
   const activity = buildActivityProgressView(
     activityRows.filter((row) => row.date <= input.asOf),
     { range: input.range, asOf: input.asOf, today, timezone },
@@ -223,6 +227,12 @@ export async function loadAskHealthPacketInput(input: {
     focusedWeightEnergy.experimentTimingReview = screenExperimentTimingReview({
       asOf:input.asOf,today,
       settings:focusedWeightEnergy.currentSettings,read:currentExperimentWindows,
+    })
+    focusedWeightEnergy.experimentOutcomeReview = screenExperimentOutcomeReview({
+      asOf:input.asOf,today,
+      settings:focusedWeightEnergy.currentSettings,
+      timing:focusedWeightEnergy.experimentTimingReview,
+      windows:currentExperimentWindows,outcomes:currentExperimentOutcomes,
     })
   }
   return {
