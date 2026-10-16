@@ -14,7 +14,7 @@ function sample(key:IntelligenceObservation['key'],date:string,value:number,qual
 function snapshot(opts:{missingFood?:boolean,unevenFood?:boolean,missingWeights?:boolean,changedConditions?:boolean,unknownVerification?:boolean,noise?:boolean}={}){
  const rows:IntelligenceObservation[]=dates.flatMap((day,i)=>{
    const items:IntelligenceObservation[]=[]
-   if(!opts.missingFood && (!opts.unevenFood || i>=14))
+   if(!opts.missingFood && (!opts.unevenFood || i<14))
      items.push(sample('nutrition.calories',day,2300,'high_confidence'))
    if(!opts.missingWeights && (!opts.changedConditions || i>=22))
      items.push(sample('body.weight_kg',day,82+(i%3)*0.01,opts.changedConditions?'different_conditions':'usual'))
@@ -25,7 +25,7 @@ function snapshot(opts:{missingFood?:boolean,unevenFood?:boolean,missingWeights?
    range:'90d',start,end:today,asOf:today,today,timezone:'America/Phoenix',
    observations:rows,
    nutritionVerifiedCompleteDates:opts.unknownVerification?undefined:
-     new Set(opts.missingFood?[]:opts.unevenFood?dates.slice(14):dates),
+     new Set(opts.missingFood?[]:opts.unevenFood?dates.slice(0,14):dates),
    nutritionVerificationStatus:opts.unknownVerification?'unavailable':'available',
  })
 }
@@ -65,12 +65,28 @@ describe('PIQ-4.2 verified weight/intake descriptive evidence (synthetic)',()=>{
    expect(f.packet.evidence.find(e=>e.id==='weight_energy.quality')?.substantive).toBe(false)
    expect(JSON.stringify(f.packet)).not.toContain('estimated kcal/day')
  })
- it('does not hide uneven/temporally misaligned calorie coverage behind enough logged entries',()=>{
+ it('does not hide obsolete early-only calorie coverage behind a sufficient total row count',()=>{
    const f=packet('Am I plateauing?',{unevenFood:true})
    expect(f.focusedWeightEnergy?.estimate.state).toBe('insufficient_evidence')
    expect(f.packet.evidence.find(e=>e.id==='weight_energy.observed_balance')).toBeUndefined()
    expect(f.packet.evidence.find(e=>e.id==='weight_energy.quality')?.text)
      .toContain('withheld')
+ })
+ it('preserves a legitimate shorter eligible observation window rather than requiring all 28 days',()=>{
+   const base=snapshot()
+   const freshOnly=buildHealthIntelligenceSnapshot({
+     range:'90d',start,end:today,asOf:today,today,timezone:'America/Phoenix',
+     observations:base.frame.flatMap(day=>Object.values(day.signals).filter((o):o is IntelligenceObservation=>
+       o!=null && (o.key!=='nutrition.calories' || o.date>=dates[14]!))),
+     nutritionVerifiedCompleteDates:new Set(dates.slice(14)),
+     nutritionVerificationStatus:'available',
+   })
+   const focus=focusWeightEnergyContext({
+     question:'Why has my weight loss stalled?',snapshot:freshOnly,today,
+   })
+   expect(focus?.estimate.state).toBe('available')
+   expect(focus?.estimate.period?.days).toBe(14)
+   expect(focus?.qualifiedWholeDayCalories).toBe(14)
  })
  it('rejects absent and incomparable weigh-ins rather than assuming stable weight',()=>{
    for(const options of [{missingWeights:true},{changedConditions:true}]){
