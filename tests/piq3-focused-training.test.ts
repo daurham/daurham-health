@@ -121,7 +121,7 @@ describe('PIQ-3.3 bounded named-lift source retrieval', () => {
     expect(evidence).toMatchObject({
       value: 98, domain: 'training', substantive: true,
       detailPath: '/progress/strength/bench-barbell',
-      provenance: 'owner', evidenceDates: ['2026-10-10'],
+      provenance: 'derived_from_owner_logged_working_set', evidenceDates: ['2026-10-10'],
     })
     expect(evidence?.text).toContain('not directly tested')
   })

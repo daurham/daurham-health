@@ -693,7 +693,7 @@ function addFocusedTraining(input: AskHealthPacketInput, push: (item: PushItem) 
       detailPath,
       userEntered: false,
       substantive: true,
-      provenance: 'owner',
+      provenance: 'derived_from_owner_logged_working_set',
       evidenceDates: [item.date],
       priority: 1,
     })

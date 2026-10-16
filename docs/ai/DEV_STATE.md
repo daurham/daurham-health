@@ -560,3 +560,8 @@ Read-only npm run migration:preflight added; reads schema_migrations and pg_cata
 ## 2026-10-15 PIQ-3 early answer-quality and safety handoff
 
 Development branch: piq/00-baseline-20261014. Source modules ask-health/intent.ts, general.ts, immediate-safety.ts; server Ask Health routing, diagnostics, UI and synthetic regressions. Standalone educational questions bypass private data loading, retain existing cost gates and use a general-only prompt/cache scope. Owner evidence requests remain conservative, with source-less personal questions unable to invent metrics. Immediate first-person emergency statements get deterministic safety advice without database or Gemini. Source-claim checks and emergency detection are intentionally narrow and require owner/expert QA. T01 old negative golden replaced with positive general-answer test. No migrations, owner data edits, production/main changes, or phase acceptance. Validate exact SHA with GitHub Actions.
+
+
+## 2026-10-15 PIQ-3.3 focused training evidence
+
+Added src/domain/ask-health/focused-training.ts and wired it into the existing canonical Ask Health loader and evidence packet: exercise-name-specific strength questions can cite a bounded six most recent high-confidence Epley-estimable working-set sessions, while reporting all eligible session coverage. Ambiguous saved exercise matches never choose arbitrarily. Same progress semantics, no new SQL/migration/model calls and derived-from-owner provenance. Unit/regression tests in tests/piq3-focused-training.test.ts. Full CI and owner acceptance still required. PIQ-3.3 GI/fiber retrieval, exact window text, and typed DB optimization remain outstanding. No main merge or prod write.
