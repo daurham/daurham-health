@@ -7,15 +7,16 @@ export const CURRENT_WEIGHT_GOAL_MODE_SQL=`
 SELECT g.id::text AS id, v.id::text AS version_id, v.target_mode
 FROM goals g LEFT JOIN goal_versions v ON v.goal_id=g.id AND v.is_current
 WHERE g.status='active' AND g.goal_kind='body_metric' AND g.body_metric_key='weight'
+  AND g.started_on <= $1::date
 ORDER BY g.id LIMIT 2
 `
 export type GoalRead =
   | {status:'available';rows:{id:string;versionId:string;targetMode:string}[]}
   | {status:'unavailable';rows:[]}
-export async function readCurrentWeightGoalMode(sqlOverride?:Sql):Promise<GoalRead>{
+export async function readCurrentWeightGoalMode(asOf:string,sqlOverride?:Sql):Promise<GoalRead>{
   try{
     const sql=sqlOverride??await getSql()
-    const fetched=await sql.query(CURRENT_WEIGHT_GOAL_MODE_SQL,[]) as unknown
+    const fetched=await sql.query(CURRENT_WEIGHT_GOAL_MODE_SQL,[asOf]) as unknown
     if(!Array.isArray(fetched)||fetched.length>2)return{status:'unavailable',rows:[]}
     const rows=fetched.map((item:unknown)=>{
       const r=item as Record<string,unknown>
