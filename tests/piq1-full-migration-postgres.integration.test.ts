@@ -99,7 +99,7 @@ function serializedConfirmation(row: Record<string, unknown>): BackupRow {
   })) as BackupRow
 }
 
-describe.skipIf(!url)('PIQ-1.1 full 0001–0055 migration-chain and backup on isolated PostgreSQL', () => {
+describe.skipIf(!url)('PIQ-1.1 full 0001–0056 migration-chain and backup on isolated PostgreSQL', () => {
   beforeAll(async () => {
     if (!url) return
     await client.connect()
@@ -108,7 +108,7 @@ describe.skipIf(!url)('PIQ-1.1 full 0001–0055 migration-chain and backup on is
     await client.query('CREATE TABLE schema_migrations (filename text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())')
     const migrations = await inspectMigrations()
     expect(migrations.at(-1)?.filename).toBe(LATEST_SCHEMA_MIGRATION)
-    expect(migrations).toHaveLength(55)
+    expect(migrations).toHaveLength(56)
     for (const migration of migrations) {
       await client.query('BEGIN')
       try {
@@ -136,7 +136,7 @@ describe.skipIf(!url)('PIQ-1.1 full 0001–0055 migration-chain and backup on is
 
   it('applied each migration exactly once without creating historical owner confirmations', async () => {
     const history = await client.query('SELECT filename FROM schema_migrations ORDER BY filename')
-    expect(history.rowCount).toBe(55)
+    expect(history.rowCount).toBe(56)
     expect(history.rows.at(-1)?.filename).toBe(LATEST_SCHEMA_MIGRATION)
     const count = await client.query('SELECT count(*)::int AS count FROM nutrition_day_completeness')
     expect(count.rows[0].count).toBe(0)
