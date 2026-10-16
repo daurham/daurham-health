@@ -84,7 +84,7 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
   if (wants.patterns) {
     addPatterns(input.patterns, push)
   }
-  addStableProfile(input.stableProfile ?? null, input.question, input.asOf, push)
+  addStableProfile(input.stableProfile ?? null, input.question, input.asOf, push, input.contextMode === 'deep')
   addClinicalProfile(input.profile ?? null, input.question, push, input.contextMode)
   if (input.intelligence) {
     addSharedIntelligence(input.intelligence, push, limitations)
@@ -1097,10 +1097,11 @@ function addStableProfile(
   question: string,
   asOf: string,
   push: (item: PushItem) => void,
+  deep = false,
 ) {
   if (!profile) return
   const demographicRelevant = /\b(?:age|aged|old|birthday|birth|born|height|tall|bmi|bmr|tdee|metabolism|metabolic|calories|calorie|energy expenditure|physiology|physiological|reference ranges?|profile)\b|about me/i.test(question)
-  if (!demographicRelevant) return
+  if (!deep && !demographicRelevant) return
 
   if (profile.dateOfBirth != null && profile.ageYears != null) {
     push({
