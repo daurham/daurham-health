@@ -69,6 +69,7 @@ function packet(question = 'QUESTION_SENTINEL_do_not_store') {
     lens: 'general',
     range: '30d',
     asOf: '2026-09-15',
+    healthToday: '2026-09-15',
     period: { start: '2026-08-17', end: '2026-09-15' },
     generatedAt: '2026-09-15T12:00:00.000Z',
     question,

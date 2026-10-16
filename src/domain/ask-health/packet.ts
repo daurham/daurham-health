@@ -1738,6 +1738,9 @@ function addGoals(
   if (requiresHistoricalGoalBoundary({
     asOf:input.asOf,today:input.healthToday,question:input.question,
   })) {
+    // A calorie/sleep-only historical question has no Goal status to screen.
+    const mentionsGoal=/\b(?:goals?|targets?|objectives?)\b/i.test(input.question)
+    if (!mentionsGoal && input.goals.length===0) return
     const message = 'Historical goal versions and lifecycle as of the requested date are NOT verified. ' +
       'Current goal targets, active status, deadlines, and projections are withheld, even if a dated body or training measurement exists. ' +
       'No historical goal achievement, unmet-goal direction, plateau or calorie change may be inferred from current goal records.'
