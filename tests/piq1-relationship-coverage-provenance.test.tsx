@@ -71,7 +71,7 @@ describe('PIQ-1.6 observed relationship source coverage reconciliation', () => {
       { ...first, eligibleDays: first.eligibleDays + 1 },
       { ...first, coveragePct: first.coveragePct + 1 },
       { ...first, provenance: { device: first.observedDays - 1 } },
-      { ...first, confidence: 'moderate' as const },
+      { ...first, confidence: 'high' as const },
       { ...first, label: 'A different sensor' },
       { ...first, excludedObservations: -1 },
     ]) {
