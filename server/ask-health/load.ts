@@ -133,7 +133,9 @@ export async function loadAskHealthPacketInput(input: {
       }
     }
     focusedDigestive = { ...focusedDigestive, bowelWindow,
-      digestivePairing: screenDigestiveLagReadiness(intelligenceSnapshot, bowelWindow, today),
+      digestivePairing: screenDigestiveLagReadiness(intelligenceSnapshot, bowelWindow, today, contexts.map(row => ({
+        contextDate: row.contextDate, tags: row.tags,
+      }))),
     }
   }
   return {

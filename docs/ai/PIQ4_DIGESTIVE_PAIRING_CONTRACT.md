@@ -19,3 +19,11 @@
 ## Synthetic acceptance
 
 Same-day and 1/2-day directionality, selected-window boundaries, verified/unverified fiber, available/unavailable completeness service, non-independent short span, partial Bristol coding and provisional today, insufficient or missing rows, logged water only, General Only and unrelated-question isolation. No new SQL, migration, owner row write, Gemini request or production deploy.
+
+## 2026-10-16: Evidence contrast and daily-context-tag review gate
+
+The initial 12-pair/4-distinct-week threshold is **not enough** to warrant further analysis if stool hardness or fiber never varies across paired dates. Candidate eligibility additionally requires a >=0.2 between-date difference in proportion of saved type 1–2 among fully typed stool events and >=2g difference in high-quality, owner-complete whole-day logged fiber. The comparison still computes no correlation, significance, effect or cause. An entire week of type 1–2 records with invariant fiber therefore means no contrast, regardless of pair count.
+
+Reuse daily context tags already loaded by the Ask Health caller, in date range only: illness, travel, alcohol, late meals, unusual stress, poor sleep, night interruptions, pain, supplement starts, medication changes and unusually demanding physical work. They are recorded flags, **not verified diagnoses, actual medication administration or claims of causation**. Count matched pairs whose same-day/0–2-day interval intersects a relevant tag; any such flagged pair forces manual context review before an eligibility label. Do not read free-text context notes in this stage. Absence of a tag is never proof that a confounder did not occur. Recorded water that changes during fiber variation is a *co-changing logged exposure* and forces context review; it is not verified total hydration and never permits hydration-stool association. Readiness status remains **non-substantive**, and AI must not infer a personal relationship from it.
+
+Tests cover all-hard Bristol with variable fiber, variable Bristol with fixed fiber, combined water/fiber changes, supplement or medication-change context, travel in the temporal lag interval, incomplete fiber, note-only or rest-day tags and provisional today. No extra database read, migration, owner data mutation or paid AI call.

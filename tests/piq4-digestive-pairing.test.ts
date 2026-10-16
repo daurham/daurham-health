@@ -58,7 +58,7 @@ describe('PIQ-4.1 typed bowel/fiber/water lag pairing readiness',()=>{
     // This is paired coverage, not independent confirmation of an effect.
     expect(f.pairing?.fiber.map(x=>x.pairedDays)).toEqual([16,0,15])
     expect(f.pairing?.fiber[0]).toMatchObject({
-      maturity:'candidate_for_review',pairedDays:16,
+      maturity:'no_outcome_variation',pairedDays:16,
       fullyTypedBowelDays:16,missingOrUnqualifiedExposureDays:0,
     })
     expect(f.pairing?.loggedWater[0]?.maturity).toBe('logging_only')
@@ -66,6 +66,7 @@ describe('PIQ-4.1 typed bowel/fiber/water lag pairing readiness',()=>{
     expect(evidence).toMatchObject({value:null,substantive:false,
       provenance:'quality_screen_only_no_association'})
     expect(evidence?.text).toContain('NOT for a claim of association')
+    expect(evidence?.text).toContain('lacks variation')
     expect(evidence?.text).toContain('NOT independent replications')
     expect(evidence?.text).not.toContain('Spearman')
   })

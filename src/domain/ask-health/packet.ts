@@ -1009,6 +1009,10 @@ function addFocusedDigestive(input: AskHealthPacketInput, push: (item: PushItem)
         lag.pairedDays + ' aligned date pair(s) in ' + lag.pairedCalendarWeeks +
         ' calendar week(s)').join('; ')
       const candidates = row.entries.filter(lag => lag.maturity === 'candidate_for_review')
+      const contextual = row.entries.filter(lag => lag.contextFlaggedPairDays > 0 ||
+        lag.coLoggedWaterVaries && row.key === 'fiber')
+      const lackingVariation = row.entries.filter(lag =>
+        lag.pairedDays > 0 && (!lag.stoolHardnessVaries || !lag.exposureVaries))
       push({
         id: 'digestive.pairing.coverage.' + row.key,
         domain: row.key === 'fiber' ? 'nutrition' : 'hydration',
@@ -1027,8 +1031,11 @@ function addFocusedDigestive(input: AskHealthPacketInput, push: (item: PushItem)
             : row.status === 'unavailable'
               ? ' Fiber whole-day verification is unavailable: no personal fiber relationship may be claimed.'
               : candidates.length
-                ? ' Pair counts reached the minimum screening thresholds for a later controlled evidence review, NOT for a claim of association.'
-                : ' Too few reliable, time-separated date pairs for even a candidate relationship review.') +
+                ? ' A bounded, varying, quality-qualified date series merits a LATER controlled review, NOT for a claim of association.'
+                : ' No lag satisfies all the initial variation, coverage and context checks; NOT for a claim of association.') +
+          (contextual.length ? ' Owner-entered daily context tags or co-changing logged-water values require alternative-explanation review; neither establishes a cause.' : '') +
+          (lackingVariation.length ? ' At least one lag lacks variation across dates in stool hardness or the recorded exposure; a fixed series cannot support a change relationship.' : '') +
+          ' Absence of owner-entered context tags does NOT prove there were no illness, medication, travel, diet or routine changes.' +
           ' The same logged day can appear in more than one lag; those lags are NOT independent replications.' +
           ' Neither matching dates nor any displayed pair count is a correlation, cause, diagnosis or rationale to change calorie intake.' +
           ' Missing records are unknown, not zero.',
@@ -1040,6 +1047,10 @@ function addFocusedDigestive(input: AskHealthPacketInput, push: (item: PushItem)
           sameDayPairs: row.entries[0]?.pairedDays ?? 0,
           nextDayPairs: row.entries[1]?.pairedDays ?? 0,
           twoDayPairs: row.entries[2]?.pairedDays ?? 0,
+          contextFlaggedSameDayPairs: row.entries[0]?.contextFlaggedPairDays ?? 0,
+          contextFlaggedNextDayPairs: row.entries[1]?.contextFlaggedPairDays ?? 0,
+          contextFlaggedTwoDayPairs: row.entries[2]?.contextFlaggedPairDays ?? 0,
+          readyForFurtherReviewLagCount: candidates.length,
           ...(focus.requestedWindow ? {
             requestedWindowStart: pairing.scope.start,
             requestedWindowEnd: pairing.scope.end,
