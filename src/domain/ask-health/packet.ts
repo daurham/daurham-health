@@ -68,6 +68,7 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
     addTraining(input, push, wants.exerciseDetail)
   }
   addFocusedTraining(input, push)
+  addFocusedDigestive(input, push)
   if (wants.supplements || questionMentionsSavedSupplement(input)) {
     addSupplements(input, push)
   }
@@ -697,6 +698,79 @@ function addFocusedTraining(input: AskHealthPacketInput, push: (item: PushItem) 
       evidenceDates: [item.date],
       priority: 1,
     })
+  }
+}
+
+/** Only owner-confirmed reliable fiber can represent a complete day; water
+ * is logged events and bowel zero requires an explicit owner report. Missing
+ * days are never interpreted as zero, and nothing here infers causation.
+ */
+function addFocusedDigestive(input: AskHealthPacketInput, push: (item: PushItem) => void): void {
+  const focus = input.focusedDigestive
+  if (!focus) return
+  const metrics = [
+    { key: 'fiber', metric: focus.fiber, unit: 'g', path: '/nutrition' },
+    { key: 'hydration', metric: focus.hydration, unit: 'ml', path: '/today' },
+    { key: 'bowel', metric: focus.bowel, unit: 'movements', path: '/today' },
+  ] as const
+
+  for (const { key, metric, unit, path } of metrics) {
+    const isFiber = key === 'fiber'
+    const text = isFiber
+      ? metric.verificationStatus !== 'available'
+        ? 'Whole-day fiber verification unavailable; recorded food does not establish total fiber intake.'
+        : metric.recordedDays + ' day(s) with some recorded fiber, of which ' +
+          (metric.verifiedDays ?? 0) + ' are owner-confirmed reliable complete days. Unverified days are unknown, not zero.'
+      : key === 'hydration'
+        ? metric.recordedDays + ' day(s) with logged water. Event totals are not proof of total daily fluid intake; missing days are unknown.'
+        : metric.recordedDays + ' day(s) with explicit bowel observations. Only an explicit no-bowel entry means zero; absent logs mean unknown.'
+
+    push({
+      id: 'digestive.focus.coverage.' + key,
+      domain: isFiber ? 'nutrition' : key,
+      label: key + ' source coverage',
+      value: metric.recordedDays,
+      unit: 'logged days',
+      text,
+      coverage: {
+        recordedDays: metric.recordedDays,
+        ...(isFiber ? {
+          verifiedDays: metric.verifiedDays ?? 0,
+          unverifiedDays: metric.recordedDays - (metric.verifiedDays ?? 0),
+          verificationStatus: metric.verificationStatus ?? 'unavailable',
+        } : {}),
+        selectedDays: metric.observations.length,
+      },
+      detailPath: path,
+      userEntered: false,
+      substantive: metric.recordedDays > 0,
+      priority: 1,
+    })
+
+    for (const day of metric.observations) {
+      const line = isFiber
+        ? day.date + ': ' + day.value + ' g recorded fiber on an owner-confirmed complete day with reliable source entries (estimated intake).'
+        : key === 'hydration'
+          ? day.date + ': ' + day.value + ' ml water explicitly logged' +
+            (day.provisional ? ' (today provisional)' : '') + '; actual total fluids may be higher.'
+          : day.date + ': ' + day.value + (day.value === 0 ? ' explicitly reported no bowel movement' : ' bowel movement(s) recorded') +
+            (day.provisional ? ' (today provisional)' : '') + '; frequency alone does not establish a cause.'
+      push({
+        id: 'digestive.focus.' + key + '.' + day.date,
+        domain: isFiber ? 'nutrition' : key,
+        label: key + ' on ' + day.date,
+        value: day.value,
+        unit,
+        text: line,
+        coverage: { sourceCount: day.sourceIds.length },
+        detailPath: path,
+        userEntered: true,
+        substantive: true,
+        evidenceDates: [day.date],
+        provenance: isFiber ? 'owner_confirmed_reliable' : 'owner_logged',
+        priority: 1,
+      })
+    }
   }
 }
 
