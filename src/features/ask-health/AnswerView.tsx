@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import type { AskLens } from '@/domain/ask-health'
+import type { AskLens, AskContextMode } from '@/domain/ask-health'
 import type { ProgressRange } from '@/domain/progress'
 import { canonicalCorrectionForEvidence, correctionFollowUpDraft, makeAskCorrectionState } from '@/domain/ask-health/corrections'
 import type { AskEvidence, AskHealthAnswer } from '@/domain/ask-health'
@@ -14,13 +14,13 @@ export function AskHealthAnswerView({
 }: {
   answer: AskHealthAnswer
   evidence: readonly AskEvidence[]
-  correctionContext?: { question: string; lens: AskLens; range: ProgressRange }
+  correctionContext?: { question: string; lens: AskLens; range: ProgressRange; contextMode?: AskContextMode }
   onDraftFollowUp?: (draft: string) => void
 }) {
   const prefix = useAppPathPrefix()
   const [flaggedId, setFlaggedId] = useState<string | null>(null)
   const returnState = correctionContext
-    ? makeAskCorrectionState(correctionContext.question, correctionContext.lens, correctionContext.range)
+    ? makeAskCorrectionState(correctionContext.question, correctionContext.lens, correctionContext.range, correctionContext.contextMode)
     : null
   const ordered = orderedEvidence(answer, evidence)
   return (

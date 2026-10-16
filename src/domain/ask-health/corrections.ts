@@ -1,5 +1,5 @@
 import type { AskEvidence } from './types.js'
-import { ASK_LENSES, ASK_QUESTION_MAX, type AskLens } from './config.js'
+import { ASK_LENSES, ASK_QUESTION_MAX, ASK_CONTEXT_MODES, type AskLens, type AskContextMode } from './config.js'
 import type { ProgressRange } from '../progress/types.js'
 
 const RANGES = ['30d', '90d', '6m', '1y', 'all'] as const
@@ -9,16 +9,21 @@ export type AskCorrectionReturn = {
   question: string
   lens: AskLens
   range: ProgressRange
+  contextMode?: AskContextMode
 }
 
 /** React Router state only: do not write the question into a URL or storage. */
 export function makeAskCorrectionState(
-  question: string, lens: AskLens, range: ProgressRange,
+  question: string, lens: AskLens, range: ProgressRange, contextMode?: AskContextMode,
 ): { askCorrection: AskCorrectionReturn } | null {
   const clean = question.trim()
   if (!clean || clean.length > ASK_QUESTION_MAX) return null
   if (!ASK_LENSES.includes(lens) || !RANGES.includes(range)) return null
-  return { askCorrection: { kind: 'ask_health_correction', question: clean, lens, range } }
+  if (contextMode !== undefined && !ASK_CONTEXT_MODES.includes(contextMode)) return null
+  return { askCorrection: {
+    kind: 'ask_health_correction', question: clean, lens, range,
+    ...(contextMode === undefined ? {} : { contextMode }),
+  } }
 }
 
 export function readAskCorrectionState(state: unknown): AskCorrectionReturn | null {
@@ -28,7 +33,13 @@ export function readAskCorrectionState(state: unknown): AskCorrectionReturn | nu
   if (!('question' in value) || typeof value.question !== 'string') return null
   if (!('lens' in value) || !ASK_LENSES.includes(value.lens as AskLens)) return null
   if (!('range' in value) || !RANGES.includes(value.range as ProgressRange)) return null
-  return makeAskCorrectionState(value.question, value.lens as AskLens, value.range as ProgressRange)?.askCorrection ?? null
+  if ('contextMode' in value &&
+      (typeof value.contextMode !== 'string' ||
+       !ASK_CONTEXT_MODES.includes(value.contextMode as AskContextMode))) return null
+  return makeAskCorrectionState(
+    value.question, value.lens as AskLens, value.range as ProgressRange,
+    'contextMode' in value ? value.contextMode as AskContextMode : undefined,
+  )?.askCorrection ?? null
 }
 
 export type CanonicalCorrection = {

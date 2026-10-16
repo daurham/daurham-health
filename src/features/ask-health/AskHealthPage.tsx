@@ -36,7 +36,7 @@ export function AskHealthPage() {
   const [lens, setLens] = useState<AskLens>(() => returningCorrection?.lens ?? initialLens(params.get('lens')))
   const [range, setRange] = useState<ProgressRange>(() => returningCorrection?.range ?? initialRange(params.get('range')))
   const [draft, setDraft] = useState(() => returningCorrection?.question ?? params.get('question') ?? '')
-  const [contextMode, setContextMode] = useState<AskContextMode>(DEFAULT_ASK_CONTEXT_MODE)
+  const [contextMode, setContextMode] = useState<AskContextMode>(() => returningCorrection?.contextMode ?? DEFAULT_ASK_CONTEXT_MODE)
   const [turns, setTurns] = useState<AskTurn[]>([])
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -130,7 +130,7 @@ export function AskHealthPage() {
       </div>
       <div className="space-y-2">
         <label htmlFor="ask-context-mode" className="block text-sm font-medium text-zinc-800">Context mode</label>
-        <select id="ask-context-mode" value={contextMode}
+        <select id="ask-context-mode" value={contextMode} disabled={pending}
           onChange={(event) => {
             setContextMode(event.target.value as AskContextMode)
             setTurns([])
@@ -203,7 +203,7 @@ export function AskHealthPage() {
         {latest ? <AskHealthContextSummary context={latest.meta.context} /> : null}
         {latest && asked ? (
           <AskHealthAnswerView key={answerRevision} answer={latest.answer} evidence={latest.evidence}
-            correctionContext={{ question: asked, lens: latest.meta.lens, range: latest.meta.range }}
+            correctionContext={{ question: asked, lens: latest.meta.lens, range: latest.meta.range, contextMode: latest.meta.contextMode }}
             onDraftFollowUp={setDraft} />
         ) : null}
         {latest && asked ? <ExternalResearch question={asked} /> : null}

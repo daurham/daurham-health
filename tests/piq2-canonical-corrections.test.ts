@@ -72,6 +72,20 @@ describe('PIQ-2.5 owner correction routed to the canonical source', () => {
     expect(makeAskCorrectionState('x'.repeat(1001), 'general', '30d')).toBeNull()
   })
 
+  it('round-trips Deep Dive and General Only modes through transient correction state', () => {
+    for (const mode of ['deep', 'general_only', 'personalized', 'smart'] as const) {
+      const state = makeAskCorrectionState('Please reconsider', 'general', '90d', mode)
+      expect(readAskCorrectionState(state)).toMatchObject({
+        question: 'Please reconsider', range: '90d', contextMode: mode,
+      })
+    }
+    const valid = makeAskCorrectionState('Question?', 'general', '30d', 'deep')
+    expect(readAskCorrectionState({ askCorrection: { ...valid?.askCorrection, contextMode: 'super_admin' } })).toBeNull()
+    expect(readAskCorrectionState({ askCorrection: { ...valid?.askCorrection, contextMode: null } })).toBeNull()
+    // Legacy correction links without a mode remain backward-compatible.
+    expect(readAskCorrectionState(makeAskCorrectionState('Question?', 'general', '30d'))?.contextMode).toBeUndefined()
+  })
+
   it('drafts reconsideration instead of affirming unverified medical facts', () => {
     const followUp = correctionFollowUpDraft('Protein\ntrend')
     expect(followUp).toContain('Protein trend')
