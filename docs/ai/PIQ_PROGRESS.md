@@ -1663,3 +1663,12 @@ General Only for a descriptive personal metric or trend now fails safe without e
 Implementation reuses the canonical already-loaded intelligence snapshot, has no new SQL, migration, production write or model call from tests, and retains the 24,000-character packet cap plus truthful truncation/considered-facts manifest. Unverified food days remain excluded from measured whole-day fiber values; water event totals are not equated to all fluid consumption; missing bowel days are unknown rather than zero. The detail expansion is explicit owner opt-in, not a promise to send the full database.
 
 Regression tests: tests/piq3-deep-context-evidence.test.ts covers a vague question selected with Deep Dive versus Smart/Personalized; no unrelated single-topic GI detail; and verified food coverage/limitations. Full exact-head CI and owner iPhone/real-model answer review must precede acceptance. Clinical answer correctness and total history coverage remain unproven.
+
+
+## 2026-10-15 — Deep Dive selected-history disclosure and all-history shortcut
+
+**State:** Development branch only. Owner acceptance remains **0/9 formal phases**; `main` and production unchanged.
+
+Deep Dive is a broad *context mode*, not an automatic unlimited historical query. Previously the default 30-day range could silently limit a user's desired comprehensive analysis. Ask Health now explicitly warns about the selected 30d / 90d / 6m / 1y window when Deep Dive is chosen and offers a one-tap **Use all available history for Deep Dive** action. If All is already selected, it states that all available recorded history is in scope but **only a bounded packet** reaches AI, so some records can still be omitted. The ordinary range control remains available in every mode. Range changes clear old answer, conversation and error state; while a question is pending, window controls cannot change the in-flight request. Changing the range does not automatically invoke the model. Pure tests in `tests/piq3-deep-dive-history-window.test.ts` cover the finite-window labels, explicit All state, and absence of the shortcut outside Deep Dive.
+
+This feature does not loosen the evidence-packet limit or AI monthly budget, make a new SQL query, change clinical records or migrations, or imply every record was analyzed. Full exact-head CI and owner iPhone check are required before code and UX acceptance. Production identity/backup gates remain unresolved.

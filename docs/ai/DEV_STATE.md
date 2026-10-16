@@ -580,3 +580,8 @@ Explicit owner-controlled Context Mode now includes a bounded, privacy-safe “W
 ## 2026-10-15 Deep Dive vague-question coverage checkpoint
 
 Deep Dive now opts into a small sample of recorded fiber/hydration/bowel values even for questions without these keywords. Existing General Only isolation, Smart/Personalized minimum-necessary GI selection, verified whole-day nutrition filtering, source caveats, packet-size limit and AI cost gate are retained. Added regression tests: piq3-deep-context-evidence. No live DB or Gemini usage; tests/owner sign-off still required.
+
+
+## 2026-10-15 — Context Mode all-history UX checkpoint
+
+On PIQ branch, added `src/domain/ask-health/context-range.ts` and a Deep Dive-specific **Use all available history** shortcut in `AskHealthPage`. It discloses 30d/90d/6m/1y versus All and still warns that All refers to the date scope, not a raw full-database AI upload. Date range changes clear previous AI answer/chat, do not trigger a new model call, and cannot change an in-flight request. Tests: `tests/piq3-deep-dive-history-window.test.ts`. No production/main migration, model or owner-data action. CI, iPhone UX and phase approval remain open.
