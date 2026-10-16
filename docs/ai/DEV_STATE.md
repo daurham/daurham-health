@@ -575,3 +575,8 @@ PIQ development branch `piq/00-baseline-20261014`. Ask Health UI/API/owner handl
 ## 2026-10-15 PIQ-3 Context Mode follow-up
 
 Explicit owner-controlled Context Mode now includes a bounded, privacy-safe “What Health AI considered” manifest for up to 24 supplied substantive evidence items (id, label, domain, dated source, detailPath, provenance) and distinguishes model-cited facts from context-only facts. Deterministic answers display no-model-call disclosure. General Only personal metric/trend queries give deterministic no-data guidance, never guessing or burning model tokens. Synthetic Context Mode regressions expanded. Changes remain on piq/00-baseline-20261014 only, unaccepted. Run full checks on exact current SHA; no production operations. The standalone single-topic digestive privacy regression from earlier PIQ-3.3 remains a separate follow-up.
+
+
+## 2026-10-15 Deep Dive vague-question coverage checkpoint
+
+Deep Dive now opts into a small sample of recorded fiber/hydration/bowel values even for questions without these keywords. Existing General Only isolation, Smart/Personalized minimum-necessary GI selection, verified whole-day nutrition filtering, source caveats, packet-size limit and AI cost gate are retained. Added regression tests: piq3-deep-context-evidence. No live DB or Gemini usage; tests/owner sign-off still required.
