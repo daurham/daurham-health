@@ -18,7 +18,7 @@ Daurham Health must become an evidence-aware personal analyst and coach: answer 
 | PIQ-0 baseline/evaluation | IN PROGRESS | Repository truth and initial case registry recorded; owner runtime/DB and measured model baseline still unknown |
 | PIQ-1 data/decision integrity | BRANCH PREPARATION | PIQ-1.1 day-completeness pure domain and persisted owner API code validated; migration/UI/consumer wiring and owner runtime QA missing |
 | PIQ-2 physiological owner context | NOT STARTED | Verify profile fields and historical behavior first |
-| PIQ-3 Ask Health answer quality | NOT STARTED | Classify early exits versus retrieval versus model errors |
+| PIQ-3 Ask Health answer quality | BRANCH IMPLEMENTATION | General educational routing, insufficient-evidence fix, narrow current-emergency safety; owner QA and later PIQ-3 slices outstanding |
 | PIQ-4 cross-domain reasoning | NOT STARTED | Realistic GI, weight, recovery and contradiction cases |
 | PIQ-5 meaningful Coach | NOT STARTED | No repetitive/obsolete recommendations; clear action lifecycle |
 | PIQ-6 evaluation/learning loop | NOT STARTED | Verified intervention and outcome semantics |
@@ -1618,3 +1618,16 @@ The new command **npm run migration:preflight** uses read-only SELECT statements
 **State:** Work branch; 0/9 program phases owner-accepted; not deployed. New synthetic-only tests drive the real Ask Health evidence packet through the explanation/cache path, proving that changing the saved height changes the evidence fingerprint and forces a fresh explanation; an unrelated profile note edit reuses the valid cache instead of spending another model call; and clearing the last saved personal fact does not replay a cached height claim. Provider responses are deterministic stubs, not real Gemini requests. These tests cannot prove network loader freshness, genuine prose quality, owner iPhone behavior or the actual production schema.
 
 The owner test script lives in [PIQ_OWNER_ACCEPTANCE_RUNBOOK.md](./PIQ_OWNER_ACCEPTANCE_RUNBOOK.md). It distinguishes code/isolated-DB validation from six production identity/backup/preview gates, ten explicit iPhone acceptance scenarios and a small owner-approved private answer-quality sample. No real owner actions are marked complete and no migrations or main promotion are authorized. The connected Vercel deployment-scope 403 and empty Neon project listing are unresolved. Exact-commit CI validation for this new test still must be checked; no preemptive acceptance claim.
+
+
+## 2026-10-15 — PIQ-3 first answer-quality and immediate safety work
+
+**Status: branch implementation, not accepted. 0 of 9 program phases owner-accepted.** No main merge, live migrations, production Health data access or Gemini calls in CI.
+
+PIQ-3.1/3.2: Added deterministic conservative question routing. Standalone educational questions (e.g. what creatine does) now bypass private owner evidence loading and previous conversation when answering, with a truly empty personal-evidence packet. Separate general prompt, cache version and metadata prevent general answers being represented as verified owner measurements. The usual rate/budget and AI usage ledger still apply; suspected invented owner-log assertions trigger bounded validation repair or a failure, not silent acceptance. Owner-specific goals/plans, symptoms, historical questions and ambiguous references stay in the owner path. T01's previously documented negative baseline is now a positive synthetic direct-answer regression. This is not complete semantic classification or live clinical validation.
+
+PIQ-3.2 immediate safety: Narrow unambiguous first-person, present-tense emergency and self-harm assertions now receive deterministic local-emergency/support guidance before database reads or model calls. The UI and privacy-safe diagnostic mark it explicitly as immediate safety guidance; no user diagnosis or private evidence is asserted. Tests include urgent statements, negated/hypothetical/historical phrases, cost independence, no personal data reads and direct-call packet sanitization. This is a deliberately limited safety floor, not comprehensive medical triage and not suitable as the only emergency classifier.
+
+New regression tests: piq3-general-routing and piq3-immediate-safety. Earlier CI found and prompted fixes for test lint, saved goal or training plan references crossing into the education lane, and plural headache symptom classification. The previously green baseline tests for known bad behavior were rewritten as positive fixed-behavior expectations. Exact-head CI is still required before calling this code validated.
+
+Remaining: owner-facing authenticated phone QA, clinical expert review of emergency paths, evidence relevance, historical time windows, better personal explanations with missing facts, independent claim-source validity, research intent integration, and direct-answer quality review on approved real questions. Production Vercel/Neon access restrictions and no formal phase acceptance still apply.
