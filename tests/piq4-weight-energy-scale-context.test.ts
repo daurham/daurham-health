@@ -81,7 +81,7 @@ describe('PIQ-4.2 validated alternative scale-noise context, no causal authority
    })
    expect(e?.text).toContain('owner-confirmed, source-reliable')
    expect(e?.text).toContain('NOT demonstrated causes')
-   expect(e?.text).toContain('NOT establish whole-day completeness')
+   expect(e?.text).toContain('cannot establish whole-day completeness')
    expect(e?.text).not.toMatch(/you have retained|you gained fat|reduce your calories/i)
    expect(x.packet.evidence.some(e=>e.id==='weight_energy.calorie_adjustment')).toBe(false)
  })
