@@ -25,6 +25,8 @@ const fiber = scoped('digestive.focus.coverage.fiber', 'nutrition', 3, 54)
 const unrelated: AskEvidence = {
   ...scoped('intelligence.relationship.shared:hydration:bowel:same_day', 'intelligence', .7, .7),
   unit: 'Spearman rho', confidence: 'moderate',
+  evidenceDates: Array.from({ length: 12 }, (_, i) =>
+    '2026-09-' + String(i + 1).padStart(2, '0')),
   coverage: {
     pairedObservations: 12, pairedDateCount: 12, selectedCalendarDays: 45,
     requiredObservations: 10, lagDays: 0,
