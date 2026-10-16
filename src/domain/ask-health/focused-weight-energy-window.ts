@@ -28,6 +28,10 @@ export type HistoricalWeightEnergyWindow = {
    */
   observedWeightChangeKg: number | null
   observedWeightSpanDays: number
+  /** Descriptive spread of eligible weigh-ins; never a body-fat measurement. */
+  observedWeightRangeKg: number | null
+  /** Internal departures from the line between observed endpoints are not a trend or diagnosis. */
+  internalWeightVariability: 'not_assessable' | 'no_large_excursion_detected' | 'large_internal_excursion'
   boundaryCoverage: 'both_endpoints_covered' | 'incomplete_or_incomparable'
 }
 
@@ -74,6 +78,7 @@ export function focusHistoricalWeightEnergyWindow(input: {
     intakeCoverage:'no_verified_days' as const,
     recordedWeightDays:0,comparableWeightDays:0,
     observedWeightChangeKg:null,observedWeightSpanDays:0,
+    observedWeightRangeKg:null,internalWeightVariability:'not_assessable' as const,
     boundaryCoverage:'incomplete_or_incomparable' as const,
   }
   if (scope !== 'in_range') return empty
@@ -111,6 +116,24 @@ export function focusHistoricalWeightEnergyWindow(input: {
     span >= 6 && dateDiff(start,first.date) <= 2 &&
     dateDiff(last.date,end) <= 2 &&
     first.date !== last.date
+  // Do NOT discard an unusual owner weight as 'incorrect'. This only flags
+  // the limits of interpreting a FIRST-vs-LAST difference when another
+  // usual-condition reading departs materially from that straight line.
+  // These are presentation heuristics, not clinical weight thresholds.
+  const weightRange = covered
+    ? Math.max(...usual.map(row => row.value)) - Math.min(...usual.map(row => row.value))
+    : null
+  const estimatedWeightAt = (date:string) =>
+    first!.value + (last!.value - first!.value) * dateDiff(first!.date,date) / span
+  const maximumIntermediateDeparture = covered
+    ? Math.max(0,...usual.slice(1,-1).map(row => Math.abs(row.value - estimatedWeightAt(row.date))))
+    : 0
+  const medianWeight = covered ? [...usual].map(row => row.value).sort((a,b)=>a-b)[Math.floor(usual.length/2)]! : 0
+  const largeExcursion = covered &&
+    maximumIntermediateDeparture >= Math.max(2,0.025*medianWeight)
+  const internalWeightVariability: HistoricalWeightEnergyWindow['internalWeightVariability'] =
+    !covered ? 'not_assessable' :
+    largeExcursion ? 'large_internal_excursion' : 'no_large_excursion_detected'
   return {
     scope,start,end,label,calendarDays:days,
     completedDays,
@@ -122,6 +145,8 @@ export function focusHistoricalWeightEnergyWindow(input: {
     recordedWeightDays:weights.length,comparableWeightDays:usual.length,
     observedWeightChangeKg:covered ? last!.value-first!.value : null,
     observedWeightSpanDays:covered?span:0,
+    observedWeightRangeKg:weightRange,
+    internalWeightVariability,
     boundaryCoverage:covered?'both_endpoints_covered':'incomplete_or_incomparable',
   }
 }

@@ -27,3 +27,9 @@ coverage and prose expose the qualification and thus change the deterministic
 response-cache fingerprint after a source/date correction. Today excluded,
 missing records UNKNOWN; General Only and ambiguous windows keep existing
 non-disclosure. No new SQL, data reads, model calls or schema change.
+
+## 2026-10-16 — Interior scale excursion disclosure (engineering-only quality screen)
+
+A historical window with three usual-condition weigh-ins and covered endpoints can have nearly equal first/last weights while an interior weigh-in differs greatly. The previous first-vs-last summary was an accurate endpoint difference but could be mistaken for a representative weekly trend. The pure historical selector now keeps that observed difference while **separately** reporting the minimum-to-maximum spread of comparable, completed-day, usual-condition weights and a qualitative `internalWeightVariability` flag. The flag is triggered when the largest interior departure from the straight line between the two endpoints is at least the greater of 2 kg or 2.5% of median sampled weight. This is only a presentation heuristic, NOT a validated clinical or biological weight cutoff, and it does not delete or adjust any source reading.
+
+The packet discloses a substantial interior excursion before treating the endpoint as a trend and adds the variability state/spread to selected evidence coverage and therefore the response-cache fingerprint. If endpoints or observation conditions are ineligible, variability remains `not_assessable`; no invented normalization, no inferred fat change, no energy-balance prescription. Synthetic tests hold endpoint change constant while changing one interior weight, assert the volatility warning and fingerprint change, and check that differently conditioned or outside-window spikes are not misused. No extra read, SQL, migration, health record, Gemini request, or target mutation.

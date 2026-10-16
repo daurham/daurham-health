@@ -437,9 +437,16 @@ function addHistoricalWeightEnergyWindow(
       'with '+window.comparableWeightDays+' comparable observation day(s) spanning '+
       window.observedWeightSpanDays+' days. The difference between the earliest and '+
       'latest qualifying weights is '+Math.round(window.observedWeightChangeKg*1000)/1000+
-      ' kg. It is not fat loss/gain, a biological plateau, a daily slope, or a validated calorie-adjustment trigger.',
+      ' kg. It is not fat loss/gain, a biological plateau, a daily slope, or a validated calorie-adjustment trigger.'+
+      (window.internalWeightVariability === 'large_internal_excursion'
+        ? ' Caution: at least one other usual-condition weigh-in diverged substantially from a straight line between the endpoints. The eligible measurements span '+
+          Math.round(window.observedWeightRangeKg!*1000)/1000+
+          ' kg within this interval; the endpoint difference must NOT be described as a representative weekly trend or proof of a plateau.'
+        : ' A modest internal deviation in the recorded sample does NOT prove consistent scale conditions or exclude unrecorded fluctuations.'),
     coverage:{comparableWeightDays:window.comparableWeightDays,
       comparableSpanDays:window.observedWeightSpanDays,
+      observedWeightRangeKg:window.observedWeightRangeKg,
+      internalWeightVariability:window.internalWeightVariability,
       boundaryCoverage:window.boundaryCoverage},
     detailPath:'/progress/body',userEntered:false,substantive:true,priority:1,
   })

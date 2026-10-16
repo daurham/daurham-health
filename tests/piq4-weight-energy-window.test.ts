@@ -174,6 +174,41 @@ describe('PIQ-4.2 exact requested historical interval boundary (synthetic)',()=>
     expect(r.packet.evidence.find(x=>x.id==='weight_energy.historical_window.calories')?.text)
       .toContain('NOT a representative estimate')
   })
+  it('flags an internal scale spike despite identical usual-condition endpoint weights',()=>{
+    const question='How did my weight change last week?'
+    const baseline=inspect(question)
+    const changed=base.map(item => item.key==='body.weight_kg'&&item.date==='2026-10-08'
+      ? {...item,value:89} : item)
+    const noisy=inspect(question,changed)
+    expect(baseline.window?.observedWeightChangeKg).toBe(-0.5)
+    expect(noisy.window?.observedWeightChangeKg).toBe(-0.5)
+    expect(baseline.window).toMatchObject({
+      internalWeightVariability:'no_large_excursion_detected',
+      observedWeightRangeKg:0.5,
+    })
+    expect(noisy.window).toMatchObject({
+      internalWeightVariability:'large_internal_excursion',
+      observedWeightRangeKg:6.5,
+    })
+    const evidence=noisy.packet.evidence.find(item=>item.id==='weight_energy.historical_window.weight_change')
+    expect(evidence?.text).toContain('diverged substantially')
+    expect(evidence?.text).toContain('NOT be described as a representative weekly trend')
+    expect(evidence?.coverage).toMatchObject({internalWeightVariability:'large_internal_excursion'})
+    expect(packetFingerprintMaterial(noisy.packet)).not.toBe(packetFingerprintMaterial(baseline.packet))
+    expect(JSON.stringify(baseline.packet)).not.toContain('89 kg')
+  })
+  it('does not mistake differently-conditioned weight or out-of-scope late spike as a comparable excursion',()=>{
+    const question='How did my weight change last week?'
+    const altered=base.map(item=>item.key==='body.weight_kg'&&item.date==='2026-10-08'
+      ? {...item,quality:'different_conditions' as const,value:89}:item)
+    const disqualified=inspect(question,altered)
+    expect(disqualified.window).toMatchObject({
+      observedWeightChangeKg:null,internalWeightVariability:'not_assessable',
+      observedWeightRangeKg:null,
+    })
+    const normal=inspect(question)
+    expect(normal.window?.internalWeightVariability).toBe('no_large_excursion_detected')
+  })
   it('re-fingerprints a corrected distribution even when the numeric mean stays equal',()=>{
     const q='How many calories last week?'
     const records=[...base,record('nutrition.calories','2026-10-09',2000,'high_confidence')]
