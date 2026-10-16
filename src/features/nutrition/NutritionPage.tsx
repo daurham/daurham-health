@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { CorrectionReturnBanner } from '@/features/ask-health/CorrectionReturnBanner'
 import { subscribeHealthDataChanges } from '@/lib/health-changes'
 import {
   nutritionDayQuality,
@@ -356,6 +357,7 @@ export function NutritionPage() {
         onDate={requestDate}
         onShift={(days) => requestDate(shiftNutritionDate(navBase, days))}
       />
+      <CorrectionReturnBanner />
 
       <div className="flex items-start justify-between gap-3">
         <div>
