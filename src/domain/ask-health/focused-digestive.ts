@@ -1,5 +1,5 @@
 import type { HealthIntelligenceSnapshot, IntelligenceObservation } from '../intelligence/shared.js'
-import { addCalendarDays } from '../training-plan.js'
+import { addCalendarDays, weekStartMonday } from '../training-plan.js'
 
 /** PIQ-3.3: question-relevant observations from the *already-loaded*,
  * quality-gated owner intelligence snapshot. Never re-query private records.
@@ -10,6 +10,14 @@ export type FocusedDigestiveMetric = {
   /** Verified, source-reliable whole-day FOOD logs only. */
   verifiedDays?: number
   verificationStatus?: 'available' | 'unavailable'
+  /** Calculated across ALL eligible window observations, never just sampled days. */
+  windowSummary?: {
+    calendarDays: number
+    daysWithObservations: number
+    summedRecordedValue: number | null
+    meanPerObservedDay: number | null
+    provisionalObservedDays: number
+  }
   observations: Array<{
     date: string
     value: number
@@ -27,6 +35,14 @@ export type FocusedDigestiveEvidence = {
   requestedDate?: { date: string; inSelectedRange: boolean } | null
   /** Unresolvable calendar scope: suppress recent samples rather than imply they answer it. */
   dateSelectionIssue?: 'invalid_or_ambiguous' | 'unsupported_period' | null
+  /** Relative window resolved against the selected as-of date; never silently clipped. */
+  requestedWindow?: {
+    start: string
+    end: string
+    label: string
+    calendarDays: number
+    inSelectedRange: boolean
+  } | null
   fiber: FocusedDigestiveMetric
   hydration: FocusedDigestiveMetric
   bowel: FocusedDigestiveMetric
@@ -69,14 +85,31 @@ export function attachBristolTypes(
     },
   }
 }
-/** Resolve single-day requests only. Multi-day and ambiguous references must
- * never be silently approximated with a few recent observations.
- * Relative labels use the owner instance's local Health calendar, not UTC.
+/** Historical date selection is a deterministic calendar operation, not an
+ * inference from sparse Health data. Multi-day windows are inclusive and
+ * anchored to selected asOf, not server UTC; "last week" means the preceding
+ * complete Monday–Sunday week, while trailing N days includes asOf.
  */
+export type DigestiveDateSelection = {
+  date: string | null
+  window: { start: string; end: string; label: string; calendarDays: number } | null
+  issue: 'invalid_or_ambiguous' | 'unsupported_period' | null
+}
+
+function daySpan(start: string, end: string): number {
+  return Math.round((Date.parse(end + 'T00:00:00Z') - Date.parse(start + 'T00:00:00Z')) / 86400000) + 1
+}
+
+function previousMonthStart(asOf: string): string {
+  const first = asOf.slice(0, 7) + '-01'
+  return addCalendarDays(first, -1).slice(0, 7) + '-01'
+}
+
 export function digestDateSelection(
   question: string,
   today: string,
-): { date: string | null; issue: 'invalid_or_ambiguous' | 'unsupported_period' | null } {
+  asOf: string = today,
+): DigestiveDateSelection {
   const dates = question.match(/\b\d{4}-\d{2}-\d{2}\b/g) ?? []
   const valid = dates.filter((date) => {
     const parsed = new Date(date + 'T00:00:00.000Z')
@@ -87,15 +120,53 @@ export function digestDateSelection(
     ...(/\btoday\b/i.test(question) ? [today] : []),
   ]
   const requested = [...new Set([...valid, ...relative])]
-  const unsupported = /\b\d{1,2}\/\d{1,2}\/\d{2,4}\b|\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2}\b/i.test(question)
-  if (valid.length !== dates.length || unsupported || requested.length > 1) {
-    return { date: null, issue: 'invalid_or_ambiguous' }
+  const ambiguousFormat = /\b\d{1,2}\/\d{1,2}\/\d{2,4}\b|\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2}\b/i.test(question)
+  const trailing = question.match(/\b(?:last|past|previous)\s+(\d+)\s+days?\b/i)
+  const week = /\b(last|previous|this)\s+week\b/i.exec(question)
+  const month = /\b(last|previous|this)\s+month\b/i.exec(question)
+  const unsupportedPeriod = /\b(?:last|past|previous|this|next)\s+(?:year|few\s+days|(?:\d+\s+)?weeks?|(?:\d+\s+)?months?|(?:\d+\s+)?years?)\b/i.test(question)
+    || /\bnext\s+\d+\s+days?\b/i.test(question)
+  // Supported week/month expressions are not ambiguous simply because the
+  // conservative unsupported-pattern recognizer also identifies them.
+  const periodCount = Number(Boolean(trailing)) + Number(Boolean(week)) + Number(Boolean(month))
+  const unexpectedPeriod = unsupportedPeriod && periodCount === 0
+  if (valid.length !== dates.length || ambiguousFormat || requested.length > 1 ||
+      (requested.length > 0 && periodCount > 0) || periodCount > 1) {
+    return { date: null, window: null, issue: 'invalid_or_ambiguous' }
   }
-  if (requested.length === 1) return { date: requested[0]!, issue: null }
-  if (/\b(?:last|past|previous)\s+(?:\d+\s+days?|week|month|year|few\s+days)\b|\b(?:this|next)\s+(?:week|month|year)\b/i.test(question)) {
-    return { date: null, issue: 'unsupported_period' }
+  if (requested.length === 1) return { date: requested[0]!, window: null, issue: null }
+  if (periodCount === 0) {
+    return { date: null, window: null, issue: unexpectedPeriod ? 'unsupported_period' : null }
   }
-  return { date: null, issue: null }
+
+  let start: string
+  let end = asOf
+  let label: string
+  if (trailing) {
+    const n = Number(trailing[1])
+    if (!Number.isSafeInteger(n) || n < 1 || n > 90) {
+      return { date: null, window: null, issue: 'unsupported_period' }
+    }
+    start = addCalendarDays(asOf, 1 - n)
+    label = 'Trailing ' + n + ' calendar days through ' + asOf
+  } else if (week) {
+    const monday = weekStartMonday(asOf)
+    const previous = week[1]!.toLowerCase() !== 'this'
+    start = previous ? addCalendarDays(monday, -7) : monday
+    end = previous ? addCalendarDays(monday, -1) : asOf
+    label = previous ? 'Previous complete Monday–Sunday week' : 'Current week through ' + asOf
+  } else {
+    const previous = month![1]!.toLowerCase() !== 'this'
+    const first = asOf.slice(0, 7) + '-01'
+    start = previous ? previousMonthStart(asOf) : first
+    end = previous ? addCalendarDays(first, -1) : asOf
+    label = previous ? 'Previous complete calendar month' : 'Current month through ' + asOf
+  }
+  const calendarDays = daySpan(start, end)
+  if (calendarDays < 1 || calendarDays > 90) {
+    return { date: null, window: null, issue: 'unsupported_period' }
+  }
+  return { date: null, window: { start, end, label, calendarDays }, issue: null }
 }
 
 export function requestedDigestiveCalendarDay(question: string, today: string): string | null {
@@ -136,19 +207,43 @@ export function focusDigestiveContext(input: {
   const topics = digestiveQuestionTopics(input.question)
   if (!input.includeBroadContext && !topics.fiber && !topics.hydration && !topics.bowel) return null
   const { snapshot, today } = input
-  const dateSelection = digestDateSelection(input.question, today)
+  const dateSelection = digestDateSelection(input.question, today, snapshot.asOf)
   const askedDate = dateSelection.date
   const requestedDate = askedDate == null ? null : {
     date: askedDate,
     inSelectedRange: askedDate >= snapshot.period.start &&
       askedDate <= snapshot.period.end && askedDate <= snapshot.asOf && askedDate <= today,
   }
-  // For a dated question, never substitute recent unrelated days if the
-  // requested date is absent or falls outside the selected evidence window.
+  const requestedWindow = dateSelection.window == null ? null : {
+    ...dateSelection.window,
+    inSelectedRange: dateSelection.window.start >= snapshot.period.start &&
+      dateSelection.window.end <= snapshot.period.end &&
+      dateSelection.window.end <= snapshot.asOf && dateSelection.window.end <= today,
+  }
+  // No silently clipped windows. A larger requested range must be explicitly
+  // selected rather than turned into a misleading partial historical total.
+  const windowFilter = (items: IntelligenceObservation[]) =>
+    requestedWindow == null ? items : requestedWindow.inSelectedRange
+      ? items.filter((item) => item.date >= requestedWindow.start && item.date <= requestedWindow.end)
+      : []
   const sample = (observations: IntelligenceObservation[]) =>
     dateSelection.issue ? [] :
       requestedDate ? observations.filter((item) =>
-        requestedDate.inSelectedRange && item.date === requestedDate.date) : recent(observations)
+        requestedDate.inSelectedRange && item.date === requestedDate.date) :
+      requestedWindow && !requestedWindow.inSelectedRange ? [] :
+      recent(windowFilter(observations))
+  const windowSummary = (source: IntelligenceObservation[]) => {
+    if (!requestedWindow || !requestedWindow.inSelectedRange || dateSelection.issue) return undefined
+    const scoped = windowFilter(source)
+    const sum = scoped.reduce((total, item) => total + item.value, 0)
+    return {
+      calendarDays: requestedWindow.calendarDays,
+      daysWithObservations: scoped.length,
+      summedRecordedValue: scoped.length > 0 ? sum : null,
+      meanPerObservedDay: scoped.length > 0 ? sum / scoped.length : null,
+      provisionalObservedDays: scoped.filter((item) => item.date === today).length,
+    }
+  }
   const fiberAll = observationDates(snapshot, 'nutrition.fiber_g', today)
   const fiberStatus = snapshot.coverage.find((c) => c.key === 'nutrition.fiber_g')?.completenessCheck
   // Do not infer full-day intake from food items, even if all entries have
@@ -160,7 +255,8 @@ export function focusDigestiveContext(input: {
   const water = observationDates(snapshot, 'hydration.ml', today)
   const bowel = observationDates(snapshot, 'bowel.count', today)
   const present = (kind: FocusedDigestiveMetric['kind'], source: IntelligenceObservation[]): FocusedDigestiveMetric => ({
-    kind, recordedDays: source.length,
+    kind, recordedDays: windowFilter(source).length,
+    windowSummary: windowSummary(source),
     observations: sample(source).map((o) => ({
       date: o.date, value: o.value, sourceIds: [...o.sourceIds].sort(),
       provisional: o.date === today,
@@ -168,9 +264,10 @@ export function focusDigestiveContext(input: {
   })
   const fiberMetric: FocusedDigestiveMetric = {
     kind: 'fiber',
-    recordedDays: fiberAll.length,
-    verifiedDays: verified.length,
+    recordedDays: windowFilter(fiberAll).length,
+    verifiedDays: windowFilter(verified).length,
     verificationStatus: fiberStatus === 'available' ? 'available' : 'unavailable',
+    windowSummary: windowSummary(verified),
     observations: sample(verified).map((o) => ({
       date: o.date, value: o.value, sourceIds: [...o.sourceIds].sort(),
       provisional: false,
@@ -180,6 +277,7 @@ export function focusDigestiveContext(input: {
     start: snapshot.period.start,
     end: snapshot.period.end,
     requestedDate,
+    requestedWindow,
     dateSelectionIssue: dateSelection.issue,
     fiber: fiberMetric,
     hydration: present('hydration', water),
