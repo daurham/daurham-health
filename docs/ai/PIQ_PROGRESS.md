@@ -1366,3 +1366,18 @@ HAVING COUNT(*) > 1;
 A reproducible correlation based on cited X/Y readings is insufficient if the loaded Health Intelligence frame itself omits, duplicates or reorders a day outside those citations. Goal Control now checks the expected 30-day range, the declared integer day count, and that every row advances exactly one valid calendar date from the source period start through end. If the frame is inconsistent, retain the historical relationship and its source links but withhold present rho, strength, pairing opportunities, clustering and sensitivity. No source values are fabricated or changed.
 
 Synthetic 16-pair regressions mutate the frame and day count while preserving the exact coefficient and prove the display fails closed. This is an in-memory consistency check, not proof of atomic SQL reads. No migration, Gemini, production writes or `main` merge. Outstanding: CI, mobile QA, canonical DB source-revision atomicity, statistical uncertainty, and owner-gated migration 0054.
+
+
+## PIQ-1.6 — Single-pair influence on observed relationships (2026-10-15)
+
+**State:** Bounded work-branch implementation awaiting full CI and owner-authenticated mobile QA; **0/9 phases owner-accepted**.
+
+**Failure mode:** A small, selected observed correlation could display an impressive original Spearman coefficient without indicating whether one unusually influential matched date pair determined the reported direction. The existing first-difference and date-clustering disclaimers do not answer this distinct sensitivity question.
+
+**Contract:** For a *fully source-verified* 30-day association with 10–31 original matched pairs, calculate the same tie-aware Spearman rank coefficient after deleting each matched date pair once (leave-one-pair-out). Display the resulting minimum/maximum rho and flag whether any deletion changes positive/negative/near-zero direction under the existing descriptive 0.05 neutral threshold. If a deletion leaves an undefined coefficient (including a constant series), report the influence result **unavailable**, not falsely stable. The original coefficient, selection, evidence-coverage grade, source rows, recommendations and matching dates remain unchanged. If upstream snapshot, coefficient, nutrition quality, or source-date verification fails, do not display the removal range.
+
+**Meaning:** This is an exploratory influence disclosure **not** a confidence interval, statistical significance test, adjustment for ten screened candidate definitions, independent sample estimate, causal proof, or permission to change an intervention. A stable leave-one-out range does not rule out serial dependence, missing-not-at-random logs, shared confounders, or trends.
+
+**Tests:** Synthetic matched-date data where the leave-one-out descriptive sign changes; strictly ranked data with no sign change; a series that becomes constant after omission; and UI integration that withholds numeric influence after a stale source snapshot. No migration, Gemini/provider call, production owner-data write or `main` promotion.
+
+**Still open:** Source-revision atomicity across SQL reads, uncertainty under serial dependence, multiple-testing correction or abstention, verification of current owner data on a real device, and separately gated production migration 0054.

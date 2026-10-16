@@ -202,6 +202,15 @@ export function GoalControlCard({
                       removal of time trends or autocorrelation, proof of independence, or a causal effect.
                     </p>
                     <p className="mt-1">
+                      Single-pair influence: {item.evidence.singlePairSensitivity?.minRho != null &&
+                        item.evidence.singlePairSensitivity.maxRho != null
+                        ? `omitting each of ${item.evidence.singlePairSensitivity.testedRemovals} matched pairs in turn gives ρ between ${spearmanLabel(item.evidence.singlePairSensitivity.minRho)} and ${spearmanLabel(item.evidence.singlePairSensitivity.maxRho)}. ${item.evidence.singlePairSensitivity.directionSensitive
+                          ? 'At least one single-pair deletion changes the descriptive direction or crosses the neutral boundary.'
+                          : 'No single-pair deletion changes the descriptive direction category.'}`
+                        : 'unavailable: there may be too few pairs, an undefined coefficient after deletion, or unverified source evidence.'}
+                      {' '}This is an influence check, not a confidence interval, significance test, proof of independent observations, or causal evidence.
+                    </p>
+                    <p className="mt-1">
                       Direction comparison: {relationshipContrastText(
                         item.evidence.rho, item.evidence.changeSensitivity,
                       )}.

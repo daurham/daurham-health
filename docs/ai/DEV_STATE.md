@@ -460,3 +460,8 @@ A matching exact Health-date snapshot and valid observation window are now prere
 ## 2026-10-15 PIQ-1.6 relationship frame calendar coherence — work branch
 
 Goal Control now requires the loaded 30-day source frame to agree with its declared day count and have exact, ordered contiguous calendar rows, not merely matching cited pairs. A corrupted source window withholds present-tense observational rho and paired-date diagnostics but leaves historical source links available. Added synthetic/SSR regressions. CI, owner device QA, source-event revision atomicity and the separately gated migration 0054 remain open.
+
+
+## 2026-10-15 PIQ-1.6 leave-one-pair-out evidence disclosure — work branch
+
+Added descriptive matched-pair deletion sensitivity to Goal Overview's verified observational relationships, with direction-category changes and an unknown result when deletion makes rho undefined. Synthetic and SSR tests protect source-gating and meaning. No schema migration, provider call, owner-data write, merge or deployment. Full CI and owner acceptance tracked in `PIQ_PROGRESS.md`.

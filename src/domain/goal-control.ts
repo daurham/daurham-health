@@ -100,6 +100,14 @@ export type GoalControlRelationship = {
     dateClustering: { distinctDates: number; contiguousRuns: number; longestRunDays: number } | null
     /** Descriptive first-difference Spearman on consecutive, verified matched dates only. */
     changeSensitivity: { adjacentTransitions: number; rho: number | null } | null
+    /** Descriptive leave-one-pair-out sensitivity, not a confidence interval or p-value. */
+    singlePairSensitivity: {
+      testedRemovals: number
+      minRho: number | null
+      maxRho: number | null
+      /** Null when removal makes any coefficient undefined. */
+      directionSensitive: boolean | null
+    } | null
     /** Selection accounting, not a family-wise error rate or statistical correction. */
     screening: {
       evaluatedPairs: number
@@ -440,6 +448,51 @@ export function relationshipSnapshotContextIsCurrent(
   return expectedDate === addCalendarDays(snapshot.period.end, 1)
 }
 
+/** Recompute a verified matched-pair rank coefficient after omitting each
+ * one recorded pair. This is a descriptive influence check, not an inferential
+ * confidence interval: serial dependence, selection and confounding remain.
+ * Use the same 0.05 descriptive "neutral" boundary as the source labels.
+ */
+export function relationshipSinglePairDeletionSensitivity(
+  frame: readonly HealthIntelligenceSnapshot['frame'][number][],
+  relation: Pick<HealthIntelligenceSnapshot['relationships'][number],
+    'xKey' | 'yKey' | 'evidenceDates' | 'rho'>,
+): {
+  testedRemovals: number
+  minRho: number | null
+  maxRho: number | null
+  directionSensitive: boolean | null
+} | null {
+  const count = relation.evidenceDates.length
+  if (count < 10 || count > 31 || relation.rho == null ||
+      !Number.isFinite(relation.rho) || Math.abs(relation.rho) > 1 ||
+      !relationshipPairsBackedByFrame(frame, relation)) return null
+
+  const byDate = new Map(frame.map((day) => [day.date, day]))
+  const xs = relation.evidenceDates.map(({ xDate }) => byDate.get(xDate)!.signals[relation.xKey]!.value)
+  const ys = relation.evidenceDates.map(({ yDate }) => byDate.get(yDate)!.signals[relation.yKey]!.value)
+  const direction = (rho: number) => Math.abs(rho) < 0.05 ? 'neutral' : rho > 0 ? 'positive' : 'negative'
+  const originalDirection = direction(relation.rho)
+  const results: number[] = []
+  for (let omitted = 0; omitted < count; omitted += 1) {
+    const xRemaining = xs.filter((_, index) => index !== omitted)
+    const yRemaining = ys.filter((_, index) => index !== omitted)
+    const rho = spearmanRho(xRemaining, yRemaining)
+    // A constant series following deletion makes even descriptive stability
+    // unassessable. Never represent such a case as "no direction change".
+    if (rho == null || !Number.isFinite(rho) || Math.abs(rho) > 1) {
+      return { testedRemovals: count, minRho: null, maxRho: null, directionSensitive: null }
+    }
+    results.push(rho)
+  }
+  return {
+    testedRemovals: count,
+    minRho: Math.min(...results),
+    maxRho: Math.max(...results),
+    directionSensitive: results.some((rho) => direction(rho) !== originalDirection),
+  }
+}
+
 /** A plausible pair date is not proof of a measured X/Y pair. Only expose
  * exact matched-date diagnostics when both source observations really exist
  * in the already-loaded frame. Never substitute a missing reading with zero.
@@ -659,6 +712,7 @@ function relationshipsFor(
           rho: coefficientVerified ? item.rho : null,
           dateClustering: pairCoverage ? relationshipDateClustering(item.evidenceDates) : null,
           changeSensitivity: pairCoverage ? relationshipDayToDaySensitivity(snapshot.frame, item) : null,
+          singlePairSensitivity: pairCoverage ? relationshipSinglePairDeletionSensitivity(snapshot.frame, item) : null,
           screening,
           strength: coefficientVerified ? item.strength : null,
           sources,
