@@ -5,6 +5,7 @@ import { ASK_HEALTH_PACKET_VERSION, ASK_PACKET_MAX_CHARS, type AskLens } from '.
 import { MIN_VERIFIED_NUTRITION_TARGET_DAYS } from './nutrition-integrity.js'
 import { digestiveQuestionTopics } from './focused-digestive.js'
 import type { FocusedWeightEnergyEvidence } from './focused-weight-energy.js'
+import type { HistoricalWeightEnergyDay } from './focused-weight-energy-history.js'
 import { deriveDigestiveSampleScreen } from './digestive-screen.js'
 import { digestivePacketGuard, guardedDigestiveIntelligence, type DigestivePacketGuard } from './digestive-packet-guard.js'
 import type {
@@ -76,6 +77,7 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
   addFocusedTraining(input, push)
   addFocusedDigestive(input, push, digestiveGuard)
   addFocusedWeightEnergy(input.focusedWeightEnergy ?? null, input.contextMode, push)
+  addHistoricalWeightEnergyDay(input.focusedWeightEnergyDay ?? null, input.contextMode, push)
   if (wants.supplements || questionMentionsSavedSupplement(input)) {
     addSupplements(input, push)
   }
@@ -345,6 +347,57 @@ function addBody(
  * safety and calibration outcomes have NOT been attested by this data path.
  * Always keep evidence quality distinct from a recommendation.
  */
+/**
+ * The named day is the ONLY allowed evidence interval; do not substitute
+ * later samples or an unrelated trailing maintenance estimate.
+ */
+function addHistoricalWeightEnergyDay(
+  day: HistoricalWeightEnergyDay | null,
+  mode: AskHealthPacketInput['contextMode'],
+  push: (item: PushItem) => void,
+): void {
+  if (!day || mode === 'general_only') return
+  const period={start:day.date,end:day.date}
+  push({
+    id:'weight_energy.historical_day.coverage',
+    domain:'body',label:'Requested historical weight and intake day',
+    value:null,unit:null,period,
+    text:day.scope==='out_of_range'
+      ? 'Requested '+day.date+' is outside the selected evidence window or as-of date. No more recent weight or calorie estimate was substituted; select an appropriate history range.'
+      :day.scope==='provisional_today'
+        ? 'Requested '+day.date+' is the current Health day and cannot be treated as a completed historical day.'
+        :'On '+day.date+', saved weight and verified completed-day food intake are checked independently. Missing or unverified observations are UNKNOWN, not zero. A single date cannot establish a trend, energy deficit, fat-loss result or calorie target.',
+    coverage:{requestedDate:day.date,requestedDateScope:day.scope,
+      savedWeight:day.weightKg!=null,verifiedCompleteCalories:day.verifiedCaloriesKcal!=null},
+    detailPath:'/progress/body',userEntered:false,substantive:false,priority:0,
+  })
+  if(day.scope!=='in_range')return
+  if(day.weightKg!=null)push({
+    id:'weight_energy.historical_day.weight',domain:'body',
+    label:'Saved scale-weight observation on requested date',
+    value:day.weightKg,unit:'kg',period,
+    text:'On '+day.date+', a saved scale-weight observation is '+day.weightKg+
+      ' kg. '+(day.weightConditions==='usual'
+        ?'Weigh-in conditions were recorded as usual.'
+        :day.weightConditions==='different_conditions'
+          ?'Weigh-in conditions differed; comparison with other days is limited.'
+          :'Weigh-in-condition comparability is unknown.')+
+      ' This isolated observation does not establish fat gain, fat loss or a weight plateau.',
+    coverage:{weightConditions:day.weightConditions},
+    detailPath:'/progress/body',userEntered:false,substantive:true,priority:1,
+  })
+  if(day.verifiedCaloriesKcal!=null)push({
+    id:'weight_energy.historical_day.calories',domain:'nutrition',
+    label:'Verified completed-day recorded calories on requested date',
+    value:day.verifiedCaloriesKcal,unit:'kcal',period,
+    text:'On '+day.date+', the owner-verified, source-reliable completed food log records '+
+      day.verifiedCaloriesKcal+' kcal. Recorded intake is NOT measured energy expenditure, '+
+      'a proven physiological deficit, fat loss or a reason to lower a calorie target.',
+    coverage:{dayCompleteness:'verified_complete'},
+    detailPath:'/nutrition',userEntered:false,substantive:true,priority:1,
+  })
+}
+
 function addFocusedWeightEnergy(
   focus: FocusedWeightEnergyEvidence | null,
   contextMode: AskHealthPacketInput['contextMode'],

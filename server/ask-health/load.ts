@@ -26,6 +26,7 @@ import { bowelSnapshotEventIds, selectDigestiveBowelWindow, summarizeBowelWindow
 import { screenDigestiveLagReadiness } from '../../src/domain/ask-health/digestive-pairing.js'
 import { recheckDigestivePairingSources } from './digestive-consistency.js'
 import { focusWeightEnergyContext } from '../../src/domain/ask-health/focused-weight-energy.js'
+import { focusHistoricalWeightEnergyDay } from '../../src/domain/ask-health/focused-weight-energy-history.js'
 import type { AskContextMode } from '../../src/domain/ask-health/config.js'
 
 export async function loadAskHealthPacketInput(input: {
@@ -180,6 +181,8 @@ export async function loadAskHealthPacketInput(input: {
     benchmarks,
     supplements,
     focusedDigestive,
+    focusedWeightEnergyDay: input.contextMode !== 'general_only'
+      ? focusHistoricalWeightEnergyDay({question:input.question,snapshot:intelligenceSnapshot,today}) : null,
     focusedWeightEnergy: input.contextMode !== 'general_only'
       ? focusWeightEnergyContext({
           question: input.question,
