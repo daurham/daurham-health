@@ -420,13 +420,12 @@ function addFocusedWeightEnergy(
         'Missing or unverified food days and unrecorded circumstances are unknown, not normal or zero.',
     coverage:{
       verifiedNutrientShiftCount:contextual.length,
-      screenedNutrients:['sodium','carbohydrate'],
+      screenedNutrients:'sodium, carbohydrate',
       status:contextual.length > 0 ? 'qualified_logging_context' : 'no_qualified_comparison',
       recentWindowDays:3,
       baselineWindowDays:7,
-      observations:contextual.map(item => ({
-        sourceKey:item.kind,observedDateCount:item.dates.length,
-      })),
+      sodiumQualifiedRecentDates:contextual.find(item => item.kind === 'sodium')?.dates.length ?? 0,
+      carbohydrateQualifiedRecentDates:contextual.find(item => item.kind === 'carbohydrate')?.dates.length ?? 0,
     },
     detailPath:'/nutrition',userEntered:false,substantive:false,priority:1,
   })
