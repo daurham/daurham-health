@@ -7,7 +7,7 @@ import {
   type HealthProfile,
 } from '@/domain/health-profile'
 import { primaryButtonClass, quietButtonClass, useHealthCalendarDate } from '@/lib'
-import { fetchHealthProfile, saveHealthProfile } from './api'
+import { fetchHealthProfile, saveHealthProfile, HealthProfileConflictError } from './api'
 import { MAX_OWNER_NOTE_DRAFT, mergeReviewedOwnerNote } from '@/domain/ask-health/owner-note-review'
 
 type Condition = HealthProfile['clinicalConditions'][number]
@@ -75,7 +75,7 @@ export function HealthProfileSection({ ownerNoteDraft = null }: { ownerNoteDraft
   const [reviewNote, setReviewNote] = useState(ownerNoteDraft ?? '')
   const [reviewConfirmed, setReviewConfirmed] = useState(false)
   const [reviewError, setReviewError] = useState<string | null>(null)
-  const [stagedOwnerNote, setStagedOwnerNote] = useState(false)
+  const [staleProfile, setStaleProfile] = useState(false)
 
   useEffect(() => {
     setReviewNote(ownerNoteDraft ?? '')
@@ -91,7 +91,6 @@ export function HealthProfileSection({ ownerNoteDraft = null }: { ownerNoteDraft
       return
     }
     setPersistentHealthContext(result.text)
-    setStagedOwnerNote(true)
     setReviewNote('')
     setReviewConfirmed(false)
     setReviewError(null)
@@ -133,6 +132,7 @@ export function HealthProfileSection({ ownerNoteDraft = null }: { ownerNoteDraft
   async function save() {
     setBusy(true)
     setError(null)
+    setStaleProfile(false)
     try {
       const feetValue = feet.trim() === '' ? null : Number(feet)
       const inchesValue = inches.trim() === '' ? null : Number(inches)
@@ -146,13 +146,7 @@ export function HealthProfileSection({ ownerNoteDraft = null }: { ownerNoteDraft
         feetValue == null && inchesValue == null
           ? null
           : (feetValue ?? 0) * 12 + (inchesValue ?? 0)
-      if (stagedOwnerNote) {
-        // Best-effort stale-draft check; transactional CAS is still needed.
-        const latestProfile = await fetchHealthProfile()
-        if (latestProfile.updatedAt !== profile?.updatedAt) {
-          throw new Error('Profile changed in another session. Reload and review your note again before saving.')
-        }
-      }
+      if (!profile) throw new Error('Load Health Profile before saving.')
       const next = await saveHealthProfile({
         dateOfBirth: dateOfBirth || null,
         sexForPhysiology,
@@ -179,12 +173,12 @@ export function HealthProfileSection({ ownerNoteDraft = null }: { ownerNoteDraft
             dose: item.dose?.trim() || null,
             frequency: item.frequency?.trim() || null,
           })),
-      })
+      }, profile.updatedAt)
       setProfile(healthProfileSchema.parse(next))
       loadDraft(next)
       setEditing(false)
-      setStagedOwnerNote(false)
     } catch (caught) {
+      setStaleProfile(caught instanceof HealthProfileConflictError)
       setError(caught instanceof Error ? caught.message : 'Could not save Health Profile')
     } finally {
       setBusy(false)
@@ -210,7 +204,33 @@ export function HealthProfileSection({ ownerNoteDraft = null }: { ownerNoteDraft
         ) : null}
       </div>
 
-      {error ? <p role="alert" className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</p> : null}
+      {error ? (
+        <div role="alert" className="space-y-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+          <p>{error}</p>
+          {staleProfile ? (
+            <button type="button" className={quietButtonClass} disabled={busy}
+              onClick={() => {
+                void (async () => {
+                  setBusy(true)
+                  try {
+                    const fresh = await fetchHealthProfile()
+                    setProfile(fresh)
+                    loadDraft(fresh)
+                    setStaleProfile(false)
+                    setError(null)
+                    setEditing(false)
+                  } catch (caught) {
+                    setError(caught instanceof Error ? caught.message : 'Could not reload saved profile')
+                  } finally {
+                    setBusy(false)
+                  }
+                })()
+              }}>
+              Reload saved profile (discard unsaved edits)
+            </button>
+          ) : null}
+        </div>
+      ) : null}
 
       {reviewNote ? (
         <div className="space-y-3 rounded-lg border border-zinc-300 bg-zinc-50 p-3" aria-label="Review owner Health Profile note">
@@ -489,8 +509,8 @@ export function HealthProfileSection({ ownerNoteDraft = null }: { ownerNoteDraft
               onClick={() => {
                 if (profile) loadDraft(profile)
                 setEditing(false)
-                setStagedOwnerNote(false)
                 setError(null)
+                setStaleProfile(false)
               }}
             >
               Cancel
