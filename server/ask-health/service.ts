@@ -106,7 +106,7 @@ export async function answerAskHealth(input: {
       await loadAskHealthPacketInput({
         // Deep Dive chooses the broadest existing evidence lens, regardless
         // of tab. It remains range- and packet-size bounded.
-        lens: contextMode === 'deep' ? 'general' : input.lens,
+        lens: contextMode === 'deep' || (contextMode === 'personalized' && route.route === 'general') ? 'general' : input.lens,
         range: input.range,
         asOf: input.asOf,
         question: input.question,
