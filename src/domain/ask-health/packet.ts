@@ -1547,6 +1547,8 @@ function addSharedIntelligence(
         coverage: {
           pairedObservations: relationship.sampleSize,
           requiredObservations: relationship.requiredSampleSize,
+          pairedDateCount: relationship.evidenceDates.length,
+          selectedCalendarDays: intelligence.period.dayCount,
           xKey: relationship.xKey,
           yKey: relationship.yKey,
           lagDays: relationship.lagDays,
@@ -1569,6 +1571,8 @@ function addSharedIntelligence(
         coverage: {
           pairedObservations: relationship.sampleSize,
           requiredObservations: relationship.requiredSampleSize,
+          pairedDateCount: relationship.evidenceDates.length,
+          selectedCalendarDays: intelligence.period.dayCount,
           xKey: relationship.xKey,
           yKey: relationship.yKey,
           lagDays: relationship.lagDays,
