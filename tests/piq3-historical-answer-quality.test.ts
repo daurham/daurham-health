@@ -16,7 +16,7 @@ const coverage = {
   requestedWindowScope: 'in_range', observedDaysInWindow: 2,
 }
 const evidence = (
-  id: string, domain: string, recordedWindowSum: number, unit: string,
+  id: string, domain: string, recordedWindowSum: number,
 ): AskEvidence => ({
   id, domain, label: domain + ' recorded window coverage', value: 2, unit: 'logged days',
   text: 'Only recorded events or verified days in the window; missing days remain unknown.',
@@ -24,11 +24,11 @@ const evidence = (
   detailPath: '/today', userEntered: false, substantive: true,
   provenance: 'owner_recorded', evidenceDates: undefined,
 })
-const water = evidence('digestive.focus.coverage.hydration', 'hydration', 1800, 'ml')
-const fiber = evidence('digestive.focus.coverage.fiber', 'nutrition', 46, 'g')
-const bowel = evidence('digestive.focus.coverage.bowel', 'bowel', 3, 'movements')
-const sameDateProtein = evidence('nutrition.protein', 'nutrition', 46, 'g')
-const unrelated = evidence('training.focus.coverage.bench', 'training', 7, 'sessions')
+const water = evidence('digestive.focus.coverage.hydration', 'hydration', 1800)
+const fiber = evidence('digestive.focus.coverage.fiber', 'nutrition', 46)
+const bowel = evidence('digestive.focus.coverage.bowel', 'bowel', 3)
+const sameDateProtein = evidence('nutrition.protein', 'nutrition', 46)
+const unrelated = evidence('training.focus.coverage.bench', 'training', 7)
 const sources = [water, fiber, bowel, unrelated]
 const pkt = (items = sources): AskHealthPacket => ({
   packetVersion: 'ask-health-evidence-v2', lens: 'general', range: '90d',
