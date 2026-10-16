@@ -111,6 +111,7 @@ export async function answerAskHealth(input: {
         asOf: input.asOf,
         question: input.question,
         generatedAt: input.generatedAt ?? new Date().toISOString(),
+        contextMode,
       }),
     )
   } catch (error) {
@@ -164,6 +165,9 @@ export async function explainAskHealth(input: {
     ...input, packet: blankGeneralAskPacket(input.packet), conversation: [],
   } : input
   const now = work.now ?? Date.now()
+  const personalPrompt = contextMode === 'deep'
+    ? ASK_HEALTH_SYSTEM_PROMPT + '\nDeep Dive requested: synthesize relevant evidence across supplied domains, distinguish missing observations, and NEVER claim to have reviewed the full database or records omitted by the packet limit.'
+    : ASK_HEALTH_SYSTEM_PROMPT
   if (work.packet.clarification) {
     const refs = work.packet.evidence.filter((item) => item.id.startsWith('training.exercise.')).map((item) => item.id)
     return responseFor(input, {
@@ -220,7 +224,7 @@ export async function explainAskHealth(input: {
   let generated: Awaited<ReturnType<AskHealthProvider>>
   try {
     generated = await work.provider({
-      system: general ? GENERAL_ASK_SYSTEM_PROMPT : ASK_HEALTH_SYSTEM_PROMPT,
+      system: general ? GENERAL_ASK_SYSTEM_PROMPT : personalPrompt,
       user: general ? generalAskUserPrompt(work.question) : askHealthUserPrompt({ packet: work.packet, question: work.question, conversation: work.conversation }),
       model: work.model,
       evidenceIds: work.packet.evidence.map((item) => item.id),
@@ -239,7 +243,7 @@ export async function explainAskHealth(input: {
     console.warn(`ask-health retry stage=validation reason=${validated.error} model=${generated.model}`)
     try {
       const repaired = await work.provider({
-        system: `${general ? GENERAL_ASK_SYSTEM_PROMPT : ASK_HEALTH_SYSTEM_PROMPT}\nThe previous attempt did not validate. Regenerate valid JSON. Never invent private records, sources, or evidence ids.`,
+        system: `${general ? GENERAL_ASK_SYSTEM_PROMPT : personalPrompt}\nThe previous attempt did not validate. Regenerate valid JSON. Never invent private records, sources, or evidence ids.`,
         user: general ? generalAskUserPrompt(work.question) : askHealthUserPrompt({ packet: work.packet, question: work.question, conversation: work.conversation }),
         model: work.model,
         evidenceIds: work.packet.evidence.map((item) => item.id),

@@ -22,6 +22,7 @@ import { loadHealthIntelligenceSnapshot } from '../intelligence/snapshot.js'
 import { getHealthProfile } from '../profile/service.js'
 import { focusTrainingWorkingSets } from '../../src/domain/ask-health/focused-training.js'
 import { focusDigestiveContext } from '../../src/domain/ask-health/focused-digestive.js'
+import type { AskContextMode } from '../../src/domain/ask-health/config.js'
 
 export async function loadAskHealthPacketInput(input: {
   lens: AskHealthPacketInput['lens']
@@ -29,6 +30,7 @@ export async function loadAskHealthPacketInput(input: {
   asOf: string
   question: string
   generatedAt: string
+  contextMode?: AskContextMode
 }): Promise<AskHealthPacketInput> {
   const { date: today, timezone } = await healthTimeContext()
   const rows = await loadProgressCanonicalRows()
@@ -65,6 +67,7 @@ export async function loadAskHealthPacketInput(input: {
   const intelligence = routeHealthIntelligence(intelligenceSnapshot, {
     question: input.question,
     lens: input.lens,
+    wide: input.contextMode === 'deep',
   })
   const patterns: AskHealthPacketInput['patterns'] = []
   return {

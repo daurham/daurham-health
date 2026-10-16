@@ -604,9 +604,9 @@ function lensDefaults(lens: string): IntelligenceSignalKey[] {
 
 export function routeHealthIntelligence(
   snapshot: HealthIntelligenceSnapshot,
-  input: { question: string; lens: string },
+  input: { question: string; lens: string; wide?: boolean },
 ): RoutedHealthIntelligence {
-  const keys = new Set<IntelligenceSignalKey>()
+  const keys = new Set<IntelligenceSignalKey>(input.wide ? INTELLIGENCE_SIGNAL_KEYS : [])
   for (const group of TERM_GROUPS) {
     if (group.pattern.test(input.question)) group.keys.forEach((key) => keys.add(key))
   }
