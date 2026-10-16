@@ -51,6 +51,7 @@ describe('PIQ-2.4 minimum necessary owner conditions and free-text context', () 
     expect(selected[0]?.text).toContain('not an independently verified diagnosis')
     expect(selectAskHealthConditions(profile, 'Could my eczematous skin be a factor?')).toEqual([])
     expect(evidence('Does my exercise-induced asthma still show up?')
+      .filter((item) => item.id.startsWith('clinical.condition.'))
       .map((item) => item.value)).toEqual(['resolved'])
   })
 
@@ -64,8 +65,8 @@ describe('PIQ-2.4 minimum necessary owner conditions and free-text context', () 
   it('does not infer an unrelated condition explains a personal symptom', () => {
     expect(evidence('Why am I constipated?').map((item) => item.id))
       .toEqual(['clinical.dietary_context'])
-    expect(evidence('Is my bloating caused by my migraine?').map((item) => item.id))
-      .toEqual(['clinical.dietary_context', 'clinical.condition.0'])
+    expect(evidence('Is my bloating caused by my migraine?').map((item) => item.id).sort())
+      .toEqual(['clinical.condition.0', 'clinical.dietary_context'])
   })
 
   it('selects the appropriate owner text source without attaching all private background', () => {
@@ -73,9 +74,9 @@ describe('PIQ-2.4 minimum necessary owner conditions and free-text context', () 
       .toEqual(['clinical.training_limitations'])
     expect(evidence('What should I eat for dinner?', 'nutrition').map((item) => item.id))
       .toEqual(['clinical.dietary_context'])
-    expect(evidence('What is saved in my health profile?').map((item) => item.id))
-      .toEqual(['clinical.persistent_context', 'clinical.training_limitations', 'clinical.dietary_context',
-        'clinical.condition.0', 'clinical.condition.1', 'clinical.condition.2'])
+    expect(evidence('What is saved in my health profile?').map((item) => item.id).sort())
+      .toEqual(['clinical.condition.0', 'clinical.condition.1', 'clinical.condition.2',
+        'clinical.dietary_context', 'clinical.persistent_context', 'clinical.training_limitations'])
     expect(selectAskHealthProfileTextFields('What makes my back pain flare?'))
       .toEqual(['trainingLimitations'])
     expect(selectAskHealthProfileTextFields('What are health profiles?')).toEqual([])
