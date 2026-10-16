@@ -45,6 +45,7 @@ const windowCoverage: AskEvidence = {
 const aDay: AskEvidence = {
   ...todayEvidence, id: 'digestive.focus.hydration.2026-10-06',
   domain: 'hydration', value: 800, unit: 'ml',
+  period: { start: prior, end: prior }, evidenceDates: [prior],
 }
 const unobservedWindow: AskEvidence = {
   ...windowCoverage, id: 'digestive.focus.coverage.empty',
