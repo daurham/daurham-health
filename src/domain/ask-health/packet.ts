@@ -3,6 +3,7 @@ import { formatWeekdayMask } from '../supplements/weekday.js'
 import type { OccurrenceState } from '../supplements/types.js'
 import { ASK_HEALTH_PACKET_VERSION, ASK_PACKET_MAX_CHARS, type AskLens } from './config.js'
 import { MIN_VERIFIED_NUTRITION_TARGET_DAYS } from './nutrition-integrity.js'
+import { digestiveQuestionTopics } from './focused-digestive.js'
 import type {
   AskClinicalProfileInput,
   AskStableProfileInput,
@@ -714,14 +715,11 @@ function addFocusedDigestive(input: AskHealthPacketInput, push: (item: PushItem)
     { key: 'bowel', metric: focus.bowel, unit: 'movements', path: '/today' },
   ] as const
 
-  const bowelRelated = /\b(?:constipat\w*|bowels?|stools?|bristol)\b/i.test(input.question)
-  const fiberRelated = /\bfib(?:er|re)\b/i.test(input.question)
-  const hydrationRelated = /\b(?:hydrat\w*|water|fluid intake)\b/i.test(input.question)
+  const topics = digestiveQuestionTopics(input.question)
   for (const { key, metric, unit, path } of metrics) {
     // Default Personal/Smart is minimum-necessary context; Deep Dive
     // deliberately includes all bounded cross-domain signals on opt-in.
-    if (input.contextMode !== 'deep' && !bowelRelated &&
-        !(key === 'fiber' && fiberRelated) && !(key === 'hydration' && hydrationRelated)) continue
+    if (input.contextMode !== 'deep' && !topics[key]) continue
     const isFiber = key === 'fiber'
     const text = isFiber
       ? metric.verificationStatus !== 'available'
@@ -761,7 +759,14 @@ function addFocusedDigestive(input: AskHealthPacketInput, push: (item: PushItem)
           ? day.date + ': ' + day.value + ' ml water explicitly logged' +
             (day.provisional ? ' (today provisional)' : '') + '; actual total fluids may be higher.'
           : day.date + ': ' + day.value + (day.value === 0 ? ' explicitly reported no bowel movement' : ' bowel movement(s) recorded') +
-            (day.provisional ? ' (today provisional)' : '') + '; frequency alone does not establish a cause.'
+            (day.provisional ? ' (today provisional)' : '') +
+            (day.value > 0 && day.bristolTypes !== undefined
+              ? '; owner-recorded Bristol stool types: ' +
+                (day.bristolTypes.length > 0 ? day.bristolTypes.join(', ') : 'unavailable') +
+                ' (' + day.bristolTypes.length + ' of ' + day.sourceIds.length +
+                ' selected event records; unlisted types are unknown)'
+              : '') +
+            '; frequency and stool type alone do not establish a cause or diagnosis.'
       push({
         id: 'digestive.focus.' + key + '.' + day.date,
         domain: isFiber ? 'nutrition' : key,
