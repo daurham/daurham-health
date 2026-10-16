@@ -39,6 +39,8 @@ Use 375–390 px Safari first; check a narrower 320 px viewport and a wider 430 
 | A9 | With unconfirmed nutrition days, inspect Goal Control and Weekly Coach | No unsupported calorie cut, no automatic numerical target change, source uncertainty clearly labeled |
 | A10 | Navigate away and back during editing; check phone scrolling, focus, and buttons | No silent draft clobber, wrong Health date or inaccessible controls |
 
+For PIQ-3, use the [controlled 13-case context/privacy/citation/cost question matrix](./PIQ3_OWNER_QUESTION_ACCEPTANCE.md) only **after** the identity and isolation gates above are satisfied. It is a prepared runbook, not proof that owner QA ran. Record redacted case IDs/status and human rubric scores only; do not put raw clinical prompts, logs or replies in GitHub.
+
 ## Owner answer-quality acceptance
 
 After a safe target and identity are verified, the owner selects a small number of **genuine** questions, privately checks the supporting evidence and scores whether answers are direct, useful, cautious about causation and time, and free of invented claims. Avoid pasting medical records, production connection details or raw personal logs into GitHub issues. Only issue explicit permission for a limited Gemini test batch if needed; there is no automated paid-model acceptance run.
