@@ -920,6 +920,76 @@ function addFocusedDigestive(input: AskHealthPacketInput, push: (item: PushItem)
       })
     }
   }
+  // Whole-window stool-type summary is independently reconciled to the saved
+  // bowel-event count for every recorded day. It never represents full-day
+  // stool completeness or a bowel/fiber/hydration correlation.
+  if ((topics.bowel || input.contextMode === 'deep') && input.contextMode !== 'general_only' &&
+      focus.bowelWindow) {
+    const full = focus.bowelWindow
+    if (full.status === 'available') {
+      push({
+        id: 'digestive.window.bristol',
+        domain: 'bowel',
+        label: 'Recorded Bristol pattern in bounded date window',
+        value: full.hardTypedEvents,
+        unit: 'recorded hard Bristol 1–2 events',
+        period: { start: full.scope.start, end: full.scope.end },
+        text: 'For ' + full.scope.start + ' through ' + full.scope.end + ' (' +
+          full.scope.calendarDays + ' calendar days): bowel activity explicitly logged on ' +
+          full.observedDays + ' day(s); ' + full.movementEvents + ' saved bowel movement event(s),' +
+          ' including ' + full.typedEvents + ' with a valid Bristol stool type.' +
+          ' Of those typed events, ' + full.hardTypedEvents + ' were Bristol 1–2 (hard-stool range); ' +
+          full.untypedEvents + ' movement event(s) lacked an eligible type.' +
+          ' There were ' + full.explicitNoMovementDays + ' separately recorded no-movement day(s); ' +
+          full.unobservedDays + ' calendar day(s) had no bowel observation and are UNKNOWN, not zero.' +
+          (full.provisionalDays ? ' Today is provisional; it is not a complete observation day.' : '') +
+          ' This describes only recorded events, not all bowel movements; no diagnosis or personal water/fiber correlation can be inferred.' +
+          ' Logged water does not establish total fluid consumption.',
+        coverage: {
+          observedDaysInWindow: full.observedDays,
+          calendarDays: full.scope.calendarDays,
+          recordedMovements: full.movementEvents,
+          typedEvents: full.typedEvents,
+          hardTypedEvents: full.hardTypedEvents,
+          untypedEvents: full.untypedEvents,
+          explicitNoMovementDays: full.explicitNoMovementDays,
+          unobservedDays: full.unobservedDays,
+          provisionalDays: full.provisionalDays,
+          ...(focus.requestedDate ? {
+            requestedDate: focus.requestedDate.date,
+            requestedDateScope: 'in_range',
+            selectedDays: full.observedDays,
+          } : {}),
+          ...(focus.requestedWindow ? {
+            requestedWindowStart: full.scope.start,
+            requestedWindowEnd: full.scope.end,
+            requestedWindowScope: 'in_range',
+          } : {}),
+        },
+        detailPath: '/today',
+        evidenceDates: full.observedDates,
+        provenance: 'canonical_bowel_events_reconciled',
+        userEntered: false,
+        substantive: full.observedDays > 0,
+        priority: 1,
+      })
+    } else {
+      push({
+        id: 'digestive.window.unavailable',
+        domain: 'bowel',
+        label: 'Bristol window verification unavailable',
+        value: null, unit: null,
+        period: { start: full.scope.start, end: full.scope.end },
+        text: full.reason === 'range_too_large'
+          ? 'Requested stool-history window spans ' + full.scope.calendarDays +
+            ' days, exceeding the maximum 90-day audited window. Select a shorter range; no silently clipped totals were calculated.'
+          : 'Full-window Bristol summary withheld: the saved event counts could not be reconciled or safely read. Partial values must not be used as complete history.',
+        coverage: { calendarDays: full.scope.calendarDays },
+        detailPath: '/today', userEntered: false, substantive: false, priority: 1,
+      })
+    }
+  }
+
 }
 
 function addTraining(input: AskHealthPacketInput, push: (item: PushItem) => void, detail: boolean) {

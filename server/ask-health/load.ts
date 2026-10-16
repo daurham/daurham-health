@@ -22,6 +22,7 @@ import { loadHealthIntelligenceSnapshot } from '../intelligence/snapshot.js'
 import { getHealthProfile } from '../profile/service.js'
 import { focusTrainingWorkingSets } from '../../src/domain/ask-health/focused-training.js'
 import { attachBristolTypes, digestiveQuestionTopics, focusDigestiveContext } from '../../src/domain/ask-health/focused-digestive.js'
+import { selectDigestiveBowelWindow, summarizeBowelWindow, type DigestiveBowelWindow } from '../../src/domain/ask-health/digestive-window.js'
 import type { AskContextMode } from '../../src/domain/ask-health/config.js'
 
 export async function loadAskHealthPacketInput(input: {
@@ -90,6 +91,47 @@ export async function loadAskHealthPacketInput(input: {
     focusedDigestive = attachBristolTypes(digestive, rows.map((row) => ({
       id: String(row.id), date: String(row.date), bristolType: Number(row.bristol_type),
     })))
+  }
+  // PIQ-4.1: aggregate only dated counts, not raw bowel notes, identities,
+  // or event timestamps. Do not load for unrelated/personal-data-free prompts.
+  // Entire selected/requested scope must fit the cap: no silent partial window.
+  const selectedBowelWindow = digestive &&
+    (topics.bowel || input.contextMode === 'deep') && input.contextMode !== 'general_only'
+    ? selectDigestiveBowelWindow(digestive, today) : null
+  if (selectedBowelWindow && focusedDigestive) {
+    let bowelWindow: DigestiveBowelWindow
+    if (selectedBowelWindow.status === 'range_too_large') {
+      bowelWindow = {
+        status: 'unavailable', reason: 'range_too_large', scope: selectedBowelWindow.scope,
+      }
+    } else {
+      try {
+        const sql = await getSql()
+        const dailyRows = (await sql.query(
+          `SELECT bowel_date::text AS date,
+             count(*)::int AS event_count,
+             count(*) FILTER (WHERE bristol_type BETWEEN 1 AND 7)::int AS typed_count,
+             count(*) FILTER (WHERE bristol_type IN (1,2))::int AS hard_count
+           FROM bowel_events
+           WHERE bowel_date >= $1::date AND bowel_date <= $2::date
+           GROUP BY bowel_date ORDER BY bowel_date`,
+          [selectedBowelWindow.scope.start, selectedBowelWindow.scope.end],
+        )) as Array<Record<string, unknown>>
+        bowelWindow = summarizeBowelWindow(intelligenceSnapshot, selectedBowelWindow.scope,
+          dailyRows.map(row => ({
+            date: String(row.date),
+            eventCount: Number(row.event_count),
+            typedCount: Number(row.typed_count),
+            hardCount: Number(row.hard_count),
+          })), today)
+      } catch {
+        // Do not invent a partial trend or expose SQL/error text to Health AI.
+        bowelWindow = {
+          status: 'unavailable', reason: 'source_unavailable', scope: selectedBowelWindow.scope,
+        }
+      }
+    }
+    focusedDigestive = { ...focusedDigestive, bowelWindow }
   }
   return {
     lens: input.lens,
