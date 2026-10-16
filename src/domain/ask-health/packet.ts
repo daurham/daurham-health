@@ -397,7 +397,7 @@ function addHistoricalWeightEnergyWindow(
       verifiedCompleteCalorieDays:window.verifiedCalorieDays,
       savedWeightDays:window.recordedWeightDays,
       comparableWeightDays:window.comparableWeightDays,
-      provisionalTodayExcluded:window.provisionalTodayExcluded},
+      provisionalTodayExcluded:window.provisionalTodayExcluded ? 'yes' : 'no'},
     detailPath:'/progress/body',userEntered:false,substantive:false,priority:0,
   })
   if(!usable)return

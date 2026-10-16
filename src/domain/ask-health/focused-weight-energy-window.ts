@@ -27,7 +27,7 @@ export type HistoricalWeightEnergyWindow = {
   boundaryCoverage: 'both_endpoints_covered' | 'incomplete_or_incomparable'
 }
 
-const SUBJECT = /\b(?:weight|weigh\w*|scale|calor\w*|deficit|maintenance|metaboli\w*|plateau\w*|fat[ -]?loss|losing fat|intake)\b/i
+const SUBJECT = /\b(?:weight|weigh\w*|scale|calor\w*|deficit|maintenance|metaboli\w*|plateau\w*|fat[ -]?loss|losing fat|intake|eat|eaten|consum\w*)\b/i
 
 function dateDiff(a: string, b: string): number {
   return Math.round((Date.parse(b + 'T00:00:00Z') - Date.parse(a + 'T00:00:00Z')) / 86_400_000)
