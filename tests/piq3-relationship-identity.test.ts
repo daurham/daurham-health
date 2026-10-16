@@ -63,7 +63,7 @@ describe('PIQ-3 relationship pairing and lag identity audit', () => {
     })
     expect(registeredRelationshipSpec('unregistered:fake')).toBeNull()
     expect(claimedRelationshipSignals('Your logged water, fiber and bowel records')).toEqual([
-      'hydration.ml', 'bowel.count', 'nutrition.fiber_g',
+      'hydration.ml', 'nutrition.fiber_g', 'bowel.count',
     ])
   })
 
