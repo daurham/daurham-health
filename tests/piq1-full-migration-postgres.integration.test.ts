@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import pg from 'pg'
 import type { Sql } from '../server/db.js'
 import { inspectMigrations } from '../server/migrate.js'
+import { assessMigrationHistory, readMigrationHistory } from '../server/migration-history.js'
 import { LATEST_SCHEMA_MIGRATION, backupTable } from '../server/backup/inventory.js'
 import { buildBackupArchive, restoreStatements, verifyBackupArchive, planRestore, type BackupRow } from '../server/backup/format.js'
 import { getNutritionDayCompleteness, saveNutritionDayCompleteness } from '../server/nutrition/day-completeness.js'
@@ -143,6 +144,27 @@ describe.skipIf(!url)('PIQ-1.1 full 0001–0056 migration-chain and backup on is
     expect(count.rows[0].count).toBe(0)
     const unreviewed = await getNutritionDayCompleteness(date, adapter, today)
     expect(unreviewed.assessment).toMatchObject({ state: 'unknown', eligibleForMaintenance: false })
+  })
+
+  it('PIQ-7: the migrated PostgreSQL schema passes a read-only migration prefix check', async () => {
+    const history = await readMigrationHistory(adapter)
+    const expected = (await inspectMigrations()).map((item) => item.filename)
+    expect(assessMigrationHistory(expected, history, LATEST_SCHEMA_MIGRATION))
+      .toMatchObject({ status: 'current', reason: 'CURRENT', appliedCount: 56 })
+    await client.query('BEGIN')
+    try {
+      await client.query(
+        'DELETE FROM schema_migrations WHERE filename = $1',
+        ['0054_coach_plateau_active_unique.sql'],
+      )
+      const broken = await readMigrationHistory(adapter)
+      expect(assessMigrationHistory(expected, broken, LATEST_SCHEMA_MIGRATION))
+        .toMatchObject({ status: 'blocked', reason: 'OUT_OF_SEQUENCE_HISTORY' })
+    } finally {
+      await client.query('ROLLBACK')
+    }
+    expect(assessMigrationHistory(expected, await readMigrationHistory(adapter), LATEST_SCHEMA_MIGRATION))
+      .toMatchObject({ status: 'current', reason: 'CURRENT' })
   })
 
   it('PIQ-2.3: owner-selected primary goal has immutable revisions and no inferred default', async () => {

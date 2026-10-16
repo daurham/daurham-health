@@ -23,6 +23,9 @@ on:
       - 'tests/piq1-nutrition-postgres.integration.test.ts'
       - 'tests/piq1-full-migration-postgres.integration.test.ts'
       - 'server/migrate.ts'
+      - 'server/migration-history.ts'
+      - 'server/migration-preflight.ts'
+      - 'tests/piq-release-migration-preflight.test.ts'
       - 'server/backup/format.ts'
       - 'server/backup/inventory.ts'
   workflow_dispatch:

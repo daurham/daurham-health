@@ -4,6 +4,8 @@ import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { formatDatabaseError, getSql } from './db.js'
 import { splitSqlStatements } from './sql.js'
+import { LATEST_SCHEMA_MIGRATION } from './backup/inventory.js'
+import { assessMigrationHistory, readMigrationHistory } from './migration-history.js'
 
 const MIGRATION_FILENAME = /^\d{4}_.+\.sql$/
 const HISTORY_TABLE_SQL = `
@@ -84,12 +86,21 @@ async function applyMigrations(): Promise<void> {
   const sql = await getSql()
   const migrations = await inspectMigrations()
 
-  await sql.query(HISTORY_TABLE_SQL)
-
-  const appliedRows = (await sql.query(
-    'SELECT filename FROM schema_migrations',
-  )) as Array<{ filename: string }>
-  const applied = new Set(appliedRows.map((row) => row.filename))
+  // Inspect metadata BEFORE the first write. A lost history table, unknown
+  // migration filename or hole in the applied prefix must never trigger an
+  // automatic partial replay into an existing owner database.
+  const history = await readMigrationHistory(sql)
+  const readiness = assessMigrationHistory(
+    migrations.map((migration) => migration.filename), history, LATEST_SCHEMA_MIGRATION,
+  )
+  if (readiness.status === 'blocked') {
+    throw new Error(
+      'Migration blocked by schema history preflight: ' + readiness.reason +
+      '. No changes applied. Run npm run migration:preflight and review the target database.',
+    )
+  }
+  if (!history.historyTableExists) await sql.query(HISTORY_TABLE_SQL)
+  const applied = new Set(history.appliedMigrations)
 
   let appliedCount = 0
 
