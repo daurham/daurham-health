@@ -27,7 +27,7 @@ export type AskIntentRoute = {
 }
 
 const SELF = /\b(i|i'm|im|i've|ive|i'd|my|mine|me|myself|we|our|ours|us)\b/i
-const OWNER_REFERENT = /\b(?:the|this|that)\s+(?:goal|target|plan|routine|workout|session|measurement|log|trend|experiment|result|record|entry)\b/i
+const OWNER_REFERENT = /\b(?:the|this|that)\s+(?:(?:training|workout|nutrition|weekly|fitness|health)\s+)?(?:goal|target|plan|routine|workout|session|measurement|log|trend|experiment|result|record|entry)\b/i
 const PERSONAL_DIRECTIVE = /\b(for me|should i|can i|do i|am i|have i|would i|help me|tell me about myself|based on (my|our)|according to (my|our))\b/i
 const SYMPTOM = /\b(symptoms?|pain|dizzy|nausea|constipation|diarrhea|headaches?|sick|fatigue|fainting|bleeding|vomit|heart racing|short(ness)? of breath)\b/i
 const URGENT = /\b(chest pain|can't breathe|cannot breathe|difficulty breathing|severe bleeding|stroke|suicid(al|e)|overdose|unconscious|passing out)\b/i
