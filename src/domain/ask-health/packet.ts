@@ -388,6 +388,13 @@ function addHistoricalWeightEnergyWindow(
         '): '+window.completedDays+' completed calendar day(s), '+window.verifiedCalorieDays+
         ' with reliable owner-confirmed whole-day calorie logs, and '+window.recordedWeightDays+
         ' saved weight-observation day(s). Unlogged and unverified days are UNKNOWN, not zero.'+
+        (window.intakeCoverage === 'single_verified_day'
+          ? ' Only ONE date has verified complete food intake; its recorded amount cannot describe typical intake for this interval.'
+          : window.intakeCoverage === 'sparse_or_clustered'
+            ? ' Verified food dates are sparse or concentrated in one half of this interval; their average must not be treated as a representative weekly or monthly intake pattern.'
+            : window.intakeCoverage === 'distributed_observations'
+              ? ' Verified food records occur in both halves of the interval, but even this does not prove every meal was logged.'
+              : ' No complete reliable calorie day is available; intake during this interval is unknown.')+
         (window.provisionalTodayExcluded
           ? ' Today was excluded from all completed-day calculations.' : '')+
         ' Recorded intake is not measured expenditure; changes in scale weight are not proven changes in body fat.',
@@ -395,6 +402,9 @@ function addHistoricalWeightEnergyWindow(
       requestedWindowScope:window.scope,selectedCalendarDays:window.calendarDays,
       completedCalendarDays:window.completedDays,
       verifiedCompleteCalorieDays:window.verifiedCalorieDays,
+      verifiedEarlyHalfDays:window.verifiedEarlyHalfDays,
+      verifiedLateHalfDays:window.verifiedLateHalfDays,
+      intakeCoverage:window.intakeCoverage,
       savedWeightDays:window.recordedWeightDays,
       comparableWeightDays:window.comparableWeightDays,
       provisionalTodayExcluded:window.provisionalTodayExcluded ? 'yes' : 'no'},
@@ -408,8 +418,14 @@ function addHistoricalWeightEnergyWindow(
     text:'Across '+window.verifiedCalorieDays+' source-reliable owner-confirmed completed food day(s) '+
       'inside the requested interval, recorded calories averaged '+
       Math.round(window.verifiedCalorieMeanKcal)+' kcal per verified date; this is NOT '+
-      'a calendar-day average, an intake deficit, total expenditure or a reason to change a calorie target.',
+      'a calendar-day average, an intake deficit, total expenditure or a reason to change a calorie target.'+
+      (window.intakeCoverage==='distributed_observations'
+        ? ' These records span both halves, but completeness of every meal is not independently proven.'
+        : ' This is a limited sample of logged dates, NOT a representative estimate of all days in the interval.'),
     coverage:{verifiedCompleteCalorieDays:window.verifiedCalorieDays,
+      intakeCoverage:window.intakeCoverage,
+      verifiedEarlyHalfDays:window.verifiedEarlyHalfDays,
+      verifiedLateHalfDays:window.verifiedLateHalfDays,
       selectedCalendarDays:window.calendarDays},
     detailPath:'/nutrition',userEntered:false,substantive:true,priority:1,
   })

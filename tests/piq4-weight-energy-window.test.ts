@@ -59,6 +59,7 @@ describe('PIQ-4.2 exact requested historical interval boundary (synthetic)',()=>
     const r=inspect('How did my weight and calories change last week?')
     expect(r.window).toMatchObject({start:prev,end:'2026-10-11',calendarDays:7,
       scope:'in_range',verifiedCalorieDays:3,verifiedCalorieMeanKcal:1900,
+      verifiedEarlyHalfDays:3,verifiedLateHalfDays:0,intakeCoverage:'sparse_or_clustered',
       recordedWeightDays:3,comparableWeightDays:3,observedWeightChangeKg:-0.5})
     const ids=r.packet.evidence.map(x=>x.id)
     expect(ids).toContain('weight_energy.historical_window.calories')
@@ -70,6 +71,8 @@ describe('PIQ-4.2 exact requested historical interval boundary (synthetic)',()=>
     expect(JSON.stringify(r.packet)).not.toContain('89 kg')
     expect(r.packet.evidence.find(x=>x.id==='weight_energy.historical_window.calories')?.text)
       .toContain('NOT a calendar-day average')
+    expect(r.packet.evidence.find(x=>x.id==='weight_energy.historical_window.coverage')?.text)
+      .toContain('sparse or concentrated in one half')
   })
   it('cannot silently borrow recent observations when the named period is outside the selected range',()=>{
     const r=inspect('How much weight did I lose last week?',base,{scopeStart:'2026-10-10'})
@@ -108,7 +111,8 @@ describe('PIQ-4.2 exact requested historical interval boundary (synthetic)',()=>
       verified:['2026-10-13',today]})
     expect(r.window).toMatchObject({start:'2026-10-12',end:today,
       provisionalTodayExcluded:true,calendarDays:5,completedDays:4,
-      verifiedCalorieDays:1,verifiedCalorieMeanKcal:4500})
+      verifiedCalorieDays:1,verifiedCalorieMeanKcal:4500,
+      verifiedEarlyHalfDays:1,verifiedLateHalfDays:0,intakeCoverage:'single_verified_day'})
     expect(r.packet.evidence.find(x=>x.id==='weight_energy.historical_window.coverage')?.text)
       .toContain('Today was excluded')
     expect(JSON.stringify(r.packet)).not.toContain('7000')
@@ -142,6 +146,41 @@ describe('PIQ-4.2 exact requested historical interval boundary (synthetic)',()=>
     const q='How many calories last week?'
     const a=inspect(q),b=inspect(q,base.map(x=>x.key==='nutrition.calories'&&x.date==='2026-10-06'
       ? {...x,value:2100} : x))
+    expect(packetFingerprintMaterial(a.packet)).not.toBe(packetFingerprintMaterial(b.packet))
+  })
+
+  it('recognizes verified dates distributed across both fixed halves of a seven-day window',()=>{
+    const added=[
+      record('nutrition.calories','2026-10-09',2200,'high_confidence'),
+      record('nutrition.calories','2026-10-10',2400,'high_confidence'),
+    ]
+    const verified=['2026-10-05','2026-10-06','2026-10-07','2026-10-09','2026-10-10']
+    const r=inspect('How many calories last week?',[...base,...added],{verified})
+    expect(r.window).toMatchObject({
+      verifiedCalorieDays:5,verifiedEarlyHalfDays:3,verifiedLateHalfDays:2,
+      intakeCoverage:'distributed_observations',
+    })
+    expect(r.packet.evidence.find(x=>x.id==='weight_energy.historical_window.coverage')?.coverage)
+      .toMatchObject({intakeCoverage:'distributed_observations'})
+    expect(r.packet.evidence.find(x=>x.id==='weight_energy.historical_window.calories')?.text)
+      .toContain('completeness of every meal is not independently proven')
+  })
+  it('explicitly describes a one-day average as nonrepresentative even with perfect source IDs',()=>{
+    const r=inspect('How many calories last week?',base,{verified:['2026-10-05']})
+    expect(r.window).toMatchObject({verifiedCalorieDays:1,
+      verifiedCalorieMeanKcal:1800,intakeCoverage:'single_verified_day'})
+    expect(r.packet.evidence.find(x=>x.id==='weight_energy.historical_window.coverage')?.text)
+      .toContain('Only ONE date')
+    expect(r.packet.evidence.find(x=>x.id==='weight_energy.historical_window.calories')?.text)
+      .toContain('NOT a representative estimate')
+  })
+  it('re-fingerprints a corrected distribution even when the numeric mean stays equal',()=>{
+    const q='How many calories last week?'
+    const records=[...base,record('nutrition.calories','2026-10-09',1900,'high_confidence')]
+    const a=inspect(q,records,{verified:['2026-10-05','2026-10-06','2026-10-07']})
+    const b=inspect(q,records,{verified:['2026-10-05','2026-10-06','2026-10-09']})
+    expect(a.window?.verifiedCalorieMeanKcal).toBe(b.window?.verifiedCalorieMeanKcal)
+    expect(a.window?.verifiedEarlyHalfDays).not.toBe(b.window?.verifiedEarlyHalfDays)
     expect(packetFingerprintMaterial(a.packet)).not.toBe(packetFingerprintMaterial(b.packet))
   })
 })

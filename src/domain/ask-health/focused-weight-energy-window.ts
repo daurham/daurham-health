@@ -17,6 +17,10 @@ export type HistoricalWeightEnergyWindow = {
   provisionalTodayExcluded: boolean
   verifiedCalorieDays: number
   verifiedCalorieMeanKcal: number | null
+  /** Counts in fixed halves of completed selected dates, not clinical diet coverage. */
+  verifiedEarlyHalfDays: number
+  verifiedLateHalfDays: number
+  intakeCoverage: 'no_verified_days' | 'single_verified_day' | 'sparse_or_clustered' | 'distributed_observations'
   recordedWeightDays: number
   comparableWeightDays: number
   /** Endpoints of 3+ usual-condition measurements spanning >=6d and
@@ -66,6 +70,8 @@ export function focusHistoricalWeightEnergyWindow(input: {
     scope,start,end,label,calendarDays:days,completedDays:0,
     provisionalTodayExcluded:false,
     verifiedCalorieDays:0,verifiedCalorieMeanKcal:null,
+    verifiedEarlyHalfDays:0,verifiedLateHalfDays:0,
+    intakeCoverage:'no_verified_days' as const,
     recordedWeightDays:0,comparableWeightDays:0,
     observedWeightChangeKg:null,observedWeightSpanDays:0,
     boundaryCoverage:'incomplete_or_incomparable' as const,
@@ -79,8 +85,21 @@ export function focusHistoricalWeightEnergyWindow(input: {
   const calories = calorieVerification ? completed.flatMap(d => {
     const row = d.signals['nutrition.calories']
     return present(row) && row.dayCompleteness === 'verified_complete' &&
-      row.quality === 'high_confidence' ? [row.value] : []
+      row.quality === 'high_confidence' ? [{date:d.date,value:row.value}] : []
   }) : []
+  const completedDays = days - (start <= today && today <= end ? 1 : 0)
+  // Calendar halves, not observation-density halves; today never counts.
+  const earlyHalfDays = Math.ceil(completedDays / 2)
+  const verifiedEarlyHalfDays = calories.filter(row =>
+    dateDiff(start,row.date) < earlyHalfDays).length
+  const verifiedLateHalfDays = calories.length - verifiedEarlyHalfDays
+  const distributed = calories.length >= 4 &&
+    calories.length * 2 >= completedDays &&
+    verifiedEarlyHalfDays >= 2 && verifiedLateHalfDays >= 2
+  const intakeCoverage: HistoricalWeightEnergyWindow['intakeCoverage'] =
+    calories.length === 0 ? 'no_verified_days' :
+    calories.length === 1 ? 'single_verified_day' :
+    distributed ? 'distributed_observations' : 'sparse_or_clustered'
   const weights = completed.flatMap(d => {
     const row = d.signals['body.weight_kg']
     return present(row) ? [row] : []
@@ -94,11 +113,12 @@ export function focusHistoricalWeightEnergyWindow(input: {
     first.date !== last.date
   return {
     scope,start,end,label,calendarDays:days,
-    completedDays:days - (start <= today && today <= end ? 1 : 0),
+    completedDays,
     provisionalTodayExcluded:start <= today && today <= end,
     verifiedCalorieDays:calories.length,
     verifiedCalorieMeanKcal:calories.length > 0
-      ? calories.reduce((total,value)=>total+value,0)/calories.length : null,
+      ? calories.reduce((total,row)=>total+row.value,0)/calories.length : null,
+    verifiedEarlyHalfDays,verifiedLateHalfDays,intakeCoverage,
     recordedWeightDays:weights.length,comparableWeightDays:usual.length,
     observedWeightChangeKg:covered ? last!.value-first!.value : null,
     observedWeightSpanDays:covered?span:0,
