@@ -117,29 +117,36 @@ describe('PIQ-3 controlled owner QA readiness (synthetic only)', () => {
   })
 
   it('limits displayed provenance to supplied evidence and cited evidence to surviving claims', async () => {
-    const packet = buildAskHealthEvidencePacket(syntheticInput())
-    const evidence = packet.evidence.find(item => item.id === 'goals.qa-weight-target')
-    expect(evidence?.substantive).toBe(true)
+    const base = buildAskHealthEvidencePacket(syntheticInput())
+    const sourceId = 'hydration.synthetic.2026-09-20'
+    const packet = { ...base, evidence: [...base.evidence, {
+      id: sourceId, domain: 'hydration', label: 'Synthetic water event', value: 500,
+      unit: 'ml', text: 'Recorded one water event, not proof of total daily intake.',
+      period: { start: '2026-09-20', end: '2026-09-20' }, coverage: null,
+      evidenceDates: ['2026-09-20'], detailPath: '/check-in',
+      userEntered: false, substantive: true,
+    }] }
     const provider = vi.fn(async (req: Parameters<AskHealthProvider>[0]) => ({
       ...defaultReply(req),
       text: JSON.stringify({ blocks: [
-        { text: 'Your saved synthetic goal is at most 78 kg.',
-          evidence_refs: ['goals.qa-weight-target'] },
+        { text: 'You logged 500 ml of water on 2026-09-20.',
+          evidence_refs: [sourceId] },
         { text: 'You logged 10,000 steps on 2026-09-20.',
-          evidence_refs: ['goals.qa-weight-target'] },
+          evidence_refs: [sourceId] },
       ], limitations: [], follow_ups: [] }),
     }))
-    // Both IDs are schema-valid; the second block's claim is historically unsupported.
+    // Both source IDs are valid; the second block cites the wrong metric.
     const res = await explainAskHealth({
-      packet, question: 'How many steps did I log on 2026-09-20?',
+      packet, question: 'How much water and how many steps did I log on 2026-09-20?',
       conversation: [], provider, gate: gate(), model: 'qa-stub', now: 1000,
       contextMode: 'personalized',
     })
-    expect(res.answer.blocks.some(b => b.text.includes('10,000 steps'))).toBe(false)
+    expect(res.answer.blocks.map(b => b.text)).toEqual(['You logged 500 ml of water on 2026-09-20.'])
     expect(res.answer.limitations.length).toBeGreaterThan(0)
     expect(res.meta.evidenceOverview.items.map(x => x.id)).toContain('goals.qa-weight-target')
+    expect(res.meta.evidenceOverview.items.map(x => x.id)).toContain(sourceId)
     expect(res.meta.evidenceOverview.items.every(x => packet.evidence.some(e => e.id === x.id))).toBe(true)
-    expect(res.evidence.map(e => e.id)).toEqual(['goals.qa-weight-target'])
+    expect(res.evidence.map(e => e.id)).toEqual([sourceId])
     expect(provider).toHaveBeenCalledOnce()
   })
 
