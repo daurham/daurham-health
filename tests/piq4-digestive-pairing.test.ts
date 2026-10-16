@@ -37,6 +37,7 @@ function fixture({stools=stoolDates, fiber=stoolDates, water=stoolDates, verifie
   const rows=allStools.map(date=>({
     date,eventCount:1,typedCount:partial && date===stools[0]?0:1,
     hardCount:partial && date===stools[0]?0:1,
+    matchedEventCount:1,
   }))
   const window=summarizeBowelWindow(snapshot,selection.scope,rows,today)
   return {snapshot,focus,window,pairing:screenDigestiveLagReadiness(snapshot,window,today)}

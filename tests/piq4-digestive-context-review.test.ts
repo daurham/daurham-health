@@ -42,7 +42,7 @@ function construct(options:{
   const rows:BowelDateCountRow[]=recorded.map((date,i)=>{
     const typedCount=options.incomplete && i===0?0:1
     const hardCount=typedCount===0?0:(options.hard?.[i]??i%2)
-    return {date,typedCount,hardCount,eventCount:1}
+    return {date,typedCount,hardCount,eventCount:1,matchedEventCount:1}
   })
   const window=summarizeBowelWindow(snapshot,scope.scope,rows,today)
   const screen=screenDigestiveLagReadiness(snapshot,window,today,options.context)

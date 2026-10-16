@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildHealthIntelligenceSnapshot, type IntelligenceObservation } from '../src/domain/intelligence/shared.js'
 import { focusDigestiveContext } from '../src/domain/ask-health/focused-digestive.js'
-import { selectDigestiveBowelWindow, summarizeBowelWindow } from '../src/domain/ask-health/digestive-window.js'
+import { bowelSnapshotEventIds, selectDigestiveBowelWindow, summarizeBowelWindow } from '../src/domain/ask-health/digestive-window.js'
 import { buildAskHealthEvidencePacket } from '../src/domain/ask-health/packet.js'
 import type { AskHealthPacketInput } from '../src/domain/ask-health/types.js'
 
@@ -12,7 +12,7 @@ const obs: IntelligenceObservation[] = [
   {key:'bowel.count',date:'2026-10-14',value:0,unit:'count',provenance:'owner',sourceIds:[]},
   {key:'hydration.ml',date:'2026-10-12',value:700,unit:'ml',provenance:'owner',sourceIds:['w']},
 ]
-const rows=[{date:'2026-10-12',eventCount:2,typedCount:2,hardCount:1}]
+const rows=[{date:'2026-10-12',eventCount:2,typedCount:2,hardCount:1,matchedEventCount:2}]
 function fixture(observations=obs, q=question, begin=start) {
   const snapshot=buildHealthIntelligenceSnapshot({
     range:'30d',asOf:today,start:begin,end:today,timezone:'America/Phoenix',today,
@@ -69,6 +69,43 @@ describe('PIQ-4.1 bounded full-window bowel evidence without causal inference',(
     expect(packetFrom(unavailable).find(e=>e.id==='digestive.window.unavailable')?.substantive)
       .toBe(false)
   })
+  it('rejects same-day delete/readd even when totals and stool classes look unchanged',()=>{
+    const {snapshot,focus}=fixture()
+    const selection=selectDigestiveBowelWindow(focus,today)!
+    if(selection.status!=='ready')throw Error('scope')
+    expect(bowelSnapshotEventIds(snapshot,selection.scope)).toEqual(['a','b'])
+    // Old canonical snapshot contained a+b; current database has a+replacement.
+    const mismatched=[{...rows[0]!,matchedEventCount:1}]
+    const result=summarizeBowelWindow(snapshot,selection.scope,mismatched,today)
+    expect(result).toMatchObject({status:'unavailable',reason:'source_mismatch'})
+    expect(packetFrom(result).some(e=>e.id==='digestive.window.bristol')).toBe(false)
+    // A brand-new canonical snapshot of the replacement IS consistent again.
+    const nextObs=obs.map(o=>o.key==='bowel.count' && o.date==='2026-10-12'
+      ? {...o,sourceIds:['a','replacement']} : o)
+    const refreshed=fixture(nextObs)
+    expect(bowelSnapshotEventIds(refreshed.snapshot,selection.scope)).toEqual(['a','replacement'])
+    expect(summarizeBowelWindow(refreshed.snapshot,selection.scope,rows,today))
+      .toMatchObject({status:'available',movementEvents:2})
+  })
+  it('fails closed for missing, incorrect, or invalid match-count evidence',()=>{
+    const {snapshot,focus}=fixture()
+    const selection=selectDigestiveBowelWindow(focus,today)!
+    if(selection.status!=='ready')throw Error('scope')
+    for(const count of [-1,0,1,3,1.5,NaN]) {
+      expect(summarizeBowelWindow(snapshot,selection.scope,
+        [{...rows[0]!,matchedEventCount:count}],today))
+        .toMatchObject({status:'unavailable',reason:'source_mismatch'})
+    }
+    const legacy=[{date:'2026-10-12',eventCount:2,typedCount:2,hardCount:1}]
+    expect(summarizeBowelWindow(snapshot,selection.scope,
+      legacy as typeof rows,today)).toMatchObject({status:'unavailable'})
+    const duplicatedSnapshot=fixture([
+      {...obs[0]!,sourceIds:['a','a']},...obs.slice(1),
+    ])
+    expect(bowelSnapshotEventIds(duplicatedSnapshot.snapshot,selection.scope)).toBeNull()
+    expect(bowelSnapshotEventIds(snapshot,{start:'2026-01-01',end:today,calendarDays:289}))
+      .toBeNull()
+  })
   it('does not treat no logged bowel events as a confirmed rest/zero day',()=>{
     const {snapshot,focus}=fixture([],question)
     const selection=selectDigestiveBowelWindow(focus,today)!
@@ -114,7 +151,7 @@ describe('PIQ-4.1 bounded full-window bowel evidence without causal inference',(
     const selection=selectDigestiveBowelWindow(focus,today)!
     if(selection.status!=='ready')throw Error('scope')
     expect(summarizeBowelWindow(snapshot,selection.scope,[...rows,
-      {date:today,eventCount:1,typedCount:1,hardCount:1}],today))
+      {date:today,eventCount:1,typedCount:1,hardCount:1,matchedEventCount:1}],today))
       .toMatchObject({status:'available',provisionalDays:1,observedDays:3})
   })
   it('never adds bowel window evidence to water-only or General Only context',()=>{

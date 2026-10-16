@@ -3,6 +3,8 @@ import type { FocusedDigestiveEvidence } from './focused-digestive.js'
 
 /** Bounded, privacy-minimal canonical bowel event totals, never a diagnosis. */
 export const MAX_BOWEL_WINDOW_DAYS = 90
+/** Do not expand a read-only grouped query into unbounded snapshot-ID parameters. */
+export const MAX_BOWEL_WINDOW_EVENT_IDS = 512
 
 export type DigestiveBowelWindowScope = {
   start: string
@@ -41,6 +43,38 @@ export type BowelDateCountRow = {
   eventCount: number
   typedCount: number
   hardCount: number
+  /** Number of rows that match exact canonical snapshot IDs for THIS date. */
+  matchedEventCount: number
+}
+
+/** Snapshot ID references are used only as a query parameter and are not
+ * returned as grouped rows, packet evidence, or AI context. Null fails closed.
+ * A bounded count cannot detect a delete/re-add with an identical count;
+ * comparing exact IDs does. */
+export function bowelSnapshotEventIds(
+  snapshot: HealthIntelligenceSnapshot,
+  scope: DigestiveBowelWindowScope,
+): string[] | null {
+  if (scope.start < snapshot.period.start || scope.end > snapshot.period.end ||
+      scope.start > scope.end || scope.end > snapshot.asOf ||
+      safeDaySpan(scope.start, scope.end) !== scope.calendarDays ||
+      scope.calendarDays > MAX_BOWEL_WINDOW_DAYS) return null
+  const ids: string[] = []
+  const unique = new Set<string>()
+  for (const day of snapshot.frame) {
+    if (day.date < scope.start || day.date > scope.end) continue
+    const bowel = day.signals['bowel.count']
+    if (!bowel) continue
+    if (!Number.isSafeInteger(bowel.value) || bowel.value < 0 ||
+        bowel.provenance !== 'owner' || bowel.sourceIds.length !== bowel.value) return null
+    for (const id of bowel.sourceIds) {
+      if (!id || unique.has(id)) return null
+      unique.add(id)
+      ids.push(id)
+      if (ids.length > MAX_BOWEL_WINDOW_EVENT_IDS) return null
+    }
+  }
+  return ids
 }
 
 function safeDaySpan(start: string, end: string): number | null {
@@ -110,6 +144,8 @@ export function summarizeBowelWindow(
         !Number.isSafeInteger(row.eventCount) || row.eventCount < 1 ||
         !Number.isSafeInteger(row.typedCount) || row.typedCount < 0 ||
         !Number.isSafeInteger(row.hardCount) || row.hardCount < 0 ||
+        !Number.isSafeInteger(row.matchedEventCount) || row.matchedEventCount < 0 ||
+        row.matchedEventCount !== row.eventCount ||
         row.hardCount > row.typedCount || row.typedCount > row.eventCount) return blocked()
     aggregates.set(row.date, row)
   }

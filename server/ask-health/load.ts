@@ -22,7 +22,7 @@ import { loadHealthIntelligenceSnapshot } from '../intelligence/snapshot.js'
 import { getHealthProfile } from '../profile/service.js'
 import { focusTrainingWorkingSets } from '../../src/domain/ask-health/focused-training.js'
 import { attachBristolTypes, digestiveQuestionTopics, focusDigestiveContext } from '../../src/domain/ask-health/focused-digestive.js'
-import { selectDigestiveBowelWindow, summarizeBowelWindow, type DigestiveBowelWindow } from '../../src/domain/ask-health/digestive-window.js'
+import { bowelSnapshotEventIds, selectDigestiveBowelWindow, summarizeBowelWindow, type DigestiveBowelWindow } from '../../src/domain/ask-health/digestive-window.js'
 import { screenDigestiveLagReadiness } from '../../src/domain/ask-health/digestive-pairing.js'
 import type { AskContextMode } from '../../src/domain/ask-health/config.js'
 
@@ -106,17 +106,23 @@ export async function loadAskHealthPacketInput(input: {
         status: 'unavailable', reason: 'range_too_large', scope: selectedBowelWindow.scope,
       }
     } else {
+      // Do not accept event totals if the first canonical snapshot contains
+      // too many, repeated or unusable event identities. A delete-and-readd
+      // with unchanged counts is NOT the same event history.
+      const expectedIds = bowelSnapshotEventIds(intelligenceSnapshot, selectedBowelWindow.scope)
       try {
+        if (expectedIds == null) throw new Error('bowel identity snapshot unavailable')
         const sql = await getSql()
         const dailyRows = (await sql.query(
           `SELECT bowel_date::text AS date,
              count(*)::int AS event_count,
              count(*) FILTER (WHERE bristol_type BETWEEN 1 AND 7)::int AS typed_count,
-             count(*) FILTER (WHERE bristol_type IN (1,2))::int AS hard_count
+             count(*) FILTER (WHERE bristol_type IN (1,2))::int AS hard_count,
+             count(*) FILTER (WHERE id = ANY($3::uuid[]))::int AS matched_event_count
            FROM bowel_events
            WHERE bowel_date >= $1::date AND bowel_date <= $2::date
            GROUP BY bowel_date ORDER BY bowel_date`,
-          [selectedBowelWindow.scope.start, selectedBowelWindow.scope.end],
+          [selectedBowelWindow.scope.start, selectedBowelWindow.scope.end, expectedIds],
         )) as Array<Record<string, unknown>>
         bowelWindow = summarizeBowelWindow(intelligenceSnapshot, selectedBowelWindow.scope,
           dailyRows.map(row => ({
@@ -124,6 +130,7 @@ export async function loadAskHealthPacketInput(input: {
             eventCount: Number(row.event_count),
             typedCount: Number(row.typed_count),
             hardCount: Number(row.hard_count),
+            matchedEventCount: Number(row.matched_event_count),
           })), today)
       } catch {
         // Do not invent a partial trend or expose SQL/error text to Health AI.
