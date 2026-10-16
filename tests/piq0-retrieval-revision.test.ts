@@ -22,6 +22,7 @@ const at = Date.parse('2026-10-14T18:00:00.000Z')
 function input(question: string, goal: string | null = null): AskHealthPacketInput {
   return {
     lens: 'general', range: '30d', asOf: '2026-10-14',
+    healthToday: '2026-10-14',
     period: { start: '2026-09-15', end: '2026-10-14' },
     generatedAt: '2026-10-14T18:00:00.000Z',
     question, overview: null, activity: null, sleep: null,

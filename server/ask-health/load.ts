@@ -10,6 +10,7 @@ import { buildSleepProgressView } from '../../src/domain/sleep/index.js'
 import { dailyContextTagLabel } from '../../src/domain/context.js'
 import { listActivityDailySummaries } from '../activity/queries.js'
 import { listGoalAskSnapshots } from '../goals/service.js'
+import { requiresHistoricalGoalBoundary } from '../../src/domain/ask-health/historical-goal-scope.js'
 import { listDailyContexts } from '../context/service.js'
 import { listTimelineBenchmarkResults } from '../lab/results.js'
 import { getSql } from '../db.js'
@@ -60,10 +61,13 @@ export async function loadAskHealthPacketInput(input: {
     nutritionTargets: rows.nutritionTargets,
   })
   const period = { start: overview.period.start, end: overview.period.end }
+  const historicalGoalBoundary = requiresHistoricalGoalBoundary({
+    asOf:input.asOf,today,question:input.question,
+  })
   const [activityRows, sleepNights, goals, supplements, experiments, benchmarks, contexts, intelligenceSnapshot, profile] = await Promise.all([
     listActivityDailySummaries(timezone),
     listSleepNightlySummaries(timezone),
-    listGoalAskSnapshots(input.asOf),
+    historicalGoalBoundary ? Promise.resolve([]) : listGoalAskSnapshots(input.asOf,today),
     listSupplementRangeInputs(period.start, period.end),
     loadExperiments(input.asOf),
     loadBenchmarks(period.start, period.end, input.asOf),

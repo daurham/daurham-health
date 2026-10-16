@@ -12,6 +12,7 @@ import {
 function fixture(question = 'What does creatine do?', hasGoal = false) {
   return buildAskHealthEvidencePacket({
     lens: 'general', range: '30d', asOf: '2026-10-14',
+    healthToday: '2026-10-14',
     generatedAt: '2026-10-14T18:00:00.000Z',
     period: { start: '2026-09-15', end: '2026-10-14' },
     question, overview: null, activity: null, sleep: null,

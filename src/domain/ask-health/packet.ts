@@ -1,4 +1,5 @@
 import { lifecycleStatusOnDate, resolveScheduleRange } from '../supplements/resolve.js'
+import { requiresHistoricalGoalBoundary } from './historical-goal-scope.js'
 import { formatWeekdayMask } from '../supplements/weekday.js'
 import type { OccurrenceState } from '../supplements/types.js'
 import { ASK_HEALTH_PACKET_VERSION, ASK_PACKET_MAX_CHARS, type AskLens } from './config.js'
@@ -84,7 +85,7 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
     addSupplements(input, push)
   }
   if (wants.goals) {
-    addGoals(input, push)
+    addGoals(input, push, limitations)
   }
   if (wants.lab) {
     addLab(input, push)
@@ -107,10 +108,12 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
   // Retain just the request's exact-date evidence and the neutral range label.
   const selectedDrafts = input.focusedWeightEnergyDay
     ? drafts.filter(item => item.id === 'ask.range' ||
-        item.id.startsWith('weight_energy.historical_day.'))
+        item.id.startsWith('weight_energy.historical_day.') ||
+        item.id === 'goals.historical_attestation_boundary')
     : input.focusedWeightEnergyWindow
       ? drafts.filter(item => item.id === 'ask.range' ||
-          item.id.startsWith('weight_energy.historical_window.'))
+          item.id.startsWith('weight_energy.historical_window.') ||
+          item.id === 'goals.historical_attestation_boundary')
       : drafts
   const evidence = trimEvidence(selectedDrafts, maxChars)
   const selectedIds = new Set(evidence.map((item) => item.id))
@@ -1727,7 +1730,33 @@ function tally(states: readonly OccurrenceState[], totals: { taken: number; skip
   }
 }
 
-function addGoals(input: AskHealthPacketInput, push: (item: PushItem) => void) {
+function addGoals(
+  input: AskHealthPacketInput,
+  push: (item: PushItem) => void,
+  limitations: AskLimitation[],
+) {
+  if (requiresHistoricalGoalBoundary({
+    asOf:input.asOf,today:input.healthToday,question:input.question,
+  })) {
+    // A calorie/sleep-only historical question has no Goal status to screen.
+    const mentionsGoal=/\b(?:goals?|targets?|objectives?)\b/i.test(input.question)
+    if (!mentionsGoal && input.goals.length===0) return
+    const message = 'Historical goal versions and lifecycle as of the requested date are NOT verified. ' +
+      'Current goal targets, active status, deadlines, and projections are withheld, even if a dated body or training measurement exists. ' +
+      'No historical goal achievement, unmet-goal direction, plateau or calorie change may be inferred from current goal records.'
+    push({
+      id:'goals.historical_attestation_boundary',domain:'goals',
+      label:'Historical Goal Control version and lifecycle boundary',
+      value:null,unit:null,period:input.period,
+      text:message,coverage:{historicalGoalStatus:'unverified'},
+      detailPath:'/goals',userEntered:false,substantive:false,priority:0,
+    })
+    limitations.push({
+      code:'historical_goal_attestation_unverified',text:message,
+      evidenceId:'goals.historical_attestation_boundary',
+    })
+    return
+  }
   const active = input.goals.filter((goal) => goal.lifecycle === 'active')
   const numbers = input.question.match(/\d+(?:\.\d+)?/g) ?? []
   const matched = numbers.length
