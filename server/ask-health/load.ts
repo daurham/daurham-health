@@ -85,7 +85,7 @@ export async function loadAskHealthPacketInput(input: {
     experiments,
     benchmarks,
     supplements,
-    focusedDigestive: focusDigestiveContext({ question: input.question, snapshot: intelligenceSnapshot, today }),
+    focusedDigestive: focusDigestiveContext({ question: input.question, snapshot: intelligenceSnapshot, today, includeBroadContext: input.contextMode === 'deep' }),
     focusedTraining: focusTrainingWorkingSets({
       question: input.question,
       exercises: rows.exercises,

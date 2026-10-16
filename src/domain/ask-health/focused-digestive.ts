@@ -54,8 +54,11 @@ export function focusDigestiveContext(input: {
   question: string
   snapshot: HealthIntelligenceSnapshot
   today: string
+  /** Explicit opt-in: allow Deep Dive to sample all three signals even
+   * when a vague question has no digestive terminology. */
+  includeBroadContext?: boolean
 }): FocusedDigestiveEvidence | null {
-  if (!DIGESTIVE_QUESTION.test(input.question)) return null
+  if (!input.includeBroadContext && !DIGESTIVE_QUESTION.test(input.question)) return null
   const { snapshot, today } = input
   const fiberAll = observationDates(snapshot, 'nutrition.fiber_g', today)
   const fiberStatus = snapshot.coverage.find((c) => c.key === 'nutrition.fiber_g')?.completenessCheck

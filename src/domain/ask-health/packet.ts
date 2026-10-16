@@ -718,7 +718,10 @@ function addFocusedDigestive(input: AskHealthPacketInput, push: (item: PushItem)
   const fiberRelated = /\bfib(?:er|re)\b/i.test(input.question)
   const hydrationRelated = /\b(?:hydrat\w*|water|fluid intake)\b/i.test(input.question)
   for (const { key, metric, unit, path } of metrics) {
-    if (!bowelRelated && !(key === 'fiber' && fiberRelated) && !(key === 'hydration' && hydrationRelated)) continue
+    // Default Personal/Smart is minimum-necessary context; Deep Dive
+    // deliberately includes all bounded cross-domain signals on opt-in.
+    if (input.contextMode !== 'deep' && !bowelRelated &&
+        !(key === 'fiber' && fiberRelated) && !(key === 'hydration' && hydrationRelated)) continue
     const isFiber = key === 'fiber'
     const text = isFiber
       ? metric.verificationStatus !== 'available'
