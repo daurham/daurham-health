@@ -85,3 +85,13 @@ describe('PIQ-2.3 explicit owner primary-goal history', () => {
     expect(query.mock.calls[0][1]).toEqual(['2026-09-01'])
   })
 })
+
+describe('PIQ-2.3 malformed canonical source is not an unset owner choice',()=>{
+  it('rejects an impossible future-dated SQL row instead of silently resolving unset',async()=>{
+    const query=vi.fn(async()=>[{
+      version:4,primary_goal_id:A,effective_from:'2026-10-16',recorded_at:'now',
+    }])
+    await expect(readPrimaryGoalIntent({query} as unknown as Sql,'2026-10-15'))
+      .rejects.toThrow('invalid dated source')
+  })
+})

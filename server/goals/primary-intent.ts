@@ -22,6 +22,18 @@ export async function readPrimaryGoalIntent(
     [asOf],
   ) as Row[]
   const row = rows[0]
+  // SQL already restricts effective_from to the requested as-of date.
+  // A contradictory/malformed returned row is a failed source read,
+  // NEVER an implicit "no owner priority" or a valid explicit clear.
+  if(row && (!Number.isSafeInteger(Number(row.version))||
+      Number(row.version)<=0||
+      typeof row.effective_from!=='string'||
+      !/^\d{4}-\d{2}-\d{2}$/.test(row.effective_from)||
+      row.effective_from>asOf||
+      (row.primary_goal_id!=null&&
+        (typeof row.primary_goal_id!=='string'||!row.primary_goal_id.trim())))){
+    throw new Error('Primary goal intent read returned invalid dated source')
+  }
   return resolvePrimaryGoalIntent(row ? [{
     version: Number(row.version),
     primaryGoalId: row.primary_goal_id,

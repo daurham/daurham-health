@@ -15,6 +15,7 @@ describe('PIQ-4.2 source-versioned current weight-goal mode',()=>{
    expect(db.query).toHaveBeenCalledWith(CURRENT_WEIGHT_GOAL_MODE_SQL,['2026-10-16'])
    expect(CURRENT_WEIGHT_GOAL_MODE_SQL).toMatch(/v\.is_current/)
    expect(CURRENT_WEIGHT_GOAL_MODE_SQL).toMatch(/g\.started_on\s*<=\s*\$1::date/)
+   expect(CURRENT_WEIGHT_GOAL_MODE_SQL).toContain('g.archived_at IS NULL')
    expect(CURRENT_WEIGHT_GOAL_MODE_SQL).toMatch(/LIMIT 2/)
    expect(CURRENT_WEIGHT_GOAL_MODE_SQL).not.toMatch(/\b(?:INSERT|UPDATE|DELETE|ALTER|DROP)\s/i)
  })
