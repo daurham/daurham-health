@@ -353,7 +353,9 @@ export function groundHistoricalAnswer(
   return {
     blocks: blocks.length > 0
       ? blocks
-      : [{ text: 'I cannot verify a personal measurement or trend for the requested historical period from the supplied, date-matched Health evidence.', evidenceRefs: [] }],
+      : [{ text: scope || dateIssue
+        ? 'I cannot verify a personal measurement or trend for the requested historical period from the supplied, date-matched Health evidence.'
+        : 'I cannot establish a personal cause or association from the supplied Health evidence.', evidenceRefs: [] }],
     limitations: [...limitations, { text: message, evidenceRefs: [] }],
     followUps: answer.followUps,
   }
