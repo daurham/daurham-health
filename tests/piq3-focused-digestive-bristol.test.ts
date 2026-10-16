@@ -90,6 +90,23 @@ describe('PIQ-3.3 focused digestive stool and minimum-necessary evidence', () =>
       .toEqual([])
   })
 
+  it('does not invent a Bristol type for invalid or unavailable per-event values', () => {
+    const focused = focusDigestiveContext({
+      question: 'Which stool types did I record?', snapshot, today,
+    })
+    const partiallyLoaded = attachBristolTypes(focused, [
+      { id: 'b1', date: '2026-10-13', bristolType: 2 },
+    ])
+    expect(partiallyLoaded?.bowel.observations.find((day) => day.date === '2026-10-13')?.bristolTypes)
+      .toEqual([2])
+    const invalid = attachBristolTypes(focused, [
+      { id: 'b1', date: '2026-10-13', bristolType: 0 },
+      { id: 'b2', date: '2026-10-13', bristolType: 8 },
+    ])
+    expect(invalid?.bowel.observations.find((day) => day.date === '2026-10-13')?.bristolTypes)
+      .toEqual([])
+  })
+
   it('reports saved Bristol types as descriptive owner evidence, not a diagnosis', () => {
     const detail = evidence('personalized', 'What Bristol stool types did I log?', true)
       .find((item) => item.id === 'digestive.focus.bowel.2026-10-13')
