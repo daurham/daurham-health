@@ -178,7 +178,7 @@ export async function explainAskHealth(input: {
     })
   }
   const canExplainWithoutOwnerFacts = contextMode !== 'smart' &&
-    (intent.route === 'general' || intent.route === 'owner' || intent.intent === 'ambiguous' || intent.intent === 'compare_options')
+    (intent.route === 'general' || intent.intent === 'ambiguous' || intent.intent === 'compare_options')
   if (!general && !packetHasSubstantiveEvidence(work.packet) && !canExplainWithoutOwnerFacts) {
     return responseFor(input, {
       answer: insufficientAskHealthAnswer(work.packet),
