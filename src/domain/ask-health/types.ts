@@ -43,6 +43,8 @@ export type AskLimitation = {
 
 export type AskGoalInput = {
   id: string
+  /** Private current Goal Control version for cross-source identity checking. */
+  versionId?: string
   kind: GoalKind
   lifecycle: GoalStatus
   label: string

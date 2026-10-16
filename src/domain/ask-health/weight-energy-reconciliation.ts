@@ -6,6 +6,7 @@ import type {ExperimentTimingReview} from './experiment-timing-review.js'
 import type {ExperimentOutcomeReview} from './experiment-outcome-review.js'
 import type {RecentExperimentResultReview} from './recent-experiment-result-review.js'
 import type {ProteinTrainingContext} from './protein-training-context.js'
+import type {CanonicalGoalStatusReview} from './canonical-goal-status-review.js'
 
 export type ReconciliationReason=
   'settings_unverified'|'goal_priority_unverified'|'weight_not_selected_primary'|
@@ -13,7 +14,9 @@ export type ReconciliationReason=
   'performance_decline_attention'|'strength_preservation_not_verified'|
   'experiment_timing_attention'|'experiment_source_unknown'|
   'recent_result_not_linked_to_current_goal'|'calorie_adequacy_not_verified'|
-  'weight_measurement_coverage_unverified'|'protein_record_coverage_unverified'
+  'weight_measurement_coverage_unverified'|'protein_record_coverage_unverified'|
+  'canonical_version_mismatch'|'canonical_measurements_disagree'|
+  'canonical_goal_status_unverified'|'canonical_deadline_attention'
 
 export type WeightEnergyReconciliation={
   state:'not_checked'|'source_inconsistent'|'goal_source_conflict'|
@@ -43,6 +46,8 @@ export function reconcileWeightEnergyEvidence(input:{
   outcomes:ExperimentOutcomeReview
   recentResults:RecentExperimentResultReview
   proteinTraining:ProteinTrainingContext
+  /** Optional for legacy synthetic fixtures; production loader always supplies. */
+  canonicalGoal?:CanonicalGoalStatusReview
 }):WeightEnergyReconciliation{
   const reasons:ReconciliationReason[]=[]
   const add=(item:ReconciliationReason)=>{if(!reasons.includes(item))reasons.push(item)}
@@ -65,6 +70,18 @@ export function reconcileWeightEnergyEvidence(input:{
     input.settings.weightGoalMode==='unavailable'||
     input.goalObservation.state==='no_active_goal')
   if(conflict)add('current_goal_sources_conflict')
+  if(input.canonicalGoal){
+    if(input.canonicalGoal.state==='version_mismatch')add('canonical_version_mismatch')
+    if(input.canonicalGoal.state==='measurement_disagreement')
+      add('canonical_measurements_disagree')
+    if(['unavailable','not_checked','canonical_target_unknown'].includes(
+      input.canonicalGoal.state))add('canonical_goal_status_unverified')
+    if(input.canonicalGoal.deadlineAttention==='past_reported_unmet'||
+       input.canonicalGoal.deadlineAttention==='past_missing_measurement'||
+       input.canonicalGoal.deadlineAttention==='due_today_reported_unmet'||
+       input.canonicalGoal.deadlineAttention==='due_today_missing_measurement')
+       add('canonical_deadline_attention')
+  }
   // Even with comparable measurements and a matched version, canonical Goal
   // status/urgency and effective historical target are not attested here.
   add('goal_status_not_verified')
@@ -90,17 +107,21 @@ export function reconcileWeightEnergyEvidence(input:{
   // sufficient energy, nutrient adequacy or intervention safety.
   add('calorie_adequacy_not_verified')
 
-  const incompleteSource=unknownExperiment||
+  const canonicalConflict=input.canonicalGoal?.state==='version_mismatch'||
+    input.canonicalGoal?.state==='measurement_disagreement'
+  const canonicalUnknown=input.canonicalGoal!=null&&
+    ['unavailable','not_checked','canonical_target_unknown'].includes(input.canonicalGoal.state)
+  const incompleteSource=unknownExperiment||canonicalUnknown||
     ['unavailable','not_checked'].includes(input.performance.state)||
     ['unavailable','not_checked'].includes(input.goalObservation.state)||
     ['none','ambiguous','unavailable','not_checked'].includes(
       input.settings.weightGoalMode??'not_checked')
   const state:WeightEnergyReconciliation['state']=!consistent||
-    (incompleteSource&&!conflict&&!notWeight&&
+    (incompleteSource&&!conflict&&!canonicalConflict&&!notWeight&&
       input.performance.state!=='possible_decline_for_review'&&!activeOrSoon)||
     ['unavailable','not_checked'].includes(primary)
       ?'source_inconsistent'
-      :conflict?'goal_source_conflict'
+      :conflict||canonicalConflict?'goal_source_conflict'
       :notWeight?'primary_not_weight'
       :input.performance.state==='possible_decline_for_review'?'performance_attention'
       :activeOrSoon||input.recentResults.interpretableDirectMetricResults!=null&&
