@@ -88,7 +88,7 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
   addStableProfile(input.stableProfile ?? null, input.question, input.asOf, push, input.contextMode === 'deep')
   addClinicalProfile(input.profile ?? null, input.question, push, input.contextMode)
   if (input.intelligence) {
-    addSharedIntelligence(input.intelligence, push, limitations)
+    addSharedIntelligence(input.intelligence, input.period, push, limitations)
   }
 
   const maxChars = input.maxChars ?? ASK_PACKET_MAX_CHARS
@@ -1487,9 +1487,13 @@ function addPatterns(patterns: readonly AskPatternInput[], push: (item: PushItem
 
 function addSharedIntelligence(
   intelligence: NonNullable<AskHealthPacketInput['intelligence']>,
+  period: AskHealthPacketInput['period'],
   push: (item: PushItem) => void,
   limitations: AskLimitation[],
 ) {
+  const selectedCalendarDays = Math.floor((
+    Date.parse(period.end + 'T00:00:00Z') - Date.parse(period.start + 'T00:00:00Z')
+  ) / 86_400_000) + 1
   for (const item of intelligence.coverage) {
     push({
       id: `intelligence.coverage.${item.key}`,
@@ -1548,7 +1552,7 @@ function addSharedIntelligence(
           pairedObservations: relationship.sampleSize,
           requiredObservations: relationship.requiredSampleSize,
           pairedDateCount: relationship.evidenceDates.length,
-          selectedCalendarDays: intelligence.period.dayCount,
+          selectedCalendarDays,
           xKey: relationship.xKey,
           yKey: relationship.yKey,
           lagDays: relationship.lagDays,
@@ -1572,7 +1576,7 @@ function addSharedIntelligence(
           pairedObservations: relationship.sampleSize,
           requiredObservations: relationship.requiredSampleSize,
           pairedDateCount: relationship.evidenceDates.length,
-          selectedCalendarDays: intelligence.period.dayCount,
+          selectedCalendarDays,
           xKey: relationship.xKey,
           yKey: relationship.yKey,
           lagDays: relationship.lagDays,
