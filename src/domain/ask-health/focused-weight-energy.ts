@@ -1,6 +1,7 @@
 import { buildMaintenanceState, type MaintenanceEstimate, type ScaleNoiseFactor } from '../maintenance.js'
 import { addCalendarDays } from '../training-plan.js'
 import type { HealthIntelligenceSnapshot } from '../intelligence/shared.js'
+import { screenProteinTrainingContext, type ProteinTrainingContext } from './protein-training-context.js'
 
 /**
  * PIQ-4.2 FIRST SLICE — purely descriptive, explicitly bounded weight/intake
@@ -21,6 +22,8 @@ export type FocusedWeightEnergyEvidence = {
   qualifiedWholeDayCalories: number
   trainingSessionDays: number
   wellnessCheckinDays: number
+  /** Bounded descriptions only; no inferred strength retention or protein target. */
+  proteinTrainingContext: ProteinTrainingContext
   /**
    * PIQ-4.2 second slice: Only maintenance-engine comparisons of owner-
    * verified sodium/carb days with matching calorie entry IDs. These are
@@ -98,6 +101,10 @@ export function focusWeightEnergyContext(input: {
     wellnessCheckinDays: selected.filter(d =>
       ['wellness.hunger','wellness.energy','wellness.soreness'].some(key =>
         d.signals[key as 'wellness.hunger' | 'wellness.energy' | 'wellness.soreness'] != null)).length,
+    proteinTrainingContext: screenProteinTrainingContext({
+      snapshot, start: boundedStart, end: maintenance.completeThrough,
+      today, verifiedCalorieDates: reliableDates,
+    }),
     // Reuse the engine's actual 3d-vs-prior-7d, whole-day-verified,
     // source-ID-matching sodium/carb tests. Never copy its less-qualified
     // event-count water/bowel contrasts into an Ask Health weight conclusion.

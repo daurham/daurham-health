@@ -1,0 +1,9 @@
+# PIQ-4.2 — Protein and source-identified training evidence boundary
+
+Development-only, synthetic-contract slice. It augments Ask Health's recent descriptive weight/intake packet with bounded **quality metadata**. It does not infer retained muscle, weight-loss plateau, fat-mass change, protein adequacy, or a safe calorie target.
+
+Eligible recorded protein requires a calendar date within the exact maintenance screen's completed-day range, under selected as-of and before Health-local today, plus an owner-confirmed reliable whole-day calorie signal and high-confidence protein signal, **exact equality of nonempty unique food-entry source IDs**, and finite nonnegative grams. Missing/unverified entry IDs or differently sourced protein is unknown. A conditional **recorded** average appears only with at least 4 matching verified dates spanning >=7 calendar days; these are engineering presentation heuristics, not dietary requirements. There is never a calendar-day average or prescribed grams/kg.
+
+Training exposure is counted only on dates with positive, finite `training.sessions` plus nonempty, unique source identity and non-unknown provenance. Positive signals without IDs are separately disclosed as unusable for verified participation. A sourced session date is **not** a matched-exercise strength trend, appropriate training effort, muscle retention, recovery assessment, or evidence supporting a calorie cut.
+
+`weight_energy.protein_training_context` and `weight_energy.training_preservation_boundary` are non-substantive context only. They join the normal fingerprint and continue to respect historical exact-date/window projection and General Only privacy. Current goal version, owner calorie target revision, active experiment, measured comparable strength/effort, and intervention eligibility remain explicitly `not_checked/not_verified`. No SQL, model calls, production deployments or migrations are required to exercise synthetic tests.

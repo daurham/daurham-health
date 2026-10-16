@@ -573,6 +573,54 @@ function addFocusedWeightEnergy(
     },
     detailPath:'/nutrition',userEntered:false,substantive:false,priority:1,
   })
+  const preservation = focus.proteinTrainingContext
+  push({
+    id:'weight_energy.protein_training_context',
+    domain:'intelligence',
+    label:'Verified recorded protein and training participation (NOT muscle preservation)',
+    value:null,unit:null,period,
+    text:preservation.proteinCoverage === 'descriptive_window'
+      ? 'Within this bounded weight/intake window, '+preservation.verifiedProteinDays+
+        ' owner-confirmed, source-ID-matched complete food dates recorded protein, averaging '+
+        Math.round(preservation.verifiedMeanProteinG!*10)/10+' g per verified date. '+
+        'That is not a mean across every calendar date, measured protein needs or proof of sufficient intake.'
+      : 'There are '+preservation.verifiedProteinDays+
+        ' source-ID-matched verified complete protein dates within this window; this does not meet the '+
+        'four-date and seven-day-span threshold for even a descriptive protein average. Missing or '+
+        'unverified days are UNKNOWN, not zero or presumed low protein.' +
+        (preservation.verifiedCalorieDaysInWindow === 0
+          ? ' No reliable completed calorie dates were available for this comparison.' : ''),
+    coverage:{
+      verifiedWholeDayProteinDates:preservation.verifiedProteinDays,
+      verifiedCalorieDates:preservation.verifiedCalorieDaysInWindow,
+      proteinContextStatus:preservation.proteinCoverage,
+      observedSourceIdentifiedTrainingDates:preservation.sourceIdentifiedTrainingDays,
+      unattributedPositiveTrainingSignalDates:preservation.trainingDaysWithoutSourceIdentity,
+      strengthOutcome:preservation.strengthOutcome,
+      descriptiveMinimumProteinDates:4,
+      descriptiveMinimumProteinSpanDays:7,
+    },
+    detailPath:'/nutrition',userEntered:false,substantive:false,priority:1,
+  })
+  push({
+    id:'weight_energy.training_preservation_boundary',
+    domain:'intelligence',
+    label:'Strength preservation remains unverified despite training participation',
+    value:null,unit:null,period,
+    text:'In the selected window, '+preservation.sourceIdentifiedTrainingDays+
+      ' positive training-session date(s) have a nonduplicate source identity; '+
+      preservation.trainingDaysWithoutSourceIdentity+
+      ' additional positive training signals lack usable event identity and are excluded. '+
+      'Training participation does NOT establish comparable resistance, effort, exercise performance, muscle retention, or appropriate recovery. '+
+      'No actual exercise-matched longitudinal performance and current goal/target version were reconciled. '+
+      'A plateau, protein adequacy judgment, or calorie-cut recommendation remains unauthorized.',
+    coverage:{
+      sourceIdentifiedTrainingDays:preservation.sourceIdentifiedTrainingDays,
+      unattributedPositiveTrainingSignalDays:preservation.trainingDaysWithoutSourceIdentity,
+      strengthPreservation:'not_verified',
+    },
+    detailPath:'/training',userEntered:false,substantive:false,priority:1,
+  })
   push({
     id:'weight_energy.decision_boundary',
     domain:'intelligence',label:'Plateau, calorie-change and strength-preservation decision boundary',
