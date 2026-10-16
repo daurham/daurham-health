@@ -150,14 +150,20 @@ export async function fetchHealthProfile(): Promise<HealthProfile> {
   return healthProfileSchema.parse((await response.json()).profile)
 }
 
-export async function saveHealthProfile(input: HealthProfileInput): Promise<HealthProfile> {
+export class HealthProfileConflictError extends Error {
+  constructor() {
+    super('Health Profile changed in another tab or session. Your edits were not saved. Reload and review them before saving.')
+    this.name = 'HealthProfileConflictError'
+  }
+}
+
+export async function saveHealthProfile(input: HealthProfileInput, expectedUpdatedAt: string | null): Promise<HealthProfile> {
   const response = await healthFetch('/api/profile', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(input),
+    body: JSON.stringify({ ...input, expectedUpdatedAt }),
   })
-  if (!response.ok) {
-    throw new Error(await readApiError(response))
-  }
+  if (response.status === 409 || response.status === 428) throw new HealthProfileConflictError()
+  if (!response.ok) throw new Error(await readApiError(response))
   return healthProfileSchema.parse((await response.json()).profile)
 }
