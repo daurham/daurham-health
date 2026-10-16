@@ -31,6 +31,7 @@ const range: AskEvidence = {
 }
 const windowCoverage: AskEvidence = {
   ...todayEvidence, id: 'digestive.focus.coverage.hydration',
+  domain: 'hydration',
   label: 'Water coverage for prior week',
   period: { start: '2026-10-05', end: '2026-10-11' },
   evidenceDates: undefined, value: 2, unit: 'logged days',
