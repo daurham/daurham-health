@@ -730,15 +730,28 @@ function addFocusedDigestive(input: AskHealthPacketInput, push: (item: PushItem)
         ? metric.recordedDays + ' day(s) with logged water. Event totals are not proof of total daily fluid intake; missing days are unknown.'
         : metric.recordedDays + ' day(s) with explicit bowel observations. Only an explicit no-bowel entry means zero; absent logs mean unknown.'
 
+    const requested = focus.requestedDate
+    const requestedDayNote = !requested ? '' : !requested.inSelectedRange
+      ? ' Requested ' + requested.date + ' is outside the selected ' + focus.start +
+        '–' + focus.end + ' evidence window or after the as-of date; Health did not retrieve that day.'
+      : metric.observations.length === 0
+        ? ' No eligible ' + key + ' observation for requested ' + requested.date +
+          ' was found. An absent or unverified observation is unknown, not zero.'
+        : ' Showing only the requested day ' + requested.date +
+          ', not substituting the latest three days.'
     push({
       id: 'digestive.focus.coverage.' + key,
       domain: isFiber ? 'nutrition' : key,
       label: key + ' source coverage',
       value: metric.recordedDays,
       unit: 'logged days',
-      text,
+      text: text + requestedDayNote,
       coverage: {
         recordedDays: metric.recordedDays,
+        ...(requested ? {
+          requestedDate: requested.date,
+          requestedDateScope: requested.inSelectedRange ? 'in_range' : 'out_of_range',
+        } : {}),
         ...(isFiber ? {
           verifiedDays: metric.verifiedDays ?? 0,
           unverifiedDays: metric.recordedDays - (metric.verifiedDays ?? 0),
