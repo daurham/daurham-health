@@ -14,14 +14,14 @@ export function AskHealthAnswerView({
 }: {
   answer: AskHealthAnswer
   evidence: readonly AskEvidence[]
-  correctionContext: { question: string; lens: AskLens; range: ProgressRange }
-  onDraftFollowUp: (draft: string) => void
+  correctionContext?: { question: string; lens: AskLens; range: ProgressRange }
+  onDraftFollowUp?: (draft: string) => void
 }) {
   const prefix = useAppPathPrefix()
   const [flaggedId, setFlaggedId] = useState<string | null>(null)
-  const returnState = makeAskCorrectionState(
-    correctionContext.question, correctionContext.lens, correctionContext.range,
-  )
+  const returnState = correctionContext
+    ? makeAskCorrectionState(correctionContext.question, correctionContext.lens, correctionContext.range)
+    : null
   const ordered = orderedEvidence(answer, evidence)
   return (
     <div className="space-y-4">
@@ -53,13 +53,15 @@ export function AskHealthAnswerView({
                       View source
                     </Link>
                   ) : null}
-                  <button type="button" className="min-h-11 text-sm font-medium underline"
-                    aria-expanded={flaggedId === item.id}
-                    onClick={() => setFlaggedId((current) => current === item.id ? null : item.id)}>
-                    Something wrong?
-                  </button>
+                  {onDraftFollowUp ? (
+                    <button type="button" className="min-h-11 text-sm font-medium underline"
+                      aria-expanded={flaggedId === item.id}
+                      onClick={() => setFlaggedId((current) => current === item.id ? null : item.id)}>
+                      Something wrong?
+                    </button>
+                  ) : null}
                 </div>
-                {flaggedId === item.id ? (
+                {flaggedId === item.id && onDraftFollowUp ? (
                   <div className="mt-2 space-y-2 rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm">
                     {canonicalCorrectionForEvidence(item) && returnState ? (
                       <>
