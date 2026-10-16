@@ -124,18 +124,21 @@ export function digestDateSelection(
   const trailing = question.match(/\b(?:last|past|previous)\s+(\d+)\s+days?\b/i)
   const week = /\b(last|previous|this)\s+week\b/i.exec(question)
   const month = /\b(last|previous|this)\s+month\b/i.exec(question)
-  const unsupportedPeriod = /\b(?:last|past|previous|this|next)\s+(?:year|few\s+days|(?:\d+\s+)?weeks?|(?:\d+\s+)?months?|(?:\d+\s+)?years?)\b/i.test(question)
-    || /\bnext\s+\d+\s+days?\b/i.test(question)
-  // Supported week/month expressions are not ambiguous simply because the
-  // conservative unsupported-pattern recognizer also identifies them.
+  // Remove the ONE supported span before looking for unsupported extras.
+  // "last week and last year" must not silently narrow to "last week".
+  const remaining = [trailing?.[0], week?.[0], month?.[0]]
+    .filter((span): span is string => span != null)
+    .reduce((text, span) => text.replace(span, ''), question)
+  const unexpectedPeriod = /\b(?:last|past|previous|this|next)\s+(?:year|few\s+days|(?:\d+\s+)?weeks?|(?:\d+\s+)?months?|(?:\d+\s+)?years?)\b/i.test(remaining)
+    || /\b(?:last|past|previous|this|next)\s+\d+\s+days?\b/i.test(remaining)
   const periodCount = Number(Boolean(trailing)) + Number(Boolean(week)) + Number(Boolean(month))
-  const unexpectedPeriod = unsupportedPeriod && periodCount === 0
   // A range starting "since/from" or a comparison is not synonymous with
   // the single date/week/month it happens to mention.
   const relational = /\b(?:since|between|from|until|through|versus|vs\.?|compared?\s+(?:to|with))\b/i.test(question)
   const namedMonth = /\b(?:in|during|last|this|next|since|from|through|until)\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b|\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{4}\b/i.test(question)
   if (valid.length !== dates.length || ambiguousFormat || namedMonth || relational ||
-      requested.length > 1 || (requested.length > 0 && periodCount > 0) || periodCount > 1) {
+      requested.length > 1 || (requested.length > 0 && periodCount > 0) || periodCount > 1 ||
+      (periodCount > 0 && unexpectedPeriod)) {
     return { date: null, window: null, issue: 'invalid_or_ambiguous' }
   }
   if (requested.length === 1) return { date: requested[0]!, window: null, issue: null }
