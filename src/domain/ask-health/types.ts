@@ -81,6 +81,14 @@ export type AskPatternInput = {
   text: string
 }
 
+/** Current owner-entered DOB may be backcast to calculate age, never height. */
+export type AskStableProfileInput = {
+  dateOfBirth: string | null
+  ageYears: number | null
+  heightCm: number | null
+  historical: boolean
+}
+
 export type AskClinicalProfileInput = {
   /** Explicit owner-entered sex applicable to reference ranges; not gender identity. */
   sexForPhysiology?: 'male' | 'female' | 'other' | null
@@ -126,6 +134,7 @@ export type AskHealthPacketInput = {
   supplements: readonly TodaySupplementInput[]
   context: AskContextInput | null
   patterns: readonly AskPatternInput[]
+  stableProfile?: AskStableProfileInput | null
   profile?: AskClinicalProfileInput | null
   intelligence?: RoutedHealthIntelligence | null
   nutritionIntegrity?: AskNutritionIntegrity | null

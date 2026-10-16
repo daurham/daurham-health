@@ -2,6 +2,7 @@ import { buildActivityProgressView } from '../../src/domain/activity/index.js'
 import { auditAskHealthSharedCoverage } from '../../src/domain/ask-health/diagnostics.js'
 import { askNutritionIntegrityFromSnapshot } from '../../src/domain/ask-health/nutrition-integrity.js'
 import { askClinicalProfileForDate } from '../../src/domain/ask-health/clinical-profile.js'
+import { askStableProfileForDate } from '../../src/domain/ask-health/stable-profile.js'
 import type { AskBenchmarkInput, AskContextInput, AskExperimentInput, AskHealthPacketInput } from '../../src/domain/ask-health/index.js'
 import { buildProgressOverview } from '../../src/domain/progress/index.js'
 import type { ProgressRange } from '../../src/domain/progress/types.js'
@@ -80,6 +81,7 @@ export async function loadAskHealthPacketInput(input: {
     supplements,
     context: contextSnapshot(contexts),
     patterns,
+    stableProfile: askStableProfileForDate(profile, input.asOf, today),
     profile: askClinicalProfileForDate(profile, input.asOf, today),
     intelligence,
     nutritionIntegrity: askNutritionIntegrityFromSnapshot({ nutrition: overview.nutrition, intelligence: intelligenceSnapshot, today }),

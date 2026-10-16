@@ -3,6 +3,7 @@ export { ASK_SUGGESTIONS } from './suggestions.js'
 export { parseAskHealthRequest, boundConversation, normalizeAskQuestion } from './conversation.js'
 export { ASK_HEALTH_SYSTEM_PROMPT, askHealthUserPrompt, evidenceForModel } from './prompt.js'
 export { askClinicalProfileForDate } from './clinical-profile.js'
+export { askStableProfileForDate } from './stable-profile.js'
 export { validateAskHealthAnswer } from './validate.js'
 export {
   buildAskHealthEvidencePacket,
@@ -20,6 +21,7 @@ export type {
   AskBenchmarkInput,
   AskContextInput,
   AskClinicalProfileInput,
+  AskStableProfileInput,
   AskPatternInput,
   AskTurn,
 } from './types.js'

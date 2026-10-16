@@ -485,3 +485,8 @@ Goal Overview now verifies raw per-source observed/eligible counts, provenance a
 ## 2026-10-15 PIQ-2.1 physiological reference-sex field — work branch
 
 New nullable owner-selected `sex_for_physiology` profile field with portable backup, Settings editor, and owner-entered current-day Ask Health context. No default male on new installs; unset and individually reviewed values never choose a binary formula automatically. Server omitted input preserves current value, explicit null clears it. Requires unapplied migration 0055 after 0053/0054, CI, and owner QA/approval. No main deployment or real owner profile modifications.
+
+
+## 2026-10-15 PIQ-2.2 stable demographic Ask context — work branch
+
+Ask Health's existing owner profile load now conditionally exposes owner-entered birth date, as-of derived calendar age, and today's recorded height for relevant questions. Historical selected dates receive only DOB-derived age, never current height or current clinical/medication/sex-reference context. Unset facts are never guessed, and unrelated general knowledge queries do not include the extra demographic facts. Independent synthetic packet tests added. The branch remains isolated from production; full CI and owner QA required.

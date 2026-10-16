@@ -4,6 +4,7 @@ import { ASK_HEALTH_PACKET_VERSION, ASK_PACKET_MAX_CHARS, type AskLens } from '.
 import { MIN_VERIFIED_NUTRITION_TARGET_DAYS } from './nutrition-integrity.js'
 import type {
   AskClinicalProfileInput,
+  AskStableProfileInput,
   AskContextInput,
   AskEvidence,
   AskGoalInput,
@@ -80,6 +81,7 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
   if (wants.patterns) {
     addPatterns(input.patterns, push)
   }
+  addStableProfile(input.stableProfile ?? null, input.question, input.asOf, push)
   addClinicalProfile(input.profile ?? null, push)
   if (input.intelligence) {
     addSharedIntelligence(input.intelligence, push, limitations)
@@ -888,6 +890,70 @@ function addContext(context: AskContextInput | null, push: (item: PushItem) => v
       userEntered: true,
       substantive: true,
       priority: 5,
+    })
+  }
+}
+
+/** Only transmit dates/measurements when the question needs them. Their
+ * provenance is not interchangeable with clinical history or inferred sex.
+ */
+function addStableProfile(
+  profile: AskStableProfileInput | null,
+  question: string,
+  asOf: string,
+  push: (item: PushItem) => void,
+) {
+  if (!profile) return
+  const demographicRelevant = /\b(?:age|aged|old|birthday|birth|born|height|tall|bmi|bmr|tdee|metabolism|metabolic|calories|calorie|energy expenditure|physiology|physiological|reference ranges?|profile)\b|about me/i.test(question)
+  if (!demographicRelevant) return
+
+  if (profile.dateOfBirth != null && profile.ageYears != null) {
+    push({
+      id: 'profile.date_of_birth',
+      domain: 'profile',
+      label: 'Owner-entered date of birth',
+      value: profile.dateOfBirth,
+      unit: null,
+      text: profile.historical
+        ? 'Current Health Profile birth date, used only to calculate age for the selected historical date. This is not proof the profile was saved during that period.'
+        : 'Birth date currently recorded in the owner Health Profile.',
+      coverage: { source: 'current_owner_profile' },
+      provenance: 'owner_profile_current',
+      detailPath: '/settings#health-profile',
+      userEntered: true,
+      substantive: true,
+      priority: 1,
+    })
+    push({
+      id: 'profile.age_years_as_of',
+      domain: 'profile',
+      label: 'Age on selected date',
+      value: profile.ageYears,
+      unit: 'years',
+      text: `Age calculated from the owner-entered birth date for ${asOf}; this is a derived calendar value, not an independently recorded health observation.`,
+      coverage: { asOf },
+      provenance: 'derived_from_current_owner_profile',
+      detailPath: '/settings#health-profile',
+      userEntered: false,
+      substantive: true,
+      priority: 1,
+    })
+  }
+
+  if (!profile.historical && profile.heightCm != null) {
+    push({
+      id: 'profile.height_cm',
+      domain: 'profile',
+      label: 'Current owner-entered height',
+      value: profile.heightCm,
+      unit: 'cm',
+      text: 'Height currently recorded in Health Profile, not a dated historical measurement.',
+      coverage: { source: 'current_owner_profile' },
+      provenance: 'owner_profile_current',
+      detailPath: '/settings#health-profile',
+      userEntered: true,
+      substantive: true,
+      priority: 1,
     })
   }
 }
