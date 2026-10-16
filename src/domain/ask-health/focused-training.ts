@@ -1,5 +1,6 @@
 import { compareSetChronology, sessionStrengthPoint } from '../progress/exercise-performance.js'
 import type { CanonicalSetRecord, ProgressExerciseDefinition } from '../progress/types.js'
+import { digestDateSelection } from './focused-digestive.js'
 
 /** The selected question calls for exercise-specific records, not every set
  * from every workout. Uses already-loaded canonical rows; never generic SQL.
@@ -16,6 +17,14 @@ export type FocusedTrainingEvidence = {
   exerciseId: string
   exerciseName: string
   eligibleAppearances: number
+  /** When supplied, only appearances within this explicit historical date may be included. */
+  requestedDate?: { date: string; inSelectedRange: boolean } | null
+  /** Entire requested window must lie inside selected Health evidence range. */
+  requestedWindow?: {
+    start: string; end: string; label: string
+    calendarDays: number; inSelectedRange: boolean
+  } | null
+  dateSelectionIssue?: 'invalid_or_ambiguous' | 'unsupported_period' | null
   /** Most recent six eligible appearances, oldest first. */
   appearances: FocusedTrainingAppearance[]
 }
@@ -62,12 +71,36 @@ export function focusTrainingWorkingSets(input: {
   sets: readonly CanonicalSetRecord[]
   start: string
   end: string
+  /** Health-local actual today and selected historical as-of; default to end for existing callers. */
+  today?: string
+  asOf?: string
 }): FocusedTrainingEvidence | null {
   const exercise = matchFocusedExercise(input.question, input.exercises)
   if (!exercise) return null
-  const selected = input.sets.filter((set) => (
-    set.exerciseId === exercise.id && set.sessionDate >= input.start && set.sessionDate <= input.end
-  ))
+  // Share the existing conservative historical-date interpretation with
+  // digestive evidence; unresolved formats cannot fall back to recent sets.
+  const today = input.today ?? input.end
+  const asOf = input.asOf ?? input.end
+  const selection = digestDateSelection(input.question, today, asOf)
+  const requestedDate = selection.date == null ? null : {
+    date: selection.date,
+    inSelectedRange: selection.date >= input.start && selection.date <= input.end &&
+      selection.date <= asOf && selection.date <= today,
+  }
+  const requestedWindow = selection.window == null ? null : {
+    ...selection.window,
+    inSelectedRange: selection.window.start >= input.start && selection.window.end <= input.end &&
+      selection.window.end <= asOf && selection.window.end <= today,
+  }
+  const validScope = !selection.issue &&
+    (requestedDate?.inSelectedRange ?? true) &&
+    (requestedWindow?.inSelectedRange ?? true)
+  const selected = validScope ? input.sets.filter((set) => (
+    set.exerciseId === exercise.id &&
+    set.sessionDate >= input.start && set.sessionDate <= input.end && set.sessionDate <= asOf &&
+    (requestedDate == null || set.sessionDate === requestedDate.date) &&
+    (requestedWindow == null || (set.sessionDate >= requestedWindow.start && set.sessionDate <= requestedWindow.end))
+  )) : []
   const groups = new Map<string, CanonicalSetRecord[]>()
   for (const set of selected) {
     const group = groups.get(set.sessionId)
@@ -89,6 +122,9 @@ export function focusTrainingWorkingSets(input: {
     exerciseId: exercise.id,
     exerciseName: exercise.name,
     eligibleAppearances: appearances.length,
+    requestedDate,
+    requestedWindow,
+    dateSelectionIssue: selection.issue,
     appearances: appearances.slice(-6).map(({ setId, date, weightKg, reps, estimated1RmKg }) =>
       ({ setId, date, weightKg, reps, estimated1RmKg })),
   }
