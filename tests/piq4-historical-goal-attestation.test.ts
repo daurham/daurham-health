@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { requiresHistoricalGoalBoundary } from '../src/domain/ask-health/historical-goal-scope.js'
 import { buildAskHealthEvidencePacket, packetFingerprintMaterial } from '../src/domain/ask-health/packet.js'
 import { buildHealthIntelligenceSnapshot } from '../src/domain/intelligence/shared.js'
