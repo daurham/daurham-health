@@ -27,8 +27,9 @@ export type AskIntentRoute = {
 }
 
 const SELF = /\b(i|i'm|im|i've|ive|i'd|my|mine|me|myself|we|our|ours|us)\b/i
+const OWNER_REFERENT = /\b(?:the|this|that)\s+(?:goal|target|plan|routine|workout|session|measurement|log|trend|experiment|result|record|entry)\b/i
 const PERSONAL_DIRECTIVE = /\b(for me|should i|can i|do i|am i|have i|would i|help me|tell me about myself|based on (my|our)|according to (my|our))\b/i
-const SYMPTOM = /\b(symptoms?|pain|dizzy|nausea|constipation|diarrhea|headache|sick|fatigue|fainting|bleeding|vomit|heart racing|short(ness)? of breath)\b/i
+const SYMPTOM = /\b(symptoms?|pain|dizzy|nausea|constipation|diarrhea|headaches?|sick|fatigue|fainting|bleeding|vomit|heart racing|short(ness)? of breath)\b/i
 const URGENT = /\b(chest pain|can't breathe|cannot breathe|difficulty breathing|severe bleeding|stroke|suicid(al|e)|overdose|unconscious|passing out)\b/i
 const RESEARCH = /\b(research|studies|papers|clinical trials|meta.analysis|systematic review|published evidence|recent guidelines)\b/i
 const HISTORICAL = /\b(last|previous|past|earlier|before|yesterday|ago|since)\b.{0,26}\b(days?|weeks?|months?|years?)\b|\byesterday\b|\blast (year|month|week)\b/i
@@ -43,6 +44,7 @@ const EDUCATIONAL = /^(?:what (?:is|are|does|do|causes?|happens?|can)|how (?:doe
 export function routeAskHealthIntent(question: string, conversation: readonly AskTurn[] = []): AskIntentRoute {
   const q = question.trim()
   const personal = SELF.test(q) || PERSONAL_DIRECTIVE.test(q)
+  if (OWNER_REFERENT.test(q)) return { intent: 'ambiguous', route: 'owner', confidence: 'conservative' }
   if (personal && URGENT.test(q)) return { intent: 'urgent_safety', route: 'owner', confidence: 'high' }
   if (personal && SYMPTOM.test(q)) return { intent: 'symptom_context', route: 'owner', confidence: 'high' }
   if (RESEARCH.test(q)) return { intent: 'research_request', route: 'owner', confidence: 'conservative' }

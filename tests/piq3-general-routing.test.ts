@@ -76,6 +76,8 @@ describe('PIQ-3.1 conservative intent classification', () => {
       expect(general(q).route).toBe('owner')
     }
     expect(general('I have chest pain right now').intent).toBe('urgent_safety')
+    expect(general('How is the goal?').route).toBe('owner')
+    expect(general('What is the training plan?').route).toBe('owner')
     expect(general('Why do I get headaches?').intent).toBe('symptom_context')
     expect(general('Has creatine improved my bench press?').intent).toBe('personal_trend')
   })

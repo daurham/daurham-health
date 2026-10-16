@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
 import { buildAskHealthEvidencePacket } from '../src/domain/ask-health/index.js'
-import { insufficientAskHealthAnswer } from '../src/domain/ask-health/packet.js'
 import { explainAskHealth } from '../server/ask-health/service.js'
 import { createAskHealthGate } from '../server/ask-health/gate.js'
 import {
@@ -70,29 +69,34 @@ describe('PIQ-0 human-reviewed answer scoring harness (NOT a clinical classifier
     // Passing synthetic review is not a claim that Gemini produces this answer.
   })
 
-  it('T01 KNOWN PRODUCT GAP: actual no-evidence fallback is syntactically valid but fails directness', async () => {
+  it('T01 FIXED: general education without owner records meets the synthetic directness review', async () => {
     const packet = fixture()
-    const provider = vi.fn(async () => ({ text: raw([{ text: general, evidence_refs: [] }]),
-      model: 'piq-stub', inputTokens: 10, outputTokens: 12 }))
+    const provider = vi.fn(async () => ({
+      text: raw([{ text: general, evidence_refs: [] }]),
+      model: 'piq-stub', inputTokens: 10, outputTokens: 12,
+    }))
     const actual = await explainAskHealth({
       packet, question: 'What does creatine do?', conversation: [], provider, model: 'piq-stub',
       gate: createAskHealthGate(), now: 1_000,
     })
-    expect(provider).not.toHaveBeenCalled()
-    expect(actual.answer).toEqual(insufficientAskHealthAnswer(packet))
-    const got = raw(actual.answer.blocks.map((block) => ({
-      text: block.text, evidence_refs: block.evidenceRefs,
-    })))
-    const axis = scores(4)
-    axis.directness = 0
-    const rated = evaluatePiqReviewedAnswer({
-      raw: got, evidence: packet.evidence,
-      review: review({ scores: axis, claims: [{
-        blockIndex: 0, kind: 'general', support: 'supported', requiredEvidenceIds: [],
-      }], notes: 'Actual current product fallback does not answer the general question.' }),
+    expect(provider).toHaveBeenCalledTimes(1)
+    expect(actual.meta).toMatchObject({
+      answerScope: 'general', diagnostic: { path: 'general_model_answer' },
     })
-    expect(rated).toMatchObject({ schemaValid: true, outcome: 'below_fixture_bar' })
-    expect(rated.failReasons).toContain('required_axis_below_3')
+    expect(actual.evidence).toEqual([])
+    expect(actual.answer.blocks[0]?.evidenceRefs).toEqual([])
+    expect(actual.answer.blocks[0]?.text).toBe(general)
+    const rated = evaluatePiqReviewedAnswer({
+      raw: raw(actual.answer.blocks.map((block) => ({
+        text: block.text, evidence_refs: block.evidenceRefs,
+      }))),
+      evidence: actual.evidence,
+      review: review({ notes: 'Synthetic provider text scored against the direct-answer rubric.' }),
+    })
+    expect(rated).toMatchObject({
+      schemaValid: true, outcome: 'meets_fixture_bar',
+    })
+    // Fixture-score success is NOT evidence that live Gemini replies are medically accurate.
   })
 
   it('T28 KNOWN VALIDATOR GAP: an uncited personal claim passes structure but fails review', () => {
