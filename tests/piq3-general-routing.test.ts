@@ -4,7 +4,7 @@ import {
   buildAskHealthEvidencePacket, type AskHealthPacketInput,
 } from '../src/domain/ask-health/index.js'
 import { blankGeneralAskPacket, generalAnswerInventsPersonalRecord } from '../src/domain/ask-health/general.js'
-import { answerAskHealth, explainAskHealth } from '../server/ask-health/service.js'
+import { answerAskHealth, explainAskHealth, type AskHealthProvider } from '../server/ask-health/service.js'
 import { createAskHealthGate } from '../server/ask-health/gate.js'
 
 const loader = vi.hoisted(() => ({ load: vi.fn() }))
@@ -17,7 +17,7 @@ const general = (question: string, conversation: Array<{role:'user'|'assistant';
 const answer = (text: string, evidence_refs: string[] = []) => JSON.stringify({
   blocks: [{ text, evidence_refs }], limitations: [], follow_ups: [],
 })
-const provider = (text: string) => vi.fn(async () => ({
+const provider = (text: string) => vi.fn(async (_input: Parameters<AskHealthProvider>[0]) => ({
   text: answer(text),
   model: 'piq-stub', inputTokens: 20, outputTokens: 20,
 }))
