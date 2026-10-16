@@ -803,7 +803,7 @@ function addFocusedWeightEnergy(
       calorieAdjustment:combined.calorieAdjustment,
       plateauClassification:combined.plateauClassification,
       strengthPreservation:combined.strengthPreservation,
-      reviewReasons:combined.reasons},
+      reviewReasons:combined.reasons.join(', ')},
     detailPath:'/goals',userEntered:false,substantive:false,priority:0,
   })
   const settings = focus.currentSettings
