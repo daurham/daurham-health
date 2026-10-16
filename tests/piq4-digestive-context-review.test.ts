@@ -12,16 +12,17 @@ const bowelDates=Array.from({length:16},(_,i)=>addCalendarDays('2026-09-06',i*2)
 function construct(options:{
   fiber?:number[],water?:number[],hard?:number[],
   missingFiber?:string[],context?:DigestiveContextTagDay[],todayAdded?:boolean,
-  incomplete?:boolean,
+  incomplete?:boolean,stoolDates?:string[],explicitZeroDates?:string[],
 }={}) {
-  const recorded=options.todayAdded?[...bowelDates,today]:bowelDates
+  const activeDates=options.stoolDates??bowelDates
+  const recorded=options.todayAdded?[...activeDates,today]:activeDates
   const observations:IntelligenceObservation[]=[]
   for(let i=0;i<recorded.length;i++){
     const date=recorded[i]!
     observations.push({key:'bowel.count',date,value:1,unit:'count',provenance:'owner',sourceIds:['b'+i]})
   }
-  for(let i=0;i<bowelDates.length;i++){
-    const date=bowelDates[i]!
+  for(let i=0;i<activeDates.length;i++){
+    const date=activeDates[i]!
     if(!options.missingFiber?.includes(date))observations.push({
       key:'nutrition.fiber_g',date,value:options.fiber?.[i]??(17+i),
       unit:'g',provenance:'owner',quality:'high_confidence',sourceIds:['f'+i],
@@ -31,9 +32,13 @@ function construct(options:{
       unit:'ml',provenance:'owner',sourceIds:['w'+i],
     })
   }
+  for(const [i,date] of (options.explicitZeroDates??[]).entries()){
+    observations.push({key:'bowel.count',date,value:0,unit:'count',provenance:'owner',
+      sourceIds:[]})
+  }
   const snapshot=buildHealthIntelligenceSnapshot({
     range:'90d',asOf:today,start,end:today,timezone:'America/Phoenix',today,
-    observations,nutritionVerifiedCompleteDates:new Set(bowelDates),
+    observations,nutritionVerifiedCompleteDates:new Set(activeDates),
     nutritionVerificationStatus:'available',
   })
   const focused=focusDigestiveContext({snapshot,question:'Are my stools from my fiber?',today})!
@@ -126,5 +131,61 @@ describe('PIQ-4.1 variation and confounder readiness (synthetic, no owner record
       provisionalBowelDaysExcluded:1,partiallyTypedBowelDays:1,fullyTypedBowelDays:15,
     })
     expect(f.screen?.fiber[0]?.pairedDays).toBe(15)
+  })
+
+  it('requires evidence in two non-overlapping 14-day bins rather than one dense cluster plus an outlier',()=>{
+    // Eleven saved dates in one fortnight and a single later date across a
+    // fourth Monday-start week; 12 pairs across 4 weeks but not 2 bins of 4.
+    const dates=[
+      ...Array.from({length:11},(_,i)=>addCalendarDays('2026-08-29',i)),
+      '2026-09-16',
+    ]
+    const f=construct({stoolDates:dates})
+    expect(f.screen?.fiber[0]).toMatchObject({
+      pairedDays:12,pairedCalendarWeeks:4,qualifiedReviewWindows:1,
+      maturity:'insufficient_separated_windows',
+    })
+    expect(evidence(f).find(x=>x.id==='digestive.pairing.coverage.fiber')?.text)
+      .toContain('non-overlapping 14-day bins')
+  })
+  it('does not call distant bowel-report clusters continuous observations',()=>{
+    const dates=[
+      ...Array.from({length:6},(_,i)=>addCalendarDays('2026-08-20',i)),
+      ...Array.from({length:6},(_,i)=>addCalendarDays('2026-09-20',i)),
+    ]
+    const f=construct({stoolDates:dates})
+    expect(f.screen?.fiber[0]?.pairedDays).toBe(12)
+    expect(f.screen?.fiber[0]?.qualifiedReviewWindows).toBe(2)
+    expect(f.screen?.fiber[0]?.longestUnknownBowelStreakDays).toBeGreaterThan(7)
+    expect(f.screen?.fiber[0]?.maturity).toBe('incomplete_bowel_diary')
+    expect(evidence(f).find(x=>x.id==='digestive.pairing.coverage.fiber')?.text)
+      .toContain('unknown dates are NOT confirmed no-movement days')
+  })
+  it('explicit zero-day logs count as observed continuity, never hard stools or outcome pairs',()=>{
+    const dates=[
+      ...Array.from({length:6},(_,i)=>addCalendarDays('2026-08-20',i)),
+      ...Array.from({length:6},(_,i)=>addCalendarDays('2026-09-20',i)),
+    ]
+    const zeroDates=Array.from({length:25},(_,i)=>addCalendarDays('2026-08-26',i))
+    const f=construct({stoolDates:dates,explicitZeroDates:zeroDates})
+    expect(f.screen?.fiber[0]).toMatchObject({
+      pairedDays:12,qualifiedReviewWindows:2,longestUnknownBowelStreakDays:0,
+      activeSpanContinuityScreenPassed:true,maturity:'candidate_for_review',
+    })
+    expect(f.window.status).toBe('available')
+    if(f.window.status==='available'){
+      expect(f.window.explicitNoMovementDays).toBe(25)
+      expect(f.window.typedEvents).toBe(12)
+    }
+    expect(evidence(f).find(x=>x.id==='digestive.pairing.coverage.fiber')?.text)
+      .toContain('does NOT verify complete daily bowel tracking')
+  })
+  it('reports the selected range unknown-status count without pretending unlogged dates are zero',()=>{
+    const f=construct()
+    expect(f.screen?.fiber[0]?.maturity).toBe('candidate_for_review')
+    expect(f.screen?.selectedRangeUnknownStatusDays).toBeGreaterThan(0)
+    const item=evidence(f).find(x=>x.id==='digestive.pairing.coverage.fiber')
+    expect(item?.coverage?.unknownBowelStatusDays).toBeGreaterThan(0)
+    expect(item?.text).toContain('absence of a saved event cannot be interpreted as no movement')
   })
 })

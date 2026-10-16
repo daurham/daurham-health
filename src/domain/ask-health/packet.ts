@@ -1036,6 +1036,9 @@ function addFocusedDigestive(input: AskHealthPacketInput, push: (item: PushItem)
       const candidates = row.entries.filter(lag => lag.maturity === 'candidate_for_review')
       const contextual = row.entries.filter(lag => lag.contextFlaggedPairDays > 0 ||
         lag.coLoggedWaterVaries && row.key === 'fiber')
+      const missingContinuity = row.entries.some(lag => lag.maturity === 'incomplete_bowel_diary')
+      const insufficientSeparatedWindows = row.entries.some(lag =>
+        lag.maturity === 'insufficient_separated_windows')
       const lackingVariation = row.entries.filter(lag =>
         lag.pairedDays > 0 && (!lag.stoolHardnessVaries || !lag.exposureVaries))
       push({
@@ -1060,12 +1063,25 @@ function addFocusedDigestive(input: AskHealthPacketInput, push: (item: PushItem)
                 : ' No lag satisfies all the initial variation, coverage and context checks; NOT for a claim of association.') +
           (contextual.length ? ' Owner-entered daily context tags or co-changing logged-water values require alternative-explanation review; neither establishes a cause.' : '') +
           (lackingVariation.length ? ' At least one lag lacks variation across dates in stool hardness or the recorded exposure; a fixed series cannot support a change relationship.' : '') +
+          (missingContinuity ? ' A stretch of more than 7 days without any saved bowel status interrupts recording continuity; unknown dates are NOT confirmed no-movement days.' : '') +
+          (insufficientSeparatedWindows ? ' There are too few separated, non-overlapping 14-day bins with at least 4 qualified pairs each for a later review candidate.' : '') +
+          ' This coverage screen does NOT verify complete daily bowel tracking; absence of a saved event cannot be interpreted as no movement.' +
           ' Absence of owner-entered context tags does NOT prove there were no illness, medication, travel, diet or routine changes.' +
           ' The same logged day can appear in more than one lag; those lags are NOT independent replications.' +
           ' Neither matching dates nor any displayed pair count is a correlation, cause, diagnosis or rationale to change calorie intake.' +
           ' Missing records are unknown, not zero.',
         coverage: {
           qualifiedBowelDays: pairing.fullyTypedBowelDays,
+          selectedRangeCalendarDays: pairing.selectedRangeCalendarDays,
+          savedBowelStatusDays: pairing.selectedRangeObservedStatusDays,
+          unknownBowelStatusDays: pairing.selectedRangeUnknownStatusDays,
+          longestUnknownActiveStreakDays: row.entries[0]?.longestUnknownBowelStreakDays ?? 0,
+          minimumSeparatedReviewWindows: 2,
+          minimumPairsPerSeparatedWindow: 4,
+          minimumCalendarDaysPerSeparatedWindow: 14,
+          sameDayQualifiedReviewWindows: row.entries[0]?.qualifiedReviewWindows ?? 0,
+          nextDayQualifiedReviewWindows: row.entries[1]?.qualifiedReviewWindows ?? 0,
+          twoDayQualifiedReviewWindows: row.entries[2]?.qualifiedReviewWindows ?? 0,
           provisionalBowelDaysExcluded: pairing.provisionalBowelDaysExcluded,
           minimumPairsForReview: 12,
           minimumWeeksForReview: 4,
