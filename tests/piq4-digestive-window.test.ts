@@ -107,7 +107,7 @@ describe('PIQ-4.1 bounded full-window bowel evidence without causal inference',(
     const old=fixture(obs,'What were my stools on 2026-09-12?').focus
     expect(selectDigestiveBowelWindow(old,today)).toBeNull()
   })
-  it('recognizes today's record as provisional without assuming the day was completed',()=>{
+  it("recognizes today\'s record as provisional without assuming the day was completed",()=>{
     const current=[...obs,{key:'bowel.count' as const,date:today,value:1,unit:'count',
       provenance:'owner' as const,sourceIds:['c']}]
     const {snapshot,focus}=fixture(current)
