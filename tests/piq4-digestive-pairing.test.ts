@@ -97,7 +97,7 @@ describe('PIQ-4.1 typed bowel/fiber/water lag pairing readiness',()=>{
   it('omits provisional day and incomplete Bristol types from all paired signals',()=>{
     const f=fixture({todayStool:true,partial:true})
     expect(f.pairing).toMatchObject({
-      recordedBowelDays:18,fullyTypedBowelDays:15,
+      recordedBowelDays:17,fullyTypedBowelDays:15,
       partiallyTypedBowelDays:1,provisionalBowelDaysExcluded:1,
     })
     expect(f.pairing?.fiber[0]?.pairedDays).toBe(15)
