@@ -267,6 +267,83 @@ describe('PIQ-3 historical citation period validator', () => {
     expect(invalid.blocks[0]?.text).toContain('cannot verify')
   })
 
+  it('normalizes thousands-grouped measurements without inventing smaller values', () => {
+    expect(literalOwnerQuantities('You logged 1,800 ml water and 12,345.5 steps.'))
+      .toEqual([{ value: 1800, unit: 'ml' }, { value: 12345.5, unit: 'steps' }])
+    expect(literalOwnerQuantities('Calendar date 2026-10-06, 18.2 g of fiber.'))
+      .toEqual([{ value: 18.2, unit: 'g' }])
+    const q = 'How much water did I record last week?'
+    const proper = 'You logged a total of 1,800 ml of water last week.'
+    const wrong = 'You logged a total of 1,500 ml of water last week.'
+    expect(groundHistoricalAnswer(answer([item(proper, [windowCoverage.id])]), packet([windowCoverage]), q)
+      .blocks[0]?.text).toEqual(proper)
+    expect(groundHistoricalAnswer(answer([item(wrong, [windowCoverage.id])]), packet([windowCoverage]), q)
+      .blocks[0]?.text).toContain('cannot verify')
+  })
+
+  it('matches each numeric sum and mean in a combined historical answer separately', () => {
+    const q = 'How much water did I log last week?'
+    const source: AskEvidence = {
+      ...windowCoverage, coverage: { ...windowCoverage.coverage, meanPerObservedDay: 900 },
+    }
+    const correct = 'You logged a total of 1,800 ml and averaged 900 ml of water per observed day last week.'
+    expect(groundHistoricalAnswer(answer([item(correct, [source.id])]), packet([source]), q)
+      .blocks[0]?.text).toEqual(correct)
+    const wrongSum = 'You logged a total of 900 ml and averaged 900 ml of water last week.'
+    const wrongMean = 'You logged a total of 1,800 ml and averaged 1,800 ml of water last week.'
+    for (const text of [wrongSum, wrongMean]) {
+      expect(groundHistoricalAnswer(answer([item(text, [source.id])]), packet([source]), q)
+        .blocks[0]?.text).toContain('cannot verify')
+    }
+  })
+
+  it('never cites grams of fiber as protein or carbs merely because date, domain and value match', () => {
+    const fiber: AskEvidence = {
+      ...windowCoverage, id: 'digestive.focus.coverage.fiber',
+      domain: 'nutrition', value: 2, unit: 'logged days',
+      coverage: {
+        ...windowCoverage.coverage, recordedWindowSum: 46, meanPerObservedDay: 23,
+      },
+    }
+    const q = 'How much fiber did I log last week?'
+    const valid = 'You recorded a total of 46 g fiber last week.'
+    const wrong = [
+      'You recorded a total of 46 g protein last week.',
+      'You recorded a total of 46 g carbohydrates last week.',
+    ]
+    expect(groundHistoricalAnswer(answer([item(valid, [fiber.id])]), packet([fiber]), q)
+      .blocks[0]?.text).toEqual(valid)
+    for (const text of wrong) {
+      expect(groundHistoricalAnswer(answer([item(text, [fiber.id])]), packet([fiber]), q)
+        .blocks[0]?.text).toContain('cannot verify')
+    }
+    const protein = { ...fiber, id: 'nutrition.protein' }
+    const correctlyPaired = 'You recorded 46 g of fiber and 46 g of protein last week.'
+    expect(groundHistoricalAnswer(
+      answer([item(correctlyPaired, [fiber.id, protein.id])]), packet([fiber, protein]), q,
+    ).blocks[0]?.text).toEqual(correctlyPaired)
+    expect(groundHistoricalAnswer(
+      answer([item(correctlyPaired, [fiber.id])]), packet([fiber]), q,
+    ).blocks[0]?.text).toContain('cannot verify')
+  })
+
+  it('distinguishes logged load from estimated strength in two-number same-block claims', () => {
+    const source: AskEvidence = {
+      ...dated, value: 93.3, coverage: { reps: 5, recordedLoadKg: 80 },
+    }
+    const q = 'How was my bench press on 2026-10-06?'
+    const good = 'You lifted 80 kg; your estimated 1RM was 93.3 kg.'
+    expect(groundHistoricalAnswer(answer([item(good, [source.id])]), packet([source]), q)
+      .blocks[0]?.text).toEqual(good)
+    for (const wrong of [
+      'You lifted 93.3 kg; your estimated 1RM was 93.3 kg.',
+      'You lifted 80 kg; your estimated 1RM was 80 kg.',
+    ]) {
+      expect(groundHistoricalAnswer(answer([item(wrong, [source.id])]), packet([source]), q)
+        .blocks[0]?.text).toContain('cannot verify')
+    }
+  })
+
   it('does not call Gemini again for a historical citation mismatch, and caches only the safe answer', async () => {
     const q = 'How was my bench press on 2026-10-06?'
     const gate = createAskHealthGate({ minIntervalMs: 0, budgetUsd: 100 })
