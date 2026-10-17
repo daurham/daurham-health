@@ -145,7 +145,7 @@ describe('PIQ-0 evidence load boundary and corrected-source cache', () => {
     expect(model).toHaveBeenCalledTimes(2)
   })
 
-  it('T48 KNOWN LIMITATION: a corrected fact omitted by a tight packet cap does not alter its cache fingerprint', () => {
+  it('T48: a corrected, size-omitted current profile fact invalidates the personal cache via its verified revision', () => {
     const question = 'Which of my active medications could be relevant?'
     const original = Array.from({ length: 16 }, (_, index) => ({
       name: index === 15 ? 'Synthetic Example A' : 'Synthetic Other ' + index,
@@ -160,9 +160,13 @@ describe('PIQ-0 evidence load boundary and corrected-source cache', () => {
     })
     const before = buildAskHealthEvidencePacket({
       ...input(question), profile: profile(original), maxChars: 1700,
+      currentHealthProfileSourceRecheck: 'verified',
+      currentProfileRevision: '2026-10-14T10:00:00.000Z',
     })
     const after = buildAskHealthEvidencePacket({
       ...input(question), profile: profile(changed), maxChars: 1700,
+      currentHealthProfileSourceRecheck: 'verified',
+      currentProfileRevision: '2026-10-14T10:00:01.000Z',
     })
     const unlimited = buildAskHealthEvidencePacket({
       ...input(question), profile: profile(changed),
@@ -171,9 +175,24 @@ describe('PIQ-0 evidence load boundary and corrected-source cache', () => {
     expect(before.evidence.map((item) => item.id)).not.toContain('clinical.medication.15')
     expect(after.evidence.map((item) => item.id)).not.toContain('clinical.medication.15')
     expect(before.evidenceSelectionAudit?.removedSubstantiveCount).toBeGreaterThan(0)
-    expect(packetFingerprintMaterial(before)).toBe(packetFingerprintMaterial(after))
-    // The app cannot promise a cache refresh for facts it did not select.
-    // T48/PIQ-3 needs source revision or relevant fact preservation.
+    expect(before.evidence).toEqual(after.evidence)
+    expect(packetFingerprintMaterial(before)).not.toBe(packetFingerprintMaterial(after))
+    expect(packetFingerprintMaterial(before)).not.toContain('Synthetic Example A')
+    expect(packetFingerprintMaterial(after)).not.toContain('Synthetic Example B')
+    // An omitted correction is intentionally NOT sent to the model: only the
+    // private cache key changes when the saved owner profile version changes.
+    const withoutAttestation = buildAskHealthEvidencePacket({
+      ...input(question), profile: profile(changed), maxChars: 1700,
+      currentHealthProfileSourceRecheck: 'changed_or_unavailable',
+      currentProfileRevision: '2026-10-14T10:00:01.000Z',
+    })
+    expect(withoutAttestation.currentProfileRevision).toBeNull()
+    const historical = buildAskHealthEvidencePacket({
+      ...input(question), asOf: '2026-10-01', profile: profile(changed), maxChars: 1700,
+      currentHealthProfileSourceRecheck: 'verified',
+      currentProfileRevision: '2026-10-14T10:00:01.000Z',
+    })
+    expect(historical.currentProfileRevision).toBeNull()
   })
 
   it('a different historical as-of scope has a distinct evidence fingerprint', () => {

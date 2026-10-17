@@ -433,6 +433,10 @@ export async function loadAskHealthPacketInput(input: {
     currentContextSourceRecheck,
     patterns,
     currentHealthProfileSourceRecheck,
+    // Reuse the already-loaded optimistic Health Profile version; no new SQL.
+    // A failed recheck remains an explicit source inconsistency, not a usable version.
+    currentProfileRevision: personalizedCurrent && currentHealthProfileSourceRecheck === 'verified'
+      ? profile.updatedAt : null,
     supplementSourceRecheck,
     stableProfile: askStableProfileForDate(profile, input.asOf, today),
     profile: askClinicalProfileForDate(profile, input.asOf, today),

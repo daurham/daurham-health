@@ -178,6 +178,9 @@ export type AskHealthPacketInput = {
   profile?: AskClinicalProfileInput | null
   /** Current owner Profile source fields/revision matched a final local read. */
   currentHealthProfileSourceRecheck?: 'not_checked' | 'verified' | 'changed_or_unavailable'
+  /** Server-loaded current profile update token; used ONLY for personal answer cache invalidation.
+   * Does not grant authority to use historical/current facts without matching source recheck. */
+  currentProfileRevision?: string | null
   intelligence?: RoutedHealthIntelligence | null
   nutritionIntegrity?: AskNutritionIntegrity | null
   maxChars?: number
@@ -201,6 +204,8 @@ export type AskHealthPacket = {
     missing: IntelligenceContextItem[]
   }
   clarification: string | null
+  /** Private cache-key revision. Never put this token in Gemini evidence or response metadata. */
+  currentProfileRevision?: string | null
   evidenceSelectionAudit?: AskHealthEvidenceSelectionAudit | null
   sourceCoverageAudit?: AskHealthSourceCoverageAudit | null
 }

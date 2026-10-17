@@ -245,6 +245,13 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
     asOf: input.asOf,
     ...(input.healthToday ? { healthToday: input.healthToday } : {}),
     generatedAt: input.generatedAt,
+    // Correcting a saved profile fact must invalidate a prior personal answer
+    // even if that fact was omitted from the capped Gemini evidence packet.
+    // Stable date/recheck gates avoid importing current profile into history.
+    currentProfileRevision: input.contextMode !== 'general_only' &&
+      input.healthToday != null && input.asOf === input.healthToday &&
+      input.currentHealthProfileSourceRecheck === 'verified'
+        ? input.currentProfileRevision ?? null : null,
     evidence,
     limitations: limitations.filter((item) => evidence.some((fact) => fact.id === item.evidenceId)),
     contextSummary: {
@@ -295,6 +302,8 @@ export function packetFingerprintMaterial(packet: AskHealthPacket): string {
     rangeEnd: packet.rangeEnd,
     asOf: packet.asOf,
     healthToday: packet.healthToday ?? null,
+    // Private version, never included in the provider prompt or client meta.
+    currentProfileRevision: packet.currentProfileRevision ?? null,
     evidence: packet.evidence.map((item) => ({
       id: item.id,
       value: item.value,
