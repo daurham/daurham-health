@@ -792,6 +792,8 @@ function addFocusedWeightEnergy(
             ? 'The latest Goal Control weight point changed or no longer matches its private source fingerprint; target and deadline reports are WITHHELD. '
             :canonical.state==='measurement_source_unavailable'
               ? 'The latest Goal Control weight-point recheck is unavailable; target and deadline reports are WITHHELD. '
+              :canonical.state==='measurement_conditions_unverified'
+                ? 'The latest Goal Control weight observation was recorded under unknown or different measurement conditions; the current selected-goal target and deadline review is WITHHELD. '
               :canonical.state==='projection_source_changed'
                 ? 'The weight history used to calculate Goal Control projections changed during retrieval; canonical target and deadline reports are WITHHELD. '
                 :canonical.state==='projection_source_unavailable'

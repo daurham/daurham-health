@@ -10,6 +10,7 @@ export type CanonicalGoalStatusReview={
   state:'not_checked'|'unavailable'|'primary_not_weight'|'version_mismatch'|
     'canonical_target_unknown'|'canonical_reported'|'measurement_disagreement'|
     'measurement_source_changed'|'measurement_source_unavailable'|
+    'measurement_conditions_unverified'|
     'projection_source_changed'|'projection_source_unavailable'|
     'projection_quality_limited'|'projection_conditions_unverified'
   /** Goal Control's current read is a REPORT, not a separately locked measurement. */
@@ -74,6 +75,7 @@ export function reviewCanonicalSelectedGoal(input:{
     return {...UNCHECKED_CANONICAL_GOAL_STATUS,state:'version_mismatch'}
   if(!targetCompatible(goal.targetMode,canonical.targetState))return {...unknown}
   let sourceRevision:CanonicalGoalStatusReview['measurementRevision']='not_attested'
+  let latestPointConditionsUnverified=false
   if(input.sourceRead!==undefined){
     if(!input.sourceRead||input.sourceRead.status!=='available')
       return {...unknown,state:'measurement_source_unavailable',
@@ -86,8 +88,14 @@ export function reviewCanonicalSelectedGoal(input:{
       return {...unknown,state:'measurement_source_changed',
         measurementRevision:'changed_or_unavailable'}
     // Missing point => unknown goal, never a confirmed unchanged weight.
+    // Only an unchanged point identified as 'usual' supports a current
+    // Goal Control target report. This is a source label, not clinical proof.
+    latestPointConditionsUnverified=input.sourceRead.hasPoint&&
+      input.sourceRead.comparability!=='usual'
   }
   let projectionRevision:CanonicalGoalStatusReview['projectionRevision']='not_attested'
+  let projectionQualityState:'projection_conditions_unverified'|
+    'projection_quality_limited'|null=null
   if(input.projectionSourceRead!==undefined){
     const check=input.projectionSourceRead
     const originally=canonical.bodyWeightProjectionRevision
@@ -105,15 +113,20 @@ export function reviewCanonicalSelectedGoal(input:{
     // crossing/deadline as meaningful present-day evidence without a
     // qualified temporal sampling distribution. Current target state is
     // withheld here rather than mispresenting a forecast as urgency.
-    if(canonical.projectionState==='available'&&
-       check.quality==='measurement_conditions_unverified')
-      return {...unknown,state:'projection_conditions_unverified',
-        measurementRevision:sourceRevision,projectionRevision}
-    if(canonical.projectionState==='available'&&
-       check.quality!=='date_spread_sufficient')
-      return {...unknown,state:'projection_quality_limited',
-        measurementRevision:sourceRevision,projectionRevision}
+    if(canonical.projectionState==='available')
+      projectionQualityState=check.quality==='measurement_conditions_unverified'
+        ?'projection_conditions_unverified'
+        :check.quality!=='date_spread_sufficient'
+          ?'projection_quality_limited':null
   }
+  // Source/revision failures above always win over quality assessments;
+  // non-usual latest evidence wins over forecast quality once both match.
+  if(latestPointConditionsUnverified)
+    return {...unknown,state:'measurement_conditions_unverified',
+      measurementRevision:sourceRevision,projectionRevision}
+  if(projectionQualityState)
+    return {...unknown,state:projectionQualityState,
+      measurementRevision:sourceRevision,projectionRevision}
   const target=canonical.targetState
   const deadline=canonical.deadlineState
   const attention:CanonicalGoalStatusReview['deadlineAttention']=

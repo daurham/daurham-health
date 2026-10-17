@@ -23,7 +23,7 @@ const raw={
  session_updated_at:'2026-10-15T16:00:00.000Z',
  measured_at:'2026-10-15T15:00:00.000Z',
  timezone:tz,
- value:'84.50',unit:'kg',
+ value:'84.50',unit:'kg',comparability:'usual',
 }
 const db=(rows:unknown)=>({query:vi.fn(async()=>rows)} as unknown as Sql&{
  query:ReturnType<typeof vi.fn>
@@ -82,17 +82,20 @@ describe('PIQ-4.2 latest canonical weight point identity recheck',()=>{
  it('uses the same as-of point query as Goal Control including source identity and update times',async()=>{
   const sql=db([raw])
   const point=await loadBodyGoalPointAsOf(sql,'weight',tz,day)
-  expect(point).toMatchObject({value:84.5,unit:'kg',observedOn:'2026-10-15'})
+  expect(point).toMatchObject({value:84.5,unit:'kg',observedOn:'2026-10-15',
+    comparability:'usual'})
   expect(point?.sourceRevision).toMatch(/^[0-9a-f]{64}$/)
   expect(BODY_GOAL_AS_OF_SQL).toContain("metrics.metric_key = $1")
   expect(BODY_GOAL_AS_OF_SQL).toContain("LIMIT 1")
   expect(BODY_GOAL_AS_OF_SQL).toContain("metrics.updated_at::text")
   expect(BODY_GOAL_AS_OF_SQL).toContain("sessions.updated_at::text")
+  expect(BODY_GOAL_AS_OF_SQL).toContain('sessions.comparability')
   expect(BODY_GOAL_AS_OF_SQL).toContain("sessions.measured_at AT TIME ZONE")
   expect(sql.query).toHaveBeenCalledWith(BODY_GOAL_AS_OF_SQL,['weight',tz,day])
   const checked=await readCurrentWeightPointSource(day,tz,db([raw]))
   expect(checked).toMatchObject({
    status:'available',hasPoint:true,revision:point?.sourceRevision,
+   comparability:'usual',
   })
   expect(review(checked,point!.sourceRevision!)).toMatchObject({
    state:'canonical_reported',targetReport:'above_target',
