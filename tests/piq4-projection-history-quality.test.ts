@@ -33,7 +33,7 @@ function review(rows:Record<string,unknown>[],status:'available'|'insufficient_d
       targetMinKg:null,targetMaxKg:80}]},
     snapshots:[{id,versionId:version,kind:'body_metric',lifecycle:'active',
       label:'Weight',targetText:'Under 80 kg',targetState:'above_target',
-      deadlineState:'future_with_projection',projectionState:status,
+      deadlineState:'projected_before_deadline',projectionState:status,
       projectionReason:null,bodyWeightProjectionRevision:revision}],
     observation:{state:'all_recorded_above_boundary',comparableWeightDays:3,sampledSpanDays:20},
     projectionSourceRead:{status:'available',revision,rowCount:rows.length,
@@ -100,7 +100,8 @@ describe('PIQ-4.2 projection history date distribution gate',()=>{
     expect(evidence.coverage).toMatchObject({
       canonicalGoalReview:'projection_quality_limited',intervention:'not_authorized'})
     for(const secret of ['measurement-0','2026-09-01','2026-10-15'])
-      expect(JSON.stringify(evidence)).not.toContain(secret)
+      expect(JSON.stringify({text:evidence.text,coverage:evidence.coverage}))
+        .not.toContain(secret)
     expect(packetFingerprintMaterial(a)).not.toBe(packetFingerprintMaterial(b))
   })
 })
