@@ -1,3 +1,8 @@
+## 2026-10-17 PIQ-6 explicit implementation record — CI GREEN (release gated on migration)
+
+- Validated application/test commit `141b3103cc216de36c34f896555570753a6b682d`; [GitHub run 39064788711](https://github.com/daurham/daurham-health/actions/runs/39064788711): 2,594 pass / 30 skipped, TypeScript, ESLint and build green.
+- New additive `0057_experiment_implementations.sql` NOT APPLIED. **Before production deployment, review/apply migration to target DB**. Existing Lab detail, Coach linked Lab and Change Ledger now query this table and will fail on an unmigrated DB; do not promote without migration. Explicit owner confirmation distinct from Lab Start, bounded effective date/what changed, atomic first-write-only, self-reported visibility in Change Ledger and Coach. Further correction/withdrawal/causal assessment required, not part of this checkpoint. No main merge and formal owner acceptance stays 0/9.
+
 ## 2026-10-17 PIQ-6.1 explicit implementation journal (branch only; CI pending)
 
 - New migration 0057 creates `experiment_implementations` with one owner-confirmed actual-change date/description per experiment. The Start button remains status-only. Active Lab records gain a separate owner-confirmed implementation form; owner-auth POST is atomic, date-scoped and collision-safe; Change Ledger gains explicit owner-report events and Coach projects the same state as self-report. No automatic target or result writes.
