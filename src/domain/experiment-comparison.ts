@@ -44,6 +44,7 @@ function consistentSleepSource(points: readonly DailyMetricPoint[], metricKey: s
     ...eligibleDays(points, metricKey, before.start, before.end),
     ...eligibleDays(points, metricKey, after.start, after.end),
   ]
+  if (observed.length === 0) return true // missing nights are a coverage failure, not a source switch
   const keys = new Set(observed.map((item) => item.sourceKey))
   return keys.size === 1 && !keys.has(undefined) && !keys.has('')
 }

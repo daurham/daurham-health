@@ -37,6 +37,11 @@ describe('PIQ-6.3 same-source sleep baseline quality',()=>{
     expect(r.state).toBe('insufficient_coverage')
     expect(r.metrics[0]?.afterDays).toBe(0)
   })
+  it('no recorded sleep nights means missing evidence, not a device switch',()=>{
+    const r=assess({sleep:[]})
+    expect(r.reason).toBe('insufficient_observations')
+    expect(r.metrics[0]?.beforeDays).toBe(0)
+  })
   it('a source switch is insufficient even with full nights',()=>{
     const r=assess({sleep:[...nights(pre,'watch-a'),...nights(post,'watch-b')]})
     expect(r.state).toBe('insufficient_coverage')
@@ -44,7 +49,7 @@ describe('PIQ-6.3 same-source sleep baseline quality',()=>{
     expect(experimentComparisonCopy(r)).toContain('recording sources changed')
   })
   it('missing source identity is not equivalent to consistent provenance',()=>{
-    const sleep=[...nights(pre),...nights(post)].map(({sourceKey:_unused,...p})=>p)
+    const sleep=[...nights(pre),...nights(post)].map((p)=>({date:p.date,metricKey:p.metricKey,value:p.value,eligible:p.eligible}))
     const r=assess({sleep})
     expect(r.reason).toBe('inconsistent_sleep_sources')
   })
