@@ -7,6 +7,7 @@ import { MIN_VERIFIED_NUTRITION_TARGET_DAYS } from './nutrition-integrity.js'
 import { digestiveQuestionTopics } from './focused-digestive.js'
 import { guardInconsistentActivityIntelligence } from './activity-source-reconciliation.js'
 import { guardInconsistentSleepIntelligence } from './sleep-source-reconciliation.js'
+import { guardInconsistentTrainingIntelligence } from './training-source-reconciliation.js'
 import type { FocusedWeightEnergyEvidence } from './focused-weight-energy.js'
 import type { HistoricalWeightEnergyDay } from './focused-weight-energy-history.js'
 import type { HistoricalWeightEnergyWindow } from './focused-weight-energy-window.js'
@@ -70,14 +71,18 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
     input.contextMode!=='general_only' && input.asOf===input.healthToday &&
     (input.focusedWeightEnergy.nutritionSourceRecheck==='changed_or_unavailable' ||
       input.focusedWeightEnergy.weightActivitySourceRecheck==='changed_or_unavailable' ||
-      input.activitySnapshotConsistency==='changed_or_unavailable')
+      input.activitySnapshotConsistency==='changed_or_unavailable' ||
+      input.trainingSnapshotConsistency==='changed_or_unavailable')
   const digestiveGuard = digestivePacketGuard(input)
-  const intelligence = guardInconsistentSleepIntelligence(
-    guardInconsistentActivityIntelligence(
-      guardedDigestiveIntelligence(input.intelligence,digestiveGuard),
-      input.activitySnapshotConsistency,
+  const intelligence = guardInconsistentTrainingIntelligence(
+    guardInconsistentSleepIntelligence(
+      guardInconsistentActivityIntelligence(
+        guardedDigestiveIntelligence(input.intelligence,digestiveGuard),
+        input.activitySnapshotConsistency,
+      ),
+      input.sleepSnapshotConsistency,
     ),
-    input.sleepSnapshotConsistency,
+    input.trainingSnapshotConsistency,
   )
   if (wants.body) {
     addBody(input, push, limitations, wants.bodyDetail)
@@ -109,10 +114,19 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
       })
     }else addSleep(input,push,limitations)
   }
-  if (wants.training) {
-    addTraining(input, push, wants.exerciseDetail)
+  if (input.trainingSnapshotConsistency==='changed_or_unavailable' &&
+    (wants.training||input.focusedTraining)) {
+    push({
+      id:'training.source_consistency',domain:'training',
+      label:'Training source disagreement',value:null,unit:null,period,
+      text:'The independently loaded canonical Training sessions and shared Health Intelligence records disagree on saved session dates, identity, counts or effort. Training frequency, logged set performance and Training-linked correlations are WITHHELD. Missing or corrected sessions are UNKNOWN, not proof of no training or strength loss.',
+      coverage:{trainingSourceAgreement:'changed_or_unavailable',trainingEvidence:'withheld'},
+      detailPath:'/progress/strength',userEntered:false,substantive:false,priority:0,
+    })
+  }else{
+    if(wants.training)addTraining(input,push,wants.exerciseDetail)
+    addFocusedTraining(input,push)
   }
-  addFocusedTraining(input, push)
   addFocusedDigestive(input, push, digestiveGuard)
   addFocusedWeightEnergy(input.focusedWeightEnergy ?? null, input.contextMode, push,
     input.activitySnapshotConsistency)

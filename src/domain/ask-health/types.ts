@@ -149,6 +149,8 @@ export type AskHealthPacketInput = {
   sleep: SleepProgressView | null
   /** Agreement of two already-loaded current Sleep views, not a late revision attestation. */
   sleepSnapshotConsistency?: 'not_checked' | 'verified' | 'changed_or_unavailable'
+  /** Session count, IDs and effort agreement, not working-set revision attestation. */
+  trainingSnapshotConsistency?: 'not_checked' | 'verified' | 'changed_or_unavailable'
   goals: readonly AskGoalInput[]
   experiments: readonly AskExperimentInput[]
   benchmarks: readonly AskBenchmarkInput[]

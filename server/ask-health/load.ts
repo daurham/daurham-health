@@ -26,6 +26,7 @@ import { routeHealthIntelligence } from '../../src/domain/intelligence/shared.js
 import { loadHealthIntelligenceSnapshot } from '../intelligence/snapshot.js'
 import { getHealthProfile } from '../profile/service.js'
 import { focusTrainingWorkingSets } from '../../src/domain/ask-health/focused-training.js'
+import { reconcileAskTrainingSources } from '../../src/domain/ask-health/training-source-reconciliation.js'
 import { attachBristolTypes, digestiveQuestionTopics, focusDigestiveContext } from '../../src/domain/ask-health/focused-digestive.js'
 import { bowelSnapshotEventIds, selectDigestiveBowelWindow, summarizeBowelWindow, type DigestiveBowelWindow } from '../../src/domain/ask-health/digestive-window.js'
 import { screenDigestiveLagReadiness } from '../../src/domain/ask-health/digestive-pairing.js'
@@ -139,6 +140,12 @@ export async function loadAskHealthPacketInput(input: {
       start:activity.start,end:activity.end,today,
     })
     :'not_checked'
+  const trainingSnapshotConsistency=input.asOf===today &&
+    input.contextMode!=='general_only'
+    ?reconcileAskTrainingSources({
+      workouts:rows.workouts,snapshot:intelligenceSnapshot,
+      start:period.start,end:period.end,today,
+    }):'not_checked'
   const intelligence = routeHealthIntelligence(intelligenceSnapshot, {
     question: input.question,
     lens: input.lens,
@@ -361,6 +368,7 @@ export async function loadAskHealthPacketInput(input: {
     activitySnapshotConsistency,
     sleep,
     sleepSnapshotConsistency,
+    trainingSnapshotConsistency,
     goals,
     experiments,
     benchmarks,
