@@ -123,7 +123,7 @@ describe('PIQ-5.5 explicit owner-selected canonical Lab linkage', () => {
     expect(sql).toContain("jsonb_build_object('linkedExperimentId', coach_recommendations.metadata ->> 'linkedExperimentId')")
     expect(sql).not.toContain('SET response_state')
     const source = readFileSync('server/intelligence/coach-intelligence.ts', 'utf8')
-    expect(source).toContain("status NOT IN ('abandoned', 'superseded')")
+    expect(source).toContain('await hydrateCoachLinkedExperiments(sql, surfaced, asOf)')
     expect(source).toContain('requireCurrentNonCalorieRecommendation(row, asOf, undefined, expectedContextRevision)')
   })
 
@@ -154,4 +154,116 @@ describe('PIQ-5.5 explicit owner-selected canonical Lab linkage', () => {
     expect(lab).toContain('await linkCoachExperiment(')
     expect(lab).toContain('labExperimentDetailHandoffPath(created.id, handoff)')
   })
+  it('shows canonical Lab statuses without inferring intervention or clinical benefit', async () => {
+    const { hydrateCoachLinkedExperiments } = await import('../server/intelligence/coach-intelligence.js')
+    const { coachLinkedExperimentCopy } = await import('../src/domain/coach-lab-lifecycle.js')
+    for (const [status, copyFragment, resultId] of [
+      ['accepted', 'not scheduled or started', null],
+      ['scheduled', 'not started', null],
+      ['active', 'adherence and outcomes are not verified', null],
+      ['completed', 'does not establish causation', '123e4567-e89b-42d3-a456-426614174002'],
+      ['inconclusive', 'inconclusive', '123e4567-e89b-42d3-a456-426614174002'],
+      ['abandoned', 'historical association only', null],
+      ['superseded', 'historical association only', null],
+    ] as const) {
+      const cards: CoachRecommendationView[] = [{
+        id: ID, fingerprint, kind: 'training_progression', domain: 'training',
+        title: 'Bench', detail: 'Review', actionText: 'Review', detailPath: '/training',
+        confidence: 'limited', evidenceRefs: [], responseState: null, responseAt: null,
+        experimentEligible: true, linkedExperimentId: LAB,
+      }]
+      const query = vi.fn().mockResolvedValue([{
+        id: LAB, origin: 'owner_created', status, window_start: null,
+        window_end: null, result_id: resultId,
+        classification: resultId ? 'completed_interpretable' : null,
+      }])
+      await hydrateCoachLinkedExperiments({ query } as unknown as Sql, cards, '2026-10-17')
+      expect(query).toHaveBeenCalledTimes(1)
+      expect(cards[0].linkedExperimentId).toBe(LAB)
+      expect(cards[0].linkedExperiment?.status).toBe(status)
+      expect(cards[0].linkedExperiment?.resultId).toBe(resultId)
+      expect(coachLinkedExperimentCopy(cards[0].linkedExperiment!)).toContain(copyFragment)
+      const [sql] = query.mock.calls[0] as [string, unknown[]]
+      expect(sql).toContain("status = 'valid'")
+    }
+  })
+
+  it('honors the full observation window before surfacing a Lab result review', async () => {
+    const { projectCoachLinkedExperiment, coachLinkedExperimentCopy } =
+      await import('../src/domain/coach-lab-lifecycle.js')
+    const input = {
+      id: LAB, origin: 'owner_created', status: 'active', window_start: '2026-10-01',
+      window_end: '2026-10-16', result_id: null, classification: null,
+    }
+    expect(projectCoachLinkedExperiment(input, '2026-10-16')?.reviewReady).toBe(false)
+    const ended = projectCoachLinkedExperiment(input, '2026-10-17')!
+    expect(ended.reviewReady).toBe(true)
+    expect(ended.resultId).toBeNull()
+    expect(coachLinkedExperimentCopy(ended)).toContain('Review the evidence before drawing conclusions')
+    expect(projectCoachLinkedExperiment({ ...input, origin: 'ai_assisted' }, '2026-10-17')).toBeNull()
+    expect(projectCoachLinkedExperiment({ ...input, status: 'unexpected' }, '2026-10-17')).toBeNull()
+    expect(projectCoachLinkedExperiment({ ...input, id: 'invalid' }, '2026-10-17')).toBeNull()
+  })
+
+  it('hides unverifiable Lab links without offering a duplicate or implying a new start', async () => {
+    const { hydrateCoachLinkedExperiments } = await import('../server/intelligence/coach-intelligence.js')
+    for (const query of [vi.fn().mockResolvedValue([]), vi.fn().mockRejectedValue(new Error('Lab unavailable'))]) {
+      const cards: CoachRecommendationView[] = [{
+        id: ID, fingerprint, kind: 'training_progression', domain: 'training',
+        title: 'Bench', detail: 'Review', actionText: 'Review', detailPath: '/training',
+        confidence: 'limited', evidenceRefs: [], responseState: null, responseAt: null,
+        experimentEligible: true, linkedExperimentId: LAB,
+      }]
+      await hydrateCoachLinkedExperiments({ query } as unknown as Sql, cards, '2026-10-17')
+      expect(cards[0].linkedExperimentId).toBeUndefined()
+      expect(cards[0].linkedExperimentUnavailable).toBe(true)
+      const html = renderToStaticMarkup(
+        <MemoryRouter><CoachIntelligencePanel state={{
+          version: 'coach-intelligence-v1', asOf: '2026-10-17',
+          state: 'act', headline: 'Review', summary: 'Check Lab', noChangeRecommended: false,
+          nextBestActions: cards, followUps: [], question: null, questionBudgetDays: 3,
+        }} pending={false} onResponse={() => undefined} onOutcome={() => undefined} /></MemoryRouter>,
+      )
+      expect(html).toContain('Linked Lab record status unavailable')
+      expect(html).not.toContain('Explore experiment')
+      expect(html).not.toContain('I started this')
+    }
+  })
+
+  it('links to a verified valid result with explicit low-adherence uncertainty', async () => {
+    const { projectCoachLinkedExperiment } = await import('../src/domain/coach-lab-lifecycle.js')
+    const linkedExperiment = projectCoachLinkedExperiment({
+      id: LAB, origin: 'owner_created', status: 'completed', window_start: '2026-10-01',
+      window_end: '2026-10-12', result_id: '123e4567-e89b-42d3-a456-426614174002',
+      classification: 'completed_low_adherence',
+    }, '2026-10-17')!
+    const card: CoachRecommendationView = {
+      id: ID, fingerprint, kind: 'training_progression', domain: 'training',
+      title: 'Bench', detail: 'Review', actionText: 'Review', detailPath: '/training',
+      confidence: 'limited', evidenceRefs: [], responseState: null, responseAt: null,
+      experimentEligible: true, linkedExperimentId: LAB, linkedExperiment,
+    }
+    const html = renderToStaticMarkup(
+      <MemoryRouter><CoachIntelligencePanel state={{
+        version: 'coach-intelligence-v1', asOf: '2026-10-17',
+        state: 'act', headline: 'Review', summary: 'Check Lab', noChangeRecommended: false,
+        nextBestActions: [card], followUps: [], question: null, questionBudgetDays: 3,
+      }} pending={false} onResponse={() => undefined} onOutcome={() => undefined} /></MemoryRouter>,
+    )
+    expect(html).toContain('Lab result recorded with low adherence')
+    expect(html).toContain('/lab/experiment-results/123e4567-e89b-42d3-a456-426614174002')
+    expect(html).not.toContain('I started this')
+    expect(html).not.toContain('Explore experiment')
+  })
+
+  it('recognizes only a valid result classification and never assumes improvement from status', async () => {
+    const { projectCoachLinkedExperiment } = await import('../src/domain/coach-lab-lifecycle.js')
+    const input = {
+      id: LAB, origin: 'owner_created', status: 'completed',
+      window_start: null, window_end: null,
+      result_id: '123e4567-e89b-42d3-a456-426614174002', classification: 'invalid',
+    }
+    expect(projectCoachLinkedExperiment(input, '2026-10-17')?.resultId).toBeNull()
+  })
+
 })
