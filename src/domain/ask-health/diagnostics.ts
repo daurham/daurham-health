@@ -42,6 +42,7 @@ export type AskHealthResponsePath =
   | 'general_cache_hit'
   | 'immediate_safety'
   | 'non_owner_subject'
+  | 'third_party_immediate_safety'
 
 export type AskHealthResponseDiagnostic = {
   path: AskHealthResponsePath
@@ -56,10 +57,10 @@ export type AskHealthResponseDiagnostic = {
 
 export function describeAskHealthResponsePath(
   packet: AskHealthPacket,
-  result: { provider: string; cached: boolean; general?: boolean; urgentSafety?: boolean; personScopeBlocked?: boolean },
+  result: { provider: string; cached: boolean; general?: boolean; urgentSafety?: boolean; personScopeBlocked?: boolean; thirdPartySafety?: boolean },
 ): AskHealthResponseDiagnostic {
   const path: AskHealthResponsePath =
-    result.urgentSafety ? 'immediate_safety' : result.personScopeBlocked ? 'non_owner_subject' : result.provider === 'health'
+    result.thirdPartySafety ? 'third_party_immediate_safety' : result.urgentSafety ? 'immediate_safety' : result.personScopeBlocked ? 'non_owner_subject' : result.provider === 'health'
       ? packet.clarification
         ? 'clarification_required'
         : 'packet_no_substantive_evidence'

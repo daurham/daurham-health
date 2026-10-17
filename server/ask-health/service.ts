@@ -20,7 +20,7 @@ import type { AskEvidence } from '../../src/domain/ask-health/types.js'
 import { NutritionInterpretError } from '../../src/domain/nutrition/interpret.js'
 import { routeAskHealthIntent } from '../../src/domain/ask-health/intent.js'
 import type { AskContextMode } from '../../src/domain/ask-health/config.js'
-import { detectImmediateSafety, immediateSafetyAnswer } from '../../src/domain/ask-health/immediate-safety.js'
+import { detectImmediateSafety, immediateSafetyAnswer, detectThirdPartyImmediateSafety, thirdPartyImmediateSafetyAnswer, type ImmediateSafetyKind } from '../../src/domain/ask-health/immediate-safety.js'
 import { askHealthNonOwnerSubject, NON_OWNER_ASK_HEALTH_TEXT } from '../../src/domain/ask-health/person-scope.js'
 import {
   ASK_HEALTH_GENERAL_PROMPT_VERSION, GENERAL_ASK_SYSTEM_PROMPT,
@@ -103,17 +103,27 @@ export async function answerAskHealth(input: {
   // private Health data at all. Owner authentication still happens in handler;
   // the existing AI rate/budget ledger still applies to provider calls.
   const contextMode = input.contextMode ?? 'smart'
+  const ownImmediate = detectImmediateSafety(input.question)
+  const thirdPartyImmediate = ownImmediate ? null : detectThirdPartyImmediateSafety(input.question)
+  // Owner-scope emergency takes priority, then explicit third-party danger.
+  // Neither branch reads data, contacts Gemini or reserves a token budget.
+  if (thirdPartyImmediate) {
+    return thirdPartyUrgentResponse({
+      lens: input.lens, range: input.range, asOf: input.asOf,
+      generatedAt: input.generatedAt ?? new Date().toISOString(),
+    }, contextMode, thirdPartyImmediate)
+  }
   // No owner-data read, provider call, conversation reuse or budget charge
   // for an explicitly different person's health question.
   // First-person immediate safety still has priority when both appear.
-  if (!detectImmediateSafety(input.question) && askHealthNonOwnerSubject(input.question)) {
+  if (!ownImmediate && askHealthNonOwnerSubject(input.question)) {
     return nonOwnerResponse({
       lens: input.lens, range: input.range, asOf: input.asOf,
       generatedAt: input.generatedAt ?? new Date().toISOString(),
     }, contextMode)
   }
   const route = routeAskHealthIntent(input.question, input.conversation)
-  if (detectImmediateSafety(input.question) || contextMode === 'general_only' ||
+  if (ownImmediate || contextMode === 'general_only' ||
       (contextMode === 'smart' && route.route === 'general')) {
     return explainAskHealth({
       packet: blankGeneralAskPacket({
@@ -186,6 +196,12 @@ export async function explainAskHealth(input: {
       urgentSafety: true,
       contextMode,
     })
+  }
+  const thirdPartyImmediate = detectThirdPartyImmediateSafety(input.question)
+  if (thirdPartyImmediate) {
+    // A direct caller may have already assembled a personal packet. The
+    // urgent response must not use or cite any part of that packet.
+    return thirdPartyUrgentResponse(input.packet, contextMode, thirdPartyImmediate)
   }
   if (askHealthNonOwnerSubject(input.question)) {
     // Do not trust a pre-built personal packet from a direct caller.
@@ -340,6 +356,22 @@ export async function explainAskHealth(input: {
   })
 }
 
+function thirdPartyUrgentResponse(
+  packet: Pick<AskHealthPacket, 'lens' | 'range' | 'asOf' | 'generatedAt'>,
+  contextMode: AskContextMode,
+  kind: ImmediateSafetyKind,
+): AskHealthResponse {
+  return responseFor({ packet: blankGeneralAskPacket(packet) }, {
+    answer: thirdPartyImmediateSafetyAnswer(kind),
+    provider: 'health',
+    model: 'deterministic',
+    cached: false,
+    urgentSafety: true,
+    thirdPartySafety: true,
+    contextMode,
+  })
+}
+
 function nonOwnerResponse(
   packet: Pick<AskHealthPacket, 'lens' | 'range' | 'asOf' | 'generatedAt'>,
   contextMode: AskContextMode,
@@ -405,7 +437,7 @@ async function settleFailure(gate: AskHealthGate, usageId: string | null, error:
 
 function responseFor(
   input: { packet: AskHealthPacket },
-  result: { answer: AskHealthAnswer; provider: string; model: string; cached: boolean; general?: boolean; urgentSafety?: boolean; personScopeBlocked?: boolean; contextMode?: AskContextMode },
+  result: { answer: AskHealthAnswer; provider: string; model: string; cached: boolean; general?: boolean; urgentSafety?: boolean; personScopeBlocked?: boolean; thirdPartySafety?: boolean; contextMode?: AskContextMode },
 ): AskHealthResponse {
   return {
     answer: result.answer,
@@ -416,7 +448,7 @@ function responseFor(
 
 function metaFor(
   input: { packet: AskHealthPacket },
-  result: { provider: string; model: string; cached: boolean; general?: boolean; urgentSafety?: boolean; personScopeBlocked?: boolean; contextMode?: AskContextMode },
+  result: { provider: string; model: string; cached: boolean; general?: boolean; urgentSafety?: boolean; personScopeBlocked?: boolean; thirdPartySafety?: boolean; contextMode?: AskContextMode },
 ): AskHealthResponse['meta'] {
   return {
     packetVersion: ASK_HEALTH_PACKET_VERSION,

@@ -14,7 +14,7 @@ export type ImmediateSafetyKind = 'emergency' | 'self_harm'
  * owner's own statement. More complex cases still use normal Ask Health
  * routing; this is not a medical/safety adjudication of the quote.
  */
-function excludeQuotedSpeech(value: string): string {
+export function excludeQuotedSpeech(value: string): string {
   return value
     .replace(/“[^”]*”/g, ' ')
     .replace(/"[^"]*"/g, ' ')
@@ -71,6 +71,59 @@ export function immediateSafetyAnswer(kind: ImmediateSafetyKind): AskHealthAnswe
     }],
     limitations: [{
       text: 'I cannot determine the cause or severity in chat. This is immediate safety guidance based on your message, not a diagnosis or a reading of saved Health records.',
+      evidenceRefs: [],
+    }],
+    followUps: [],
+  }
+}
+
+
+/**
+ * Third-party current-symptom floor. A reported emergency in another person
+ * must receive basic safety guidance, never the account owner's stored facts.
+ * This is deliberately not a diagnosis or general medical triage classifier.
+ *
+ * Quoted, hypothetical and clearly historical language is withheld rather
+ * than assumed to describe a live event. Follow-up or ambiguous cases still
+ * need appropriately reviewed human-facing clinical routing.
+ */
+export function detectThirdPartyImmediateSafety(question: string): ImmediateSafetyKind | null {
+  const normalized = excludeQuotedSpeech(question.trim()).replace(/\u2019/g, "'")
+  // A model should not infer an ongoing emergency from examples, conditional
+  // questions or hypothetical scenarios.
+  if (/\b(?:what if|suppose|imagine|hypothetical(?:ly)?|fictional|scenario|for example|in a story|would|used to)\b/i.test(normalized)) {
+    return null
+  }
+  const person = String.raw`(?:(?:(?:my|our|your|the|his|her|their)\\s+(?:(?:young|older|elderly|little|adult|newborn)\\s+)?(?:wife|husband|spouse|partner|mother|father|mom|dad|son|daughter|child|baby|kid|brother|sister|friend|roommate|coworker|patient))|(?:he|she|they))`
+  const present = String.raw`\\b${person}\\s+(?:is\\s+|are\\s+|['’]s\\s+)?`
+  const patterns = [
+    new RegExp(present + String.raw`(?:having|experiencing|feeling|has|have)\\s+(?:(?:new|sudden|severe|crushing|sharp)\\s+)?chest pain\\b`, 'i'),
+    new RegExp(present + String.raw`(?:can(?:not|['’]t))\\s+breathe\\b`, 'i'),
+    new RegExp(present + String.raw`(?:having|experiencing|has|have)\\s+(?:severe\\s+)?(?:trouble|difficulty)\\s+breathing\\b`, 'i'),
+    new RegExp(present + String.raw`(?:bleeding heavily|bleeding uncontrollably|experiencing severe bleeding|having uncontrolled bleeding)\\b`, 'i'),
+    new RegExp(present + String.raw`(?:having|experiencing)\\s+(?:a\\s+)?stroke\\b`, 'i'),
+    new RegExp(present + String.raw`(?:vomiting|throwing up)\\s+blood\\b`, 'i'),
+    new RegExp(String.raw`\\b${person}['’]s\\s+chest\\s+(?:hurts|is hurting|feels (?:tight|painful))\\b`, 'i'),
+    /\b(?:his|her|their)\s+chest\s+(?:hurts|is hurting|feels (?:tight|painful))\b/i,
+  ]
+  const selfHarm = [
+    new RegExp(present + String.raw`suicidal\\b`, 'i'),
+    new RegExp(String.raw`\\b${person}\\s+(?:wants|plans|intends)\\s+to\\s+(?:kill|hurt)\\s+(?:himself|herself|themself|themselves)\\b`, 'i'),
+  ]
+  if (selfHarm.some((pattern) => pattern.test(normalized))) return 'self_harm'
+  return patterns.some((pattern) => pattern.test(normalized)) ? 'emergency' : null
+}
+
+export function thirdPartyImmediateSafetyAnswer(kind: ImmediateSafetyKind): AskHealthAnswer {
+  return {
+    blocks: [{
+      text: kind === 'self_harm'
+        ? 'If this person may hurt themselves now, contact local emergency services or a crisis service immediately. Stay with them if it is safe and get nearby help. Do not leave them alone if there is an immediate danger.'
+        : 'If this is happening to the other person now, call your local emergency number for immediate medical help. Stay with them, do not let them drive, and follow the emergency dispatcher’s instructions.',
+      evidenceRefs: [],
+    }],
+    limitations: [{
+      text: 'This is urgent guidance based only on the question. No saved Health records or previous conversation were used. I cannot confirm another person’s condition or diagnose the cause.',
       evidenceRefs: [],
     }],
     followUps: [],
