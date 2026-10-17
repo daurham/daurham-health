@@ -76,6 +76,7 @@ describe('PIQ4 late Daily Context integrity and packet precedence',()=>{
     focus.weightActivitySourceRecheck='verified'
     x.focusedWeightEnergy=focus
     x.intelligence={
+      selectedKeys:['activity.steps'],
       coverage:[{key:'activity.steps',label:'Steps',coveragePct:20,
         observedDays:4,eligibleDays:20,excludedObservations:0,
         confidence:'low',provenance:{device:4},detailPath:'/progress/activity'}],
