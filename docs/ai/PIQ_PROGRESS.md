@@ -3704,3 +3704,85 @@ questions, enforce one meaningful question per owner-day while preserving
 the existing three-day frequency limit and "zero questions is normal".
 Then test PIQ-5.5 explicit adoption separately from review-only clicks
 and inspect owner QA runtime blockers before release.
+
+
+## 2026-10-17 — PIQ-5.4 adaptive question relevance and completed-check-in suppression (CI GREEN)
+
+**Status:** validated *bounded engineering slice* on the PIQ development
+branch; not an owner-accepted phase or a production release. Follows
+PIQ-5.1 task eligibility, PIQ-5.2 post-suppression ranking, PIQ-5.3
+source-grounded card rationale, and PIQ-5.6 quiet UI.
+
+**Original defect:** `recentQuestion` blindly re-presented whichever
+question was written in the previous three owner-days even if current
+Goal Control was `maintain` or its underlying limitation had been
+resolved. Questions were generated from the first limitation, including
+generic cross-domain uncertainty, and might urge another daily
+check-in even after the owner had completed it.
+
+**New bounded policy:**
+- `buildCoachFollowUpQuestion` only asks in
+  `insufficient_evidence` state. It skips non-actionable/resolved
+  limitations and selects the first grounded useful prompt or **none**.
+  It does not invent a generic "more context" question from a
+  nonspecific confidence notice.
+- Nutrition-completeness clarification requires **some logged days**
+  but insufficient verified complete-day evidence. Zero entries are a
+  Nutrition task, not a coaching question, and already adequate
+  complete-day evidence suppresses the question.
+- Missing sleep coverage navigates to `/progress/sleep` to inspect
+  actual records rather than requesting an unrelated wellness check-in.
+- A wellness/check-in question requires a verified **false**
+  `todayWellnessCompleted` flag, checked against existence of an
+  actual `daily_wellness` record for the exact owner-day as-of date.
+  Missing/unavailable query results are **unknown**, not false, so the
+  prompt fails closed without blocking other eligible advice.
+  This is a read-only single-row existence check, only invoked when a
+  wellness limitation might produce a question.
+- Goal status questions require the matching active, unresolved goal
+  ID and canonical destination; stale, missing, paused or satisfied
+  goals cannot produce a false review prompt.
+- `coachQuestionPresentation` enforces that a recent persisted
+  question is displayed only when its fingerprint still matches the
+  **current** qualifying question. If the old question is obsolete,
+  it disappears. Another prompt does not replace it inside the
+  existing three-day budget window. Existing relevant prompt text is
+  refreshed from the current canonical domain draft **without**
+  re-writing its surfaced date or resetting the cooldown.
+- Existing maximum three-day recent-question budget remains;
+  one active prompt at a time and **zero is normal**. No paid provider
+  invocation, auto-health target adjustment or new table/migration.
+
+**Tests:** new `tests/piq5-coach-adaptive-questions.test.ts`
+covers nine synthetic cases: completed wellness, unknown query state,
+fallback to next eligible limitation, adequate/empty nutrition
+coverage, sleep source navigation, expired/paused/satisfied goal
+matching, sufficient-state silence, relevance matching inside the
+cooldown and removal of generic filler. Existing I9 test previously
+expected a nutrition uncertainty prompt even while fixture
+`nutritionQuality.state='met'`; fixture corrected to genuinely
+incomplete coverage. First run
+https://github.com/daurham/daurham-health/actions/runs/39055826340
+failed that single obsolete assertion (2,553 others passed). Final
+exact-code commit `d1826f3a32c9f91ba0ac379a042e87096b986d82`
+passed **npm ci, TypeScript, ESLint, 2,554 tests passing
+(30 skipped; 338 suites passed), and production build**:
+https://github.com/daurham/daurham-health/actions/runs/39056013533.
+
+**Limits:** cooldown and relevance filtering are tested with
+synthetic fixtures/CI; no live owner check-in, app navigation, device
+accessibility or QA release has been accepted. There is still **no
+dedicated question-dismissal action** in the Coach UI/API, so PIQ-5.4
+dismissal memory and its UX are unfinished. The three-day budget
+prevents multiple prompts but is not a scientifically validated
+optimal follow-up cadence. Do not classify the entire PIQ-5 phase as
+complete. Formal owner acceptance remains **0/9**.
+
+**No** main/prod deployment, owner personal record inspection,
+production migrations, paid AI use, private preview unlock, external
+health service call or automatic owner-target mutation.
+
+**Next:** PIQ-5.5 adoption, feedback, owner-start and outcome
+linkage integrity (especially "reviewed" vs "started" and stale
+historical follow-up expiry). Later end-to-end PIQ-5.7 scenarios,
+isolated preview authorization, and actual owner mobile acceptance.
