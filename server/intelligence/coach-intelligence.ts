@@ -26,6 +26,7 @@ import {
   type CoachRecommendationView,
 } from '../../src/domain/coach-intelligence.js'
 import type { GoalControlState } from '../../src/domain/goal-control.js'
+import { projectCoachLinkedExperiment, type CoachLinkedLabRow } from '../../src/domain/coach-lab-lifecycle.js'
 import { addCalendarDays } from '../../src/domain/training-plan.js'
 import { getSql, type Sql } from '../db.js'
 import { HttpError } from '../http.js'
@@ -360,6 +361,48 @@ function questionView(row: RecommendationRow): CoachFollowUpQuestion {
   }
 }
 
+/** Read canonical owner-created Lab status once for the visible Coach cards.
+ * When Lab is unreachable, keep provenance in storage, never invent its state
+ * or invite a duplicate experiment creation from the unresolved association.
+ */
+export async function hydrateCoachLinkedExperiments(
+  sql: Sql, items: CoachRecommendationView[], today: string,
+): Promise<void> {
+  const ids = [...new Set(items.flatMap((item) => item.linkedExperimentId ? [item.linkedExperimentId] : []))]
+  if (!ids.length) return
+  const verified = new Map<string, NonNullable<CoachRecommendationView['linkedExperiment']>>()
+  try {
+    const rows = (await sql.query(
+      `SELECT lab.id::text AS id, lab.origin, lab.status,
+              lab.window_start::text AS window_start, lab.window_end::text AS window_end,
+              result.id::text AS result_id, result.classification
+         FROM experiments AS lab
+         LEFT JOIN LATERAL (
+           SELECT id, classification FROM experiment_results
+            WHERE experiment_id = lab.id AND status = 'valid'
+            ORDER BY created_at DESC, id DESC LIMIT 1
+         ) AS result ON TRUE
+        WHERE lab.id = ANY($1::uuid[]) AND lab.origin = 'owner_created'`,
+      [ids],
+    )) as CoachLinkedLabRow[]
+    for (const row of rows) {
+      const projection = projectCoachLinkedExperiment(row, today)
+      if (projection && ids.includes(projection.id)) verified.set(projection.id, projection)
+    }
+  } catch {
+    // Missing or unreachable source does not mean there never was a link.
+  }
+  for (const item of items) {
+    if (!item.linkedExperimentId) continue
+    const link = verified.get(item.linkedExperimentId)
+    if (link) item.linkedExperiment = link
+    else {
+      delete item.linkedExperimentId
+      item.linkedExperimentUnavailable = true
+    }
+  }
+}
+
 export async function loadCoachIntelligenceState(asOf: string): Promise<CoachIntelligenceState> {
   const [sql, control] = await Promise.all([getSql(), loadGoalControlState(asOf)])
   const drafts = buildCoachRecommendationDrafts(control)
@@ -394,24 +437,8 @@ export async function loadCoachIntelligenceState(asOf: string): Promise<CoachInt
     })
   }
 
-  // Only show linked Lab records that are still in a non-cancelled state.
-  const linkedIds = surfaced.flatMap((item) => item.linkedExperimentId ? [item.linkedExperimentId] : [])
-  if (linkedIds.length) {
-    let retained = new Set<string>()
-    try {
-      const links = await sql.query(
-        `SELECT id::text AS id FROM experiments
-          WHERE id = ANY($1::uuid[]) AND status NOT IN ('abandoned', 'superseded')`,
-        [linkedIds],
-      )
-      retained = new Set(links.map((row) => String(row.id)))
-    } catch {
-      // Unavailable source does not prove the linked experiment still exists.
-    }
-    for (const item of surfaced) {
-      if (item.linkedExperimentId && !retained.has(item.linkedExperimentId)) delete item.linkedExperimentId
-    }
-  }
+  // A saved link is provenance, not implementation or outcome.
+  await hydrateCoachLinkedExperiments(sql, surfaced, asOf)
 
   let question: CoachFollowUpQuestion | null = null
   // Check canonical owner-day check-in existence only if wellness evidence
