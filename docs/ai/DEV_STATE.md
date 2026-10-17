@@ -1,3 +1,9 @@
+## 2026-10-17 PIQ-5.7 six integrated golden scenarios — CI GREEN
+
+- `tests/piq5-integrated-golden-scenarios.test.tsx` validates completed Training, poor food-log coverage and blocked calorie changes, legitimate quiet Coach behavior, accepted-but-unstarted Lab, active-but-unevaluated Lab, and low-adherence/historical result framing using synthetic fixtures.
+- CI on app/test commit `e53ba12acac96e6a2b09fc5a6eaa19bbddc5b299`, GitHub Actions run `39061903631`: 2,582 passing tests, 30 skipped; TypeScript, ESLint and build green.
+- PIQ-5.7 remains broader than these six scenarios, and PIQ-6 still needs owner-verifiable implementation/adherence/outcome controls. No production promotion, migration, provider spend or formal owner phase acceptance (0/9).
+
 ## 2026-10-17 Verified Coach-linked Lab lifecycle checkpoint
 
 Branch code commit `d4f715ad01c43b5c75ef92e3db72398d0516dea9` passed GitHub Actions 39061473074: 2,576 tests passing, 30 skipped; TypeScript, ESLint and build green. Canonical Lab state is a read-only owner-created experiment projection, not an adopted intervention or causal outcome. Continue PIQ-5.7 integrated scenarios and PIQ-6 actual implementation/evaluation; owner QA and rollout gates remain closed. Owner phase acceptance 0/9.
