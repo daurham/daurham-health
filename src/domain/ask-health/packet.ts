@@ -2432,7 +2432,11 @@ function explicitlyRequestsClinicalInventory(
       ? /\b(?:allerg(?:y|ies|ens?)|intolerances?|reactions?)\b/i
       : /\b(?:conditions?|diagnos(?:is|es))\b/i
   if (!term.test(question)) return false
-  // An imperative needs to start as an inventory request. 'Show me how my\n  // medicine affects sleep' is not permission to disclose a broad list.\n  const listingLead = /^\s*(?:please\s+)?(?:list|show|display|enumerate)\s+(?:me\s+)?(?:all|each|every|my|saved|recorded|current|medications?|meds?|medicines?|prescriptions?|drugs?|allerg(?:y|ies)|conditions?|diagnos(?:is|es))\b/i\n  return listingLead.test(question) ||\n    /\b(?:what|which)\b.{0,100}\b(?:do i have|have i|are my|is my|my saved|my recorded|my listed|on my (?:list|profile))\b/i.test(question)
+  // An imperative needs to start as an inventory request. 'Show me how my
+  // medicine affects sleep' is not permission to disclose a broad list.
+  const listingLead = /^\s*(?:please\s+)?(?:list|show|display|enumerate)\s+(?:me\s+)?(?:all|each|every|my|saved|recorded|current|medications?|meds?|medicines?|prescriptions?|drugs?|allerg(?:y|ies)|conditions?|diagnos(?:is|es))\b/i
+  return listingLead.test(question) ||
+    /\b(?:what|which)\b.{0,100}\b(?:do i have|have i|are my|is my|my saved|my recorded|my listed|on my (?:list|profile))\b/i.test(question)
 }
 
 function clinicalItemId(category: 'medications' | 'allergies' | 'conditions', index: number): string {
