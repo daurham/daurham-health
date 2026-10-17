@@ -60,6 +60,8 @@ export type AskHealthResponse = {
       domains: string[]
       omittedCount: number
       limited: boolean
+      /** Deterministic scope caveat for clinical facts omitted by the cap; never raw PHI. */
+      clinicalScopeWarning: string | null
       /** Owner-only bounded list of facts supplied to the model, not all DB records. */
       items: Array<{
         id: string
@@ -393,6 +395,7 @@ function metaFor(
       domains: [...new Set(input.packet.evidence.filter(e => e.substantive).map(e => e.domain))].sort(),
       omittedCount: input.packet.evidenceSelectionAudit?.removedCount ?? 0,
       limited: (input.packet.evidenceSelectionAudit?.removedCount ?? 0) > 0 || Boolean(input.packet.evidenceSelectionAudit?.exceedsMaxChars),
+      clinicalScopeWarning: input.packet.limitations.find(item => item.code === 'clinical_evidence_limited')?.text ?? null,
       items: input.packet.evidence.filter(item => item.substantive).slice(0, 24).map(item => ({
         id: item.id,
         label: item.label,

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  askHealthUserPrompt,
   buildAskHealthEvidencePacket,
   packetFingerprintMaterial,
   type AskHealthPacketInput,
@@ -36,6 +37,12 @@ function input(question: string, goal: string | null = null): AskHealthPacketInp
   }
 }
 
+function rawPartialAnswer(): string {
+  return JSON.stringify({
+    blocks: [{ text: 'Some saved medications are listed; this is not a full interaction assessment.', evidence_refs: ['ask.range'] }],
+    limitations: [], follow_ups: [],
+  })
+}
 function provider() {
   return vi.fn(async () => ({
     text: JSON.stringify({
@@ -195,6 +202,94 @@ describe('PIQ-0 evidence load boundary and corrected-source cache', () => {
     expect(historical.currentProfileRevision).toBeNull()
   })
 
+
+  it('T48: discloses capped partial medication evidence without sending omitted names', async () => {
+    const question = 'Which of my active medications could be relevant?'
+    const medications = Array.from({ length: 16 }, (_, index) => ({
+      name: 'Synthetic Med ' + index, dose: null, frequency: null, status: 'active' as const,
+    }))
+    const packet = buildAskHealthEvidencePacket({
+      ...input(question), contextMode: 'personalized',
+      profile: {
+        persistentHealthContext: null, trainingLimitations: null, dietaryContext: null,
+        conditions: [], allergies: [], medications,
+      },
+      maxChars: 1700,
+    })
+    expect(packet.evidence.map(item => item.id)).not.toContain('clinical.medication.15')
+    const limitation = packet.limitations.find(item => item.code === 'clinical_evidence_limited')
+    expect(limitation?.evidenceId).toBe('ask.range')
+    expect(limitation?.text).toContain('medications')
+    expect(limitation?.text).toContain('not a complete review')
+    expect(limitation?.text).not.toContain('Synthetic Med')
+    const modelPrompt = askHealthUserPrompt({ packet, question, conversation: [] })
+    expect(modelPrompt).toContain('clinical_evidence_limited')
+    expect(modelPrompt).not.toContain('Synthetic Med 15')
+    expect(modelPrompt).not.toContain('currentProfileRevision')
+    const model = vi.fn(async () => ({
+      text: rawPartialAnswer(), model: 'piq-stub', inputTokens: 10, outputTokens: 12,
+    }))
+    const result = await explainAskHealth({
+      packet, question, conversation: [], contextMode: 'personalized',
+      provider: model, gate: createAskHealthGate({ minIntervalMs: 0 }),
+      model: 'piq-stub', now: at + 75_000,
+    })
+    expect(model).toHaveBeenCalledOnce()
+    expect(result.meta.answerScope).toBe('personal')
+    expect(result.meta.evidenceOverview.clinicalScopeWarning).toBe(limitation?.text)
+    expect(result.meta.evidenceOverview.clinicalScopeWarning).not.toContain('Synthetic Med')
+  })
+
+  it('T48: no false clinical omission warning for unrelated or fully included records, nor source disagreement', () => {
+    const medications = Array.from({ length: 16 }, (_, index) => ({
+      name: 'Synthetic Med ' + index, dose: null, frequency: null, status: 'active' as const,
+    }))
+    const profile = {
+      persistentHealthContext: null, trainingLimitations: null, dietaryContext: null,
+      conditions: [], allergies: [], medications,
+    }
+    const question = 'Which of my active medications could be relevant?'
+    const full = buildAskHealthEvidencePacket({ ...input(question), profile, maxChars: 20000 })
+    expect(full.limitations.some(item => item.code === 'clinical_evidence_limited')).toBe(false)
+    const unrelated = buildAskHealthEvidencePacket({
+      ...input('How do muscles grow?'), profile, maxChars: 1700,
+    })
+    expect(unrelated.evidence.some(item => item.id.startsWith('clinical.medication.'))).toBe(false)
+    expect(unrelated.limitations.some(item => item.code === 'clinical_evidence_limited')).toBe(false)
+    const withheld = buildAskHealthEvidencePacket({
+      ...input(question), profile, healthToday: '2026-10-14',
+      currentHealthProfileSourceRecheck: 'changed_or_unavailable', maxChars: 1700,
+    })
+    expect(withheld.evidence.some(item => item.id.startsWith('clinical.medication.'))).toBe(false)
+    expect(withheld.limitations.some(item => item.code === 'clinical_evidence_limited')).toBe(false)
+    expect(withheld.evidence.some(item => item.id === 'profile.source_consistency')).toBe(true)
+  })
+
+  it('T48: an allergy/condition selection capped by size warns without revealing missing details', () => {
+    const question = 'Which conditions and allergies do I have saved?'
+    const packet = buildAskHealthEvidencePacket({
+      ...input(question),
+      profile: {
+        persistentHealthContext: null, trainingLimitations: null, dietaryContext: null,
+        conditions: Array.from({ length: 12 }, (_, i) => ({
+          name: 'Synthetic Condition ' + i, status: 'active' as const,
+        })),
+        allergies: Array.from({ length: 12 }, (_, i) => ({
+          substance: 'Synthetic Allergen ' + i, reaction: null, severity: 'unknown' as const,
+        })),
+        medications: [],
+      },
+      maxChars: 1300,
+    })
+    const warning = packet.limitations.find(item => item.code === 'clinical_evidence_limited')?.text
+    expect(warning).toContain('allergies')
+    expect(warning).toContain('conditions')
+    expect(warning).not.toContain('Synthetic Allergen')
+    expect(warning).not.toContain('Synthetic Condition')
+    const prompt = askHealthUserPrompt({ packet, question, conversation: [] })
+    expect(prompt).not.toContain('Synthetic Allergen 11')
+    expect(prompt).not.toContain('Synthetic Condition 11')
+  })
   it('a different historical as-of scope has a distinct evidence fingerprint', () => {
     const question = 'What is my goal?'
     const current = buildAskHealthEvidencePacket(input(question, 'At most 80 kg'))

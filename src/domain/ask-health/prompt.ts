@@ -33,6 +33,7 @@ export const ASK_HEALTH_SYSTEM_PROMPT = [
   'For a numeric owner-recorded quantity, quote only the corresponding value and unit in the cited evidence or its explicitly provided canonical coverage; never derive an unrelated nutrient from another equal-valued number. Avoid unsupported unit conversions.',
   'A saved numeric goal target does not establish that the target is met or the goal is completed. Only report met/completed/on-track status if the cited Goal Control state explicitly supports it.',
   'State uncertainty when evidence is sparse. Use supplied confidence and coverage fields rather than inventing precision.',
+  'If EVIDENCE limitations include clinical_evidence_limited, clearly describe the clinical list as partial; do not claim all saved medications, conditions or allergies were reviewed or that possible interactions were ruled out. Never invent omitted details.',
   'Treat excluded observations as intentionally unavailable to intelligence; do not reconstruct or second-guess them.',
   'The selected range is fixed. If the question asks about a different period, say the packet covers the selected range and the owner can switch the range. Do not assume a wider query was run.',
   'For a named historical day, week, month, or trailing-day window, only use evidence specifically scoped to that interval to claim what occurred then. Do not apply wider-range averages, the latest unrelated day, or an undated profile statement as if they measured the requested period.',

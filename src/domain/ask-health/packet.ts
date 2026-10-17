@@ -234,6 +234,20 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
     : historicalSafeDrafts
   const evidence=trimEvidence(safeDrafts,maxChars)
   const selectedIds = new Set(evidence.map((item) => item.id))
+  // T48: report only the categories of question-selected clinical records
+  // trimmed by the evidence cap. Never include omitted names, doses or notes.
+  const omittedClinicalCategories = [...new Set(safeDrafts
+    .filter((item) => item.substantive && !selectedIds.has(item.id))
+    .map((item) => clinicalOmissionCategory(item.id))
+    .filter((category): category is string => category !== null))].sort()
+  const clinicalCapLimitation: AskLimitation[] = omittedClinicalCategories.length > 0 ? [{
+    code: 'clinical_evidence_limited',
+    evidenceId: 'ask.range',
+    text: 'Some question-selected saved ' + omittedClinicalCategories.join(', ') +
+      ' did not fit the evidence limit. This is not a complete review of those Health Profile records. ' +
+      'Do not treat absent details as absent conditions, medications or allergies, or use this partial view ' +
+      'to rule out a medication interaction or allergy risk. Review your Health Profile or narrow the question.',
+  }] : []
   const clarification = trainingSourceConflict ? null : exerciseClarification(input)
   const selectedSerializedChars = JSON.stringify(evidence).length
   return {
@@ -253,7 +267,7 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
       input.currentHealthProfileSourceRecheck === 'verified'
         ? input.currentProfileRevision ?? null : null,
     evidence,
-    limitations: limitations.filter((item) => evidence.some((fact) => fact.id === item.evidenceId)),
+    limitations: [...limitations, ...clinicalCapLimitation].filter((item) => selectedIds.has(item.evidenceId)),
     contextSummary: {
       knows: input.focusedWeightEnergyDay || input.focusedWeightEnergyWindow || focusedSourceConflict
         ? [] : intelligence?.knows ?? [],
@@ -2704,6 +2718,14 @@ function exerciseClarification(input: AskHealthPacketInput): string | null {
     return null
   }
   return `More than one exercise matches this question: ${matches.map((item) => item.name).join(', ')}. Health is showing each match rather than choosing one.`
+}
+
+function clinicalOmissionCategory(id: string): string | null {
+  if (id.startsWith('clinical.medication.')) return 'medications'
+  if (id.startsWith('clinical.allergy.')) return 'allergies'
+  if (id.startsWith('clinical.condition.')) return 'conditions'
+  if (id.startsWith('clinical.')) return 'profile context'
+  return null
 }
 
 function trimEvidence(drafts: readonly Draft[], maxChars: number): AskEvidence[] {

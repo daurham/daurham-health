@@ -252,6 +252,12 @@ export function AskHealthPage() {
         {latest?.meta.answerScope === 'general' ? (
           <p className="text-xs text-zinc-600" role="status">General health education · no personal Health records used{latest.meta.cached ? ' · reused answer' : ''}</p>
         ) : null}
+        {latest?.meta.answerScope === 'personal' && latest.meta.evidenceOverview.clinicalScopeWarning ? (
+          <p role="status" className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm leading-6 text-amber-950">
+            {latest.meta.evidenceOverview.clinicalScopeWarning}
+            {' '}<a href={prefixedPath(prefix, '/settings#health-profile')} className="font-medium underline">Review Health Profile</a>
+          </p>
+        ) : null}
         {latest?.meta.evidenceOverview ? (
           <details className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
             <summary className="cursor-pointer text-sm font-medium text-zinc-800">
