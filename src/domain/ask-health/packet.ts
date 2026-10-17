@@ -6,6 +6,7 @@ import { ASK_HEALTH_PACKET_VERSION, ASK_PACKET_MAX_CHARS, type AskLens } from '.
 import { MIN_VERIFIED_NUTRITION_TARGET_DAYS } from './nutrition-integrity.js'
 import { digestiveQuestionTopics } from './focused-digestive.js'
 import { guardInconsistentActivityIntelligence } from './activity-source-reconciliation.js'
+import { guardInconsistentSleepIntelligence } from './sleep-source-reconciliation.js'
 import type { FocusedWeightEnergyEvidence } from './focused-weight-energy.js'
 import type { HistoricalWeightEnergyDay } from './focused-weight-energy-history.js'
 import type { HistoricalWeightEnergyWindow } from './focused-weight-energy-window.js'
@@ -71,9 +72,12 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
       input.focusedWeightEnergy.weightActivitySourceRecheck==='changed_or_unavailable' ||
       input.activitySnapshotConsistency==='changed_or_unavailable')
   const digestiveGuard = digestivePacketGuard(input)
-  const intelligence = guardInconsistentActivityIntelligence(
-    guardedDigestiveIntelligence(input.intelligence,digestiveGuard),
-    input.activitySnapshotConsistency,
+  const intelligence = guardInconsistentSleepIntelligence(
+    guardInconsistentActivityIntelligence(
+      guardedDigestiveIntelligence(input.intelligence,digestiveGuard),
+      input.activitySnapshotConsistency,
+    ),
+    input.sleepSnapshotConsistency,
   )
   if (wants.body) {
     addBody(input, push, limitations, wants.bodyDetail)
@@ -95,7 +99,15 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
     }else addActivity(input,push)
   }
   if (wants.sleep) {
-    addSleep(input, push, limitations)
+    if(input.sleepSnapshotConsistency==='changed_or_unavailable'){
+      push({
+        id:'sleep.source_consistency',domain:'sleep',
+        label:'Sleep source disagreement',value:null,unit:null,period,
+        text:'The independently loaded Sleep progress and Health Intelligence views disagree about eligible sleep observations or their recorded duration. Sleep averages, stage interpretations, baseline and Sleep-linked relationships are WITHHELD. Missing or partial sleep records are UNKNOWN, not zero sleep; no sleep disorder or recovery conclusion is authorized.',
+        coverage:{sleepSourceAgreement:'changed_or_unavailable',sleepClaims:'withheld'},
+        detailPath:'/progress/sleep',userEntered:false,substantive:false,priority:0,
+      })
+    }else addSleep(input,push,limitations)
   }
   if (wants.training) {
     addTraining(input, push, wants.exerciseDetail)

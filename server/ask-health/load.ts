@@ -8,6 +8,7 @@ import type { AskBenchmarkInput, AskContextInput, AskExperimentInput, AskHealthP
 import { buildProgressOverview } from '../../src/domain/progress/index.js'
 import type { ProgressRange } from '../../src/domain/progress/types.js'
 import { buildSleepProgressView } from '../../src/domain/sleep/index.js'
+import { reconcileAskSleepSources } from '../../src/domain/ask-health/sleep-source-reconciliation.js'
 import { dailyContextTagLabel } from '../../src/domain/context.js'
 import { listActivityDailySummaries } from '../activity/queries.js'
 import { listGoalAskSnapshots } from '../goals/service.js'
@@ -124,6 +125,13 @@ export async function loadAskHealthPacketInput(input: {
     sleepNights.filter((night) => night.sleepDate <= input.asOf),
     { range: input.range, asOf: input.asOf, timezone },
   )
+  const sleepSnapshotConsistency=input.asOf===today &&
+    input.contextMode!=='general_only'
+    ?reconcileAskSleepSources({
+      nights:sleepNights,snapshot:intelligenceSnapshot,
+      start:sleep.start,end:sleep.end,today,
+    })
+    :'not_checked'
   const activitySnapshotConsistency=input.asOf===today &&
     input.contextMode!=='general_only'
     ?reconcileAskActivitySources({
@@ -352,6 +360,7 @@ export async function loadAskHealthPacketInput(input: {
     activity,
     activitySnapshotConsistency,
     sleep,
+    sleepSnapshotConsistency,
     goals,
     experiments,
     benchmarks,
