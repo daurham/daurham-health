@@ -19,7 +19,7 @@ const night:SleepNightlySummary={
   timeInBedMinutes:420,awakeMinutes:20,coreMinutes:230,
   deepMinutes:80,remMinutes:90,unspecifiedSleepMinutes:0,
   stageCoveragePct:100,stageConflictMinutes:0,
-  observationStatus:'complete',analysisEligible:true,
+  observationStatus:'analysis_eligible',analysisEligible:true,
   stageAnalysisEligible:true,selectionReason:'source_priority',
   calculationVersion:'test-v1',evidence:{} as SleepNightlySummary['evidence'],
 }

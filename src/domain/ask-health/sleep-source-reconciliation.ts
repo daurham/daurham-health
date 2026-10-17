@@ -30,18 +30,20 @@ export function reconcileAskSleepSources(input:{
   for(const frame of snapshot.frame){
     if(frame.date<start||frame.date>end)continue
     const night=byDate.get(frame.date)
-    const eligible=night?.analysisEligible===true&&
+    const minutes=night?.analysisEligible===true&&
       night.observationStatus!=='partial_observation'&&
       night.observationStatus!=='in_bed_only'&&
       typeof night.totalSleepMinutes==='number'&&
       Number.isFinite(night.totalSleepMinutes)
+      ?night.totalSleepMinutes:null
     const signal=frame.signals['sleep.total_minutes']
-    if(!eligible){
+    if(minutes===null){
       if(signal!=null)return 'changed_or_unavailable'
     }else if(signal==null||signal.key!=='sleep.total_minutes'||
-      signal.date!==frame.date||signal.value!==night.totalSleepMinutes||
+      signal.date!==frame.date||signal.value!==minutes||
       signal.unit!=='min'||signal.provenance!=='device'||
-      signal.sourceIds.length!==1||signal.sourceIds[0]?.trim()==='')
+      signal.sourceIds.length!==1||
+      typeof signal.sourceIds[0]!=='string'||signal.sourceIds[0].trim()==='')
       return 'changed_or_unavailable'
   }
   return 'verified'
