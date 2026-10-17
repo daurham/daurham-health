@@ -44,7 +44,8 @@ export async function loadBodyGoalPointAsOf(
   // A malformed stored label fails closed rather than masquerading as 'usual'.
   if(item.comparability!==undefined&&item.comparability!==null&&
      item.comparability!=='usual'&&item.comparability!=='unknown'&&
-     item.comparability!=='different_conditions')return null
+     item.comparability!=='different_conditions')
+    throw new Error('Invalid canonical body measurement comparability')
   const sourceRevision=[
     item.metric_id,item.session_id,item.metric_updated_at,item.session_updated_at,
   ].every(s=>typeof s==='string'&&s.trim())?
