@@ -13,6 +13,7 @@ import type {AskHealthPacketInput} from '../src/domain/ask-health/types.js'
 
 const today='2026-10-16',start='2026-10-01',day='2026-10-15',timezone='America/Phoenix'
 const night:SleepNightlySummary={
+  summaryId:'sleep-summary-1',
   sleepDate:day,timezone,logicalSourceKey:'watch:sleep',
   sourceName:'Watch',startAt:'2026-10-15T05:00:00.000Z',
   endAt:'2026-10-15T12:00:00.000Z',totalSleepMinutes:400,
@@ -70,6 +71,10 @@ describe('PIQ-4.2 generic Sleep two-source quality screen',()=>{
     expect(check([])).toBe('changed_or_unavailable')
     expect(check([night],snapshot(null))).toBe('changed_or_unavailable')
     expect(check([night],snapshot(400,[]))).toBe('changed_or_unavailable')
+    expect(check([{...night,summaryId:'replaced-summary'}]))
+      .toBe('changed_or_unavailable')
+    expect(check([{...night,summaryId:undefined}]))
+      .toBe('changed_or_unavailable')
   })
   it('fails for wrong timezone, duplicate date or incompatible date range',()=>{
     expect(check([night,night])).toBe('changed_or_unavailable')

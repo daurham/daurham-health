@@ -10,7 +10,9 @@ Sleep-linked relationship could survive after the direct Sleep number changed.
 
 `reconcileAskSleepSources` now compares all in-range completed and eligible
 nightly totals from the first source with the dated source-identified
-`sleep.total_minutes` intelligence frame. It checks date scope, Health
+`sleep.total_minutes` intelligence frame. The canonical nightly summary
+row ID now also flows through the existing Progress read and must exactly
+agree with the row ID in Intelligence; same-duration row replacement fails. It checks date scope, Health
 timezone, unique sleep date, analysis eligibility, partial/in-bed-only
 status, total minutes, signal unit and row provenance. The recorded zero is
 not replaced by a missing observation. On mismatch (or an incompatible

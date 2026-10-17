@@ -43,7 +43,9 @@ export function reconcileAskSleepSources(input:{
       signal.date!==frame.date||signal.value!==minutes||
       signal.unit!=='min'||signal.provenance!=='device'||
       signal.sourceIds.length!==1||
-      typeof signal.sourceIds[0]!=='string'||signal.sourceIds[0].trim()==='')
+      typeof signal.sourceIds[0]!=='string'||signal.sourceIds[0].trim()===''||
+      typeof night?.summaryId!=='string'||night.summaryId.trim()===''||
+      night.summaryId!==signal.sourceIds[0])
       return 'changed_or_unavailable'
   }
   return 'verified'

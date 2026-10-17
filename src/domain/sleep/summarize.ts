@@ -30,6 +30,8 @@ export type SleepNightEvidence = {
 }
 
 export type SleepNightlySummary = {
+  /** Canonical persisted nightly summary identity, only on DB-loaded records. */
+  summaryId?: string
   sleepDate: string
   timezone: string
   logicalSourceKey: string

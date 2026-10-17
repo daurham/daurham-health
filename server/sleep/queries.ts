@@ -98,7 +98,8 @@ export const UPSERT_SLEEP_NIGHTLY_SUMMARY_SQL = `INSERT INTO sleep_nightly_summa
             OR sleep_nightly_summaries.source_id IS DISTINCT FROM EXCLUDED.source_id
             OR sleep_nightly_summaries.import_job_id IS DISTINCT FROM EXCLUDED.import_job_id`
 
-export const LIST_SLEEP_NIGHTLY_SUMMARIES_SQL = `SELECT sleep_date::text AS sleep_date,
+export const LIST_SLEEP_NIGHTLY_SUMMARIES_SQL = `SELECT id::text AS summary_id,
+           sleep_date::text AS sleep_date,
            timezone,
            logical_source_key,
            source_name,
@@ -223,6 +224,8 @@ export async function listSleepObservationsForProgress(timezone = DEFAULT_HEALTH
 export function mapSleepNightlySummaryRow(row: Record<string, unknown>): SleepNightlySummary {
   const evidence = typeof row.evidence === 'object' && row.evidence != null ? row.evidence : {}
   return {
+    ...(typeof row.summary_id === 'string' && row.summary_id.trim()
+      ? { summaryId: row.summary_id } : {}),
     sleepDate: String(row.sleep_date),
     timezone: String(row.timezone),
     logicalSourceKey: String(row.logical_source_key),
