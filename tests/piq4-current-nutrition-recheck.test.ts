@@ -2,6 +2,7 @@ import {describe,expect,it,vi} from 'vitest'
 import type {Sql} from '../server/db.js'
 import {ACTIVITY_INTELLIGENCE_SQL,activitySummaryObservations} from '../server/intelligence/snapshot.js'
 import {recheckCurrentWeightNutrition} from '../server/ask-health/current-weight-nutrition-recheck.js'
+import {VERIFIED_NUTRITION_DAYS_SQL} from '../server/nutrition/maintenance-eligibility.js'
 import {buildHealthIntelligenceSnapshot,type IntelligenceObservation} from '../src/domain/intelligence/shared.js'
 import {focusWeightEnergyContext} from '../src/domain/ask-health/focused-weight-energy.js'
 import {buildAskHealthEvidencePacket,packetFingerprintMaterial} from '../src/domain/ask-health/packet.js'
@@ -59,18 +60,19 @@ describe('PIQ-4.2 activity attribution and late Nutrition corrections',()=>{
   it('rechecks the exact original verified date set against revision-gated canonical rows',async()=>{
     const snapshotValue=snapshot()
     const db=sql([{date,calories:'2100',source_ids:['entry-a']}])
-    expect(await recheckCurrentWeightNutrition(snapshotValue,db)).toBe('verified')
+    expect(await recheckCurrentWeightNutrition(snapshotValue,today,db)).toBe('verified')
     expect(db.query).toHaveBeenCalledTimes(1)
-    expect(db.query.mock.calls[0]![1]).toEqual(['2026-10-01',today,today])
-    expect(await recheckCurrentWeightNutrition(snapshotValue,
+    expect(db.query).toHaveBeenCalledWith(VERIFIED_NUTRITION_DAYS_SQL,
+      ['2026-10-01',today,today])
+    expect(await recheckCurrentWeightNutrition(snapshotValue,today,
       sql([{date,calories:'2100',source_ids:['entry-b']}]))).toBe('changed_or_unavailable')
-    expect(await recheckCurrentWeightNutrition(snapshotValue,
+    expect(await recheckCurrentWeightNutrition(snapshotValue,today,
       sql([{date,calories:'1900',source_ids:['entry-a']}]))).toBe('changed_or_unavailable')
-    expect(await recheckCurrentWeightNutrition(snapshotValue,sql([])))
+    expect(await recheckCurrentWeightNutrition(snapshotValue,today,sql([])))
       .toBe('changed_or_unavailable')
   })
   it('withholds estimates if correction/delete, lack of revision, or DB error occurs',async()=>{
-    expect(await recheckCurrentWeightNutrition(snapshot(),{
+    expect(await recheckCurrentWeightNutrition(snapshot(),today,{
       query:vi.fn(async()=>{throw Error('DB down')}),
     } as unknown as Sql)).toBe('changed_or_unavailable')
     const missing=buildHealthIntelligenceSnapshot({
@@ -78,7 +80,7 @@ describe('PIQ-4.2 activity attribution and late Nutrition corrections',()=>{
       timezone:'America/Phoenix',observations,
       nutritionVerifiedCompleteDates:new Set([date]),nutritionVerificationStatus:'unavailable',
     })
-    expect(await recheckCurrentWeightNutrition(missing,sql([])))
+    expect(await recheckCurrentWeightNutrition(missing,today,sql([])))
       .toBe('changed_or_unavailable')
     const p=packet('changed_or_unavailable')
     expect(p.evidence.some(x=>x.id==='weight_energy.observed_balance')).toBe(false)

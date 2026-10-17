@@ -288,7 +288,7 @@ export async function loadAskHealthPacketInput(input: {
   // before forwarding any stale maintenance/nutrient/scale conclusions.
   if(focusedWeightEnergy&&input.asOf===today){
     focusedWeightEnergy.nutritionSourceRecheck=
-      await recheckCurrentWeightNutrition(intelligenceSnapshot)
+      await recheckCurrentWeightNutrition(intelligenceSnapshot,today)
   }
   return {
     lens: input.lens,
