@@ -68,7 +68,7 @@ export type FocusedWeightEnergyEvidence = {
 }
 
 const WEIGHT_ENERGY_QUESTION =
-  /\b(?:plateau\w*|stall(?:ed|ing|s)?|weight[ -]?loss|losing weight|lose weight|fat[ -]?loss|losing fat|scale(?: weight| fluctuat\w*| not moving)?|weight (?:isn't|is not|hasn't|has not|won't|not) (?:chang\w*|mov\w*)|maintenance calories|observed maintenance|energy balance|calorie deficit|caloric deficit|cut(?:ting)? calories|eat less|metabolic rate|tdee|preserv\w* (?:strength|muscle))\b/i
+  /\b(?:plateau\w*|stall(?:ed|ing|s)?|weight[ -]?loss|weight[ -]?(?:goal|target|trend|projection)s?|losing weight|lose weight|fat[ -]?loss|losing fat|scale(?: weight| fluctuat\w*| not moving)?|weight (?:isn't|is not|hasn't|has not|won't|not) (?:chang\w*|mov\w*)|maintenance calories|observed maintenance|energy balance|calorie deficit|caloric deficit|cut(?:ting)? calories|eat less|metabolic rate|tdee|preserv\w* (?:strength|muscle))\b/i
 
 // A dated question needs *that* interval's observation, never an unrelated
 // trailing-28d energy estimate. PIQ-4.2 historical scope is deferred.
