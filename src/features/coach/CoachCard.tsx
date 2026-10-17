@@ -573,6 +573,13 @@ export function CoachIntelligencePanel({
               ) : item.kind === 'training_progression' ? (
                 <p className="mt-2 text-xs text-zinc-500">Exact-exercise confidence unknown; matching trend evidence is unavailable.</p>
               ) : null}
+              {item.linkedExperimentId ? (
+                <p className="mt-2 text-xs leading-relaxed text-zinc-600">
+                  <Link to={prefixedPath(prefix, `/lab/experiments/${item.linkedExperimentId}`)}
+                    className="font-medium text-accent underline underline-offset-2">Review linked Lab experiment</Link>
+                  {' '}· Linking does not establish that an experiment started or worked.
+                </p>
+              ) : null}
               <div className="mt-2 flex flex-wrap gap-2">
                 <Link to={prefixedPath(prefix, item.detailPath)} className={primaryButtonClass}>
                   {item.actionText}
@@ -584,11 +591,15 @@ export function CoachIntelligencePanel({
                 ) : null}
                 <button type="button" className={quietButtonClass} disabled={pending} onClick={() => onResponse(item, 'not_now')}>Not now</button>
                 <button type="button" className={quietButtonClass} disabled={pending} onClick={() => onResponse(item, 'not_relevant', 'not_relevant')}>Not relevant</button>
-                {item.experimentEligible ? (
+                {item.experimentEligible && !item.linkedExperimentId ? (
                   <Link to={prefixedPath(prefix, labExperimentHandoffPath({
                     title: item.title,
                     rationale: item.detail,
                     source: 'coach',
+                    ...(!['review_intake_adjustment', 'review_activity_adjustment'].includes(item.kind) && item.contextRevision
+                      ? { coachRecommendation: {
+                          recommendationId: item.id, contextRevision: item.contextRevision, responseAt: item.responseAt,
+                        } } : {}),
                   }))} className={quietButtonClass}>
                     Explore experiment
                   </Link>
