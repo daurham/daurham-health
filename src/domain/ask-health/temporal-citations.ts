@@ -286,10 +286,10 @@ function currentConfiguredQuantitySupports(
   return sources.some((source) => {
     let configured = ''
     if (isGoal && source.domain === 'goals' && source.id.startsWith('goals.')) {
-      configured = source.text.split(' Target state ')[0] ?? ''
+      configured = (source.text ?? '').split(' Target state ')[0] ?? ''
     } else if (isRegimen && source.domain === 'supplements' &&
                source.id.startsWith('supplements.recorded.')) {
-      configured = source.text.split('Planned regimen: ')[1]?.split(' Within ')[0] ?? ''
+      configured = (source.text ?? '').split('Planned regimen: ')[1]?.split(' Within ')[0] ?? ''
       if (configured.startsWith('No saved schedule')) return false
     } else return false
     if (quantity.nutrient) {
