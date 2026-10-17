@@ -13,6 +13,7 @@ import { listGoalAskSnapshots } from '../goals/service.js'
 import { requiresHistoricalGoalBoundary } from '../../src/domain/ask-health/historical-goal-scope.js'
 import { listDailyContexts } from '../context/service.js'
 import { recheckCurrentDailyContexts } from './current-context-consistency.js'
+import { addCalendarDays } from '../../src/domain/training-plan.js'
 import { listTimelineBenchmarkResults } from '../lab/results.js'
 import { getSql } from '../db.js'
 import { loadProgressCanonicalRows } from '../progress/queries.js'
@@ -313,12 +314,12 @@ export async function loadAskHealthPacketInput(input: {
     :historicalWeightEnergyWindow?.scope==='in_range'
       ?{start:historicalWeightEnergyWindow.start,
          end:historicalWeightEnergyWindow.end<today
-           ?historicalWeightEnergyWindow.end:undefined}
+           ?historicalWeightEnergyWindow.end:addCalendarDays(today,-1)}
       :null
   const historicalWeightEnergySourceRecheck=historicalSelection
     ?await recheckHistoricalWeightEnergySources({
       snapshot:intelligenceSnapshot,today,start:historicalSelection.start,
-      end:historicalSelection.end??historicalWeightEnergyWindow!.end,
+      end:historicalSelection.end,
     })
     :'not_checked'
   // Include initially empty sets: a new late Context row is a mutation.
