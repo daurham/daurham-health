@@ -3625,3 +3625,82 @@ competing explanations, an explicitly optional low-burden action,
 outcome-check criterion, and source navigation using existing
 verified fields. Do not fabricate trend size or permit a model to
 recommend an intervention without existing hard eligibility.
+
+
+## 2026-10-17 — PIQ-5.3 source-bounded Coach explanation disclosure (CI GREEN)
+
+**Status:** bounded PIQ-5.3 engineering milestone validated on the
+isolated development branch. NOT all PIQ-5 exit criteria met; owner
+acceptance remains **0/9**. Preview Auth/origin/mobile QA still gated.
+
+**What changed:** an optional typed
+`CoachRecommendationRationale` adds seven explicitly separated
+interpretation fields to the existing Coach recommendation view:
+observed claim, personal relevance, uncertainty, competing explanations,
+safe optional next step, timing, and future outcome/recheck criterion.
+Only data-backed, matching known sources can generate a rationale.
+The UI reveals it inside a collapsed, keyboard-accessible
+**"Why this recommendation?"** disclosure, with an explicit link
+to its canonical source view. The one-card default remains compact.
+The server projects the rationale from the current draft, not a
+historical SQL title or a paid AI response. Non-calorie context
+revisions include the derived rationale so old advice cannot silently
+inherit revised evidence. No new Gemini requests, cost, migrations,
+owner-data writes or target changes.
+
+**Grounding and boundaries:**
+- Exact Training exercise: matching exercise identity, actual exposure
+  count, source window, latest observation, scoped confidence,
+  qualifying change percentage and limitation kinds. Link an active
+  owner goal only through an exact verified goal–exercise relationship;
+  do not borrow another exercise or unrelated goal's measurements.
+- Incomplete Nutrition: compare days with calorie entries to days
+  verified **complete and source-reliable** in the last seven
+  completed dates; missed/unknown days are not zero intake and no
+  numerical target change is proposed.
+- Active Goal deadline: only exact matching active goal ID, source
+  reference and canonical path; dates and target statuses are reported
+  as goal-record state, not measured outcomes or a diagnosis.
+- Experiment review: only exact experiment-ready record; cannot infer
+  the intervention was implemented, effective or causally successful.
+- Maintenance: only matching intervention with actual maintained
+  evidence explanation; calorie review additionally requires existing
+  `review_possible` safety and complete-day Nutrition eligibility.
+  Observation and alternatives do not constitute a calorie prescription.
+- Evidence gap: use actual source-window coverage when present;
+  unknown observation counts stay unknown, not fabricated zeros.
+- Other/unverified kinds: **no rationale** rather than a made-up
+  statistics paragraph. Existing historical evidence details remain
+  accessible separately.
+
+**Code and tests:** `src/domain/coach-intelligence.ts`,
+`server/intelligence/coach-intelligence.ts`,
+`src/features/coach/CoachCard.tsx`;
+`tests/piq5-coach-evidence-rationale.test.tsx`,
+`tests/piq5-coach-rationale-context.test.ts`.
+Commits `94754841bc1df644449d641c78734ed45c4948a7`
+(Training/Nutrition and UI),
+`1d80a5fad3129523e23c7b9fafbc947ff6d7f441`
+(Goal, Experiment, Maintenance, gaps),
+`b3c23fb2ca04` (one test assertion grammatical correction).
+First combined run
+https://github.com/daurham/daurham-health/actions/runs/39054139272
+failed a single synthetic typo checking "does not" versus
+"do not" (2,544 other tests passed). **Exact validated code SHA**
+`b3c23fb2ca04`;
+https://github.com/daurham/daurham-health/actions/runs/39054388798
+**SUCCESS**: npm ci, TypeScript, ESLint, Vitest
+**2,545 passed; 30 skipped; 337 suites passed**, production build.
+
+**Still outstanding:** PIQ-5.4 high-value question budget and nuisance
+suppression; PIQ-5.5 owner-reviewed adoption/feedback and honest
+outcome-linking; end-to-end PIQ-5.7 scenarios, mobile disclosure
+accessibility, and evidence usefulness comparisons. PIQ-6 and PIQ-7
+are not complete. This CI milestone is not clinical safety signoff,
+real owner QA, an accepted phase, a main merge or deployment.
+
+**Next highest-value work:** PIQ-5.4 suppress already-completed check-in
+questions, enforce one meaningful question per owner-day while preserving
+the existing three-day frequency limit and "zero questions is normal".
+Then test PIQ-5.5 explicit adoption separately from review-only clicks
+and inspect owner QA runtime blockers before release.
