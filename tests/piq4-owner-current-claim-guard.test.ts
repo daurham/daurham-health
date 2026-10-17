@@ -116,4 +116,111 @@ describe('PIQ-4 owner preview: current owner-claim citation integrity', () => {
     expect(cached.answer).toEqual(first.answer)
     expect(provider).toHaveBeenCalledOnce()
   })
+  it('rejects a current wrong quantity even with the exact right evidence ID', () => {
+    const pkt = makePacket([steps])
+    for (const text of ['You logged 6000 steps.', 'Your measured steps totaled 4,000 steps.']) {
+      const safe = groundHistoricalAnswer(answer(block(text, [steps.id])), pkt,
+        'How many steps do my logs show?')
+      expect(safe.blocks[0]?.text).toContain('cannot verify')
+      expect(safe.blocks[0]?.text).not.toContain('6000')
+      expect(safe.blocks[0]?.text).not.toContain('4,000')
+    }
+    const verified = groundHistoricalAnswer(
+      answer(block('You logged 5,000 steps.', [steps.id])), pkt,
+      'How many steps do my logs show?',
+    )
+    expect(verified.blocks[0]?.text).toContain('5,000 steps')
+  })
+
+  it('does not confuse two equal-unit nutrients with different saved numbers', () => {
+    const protein = evidence('nutrition.protein', 'nutrition', 150, 'g')
+    const fiber = evidence('nutrition.fiber', 'nutrition', 25, 'g')
+    const calories = evidence('nutrition.calories', 'nutrition', 2000, 'kcal')
+    const pkt = makePacket([protein, fiber, calories])
+    const wrong = groundHistoricalAnswer(answer(
+      block('You logged 150 g of fiber.', [protein.id]),
+      block('You recorded 25 g of protein.', [fiber.id]),
+      block('You consumed 2100 kcal.', [calories.id]),
+      block('You logged 150 g protein and 25 g fiber.', [protein.id, fiber.id]),
+    ), pkt, 'How is my nutrition?')
+    expect(wrong.blocks.map(x => x.text)).toEqual([
+      'You logged 150 g protein and 25 g fiber.',
+    ])
+    expect(wrong.limitations[0]?.text).toContain('withheld')
+  })
+
+  it('rejects mixed current quantities when even one value is not supported', () => {
+    const pkt = makePacket([steps, sleep])
+    const good = groundHistoricalAnswer(answer(
+      block('You logged 5,000 steps and recorded 420 minutes of sleep.',
+        [steps.id, sleep.id]),
+    ), pkt, 'What did my steps and sleep logs show?')
+    expect(good.blocks[0]?.text).toContain('420 minutes')
+    const bad = groundHistoricalAnswer(answer(
+      block('You logged 5,000 steps and recorded 480 minutes of sleep.',
+        [steps.id, sleep.id]),
+    ), pkt, 'What did my steps and sleep logs show?')
+    expect(bad.blocks[0]?.text).toContain('cannot verify')
+  })
+
+  it('supports milligram sodium values but not invented milligram or ambiguous units', () => {
+    const sodium = evidence('nutrition.sodium', 'nutrition', 900, 'mg')
+    const pkt = makePacket([sodium])
+    const good = groundHistoricalAnswer(answer(
+      block('You recorded 900 mg of sodium.', [sodium.id]),
+    ), pkt, 'How much sodium do my logs show?')
+    expect(good.blocks[0]?.text).toContain('900 mg')
+    for (const claim of [
+      'You recorded 950 mg sodium.',
+      'You recorded 1,5 mg sodium.',
+      'You recorded 0.9 g sodium.',
+      'You recorded 0.9 liters of water.',
+      'You recorded 9% sodium.',
+    ]) {
+      const result = groundHistoricalAnswer(answer(block(claim, [sodium.id])), pkt,
+        'How much sodium do my logs show?')
+      expect(result.blocks[0]?.text).toContain('cannot verify')
+    }
+  })
+
+  it('does not treat a current weight goal with matching unit as proof of actual scale weight', () => {
+    const goal = evidence('goals.synthetic-weight', 'goals', 82, 'kg')
+    const actual = evidence('body.weight.latest', 'body', 79, 'kg')
+    const pkt = makePacket([goal, actual])
+    expect(groundHistoricalAnswer(answer(
+      block('Your weight was 82 kg.', [goal.id]),
+    ), pkt, 'What is my weight?').blocks[0]?.text).toContain('cannot verify')
+    expect(groundHistoricalAnswer(answer(
+      block('Your weight was 79 kg.', [actual.id]),
+    ), pkt, 'What is my weight?').blocks[0]?.text).toContain('79 kg')
+  })
+
+  it('sanitizes incorrect current quantities on both newly generated and cached answers', async () => {
+    const pkt = makePacket([steps])
+    const provider = vi.fn(async () => ({
+      text: JSON.stringify({
+        blocks: [
+          { text: 'You logged 6000 steps.', evidence_refs: [steps.id] },
+          { text: 'A step total is descriptive, not a diagnosis.', evidence_refs: [] },
+        ], limitations: [], follow_ups: [],
+      }),
+      model: 'synthetic-no-paid-model', inputTokens: 12, outputTokens: 15,
+    }))
+    const gate = createAskHealthGate({ budgetUsd: 100, minIntervalMs: 0 })
+    const args = {
+      packet: pkt, question: 'How many steps do my records show?',
+      conversation: [], provider, gate, model: 'synthetic-no-paid-model',
+      contextMode: 'personalized' as const,
+    }
+    const first = await explainAskHealth({ ...args, now: 1000 })
+    const cached = await explainAskHealth({ ...args, now: 2000 })
+    expect(first.answer.blocks.map(x => x.text)).toEqual([
+      'A step total is descriptive, not a diagnosis.',
+    ])
+    expect(cached.answer).toEqual(first.answer)
+    expect(cached.meta.cached).toBe(true)
+    expect(provider).toHaveBeenCalledOnce()
+    expect(first.evidence).toEqual([])
+  })
+
 })

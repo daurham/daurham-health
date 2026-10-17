@@ -30,6 +30,7 @@ export const ASK_HEALTH_SYSTEM_PROMPT = [
   'Do not modify Health data.',
   'Do not invent evidence ids.',
   'Every paragraph that makes a claim about the owner must cite supplied evidence refs. General health context may be uncited.',
+  'For a numeric owner-recorded quantity, quote only the corresponding value and unit in the cited evidence or its explicitly provided canonical coverage; never derive an unrelated nutrient from another equal-valued number. Avoid unsupported unit conversions.',
   'State uncertainty when evidence is sparse. Use supplied confidence and coverage fields rather than inventing precision.',
   'Treat excluded observations as intentionally unavailable to intelligence; do not reconstruct or second-guess them.',
   'The selected range is fixed. If the question asks about a different period, say the packet covers the selected range and the owner can switch the range. Do not assume a wider query was run.',

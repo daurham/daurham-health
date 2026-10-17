@@ -94,7 +94,7 @@ export function explicitlyClaimedMetricDomains(text: string): string[] {
   return patterns.filter(([, pattern]) => pattern.test(text)).map(([domain]) => domain)
 }
 
-type RecordedQuantity = { value: number; unit: 'kg' | 'lb' | 'g' | 'ml' | 'kcal' | 'reps' | 'steps' | 'sessions' | 'movements' }
+type RecordedQuantity = { value: number; unit: 'kg' | 'lb' | 'g' | 'mg' | 'ml' | 'kcal' | 'reps' | 'steps' | 'sessions' | 'movements' | 'minutes' | 'hours' }
 type Nutrient = 'fiber' | 'protein' | 'carbs' | 'fat' | 'sodium'
 type QualifiedQuantity = RecordedQuantity & {
   nutrient: Nutrient | null
@@ -106,7 +106,10 @@ function recordedUnit(raw: string): RecordedQuantity['unit'] | null {
   if (/^(?:kg|kilogram)/i.test(raw)) return 'kg'
   if (/^(?:lb|pound)/i.test(raw)) return 'lb'
   if (/^(?:g|gram)/i.test(raw)) return 'g'
+  if (/^(?:mg|milligram)/i.test(raw)) return 'mg'
   if (/^(?:ml|millilit)/i.test(raw)) return 'ml'
+  if (/^(?:min|minute)/i.test(raw)) return 'minutes'
+  if (/^(?:h(?:r|rs)?|hour)/i.test(raw)) return 'hours'
   if (/^(?:kcal|calorie)/i.test(raw)) return 'kcal'
   if (/^rep/i.test(raw)) return 'reps'
   if (/^step/i.test(raw)) return 'steps'
@@ -128,7 +131,7 @@ function nutrientName(raw: string): Nutrient {
  * or a lifted load and derived 1RM, without confusing them.
  */
 function qualifiedOwnerQuantities(text: string): QualifiedQuantity[] {
-  const pattern = /\b((?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?)\s*(kilograms?|kg|pounds?|lbs?|grams?|g|millilit(?:ers?|res?)|ml|kcal|calories?|reps?|steps?|sessions?|movements?)\b/gi
+  const pattern = /\b((?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?)\s*(kilograms?|kg|pounds?|lbs?|milligrams?|mg|grams?|g|millilit(?:ers?|res?)|ml|kcal|calories?|reps?|steps?|sessions?|movements?|minutes?|mins?|hours?|hrs?)\b/gi
   const matches = [...text.matchAll(pattern)]
   const qualifiers = (text: string) => {
     const words = [...text.matchAll(/\b(averag(?:e|ed|ing)|mean|total(?:ed)?|sum(?:med)?|estimated|estimate|e1rm|1rm|one.rep max|lifted|load(?:ed)?)\b/gi)]
@@ -145,7 +148,7 @@ function qualifiedOwnerQuantities(text: string): QualifiedQuantity[] {
     const nutrientAfter = /^\s*(?:(?:of|in)\s+)?(fiber|fibre|protein|carbs?|carbohydrates?|fat|sodium)\b/i.exec(after)
     const nutrientMatches = [...before.matchAll(/\b(fiber|fibre|protein|carbs?|carbohydrates?|fat|sodium)\b/gi)]
     const nutrientBefore = nutrientMatches[nutrientMatches.length - 1]?.[1]
-    const nutrient = unit === 'g' && (nutrientAfter?.[1] || nutrientBefore)
+    const nutrient = (unit === 'g' || unit === 'mg') && (nutrientAfter?.[1] || nutrientBefore)
       ? nutrientName(nutrientAfter?.[1] ?? nutrientBefore!) : null
     const near = qualifiers(before)
     const afterRate = /^\s*per\s+(?:(?:logged|observed|verified)\s+)?(?:day|date)\b/i.test(after)
@@ -163,24 +166,35 @@ function qualifiedOwnerQuantities(text: string): QualifiedQuantity[] {
  * We do not silently convert units, locale separators, signed changes,
  * partial decimals, or medication quantities in this narrow source audit.
  */
-export function unsupportedHistoricalMeasurement(text: string): boolean {
-  const units = '(?:kilograms?|kg|pounds?|lbs?|grams?|g|millilit(?:ers?|res?)|ml|kcal|calories?|reps?|steps?|sessions?|movements?)'
+function unsupportedLiteralMeasurement(text: string, allowMilligrams: boolean): boolean {
+  const units = '(?:kilograms?|kg|pounds?|lbs?|milligrams?|mg|grams?|g|millilit(?:ers?|res?)|ml|kcal|calories?|reps?|steps?|sessions?|movements?|minutes?|mins?|hours?|hrs?)'
   const candidate = new RegExp('\\b(-?\\d[\\d,.]*|\\.?\\d+)\\s*(' + units + ')\\b', 'gi')
   const validUSNumber = /^(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?$/
   for (const match of text.matchAll(candidate)) {
     const numeric = match[1] ?? ''
     if (!validUSNumber.test(numeric)) return true
     const position = match.index ?? 0
-    // Reject a detached final fragment, e.g. the "5 g" inside "1,5 g".
     if (position > 0 && /[\d,.-]/.test(text[position - 1]!)) return true
   }
-  if (/\b-?\d[\d,.]*\s*(?:milligrams?|mg|liters?|litres?|l|ounces?|oz|fl\.?\s*oz|cups?)\b/i.test(text)) return true
+  const unsupportedUnits = allowMilligrams
+    ? /\b-?\d[\d,.]*\s*(?:liters?|litres?|l|ounces?|oz|fl\.?\s*oz|cups?)\b/i
+    : /\b-?\d[\d,.]*\s*(?:milligrams?|mg|liters?|litres?|l|ounces?|oz|fl\.?\s*oz|cups?)\b/i
+  if (unsupportedUnits.test(text)) return true
   if (/\b-?\d[\d,.]*\s*%/.test(text)) return true
-  // Space-grouped thousands are locale-dependent: do not certify a partial
-  // "234 steps" substring of a claimed "1 234 steps" value.
-  if (/\b\d{1,3}(?:[ \u00a0]\d{3})+\s*(?:kg|g|ml|lbs?|kcal|calories?|reps?|steps?|sessions?|movements?)\b/i.test(text)) return true
-  if (/(?:^|[^\w])(?:\.\d+|\d+\.)\s*(?:kg|g|ml|lbs?|kcal|calories?|reps?|steps?|sessions?|movements?)\b/i.test(text)) return true
+  if (/\b\d{1,3}(?:[ \u00a0]\d{3})+\s*(?:kg|g|mg|ml|lbs?|kcal|calories?|reps?|steps?|sessions?|movements?|minutes?|mins?|hours?|hrs?)\b/i.test(text)) return true
+  if (/(?:^|[^\w])(?:\.\d+|\d+\.)\s*(?:kg|g|mg|ml|lbs?|kcal|calories?|reps?|steps?|sessions?|movements?|minutes?|mins?|hours?|hrs?)\b/i.test(text)) return true
   return false
+}
+
+export function unsupportedHistoricalMeasurement(text: string): boolean {
+  return unsupportedLiteralMeasurement(text, false)
+}
+
+/** Current, untimed assertions can verify milligram-level sodium evidence.
+ * Historical handling retains its existing deliberately narrower unit policy.
+ */
+function unsupportedCurrentMeasurement(text: string): boolean {
+  return unsupportedLiteralMeasurement(text, true)
 }
 
 /** Exposes supported literal quantities without prose qualifiers; numbers
@@ -422,18 +436,24 @@ export function groundHistoricalAnswer(
       return false
     }
     if (!affirmativeOwnerMetricClaim(block.text)) return true
-    // Numeric/current owner assertions cannot borrow generic prose, a
-    // non-substantive source-consistency warning, or an unrelated domain.
-    // This is citation integrity only, not a proof that cited prose is true.
+    // Current owner-recorded quantities need the actual cited recorded
+    // number AND unit, not merely a matching domain. All numbers in a mixed
+    // claim must have independent matching support. A saved target, summary
+    // warning or recorded unrelated nutrient cannot certify a measurement.
     if (!scope && !dateIssue) {
       const substantiveCitations = block.evidenceRefs.flatMap((id) => {
         const source = byId.get(id)
         return source?.substantive ? [source] : []
       })
       const claimedDomains = explicitlyClaimedMetricDomains(block.text)
-      if (substantiveCitations.length > 0 &&
-          claimedDomains.every((domain) =>
-            substantiveCitations.some((source) => source.domain === domain))) return true
+      const values = qualifiedOwnerQuantities(block.text)
+      const verified = substantiveCitations.length > 0 &&
+        claimedDomains.every((domain) =>
+          substantiveCitations.some((source) => source.domain === domain)) &&
+        !unsupportedCurrentMeasurement(block.text) &&
+        values.every((quantity) =>
+          numericEvidenceSupports(quantity, substantiveCitations, block.text, false))
+      if (verified) return true
       withheld += 1
       return false
     }
@@ -483,7 +503,7 @@ export function groundHistoricalAnswer(
         scope.start + (scope.end === scope.start ? ' date.' : ' through ' + scope.end + ' window.') +
         ' An observational association does not prove a cause.'
       : currentMetricClaim
-        ? 'An owner-specific measurement claim was withheld because it lacked substantive cited Health evidence for the claimed metric domain. Unrelated records and source-consistency warnings are not proof of a personal measurement.'
+        ? 'An owner-specific measurement claim was withheld because its cited evidence did not verify the stated metric domain, recorded quantity or unit. An unrelated value, incomplete log or source-consistency warning cannot establish the claimed amount.'
         : 'An owner-specific causal or relationship claim was withheld because the supplied evidence cannot establish causation or did not include a qualifying personal relationship calculation.'
   return {
     blocks: blocks.length > 0
