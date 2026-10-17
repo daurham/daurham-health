@@ -2863,3 +2863,28 @@ owner pathway, not a guarantee of a complete medical triage system.
 Migrations: none. Production/main: unchanged. PIQ preview API: still hard
 locked. Owner accepted 0/9; no live QA until isolated runtime verified.
 Next: full exact-SHA CI and protected-preview runtime attestation.
+
+
+## 2026-10-17 — T43 cross-instance identical Ask Health request cost guard
+
+State: **implemented on PIQ development branch, exact CI pending; not owner accepted**.
+The durable SQL AI usage ledger already serializes reservations under a database
+advisory transaction lock and protects the global cost ceiling, but previously
+allowed simultaneous *same-hash* Ask Health questions to reserve separate Gemini
+calls if budget/rate settings allowed. New same-key duplicate check runs inside
+that same locked SQL decision: match request type/provider/model/fingerprint,
+block reserved or uncertain attempts for 15 minutes, and completed attempts
+for 60 seconds; released pre-call reservations don't block. The in-memory
+test double matches SQL. A duplicate receives a distinct privacy-safe 429
+`ASK_HEALTH_DUPLICATE_REQUEST`, not another provider call or hidden charge.
+Different question/evidence hashes still work. This is conservative duplicate
+**suppression**, not cross-instance answer sharing or an exactly-once provider
+guarantee. Outside the suppression window, legitimate re-requests remain
+possible and all uncertain ledger reservations stay charged against the cap.
+
+Tests: synthetic in-memory two-gate race, completion/retry, release and
+unrelated AI workflows; durable isolated PostgreSQL two-client concurrency
+and status/fingerprint tests in `tests/ai-usage.test.ts`. No migrations or
+database edits, paid model calls, personal owner records, production writes or
+PIQ lock changes. Golden T43 stays partial until exact-SHA CI and real
+multi-tab/cold-instance QA; production unchanged.

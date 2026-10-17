@@ -19,7 +19,7 @@ export type AiUsageReserveInput = {
 
 export type AiUsageReserveResult =
   | { ok: true; id: string }
-  | { ok: false; reason: 'budget' | 'rate' }
+  | { ok: false; reason: 'budget' | 'rate' | 'duplicate' }
 
 export type AiUsageLedger = {
   reserve(input: AiUsageReserveInput): Promise<AiUsageReserveResult>
@@ -46,6 +46,26 @@ rate AS (
   SELECT COUNT(*)::int AS calls, MAX(created_at) AS last_at
   FROM attempts
 ),
+-- T43: the global advisory transaction lock serializes same-key reservations
+-- across serverless instances. Pending/uncertain attempts get a 15-minute
+-- safety window, and completed answers a 60-second retry cooldown.
+-- Released pre-call reservations never block a retry. No question prose stored.
+duplicate AS (
+  SELECT EXISTS (
+    SELECT 1 FROM ai_usage
+    WHERE $8::text = 'ask_health'
+      AND $11::text IS NOT NULL AND $11::text <> ''
+      AND request_type = $8::text AND provider = $9::text
+      AND model = $10::text AND request_hash = $11::text
+      AND created_at <= $1::timestamptz
+      AND (
+        (status IN ('reserved', 'uncertain')
+          AND created_at > $1::timestamptz - interval '15 minutes')
+        OR (status = 'completed'
+          AND created_at > $1::timestamptz - interval '60 seconds')
+      )
+  ) AS found
+),
 charged AS (
   SELECT COALESCE(SUM(
     CASE
@@ -67,10 +87,12 @@ decision AS (
         AND rate.last_at > $1::timestamptz - ($5::int * interval '1 millisecond')
         THEN 'rate'
       WHEN charged.amount + $6::numeric > $7::numeric THEN 'budget'
+      WHEN duplicate.found THEN 'duplicate'
       ELSE 'reserve'
     END AS outcome
   FROM rate
   CROSS JOIN charged
+  CROSS JOIN duplicate
 ),
 inserted AS (
   INSERT INTO ai_usage (
@@ -124,7 +146,7 @@ export function createSqlAiUsageLedger(session: AiUsageSession): AiUsageLedger {
         }
         return { ok: true, id }
       }
-      if (outcome === 'budget' || outcome === 'rate') {
+      if (outcome === 'budget' || outcome === 'rate' || outcome === 'duplicate') {
         return { ok: false, reason: outcome }
       }
       throw new Error('AI usage reservation failed')

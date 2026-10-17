@@ -36,6 +36,7 @@ import { askHealthGemini, askHealthModel } from './provider.js'
 const FAILURE = "Ask Health couldn't generate an explanation. Your Health data is unchanged."
 const BUDGET = 'Ask Health unavailable — AI monthly budget reached.'
 const RATE = 'Ask Health is receiving requests too quickly. Wait a moment and try again.'
+const DUPLICATE = 'This question was recently requested. Please try again shortly to avoid another AI charge.'
 const READ_FAILURE = "Ask Health couldn't read Health evidence. Your Health data is unchanged."
 
 export type AskHealthProvider = (input: { system: string; user: string; model: string; evidenceIds: string[] }) => Promise<{
@@ -245,8 +246,11 @@ export async function explainAskHealth(input: {
     throw new HttpError(503, FAILURE, undefined, 'ASK_HEALTH_USAGE_GATE')
   }
   if (!decision.ok) {
-    throw new HttpError(429, decision.reason === 'budget' ? BUDGET : RATE, undefined,
-      decision.reason === 'budget' ? 'ASK_HEALTH_BUDGET_EXCEEDED' : 'ASK_HEALTH_RATE_LIMIT')
+    const message = decision.reason === 'budget' ? BUDGET
+      : decision.reason === 'duplicate' ? DUPLICATE : RATE
+    const code = decision.reason === 'budget' ? 'ASK_HEALTH_BUDGET_EXCEEDED'
+      : decision.reason === 'duplicate' ? 'ASK_HEALTH_DUPLICATE_REQUEST' : 'ASK_HEALTH_RATE_LIMIT'
+    throw new HttpError(429, message, undefined, code)
   }
   if (decision.cached) {
     // Defensive against older cache entries or future scope-rule changes.

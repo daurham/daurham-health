@@ -8,6 +8,10 @@ type MemoryRow = {
   reserved: number
   actual: number | null
   createdAt: number
+  requestType: string
+  provider: string
+  model: string
+  requestHash: string | null
 }
 
 /** Test double. Production budget authority is createSqlAiUsageLedger. */
@@ -68,8 +72,25 @@ function reserveRow(rows: MemoryRow[], input: AiUsageReserveInput): AiUsageReser
   if (charged(rows, input.now) + input.reservedCostUsd > input.budgetUsd) {
     return { ok: false, reason: 'budget' }
   }
+  // Keep the deterministic test double in sync with SQL's serialized T43 guard.
+  if (input.requestType === 'ask_health' && input.requestHash &&
+      rows.some((row) =>
+        row.requestType === input.requestType &&
+        row.provider === input.provider &&
+        row.model === input.model &&
+        row.requestHash === input.requestHash &&
+        row.createdAt <= input.now &&
+        ((row.status === 'reserved' || row.status === 'uncertain')
+          ? input.now - row.createdAt < 15 * 60_000
+          : row.status === 'completed' && input.now - row.createdAt < 60_000))) {
+    return { ok: false, reason: 'duplicate' }
+  }
   const id = randomUUID()
-  rows.push({ id, status: 'reserved', reserved: input.reservedCostUsd, actual: null, createdAt: input.now })
+  rows.push({
+    id, status: 'reserved', reserved: input.reservedCostUsd, actual: null,
+    createdAt: input.now, requestType: input.requestType, provider: input.provider,
+    model: input.model, requestHash: input.requestHash,
+  })
   return { ok: true, id }
 }
 

@@ -11,7 +11,7 @@ export type AskHealthCacheRecord = {
 
 export type AskHealthGateDecision =
   | { ok: true; cached: AskHealthCacheRecord | null; usageId: string | null }
-  | { ok: false; reason: 'budget' | 'rate' }
+  | { ok: false; reason: 'budget' | 'rate' | 'duplicate' }
 
 export type AskHealthGate = {
   take(key: string, now: number, model: string): Promise<AskHealthGateDecision>

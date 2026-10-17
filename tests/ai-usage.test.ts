@@ -150,6 +150,49 @@ describe('durable ai usage', () => {
     expect([left, right].find((item) => !item.ok)).toEqual({ ok: false, reason: 'budget' })
   })
 
+  it('T43: serializes duplicate same-hash Ask Health requests across independent SQL clients', async () => {
+    const first = createSqlAiUsageLedger(sessionFor(await connect()))
+    const second = createSqlAiUsageLedger(sessionFor(await connect()))
+    const args = reserveInput({ budgetUsd: 1, maxPerMinute: 100, minIntervalMs: 0 })
+    const [a, b] = await Promise.all([first.reserve(args), second.reserve(args)])
+    expect([a, b].filter((x) => x.ok)).toHaveLength(1)
+    expect([a, b].find((x) => !x.ok)).toEqual({ ok: false, reason: 'duplicate' })
+    const accepted = a.ok ? a : b
+    if (!accepted.ok) return
+    const inspect = await connect()
+    const count = await inspect.query('SELECT count(*)::int AS count FROM ai_usage')
+    expect(count.rows[0]?.count).toBe(1)
+    expect(await first.chargedUsd(NOW)).toBeCloseTo(0.02, 6)
+
+    // A genuinely different evidence fingerprint is a different request.
+    const distinct = await second.reserve({ ...args, requestHash: 'b'.repeat(64), now: NOW + 1_000 })
+    expect(distinct.ok).toBe(true)
+    if (distinct.ok) await second.release(distinct.id, NOW + 2_000)
+    // Failed or uncertain billing cannot silently trigger a duplicate provider charge.
+    await first.uncertain(accepted.id, NOW + 3_000)
+    expect(await second.reserve({ ...args, now: NOW + 2 * 60_000 }))
+      .toEqual({ ok: false, reason: 'duplicate' })
+    expect((await second.reserve({ ...args, now: NOW + 16 * 60_000 })).ok).toBe(true)
+  })
+
+  it('T43: recent completed answers suppress cold-instance re-requests; released requests retry', async () => {
+    const first = createSqlAiUsageLedger(sessionFor(await connect()))
+    const second = createSqlAiUsageLedger(sessionFor(await connect()))
+    const args = reserveInput({ budgetUsd: 1, maxPerMinute: 100, minIntervalMs: 0 })
+    const done = await first.reserve(args)
+    expect(done.ok).toBe(true)
+    if (!done.ok) return
+    await first.complete(done.id, 0.005, 10, 12, NOW + 100)
+    expect(await second.reserve({ ...args, now: NOW + 20_000 }))
+      .toEqual({ ok: false, reason: 'duplicate' })
+    const later = await second.reserve({ ...args, now: NOW + 61_000 })
+    expect(later.ok).toBe(true)
+    if (!later.ok) return
+    await second.release(later.id, NOW + 61_100)
+    const retried = await first.reserve({ ...args, now: NOW + 62_000 })
+    expect(retried.ok).toBe(true)
+  })
+
   it('charges the actual cost, keeps crash and uncertain reservations, and releases a pre-call failure', async () => {
     const client = await connect()
     const ledger = createSqlAiUsageLedger(sessionFor(client))
