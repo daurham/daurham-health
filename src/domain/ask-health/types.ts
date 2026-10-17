@@ -47,6 +47,8 @@ export type AskGoalInput = {
   versionId?: string
   /** Private fingerprint of the exact weight point read by Goal Control. */
   bodyWeightSourceRevision?: string | null
+  /** Private revision of the exact canonical weight series used for projection. */
+  bodyWeightProjectionRevision?: string | null
   kind: GoalKind
   lifecycle: GoalStatus
   label: string

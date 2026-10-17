@@ -4,11 +4,13 @@ import type {WeightEnergyCurrentSettings} from './weight-energy-current-settings
 import type {WeightGoalObservation} from './weight-goal-observation.js'
 import type {PrimaryWeightGoalPriority} from './primary-weight-goal-intent.js'
 import type {WeightPointSourceRead} from '../../../server/ask-health/current-weight-point-source.js'
+import type {WeightProjectionSourceRead} from '../../../server/ask-health/current-weight-projection-source.js'
 
 export type CanonicalGoalStatusReview={
   state:'not_checked'|'unavailable'|'primary_not_weight'|'version_mismatch'|
     'canonical_target_unknown'|'canonical_reported'|'measurement_disagreement'|
-    'measurement_source_changed'|'measurement_source_unavailable'
+    'measurement_source_changed'|'measurement_source_unavailable'|
+    'projection_source_changed'|'projection_source_unavailable'
   /** Goal Control's current read is a REPORT, not a separately locked measurement. */
   targetReport:'withheld'|'unknown'|'satisfied'|'above_target'|'below_target'|
     'outside_range_low'|'outside_range_high'
@@ -16,11 +18,14 @@ export type CanonicalGoalStatusReview={
     'due_today_reported_unmet'|'due_today_missing_measurement'|
     'past_reported_satisfied'|'past_reported_unmet'|'past_missing_measurement'
   measurementRevision:'not_attested'|'latest_point_rechecked'|'changed_or_unavailable'
+  projectionRevision:'not_attested'|'complete_series_rechecked'|
+    'empty_series_rechecked'|'changed_or_unavailable'
   intervention:'not_authorized'
 }
 export const UNCHECKED_CANONICAL_GOAL_STATUS:CanonicalGoalStatusReview={
   state:'not_checked',targetReport:'withheld',deadlineAttention:'withheld',
-  measurementRevision:'not_attested',intervention:'not_authorized',
+  measurementRevision:'not_attested',projectionRevision:'not_attested',
+  intervention:'not_authorized',
 }
 const unknown:CanonicalGoalStatusReview={
   ...UNCHECKED_CANONICAL_GOAL_STATUS,state:'unavailable',
@@ -44,6 +49,8 @@ export function reviewCanonicalSelectedGoal(input:{
   observation:WeightGoalObservation
   /** Optional for old test fixtures; production always supplies recheck. */
   sourceRead?:WeightPointSourceRead|null
+  /** Optional for earlier isolated tests; production always supplies both reads. */
+  projectionSourceRead?:WeightProjectionSourceRead|null
 }):CanonicalGoalStatusReview{
   if(input.asOf!==input.today)return {...unknown}
   if(input.settings.state==='not_checked')return {...UNCHECKED_CANONICAL_GOAL_STATUS}
@@ -79,6 +86,20 @@ export function reviewCanonicalSelectedGoal(input:{
         measurementRevision:'changed_or_unavailable'}
     // Missing point => unknown goal, never a confirmed unchanged weight.
   }
+  let projectionRevision:CanonicalGoalStatusReview['projectionRevision']='not_attested'
+  if(input.projectionSourceRead!==undefined){
+    const check=input.projectionSourceRead
+    const originally=canonical.bodyWeightProjectionRevision
+    if(!check||check.status!=='available'||!originally)
+      return {...unknown,state:'projection_source_unavailable',
+        measurementRevision:sourceRevision,projectionRevision:'changed_or_unavailable'}
+    if(check.revision!==originally||
+       (check.rowCount===0&&canonical.targetState!=='unknown'))
+      return {...unknown,state:'projection_source_changed',
+        measurementRevision:sourceRevision,projectionRevision:'changed_or_unavailable'}
+    projectionRevision=check.rowCount===0?
+      'empty_series_rechecked':'complete_series_rechecked'
+  }
   const target=canonical.targetState
   const deadline=canonical.deadlineState
   const attention:CanonicalGoalStatusReview['deadlineAttention']=
@@ -102,6 +123,7 @@ export function reviewCanonicalSelectedGoal(input:{
     state:diverges?'measurement_disagreement':
       target==='unknown'?'canonical_target_unknown':'canonical_reported',
     targetReport:target,deadlineAttention:attention,
-    measurementRevision:sourceRevision,intervention:'not_authorized',
+    measurementRevision:sourceRevision,projectionRevision,
+    intervention:'not_authorized',
   }
 }

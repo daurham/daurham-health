@@ -30,6 +30,7 @@ import type { BodyObservation, CanonicalSetRecord, ProgressExerciseDefinition } 
 import type { AdherenceWindow, ScheduleWindow, StatusEventWindow } from '../../src/domain/supplements/types.js'
 import { getSql, type Sql } from '../db.js'
 import { loadBodyGoalPointAsOf, loadStrengthGoalSetsAsOf, loadBenchmarkGoalPointAsOf } from './as-of-point-evidence.js'
+import {loadBodyProjectionSource} from './body-projection-source.js'
 import { HttpError } from '../http.js'
 import { currentHealthDate, healthCalendarTimeZone } from '../health-time.js'
 
@@ -754,11 +755,14 @@ export async function listGoalAskSnapshots(asOf: string, healthToday?: string) {
       bodyWeightSourceRevision:null,
     }
     const evidence = await loadEvidence(sql, row, target, asOf, timezone, sourceCapture)
-    const derived = await deriveGoalStatus(sql, row, current, evidence, asOf)
+    const projectionCapture:{weightProjectionRevision:string|null}={weightProjectionRevision:null}
+    const derived = await deriveGoalStatus(sql,row,current,evidence,asOf,projectionCapture)
     goals.push({
       id: row.id,
       bodyWeightSourceRevision:row.goal_kind==='body_metric'&&
         row.body_metric_key==='weight'?sourceCapture.bodyWeightSourceRevision:undefined,
+      bodyWeightProjectionRevision:row.goal_kind==='body_metric'&&
+        row.body_metric_key==='weight'?projectionCapture.weightProjectionRevision:undefined,
       kind: row.goal_kind,
       lifecycle: row.status,
       label: goalDisplayName({
@@ -1044,22 +1048,10 @@ async function loadProjectionSeries(
   row: GoalRow,
   goalUnit: string,
   asOf: string,
-): Promise<{ current: { value: number; observedOn: string } | null; series: Array<{ date: string; value: number }> }> {
+): Promise<{ current: { value: number; observedOn: string } | null;
+  series: Array<{ date: string; value: number }>;sourceRevision?:string|null }> {
   if (row.goal_kind === 'body_metric' && row.body_metric_key) {
-    const metrics = (await sql.query(
-      `SELECT metrics.id::text AS measurement_id,
-              metrics.measurement_session_id::text AS measurement_session_id,
-              metrics.metric_key,
-              metrics.value::text AS value,
-              metrics.unit,
-              metrics.value_kind,
-              sessions.measured_at::text AS measured_at,
-              sessions.timezone
-       FROM body_metrics metrics
-       JOIN body_measurement_sessions sessions ON sessions.id = metrics.measurement_session_id
-       WHERE metrics.metric_key = $1`,
-      [row.body_metric_key],
-    )) as Array<Record<string, unknown>>
+    const {rows:metrics,revision}=await loadBodyProjectionSource(sql,row.body_metric_key)
     const observations: BodyObservation[] = metrics.map((metric) => {
       const measuredAt = new Date(String(metric.measured_at))
       const timezone = metric.timezone == null ? null : String(metric.timezone)
@@ -1075,7 +1067,8 @@ async function loadProjectionSeries(
         calendarDate: calendarDateFromInstant(measuredAt, timezone),
       }
     })
-    return bodyGoalSeries(observations, row.body_metric_key, goalUnit, asOf)
+    return {...bodyGoalSeries(observations,row.body_metric_key,goalUnit,asOf),
+      ...(row.body_metric_key==='weight'?{sourceRevision:revision}:{})}
   }
   if (row.goal_kind === 'strength_e1rm' && row.exercise_definition_id) {
     const exercises = (await sql.query(
@@ -1135,9 +1128,14 @@ async function loadProjectionSeries(
   return { current: null, series: [] }
 }
 
-async function deriveGoalStatus(sql: Sql, row: GoalRow, current: VersionRow, evidence: GoalEvidence, asOf: string) {
+async function deriveGoalStatus(sql: Sql,row:GoalRow,current:VersionRow,
+  evidence:GoalEvidence,asOf:string,
+  projectionCapture?:{weightProjectionRevision:string|null},
+) {
   const target = targetFrom(current)
   const loaded = await loadProjectionSeries(sql, row, target.targetUnit, asOf)
+  if(projectionCapture&&row.goal_kind==='body_metric'&&row.body_metric_key==='weight')
+    projectionCapture.weightProjectionRevision=loaded.sourceRevision??null
   const projection = projectGoal({
     goalId: row.id,
     goalVersionId: current.id,

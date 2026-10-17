@@ -71,7 +71,7 @@ describe('PIQ-4.2 current selected Goal Control version and deadline review',()=
   expect(r).toEqual({
    state:'canonical_reported',targetReport:'above_target',
    deadlineAttention:'future_or_projection',measurementRevision:'not_attested',
-   intervention:'not_authorized',
+   projectionRevision:'not_attested',intervention:'not_authorized',
   })
   const p=packet(r)
   const entry=p.evidence.find(x=>x.id==='weight_energy.canonical_goal_status')

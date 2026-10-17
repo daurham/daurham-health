@@ -47,6 +47,7 @@ import {screenRecentExperimentResults} from '../../src/domain/ask-health/recent-
 import {reconcileWeightEnergyEvidence} from '../../src/domain/ask-health/weight-energy-reconciliation.js'
 import {reviewCanonicalSelectedGoal} from '../../src/domain/ask-health/canonical-goal-status-review.js'
 import {readCurrentWeightPointSource} from './current-weight-point-source.js'
+import {readCurrentWeightProjectionSource} from './current-weight-projection-source.js'
 import { loadTrainingProgressionState } from '../intelligence/training-progression.js'
 
 export async function loadAskHealthPacketInput(input: {
@@ -215,9 +216,10 @@ export async function loadAskHealthPacketInput(input: {
   // Bracket other retrieval work with a fresh read. A failed/changed view
   // remains UNKNOWN rather than claiming no experiments or a safe target.
   if (focusedWeightEnergy && capturedDecision) {
-    const [checkedDecision,checkedWeightSource]=await Promise.all([
+    const [checkedDecision,checkedWeightSource,checkedWeightProjection]=await Promise.all([
       readMaintenanceDecisionSnapshot(input.asOf),
       readCurrentWeightPointSource(input.asOf,timezone),
+      readCurrentWeightProjectionSource(),
     ])
     focusedWeightEnergy.currentSettings = screenWeightEnergyCurrentSettings(
       capturedDecision,checkedDecision,
@@ -258,6 +260,7 @@ export async function loadAskHealthPacketInput(input: {
       read:currentGoalRead,snapshots:goals,
       observation:focusedWeightEnergy.weightGoalObservation,
       sourceRead:checkedWeightSource,
+      projectionSourceRead:checkedWeightProjection,
     })
     focusedWeightEnergy.reconciliation = reconcileWeightEnergyEvidence({
       asOf:input.asOf,today,
