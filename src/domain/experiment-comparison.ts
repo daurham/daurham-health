@@ -31,6 +31,15 @@ function countDays(points: readonly DailyMetricPoint[], metricKey: string, start
   ).map((p) => p.date)).size
 }
 
+/** Include the ENTIRE canonical experiment window, even if implementation
+ * was acknowledged late. The comparison only widens the original read;
+ * it must never discard earlier outcome observations. */
+export function nutritionComparisonLoadStart(windowStart: string, reportedChangeDate: string | null): string {
+  if (!reportedChangeDate || !isCalendarDate(reportedChangeDate)) return windowStart
+  const prior = addCalendarDays(reportedChangeDate, -BASELINE_DAYS)
+  return prior < windowStart ? prior : windowStart
+}
+
 export function assessNutritionExperimentComparison(input: {
   reportedImplementationDate: string | null
   windowStart: string
