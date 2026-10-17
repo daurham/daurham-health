@@ -1,4 +1,9 @@
-## 2026-10-17 PIQ-6.3 observed timing overlap warning (CI pending)
+## 2026-10-17 PIQ-6.3 overlap review verified, further outcome gates open
+
+- CI 39067558828 SUCCESS for app commit 857512bd74e93cc1fbbf059a0ca877f401b46498 (2,606 passed/30 skipped, 343 files passed/2 skipped, TS, ESLint, build). No new migration; read-only Change Ledger source queries for verified linked Lab observation windows. None-recorded explicitly does not rule out unlogged confounders; unavailable fails closed.
+- Critical gates remain: baseline sufficiency, outcome-level completeness/quality, corrected interventions impact on finalized results, owner evaluation feedback and calibration memory. Existing migrations 0057 and 0058 remain unapplied, do not promote to main/prod until authorized and applied. Owner phase acceptance 0/9.
+
+## 2026-10-17 PIQ-6.3 observed timing overlap warning (CI GREEN)
 
 - Read-only one-query aggregation for 7 existing Change Ledger-relevant sources, current date/window/verified owner Lab scope; present only aggregate counts by source-kind. Owner's own implementation excluded; retracted other experiments excluded; unavailable and missing-data categories remain explicit.
 - No causal claim or automatic result, target, protocol changes. Not an outcome evaluator or complete confounder registry. Migrations 0057/0058 still unapplied, stay on PIQ branch, phase owner acceptance 0/9.
