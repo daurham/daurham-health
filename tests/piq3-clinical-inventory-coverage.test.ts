@@ -57,8 +57,9 @@ describe('T48 pre-cap explicit clinical inventory completeness (synthetic only)'
     const entries = actual.evidence.filter(item => item.id.startsWith('clinical.medication.'))
     expect(entries).toHaveLength(16)
     expect(entries.map(item => item.id)).not.toContain('clinical.medication.19')
-    expect(entries[1]?.value).toBe('paused')
-    expect(entries[2]?.value).toBe('discontinued')
+    // Evidence is priority-sorted; source IDs preserve original Profile indices.
+    expect(entries.find(item => item.id === 'clinical.medication.1')?.value).toBe('paused')
+    expect(entries.find(item => item.id === 'clinical.medication.2')?.value).toBe('discontinued')
     expect(actual.evidenceSelectionAudit?.removedSubstantiveCount).toBe(0)
     const limitation = actual.limitations.find(item => item.code === 'clinical_evidence_limited')
     expect(limitation?.evidenceId).toBe('ask.range')
