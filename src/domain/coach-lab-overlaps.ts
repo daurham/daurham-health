@@ -42,7 +42,7 @@ export function projectCoachLabOverlapReview(
       !(COACH_LAB_OVERLAP_KINDS as readonly string[]).includes(row.kind) ||
       seen.has(row.kind)) return { state: 'unavailable', observations: [] }
     const count = typeof row.event_count === 'number' ? row.event_count
-      : typeof row.event_count === 'string' && /^\\d+$/.test(row.event_count) ? Number(row.event_count) : NaN
+      : typeof row.event_count === 'string' && /^\d+$/.test(row.event_count) ? Number(row.event_count) : NaN
     if (!Number.isSafeInteger(count) || count < 1) {
       return { state: 'unavailable', observations: [] }
     }
