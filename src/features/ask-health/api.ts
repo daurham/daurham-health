@@ -17,6 +17,8 @@ export type AskHealthResponse = {
       domains: string[]
       omittedCount: number
       limited: boolean
+      /** Optional for older API deployments; no private records included. */
+      clinicalScopeWarning?: string | null
       items: Array<{
         id: string
         label: string
