@@ -3808,7 +3808,7 @@ isolated preview authorization, and actual owner mobile acceptance.
 **Verification planned:** SQL metadata lifecycle tests, validation fail-closed tests, API payload and panel render tests plus standard branch CI. This does **not** implement adaptive learning from ratings or verified plan change linkage. The next PIQ-5.5 slice should link owner-reviewed interventions to canonical plan/change-ledger/experiment records only with explicit owner-approved action, then run integrated PIQ-5.7 scenarios. Still **0/9** owner-accepted phases. Development branch only; no migration, production deployment or main merge.
 
 
-## 2026-10-17 — PIQ-5.5 owner-confirmed Coach → Personal Lab experiment linking (CI pending)
+## 2026-10-17 — PIQ-5.5 owner-confirmed Coach → Personal Lab experiment linking (CI GREEN)
 
 **Scope:** A non-calorie, experiment-eligible Coach recommendation can now prefill a Personal Lab experiment while preserving the exact source card ID, as-of evidence revision and response version. Creating a canonical experiment remains separate from linking; the saved Experiment page offers an explicit **Link this experiment to Coach** confirmation. No automatic owner start, target adjustment, lab schedule, or seven-day subjective follow-up is created.
 
@@ -3819,3 +3819,5 @@ isolated preview authorization, and actual owner mobile acceptance.
 **Tests:** `tests/piq5-coach-experiment-link.test.tsx` covers URL shape, invalid or missing tokens, eligibility and stale-evidence failures, update CAS, real owner-created Lab restrictions, metadata preservation, and Coach UI state. `tests/i9-coach-intelligence-routing.test.ts` now asserts the new link route. Branch validation must complete before engineering slice is marked green.
 
 **Remaining gates:** real owner mobile QA, actual evidence usefulness, PIQ-5.4 question dismissal, PIQ-5.5 verified implementation-to-outcome link, integrated PIQ-5.7 scenarios, PIQ-6 and PIQ-7. Formal owner acceptance **0/9**.
+
+**Validated engineering checkpoint:** exact application commit `de60760d7f5717abbc277fb2a5f6026616e236b4` passed GitHub Actions run https://github.com/daurham/daurham-health/actions/runs/39058896137 with `npm ci`, TypeScript, ESLint, **2,571 passed tests (30 skipped, 340 suites passed)** and the production build. First attempt failed TypeScript for a missing Lab handoff type and was fixed on branch before this green run. No owner mobile acceptance, production migration, AI provider call or deployment. This records validated code, NOT 1/9 owner-accepted phases.
