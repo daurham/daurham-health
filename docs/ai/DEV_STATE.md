@@ -1,3 +1,9 @@
+## 2026-10-17 PIQ-5.5 linked Lab lifecycle projection — engineering, CI pending
+
+- Added read-only canonical lifecycle `src/domain/coach-lab-lifecycle.ts` for owner-created linked experiments. Coach shows accepted/scheduled/active/completed/inconclusive/archived with truthful observational limits, a verified result link only when present, and observation windows. Does not assume actual behavior, adherence, improvement or causation.
+- Missing/unreachable/invalid Lab links retain saved provenance and an unknown-state cue in Coach; no false fresh handoff or owner-start prompt. Archived linked records remain historical rather than being treated as unlinked.
+- Tests in `tests/piq5-coach-experiment-link.test.tsx`. Branch `piq/00-baseline-20261014`, no new migrations, owner data access, production deployment or AI provider cost. PIQ-6 actual verified intervention-to-result closed loop and owner mobile QA remain to be done; 0/9 owner-accepted phases.
+
 ## 2026-10-17 PIQ-5.5 owner-selected canonical Lab association — development only
 
 - Branch `piq/00-baseline-20261014` now carries a separate Coach-to-Lab handoff and owner-confirmed link endpoint. An owner may save a new Personal Lab experiment and explicitly link that canonical record to the originating non-calorie Coach recommendation.
