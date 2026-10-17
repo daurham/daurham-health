@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { emptyCriteria, type DailyMetricPoint, type ExperimentRequirementSpec } from '../src/domain/experiment-results.js'
-import { assessNutritionExperimentComparison, nutritionComparisonCopy } from '../src/domain/experiment-comparison.js'
+import { assessNutritionExperimentComparison, nutritionComparisonCopy, nutritionComparisonLoadStart } from '../src/domain/experiment-comparison.js'
 import { EXPERIMENT_VERIFIED_NUTRITION_SQL } from '../server/lab/experiment-results.js'
 
 function req(key = 'calories', kind = 'nutrition_metric', id = key): ExperimentRequirementSpec {
@@ -76,6 +76,11 @@ describe('PIQ-6.3 owner-date nutrition comparison coverage', () => {
       nutrition:[...points(before),...points(after),...points(['2026-10-05'],'protein')]})
     expect(r.state).toBe('insufficient_coverage')
     expect(r.metrics).toHaveLength(2)
+  })
+  it('does not truncate the original experiment window if implementation is late', () => {
+    expect(nutritionComparisonLoadStart('2026-10-01', '2026-10-25')).toBe('2026-10-01')
+    expect(nutritionComparisonLoadStart('2026-10-01', '2026-10-05')).toBe('2026-09-28')
+    expect(nutritionComparisonLoadStart('2026-10-01', null)).toBe('2026-10-01')
   })
   it('uses the already-gated owner-confirmed complete-day nutrition query',()=>{
     expect(EXPERIMENT_VERIFIED_NUTRITION_SQL).toContain("owner_report = 'complete'")
