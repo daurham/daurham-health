@@ -19,7 +19,8 @@ export type ReconciliationReason=
   'canonical_measurement_source_unverified'|
   'canonical_projection_source_unverified'|
   'canonical_goal_status_unverified'|'canonical_deadline_attention'|
-  'canonical_projection_quality_limited'
+  'canonical_projection_quality_limited'|
+  'canonical_projection_conditions_unverified'
 
 export type WeightEnergyReconciliation={
   state:'not_checked'|'source_inconsistent'|'goal_source_conflict'|
@@ -80,6 +81,8 @@ export function reconcileWeightEnergyEvidence(input:{
     if(input.canonicalGoal.state==='measurement_source_changed'||
        input.canonicalGoal.state==='measurement_source_unavailable')
       add('canonical_measurement_source_unverified')
+    if(input.canonicalGoal.state==='projection_conditions_unverified')
+      add('canonical_projection_conditions_unverified')
     if(input.canonicalGoal.state==='projection_quality_limited')
       add('canonical_projection_quality_limited')
     if(input.canonicalGoal.state==='projection_source_changed'||
@@ -125,7 +128,8 @@ export function reconcileWeightEnergyEvidence(input:{
   const canonicalUnknown=input.canonicalGoal!=null&&
     ['unavailable','not_checked','canonical_target_unknown',
       'measurement_source_unavailable',
-      'projection_source_unavailable','projection_quality_limited']
+      'projection_source_unavailable','projection_quality_limited',
+      'projection_conditions_unverified']
       .includes(input.canonicalGoal.state)
   const incompleteSource=unknownExperiment||canonicalUnknown||
     ['unavailable','not_checked'].includes(input.performance.state)||

@@ -15,6 +15,7 @@ const row=(date:string,i:number)=>({
   measurement_id:'measurement-'+i,measurement_session_id:'session-'+i,
   metric_key:'weight',value:String(200-i),unit:'lb',value_kind:'manual',
   measured_at:date+'T16:00:00.000Z',timezone:'America/Phoenix',
+  comparability:'usual',
   metric_updated_at:'2026-10-16T12:00:00.000Z',
   session_updated_at:'2026-10-16T12:00:00.000Z',
 })

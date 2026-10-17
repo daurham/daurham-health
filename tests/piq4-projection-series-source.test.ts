@@ -23,7 +23,7 @@ const row=(id:string,value:string,date='2026-09-23T16:00:00.000Z')=>({
   measurement_id:id,
   measurement_session_id:'77777777-7777-4777-8777-777777777777',
   metric_key:'weight',value,unit:'kg',value_kind:'measured',measured_at:date,
-  timezone:'America/Phoenix',
+  timezone:'America/Phoenix',comparability:'usual',
   metric_updated_at:'2026-10-01T12:00:00.000Z',
   session_updated_at:'2026-10-01T12:00:00.000Z',
 })
@@ -98,6 +98,7 @@ describe('PIQ-4.2 canonical projection history source recheck',()=>{
   expect(sql.query).toHaveBeenCalledWith(BODY_GOAL_PROJECTION_SOURCE_SQL,['weight'])
   expect(BODY_GOAL_PROJECTION_SOURCE_SQL).toContain('metrics.updated_at::text')
   expect(BODY_GOAL_PROJECTION_SOURCE_SQL).toContain('sessions.updated_at::text')
+  expect(BODY_GOAL_PROJECTION_SOURCE_SQL).toContain('sessions.comparability')
   expect(BODY_GOAL_PROJECTION_SOURCE_SQL).toContain('ORDER BY metrics.id::text')
   expect(fromGoal).toMatchObject({total:2,revision:original})
   const recheck=await readCurrentWeightProjectionSource(db([first,latest]))
@@ -120,6 +121,7 @@ describe('PIQ-4.2 canonical projection history source recheck',()=>{
     [{...first,metric_updated_at:'2026-10-16T12:00:00Z'},latest],
     [{...first,session_updated_at:'2026-10-16T12:00:00Z'},latest],
     [{...first,timezone:'America/New_York'},latest],
+    [{...first,comparability:'different_conditions'},latest],
     [{...first,unit:'lb'},latest],
     [{...first,measured_at:'2026-09-24T16:00:00Z'},latest],
     [latest],

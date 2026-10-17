@@ -7,7 +7,8 @@ import {PROGRESS_ANALYTICS_CONFIG} from '../../src/domain/progress/config.js'
  * Called only on rows already covered by the identical private revision.
  */
 export type WeightProjectionHistoryQuality =
-  'date_spread_sufficient'|'date_spread_limited'|'unavailable'
+  'date_spread_sufficient'|'date_spread_limited'|
+  'measurement_conditions_unverified'|'unavailable'
 
 export function assessWeightProjectionHistory(
   rows:readonly Record<string,unknown>[],asOf:string,
@@ -15,6 +16,7 @@ export function assessWeightProjectionHistory(
   if(!/^\d{4}-\d{2}-\d{2}$/.test(asOf)||rows.length>3000)
     return 'unavailable'
   const dates=new Set<string>()
+  let unsupportedConditions=false
   const windowStart=addCalendarDays(asOf,-90)
   for(const row of rows){
     if(row.metric_key!=='weight'||typeof row.measured_at!=='string'||
@@ -34,7 +36,13 @@ export function assessWeightProjectionHistory(
     const day=calendarDateFromInstant(instant,row.timezone as string|null)
     // Canonical Goal projections use no future points and only 90-day
     // evidence. Multiple sessions on one day count once.
-    if(day<=asOf&&day>=windowStart)dates.add(day)
+    if(day<=asOf&&day>=windowStart){
+      dates.add(day)
+      // The same full source series feeds the canonical slope, so five
+      // "usual" points do not make an estimate comparable if another
+      // included point came from unknown or different conditions.
+      if(row.comparability!=='usual')unsupportedConditions=true
+    }
   }
   const sorted=[...dates].sort()
   const first=sorted[0],last=sorted[sorted.length-1]
@@ -55,5 +63,6 @@ export function assessWeightProjectionHistory(
   for(let i=1;i<sorted.length;i++)
     if(calendarDaysBetween(sorted[i-1]!,sorted[i]!)>21)
       return 'date_spread_limited'
-  return 'date_spread_sufficient'
+  return unsupportedConditions?'measurement_conditions_unverified':
+    'date_spread_sufficient'
 }

@@ -11,7 +11,7 @@ export type CanonicalGoalStatusReview={
     'canonical_target_unknown'|'canonical_reported'|'measurement_disagreement'|
     'measurement_source_changed'|'measurement_source_unavailable'|
     'projection_source_changed'|'projection_source_unavailable'|
-    'projection_quality_limited'
+    'projection_quality_limited'|'projection_conditions_unverified'
   /** Goal Control's current read is a REPORT, not a separately locked measurement. */
   targetReport:'withheld'|'unknown'|'satisfied'|'above_target'|'below_target'|
     'outside_range_low'|'outside_range_high'
@@ -105,6 +105,10 @@ export function reviewCanonicalSelectedGoal(input:{
     // crossing/deadline as meaningful present-day evidence without a
     // qualified temporal sampling distribution. Current target state is
     // withheld here rather than mispresenting a forecast as urgency.
+    if(canonical.projectionState==='available'&&
+       check.quality==='measurement_conditions_unverified')
+      return {...unknown,state:'projection_conditions_unverified',
+        measurementRevision:sourceRevision,projectionRevision}
     if(canonical.projectionState==='available'&&
        check.quality!=='date_spread_sufficient')
       return {...unknown,state:'projection_quality_limited',

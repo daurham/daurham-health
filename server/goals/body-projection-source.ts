@@ -15,6 +15,7 @@ SELECT metrics.id::text AS measurement_id,
        metrics.value_kind,
        sessions.measured_at::text AS measured_at,
        sessions.timezone,
+       sessions.comparability,
        metrics.updated_at::text AS metric_updated_at,
        sessions.updated_at::text AS session_updated_at
   FROM body_metrics metrics
@@ -52,12 +53,15 @@ export function fingerprintBodyProjectionRows(
       typeof r.value_kind!=='string'||!r.value_kind.trim()||
       typeof r.measured_at!=='string'||!Number.isFinite(new Date(r.measured_at).getTime())||
       (r.timezone!==null&&(typeof r.timezone!=='string'))||
+      !['usual','different_conditions','unknown',null].includes(
+        r.comparability as string|null)||
       typeof r.metric_updated_at!=='string'||!r.metric_updated_at.trim()||
       typeof r.session_updated_at!=='string'||!r.session_updated_at.trim())
       return null
     seen.add(id)
     parts.push([id,r.measurement_session_id,metricKey,r.value,r.unit,
-      r.value_kind,r.measured_at,r.timezone,r.metric_updated_at,r.session_updated_at])
+      r.value_kind,r.measured_at,r.timezone,r.comparability,
+      r.metric_updated_at,r.session_updated_at])
   }
   parts.sort((a,b)=>String(a[0]).localeCompare(String(b[0]),'en'))
   return createHash('sha256').update(JSON.stringify([metricKey,parts])).digest('hex')
