@@ -5,6 +5,7 @@ import type { OccurrenceState } from '../supplements/types.js'
 import { ASK_HEALTH_PACKET_VERSION, ASK_PACKET_MAX_CHARS, type AskLens } from './config.js'
 import { MIN_VERIFIED_NUTRITION_TARGET_DAYS } from './nutrition-integrity.js'
 import { digestiveQuestionTopics } from './focused-digestive.js'
+import { guardInconsistentActivityIntelligence } from './activity-source-reconciliation.js'
 import type { FocusedWeightEnergyEvidence } from './focused-weight-energy.js'
 import type { HistoricalWeightEnergyDay } from './focused-weight-energy-history.js'
 import type { HistoricalWeightEnergyWindow } from './focused-weight-energy-window.js'
@@ -67,9 +68,13 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
   const focusedSourceConflict=input.focusedWeightEnergy!=null &&
     input.contextMode!=='general_only' && input.asOf===input.healthToday &&
     (input.focusedWeightEnergy.nutritionSourceRecheck==='changed_or_unavailable' ||
-      input.focusedWeightEnergy.weightActivitySourceRecheck==='changed_or_unavailable')
+      input.focusedWeightEnergy.weightActivitySourceRecheck==='changed_or_unavailable' ||
+      input.activitySnapshotConsistency==='changed_or_unavailable')
   const digestiveGuard = digestivePacketGuard(input)
-  const intelligence = guardedDigestiveIntelligence(input.intelligence, digestiveGuard)
+  const intelligence = guardInconsistentActivityIntelligence(
+    guardedDigestiveIntelligence(input.intelligence,digestiveGuard),
+    input.activitySnapshotConsistency,
+  )
   if (wants.body) {
     addBody(input, push, limitations, wants.bodyDetail)
   }
@@ -77,7 +82,17 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
     addNutrition(input, push, limitations)
   }
   if (wants.activity) {
-    addActivity(input, push)
+    if(input.activitySnapshotConsistency==='changed_or_unavailable'){
+      push({
+        id:'activity.source_consistency',domain:'activity',
+        label:'Activity source disagreement',
+        value:null,unit:null,period,
+        text:'The independently loaded Activity progress and shared Health Intelligence records disagree on saved activity measurements, source identity, or date scope. Steps, energy, exercise minutes and resting-heart-rate claims from these paths are WITHHELD. A missing or corrected log is UNKNOWN, not zero. This does not establish how much activity occurred.',
+        coverage:{activitySourceAgreement:'changed_or_unavailable',activityEvidence:'withheld'},
+        detailPath:'/progress/activity',userEntered:false,
+        substantive:false,priority:0,
+      })
+    }else addActivity(input,push)
   }
   if (wants.sleep) {
     addSleep(input, push, limitations)
@@ -87,7 +102,8 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
   }
   addFocusedTraining(input, push)
   addFocusedDigestive(input, push, digestiveGuard)
-  addFocusedWeightEnergy(input.focusedWeightEnergy ?? null, input.contextMode, push)
+  addFocusedWeightEnergy(input.focusedWeightEnergy ?? null, input.contextMode, push,
+    input.activitySnapshotConsistency)
   addHistoricalWeightEnergyDay(input.focusedWeightEnergyDay ?? null, input.contextMode, push)
   addHistoricalWeightEnergyWindow(input.focusedWeightEnergyWindow ?? null, input.contextMode, push)
   if(historicalSourceConflict){
@@ -570,21 +586,24 @@ function addFocusedWeightEnergy(
   focus: FocusedWeightEnergyEvidence | null,
   contextMode: AskHealthPacketInput['contextMode'],
   push: (item: PushItem) => void,
+  activitySnapshotConsistency?: AskHealthPacketInput['activitySnapshotConsistency'],
 ): void {
   if (!focus || contextMode === 'general_only') return
   const estimate = focus.estimate
   const period = {start:focus.start,end:focus.end}
   if(focus.nutritionSourceRecheck==='changed_or_unavailable'||
-     focus.weightActivitySourceRecheck==='changed_or_unavailable'){
+     focus.weightActivitySourceRecheck==='changed_or_unavailable' ||
+     activitySnapshotConsistency==='changed_or_unavailable'){
     push({
       id:'weight_energy.source_consistency',
       domain:'intelligence',
       label:'Current weight/energy source consistency boundary',
       value:null,unit:null,period,
-      text:'At least one independently rechecked current Nutrition, body-weight or Activity source changed, lacks compatible source identity, or was unavailable. Current focused weight/intake estimates, nutrient shifts, protein context, step/log comparisons and selected-goal interpretations are WITHHELD. A corrected or missing record is UNKNOWN, not zero. No calorie adjustment or personalized plateau conclusion is authorized.',
+      text:'At least one independently rechecked current Nutrition, body-weight or Activity source changed, lacks compatible source identity, disagreed between initially loaded source views, or was unavailable. Current focused weight/intake estimates, nutrient shifts, protein context, step/log comparisons and selected-goal interpretations are WITHHELD. A corrected or missing record is UNKNOWN, not zero. No calorie adjustment or personalized plateau conclusion is authorized.',
       coverage:{
         nutritionSourceRecheck:focus.nutritionSourceRecheck,
         weightActivitySourceRecheck:focus.weightActivitySourceRecheck,
+        activitySnapshotConsistency:activitySnapshotConsistency??'not_checked',
         intakeEstimate:'withheld',nutrientShiftContext:'withheld',
         scaleInterpretation:'withheld',intervention:'not_authorized'},
       detailPath:'/nutrition',userEntered:false,substantive:false,priority:0,

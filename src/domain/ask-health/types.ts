@@ -142,6 +142,10 @@ export type AskHealthPacketInput = {
   contextMode?: AskContextMode
   overview: ProgressOverview | null
   activity: ActivityProgressView | null
+  /** Cross-read agreement of canonical Activity and shared intelligence values.
+   * No extra database read; optional for synthetic/historical inputs.
+   */
+  activitySnapshotConsistency?: 'not_checked' | 'verified' | 'changed_or_unavailable'
   sleep: SleepProgressView | null
   goals: readonly AskGoalInput[]
   experiments: readonly AskExperimentInput[]

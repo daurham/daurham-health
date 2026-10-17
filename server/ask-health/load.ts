@@ -1,4 +1,5 @@
 import { buildActivityProgressView } from '../../src/domain/activity/index.js'
+import { reconcileAskActivitySources } from '../../src/domain/ask-health/activity-source-reconciliation.js'
 import { auditAskHealthSharedCoverage } from '../../src/domain/ask-health/diagnostics.js'
 import { askNutritionIntegrityFromSnapshot } from '../../src/domain/ask-health/nutrition-integrity.js'
 import { askClinicalProfileForDate } from '../../src/domain/ask-health/clinical-profile.js'
@@ -123,6 +124,13 @@ export async function loadAskHealthPacketInput(input: {
     sleepNights.filter((night) => night.sleepDate <= input.asOf),
     { range: input.range, asOf: input.asOf, timezone },
   )
+  const activitySnapshotConsistency=input.asOf===today &&
+    input.contextMode!=='general_only'
+    ?reconcileAskActivitySources({
+      rows:activityRows,snapshot:intelligenceSnapshot,
+      start:activity.start,end:activity.end,today,
+    })
+    :'not_checked'
   const intelligence = routeHealthIntelligence(intelligenceSnapshot, {
     question: input.question,
     lens: input.lens,
@@ -342,6 +350,7 @@ export async function loadAskHealthPacketInput(input: {
     contextMode: input.contextMode,
     overview,
     activity,
+    activitySnapshotConsistency,
     sleep,
     goals,
     experiments,
