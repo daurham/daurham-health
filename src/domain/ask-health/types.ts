@@ -153,6 +153,8 @@ export type AskHealthPacketInput = {
   trainingSnapshotConsistency?: 'not_checked' | 'verified' | 'changed_or_unavailable'
   /** Final bounded canonical working-set content recheck for selected current strength evidence. */
   workingSetSourceRecheck?: 'not_checked' | 'verified' | 'changed_or_unavailable'
+  /** Final canonical exercise name/classification agreement; not an atomic DB snapshot. */
+  exerciseDefinitionSourceRecheck?: 'not_checked' | 'verified' | 'changed_or_unavailable'
   goals: readonly AskGoalInput[]
   experiments: readonly AskExperimentInput[]
   benchmarks: readonly AskBenchmarkInput[]

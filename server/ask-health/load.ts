@@ -27,6 +27,7 @@ import { loadHealthIntelligenceSnapshot } from '../intelligence/snapshot.js'
 import { getHealthProfile } from '../profile/service.js'
 import { focusTrainingWorkingSets } from '../../src/domain/ask-health/focused-training.js'
 import { recheckCurrentWorkingSets } from './current-working-sets-recheck.js'
+import { recheckCurrentExerciseDefinitions } from './current-exercise-definitions-recheck.js'
 import { reconcileAskTrainingSources } from '../../src/domain/ask-health/training-source-reconciliation.js'
 import { attachBristolTypes, digestiveQuestionTopics, focusDigestiveContext } from '../../src/domain/ask-health/focused-digestive.js'
 import { bowelSnapshotEventIds, selectDigestiveBowelWindow, summarizeBowelWindow, type DigestiveBowelWindow } from '../../src/domain/ask-health/digestive-window.js'
@@ -364,12 +365,17 @@ export async function loadAskHealthPacketInput(input: {
   const needsWorkingSets=input.asOf===today&&
     input.contextMode!=='general_only'&&
     (input.lens==='training'||input.lens==='general'||focusedTraining!=null)
-  const workingSetSourceRecheck=needsWorkingSets
-    ?await recheckCurrentWorkingSets({
-      initial:rows.sets,start:period.start,end:period.end,today,
-      exerciseId:input.lens==='general'||input.lens==='training'
-        ?null:focusedTraining?.exerciseId??null,
-    }):'not_checked'
+  const [workingSetSourceRecheck,exerciseDefinitionSourceRecheck]=needsWorkingSets
+    ?await Promise.all([
+      recheckCurrentWorkingSets({
+        initial:rows.sets,start:period.start,end:period.end,today,
+        exerciseId:input.lens==='general'||input.lens==='training'
+          ?null:focusedTraining?.exerciseId??null,
+      }),
+      recheckCurrentExerciseDefinitions({
+        initial:rows.exercises,start:period.start,end:period.end,today,
+      }),
+    ]):['not_checked','not_checked'] as const
   return {
     lens: input.lens,
     range: input.range,
@@ -386,6 +392,7 @@ export async function loadAskHealthPacketInput(input: {
     sleepSnapshotConsistency,
     trainingSnapshotConsistency,
     workingSetSourceRecheck,
+    exerciseDefinitionSourceRecheck,
     goals,
     experiments,
     benchmarks,

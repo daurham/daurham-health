@@ -103,6 +103,30 @@ export function mapCheckpointRow(row: Record<string, unknown>): ProgressCheckpoi
   }
 }
 
+/** Shared canonical classification used by Progress and the final Ask Health read. */
+export function mapProgressExerciseDefinitionRow(row: Record<string, unknown>): ProgressExerciseDefinition {
+  const fallback = classificationForExternalId(typeof row.external_id === 'string' ? row.external_id : null)
+  const performanceType = PERFORMANCE_TYPES.includes(row.performance_type as never)
+    ? (row.performance_type as ProgressExerciseDefinition['performanceType'])
+    : fallback.performanceType
+  const analyticsLoadType = ANALYTICS_LOAD_TYPES.includes(row.analytics_load_type as never)
+    ? (row.analytics_load_type as ProgressExerciseDefinition['analyticsLoadType'])
+    : fallback.analyticsLoadType
+  const analyticsRepMode = ANALYTICS_REP_MODES.includes(row.analytics_rep_mode as never)
+    ? (row.analytics_rep_mode as ProgressExerciseDefinition['analyticsRepMode'])
+    : fallback.analyticsRepMode
+  return {
+    id: String(row.id),
+    name: String(row.name),
+    externalId: typeof row.external_id === 'string' ? row.external_id : null,
+    performanceType,
+    analyticsLoadType,
+    analyticsRepMode,
+    measurementKind: String(row.measurement_kind),
+    unilateral: Boolean(row.unilateral),
+  }
+}
+
 /** Shared canonical representation for Progress and late Training source reads. */
 export function mapProgressSetRow(row: Record<string, unknown>): CanonicalSetRecord {
   return {
@@ -189,28 +213,7 @@ export async function loadProgressCanonicalRows(): Promise<ProgressCanonicalRows
       ]),
     )
 
-  const exercises: ProgressExerciseDefinition[] = (exerciseRows as Record<string, unknown>[]).map((row) => {
-    const fallback = classificationForExternalId(typeof row.external_id === 'string' ? row.external_id : null)
-    const performanceType = PERFORMANCE_TYPES.includes(row.performance_type as never)
-      ? (row.performance_type as ProgressExerciseDefinition['performanceType'])
-      : fallback.performanceType
-    const analyticsLoadType = ANALYTICS_LOAD_TYPES.includes(row.analytics_load_type as never)
-      ? (row.analytics_load_type as ProgressExerciseDefinition['analyticsLoadType'])
-      : fallback.analyticsLoadType
-    const analyticsRepMode = ANALYTICS_REP_MODES.includes(row.analytics_rep_mode as never)
-      ? (row.analytics_rep_mode as ProgressExerciseDefinition['analyticsRepMode'])
-      : fallback.analyticsRepMode
-    return {
-      id: String(row.id),
-      name: String(row.name),
-      externalId: typeof row.external_id === 'string' ? row.external_id : null,
-      performanceType,
-      analyticsLoadType,
-      analyticsRepMode,
-      measurementKind: String(row.measurement_kind),
-      unilateral: Boolean(row.unilateral),
-    }
-  })
+  const exercises: ProgressExerciseDefinition[] = (exerciseRows as Record<string, unknown>[]).map(mapProgressExerciseDefinitionRow)
 
   const workouts: ProgressWorkoutSummary[] = (sessionRows as Record<string, unknown>[]).map((row) => {
     const sessionType =

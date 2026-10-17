@@ -67,7 +67,8 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
   const lens = input.lens
   const wants = lensWants(lens)
   const trainingSourceConflict=input.trainingSnapshotConsistency==='changed_or_unavailable' ||
-    input.workingSetSourceRecheck==='changed_or_unavailable'
+    input.workingSetSourceRecheck==='changed_or_unavailable' ||
+    input.exerciseDefinitionSourceRecheck==='changed_or_unavailable'
   // A failed final current-focused read outranks earlier generic snapshots.
   const focusedSourceConflict=input.focusedWeightEnergy!=null &&
     input.contextMode!=='general_only' && input.asOf===input.healthToday &&
@@ -120,9 +121,10 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
     push({
       id:'training.source_consistency',domain:'training',
       label:'Training source disagreement',value:null,unit:null,period,
-      text:'Independently checked Training session or working-set sources changed or could not be verified consistently. Training frequency, logged strength performance and Training-linked correlations are WITHHELD; no set, repetition, load or missing day may be treated as reliable evidence of progress or decline.',
+      text:'Independently checked Training sessions, working sets or exercise definitions changed or could not be verified consistently. Training frequency, exercise labels, logged strength performance and Training-linked correlations are WITHHELD; no set, load or rep may be treated as reliable evidence of progress or decline.',
       coverage:{trainingSourceAgreement:input.trainingSnapshotConsistency??'not_checked',
         workingSetSourceAgreement:input.workingSetSourceRecheck??'not_checked',
+        exerciseDefinitionAgreement:input.exerciseDefinitionSourceRecheck??'not_checked',
         trainingEvidence:'withheld'},
       detailPath:'/progress/strength',userEntered:false,substantive:false,priority:0,
     })
@@ -211,7 +213,7 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
     : historicalSafeDrafts
   const evidence=trimEvidence(safeDrafts,maxChars)
   const selectedIds = new Set(evidence.map((item) => item.id))
-  const clarification = exerciseClarification(input)
+  const clarification = trainingSourceConflict ? null : exerciseClarification(input)
   const selectedSerializedChars = JSON.stringify(evidence).length
   return {
     packetVersion: ASK_HEALTH_PACKET_VERSION,
