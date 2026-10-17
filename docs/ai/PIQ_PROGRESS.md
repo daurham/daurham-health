@@ -2599,3 +2599,28 @@ older deployed preview SHAs, and the cloned Neon candidate remains
 unsuitable for owner QA. No database, migration, credentials,
 personal records, paid AI or main touched. ~91% engineering,
 formal acceptance 0/9.
+
+## 2026-10-17 — PIQ-4 fresh independent QA project and Auth established
+
+**Approved limited infrastructure action completed, not QA approval.**
+Created a separate Neon project `lively-wave-25801832` named
+`daurham-health-piq-isolated-qa`, default root
+`br-crimson-cloud-akrf5kuo` (Postgres 18), distinct from the
+production Health project. Read-only QA SQL initially confirmed
+no non-system tables. Provisioned isolated `better_auth`, matching
+the production Auth technology but with a different provider project
+and Auth endpoint; read-only follow-up found zero application tables,
+zero QA users/sessions, and nine new Auth service tables. No owner
+rows or backups copied; no QA account created; Vercel and production
+untouched. GitHub Actions 39008436437 validation of runtime
+API lock `0c06235` succeeded on retry after transient disposable
+Postgres runner startup failure.
+
+Neon reports root `init_source=parent-data` despite no parent branch;
+existing strict metadata checker appropriately still reports BLOCKED.
+Do not weaken it without provider-created root provenance plus
+independent schema/data evidence and explicit release review. Next
+work: QA schema compatibility and separately approved migrations,
+disposable Auth owner, isolated preview bindings and runtime
+attestation, then mobile acceptance. Engineering ~91%;
+formal owner acceptance 0/9.

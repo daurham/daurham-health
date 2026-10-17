@@ -799,3 +799,18 @@ uncacheable 503 before owner/Auth handlers on PIQ candidates, with
 synthetic direct/rewrite route tests. The gate has no env-only
 unlock. Older Vercel READY deployment does not include it until
 matching commit deployment. Production untouched; owner QA blocked.
+
+## 2026-10-17 — Isolated QA infrastructure created (release remains blocked)
+
+User approved a separate empty PIQ QA Neon project. Provisioned
+`lively-wave-25801832`, root `br-crimson-cloud-akrf5kuo`;
+verified zero application tables/read-only SQL, distinct Health project,
+and distinct new QA better_auth integration. Nine Auth service tables;
+zero QA users or sessions. Default Neon root reports
+`init_source=parent-data` with no parent branch, so existing
+PIQ empty-origin release gate still blocks until root provenance is
+separately attested and logic reviewed. No migrations, QA account,
+Vercel overrides/deployment, AI billing, personal record access or
+production mutation. Guard commit `0c06235` passed full CI on run
+39008436437 attempt 2. PostgreSQL 18 migration compatibility, test
+Auth owner, and preview runtime bindings still need work.

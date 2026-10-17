@@ -61,3 +61,46 @@ and owner approval. Synthetic dispatch tests only, no SQL/PHI/provider
 calls. The old deployed preview SHA is **not protected** by undelivered
 development code. Existing inherited-data preview remains unsafe
 for owner QA.
+
+## 2026-10-17 — Independently empty PIQ Neon QA project (provisioned; runtime QA not approved)
+
+After owner approval, created a **separate new Neon project** named
+`daurham-health-piq-isolated-qa` (`lively-wave-25801832`).
+Its new default root branch is `br-crimson-cloud-akrf5kuo` (`main`),
+created 2026-10-17 06:13:43 UTC, PostgreSQL 18, with **no parent
+branch**, in a different project from existing Health
+`holy-recipe-28496000`. Read-only SQL on the new root established
+zero public application tables and zero non-system tables before Neon
+Auth setup. No existing Health records, migrations or backups were
+copied.
+
+Provisioned a **new better_auth integration on the QA project only**.
+Verified through independently read Neon provider metadata that the
+auth provider-project identity and base URL both differ from the
+existing Health production Auth integration. Subsequent read-only SQL
+found only nine `neon_auth` service tables, **zero public application
+tables, zero QA Auth users, and zero sessions**. No disposable user
+or owner identifier has been created yet; no credentials/URLs appear in
+these docs. No Vercel environment/deployment mutation occurred.
+
+**Provenance caveat:** Neon labels the brand-new default root branch
+`init_source=parent-data` even though it is a root with no
+`parent_id` and independent project identity. The current pure PIQ
+preflight correctly still blocks it: do **not** blindly reclassify
+every `parent-data` branch as safe. Follow-up gate design must require
+independent new-project creation evidence, new-root identity, verified
+empty application data, and verified distinct Auth, alongside all
+existing runtime and owner checks. Never use the cloned former
+`br-damp-pine-aw5cconp` PIQ branch for owner QA.
+
+Remaining blockers: independent project empty schema is **not yet
+migrated**; PostgreSQL 18 compatibility unvalidated, disposable QA
+owner not created, no Vercel preview-specific database/Auth binding,
+runtime comparison/owner-row attestation, recovery readiness, or owner
+mobile acceptance. No schema migration, production changes, owner
+data access, paid AI requests, or PIQ preview enablement authorized
+by the provisioning. Code branch `0c0623572f1b1f463266f6147f0aa71320a3a790`
+passed GitHub full validation on attempt 2,
+[Actions 39008436437](https://github.com/daurham/daurham-health/actions/runs/39008436437).
+Latest known READY Vercel PIQ preview is an older SHA and must not be
+treated as isolation-protected or current.
