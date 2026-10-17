@@ -2545,3 +2545,26 @@ inherits parent data, runtime DB/Auth/owner identity and empty-row verification
 unattested, no owner/mobile acceptance, read-only migration/backups and approval
 pending. Engineering remains approximately 91%; formal owner acceptance 0/9.
 No Vercel deployment or other provider mutation was initiated for this step.
+
+## 2026-10-16 — PIQ-3/4 General Only follow-up and qualitative owner-claim guard (CI pending)
+
+**Development branch, exact-SHA full CI pending.** General Only's existing
+deterministic unsupported-owner-record screen checked answer blocks and
+limitations but omitted model-generated `followUps`. Added follow-up screening
+to both fresh-response validation and cached-answer sanitization, so a
+seemingly safe education paragraph cannot smuggle a fabricated user
+measurement in its suggested next question. Also recognizes narrow,
+sentence-start affirmative owner states (e.g., "Your fiber intake is low,"
+"Your sleep has worsened," "You are dehydrated") while retaining
+hypothetical educational questions and generic second-person physiology.
+No user data, provider call or SQL access added. Cache scope stays v2:
+already-cached General Only answers are screened on delivery with zero
+new model spend. Synthetic stub tests cover provider retry, poisoned
+cached follow-up removal, false-personal-state rejection and safe
+educational phrasing. This is a high-precision string guard, not clinical
+truth verification; owner preview acceptance still required.
+
+**Release:** preview code SHA for preceding candidate is now READY, but
+Neon PIQ branch remains a parent-data clone, and runtime Auth/DB/owner
+isolation is unverified. No main merge, migration, database mutation or
+live owner QA. Approximately 91% engineering, formal acceptance 0/9.

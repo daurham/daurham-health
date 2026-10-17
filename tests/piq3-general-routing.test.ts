@@ -241,6 +241,82 @@ describe('PIQ-3.2 educational routing and safety', () => {
     expect(allBad.blocks[0]?.text).toContain('cannot verify')
   })
 
+  it('rejects direct qualitative owner claims but retains conditional general education', () => {
+    const personal = [
+      'Your fiber intake is low.',
+      'Your sleep has worsened.',
+      'Your weight is stable.',
+      'Your training performance improved.',
+      'You are dehydrated.',
+    ]
+    for (const text of personal) {
+      expect(generalAnswerInventsPersonalRecord({
+        blocks: [{ text, evidenceRefs: [] }], limitations: [], followUps: [],
+      }), text).toBe(true)
+    }
+    for (const text of [
+      'If your fiber intake is low, add foods gradually.',
+      'Your muscles use ATP during exercise.',
+      'Your training performance can improve with progressive overload.',
+      'If you are dehydrated, seek suitable rehydration advice.',
+    ]) {
+      expect(generalAnswerInventsPersonalRecord({
+        blocks: [{ text, evidenceRefs: [] }], limitations: [], followUps: [],
+      }), text).toBe(false)
+    }
+  })
+
+  it('screens personal-record hallucinations in follow-up suggestions on fresh and cached General Only', async () => {
+    const generalBlock = { text: 'Creatine supports short bursts of intense effort.', evidenceRefs: [] }
+    const poisoned = {
+      blocks: [generalBlock],
+      limitations: [],
+      followUps: ['Your weight is 90 kg. Should you take more creatine?'],
+    }
+    expect(generalAnswerInventsPersonalRecord(poisoned)).toBe(true)
+    const filtered = sanitizeCachedGeneralAnswer(poisoned)
+    expect(filtered.blocks).toEqual([generalBlock])
+    expect(filtered.followUps).toEqual([])
+    expect(JSON.stringify(filtered)).not.toContain('90 kg')
+
+    const gate = createAskHealthGate({ minIntervalMs: 0 })
+    gate.take = async () => ({
+      ok: true, usageId: null, cached: { answer: poisoned, evidence: [] },
+    })
+    const noProvider = vi.fn()
+    const fromCache = await answerAskHealth({
+      ...request('What does creatine do?'), contextMode: 'general_only',
+      gate, provider: noProvider,
+    })
+    expect(fromCache.meta.cached).toBe(true)
+    expect(fromCache.answer.followUps).toEqual([])
+    expect(fromCache.answer.blocks).toEqual([generalBlock])
+    expect(noProvider).not.toHaveBeenCalled()
+
+    const stub = vi.fn()
+      .mockResolvedValueOnce({
+        text: JSON.stringify({
+          blocks: [{ text: generalBlock.text, evidence_refs: [] }],
+          limitations: [], follow_ups: ['Your fiber intake is low. Should you supplement?'],
+        }),
+        model: 'piq-stub', inputTokens: 12, outputTokens: 12,
+      })
+      .mockResolvedValueOnce({
+        text: JSON.stringify({
+          blocks: [{ text: generalBlock.text, evidence_refs: [] }],
+          limitations: [], follow_ups: ['What are common creatine side effects?'],
+        }),
+        model: 'piq-stub', inputTokens: 12, outputTokens: 12,
+      })
+    const live = await answerAskHealth({
+      ...request('What does creatine do?'), contextMode: 'general_only',
+      gate: createAskHealthGate({ minIntervalMs: 0 }), provider: stub,
+    })
+    expect(stub).toHaveBeenCalledTimes(2)
+    expect(live.answer.followUps).toEqual(['What are common creatine side effects?'])
+    expect(live.answer.blocks).toEqual([generalBlock])
+  })
+
   it('preserves owner missing-evidence fallback; never makes up height or weights', async () => {
     const stub = provider('Your height is 180 cm.')
     const empty = blankGeneralAskPacket({

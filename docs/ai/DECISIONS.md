@@ -963,3 +963,14 @@ Vercel project is not evidence for the intended Health preview; require
 project ID equality from independent provider metadata. Missing evidence
 fails closed. These narrow checks are synthetic/read-only and cannot
 attest runtime DB/Auth separation, empty data, migrations or owner approval.
+
+## Decision: General Only suggested questions are answer claims for owner-identity safety (2026-10-16)
+
+Model-generated `followUps` can assert unsupported user facts just as
+answer blocks can. Treat them as first-class text for the narrow
+personal-record hallucination screen in General Only; withhold poisoned
+cached suggestions without a new provider request and reject fresh
+unsupported outputs through the existing bounded validation/retry path.
+Restrict new nonnumeric detection to direct affirmative personal-state
+claims so hypothetical general education remains useful. This regex
+guard does not establish medical accuracy and does not inspect owner data.

@@ -771,3 +771,13 @@ Synthetic tests added; commit requires an exact-SHA CI pass before validated
 status. No DB/PHI/model access, schema work, preview authorization, main merge
 or manual deployment. Preview still blocked by inherited Neon data and
 unmatched deployed commit; owner acceptance 0/9 (~91% engineering).
+
+## 2026-10-16 — General Only suggestion-scope gap (CI pending)
+
+Found that fabricated personal-record claims in `followUps` were not
+screened though blocks/limitations were. Added a deterministic
+follow-up integrity check for fresh and cached General Only replies,
+plus narrow affirmative nonnumeric owner states; safe educational
+conditionals remain. Synthetic stub regression only, no paid model
+or Health data. Await exact commit CI. Preview remains blocked by
+Neon parent-data clone and unknown runtime owner/Auth isolation.

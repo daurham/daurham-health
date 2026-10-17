@@ -61,16 +61,23 @@ export function generalAskUserPrompt(question: string): string {
 function inventedGeneralOwnerRecord(text: string): boolean {
   const claimsSavedData = /\b(?:your|the user's|the owner's)\s+(?:logged|recorded|saved|tracked|measured|health records?|food logs?|nutrition logs?|workout logs?|medical history|medications|weight history|bloodwork|health profile)\b|\baccording to your\b|\bbased on your (?:data|logs?|records?|history|measurements?)\b|\bi (?:can )?(?:see|found|reviewed) (?:in )?your (?:data|logs?|records?|history|measurements?)\b/i
   const inventedMeasurement = /\b(?:your|the user's|the owner's)\s+(?:(?:recorded|current|daily|average|latest)\s+)?(?:weight|height|steps?|step count|sleep(?: duration)?|water intake|calor(?:ie|ic) intake|protein intake|body fat)\s+(?:is|was|averaged|total(?:ed|led)?|equal(?:s|ed)?)\s*-?\d[\d,.]*\s*(?:kg|lbs?|pounds?|cm|inches?|steps?|minutes?|hours?|g|grams?|ml|kcal|calories?|%)(?=\W|$)|\byou\s+(?:logged|recorded|weighed|slept|lifted|consumed|averaged)\s+(?:a\s+(?:total|daily average)\s+of\s+)?-?\d[\d,.]*\s*(?:kg|lbs?|pounds?|cm|inches?|steps?|minutes?|hours?|g|grams?|ml|kcal|calories?|%)(?=\W|$)/i
-  return claimsSavedData.test(text) || inventedMeasurement.test(text)
+  // Only affirmative owner-status claims at sentence starts. Conditional
+  // education ("If your intake is low ...") and generic second-person
+  // physiology ("Your muscles use ATP") should not be treated as observations.
+  const inventedQualitativeState = /(?:^|[.!?]\s+)(?:your|the user's|the owner's)\s+(?:(?:recorded|current|recent|average)\s+)?(?:weight|body fat|sleep|hydration|water intake|protein intake|fiber intake|calorie intake|strength|training (?:progress|performance)|blood pressure|symptoms?)\s+(?:(?:(?:is|was|has been|looks|seems)\s+(?:(?:too|very)\s+)?(?:low|high|poor|good|stable|improving|worsening|increasing|decreasing|abnormal))|(?:(?:has|have)\s+)?(?:improved|worsened|increased|decreased|declined|plateaued))\b|(?:^|[.!?]\s+)you\s+(?:are|have been|have)\s+(?:dehydrated|dehydration|constipated|constipation|high blood pressure)\b/i
+  return claimsSavedData.test(text) || inventedMeasurement.test(text) ||
+    inventedQualitativeState.test(text)
 }
 
 export function generalAnswerInventsPersonalRecord(answer: AskHealthAnswer): boolean {
   return [...answer.blocks, ...answer.limitations].some((block) =>
-    inventedGeneralOwnerRecord(block.text))
+    inventedGeneralOwnerRecord(block.text)) ||
+    answer.followUps.some((question) => inventedGeneralOwnerRecord(question))
 }
 
 /** Old cached general answers do not receive the current provider validation
- * pass. Redact invented owner claims at read time without a new paid call.
+ * pass. Redact invented owner claims from blocks, limitations and follow-ups
+ * at read time without a new paid call.
  * Independent general education can survive; citations remain empty.
  */
 export function sanitizeCachedGeneralAnswer(answer: AskHealthAnswer): AskHealthAnswer {
