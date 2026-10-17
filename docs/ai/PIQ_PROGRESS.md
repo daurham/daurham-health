@@ -2929,3 +2929,55 @@ while preserving the preview lock; later configure distinct QA-only database
 and cookie credentials through the approved secret path, attest exact-SHA
 preview/runtime/owner isolation, then run the owner acceptance matrix
 before considering any production promotion.
+
+
+## 2026-10-17 — T48 personal cache freshness on size-omitted Health Profile corrections (CI GREEN)
+
+State: **validated on the PIQ development branch**, not deployed, owner-QA-approved or fully T48-accepted.
+Depends on: PIQ-2 profile version/recheck and PIQ-3 capped evidence selection.
+Why: the real `tests/piq0-retrieval-revision.test.ts` T48 scenario showed a
+correction to the final named saved medication could leave the selected
+size-capped evidence unchanged and hit a stale Ask Health answer cache.
+The app must not imply that omitted profile details were checked.
+
+Files: `src/domain/ask-health/types.ts`,
+`src/domain/ask-health/packet.ts`, `server/ask-health/load.ts`,
+`tests/piq0-retrieval-revision.test.ts`.
+Contract: when a current personalized Health Profile receives a successful
+existing two-read field-and-version source recheck, include the already-loaded
+`updatedAt` in **private cache-key material only**. A subsequent saved
+Profile edit now changes the answer fingerprint even if an affected detail
+was omitted by the packet limit. A failed/missing verification, historical
+as-of question, or General Only mode does not claim an attested current
+profile version. No omitted clinical records or revision token are passed to
+Gemini in the model prompt or included in response metadata. The revision
+may increase Gemini spend *only if* the owner later manually asks again
+after an actual saved Profile edit. It initiates no provider call itself.
+No additional SQL, schema, write, or background job.
+
+Evaluation: synthetic T48 adversarial fixture verifies that the capped
+evidence stays byte-for-byte identical after a change to an omitted saved
+medication, but the verified updated-at revision changes the private cache
+fingerprint. Additional assertions deny revision use when source recheck
+fails or a historical as-of is requested. This fixes the cache staleness
+boundary; it does **not** solve evidence selection of all omitted clinically
+relevant medications, full T48 completeness, in-flight multi-device
+consistency, or live response quality.
+
+Evidence: commit `ad11cd8ca5be7ddb25854c8214439bbfc43916ee`;
+exact-SHA GitHub Actions run
+https://github.com/daurham/daurham-health/actions/runs/39019021989
+**PASSED** npm ci, TypeScript, ESLint, Vitest (2,487 passed,
+30 skipped), and production build. This is synthetic/engineering validation,
+not proof that owner-visible personalized answers work on deployed mobile.
+
+Release: branch only; `main` and production unchanged. PIQ Preview APIs
+still hard locked, QA login credentials intentionally nonfunctional,
+formal owner acceptance 0/9, and production migration/schema state
+unattested. No migrations, provider calls, production health-data access,
+or owner-data writes performed.
+
+Next: build an executable T48 selection-coverage test that proves the
+app discloses/handles omitted relevant clinical facts without guessing
+their meaning, and run an isolated credentialed preview owner test once
+the already-documented security gate is deliberately unlocked.
