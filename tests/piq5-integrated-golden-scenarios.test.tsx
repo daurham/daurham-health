@@ -197,4 +197,32 @@ describe('PIQ-5.7 synthetic end-to-end decision and lifecycle goldens', () => {
       result_id: null, classification: null,
     }, TODAY)!)).toContain('historical association only')
   })
+  it('treats owner-finalized protocol-followed as self-report, not verified or causal evidence', () => {
+    const { resultId, protocolAttestation, stoppedForSafety, classification } =
+      projectCoachLinkedExperiment({
+        id: LAB, origin: 'owner_created', status: 'completed',
+        window_start: '2026-10-01', window_end: '2026-10-16',
+        result_id: '123e4567-e89b-42d3-a456-426614174002',
+        classification: 'completed_low_adherence',
+        protocol_attestation: 'followed', stopped_for_safety: false,
+      }, TODAY)!
+    expect(resultId).not.toBeNull()
+    expect(protocolAttestation).toBe('followed')
+    expect(stoppedForSafety).toBe(false)
+    expect(classification).toBe('completed_low_adherence')
+    // Result quality can contradict a subjective protocol-followed report.
+    // It cannot be promoted to a verified intervention outcome.
+    const link = projectCoachLinkedExperiment({
+      id: LAB, origin: 'owner_created', status: 'completed',
+      window_start: '2026-10-01', window_end: '2026-10-16',
+      result_id: '123e4567-e89b-42d3-a456-426614174002',
+      classification: 'completed_low_adherence',
+      protocol_attestation: 'followed', stopped_for_safety: false,
+    }, TODAY)!
+    const html = render([{ ...card(LAB), linkedExperiment: link }], 'Review', 'Inspect Lab')
+    expect(html).toContain('low adherence; no proven benefit')
+    expect(html).toContain('actual adherence and benefit are not independently verified')
+    expect(html).not.toContain('>I started this</button>')
+  })
+
 })

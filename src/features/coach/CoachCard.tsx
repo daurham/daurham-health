@@ -11,7 +11,7 @@ import type {
 } from '@/domain/coach-intelligence'
 import type { CoachLabItem } from '@/domain/coach-lab'
 import { labExperimentHandoffPath } from '@/domain/lab-handoff'
-import { coachLinkedExperimentCopy } from '@/domain/coach-lab-lifecycle'
+import { coachLinkedExperimentCopy, coachLinkedImplementationEvidenceCopy } from '@/domain/coach-lab-lifecycle'
 import { XpAmount } from '@/components/XpAmount'
 import { primaryButtonClass, quietButtonClass } from '@/lib'
 import { prefixedPath, useAppPathPrefix } from '@/lib/app-prefix'
@@ -586,6 +586,7 @@ export function CoachIntelligencePanel({
                     : ''}
                   {item.linkedExperiment?.resultId ? (
                     <>
+                      {' '}{coachLinkedImplementationEvidenceCopy(item.linkedExperiment)}
                       {' '}<Link to={prefixedPath(prefix, `/lab/experiment-results/${item.linkedExperiment.resultId}`)}
                         className="font-medium text-accent underline underline-offset-2">Review recorded Lab result</Link>
                     </>

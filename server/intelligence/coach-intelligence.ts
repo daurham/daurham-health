@@ -375,10 +375,11 @@ export async function hydrateCoachLinkedExperiments(
     const rows = (await sql.query(
       `SELECT lab.id::text AS id, lab.origin, lab.status,
               lab.window_start::text AS window_start, lab.window_end::text AS window_end,
-              result.id::text AS result_id, result.classification
+              result.id::text AS result_id, result.classification,
+              result.protocol_attestation, result.stopped_for_safety
          FROM experiments AS lab
          LEFT JOIN LATERAL (
-           SELECT id, classification FROM experiment_results
+           SELECT id, classification, protocol_attestation, stopped_for_safety FROM experiment_results
             WHERE experiment_id = lab.id AND status = 'valid'
             ORDER BY created_at DESC, id DESC LIMIT 1
          ) AS result ON TRUE

@@ -157,14 +157,14 @@ describe('PIQ-5.5 explicit owner-selected canonical Lab linkage', () => {
   it('shows canonical Lab statuses without inferring intervention or clinical benefit', async () => {
     const { hydrateCoachLinkedExperiments } = await import('../server/intelligence/coach-intelligence.js')
     const { coachLinkedExperimentCopy } = await import('../src/domain/coach-lab-lifecycle.js')
-    for (const [status, copyFragment, resultId] of [
-      ['accepted', 'not scheduled or started', null],
-      ['scheduled', 'not started', null],
-      ['active', 'adherence and outcomes are not verified', null],
-      ['completed', 'does not establish causation', '123e4567-e89b-42d3-a456-426614174002'],
-      ['inconclusive', 'inconclusive', '123e4567-e89b-42d3-a456-426614174002'],
-      ['abandoned', 'historical association only', null],
-      ['superseded', 'historical association only', null],
+    for (const [status, copyFragment, resultId, classification] of [
+      ['accepted', 'not scheduled or started', null, null],
+      ['scheduled', 'not started', null, null],
+      ['active', 'adherence and outcomes are not verified', null, null],
+      ['completed', 'does not establish causation', '123e4567-e89b-42d3-a456-426614174002', 'completed_interpretable'],
+      ['inconclusive', 'inconclusive', '123e4567-e89b-42d3-a456-426614174002', 'inconclusive'],
+      ['abandoned', 'historical association only', null, null],
+      ['superseded', 'historical association only', null, null],
     ] as const) {
       const cards: CoachRecommendationView[] = [{
         id: ID, fingerprint, kind: 'training_progression', domain: 'training',
@@ -175,7 +175,8 @@ describe('PIQ-5.5 explicit owner-selected canonical Lab linkage', () => {
       const query = vi.fn().mockResolvedValue([{
         id: LAB, origin: 'owner_created', status, window_start: null,
         window_end: null, result_id: resultId,
-        classification: resultId ? 'completed_interpretable' : null,
+        classification, protocol_attestation: resultId ? 'uncertain' : null,
+        stopped_for_safety: resultId ? false : null,
       }])
       await hydrateCoachLinkedExperiments({ query } as unknown as Sql, cards, '2026-10-17')
       expect(query).toHaveBeenCalledTimes(1)
@@ -264,6 +265,87 @@ describe('PIQ-5.5 explicit owner-selected canonical Lab linkage', () => {
       result_id: '123e4567-e89b-42d3-a456-426614174002', classification: 'invalid',
     }
     expect(projectCoachLinkedExperiment(input, '2026-10-17')?.resultId).toBeNull()
+  })
+
+  it('distinguishes owner protocol attestation from independently verified implementation', async () => {
+    const { projectCoachLinkedExperiment, coachLinkedImplementationEvidenceCopy } =
+      await import('../src/domain/coach-lab-lifecycle.js')
+    const canonical = {
+      id: LAB, origin: 'owner_created', status: 'completed',
+      window_start: '2026-10-01', window_end: '2026-10-12',
+      result_id: '123e4567-e89b-42d3-a456-426614174002',
+      classification: 'completed_interpretable', stopped_for_safety: false,
+    }
+    for (const [attestation, phrase] of [
+      ['followed', 'not independently verified'],
+      ['not_followed', 'implementation is not established'],
+      ['uncertain', 'implementation is not established'],
+      ['invalid', 'implementation cannot be confirmed'],
+    ] as const) {
+      const link = projectCoachLinkedExperiment({ ...canonical, protocol_attestation: attestation }, '2026-10-17')!
+      expect(link.resultId).toBe(canonical.result_id)
+      expect(coachLinkedImplementationEvidenceCopy(link)).toContain(phrase)
+    }
+    const started = projectCoachLinkedExperiment({
+      ...canonical, status: 'active', result_id: null, protocol_attestation: 'followed',
+    }, '2026-10-17')!
+    expect(started.protocolAttestation).toBeNull()
+    expect(coachLinkedImplementationEvidenceCopy(started)).toBeNull()
+  })
+
+  it('rejects inconsistent finalized result statuses and honors safety stops over affirmative attestation', async () => {
+    const { projectCoachLinkedExperiment, coachLinkedImplementationEvidenceCopy } =
+      await import('../src/domain/coach-lab-lifecycle.js')
+    const sample = {
+      id: LAB, origin: 'owner_created', status: 'inconclusive', window_start: '2026-10-01',
+      window_end: '2026-10-12',
+      result_id: '123e4567-e89b-42d3-a456-426614174002',
+      classification: 'completed_interpretable', protocol_attestation: 'followed',
+      stopped_for_safety: false,
+    }
+    expect(projectCoachLinkedExperiment(sample, '2026-10-17')?.resultId).toBeNull()
+    expect(projectCoachLinkedExperiment(sample, '2026-10-17')?.protocolAttestation).toBeNull()
+    const safety = projectCoachLinkedExperiment({
+      ...sample, classification: 'stopped_safety', stopped_for_safety: true,
+    }, '2026-10-17')!
+    expect(safety.classification).toBe('stopped_safety')
+    expect(safety.stoppedForSafety).toBe(true)
+    expect(coachLinkedImplementationEvidenceCopy(safety)).toContain('safety stop')
+    expect(coachLinkedImplementationEvidenceCopy(safety)).not.toContain('following the protocol')
+  })
+
+  it('hydrates only bounded canonical attestation fields, never private notes', async () => {
+    const { hydrateCoachLinkedExperiments } = await import('../server/intelligence/coach-intelligence.js')
+    const cards: CoachRecommendationView[] = [{
+      id: ID, fingerprint, kind: 'training_progression', domain: 'training',
+      title: 'Bench', detail: 'Review', actionText: 'Review', detailPath: '/training',
+      confidence: 'limited', evidenceRefs: [], responseState: null, responseAt: null,
+      experimentEligible: true, linkedExperimentId: LAB,
+    }]
+    const query = vi.fn().mockResolvedValue([{
+      id: LAB, origin: 'owner_created', status: 'completed',
+      window_start: '2026-10-01', window_end: '2026-10-12',
+      result_id: '123e4567-e89b-42d3-a456-426614174002',
+      classification: 'completed_low_adherence', protocol_attestation: 'followed',
+      stopped_for_safety: false, owner_note: 'Should not leak',
+    }])
+    await hydrateCoachLinkedExperiments({ query } as unknown as Sql, cards, '2026-10-17')
+    expect(cards[0].linkedExperiment?.protocolAttestation).toBe('followed')
+    expect(cards[0].linkedExperiment?.classification).toBe('completed_low_adherence')
+    expect(JSON.stringify(cards[0])).not.toContain('Should not leak')
+    const [statement] = query.mock.calls[0] as [string, unknown[]]
+    expect(statement).toContain('result.protocol_attestation')
+    expect(statement).toContain('result.stopped_for_safety')
+    expect(statement).not.toContain('owner_note')
+    const html = renderToStaticMarkup(
+      <MemoryRouter><CoachIntelligencePanel state={{
+        version: 'coach-intelligence-v1', asOf: '2026-10-17',
+        state: 'act', headline: 'Review', summary: 'Check Lab', noChangeRecommended: false,
+        nextBestActions: cards, followUps: [], question: null, questionBudgetDays: 3,
+      }} pending={false} onResponse={() => undefined} onOutcome={() => undefined} /></MemoryRouter>,
+    )
+    expect(html).toContain('actual adherence and benefit are not independently verified')
+    expect(html).toContain('low adherence')
   })
 
 })

@@ -1,3 +1,9 @@
+## 2026-10-17 PIQ-6.1 cautious owner result-attestation display (CI pending)
+
+- Coach's read-only existing Lab result join includes only finalized protocol-following attestation and safety-stop flag, never free-text owner notes. Current status alone is not evidence of actual implementation.
+- Domain projection requires result classification to agree with canonical experiment status; a mismatch or absent/invalid attestation cannot prove implementation. Self-report of `followed` remains labelled subjective and subordinate to low adherence and safety flags.
+- New regression + integrated golden scenario cases cover all attestation choices, low adherence conflicts, inconsistent statuses, safety stop, no-result active periods and absence of owner notes in Coach response. No migration, model spend or production promotion; phase acceptance 0/9.
+
 ## 2026-10-17 PIQ-5.7 six integrated golden scenarios — CI GREEN
 
 - `tests/piq5-integrated-golden-scenarios.test.tsx` validates completed Training, poor food-log coverage and blocked calorie changes, legitimate quiet Coach behavior, accepted-but-unstarted Lab, active-but-unevaluated Lab, and low-adherence/historical result framing using synthetic fixtures.
