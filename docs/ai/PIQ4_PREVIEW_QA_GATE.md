@@ -104,3 +104,52 @@ passed GitHub full validation on attempt 2,
 [Actions 39008436437](https://github.com/daurham/daurham-health/actions/runs/39008436437).
 Latest known READY Vercel PIQ preview is an older SHA and must not be
 treated as isolation-protected or current.
+
+
+## 2026-10-17 — Approved schema-only bootstrap on separate Neon QA project (VERIFIED)
+
+**Owner authorization was expressly limited to applying/testing existing
+repository migrations on this new isolated database.** Project
+`lively-wave-25801832`, root branch `br-crimson-cloud-akrf5kuo`,
+database `neondb`, PostgreSQL version `18.6` (server_version_num
+`180006`). No production project or original preview Neon branch
+was accessed for SQL in this operation.
+
+- Checked the QA database was pristine: zero public tables, zero QA
+  Auth users and sessions before applying application migrations.
+- Fetched the 56 numbered migration SQL files from the pinned PIQ
+  GitHub branch and used the repository's PostgreSQL-aware
+  `splitSqlStatements` semantics. Applied each file in its own Neon
+  SQL transaction with the corresponding `schema_migrations` insert,
+  after checking the recorded prefix before each batch. This was
+  executed through the Neon SQL tooling, not by running `npm run migrate`
+  in the deployed app.
+- All 56 applied in exact ascending order, from
+  `0001_health_foundation.sql` through
+  `0056_primary_goal_intent_events.sql`, with no reported DDL errors.
+- Independent read-only Neon SQL verified 56 distinct sequential
+  migration-history filenames, 77 public application/system tables
+  (including `schema_migrations`) and nine `neon_auth` tables.
+- Fresh-install seed checks: 26 active shared exercise definitions,
+  one active seeded Beginner Calisthenics template (`CAL-BEG`),
+  zero active seeded original A/B/C legacy templates and zero
+  owner-created workout templates.
+- Explicit read-only counts on 13 high-value owner-data tables:
+  `health_profile`, `body_metrics`, `nutrition_entries`,
+  `workout_sessions`, `goals`, `supplements`, `daily_context`,
+  `hydration_events`, `bowel_events`, `benchmark_results`,
+  `coach_tasks`, `ai_usage`, and `primary_goal_intent_events` —
+  **all zero**, as were QA Auth users and sessions.
+
+**Scope/limits:** This establishes **schema migration compatibility**
+with PostgreSQL 18 and an empty disposable-owner starting state,
+not runtime/API compatibility or a verified Vercel preview. No
+app authentication/logins, disposable owner creation, runtime binding,
+model calls, backup import, production migrations, `main` merge,
+or preview deployment occurred. New-root Neon
+`init_source=parent-data` metadata still needs separately justified
+provenance in the strict release gate; do not globally whitelist
+`parent-data`. Unverified release conditions: QA account/owner
+mapping, Vercel preview-only DB/Auth overrides, exact-SHA deployment,
+runtime test, backup/rollback and owner mobile acceptance. Formal
+owner acceptance remains 0/9 (~91% overall engineering estimate).

@@ -994,3 +994,17 @@ identity. Keep known other branches and `main` unchanged.
 No environment-only bypass: independent isolation, migration,
 and owner signoff must precede an explicit reviewed release change.
 No DB/owner/provider access needed for deterministic tests.
+
+
+## Decision: QA schema migration does not authorize preview owner traffic (2026-10-17)
+
+With explicit owner approval, established a new empty database in the
+separate Neon PIQ QA project and applied the exact ordered 56 SQL
+migrations transactionally with `schema_migrations` history, matching
+the repository splitter. Read-only verification showed a current
+migration head, fresh shared exercise/routine seeds, and zero QA
+Auth/owner records in checked tables. PostgreSQL 18 acceptance of
+these migrations does not validate live app code, Neon root origin
+metadata, Auth sessions, or Vercel runtime bindings. Keep the PIQ
+preview API lock intact until independently attested isolation and
+a deliberate owner-approved release step; do not merge `main`.
