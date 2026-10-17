@@ -223,4 +223,45 @@ describe('PIQ-4 owner preview: current owner-claim citation integrity', () => {
     expect(first.evidence).toEqual([])
   })
 
+  it('preserves a configured goal target while withholding a false measured weight', () => {
+    const savedGoal: AskEvidence = {
+      ...evidence('goals.synthetic-goal-1', 'goals', null, null),
+      label:'Weight',
+      value:'above_target',
+      text:'At most 80 kg Target state above_target. Deadline state none.',
+    }
+    const pkt = makePacket([savedGoal])
+    for (const text of ['Your saved goal is at most 80 kg.', 'Your weight target is 80 kg.']) {
+      expect(groundHistoricalAnswer(answer(block(text,[savedGoal.id])),pkt,
+        'What is my current weight goal?').blocks[0]?.text).toBe(text)
+    }
+    for (const text of ['Your saved goal is at most 85 kg.', 'Your weight was 80 kg.']) {
+      const result = groundHistoricalAnswer(answer(block(text,[savedGoal.id])),pkt,
+        'What is my current weight goal?')
+      expect(result.blocks[0]?.text).toContain('cannot verify')
+    }
+  })
+
+  it('keeps planned supplement dose exactly when attested, not invented dose or ingestion', () => {
+    const regimen: AskEvidence = {
+      ...evidence('supplements.recorded.creatine', 'supplements', null, null),
+      value:'active', label:'Creatine monohydrate', userEntered:true,
+      text:'Saved supplement lifecycle on 2026-10-16: active. Planned regimen: 5 g (Daily), effective from 2026-10-01 Within 2026-10-01 through 2026-10-16: 1 self-reported taken, 0 skipped, 0 unknown scheduled occurrences.',
+    }
+    const pkt=makePacket([regimen])
+    expect(groundHistoricalAnswer(answer(block(
+      'Your planned creatine dose is 5 g.', [regimen.id],
+    )),pkt,'What is my scheduled supplement dose?').blocks[0]?.text)
+      .toContain('5 g')
+    for(const incorrect of [
+      'Your planned creatine dose is 8 g.',
+      'You took 5 g of creatine.',
+    ]) {
+      const result=groundHistoricalAnswer(answer(block(incorrect,[regimen.id])),pkt,
+        'What is my scheduled supplement dose?')
+      expect(result.blocks[0]?.text).toContain('cannot verify')
+    }
+  })
+
+
 })

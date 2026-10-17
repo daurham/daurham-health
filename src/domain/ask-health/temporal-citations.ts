@@ -270,6 +270,37 @@ function numericEvidenceSupports(
   })
 }
 
+/**
+ * Goals and planned supplement regimens expose owner-configured quantities in
+ * a canonical bounded text field, not a recorded-measurement numeric value.
+ * Match the target/regimen portion only; never infer an actual weigh-in,
+ * ingestion, or achievement from the configured quantity.
+ */
+function currentConfiguredQuantitySupports(
+  quantity: QualifiedQuantity, sources: readonly AskEvidence[], claim: string,
+): boolean {
+  const mixedWithActual = /\b(?:actually|measured|weighed|logged|consumed|lifted|performed|achieved|completed|ingested|took)\b|\b(?:your|my)\s+(?:current\s+|recorded\s+)?weight\s+(?:is|was)\b/i.test(claim)
+  if (mixedWithActual) return false
+  const isGoal = /\b(?:goals?|targets?)\b/i.test(claim)
+  const isRegimen = /\b(?:planned|scheduled|regimen|dose|dosing)\b/i.test(claim)
+  return sources.some((source) => {
+    let configured = ''
+    if (isGoal && source.domain === 'goals' && source.id.startsWith('goals.')) {
+      configured = source.text.split(' Target state ')[0] ?? ''
+    } else if (isRegimen && source.domain === 'supplements' &&
+               source.id.startsWith('supplements.recorded.')) {
+      configured = source.text.split('Planned regimen: ')[1]?.split(' Within ')[0] ?? ''
+      if (configured.startsWith('No saved schedule')) return false
+    } else return false
+    if (quantity.nutrient) {
+      const nutrientWords = (source.label + ' ' + configured).toLowerCase()
+      if (!nutrientWords.includes(quantity.nutrient)) return false
+    }
+    return qualifiedOwnerQuantities(configured).some((target) =>
+      target.unit === quantity.unit && closelyMatches(target.value, quantity.value))
+  })
+}
+
 /** No observational packet, including a valid relationship statistic, proves
  * a personal cause. Only unmistakably asserted owner causation is blocked;
  * explicit uncertainty/negation and educational mechanism statements remain.
@@ -447,12 +478,18 @@ export function groundHistoricalAnswer(
       })
       const claimedDomains = explicitlyClaimedMetricDomains(block.text)
       const values = qualifiedOwnerQuantities(block.text)
-      const verified = substantiveCitations.length > 0 &&
-        claimedDomains.every((domain) =>
-          substantiveCitations.some((source) => source.domain === domain)) &&
-        !unsupportedCurrentMeasurement(block.text) &&
+      const configClaim = /\b(?:goals?|targets?|planned|scheduled|regimen|dose|dosing)\b/i.test(block.text) &&
+        !/\b(?:actually|measured|weighed|logged|consumed|lifted|performed|achieved|completed|ingested|took)\b/i.test(block.text)
+      const hasConfiguredValues = configClaim && values.length > 0 &&
         values.every((quantity) =>
-          numericEvidenceSupports(quantity, substantiveCitations, block.text, false))
+          currentConfiguredQuantitySupports(quantity, substantiveCitations, block.text))
+      const verified = substantiveCitations.length > 0 &&
+        !unsupportedCurrentMeasurement(block.text) &&
+        (hasConfiguredValues ||
+          (claimedDomains.every((domain) =>
+            substantiveCitations.some((source) => source.domain === domain)) &&
+          values.every((quantity) =>
+            numericEvidenceSupports(quantity, substantiveCitations, block.text, false))))
       if (verified) return true
       withheld += 1
       return false
