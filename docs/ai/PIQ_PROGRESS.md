@@ -3821,3 +3821,14 @@ isolated preview authorization, and actual owner mobile acceptance.
 **Remaining gates:** real owner mobile QA, actual evidence usefulness, PIQ-5.4 question dismissal, PIQ-5.5 verified implementation-to-outcome link, integrated PIQ-5.7 scenarios, PIQ-6 and PIQ-7. Formal owner acceptance **0/9**.
 
 **Validated engineering checkpoint:** exact application commit `de60760d7f5717abbc277fb2a5f6026616e236b4` passed GitHub Actions run https://github.com/daurham/daurham-health/actions/runs/39058896137 with `npm ci`, TypeScript, ESLint, **2,571 passed tests (30 skipped, 340 suites passed)** and the production build. First attempt failed TypeScript for a missing Lab handoff type and was fixed on branch before this green run. No owner mobile acceptance, production migration, AI provider call or deployment. This records validated code, NOT 1/9 owner-accepted phases.
+
+
+## 2026-10-17 — PIQ-5.5 / PIQ-6 read-only linked Lab lifecycle projection (engineering; CI pending)
+
+**Purpose:** Show what happened to a Coach-linked Personal Lab experiment, without inferring intervention adoption, adherence, medical efficacy or causation from a saved link or the passing of time.
+
+**Bounded implementation:** `src/domain/coach-lab-lifecycle.ts` builds a typed, validated lifecycle state from canonical `experiments` and optional `experiment_results` records. Coach makes one bounded read for currently surfaced links, limited to owner-created records and `status='valid'` Lab results. Display distinguishes accepted but not started, scheduled but not started, Lab-marked active (adherence unknown), ended observation window (review only), recorded interpretable/low-adherence/inconclusive results, and abandoned/superseded historical associations. The existing Lab result page remains the source for detailed evidence and caveats. No automatic health or Coach response mutation; no new AI cost.
+
+**Failure-mode correction:** Prior code dropped cancelled or inaccessible links from the view, unintentionally displaying the new-experiment handoff again. Archived canonical links now remain navigable as historical. On missing, invalid or temporarily unreachable linked Lab records, Coach displays status unavailable and does **not** offer a duplicate experiment creation or owner-start action. Underlying saved provenance remains intact.
+
+**Validation gates:** Regression coverage includes Lab state mappings, end-of-window boundary, origin/status/result validation, available result links, archived states, and fail-closed missing-source behavior. Still must pass GitHub branch TypeScript/ESLint/unit tests/build and owner mobile acceptance. This is not PIQ-6 evaluation closure; verified intervention adherence, confounders, contextual changes and outcomes remain separate future work. No production migration/merge. Owner phase acceptance remains **0/9**.
