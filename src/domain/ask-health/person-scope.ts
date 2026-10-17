@@ -23,7 +23,7 @@ export function askHealthNonOwnerSubject(question: string): boolean {
   }
   // Another person's explicitly possessive clinical history is never
   // equivalent to the owner's current Health Profile.
-  if (/\b(?:her|his|their|someone else's)\s+(?:current\s+|saved\s+|recorded\s+)?(?:allerg(?:y|ies)|medications?|meds?|medicines?|prescriptions?|conditions?|diagnos(?:is|es)|medical history|health profile)\b/i.test(question)) {
+  if (/\b(?:her|his|their|someone else's)\s+(?:current\s+|saved\s+|recorded\s+)?(?:allerg(?:y|ies)|medications?|meds?|medicines?|prescriptions?|conditions?|diagnos(?:is|es)|medical history|health profile|weight|body measurements?|calor(?:ie|ies)|food logs?|nutrition|workouts?|training|sleep|steps?|activity|goals?|progress|health records?)\b/i.test(question)) {
     return true
   }
   // First-person inside an educational or reported quotation does not
