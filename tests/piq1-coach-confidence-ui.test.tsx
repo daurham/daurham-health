@@ -53,7 +53,9 @@ describe('PIQ-1.2 maintenance confidence disclosure in Coach', () => {
         <CoachIntelligencePanel state={state(false)} pending={false} onResponse={() => undefined} onOutcome={() => undefined} />
       </MemoryRouter>,
     )
-    expect(html).not.toContain('<details')
+    expect(html).toContain('Other feedback') // Optional owner feedback is not an evidence disclosure.
     expect(html).not.toContain('How this was assessed')
+    expect(html).not.toContain('Food-log evidence')
+    expect(html).not.toContain('Calorie-change decision')
   })
 })
