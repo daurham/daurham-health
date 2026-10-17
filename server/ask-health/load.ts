@@ -26,6 +26,8 @@ import { routeHealthIntelligence } from '../../src/domain/intelligence/shared.js
 import { loadHealthIntelligenceSnapshot } from '../intelligence/snapshot.js'
 import { getHealthProfile } from '../profile/service.js'
 import { recheckCurrentHealthProfile } from './current-health-profile-recheck.js'
+import { recheckCurrentSupplementInputs } from './current-supplement-recheck.js'
+import { matchedSavedSupplements } from '../../src/domain/ask-health/packet.js'
 import { focusTrainingWorkingSets } from '../../src/domain/ask-health/focused-training.js'
 import { recheckCurrentWorkingSets } from './current-working-sets-recheck.js'
 import { recheckCurrentExerciseDefinitions } from './current-exercise-definitions-recheck.js'
@@ -377,10 +379,23 @@ export async function loadAskHealthPacketInput(input: {
         initial:rows.exercises,start:period.start,end:period.end,today,
       }),
     ]):['not_checked','not_checked'] as const
-  const currentHealthProfileSourceRecheck=input.asOf===today&&
-    input.contextMode!=='general_only'
-      ?await recheckCurrentHealthProfile({first:profile,asOf:input.asOf,today})
-      :'not_checked'
+  const personalizedCurrent=input.asOf===today&&input.contextMode!=='general_only'
+  // The packet only includes Supplements for General/Nutrition lenses or an
+  // unambiguous saved name. Reuse the SAME matcher to avoid missing a path.
+  const maySurfaceSupplements=personalizedCurrent&&supplements.length>0&&(
+    input.lens==='general'||input.lens==='nutrition'||
+    matchedSavedSupplements({question:input.question,supplements}).length>0
+  )
+  const [currentHealthProfileSourceRecheck,supplementSourceRecheck]=
+    await Promise.all([
+      personalizedCurrent
+        ?recheckCurrentHealthProfile({first:profile,asOf:input.asOf,today})
+        :Promise.resolve('not_checked' as const),
+      maySurfaceSupplements
+        ?recheckCurrentSupplementInputs({
+          initial:supplements,start:period.start,end:period.end,today,
+        }):Promise.resolve('not_checked' as const),
+    ])
   return {
     lens: input.lens,
     range: input.range,
@@ -412,6 +427,7 @@ export async function loadAskHealthPacketInput(input: {
     currentContextSourceRecheck,
     patterns,
     currentHealthProfileSourceRecheck,
+    supplementSourceRecheck,
     stableProfile: askStableProfileForDate(profile, input.asOf, today),
     profile: askClinicalProfileForDate(profile, input.asOf, today),
     intelligence,

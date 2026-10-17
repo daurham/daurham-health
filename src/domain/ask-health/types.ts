@@ -159,6 +159,8 @@ export type AskHealthPacketInput = {
   experiments: readonly AskExperimentInput[]
   benchmarks: readonly AskBenchmarkInput[]
   supplements: readonly TodaySupplementInput[]
+  /** Current saved supplement schedules/status/adherence match final service read. */
+  supplementSourceRecheck?: 'not_checked' | 'verified' | 'changed_or_unavailable'
   context: AskContextInput | null
   /** Current context source consistency; optional for historical/test callers. */
   currentContextSourceRecheck?: 'not_checked' | 'verified' | 'changed_or_unavailable'

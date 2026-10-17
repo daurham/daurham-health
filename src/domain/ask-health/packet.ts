@@ -153,7 +153,15 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
     })
   }
   if (wants.supplements || questionMentionsSavedSupplement(input)) {
-    addSupplements(input, push)
+    if (input.supplementSourceRecheck==='changed_or_unavailable') {
+      push({
+        id:'supplements.source_consistency',domain:'supplements',
+        label:'Saved Supplements source disagreement',value:null,unit:null,period,
+        text:'Saved supplement schedules, lifecycle status, dose records or recorded adherence changed or could not be rechecked consistently. Owner supplement names, regimens, counts and adherence are WITHHELD; missing or corrected logs do not prove a supplement was taken or skipped.',
+        coverage:{supplementSourceRecheck:'changed_or_unavailable',supplementClaims:'withheld'},
+        detailPath:'/supplements',userEntered:false,substantive:false,priority:0,
+      })
+    } else addSupplements(input, push)
   }
   if (wants.goals) {
     addGoals(input, push, limitations)
@@ -1936,7 +1944,7 @@ function addTraining(input: AskHealthPacketInput, push: (item: PushItem) => void
  * or fish/fishing, substring false positives. Multiple matched formulations
  * remain separate rather than silently guessing which one was meant.
  */
-function matchedSavedSupplements(input: AskHealthPacketInput): AskHealthPacketInput['supplements'] {
+export function matchedSavedSupplements(input: Pick<AskHealthPacketInput, 'question' | 'supplements'>): AskHealthPacketInput['supplements'] {
   const tokens = (text: string) => text.toLowerCase().match(/[a-z0-9]+/g) ?? []
   const question = tokens(input.question)
   const phrase = ` ${question.join(' ')} `
