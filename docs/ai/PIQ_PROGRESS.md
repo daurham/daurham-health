@@ -3184,3 +3184,79 @@ are not a percentage of owner signoff.
 Next: cross-domain third-person data isolation with explicit safe
 response wording and synthetic negative controls; later independent
 QA setup and real owner acceptance before a main/prod release decision.
+
+
+## 2026-10-17 — T48 cross-domain non-owner Ask Health denial (CI GREEN)
+
+State: **validated on PIQ development branch; NO owner acceptance or release**.
+
+Why: the previous third-person guard withheld only the clinical/stable Health
+Profile, leaving logged goals, workouts, nutrition, sleep, shared
+intelligence, context notes and other owner-sourced evidence retrievable
+for explicit questions about somebody else. The Ask Health default
+Personalized/Deep path could both read those records and send them to
+Gemini, even when it should not infer that the account owner's data
+describe a wife, child, friend or other person.
+
+Files: `src/domain/ask-health/person-scope.ts`,
+`src/domain/ask-health/packet.ts`, `server/ask-health/service.ts`,
+`src/domain/ask-health/diagnostics.ts`,
+`tests/piq3-whole-packet-person-scope.test.ts`.
+
+Contract: one shared conservative English lexical non-owner classifier
+is applied **at the beginning of the authenticated Ask Health service,
+before DB load, AI usage gate, model request or conversation reuse**.
+An explicitly third-person question receives a deterministic
+non-owner limitation, no provider call/expense, and no saved owner
+evidence; the response diagnostic is `non_owner_subject`. A
+second guard at `explainAskHealth` blocks direct callers attempting
+to supply an already-constructed personal packet, and the packet
+builder has its own neutral `ask.range`-only fail-closed branch with
+no owner context, source-coverage audit, version token or private
+clarification. Current first-person emergency detection retains
+priority even when a relative is mentioned.
+
+The shared classifier retains the previously protected clinical field
+selectors, now covers pronoun-possessive sleep, nutrition, workouts,
+goals and other domains, and allows a tightly phrased owner-delegation
+example ("My wife asked me about my workouts") so not every family
+reference is taken as somebody else's measured record. Do not take
+this as comprehensive pronoun/coreference resolution.
+
+Validation: six new synthetic tests check Smart, Personalized,
+Deep Dive and General Only direct API entry points; assert zero
+DB fetches, zero AI calls and zero gate charges. Direct packet and
+direct service paths must not disclose any synthetic goal, profile,
+context note, stable owner demographics or source-coverage audit,
+even if a private packet existed earlier. Legitimate explicitly
+owner-focused questions and current first-person emergency safety
+remain available. No production health data inspected.
+
+Commits: `7bf6d07df6ce78f0c08305a675da7db4660b33d2` and
+`1788c55edf47dc2a4ebeaadde62c35d99002d1e8`.
+Exact-app-commit GitHub Actions run
+https://github.com/daurham/daurham-health/actions/runs/39047711075
+**PASSED** npm ci, TypeScript, ESLint, Vitest
+(2,507 passed, 30 skipped; 331 suites passed), production build.
+
+Limitations: this is a conservative bounded English classifier,
+not complete subject attribution or deep multilingual, quoted,
+embedded, follow-up and mixed-owner+family understanding. Some
+questions that could safely ask for generic advice instead receive
+a deterministic limitation until rewritten. Explicit third-party
+medical emergencies and safe family-oriented education still need
+specialized safety review so refusing owner evidence does not
+suppress appropriate emergency help. This addresses the Ask Health
+service and builder; other endpoints or AI features have NOT been
+audited for person-context isolation. Owner acceptance: **0/9**.
+
+No migrations, QA unlock, authenticated preview testing, owner
+data reads, new paid provider requests, schema mutations or
+production/main changes. Preview credentials remain deliberately
+locked under the independent QA and trusted-origin gate.
+
+Next: evaluate mixed-subject and third-party emergency routing with
+synthetic tests, ensuring person privacy does not suppress proportionate
+urgent guidance. Later establish QA-only credentialed runtime and
+exact-SHA authenticated mobile owner acceptance before considering
+a production merge.
