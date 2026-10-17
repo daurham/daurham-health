@@ -55,6 +55,7 @@ export type ChangeLedgerEntry = {
     | 'goal_lifecycle'
     | 'supplement_status'
     | 'experiment_window'
+    | 'experiment_implementation'
     | 'context_event'
     | 'behavior_change'
   title: string

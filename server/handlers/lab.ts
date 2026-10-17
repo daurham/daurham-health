@@ -32,6 +32,7 @@ import {
   previewExperimentResult,
 } from '../lab/experiment-results.js'
 import { getBenchmarkRetest, listBenchmarkRetests } from '../lab/retests.js'
+import { confirmOwnerExperimentImplementation } from '../lab/implementation.js'
 import {
   acceptExperimentSuggestion,
   draftExperimentSuggestion,
@@ -53,7 +54,7 @@ import {
 
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}'
 const EXPERIMENT = new RegExp(
-  `^/api/lab/experiments(?:/(${UUID})(?:/(schedule|start|abandon|supersede|accept|protocol-version|result)(?:/(preview))?)?)?$`,
+  `^/api/lab/experiments(?:/(${UUID})(?:/(schedule|start|implementation|abandon|supersede|accept|protocol-version|result)(?:/(preview))?)?)?$`,
   'i',
 )
 const EXPERIMENT_RESULT = new RegExp(`^/api/lab/experiment-results/(${UUID})(?:/(invalidate))?$`, 'i')
@@ -207,6 +208,11 @@ export async function handleLab(req: ApiRequest, res: ApiResponse) {
     }
     if (route.action === 'start') {
       sendJson(res, 200, await startExperiment(route.id))
+      return
+    }
+    if (route.action === 'implementation') {
+      await confirmOwnerExperimentImplementation(route.id, await readJsonBody(req))
+      sendJson(res, 200, await getExperiment(route.id))
       return
     }
     if (route.action === 'abandon') {

@@ -60,6 +60,7 @@ export type ExperimentDetail = {
   benchmarks: Array<{ benchmarkDefinitionId: string; title: string; role: string; protocolId: string }>
   sessions: Array<{ id: string; workoutDate: string; sessionName: string | null; benchmarkProtocolVersionId: string | null }>
   currentResultId?: string | null
+  implementation?: { effectiveDate: string; behaviorChange: string; ownerConfirmedAt: string } | null
   reviewReady?: boolean
 }
 
@@ -132,6 +133,13 @@ export function scheduleExperiment(id: string, windowStart: string, windowEnd: s
 
 export function startExperiment(id: string): Promise<ExperimentDetail> {
   return sendJson(`/api/lab/experiments/${id}/start`, 'POST', {})
+}
+
+/** Independent owner-confirmed implementation; Start alone never records this. */
+export function confirmExperimentImplementation(id: string, effectiveDate: string, behaviorChange: string): Promise<ExperimentDetail> {
+  return sendJson(`/api/lab/experiments/${id}/implementation`, 'POST', {
+    confirmImplemented: true, effectiveDate, behaviorChange,
+  })
 }
 
 export function acceptExperiment(id: string): Promise<ExperimentDetail> {

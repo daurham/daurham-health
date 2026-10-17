@@ -581,6 +581,10 @@ export function CoachIntelligencePanel({
                   {' '}· {item.linkedExperiment
                     ? coachLinkedExperimentCopy(item.linkedExperiment)
                     : 'Linking does not establish that an experiment started or worked.'}
+                  {item.linkedExperiment?.implementation ? (
+                    <> {' '}Owner reported changing “{item.linkedExperiment.implementation.behaviorChange}” effective
+                      {' '}{item.linkedExperiment.implementation.effectiveDate}. This is self-reported; adherence and benefit are unverified.</>
+                  ) : null}
                   {item.linkedExperiment?.windowStart && item.linkedExperiment.windowEnd
                     ? ` Observation window: ${item.linkedExperiment.windowStart} to ${item.linkedExperiment.windowEnd}.`
                     : ''}

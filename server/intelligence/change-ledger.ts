@@ -209,6 +209,26 @@ async function explicitEntries(sql: Sql, timezone: string): Promise<ChangeLedger
     })
   }
 
+  const implemented = (await sql.query(
+    `SELECT implementation.experiment_id::text AS experiment_id, implementation.effective_date::text AS effective_date,
+            implementation.behavior_change, lab.title
+       FROM experiment_implementations AS implementation
+       JOIN experiments AS lab ON lab.id = implementation.experiment_id
+      ORDER BY implementation.effective_date, implementation.experiment_id`,
+  )) as Array<{ experiment_id: string; effective_date: string; behavior_change: string; title: string }>
+  for (const row of implemented) {
+    entries.push({
+      id: 'experiment-implementation:' + row.experiment_id,
+      date: row.effective_date,
+      kind: 'experiment_implementation',
+      title: 'Owner-reported experiment change · ' + row.title,
+      detail: row.behavior_change + ' · Owner-confirmed report, not verified adherence or benefit.',
+      sourceKind: 'experiment_implementation',
+      sourceId: row.experiment_id,
+      metadata: { experimentId: row.experiment_id, evidenceKind: 'owner_reported' },
+    })
+  }
+
   const contextRows = (await sql.query(
     "SELECT context.id::text AS id, context.context_date::text AS context_date, context.note, array_agg(tags.tag_key ORDER BY tags.tag_key) AS tags FROM daily_context context JOIN daily_context_tags tags ON tags.context_id = context.id WHERE tags.tag_key IN ('sick','travel','rest_day','new_supplement','medication_change','unusual_physical_labor') GROUP BY context.id, context.context_date, context.note ORDER BY context.context_date, context.id",
   )) as Array<{ id: string; context_date: string; note: string | null; tags: string[] }>

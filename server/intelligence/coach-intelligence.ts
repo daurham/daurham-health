@@ -376,13 +376,16 @@ export async function hydrateCoachLinkedExperiments(
       `SELECT lab.id::text AS id, lab.origin, lab.status,
               lab.window_start::text AS window_start, lab.window_end::text AS window_end,
               result.id::text AS result_id, result.classification,
-              result.protocol_attestation, result.stopped_for_safety
+              result.protocol_attestation, result.stopped_for_safety,
+              implementation.effective_date::text AS implementation_date,
+              implementation.behavior_change AS implementation_change
          FROM experiments AS lab
          LEFT JOIN LATERAL (
            SELECT id, classification, protocol_attestation, stopped_for_safety FROM experiment_results
             WHERE experiment_id = lab.id AND status = 'valid'
             ORDER BY created_at DESC, id DESC LIMIT 1
          ) AS result ON TRUE
+         LEFT JOIN experiment_implementations AS implementation ON implementation.experiment_id = lab.id
         WHERE lab.id = ANY($1::uuid[]) AND lab.origin = 'owner_created'`,
       [ids],
     )) as CoachLinkedLabRow[]

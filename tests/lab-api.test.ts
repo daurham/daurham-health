@@ -57,7 +57,10 @@ const experimentResults = vi.hoisted(() => ({
   listTimelineExperimentResults: vi.fn(),
 }))
 
+const implementation = vi.hoisted(() => ({ confirmOwnerExperimentImplementation: vi.fn() }))
+
 vi.mock('../server/lab/service.ts', () => service)
+vi.mock('../server/lab/implementation.ts', () => implementation)
 vi.mock('../server/lab/results.ts', () => results)
 vi.mock('../server/lab/retests.ts', () => retests)
 vi.mock('../server/lab/experiment-results.ts', () => experimentResults)
@@ -129,6 +132,8 @@ describe('personal lab API auth', () => {
     service.listExperiments.mockResolvedValue({ experiments: [] })
     service.createOwnerExperiment.mockResolvedValue({ id: EXPERIMENT, status: 'accepted', origin: 'owner_created' })
     service.startExperiment.mockResolvedValue({ id: EXPERIMENT, status: 'active' })
+    implementation.confirmOwnerExperimentImplementation.mockReset()
+    service.getExperiment.mockResolvedValue({ id: EXPERIMENT, status: 'active' })
   })
 
   it('keeps lab on owner auth and away from machine ingest', () => {
@@ -162,6 +167,22 @@ describe('personal lab API auth', () => {
     const started = await call('POST', `/api/lab/experiments/${EXPERIMENT}/start`, owner)
     expect(started.status()).toBe(200)
     expect(service.startExperiment).toHaveBeenCalledWith(EXPERIMENT)
+  })
+
+  it('makes actual experiment implementation a separate owner-authenticated POST', async () => {
+    const path = `/api/lab/experiments/${EXPERIMENT}/implementation`
+    const owner = { id: 'owner-1', email: 'owner@example.com' }
+    const input = { confirmImplemented: true, effectiveDate: '2026-10-17', behaviorChange: 'Walk after lunch' }
+    expect(matchLabRoute(path)).toEqual({ kind: 'experiment', id: EXPERIMENT, action: 'implementation' })
+    expect((await call('POST', path, null, {}, input)).status()).toBe(401)
+    expect((await call('POST', path, { id: 'other', email: 'other@example.com' }, {}, input)).status()).toBe(403)
+    expect(implementation.confirmOwnerExperimentImplementation).not.toHaveBeenCalled()
+    const invalid = await call('GET', path, owner)
+    expect(invalid.status()).toBe(405)
+    const saved = await call('POST', path, owner, {}, input)
+    expect(saved.status()).toBe(200)
+    expect(implementation.confirmOwnerExperimentImplementation).toHaveBeenCalledWith(EXPERIMENT, input)
+    expect(service.startExperiment).not.toHaveBeenCalled()
   })
 
   it('keeps benchmark results owner-only and immutable', async () => {

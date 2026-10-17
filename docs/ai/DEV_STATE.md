@@ -1,3 +1,8 @@
+## 2026-10-17 PIQ-6.1 explicit implementation journal (branch only; CI pending)
+
+- New migration 0057 creates `experiment_implementations` with one owner-confirmed actual-change date/description per experiment. The Start button remains status-only. Active Lab records gain a separate owner-confirmed implementation form; owner-auth POST is atomic, date-scoped and collision-safe; Change Ledger gains explicit owner-report events and Coach projects the same state as self-report. No automatic target or result writes.
+- **Do not merge to main or promote without running/reviewing migration 0057 in the target DB first. Migration not executed.** No production changes. Corrections, revocations and measured outcomes remain future work; formal acceptance 0/9.
+
 ## 2026-10-17 PIQ-6.1 cautious owner result-attestation display (CI GREEN)
 
 - Coach's read-only existing Lab result join includes only finalized protocol-following attestation and safety-stop flag, never free-text owner notes. Current status alone is not evidence of actual implementation.

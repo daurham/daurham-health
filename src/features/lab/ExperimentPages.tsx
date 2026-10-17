@@ -9,6 +9,7 @@ import {
   acceptExperiment,
   addExperimentProtocolVersion,
   createExperiment,
+  confirmExperimentImplementation,
   deleteExperiment,
   fetchExperiment,
   scheduleExperiment,
@@ -171,6 +172,9 @@ export function ExperimentDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const [windowStart, setWindowStart] = useState('')
   const [windowEnd, setWindowEnd] = useState('')
+  const [implementationDate, setImplementationDate] = useState('')
+  const [implementationChange, setImplementationChange] = useState('')
+  const [implementationConfirmed, setImplementationConfirmed] = useState(false)
   const [editingProtocol, setEditingProtocol] = useState(false)
   const [instructions, setInstructions] = useState('')
   const [requirements, setRequirements] = useState<RequirementDraft[]>([])
@@ -294,6 +298,15 @@ export function ExperimentDetailPage() {
             ? formatCalendarRange(experiment.windowStart, experiment.windowEnd)
             : 'Not scheduled'}
         </p>
+        {experiment.implementation ? (
+          <p>
+            <span className="font-medium">Owner-confirmed change. </span>
+            {experiment.implementation.behaviorChange} · effective {experiment.implementation.effectiveDate}.
+            {' '}This is your report, not independent proof of adherence or an outcome.
+          </p>
+        ) : active ? (
+          <p className="text-zinc-600">Lab is marked active; no actual behavior change has been confirmed.</p>
+        ) : null}
         <p>
           <span className="font-medium">Protocol. </span>
           {version ? `v${version.version}` : 'Missing'}
@@ -396,6 +409,35 @@ export function ExperimentDetailPage() {
               Return to accepted
             </button>
           </>
+        ) : null}
+        {active && !experiment.implementation ? (
+          <section className="w-full space-y-2 rounded-lg border border-zinc-200 bg-zinc-50 p-3" aria-label="Confirm experiment implementation">
+            <h2 className="text-sm font-semibold text-zinc-900">Record a change you actually made</h2>
+            <p className="text-xs text-zinc-600">
+              Starting Lab did not confirm any behavior change. Only confirm once you actually made the change;
+              this is your report, not proof of adherence or benefit.
+            </p>
+            <label className="block text-sm text-zinc-700">Effective date
+              <input type="date" className={fieldClass} value={implementationDate}
+                min={experiment.windowStart ?? undefined} max={experiment.windowEnd ?? undefined}
+                onChange={(event) => setImplementationDate(event.target.value)} />
+            </label>
+            <label className="block text-sm text-zinc-700">What did you actually change?
+              <textarea className={fieldClass} maxLength={500} rows={2}
+                value={implementationChange} onChange={(event) => setImplementationChange(event.target.value)}
+                placeholder="Describe the behavior or plan change you began" />
+            </label>
+            <label className="flex items-start gap-2 text-sm text-zinc-700">
+              <input type="checkbox" className="mt-1" checked={implementationConfirmed}
+                onChange={(event) => setImplementationConfirmed(event.target.checked)} />
+              I confirm that I actually made this change on the selected date.
+            </label>
+            <button type="button" className={secondaryButtonClass}
+              disabled={!implementationConfirmed || !implementationDate || !implementationChange.trim()}
+              onClick={() => void run(() => confirmExperimentImplementation(
+                experiment.id, implementationDate, implementationChange,
+              ))}>Record my implementation</button>
+          </section>
         ) : null}
         {active ? (
           <Link to={`/training/new?type=experiment&experimentId=${experiment.id}`} className={primaryButtonClass}>
