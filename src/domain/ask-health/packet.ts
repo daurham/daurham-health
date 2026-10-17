@@ -195,7 +195,9 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
       detailPath:'/settings#health-profile',userEntered:false,
       substantive:false,priority:0,
     })
-  }else if (input.contextMode !== 'general_only') {
+  }else if (input.contextMode !== 'general_only' && !clinicalQuestionHasNonOwnerSubject(input.question)) {
+    // PIQ privacy: even explicit inventory words in a third-party question
+    // cannot authorize borrowing the signed-in owner's saved Health Profile.
     addStableProfile(input.stableProfile ?? null, input.question, input.asOf, push, input.contextMode === 'deep')
     addClinicalProfile(input.profile ?? null, input.question, push, input.contextMode)
   }
@@ -245,6 +247,7 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
   // Compare only the requested categories, never disclose omitted details.
   const selectorClinicalCategories = input.profile &&
     input.contextMode !== 'general_only' &&
+    !clinicalQuestionHasNonOwnerSubject(input.question) &&
     input.currentHealthProfileSourceRecheck !== 'changed_or_unavailable' &&
     (input.healthToday == null || input.asOf === input.healthToday) &&
     !input.focusedWeightEnergyDay && !input.focusedWeightEnergyWindow &&
@@ -2331,6 +2334,7 @@ export function selectAskHealthMedications(
   profile: AskClinicalProfileInput,
   question: string,
 ): Array<{ index: number; medication: AskClinicalProfileInput['medications'][number] }> {
+  if (clinicalQuestionHasNonOwnerSubject(question)) return []
   const q = ' ' + (question.toLowerCase().match(/[a-z0-9]+/g) ?? []).join(' ') + ' '
   const names = profile.medications.map((medication, index) => ({ medication, index }))
   const explicit = /\b(?:medications?|meds?|medicines?|prescriptions?|prescribed|drugs?|drug interactions?|side effects?|adverse effects?)\b/i.test(question)
@@ -2360,6 +2364,7 @@ export function selectAskHealthAllergies(
   profile: AskClinicalProfileInput,
   question: string,
 ): Array<{ index: number; allergy: AskClinicalProfileInput['allergies'][number] }> {
+  if (clinicalQuestionHasNonOwnerSubject(question)) return []
   const records = profile.allergies.map((allergy, index) => ({ allergy, index }))
   const personal = /\b(?:my|mine|me|i|myself)\b/i.test(question)
   if (!personal) return []
@@ -2386,6 +2391,7 @@ export function selectAskHealthConditions(
   profile: AskClinicalProfileInput,
   question: string,
 ): Array<{ index: number; condition: AskClinicalProfileInput['conditions'][number] }> {
+  if (clinicalQuestionHasNonOwnerSubject(question)) return []
   if (!/\b(?:i|me|my|mine|myself)\b/i.test(question)) return []
   const records = profile.conditions.map((condition, index) => ({ condition, index }))
   const words = ' ' + (question.toLowerCase().match(/[a-z0-9]+/g) ?? []).join(' ') + ' '
@@ -2405,6 +2411,7 @@ export function selectAskHealthConditions(
 export function selectAskHealthProfileTextFields(
   question: string,
 ): Array<'persistentHealthContext' | 'trainingLimitations' | 'dietaryContext'> {
+  if (clinicalQuestionHasNonOwnerSubject(question)) return []
   if (!/\b(?:i|me|my|mine|myself)\b/i.test(question)) return []
   const profileRequest = /\bmy\s+(?:medical history|health history|health profile|health context|health background|profile)\b/i.test(question)
     || /\b(?:what|which|show|list)\b.{0,70}\b(?:health|medical)\s+(?:facts?|background|history|profile|context)\b.{0,70}\b(?:about me|recorded|saved)\b/i.test(question)
@@ -2415,6 +2422,37 @@ export function selectAskHealthProfileTextFields(
   if (training) relevant.push('trainingLimitations')
   if (diet) relevant.push('dietaryContext')
   return relevant
+}
+
+/** A first-person phrase in someone else's question is not an instruction to
+ * include the account owner's clinical profile. This is intentionally
+ * conservative: ambiguous mixed-family questions withhold the owner's
+ * clinical profile rather than silently attaching their sensitive data.
+ *
+ * This scoped guard does NOT classify medical risk, establish identities,
+ * or replace full cross-domain conversation/intent review.
+ */
+function clinicalQuestionHasNonOwnerSubject(question: string): boolean {
+  // Explicit family/member third-person referents in a question that could
+  // otherwise be mistaken for a first-person clinical-profile request.
+  if (/\b(?:my|our|your|the|his|her|their)\s+(?:(?:young|older|elderly|little|adult|newborn)\s+)?(?:wife|husband|spouse|partner|mother|father|mom|dad|son|daughter|child|baby|kid|brother|sister|friend|roommate|coworker|patient)(?:['’]s)?\b/i.test(question)) {
+    return true
+  }
+  // Another person's explicitly possessive clinical history is never
+  // equivalent to the owner's current Health Profile.
+  if (/\b(?:her|his|their|someone else's)\s+(?:current\s+|saved\s+|recorded\s+)?(?:allerg(?:y|ies)|medications?|meds?|medicines?|prescriptions?|conditions?|diagnos(?:is|es)|medical history|health profile)\b/i.test(question)) {
+    return true
+  }
+  // First-person inside an educational or reported quotation does not
+  // identify the person whose canonical health data this question concerns.
+  const unquoted = question
+    .replace(/“[^”]*”/g, ' ')
+    .replace(/"[^"]*"/g, ' ')
+    .replace(/(?<!\w)'(?:[^']|'(?=\w))*'(?!\w)/g, ' ')
+    .replace(/(?<!\w)‘(?:[^’]|’(?=\w))*’(?!\w)/g, ' ')
+  const containsQuotation = unquoted !== question
+  return containsQuotation &&
+    /\b(?:phrase|sentence|quote|quotation|example|dialogue|translate|grammar|what does|what do|meaning|mean|someone|asked|said|wrote|told|imaginary|fictional)\b/i.test(unquoted)
 }
 
 /** An explicit request for a saved inventory is different from a named-fact
