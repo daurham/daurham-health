@@ -2981,3 +2981,72 @@ Next: build an executable T48 selection-coverage test that proves the
 app discloses/handles omitted relevant clinical facts without guessing
 their meaning, and run an isolated credentialed preview owner test once
 the already-documented security gate is deliberately unlocked.
+
+
+## 2026-10-17 — T48 cap-omitted clinical scope disclosure (CI GREEN, branch only)
+
+State: **engineering-validated; NOT preview deployed or owner accepted**.
+Depends on: PIQ-2 minimal-necessary profile selection, PIQ-3 packet cap,
+T48 verified current-profile cache-revision guard.
+
+Why: a saved question-relevant medication/allergy/condition can be selected
+by the retrieval policy, dropped by `trimEvidence`, and therefore neither
+available to Gemini nor clearly distinguished from absent Health facts.
+Refreshing the cache after a Profile edit (prior T48 slice) does not itself
+address this clinical coverage omission.
+
+Files: `src/domain/ask-health/packet.ts`,
+`src/domain/ask-health/prompt.ts`, `server/ask-health/service.ts`,
+`src/features/ask-health/api.ts`, `src/features/ask-health/AskHealthPage.tsx`,
+`tests/piq0-retrieval-revision.test.ts`.
+
+Contract: after privacy/source/historical scope filtering, compare the
+question-selected substantive clinical candidates to the final capped evidence.
+Only when selected records were removed by packet sizing, emit a deterministic
+`clinical_evidence_limited` limitation tied to `ask.range`, naming at most
+the **categories** medications/allergies/conditions/profile context. Do not
+include omitted names, doses, reactions, notes, IDs or a purported full record
+count in this warning. Prompt instructs Gemini not to equate partial lists
+with exhaustive review or rule out interactions. Server exposes the warning
+as typed metadata, and the mobile Ask Health answer shows it outside the
+collapsed evidence panel even if a provider answer omits the caveat.
+Client field is optional for compatibility with older API responses.
+Source-inconsistent Health Profile information stays withheld by its existing
+separate guard. General educational responses have no clinical warning.
+
+Tests: synthetic T48 medication inventory trimmed at 1,700 characters,
+omitted name never reaches Gemini prompt or UI warning; owner-visible
+server metadata exists despite model output ignoring the caution. Unrelated
+general question, untruncated packet, and source-recheck failure do not
+manufacture clinical cap warnings. Synthetic combined condition/allergy
+inventory reports categories without omitted names. No real owner data.
+
+Evidence: code commits `5228b747500a47bcb5e5f0964e0ee2d38b498aff`
+and `6b5089a77860ee8d9dd5d423ae6849b9d79a2ac3`.
+First CI run found an independently typed frontend response missing the new
+property; the second commit synchronized the client contract and handled
+older optional `evidenceOverview` correctly. Exact-app-revision GitHub
+Actions run
+https://github.com/daurham/daurham-health/actions/runs/39035324871
+**PASSED** npm ci, TypeScript, ESLint, Vitest (2,490 passed,
+30 skipped), and production build.
+
+Scope limit: this detects records that were **selected, then removed by the
+evidence character cap**. It does not attest that the initial profile
+selection (e.g., intentional 8/12/16-item selector caps), historical saved
+records or question routing covered every relevant clinical record.
+It is a truthful partial-evidence warning, NOT complete medication-interaction
+checking, a medical safety classifier, or all T48 owner acceptance. Later
+work should make explicit clinical inventory requests disclose initial
+selection caps as well, without indiscriminately transmitting private data.
+
+No migration, database write, owner-data access, additional SQL,
+provider calls, unlocked PIQ APIs, or production/main changes. Independent
+Neon QA preview credential/Origin/branch-runtime verification and owner
+mobile acceptance remain blocked. Formal acceptance: 0/9.
+
+Next smallest task: add category-scoped **pre-cap selector completeness**
+checks for explicit owner medication/allergy/condition inventory questions;
+distinguish intentionally selected subsets from genuinely exhaustive
+records. Then revisit isolated preview credentials and user-visible
+acceptance; do not merge main or bypass the release gate.
