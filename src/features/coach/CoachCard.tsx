@@ -632,7 +632,7 @@ export function CoachIntelligencePanel({
                   <button type="button" className={quietButtonClass} disabled={pending} onClick={() => onResponse(item, 'not_relevant', 'not_practical')}>Not practical</button>
                 </div>
               </details>
-              {item.experimentEligible ? (
+              {item.experimentEligible && !item.linkedExperimentId && !item.linkedExperimentUnavailable ? (
                 <p className="mt-2 text-[11px] leading-relaxed text-zinc-500">
                   Reviewing is not acceptance. Only select “I started this” after actually taking action. This records your report, not a verified plan or target change.
                 </p>
