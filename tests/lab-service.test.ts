@@ -16,6 +16,7 @@ const harness = vi.hoisted(() => {
     controls: Row[]
     benchmarks: Row[]
     experiments: Row[]
+    implementations: Row[]
     experimentBenchmarks: Row[]
     experimentSupplements: Row[]
     supplements: Row[]
@@ -28,6 +29,7 @@ const harness = vi.hoisted(() => {
     controls: [],
     benchmarks: [],
     experiments: [],
+    implementations: [],
     experimentBenchmarks: [],
     experimentSupplements: [],
     supplements: [
@@ -371,6 +373,13 @@ const harness = vi.hoisted(() => {
       state.protocols = state.protocols.filter((item) => item.id !== params[0])
       return []
     }
+    if (text.includes('FROM experiment_implementations WHERE experiment_id')) {
+      return state.implementations
+        .filter((item) => item.experiment_id === params[0])
+        .map(({ effective_date, behavior_change, owner_confirmed_at }) => ({
+          effective_date, behavior_change, owner_confirmed_at,
+        }))
+    }
     if (text.includes('FROM workout_sessions WHERE experiment_id')) {
       return state.sessions.filter((item) => item.experiment_id === params[0])
     }
@@ -402,6 +411,7 @@ import {
   createBenchmark,
   createOwnerExperiment,
   createProposedExperiment,
+  getExperiment,
   listTodayLabExperiments,
   scheduleExperiment,
   startExperiment,
@@ -435,6 +445,7 @@ describe('personal lab service', () => {
     harness.state.controls = []
     harness.state.benchmarks = []
     harness.state.experiments = []
+    harness.state.implementations = []
     harness.state.experimentBenchmarks = []
     harness.state.experimentSupplements = []
     harness.state.sessions = []
@@ -462,6 +473,18 @@ describe('personal lab service', () => {
     expect(scheduled.status).toBe('scheduled')
     const active = await startExperiment(created.id)
     expect(active.status).toBe('active')
+    expect(active.implementation).toBeNull()
+    harness.state.implementations.push({
+      experiment_id: created.id, effective_date: '2026-10-01',
+      behavior_change: 'Added a deliberately recorded intervention',
+      owner_confirmed_at: '2026-10-02T12:00:00.000Z',
+    })
+    const withImplementation = await getExperiment(created.id)
+    expect(withImplementation.implementation).toEqual({
+      effectiveDate: '2026-10-01',
+      behaviorChange: 'Added a deliberately recorded intervention',
+      ownerConfirmedAt: '2026-10-02T12:00:00.000Z',
+    })
     await expect(
       addExperimentProtocolVersion(created.id, {
         instructions: 'Too late.',
