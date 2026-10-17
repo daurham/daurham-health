@@ -374,6 +374,12 @@ const harness = vi.hoisted(() => {
     if (text.includes('FROM workout_sessions WHERE experiment_id')) {
       return state.sessions.filter((item) => item.experiment_id === params[0])
     }
+    // The new implementation journal is independent of creating, scheduling,
+    // and starting existing Lab experiments. None of these legacy fixtures
+    // explicitly confirms a behavior change.
+    if (text.includes('FROM experiment_implementations WHERE experiment_id')) {
+      return []
+    }
     throw new Error(`unexpected sql: ${text}`)
   }
 
