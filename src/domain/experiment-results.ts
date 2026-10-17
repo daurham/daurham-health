@@ -83,6 +83,8 @@ export type DailyMetricPoint = {
   metricKey: string
   value: number | null
   eligible?: boolean
+  /** Stable canonical provider identity when comparing same-source sleep nights. */
+  sourceKey?: string
 }
 
 export type AdherenceDay = {

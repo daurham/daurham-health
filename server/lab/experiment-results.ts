@@ -23,7 +23,7 @@ import { HttpError } from '../http.js'
 import { currentHealthDate, healthCalendarTimeZone } from '../health-time.js'
 import { VERIFIED_NUTRITION_DAYS_SQL } from '../nutrition/maintenance-eligibility.js'
 import { isCalendarDate } from '../../src/domain/training.js'
-import { assessNutritionExperimentComparison, nutritionComparisonLoadStart, type ExperimentComparisonReview } from '../../src/domain/experiment-comparison.js'
+import { assessExperimentComparison, experimentComparisonLoadStart, type ExperimentComparisonReview } from '../../src/domain/experiment-comparison.js'
 
 type ExperimentRow = {
   id: string
@@ -257,10 +257,10 @@ async function buildEvaluation(
     experiment.reported_implementation_date <= today
     ? experiment.reported_implementation_date : null
   const evidence = await loadEvidence(sql, experiment, requirements, start, loadEnd, timezone, today, reportedChangeDate)
-  const comparisonReview: ExperimentComparisonReview = assessNutritionExperimentComparison({
+  const comparisonReview: ExperimentComparisonReview = assessExperimentComparison({
     reportedImplementationDate: experiment.reported_implementation_date ?? null,
     windowStart: start, effectiveEndDate: loadEnd, today,
-    requirements, nutrition: evidence.nutrition,
+    requirements, nutrition: evidence.nutrition, sleep: evidence.sleep,
   })
   const evaluation = evaluateExperiment({
     windowStart: start,
@@ -385,10 +385,11 @@ async function loadEvidence(
     loadTraining(sql, experiment.id, start, end),
     loadBody(sql, requirements, start, end, timezone),
     requirements.some((item) => item.requirementKind === 'nutrition_metric')
-      ? loadNutrition(sql, nutritionComparisonLoadStart(start, reportedChangeDate), end, today)
+      ? loadNutrition(sql, experimentComparisonLoadStart(start, reportedChangeDate), end, today)
       : Promise.resolve([] as ExperimentEvidence['nutrition']),
     loadActivity(sql, start, end, timezone),
-    loadSleep(sql, start, end, timezone),
+    loadSleep(sql, requirements.some((item) => item.requirementKind === 'sleep_metric')
+      ? experimentComparisonLoadStart(start, reportedChangeDate) : start, end, timezone),
     loadAdherence(sql, [...new Set(supplementIds)], start, end),
     loadContext(sql, start, end),
     loadControls(sql, experiment.protocol_version_id),
@@ -584,7 +585,7 @@ async function loadActivity(sql: Sql, start: string, end: string, timezone: stri
 
 async function loadSleep(sql: Sql, start: string, end: string, timezone: string) {
   const rows = (await sql.query(
-    `SELECT sleep_date::text AS sleep_date, total_sleep_minutes, analysis_eligible
+    `SELECT sleep_date::text AS sleep_date, total_sleep_minutes, analysis_eligible, logical_source_key
      FROM sleep_nightly_summaries
      WHERE timezone = $3 AND sleep_date BETWEEN $1::date AND $2::date`,
     [start, end, timezone],
@@ -594,6 +595,7 @@ async function loadSleep(sql: Sql, start: string, end: string, timezone: string)
     metricKey: 'total_sleep_minutes',
     value: finite(row.total_sleep_minutes),
     eligible: row.analysis_eligible === true,
+    sourceKey: typeof row.logical_source_key === 'string' ? row.logical_source_key : undefined,
   }))
 }
 

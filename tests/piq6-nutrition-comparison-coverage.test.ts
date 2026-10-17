@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { emptyCriteria, type DailyMetricPoint, type ExperimentRequirementSpec } from '../src/domain/experiment-results.js'
-import { assessNutritionExperimentComparison, nutritionComparisonCopy, nutritionComparisonLoadStart } from '../src/domain/experiment-comparison.js'
+import { assessExperimentComparison, experimentComparisonCopy, experimentComparisonLoadStart } from '../src/domain/experiment-comparison.js'
 import { EXPERIMENT_VERIFIED_NUTRITION_SQL } from '../server/lab/experiment-results.js'
 
 function req(key = 'calories', kind = 'nutrition_metric', id = key): ExperimentRequirementSpec {
@@ -11,8 +11,8 @@ const before = ['2026-09-28','2026-09-29','2026-10-01','2026-10-04']
 const after = ['2026-10-05','2026-10-06','2026-10-08','2026-10-11']
 const points = (dates: string[], metricKey='calories'): DailyMetricPoint[] =>
   dates.map((date)=>({date, metricKey, value: 2100}))
-function assess(overrides: Partial<Parameters<typeof assessNutritionExperimentComparison>[0]>={}) {
-  return assessNutritionExperimentComparison({
+function assess(overrides: Partial<Parameters<typeof assessExperimentComparison>[0]>={}) {
+  return assessExperimentComparison({
     reportedImplementationDate: '2026-10-05', windowStart: '2026-10-01',
     effectiveEndDate: '2026-10-11', today: '2026-10-17',
     requirements: [req()], nutrition: [...points(before), ...points(after)], ...overrides,
@@ -24,15 +24,15 @@ describe('PIQ-6.3 owner-date nutrition comparison coverage', () => {
     const result=assess({reportedImplementationDate:null})
     expect(result.state).toBe('not_assessable')
     expect(result.reason).toBe('no_reported_implementation')
-    expect(nutritionComparisonCopy(result)).toContain('not proof of implementation')
+    expect(experimentComparisonCopy(result)).toContain('not proof of implementation')
   })
   it('screens exactly seven pre-change dates and at most seven completed post-change days', () => {
     const result=assess()
     expect(result.state).toBe('descriptive_coverage')
     expect(result.baselineWindow).toEqual({start:'2026-09-28',end:'2026-10-04'})
     expect(result.followUpWindow).toEqual({start:'2026-10-05',end:'2026-10-11'})
-    expect(result.metrics).toEqual([{metricKey:'calories',beforeDays:4,afterDays:4,beforeExpected:7,afterExpected:7}])
-    expect(nutritionComparisonCopy(result)).toContain('does not verify adherence')
+    expect(result.metrics).toEqual([{requirementId:'calories',outcomeKind:'nutrition_metric',metricKey:'calories',beforeDays:4,afterDays:4,beforeExpected:7,afterExpected:7}])
+    expect(experimentComparisonCopy(result)).toContain('does not verify adherence')
   })
   it('missing and unreliable days never become explicit zero or complete', () => {
     const result=assess({ nutrition: [
@@ -42,7 +42,7 @@ describe('PIQ-6.3 owner-date nutrition comparison coverage', () => {
     ]})
     expect(result.state).toBe('insufficient_coverage')
     expect(result.metrics[0]?.beforeDays).toBe(2)
-    expect(nutritionComparisonCopy(result)).toContain('missing or incomplete days are not zero')
+    expect(experimentComparisonCopy(result)).toContain('missing, unverified or incomplete days and nights')
   })
   it('deduplicates same-date observations rather than inflating day count', () => {
     const result=assess({nutrition:[...points(before),...points(before),...points(after)]})
@@ -78,9 +78,9 @@ describe('PIQ-6.3 owner-date nutrition comparison coverage', () => {
     expect(r.metrics).toHaveLength(2)
   })
   it('does not truncate the original experiment window if implementation is late', () => {
-    expect(nutritionComparisonLoadStart('2026-10-01', '2026-10-25')).toBe('2026-10-01')
-    expect(nutritionComparisonLoadStart('2026-10-01', '2026-10-05')).toBe('2026-09-28')
-    expect(nutritionComparisonLoadStart('2026-10-01', null)).toBe('2026-10-01')
+    expect(experimentComparisonLoadStart('2026-10-01', '2026-10-25')).toBe('2026-10-01')
+    expect(experimentComparisonLoadStart('2026-10-01', '2026-10-05')).toBe('2026-09-28')
+    expect(experimentComparisonLoadStart('2026-10-01', null)).toBe('2026-10-01')
   })
   it('uses the already-gated owner-confirmed complete-day nutrition query',()=>{
     expect(EXPERIMENT_VERIFIED_NUTRITION_SQL).toContain("owner_report = 'complete'")
