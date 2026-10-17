@@ -2,7 +2,7 @@ import { ASK_HEALTH_PACKET_VERSION, type AskLens } from './config.js'
 import type { AskHealthAnswer, AskHealthPacket } from './types.js'
 import type { ProgressRange } from '../progress/types.js'
 
-export const ASK_HEALTH_GENERAL_PROMPT_VERSION = 'ask-health-general-v1'
+export const ASK_HEALTH_GENERAL_PROMPT_VERSION = 'ask-health-general-v2'
 
 /** No canonical queries and no borrowed owner data. This is NOT fabricated
  * evidence: the evidence array is genuinely empty.
@@ -58,7 +58,34 @@ export function generalAskUserPrompt(question: string): string {
 /** A second protection against turning uncited general prose into a claimed
  * private Health record. Not a medical correctness validator.
  */
+function inventedGeneralOwnerRecord(text: string): boolean {
+  const claimsSavedData = /\b(?:your|the user's|the owner's)\s+(?:logged|recorded|saved|tracked|measured|health records?|food logs?|nutrition logs?|workout logs?|medical history|medications|weight history|bloodwork|health profile)\b|\baccording to your\b|\bbased on your (?:data|logs?|records?|history|measurements?)\b|\bi (?:can )?(?:see|found|reviewed) (?:in )?your (?:data|logs?|records?|history|measurements?)\b/i
+  const inventedMeasurement = /\b(?:your|the user's|the owner's)\s+(?:(?:recorded|current|daily|average|latest)\s+)?(?:weight|height|steps?|step count|sleep(?: duration)?|water intake|calor(?:ie|ic) intake|protein intake|body fat)\s+(?:is|was|averaged|total(?:ed|led)?|equal(?:s|ed)?)\s*-?\d[\d,.]*\s*(?:kg|lbs?|pounds?|cm|inches?|steps?|minutes?|hours?|g|grams?|ml|kcal|calories?|%)(?=\W|$)|\byou\s+(?:logged|recorded|weighed|slept|lifted|consumed|averaged)\s+(?:a\s+(?:total|daily average)\s+of\s+)?-?\d[\d,.]*\s*(?:kg|lbs?|pounds?|cm|inches?|steps?|minutes?|hours?|g|grams?|ml|kcal|calories?|%)(?=\W|$)/i
+  return claimsSavedData.test(text) || inventedMeasurement.test(text)
+}
+
 export function generalAnswerInventsPersonalRecord(answer: AskHealthAnswer): boolean {
   return [...answer.blocks, ...answer.limitations].some((block) =>
-    /\b(?:your|the user's|the owner's)\s+(?:logged|recorded|saved|tracked|measured|health records?|food logs?|nutrition logs?|workout logs?|medical history|medications|weight history|bloodwork|health profile)\b|\baccording to your\b|\bbased on your (?:data|logs?|records?|history|measurements?)\b|\bi (?:can )?(?:see|found|reviewed) (?:in )?your (?:data|logs?|records?|history|measurements?)\b/i.test(block.text))
+    inventedGeneralOwnerRecord(block.text))
+}
+
+/** Old cached general answers do not receive the current provider validation
+ * pass. Redact invented owner claims at read time without a new paid call.
+ * Independent general education can survive; citations remain empty.
+ */
+export function sanitizeCachedGeneralAnswer(answer: AskHealthAnswer): AskHealthAnswer {
+  if (!generalAnswerInventsPersonalRecord(answer)) return answer
+  const blocks = answer.blocks.filter((item) => !inventedGeneralOwnerRecord(item.text))
+    .map((item) => ({ ...item, evidenceRefs: [] }))
+  const limitations = answer.limitations.filter((item) => !inventedGeneralOwnerRecord(item.text))
+    .map((item) => ({ ...item, evidenceRefs: [] }))
+  return {
+    blocks: blocks.length > 0 ? blocks :
+      [{ text: 'That cached response claimed personal measurements I cannot verify in General Only. Ask again using an appropriate mode for your saved Health records.', evidenceRefs: [] }],
+    limitations: [...limitations, {
+      text: 'An unsupported personal-record claim was withheld from a cached general answer.',
+      evidenceRefs: [],
+    }],
+    followUps: [],
+  }
 }

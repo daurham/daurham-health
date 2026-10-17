@@ -24,6 +24,7 @@ import { detectImmediateSafety, immediateSafetyAnswer } from '../../src/domain/a
 import {
   ASK_HEALTH_GENERAL_PROMPT_VERSION, GENERAL_ASK_SYSTEM_PROMPT,
   blankGeneralAskPacket, generalAskUserPrompt, generalAnswerInventsPersonalRecord,
+  sanitizeCachedGeneralAnswer,
 } from '../../src/domain/ask-health/general.js'
 import { billableOutputTokens, boundedProviderCostUsd } from '../ai-usage/cost.js'
 import { HttpError } from '../http.js'
@@ -249,7 +250,7 @@ export async function explainAskHealth(input: {
   }
   if (decision.cached) {
     // Defensive against older cache entries or future scope-rule changes.
-    const cachedAnswer = general ? decision.cached.answer :
+    const cachedAnswer = general ? sanitizeCachedGeneralAnswer(decision.cached.answer) :
       groundHistoricalAnswer(decision.cached.answer, work.packet, work.question)
     return {
       answer: cachedAnswer,

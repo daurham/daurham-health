@@ -3,7 +3,7 @@ import {
   routeAskHealthIntent,
   buildAskHealthEvidencePacket, type AskHealthPacketInput,
 } from '../src/domain/ask-health/index.js'
-import { blankGeneralAskPacket, generalAnswerInventsPersonalRecord } from '../src/domain/ask-health/general.js'
+import { blankGeneralAskPacket, generalAnswerInventsPersonalRecord, sanitizeCachedGeneralAnswer } from '../src/domain/ask-health/general.js'
 import { answerAskHealth, explainAskHealth, type AskHealthProvider } from '../server/ask-health/service.js'
 import { createAskHealthGate } from '../server/ask-health/gate.js'
 
@@ -101,7 +101,7 @@ describe('PIQ-3.2 educational routing and safety', () => {
     expect(response.answer.blocks[0]?.evidenceRefs).toEqual([])
     expect(response.meta).toMatchObject({
       answerScope: 'general', cached: false,
-      promptVersion: 'ask-health-general-v1',
+      promptVersion: 'ask-health-general-v2',
       diagnostic: { path: 'general_model_answer', substantiveEvidenceCount: 0 },
       context: { knows: [], missing: [] },
     })
@@ -178,6 +178,69 @@ describe('PIQ-3.2 educational routing and safety', () => {
     })).rejects.toMatchObject({ statusCode: 502, code: 'ASK_HEALTH_INVALID_RESPONSE' })
     expect(stub).toHaveBeenCalledTimes(2)
   })
+
+  it('withholds invented uncited owner numbers from general-only educational answers', async () => {
+    const personalStatements = [
+      'Your weight is 90 kg.',
+      'Your steps averaged 6,000 steps.',
+      'You logged 1800 kcal.',
+    ]
+    for (const text of personalStatements) {
+      expect(generalAnswerInventsPersonalRecord({
+        blocks: [{ text, evidenceRefs: [] }], limitations: [], followUps: [],
+      })).toBe(true)
+    }
+    const stub = vi.fn(async () => ({
+      text: answer('Your weight is 90 kg.'),
+      model: 'piq-stub', inputTokens: 8, outputTokens: 6,
+    }))
+    await expect(answerAskHealth({
+      ...request('What does creatine do?'),
+      contextMode: 'general_only', provider: stub,
+      gate: createAskHealthGate({ minIntervalMs: 0 }),
+    })).rejects.toMatchObject({ statusCode: 502, code: 'ASK_HEALTH_INVALID_RESPONSE' })
+    expect(stub).toHaveBeenCalledTimes(2)
+  })
+
+  it('redacts poisoned cached General Only claims but keeps general education at zero provider cost', async () => {
+    const poisoned = {
+      blocks: [
+        { text: 'Your weight is 90 kg.', evidenceRefs: [] },
+        { text: 'Creatine helps regenerate ATP during intense effort.', evidenceRefs: [] },
+      ],
+      limitations: [{ text: 'Based on your logs, your strength increased.', evidenceRefs: [] }],
+      followUps: [],
+    }
+    const safe = sanitizeCachedGeneralAnswer(poisoned)
+    expect(safe.blocks.map(x => x.text)).toEqual([
+      'Creatine helps regenerate ATP during intense effort.',
+    ])
+    expect(safe.limitations.some(x => x.text.includes('withheld'))).toBe(true)
+    expect(JSON.stringify(safe)).not.toContain('90 kg')
+    expect(JSON.stringify(safe)).not.toContain('your strength increased')
+    const gate = createAskHealthGate({ minIntervalMs: 0 })
+    const realTake = gate.take
+    gate.take = async (key, now, model) => {
+      void key; void now; void model
+      return { ok: true, usageId: null, cached: { answer: poisoned, evidence: [] } }
+    }
+    const noProvider = vi.fn(async () => ({ text: answer('Safe educational response.'), model: 'piq-stub', inputTokens: 0, outputTokens: 0 }))
+    const result = await answerAskHealth({
+      ...request('What does creatine do?'), contextMode: 'general_only',
+      provider: noProvider, gate,
+    })
+    expect(result.meta).toMatchObject({ cached: true, answerScope: 'general' })
+    expect(result.evidence).toEqual([])
+    expect(result.answer.blocks.map(x => x.text)).toEqual(safe.blocks.map(x => x.text))
+    expect(noProvider).not.toHaveBeenCalled()
+    gate.take = realTake
+    const allBad = sanitizeCachedGeneralAnswer({
+      blocks: [{ text: 'You logged 8000 steps.', evidenceRefs: [] }],
+      limitations: [], followUps: [],
+    })
+    expect(allBad.blocks[0]?.text).toContain('cannot verify')
+  })
+
   it('preserves owner missing-evidence fallback; never makes up height or weights', async () => {
     const stub = provider('Your height is 180 cm.')
     const empty = blankGeneralAskPacket({
