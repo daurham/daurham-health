@@ -98,7 +98,8 @@ export function screenScaleShiftTiming(input:{
       return 'source_dates_unverified'
     if(input.coverage.weightSampling!=='sampled_both_windows')
       return 'weight_window_insufficient'
-    const latestFoodDay=[...dates].sort().at(-1)!
+    const sortedDates=[...dates].sort()
+    const latestFoodDay=sortedDates[sortedDates.length-1]!
     // A same-day weight is NOT evidence it followed a daily food total.
     return recentWeights.some(day=>day>latestFoodDay)
       ?'later_scale_recorded':'no_later_scale_record'
