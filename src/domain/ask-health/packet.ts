@@ -796,6 +796,8 @@ function addFocusedWeightEnergy(
                 ? 'The weight history used to calculate Goal Control projections changed during retrieval; canonical target and deadline reports are WITHHELD. '
                 :canonical.state==='projection_source_unavailable'
                   ? 'The weight history source recheck could not be verified; canonical target and deadline reports are WITHHELD. '
+                  :canonical.state==='projection_quality_limited'
+                    ? 'Goal Control produced a projection, but its verified history lacks sufficiently recent and distributed weight dates to support forecast interpretation; the target and deadline review is WITHHELD. '
           :canonical.state==='primary_not_weight'
             ? 'No active weight goal was selected as primary; this screen withholds weight-goal achievement and urgency. '
             : 'Exact selected-goal status or source versions could not be reconciled. '

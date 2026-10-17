@@ -219,7 +219,7 @@ export async function loadAskHealthPacketInput(input: {
     const [checkedDecision,checkedWeightSource,checkedWeightProjection]=await Promise.all([
       readMaintenanceDecisionSnapshot(input.asOf),
       readCurrentWeightPointSource(input.asOf,timezone),
-      readCurrentWeightProjectionSource(),
+      readCurrentWeightProjectionSource(undefined,input.asOf),
     ])
     focusedWeightEnergy.currentSettings = screenWeightEnergyCurrentSettings(
       capturedDecision,checkedDecision,

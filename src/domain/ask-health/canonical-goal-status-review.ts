@@ -10,7 +10,8 @@ export type CanonicalGoalStatusReview={
   state:'not_checked'|'unavailable'|'primary_not_weight'|'version_mismatch'|
     'canonical_target_unknown'|'canonical_reported'|'measurement_disagreement'|
     'measurement_source_changed'|'measurement_source_unavailable'|
-    'projection_source_changed'|'projection_source_unavailable'
+    'projection_source_changed'|'projection_source_unavailable'|
+    'projection_quality_limited'
   /** Goal Control's current read is a REPORT, not a separately locked measurement. */
   targetReport:'withheld'|'unknown'|'satisfied'|'above_target'|'below_target'|
     'outside_range_low'|'outside_range_high'
@@ -99,6 +100,15 @@ export function reviewCanonicalSelectedGoal(input:{
         measurementRevision:sourceRevision,projectionRevision:'changed_or_unavailable'}
     projectionRevision=check.rowCount===0?
       'empty_series_rechecked':'complete_series_rechecked'
+    // Canonical Goal Control may mathematically project from five historical
+    // observations even if they are old or clustered. Never forward that
+    // crossing/deadline as meaningful present-day evidence without a
+    // qualified temporal sampling distribution. Current target state is
+    // withheld here rather than mispresenting a forecast as urgency.
+    if(canonical.projectionState==='available'&&
+       check.quality!=='date_spread_sufficient')
+      return {...unknown,state:'projection_quality_limited',
+        measurementRevision:sourceRevision,projectionRevision}
   }
   const target=canonical.targetState
   const deadline=canonical.deadlineState
