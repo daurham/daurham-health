@@ -3121,3 +3121,66 @@ Next: bounded synthetic privacy/intent adversarial cases and independent
 QA runtime preparation; only then protected preview owner testing and
 a production release proposal. Do not unlock preview, run migrations
 on production, or merge to `main` without the approved QA/release gate.
+
+
+## 2026-10-17 — T48 owner-versus-third-party clinical subject scope (CI GREEN)
+
+State: **exact-code-SHA engineering validated; PIQ branch only, not owner accepted**.
+
+Why: a previously approved explicit-inventory classifier could parse
+"List my wife's medications" as an owner inventory. Default Personalized
+or Deep Dive could also attach the signed-in owner's saved clinical
+records to a question clearly about another person or an educational
+quotation containing the words "my medications". This is a privacy and
+person-referent correctness error, not merely a misleading disclaimer.
+
+Files: `src/domain/ask-health/packet.ts`,
+`tests/piq3-clinical-person-scope.test.ts`.
+
+Contract: conservatively withhold both current clinical and stable Health
+Profile evidence when a question explicitly references a different
+family/member subject (wife, husband, spouse, child, parent, friend,
+etc.), other-person possessive clinical records, or a clearly educational
+quotation. The Smart standalone medication, allergy, condition and
+free-text selectors also fail closed for these questions. No clinical
+preselector cap warning is invented when the entire clinical source
+has correctly been withheld. Direct first-person owner questions,
+including clinician-requested owner history, still select relevant
+saved records. Current saved statuses are not inferred about relatives.
+
+Validation: five new synthetic adversarial test cases cover third-party
+possessives and family/member referents in Smart/Personalized/Deep,
+quoted first-person examples, unaffected true first-person retrieval,
+direct standalone selectors and General Only isolation. Assert that
+omitted synthetic clinical names, doses, notes and reactions never
+appear in the outgoing model prompt and are not represented by
+misleading clinical-limit warnings.
+
+Code commit `aa4523c58f9a6de32281c0404a589b5c588c487b`.
+Exact-commit GitHub Actions run
+https://github.com/daurham/daurham-health/actions/runs/39043877449
+**PASSED** npm ci, TypeScript, ESLint, Vitest (2,501 passed,
+30 skipped; 330 files passed, 2 skipped), production build.
+
+Explicit remaining limits: the heuristic is deliberately conservative
+and English-worded; ambiguous mixed-person, multilingual, implicit
+identity, reported speech without quotation marks, and difficult
+pronoun/negation constructions need more owner QA. This is a
+**clinical/stable Health Profile** source boundary, NOT a certified
+cross-domain person router. Other personal sources (e.g. owner goals,
+training, nutrition or intelligence) can still be selected by
+Personalized/Deep, even when the clinical/stable Profile is withheld.
+A later task should add a fail-closed whole-packet person-context
+boundary without disrupting valid first-person multi-person questions
+or the intended owner-data mode.
+
+No migration, owner-data access, live Gemini request, production change,
+main merge, preview credential unlock or database write. The protected
+PIQ preview and independent owner mobile acceptance remain blocked by
+the documented QA credential/trusted-origin/runtime attestation gate.
+Formal PIQ acceptance remains **0/9**; prior green engineering runs
+are not a percentage of owner signoff.
+
+Next: cross-domain third-person data isolation with explicit safe
+response wording and synthetic negative controls; later independent
+QA setup and real owner acceptance before a main/prod release decision.
