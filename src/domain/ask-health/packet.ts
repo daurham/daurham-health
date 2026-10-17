@@ -628,7 +628,7 @@ function addFocusedWeightEnergy(
       domain:'intelligence',
       label:'Current weight/energy source consistency boundary',
       value:null,unit:null,period,
-      text:'At least one independently rechecked current Nutrition, body-weight or Activity source changed, lacks compatible source identity, disagreed between initially loaded source views, or was unavailable. Current focused weight/intake estimates, nutrient shifts, protein context, step/log comparisons and selected-goal interpretations are WITHHELD. A corrected or missing record is UNKNOWN, not zero. No calorie adjustment or personalized plateau conclusion is authorized.',
+      text:'At least one independently rechecked current Nutrition, body-weight, Activity or Training source changed, lacks compatible source identity, disagreed between initially loaded source views, or was unavailable. Current focused weight/intake estimates, nutrient shifts, protein context, step/log comparisons and selected-goal interpretations are WITHHELD. A corrected or missing record is UNKNOWN, not zero. No calorie adjustment or personalized plateau conclusion is authorized.',
       coverage:{
         nutritionSourceRecheck:focus.nutritionSourceRecheck,
         weightActivitySourceRecheck:focus.weightActivitySourceRecheck,
