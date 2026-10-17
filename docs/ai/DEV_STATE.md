@@ -1,4 +1,10 @@
-## 2026-10-17 — PIQ-6.1 owner correction/retraction journal (branch CI pending)
+## 2026-10-17 PIQ-6.1 append-only owner correction acceptance checkpoint
+
+- GitHub Actions `39065588376` is SUCCESS on commit `79643a999321eb5de7f7d318cf93b70d48c791b3`; TypeScript, ESLint, production build, 2,600 Vitest cases passed (30 skipped).
+- Added regression tests for correction/retraction input validation, bounded reasons, effective dates, optimistic concurrent version, retracted privacy and original-record immutability, canonical Lab detail and owner-only actions.
+- Release gate still open: apply BOTH 0057 and 0058 in the right database when owner authorizes promotion; never deploy branch readers until schema exists. No automatic goal/result/target updates and no claimed causal learning. Formal PIQ phase owner acceptance 0/9.
+
+## 2026-10-17 — PIQ-6.1 owner correction/retraction journal (CI GREEN)
 
 - Additive migration 0058 after 0057, creating append-only revision rows (action, reason, effective date/details, revision, timestamp). Stale-write guarded by unique experiment/revision. Owner-only POST endpoints and correction/retraction UX use expectedRevision from canonical Lab detail.
 - Original 0057 row is immutable; latest correction wins in Lab, Coach and Ledger; retraction removes behavior-change claims but retains audit and contextual retraction status; result not automatically changed and explicit warning if correction/retraction postdated result.
