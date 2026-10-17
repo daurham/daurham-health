@@ -1,5 +1,5 @@
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ASK_LENS_LABELS, ASK_SUGGESTIONS, ASK_CONTEXT_MODES, ASK_CONTEXT_MODE_LABELS, DEFAULT_ASK_CONTEXT_MODE, type AskLens, type AskTurn, type AskContextMode } from '@/domain/ask-health'
 import type { ProgressRange } from '@/domain/progress'
 import { primaryButtonClass, quietButtonClass, useHealthCalendarDate } from '@/lib'
@@ -13,6 +13,8 @@ import { KnownProfilePanel } from './KnownProfilePanel'
 import { readAskCorrectionState } from '@/domain/ask-health/corrections'
 import { OptionalClarification } from './OptionalClarification'
 import { deepDiveRangeHint } from '@/domain/ask-health/context-range'
+import { subscribeHealthDataChanges } from '@/lib/health-changes'
+import { shouldWithholdChangedAskResponse } from '@/domain/ask-health/stale-response'
 
 const LENSES = ['general', 'training', 'nutrition', 'recovery', 'experiments'] as const
 
@@ -48,10 +50,33 @@ export function AskHealthPage() {
   const [ownerNote, setOwnerNote] = useState('')
   const [answerRevision, setAnswerRevision] = useState(0)
   const deepRangeHint = deepDiveRangeHint(contextMode, range)
+  const dataRevisionRef = useRef(0)
+  const lastPersonalQuestionRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    // The shared healthFetch invalidation channel broadcasts only a constant,
+    // never owner records or the changed workout ID. Invalidation must be
+    // synchronous: a response may resolve before a coalesced refresh timer.
+    return subscribeHealthDataChanges(() => {
+      dataRevisionRef.current += 1
+      if (lastPersonalQuestionRef.current !== null) {
+        const previousQuestion = lastPersonalQuestionRef.current
+        lastPersonalQuestionRef.current = null
+        setLatest(null)
+        setAsked(null)
+        setTurns([])
+        setOwnerNote('')
+        setNoteOpen(false)
+        setError('Your Health records changed. Ask again to get current personalized advice.')
+        setDraft((current) => current.trim() ? current : previousQuestion)
+      }
+    }, { immediate: true })
+  }, [])
 
   function changeRange(next: ProgressRange) {
     if (pending || next === range) return
     setRange(next)
+    lastPersonalQuestionRef.current = null
     setTurns([])
     setLatest(null)
     setAsked(null)
@@ -63,6 +88,7 @@ export function AskHealthPage() {
     if (!trimmed || pending) {
       return
     }
+    const startedDataRevision = dataRevisionRef.current
     setPending(true)
     setError(null)
     setReturnNotice(false)
@@ -75,6 +101,18 @@ export function AskHealthPage() {
         asOf: today,
         conversation: turns.slice(-6),
       })
+      if (shouldWithholdChangedAskResponse(
+        response.meta.answerScope, startedDataRevision, dataRevisionRef.current,
+      )) {
+        lastPersonalQuestionRef.current = null
+        setLatest(null)
+        setAsked(null)
+        setTurns([])
+        setOwnerNote('')
+        setError('Your Health records changed while this answer was being prepared. Ask again for current advice.')
+        return
+      }
+      lastPersonalQuestionRef.current = response.meta.answerScope === 'personal' ? trimmed : null
       const assistant = response.answer.blocks.map((block) => block.text).join('\n')
       setTurns((current) =>
         [...current, { role: 'user' as const, text: trimmed }, { role: 'assistant' as const, text: assistant }].slice(-6),
@@ -102,6 +140,7 @@ export function AskHealthPage() {
           className={quietButtonClass}
           disabled={pending}
           onClick={() => {
+            lastPersonalQuestionRef.current = null
             setTurns([])
             setLatest(null)
             setReturnNotice(false)
@@ -132,6 +171,7 @@ export function AskHealthPage() {
             className={`min-h-10 shrink-0 rounded-md px-3 text-sm font-medium ${item === lens ? 'bg-zinc-900 text-white' : 'text-zinc-600'}`}
             onClick={() => {
               setLens(item)
+              lastPersonalQuestionRef.current = null
               setTurns([])
               setLatest(null)
               setError(null)
@@ -146,6 +186,7 @@ export function AskHealthPage() {
         <select id="ask-context-mode" value={contextMode} disabled={pending}
           onChange={(event) => {
             setContextMode(event.target.value as AskContextMode)
+            lastPersonalQuestionRef.current = null
             setTurns([])
             setLatest(null)
             setError(null)

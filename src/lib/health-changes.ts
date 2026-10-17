@@ -61,12 +61,18 @@ export function notifyHealthDataChanged(): void {
  */
 export function subscribeHealthDataChanges(
   refresh: () => void,
-  options: { revalidateOnFocus?: boolean } = {},
+  options: { revalidateOnFocus?: boolean; immediate?: boolean } = {},
 ): () => void {
   if (typeof window === 'undefined') return () => undefined
   openChangeChannel()
   let timer: ReturnType<typeof setTimeout> | null = null
   const changed = () => {
+    // Safety-sensitive in-flight responses need synchronous invalidation.
+    // Other callers retain batched refreshes to avoid redundant data loads.
+    if (options.immediate) {
+      refresh()
+      return
+    }
     if (timer != null) return
     timer = setTimeout(() => {
       timer = null

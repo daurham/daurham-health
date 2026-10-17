@@ -108,6 +108,24 @@ describe('healthFetch invalidation and coalescing', () => {
     unsubscribe()
   })
 
+  it('supports synchronous safety invalidation while retaining normal coalescing', () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('window', new EventTarget())
+    const immediate = vi.fn()
+    const normal = vi.fn()
+    const stopImmediate = subscribeHealthDataChanges(immediate, { immediate: true })
+    const stopNormal = subscribeHealthDataChanges(normal)
+    notifyHealthDataChanged()
+    expect(immediate).toHaveBeenCalledTimes(1)
+    expect(normal).not.toHaveBeenCalled()
+    vi.runAllTimers()
+    expect(normal).toHaveBeenCalledTimes(1)
+    stopImmediate()
+    stopNormal()
+    notifyHealthDataChanged()
+    expect(immediate).toHaveBeenCalledTimes(1)
+  })
+
   it('unsubscribes and cancels queued work when Today unmounts', () => {
     vi.useFakeTimers()
     vi.stubGlobal('window', new EventTarget())

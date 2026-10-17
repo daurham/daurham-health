@@ -41,6 +41,16 @@ describe('PIQ-3 Context Mode actual page and in-flight controls', () => {
     expect(source).toMatch(/id="ask-health-question"\s+disabled=\{pending\}/)
   })
 
+  it('T42 protects in-flight personalized answers against canonical cross-tab data changes', () => {
+    const source = readFileSync('src/features/ask-health/AskHealthPage.tsx', 'utf8')
+    expect(source).toContain('subscribeHealthDataChanges')
+    expect(source).toContain('{ immediate: true }')
+    expect(source).toContain('startedDataRevision')
+    expect(source).toContain('shouldWithholdChangedAskResponse')
+    expect(source).toContain('setLatest(null)')
+    expect(source).toContain('Your Health records changed')
+  })
+
   it('shows Deep Dive as an explicit choice rather than promising unbounded records', () => {
     const html = renderPage('/ask-health?lens=training&range=30d')
     expect(html).toContain('Deep Dive')
