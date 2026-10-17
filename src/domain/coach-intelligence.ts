@@ -405,6 +405,104 @@ export function buildCoachRecommendationRationale(
         nutrition.requiredReliableDays + ' reliable complete days are confirmed. Meeting that threshold is not proof of a health outcome.',
     }
   }
+  // Goal reviews must resolve to the exact active goal and its canonical
+  // source reference. A fuzzy title match or merely having a goal somewhere
+  // in the account does not support a personalized explanation.
+  if (draft.kind === 'goal_review' || draft.kind === 'goal_off_track') {
+    const goal = control.goals.find((candidate) =>
+      candidate.lifecycle === 'active' &&
+      candidate.targetState !== 'satisfied' &&
+      draft.detailPath === candidate.detailPath &&
+      draft.evidenceRefs.includes('goal:' + candidate.id))
+    if (goal) {
+      const timing = goal.deadlineState === 'due_today'
+        ? 'The stored target date is today.'
+        : goal.deadlineState === 'passed_unmet'
+          ? 'The stored target date has passed and the goal is not marked satisfied.'
+          : goal.deadlineState === 'projected_after_deadline'
+            ? 'The current projection falls after the stored goal deadline.'
+            : 'The recorded goal status calls for review; its exact deadline urgency was not established.'
+      return {
+        observation: 'At ' + control.asOf + ', the active ' + goal.label +
+          ' goal has status "' + goal.targetState.replace(/_/g, ' ') +
+          '" and deadline assessment "' + goal.deadlineState.replace(/_/g, ' ') +
+          '". This is the goal record, not a newly measured outcome.',
+        relevance: goal.ownerPrimary
+          ? 'You selected this as your primary goal; its plan deserves review before changing other goals.'
+          : 'This goal is active, but it was not verified as your chosen primary goal.',
+        uncertainty: 'The weekly assessment does not, by itself, verify an exact measurement, why progress changed, or that the goal has failed.',
+        alternatives: 'The deadline, measurement coverage, or pace of progress may need review; this status does not identify which explanation applies.',
+        nextStep: 'Open this goal and check its latest recorded evidence and target date before deciding whether anything needs adjusting.',
+        timing,
+        successCheck: 'Review this same goal at the next weekly assessment, comparing the current target and supported progress. Reading a card is not starting a change.',
+      }
+    }
+  }
+  // Matching finalized experiments signal a review opportunity, NOT
+  // evidence that an intervention worked or was started by the owner.
+  if (draft.kind === 'experiment_review') {
+    const id = draft.sourceId.startsWith('focus:experiment:')
+      ? draft.sourceId.slice('focus:experiment:'.length) : null
+    if (id && draft.detailPath === '/lab/experiments/' + id &&
+        draft.evidenceRefs.includes('experiment:' + id)) {
+      return {
+        observation: 'As of ' + control.asOf + ', the weekly review marked a saved experiment result ready to inspect. No outcome size or interpretation was supplied to this Coach card.',
+        relevance: 'Reviewing an already recorded experiment can inform a later goal decision, but it is not proof that a change helped.',
+        uncertainty: 'This status does not establish adherence, comparable measurements, a valid protocol or a causal effect.',
+        alternatives: 'Normal variation, incomplete observations or changed conditions may explain apparent differences; inspect the actual result first.',
+        nextStep: 'Open the existing experiment result and review its protocol, data quality and recorded interpretation. Do not repeat or adopt the intervention from this reminder.',
+        timing: 'The result is ready for review; there is no urgent or automatic action.',
+        successCheck: 'Record an interpretation only if its protocol and measurements support it. A review click is not an intervention start or health outcome.',
+      }
+    }
+  }
+  // Maintenance decisions need the exact matching current intervention.
+  // Never interpret a blocked calorie review as permission to change intake.
+  if (draft.evidenceExplanation && control.maintenance) {
+    const intervention = control.maintenance.interventions.find((item) =>
+      item.kind === draft.kind && item.detailPath === draft.detailPath &&
+      (draft.sourceId === item.id || draft.sourceId === 'maintenance:' + item.id))
+    if (intervention &&
+        (draft.kind !== 'review_intake_adjustment' ||
+          (control.maintenance.calorieAdjustmentSafety.status === 'review_possible' &&
+           control.nutritionQuality.state === 'met'))) {
+      const explanation = draft.evidenceExplanation
+      const days = draft.nutritionEvidence
+      return {
+        observation: 'Assessment through ' + control.maintenance.completeThrough +
+          ': ' + explanation.weightTrend.detail + ' ' + explanation.plateau.detail +
+          (days ? ' Recent food-log coverage: ' + days.reliableDays +
+            ' verified complete days out of ' + days.loggedDays +
+            ' logged days in ' + days.period.start + ' to ' + days.period.end + '.' : ''),
+        relevance: 'This is a review of the existing goal or intake plan, not a mandate to change your targets.',
+        uncertainty: draft.confidence + ' confidence belongs to the Maintenance estimate only. ' +
+          explanation.nutrition.detail + ' ' + explanation.calorieDecision.detail,
+        alternatives: 'Changes in water balance, observation timing, incomplete food logs or recovery context can affect interpretation without proving a particular cause.',
+        nextStep: 'Open the current assessment and compare verified intake coverage, weight observations and recovery context. Do not make an automatic calorie adjustment.',
+        timing: 'Review before making any plan change; this evidence does not require immediate action.',
+        successCheck: 'Re-evaluate the same verified food-day coverage and weight trend over the next comparable completed window, after any owner-approved change is actually started.',
+      }
+    }
+  }
+  const gap = draft.kind === 'improve_evidence' ? draft.evidenceGap : null
+  if (gap && draft.evidenceRefs.includes('limitation:' + gap.limitationCode)) {
+    const coverage = gap.coverage
+    return {
+      observation: coverage
+        ? coverage.label + ' had ' + coverage.observedDays + ' recorded dates out of ' +
+          coverage.eligibleDays + ' eligible dates during ' + coverage.period.start +
+          ' to ' + coverage.period.end + '.'
+        : 'The assessment for ' + gap.period.start + ' to ' + gap.period.end +
+          ' identified "' + gap.limitationCode.replace(/_/g, ' ') +
+          '" without a verified observation count.',
+      relevance: 'Clarifying this specific evidence gap may help a later goal decision; it is not proof that health worsened.',
+      uncertainty: gap.explanation + ' Recorded dates do not establish complete tracking.',
+      alternatives: 'Missing imports, incomplete entries or a genuinely untracked period could explain the gap.',
+      nextStep: 'Open the linked source and check whether the missing information is available. Do not invent or backfill measurements.',
+      timing: 'Review when convenient, before interpreting a trend that depends on this signal.',
+      successCheck: 'After new records are available, check whether the same missing-evidence limitation still applies; no health outcome is presumed.',
+    }
+  }
   return null
 }
 
