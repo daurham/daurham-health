@@ -2,6 +2,7 @@ import { pathToFileURL } from 'node:url'
 import { assessAuthBinding } from './auth/binding.js'
 import { assessDatabaseBinding } from './database-binding.js'
 import { loadLocalEnv } from './env.js'
+import { independentlyVerifiedEmptyRoot, type PiqIndependentRootEvidence } from './piq-neon-root-provenance.js'
 
 /**
  * PIQ read-only PREVIEW QA boundary.
@@ -47,6 +48,7 @@ function present(value: string | undefined): string {
 export function reviewPiqPreviewSafety(input: {
   env: NodeJS.ProcessEnv
   neonBranch: PiqNeonBranchEvidence | null
+  independentRoot?: PiqIndependentRootEvidence | null
 }): PiqPreviewSafetyReview {
   const { env, neonBranch } = input
   const blockers: PiqPreviewBlocker[] = []
@@ -90,7 +92,13 @@ export function reviewPiqPreviewSafety(input: {
         (neonBranch.parentId != null && neonBranch.parentId === productionBranch)) {
       blockers.push('PREVIEW_BRANCH_IS_PRODUCTION')
     }
-    if (neonBranch.initSource === 'parent-data') {
+    if (neonBranch.initSource === 'parent-data' && !independentlyVerifiedEmptyRoot({
+      expectedProjectId: expectedProject,
+      expectedBranchId: expectedBranch,
+      productionProjectId: present(env.HEALTH_PIQ_PRODUCTION_NEON_PROJECT_ID),
+      branch: neonBranch,
+      proof: input.independentRoot,
+    })) {
       blockers.push('PARENT_DATA_CLONE')
     } else if (neonBranch.initSource !== 'empty') {
       // If Neon does not independently attest an empty branch, static

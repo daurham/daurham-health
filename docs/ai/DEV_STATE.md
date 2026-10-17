@@ -863,3 +863,30 @@ provenance in the strict release gate; do not globally whitelist
 mapping, Vercel preview-only DB/Auth overrides, exact-SHA deployment,
 runtime test, backup/rollback and owner mobile acceptance. Formal
 owner acceptance remains 0/9 (~91% overall engineering estimate).
+
+
+## 2026-10-17 — Separate-project root provenance review: code-only
+
+The new independently provisioned Neon QA **root** has
+`init_source=parent-data` despite a null parent branch and verified
+zero original application tables. Added a bounded, *offline only*
+`piq-neon-root-provenance.ts` review so this root label is not
+mistaken for an inherited production-data clone **only when all
+independently obtained records are supplied by a trusted operator**:
+different production/QA Neon project identities; same newly-created
+default/root branch with no parent and matching project creation time;
+zero public tables and auth users/sessions at genesis; fully ordered
+current migration history; zero owner data in 13 sensitive tables
+after bootstrap; distinct, provider-verified better_auth projects.
+A missing, mismatched, incomplete, or self-asserted proof blocks
+the special case. Other `parent-data` branches remain blocked.
+
+Both existing read-only PIQ metadata and preview preflight validators
+can accept this optional independent proof. This **does not enable**
+PIQ preview owner/API access: `piq-preview-access.ts` retains its
+hard 503 release stop, and live DB/Auth binding, disposable owner,
+Vercel exact-SHA deploy, QA/backup and owner acceptance remain
+independent requirements. No Vercel variables, deployment, Neon
+data, credentials, owner accounts, migrations or production edited.
+All tests are synthetic; proof must never originate from the app
+request or environment as a self-attestation.

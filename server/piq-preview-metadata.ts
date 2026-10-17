@@ -1,4 +1,5 @@
 import type { PiqNeonBranchEvidence } from './piq-preview-preflight.js'
+import { independentlyVerifiedEmptyRoot, type PiqIndependentRootEvidence } from './piq-neon-root-provenance.js'
 
 /**
  * Offline PIQ preview metadata check. Input MUST come from independently
@@ -80,6 +81,8 @@ export function reviewPiqPreviewMetadata(input: {
   expectedNeonProjectId: string
   expectedNeonBranchId: string
   productionNeonBranchId: string
+  productionNeonProjectId?: string
+  independentRoot?: PiqIndependentRootEvidence | null
   candidate: PiqCandidateMetadata | null
   deployment: PiqDeploymentMetadata | null
   neonBranch: PiqNeonBranchEvidence | null
@@ -152,7 +155,13 @@ export function reviewPiqPreviewMetadata(input: {
         neonBranch.parentId === input.productionNeonBranchId) {
       blockers.push('NEON_PREVIEW_PARENT_IS_PRODUCTION')
     }
-    if (neonBranch.initSource === 'parent-data') {
+    if (neonBranch.initSource === 'parent-data' && !independentlyVerifiedEmptyRoot({
+      expectedProjectId: input.expectedNeonProjectId,
+      expectedBranchId: input.expectedNeonBranchId,
+      productionProjectId: input.productionNeonProjectId ?? '',
+      branch: neonBranch,
+      proof: input.independentRoot,
+    })) {
       blockers.push('NEON_PARENT_DATA_CLONE')
     } else if (neonBranch.initSource !== 'empty') {
       blockers.push('NEON_EMPTY_ORIGIN_UNVERIFIED')
