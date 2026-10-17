@@ -21,6 +21,7 @@ production, database migrations, new paid AI calls or treatment advice.
 | Scenario | Required outcome | Evidence gate |
 | --- | --- | --- |
 | General education in General Only | Helpful general answer; no private Health DB context retrieved or sent | Personal-data-free route |
+| A legacy cached General Only answer contains an invented personal measurement or a claimed review of private logs | Redact the invented block at cache delivery; retain independent general education; no private evidence, no extra provider call | Synthetic poisoned-cache regression plus v2 general prompt/cache isolation |
 | Current weight plateau with sparse food/scale records | No personal deficit, plateau or calorie reduction concluded; limited observations explained | Current focused Nutrition/weight/projection gates |
 | Current answer invents an uncited owner metric (or cites a neutral source warning / unrelated domain) | Withhold the unsupported claim and disclose citation gap; keep independently useful general explanation; no extra model repair | Current-claim evidence boundary, synthetic offline tests; full semantic owner review remains |
 | Current response cites a true measurement but changes its number, unit, nutrient, or one value in a mixed-domain sentence | Withhold the unsupported numeric claim; retain general education, preserve exact recorded-step, sleep-minute, protein/fiber and sodium-mg values | Deterministic current literal numeric/source agreement with saved-type distinction |
