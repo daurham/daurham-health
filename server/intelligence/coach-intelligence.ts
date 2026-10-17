@@ -10,6 +10,7 @@ import {
   storedCoachRecommendationIsCurrent,
   keepCurrentCoachFollowUps,
   keepNonCompetingCalorieDrafts,
+  selectCoachRecommendationSlots,
   POSSIBLE_PLATEAU_RESPONSE_GROUP,
   recommendationIsSuppressed,
   type CoachFollowUpQuestion,
@@ -354,7 +355,10 @@ export async function loadCoachIntelligenceState(asOf: string): Promise<CoachInt
   const activePlateauDecision = currentRevision &&
     currentDrafts.some((draft) => isCalorieDecisionKind(draft.kind)) &&
     await activeCalorieDecisionInRevision(sql, control.maintenance?.decisionRevision)
-  const actionableDrafts = keepNonCompetingCalorieDrafts(currentDrafts, activePlateauDecision)
+  const eligibleAfterDecisionGates = keepNonCompetingCalorieDrafts(currentDrafts, activePlateauDecision)
+  // Filtering and suppression precede the card budget so dismissed/revised
+  // advice cannot consume a slot that should belong to the next candidate.
+  const actionableDrafts = selectCoachRecommendationSlots(eligibleAfterDecisionGates)
   const surfaced: CoachRecommendationView[] = []
   for (const draft of actionableDrafts) {
     const row = await surfaceDraft(sql, draft, asOf, control.maintenance?.decisionRevision ?? null)

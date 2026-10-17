@@ -348,14 +348,70 @@ export function buildCoachRecommendationDrafts(control: GoalControlState): Coach
     if (evidence) drafts.push(evidence)
   }
   const seen = new Set<string>()
-  return drafts
-    .filter((item) => {
-      if (seen.has(item.fingerprint)) return false
-      seen.add(item.fingerprint)
-      return true
-    })
-    .sort((a, b) => b.priority - a.priority || a.fingerprint.localeCompare(b.fingerprint))
-    .slice(0, 3)
+  return rankCoachRecommendationDrafts(drafts.filter((item) => {
+    if (seen.has(item.fingerprint)) return false
+    seen.add(item.fingerprint)
+    return true
+  }))
+}
+
+
+/**
+ * PIQ-5.2: transparent ordering for already-eligible recommendations.
+ * Eligibility (source/current state, decision safety and owner suppression)
+ * must run first; these are editorial categories, NOT clinical risk scores
+ * or probabilistic utilities. A credible exact-exercise trend outranks a
+ * routine result-review card; an unverified training trend does not.
+ */
+export function rankCoachRecommendationDrafts(
+  drafts: readonly CoachRecommendationDraft[],
+): CoachRecommendationDraft[] {
+  const category = (draft: CoachRecommendationDraft): number => {
+    switch (draft.kind) {
+      case 'goal_review':
+      case 'review_goal_plan':
+        return 7 // explicit time-sensitive goal or safety-aware plan review
+      case 'review_intake_adjustment':
+      case 'goal_off_track':
+        return 6 // separately verified eligible adjustment / overdue trajectory
+      case 'training_progression':
+        return draft.trainingEvidence &&
+          ['moderate', 'high'].includes(draft.confidence) &&
+          draft.trainingEvidence.exposureCount >= 4
+          ? 5 : 3
+      case 'experiment_review':
+      case 'improve_nutrition_evidence':
+      case 'improve_weigh_in_consistency':
+        return 4 // genuine review/quality decision, not scheduled homework
+      case 'review_activity_adjustment':
+        return 2 // alternative dependent on active intake parent
+      case 'improve_evidence':
+        return 1 // useful clarification, but not a demonstrated insight
+      default:
+        return 3 // unknown future kinds: do not claim automatic high impact
+    }
+  }
+  const confidenceRank: Record<IntelligenceConfidence, number> = {
+    high: 3, moderate: 2, limited: 1, unknown: 0,
+  }
+  return [...drafts].sort((left, right) =>
+    category(right) - category(left) ||
+    confidenceRank[right.confidence] - confidenceRank[left.confidence] ||
+    right.priority - left.priority ||
+    left.fingerprint.localeCompare(right.fingerprint))
+}
+
+/**
+ * Restrict after owner memory, dependency, source-revision and competing
+ * intervention gates, never before. A dismissed high-ranked suggestion must
+ * not hide a later eligible one. Preserve full candidate identity separately
+ * for saved-ID integrity and historical follow-ups.
+ */
+export function selectCoachRecommendationSlots<T>(
+  drafts: readonly T[],
+  limit = 3,
+): T[] {
+  return drafts.slice(0, Math.max(0, Math.floor(limit)))
 }
 
 /** Apply after owner suppression, not merely when drafting: the secondary
