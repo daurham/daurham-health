@@ -176,8 +176,21 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
   if (wants.patterns) {
     addPatterns(input.patterns, push)
   }
-  addStableProfile(input.stableProfile ?? null, input.question, input.asOf, push, input.contextMode === 'deep')
-  addClinicalProfile(input.profile ?? null, input.question, push, input.contextMode)
+  if(input.currentHealthProfileSourceRecheck==='changed_or_unavailable' &&
+    input.contextMode!=='general_only' && input.asOf===input.healthToday){
+    push({
+      id:'profile.source_consistency',domain:'profile',
+      label:'Saved Health Profile source changed during retrieval',
+      value:null,unit:null,period,
+      text:'Saved owner Health Profile details or their revision could not be confirmed in the final read. Age, height, physiological reference, allergies, medications, conditions and profile notes from that read are WITHHELD. This does not establish that the owner has no conditions, limitations or allergies; re-ask after saved information settles.',
+      coverage:{profileSourceRecheck:'changed_or_unavailable',profileClaims:'withheld'},
+      detailPath:'/settings#health-profile',userEntered:false,
+      substantive:false,priority:0,
+    })
+  }else{
+    addStableProfile(input.stableProfile ?? null, input.question, input.asOf, push, input.contextMode === 'deep')
+    addClinicalProfile(input.profile ?? null, input.question, push, input.contextMode)
+  }
   if (intelligence) {
     addSharedIntelligence(intelligence, input.period, push, limitations)
   }

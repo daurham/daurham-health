@@ -25,6 +25,7 @@ import { healthTimeContext } from '../health-time.js'
 import { routeHealthIntelligence } from '../../src/domain/intelligence/shared.js'
 import { loadHealthIntelligenceSnapshot } from '../intelligence/snapshot.js'
 import { getHealthProfile } from '../profile/service.js'
+import { recheckCurrentHealthProfile } from './current-health-profile-recheck.js'
 import { focusTrainingWorkingSets } from '../../src/domain/ask-health/focused-training.js'
 import { recheckCurrentWorkingSets } from './current-working-sets-recheck.js'
 import { recheckCurrentExerciseDefinitions } from './current-exercise-definitions-recheck.js'
@@ -376,6 +377,10 @@ export async function loadAskHealthPacketInput(input: {
         initial:rows.exercises,start:period.start,end:period.end,today,
       }),
     ]):['not_checked','not_checked'] as const
+  const currentHealthProfileSourceRecheck=input.asOf===today&&
+    input.contextMode!=='general_only'
+      ?await recheckCurrentHealthProfile({first:profile,asOf:input.asOf,today})
+      :'not_checked'
   return {
     lens: input.lens,
     range: input.range,
@@ -406,6 +411,7 @@ export async function loadAskHealthPacketInput(input: {
     context: contextSnapshot(contexts),
     currentContextSourceRecheck,
     patterns,
+    currentHealthProfileSourceRecheck,
     stableProfile: askStableProfileForDate(profile, input.asOf, today),
     profile: askClinicalProfileForDate(profile, input.asOf, today),
     intelligence,

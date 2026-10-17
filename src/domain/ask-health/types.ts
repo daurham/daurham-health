@@ -174,6 +174,8 @@ export type AskHealthPacketInput = {
   focusedWeightEnergyWindow?: HistoricalWeightEnergyWindow | null
   stableProfile?: AskStableProfileInput | null
   profile?: AskClinicalProfileInput | null
+  /** Current owner Profile source fields/revision matched a final local read. */
+  currentHealthProfileSourceRecheck?: 'not_checked' | 'verified' | 'changed_or_unavailable'
   intelligence?: RoutedHealthIntelligence | null
   nutritionIntegrity?: AskNutritionIntegrity | null
   maxChars?: number
