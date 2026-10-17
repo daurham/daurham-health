@@ -13,6 +13,7 @@ import {
   loadCoachIntelligenceState,
   recordCoachRecommendationOutcome,
   respondCoachRecommendation,
+  linkCoachRecommendationExperiment,
 } from '../intelligence/coach-intelligence.js'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -21,12 +22,13 @@ type Route =
   | { kind: 'root' }
   | { kind: 'respond'; id: string }
   | { kind: 'outcome'; id: string }
+  | { kind: 'link-experiment'; id: string }
 
 export function matchCoachIntelligenceRoute(pathname: string): Route | null {
   if (pathname === '/api/intelligence/coach') return { kind: 'root' }
-  const match = /^\/api\/intelligence\/coach\/recommendations\/([^/]+)\/(respond|outcome)$/.exec(pathname)
+  const match = /^\/api\/intelligence\/coach\/recommendations\/([^/]+)\/(respond|outcome|link-experiment)$/.exec(pathname)
   if (!match || !UUID.test(match[1] ?? '')) return null
-  return { kind: match[2] as 'respond' | 'outcome', id: match[1]! }
+  return { kind: match[2] as 'respond' | 'outcome' | 'link-experiment', id: match[1]! }
 }
 
 async function handleCoachIntelligence(req: ApiRequest, res: ApiResponse) {
@@ -69,6 +71,21 @@ async function handleCoachIntelligence(req: ApiRequest, res: ApiResponse) {
       Object.prototype.hasOwnProperty.call(body, 'expectedResponseAt') ? body.expectedResponseAt as string | null : undefined,
       typeof body.expectedContextRevision === 'string' ? body.expectedContextRevision : undefined,
       hasFeedbackReason ? body.feedbackReason as CoachRecommendationFeedbackReason : undefined))
+    return
+  }
+  if (route.kind === 'link-experiment') {
+    if (body.ownerConfirmed !== true || typeof body.experimentId !== 'string' ||
+        !UUID.test(body.experimentId) ||
+        !Object.prototype.hasOwnProperty.call(body, 'expectedResponseAt') ||
+        !(body.expectedResponseAt === null || typeof body.expectedResponseAt === 'string') ||
+        typeof body.expectedContextRevision !== 'string') {
+      sendJson(res, 400, { error: 'Linking requires a selected experiment and the current Coach card.' })
+      return
+    }
+    sendJson(res, 200, await linkCoachRecommendationExperiment(
+      route.id, body.experimentId, date, body.expectedResponseAt,
+      body.expectedContextRevision,
+    ))
     return
   }
   const outcome = typeof body.outcome === 'string' ? body.outcome as CoachRecommendationOutcome : null
