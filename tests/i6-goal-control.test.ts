@@ -168,7 +168,7 @@ describe('I6 Goal Control authority', () => {
     expect(state.summary).toContain('No change recommended')
   })
 
-  it('promotes the deterministic Weekly Coach focus instead of inventing another opportunity', () => {
+  it('retains the due Weekly Coach task without promoting it to a health-change recommendation', () => {
     const focus = candidate({
       id: 'focus:body-cadence:waist',
       kind: 'body_cadence',
@@ -184,13 +184,13 @@ describe('I6 Goal Control authority', () => {
       goals: [],
       trainingPlan: null,
     })
-    expect(state.state).toBe('act')
-    expect(state.primaryOpportunity).toMatchObject({
-      id: focus.id,
-      sourceCandidateId: focus.id,
-      detailPath: '/body',
-    })
-    expect(state.summary).toBe(focus.actionText)
+    // The due measurement remains in Weekly Coach's task list, but it is
+    // not itself grounds to change goals or treatment through Goal Control.
+    expect(brief(focus).focus?.id).toBe(focus.id)
+    expect(state.state).toBe('maintain')
+    expect(state.noChangeRecommended).toBe(true)
+    expect(state.primaryOpportunity).toBeNull()
+    expect(state.summary).toContain('No change recommended')
   })
 
   it('uses a Nutrition evidence floor before intake evidence is considered reliable', () => {
