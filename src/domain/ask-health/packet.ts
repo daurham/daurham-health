@@ -2108,6 +2108,7 @@ function addGoals(
       text: `${goal.targetText} Target state ${goal.targetState}. Deadline state ${goal.deadlineState}. Projection ${goal.projectionState ?? 'not_included'}${goal.projectionReason ? `: ${goal.projectionReason}` : ''}.`,
       coverage: {
         kind: goal.kind,
+        lifecycle: goal.lifecycle,
         targetState: goal.targetState,
         deadlineState: goal.deadlineState,
         projectionState: goal.projectionState,

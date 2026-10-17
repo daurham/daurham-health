@@ -264,4 +264,84 @@ describe('PIQ-4 owner preview: current owner-claim citation integrity', () => {
   })
 
 
+  it('blocks fabricated goal attainment, completion and on-track status despite correct target', () => {
+    const goal: AskEvidence = {
+      ...evidence('goals.weight-target', 'goals', null, null),
+      label: 'Saved weight target', value: 'above_target',
+      text: 'At most 80 kg Target state above_target. Deadline state future_no_projection.',
+      coverage: { kind: 'body_metric', lifecycle: 'active',
+        targetState: 'above_target', deadlineState: 'future_no_projection' },
+    }
+    const pkt = makePacket([goal])
+    const unsupported = [
+      'You have met your goal.',
+      'Your weight goal is met.',
+      'Your weight goal is completed.',
+      'Your weight goal is on track.',
+      'Your saved weight goal is 80 kg and has already been achieved.',
+    ]
+    for (const text of unsupported) {
+      const actual = groundHistoricalAnswer(answer(block(text, [goal.id])), pkt,
+        'Is my current weight goal met?')
+      expect(actual.blocks[0]?.text).toContain('cannot verify')
+      expect(actual.blocks[0]?.text).not.toBe(text)
+    }
+    const configured = groundHistoricalAnswer(answer(
+      block('Your saved goal is at most 80 kg.', [goal.id]),
+    ), pkt, 'What is my current weight goal?')
+    expect(configured.blocks[0]?.text).toContain('80 kg')
+    const uncertain = answer(block('Your goal might be met; check a comparable weight record.'))
+    expect(groundHistoricalAnswer(uncertain, pkt, 'Is my goal met?')).toBe(uncertain)
+  })
+
+  it('permits only evidenced target-met and deadline states, not completed lifecycle', () => {
+    const goal: AskEvidence = {
+      ...evidence('goals.target', 'goals', null, null),
+      value: 'satisfied',
+      text: 'At least 90 kg Target state satisfied. Deadline state projected_before_deadline.',
+      coverage: { lifecycle: 'active', targetState: 'satisfied',
+        deadlineState: 'projected_before_deadline' },
+    }
+    const packet = makePacket([goal])
+    for (const phrase of ['You have reached your goal.', 'Your goal is on track.']) {
+      expect(groundHistoricalAnswer(answer(block(phrase, [goal.id])), packet,
+        'How is my goal?').blocks[0]?.text).toBe(phrase)
+    }
+    expect(groundHistoricalAnswer(answer(
+      block('Your goal is completed.', [goal.id]),
+    ), packet, 'How is my goal?').blocks[0]?.text).toContain('cannot verify')
+    const completed = makePacket([{
+      ...goal, coverage: { ...goal.coverage, lifecycle: 'completed' },
+    }])
+    expect(groundHistoricalAnswer(answer(
+      block('Your goal is completed.', [goal.id]),
+    ), completed, 'How is my goal?').blocks[0]?.text).toBe('Your goal is completed.')
+  })
+
+  it('applies current Goal Control status checks to cached answers without another call', async () => {
+    const goal: AskEvidence = {
+      ...evidence('goals.target', 'goals', null, null),
+      value: 'above_target', text: 'At most 80 kg Target state above_target.',
+      coverage: { lifecycle: 'active', targetState: 'above_target' },
+    }
+    const provider = vi.fn(async () => ({
+      text: JSON.stringify({ blocks: [
+        { text: 'Your weight goal is met.', evidence_refs: [goal.id] },
+        { text: 'Your saved goal is at most 80 kg.', evidence_refs: [goal.id] },
+      ], limitations: [], follow_ups: [] }),
+      model: 'synthetic-stub', inputTokens: 8, outputTokens: 17,
+    }))
+    const args = { packet: makePacket([goal]), question: 'How is my weight goal?',
+      conversation: [], provider,
+      gate: createAskHealthGate({ minIntervalMs: 0, budgetUsd: 100 }),
+      model: 'synthetic-stub', contextMode: 'personalized' as const }
+    const first = await explainAskHealth({ ...args, now: 1000 })
+    const cached = await explainAskHealth({ ...args, now: 2000 })
+    expect(first.answer.blocks.map(b => b.text)).toEqual(['Your saved goal is at most 80 kg.'])
+    expect(first.answer.limitations.some(b => b.text.includes('withheld'))).toBe(true)
+    expect(cached.meta.cached).toBe(true)
+    expect(cached.answer).toEqual(first.answer)
+    expect(provider).toHaveBeenCalledOnce()
+  })
+
 })

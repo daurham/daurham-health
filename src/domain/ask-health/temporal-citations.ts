@@ -301,6 +301,44 @@ function currentConfiguredQuantitySupports(
   })
 }
 
+/**
+ * A configured numeric goal target is NOT proof that the goal is met,
+ * completed, or on schedule. Check explicitly stated owner goal-status
+ * assertions against one cited current Goal Control status record. This is
+ * deliberately narrow: qualified questions, uncertainty and general advice
+ * are not interpreted as historical outcomes or goal status assertions.
+ */
+function currentGoalStatusAssertion(text: string):
+  'satisfied' | 'completed' | 'on_track' | 'off_track' | null {
+  if (!/\b(?:your|my|you|i)\b/i.test(text) || !/\b(?:goals?|targets?)\b/i.test(text)) return null
+  if (/\b(?:not|never|cannot|can't|could|might|may|maybe|unknown|uncertain|unclear|if|whether)\b/i.test(text)) return null
+  if (/\byou\s+(?:(?:have|already)\s+){0,2}(?:met|reached|achieved)\s+(?:your|the)\s+(?:\w+\s+){0,3}(?:goal|target)\b/i.test(text) ||
+      /\b(?:your|my)\s+(?:\w+\s+){0,4}(?:goal|target)\s+(?:is|was|has been|is already|has already been)\s+(?:met|reached|achieved|satisfied)\b/i.test(text)) return 'satisfied'
+  if (/\byou\s+(?:(?:have|already)\s+){0,2}(?:completed|finished)\s+(?:your|the)\s+(?:\w+\s+){0,3}(?:goal|target)\b/i.test(text) ||
+      /\b(?:your|my)\s+(?:\w+\s+){0,4}(?:goal|target)\s+(?:is|was|has been|is already|has already been)\s+(?:completed|finished)\b/i.test(text)) return 'completed'
+  if (/\b(?:your|my)\s+(?:\w+\s+){0,4}(?:goal|target)\s+(?:is|was)\s+on[\s-]+track\b/i.test(text)) return 'on_track'
+  if (/\b(?:your|my)\s+(?:\w+\s+){0,4}(?:goal|target)\s+(?:is|was)\s+off[\s-]+track\b/i.test(text)) return 'off_track'
+  return null
+}
+
+function currentGoalStatusSupported(
+  assertion: NonNullable<ReturnType<typeof currentGoalStatusAssertion>>,
+  references: readonly string[], evidence: ReadonlyMap<string, AskEvidence>,
+): boolean {
+  const goals = references.flatMap((id) => {
+    const source = evidence.get(id)
+    return source?.substantive && source.domain === 'goals' &&
+      source.id.startsWith('goals.') ? [source] : []
+  })
+  // Multiple goals may have different statuses; do not arbitrarily choose.
+  if (goals.length !== 1) return false
+  const goal = goals[0]!
+  if (assertion === 'satisfied') return goal.coverage?.targetState === 'satisfied'
+  if (assertion === 'completed') return goal.coverage?.lifecycle === 'completed'
+  if (assertion === 'on_track') return goal.coverage?.deadlineState === 'projected_before_deadline'
+  return goal.coverage?.deadlineState === 'projected_after_deadline'
+}
+
 /** No observational packet, including a valid relationship statistic, proves
  * a personal cause. Only unmistakably asserted owner causation is blocked;
  * explicit uncertainty/negation and educational mechanism statements remain.
@@ -455,11 +493,25 @@ export function groundHistoricalAnswer(
   const byId = new Map(packet.evidence.map((item) => [item.id, item]))
   const currentMetricClaim = !scope && !dateIssue && answer.blocks.concat(answer.limitations)
     .some((block) => affirmativeOwnerMetricClaim(block.text))
-  if (!scope && !dateIssue && !currentMetricClaim &&
+  const currentGoalStatusClaim = !scope && !dateIssue &&
+    answer.blocks.concat(answer.limitations).some((block) =>
+      currentGoalStatusAssertion(block.text) !== null)
+  if (!scope && !dateIssue && !currentMetricClaim && !currentGoalStatusClaim &&
       !answer.blocks.concat(answer.limitations).some((block) =>
         definitiveOwnerCause(block.text) || affirmativeOwnerAssociation(block.text))) return answer
   let withheld = 0
+  let withheldGoalStatus = 0
   const keep = (block: AskHealthAnswer['blocks'][number]) => {
+    if (!scope && !dateIssue) {
+      const claimedStatus = currentGoalStatusAssertion(block.text)
+      if (claimedStatus && !currentGoalStatusSupported(
+        claimedStatus, block.evidenceRefs, byId,
+      )) {
+        withheld += 1
+        withheldGoalStatus += 1
+        return false
+      }
+    }
     if (definitiveOwnerCause(block.text) ||
         (affirmativeOwnerAssociation(block.text) &&
          !relationshipCitationSupports(block.evidenceRefs, byId, scope, block.text))) {
@@ -539,17 +591,21 @@ export function groundHistoricalAnswer(
       ? 'A personal historical claim was withheld because its cited date, metric domain, recorded numeric value, or association was not established for the requested ' +
         scope.start + (scope.end === scope.start ? ' date.' : ' through ' + scope.end + ' window.') +
         ' An observational association does not prove a cause.'
-      : currentMetricClaim
-        ? 'An owner-specific measurement claim was withheld because its cited evidence did not verify the stated metric domain, recorded quantity or unit. An unrelated value, incomplete log or source-consistency warning cannot establish the claimed amount.'
-        : 'An owner-specific causal or relationship claim was withheld because the supplied evidence cannot establish causation or did not include a qualifying personal relationship calculation.'
+      : withheldGoalStatus > 0
+        ? 'A stated personal goal status was withheld because the cited current Goal Control record did not support that target-satisfied, lifecycle-completed or projected-deadline status. A configured target is not evidence of achieved progress.'
+        : currentMetricClaim
+          ? 'An owner-specific measurement claim was withheld because its cited evidence did not verify the stated metric domain, recorded quantity or unit. An unrelated value, incomplete log or source-consistency warning cannot establish the claimed amount.'
+          : 'An owner-specific causal or relationship claim was withheld because the supplied evidence cannot establish causation or did not include a qualifying personal relationship calculation.'
   return {
     blocks: blocks.length > 0
       ? blocks
       : [{ text: scope || dateIssue
         ? 'I cannot verify a personal measurement or trend for the requested historical period from the supplied, date-matched Health evidence.'
-        : currentMetricClaim
-          ? 'I cannot verify that personal measurement from the supplied Health evidence.'
-          : 'I cannot verify a personal cause or association from the supplied Health evidence.', evidenceRefs: [] }],
+        : withheldGoalStatus > 0
+          ? 'I cannot verify that your goal has been met, completed or is on schedule from the supplied Goal Control evidence.'
+          : currentMetricClaim
+            ? 'I cannot verify that personal measurement from the supplied Health evidence.'
+            : 'I cannot verify a personal cause or association from the supplied Health evidence.', evidenceRefs: [] }],
     limitations: [...limitations, { text: message, evidenceRefs: [] }],
     followUps: answer.followUps,
   }
