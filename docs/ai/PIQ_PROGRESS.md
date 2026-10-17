@@ -3786,3 +3786,14 @@ health service call or automatic owner-target mutation.
 linkage integrity (especially "reviewed" vs "started" and stale
 historical follow-up expiry). Later end-to-end PIQ-5.7 scenarios,
 isolated preview authorization, and actual owner mobile acceptance.
+
+
+## 2026-10-17 — PIQ-5.5 bounded follow-up expiry and subjective feedback labels (engineering; CI pending)
+
+**Purpose:** Improve truthful owner feedback without claiming canonical implementation, health causation, or full PIQ-5.5 completion. A saved `I started this` action is an **owner-reported start**, not an independently verified plan/target change. Navigation/review-only actions remain distinct and cannot schedule outcome prompts.
+
+**Bounded behavior:** Existing seven-day check-in can be completed through **21 calendar days after its due date**; after that, the item is omitted from the due queue rather than resurfacing indefinitely. The atomic outcome-write path uses the same upper-age gate, so a stale open tab cannot bypass expiry. Saved recommendation/history is retained. This is a pragmatic low-burden UI deadline, **not** a physiological evaluation standard; new cohorts may need owner validation of cadence.
+
+**Presentation:** Outcome choices now read `Seemed helpful`, `No clear change`, `Seemed worse`, `Can't tell` while preserving existing stored outcome codes. Both start acknowledgement and follow-up explicitly state self-report versus verified action/causal outcome. Legacy review-only rows remain excluded by the existing ownerStarted gate. No new table, migration, AI calls, auto-adjusted target, real owner record access, or production release.
+
+**Validation:** Added static UI semantics and SQL contract regression checks in `tests/piq1-coach-historical-context.test.tsx` and `tests/piq1-coach-outcome-cas.test.ts`. Full branch CI required. Still outstanding: direct canonical plan/change-ledger linkage, optional usefulness/incorrect-context feedback, dismissal memory, PIQ-5.7 integrated scenarios, owner mobile QA, and overall owner acceptance **0/9**. `main`/production remain untouched.

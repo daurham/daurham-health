@@ -53,6 +53,26 @@ describe('PIQ-1.5 outcome ownership and concurrency', () => {
     expect(query.mock.calls[0][0]).toContain('response_at IS NOT NULL')
   })
 
+  it('expires unattended owner-start follow-ups 21 days after their due date before the queue limit', async () => {
+    const query = vi.fn().mockResolvedValue([])
+    await dueFollowUps({ query } as unknown as Sql, '2026-11-15', null, [])
+    const [statement, args] = query.mock.calls[0] as [string, unknown[]]
+    expect(statement).toContain('follow_up_on >= ($1::date - 21)')
+    expect(statement.indexOf('follow_up_on >= ($1::date - 21)')).toBeLessThan(statement.indexOf('LIMIT 3'))
+    expect(args).toEqual(['2026-11-15', null, []])
+  })
+
+  it('rejects stale-tab outcome feedback after the same grace window without erasing saved history', async () => {
+    const query = vi.fn().mockResolvedValue([])
+    await expect(writeCoachRecommendationOutcome(
+      { query } as unknown as Sql, ID, 'helped', '2026-11-15', REVISION,
+    )).rejects.toMatchObject({ statusCode: 409 })
+    const [statement] = query.mock.calls[0] as [string, unknown[]]
+    expect(statement).toContain('follow_up_on >= ($3::date - 21)')
+    expect(statement).toContain('outcome_state IS NULL')
+    expect(statement).not.toContain('DELETE FROM')
+  })
+
   it('the client posts the saved response revision and refreshes on conflict', () => {
     const api = readFileSync('src/features/coach/api.ts', 'utf8')
     const panel = readFileSync('src/features/coach/CoachCard.tsx', 'utf8')

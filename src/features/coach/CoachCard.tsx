@@ -277,7 +277,7 @@ export function CoachCard({ state, pending, error, onState }: {
       const next = await respondCoachRecommendation(item.id, response, item.responseAt, item.contextRevision)
       setIntelligence(next)
       if (response === 'do_this') {
-        setNotice('Marked as started. Coach will ask how it went after seven days.')
+        setNotice('Your reported start was saved. This does not verify a plan change; Coach will ask for your impression after seven days.')
       } else if (response === 'not_now') {
         setNotice('Coach will hold this recommendation for a week.')
       } else {
@@ -593,7 +593,7 @@ export function CoachIntelligencePanel({
               </div>
               {item.experimentEligible ? (
                 <p className="mt-2 text-[11px] leading-relaxed text-zinc-500">
-                  Reviewing is not acceptance. Only select “I started this” after taking action; Coach will check in after seven days.
+                  Reviewing is not acceptance. Only select “I started this” after actually taking action. This records your report, not a verified plan or target change.
                 </p>
               ) : null}
             </article>
@@ -621,11 +621,12 @@ export function CoachIntelligencePanel({
               <p className="mt-1 text-xs text-zinc-500">{item.acceptedOn
                 ? `You marked this as started on ${new Date(item.acceptedOn).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}.`
                 : 'You marked this as started.'}</p>
+              <p className="mt-1 text-xs leading-relaxed text-zinc-500">This asks for your impression after a self-reported start, not proof of a measured health outcome or a confirmed plan change.</p>
               <div className="mt-2 flex flex-wrap gap-2">
-                <button type="button" className={quietButtonClass} disabled={pending} onClick={() => onOutcome(item, 'helped')}>Helped</button>
-                <button type="button" className={quietButtonClass} disabled={pending} onClick={() => onOutcome(item, 'no_change')}>No change</button>
-                <button type="button" className={quietButtonClass} disabled={pending} onClick={() => onOutcome(item, 'made_worse')}>Worse</button>
-                <button type="button" className={quietButtonClass} disabled={pending} onClick={() => onOutcome(item, 'unclear')}>Unclear</button>
+                <button type="button" className={quietButtonClass} disabled={pending} onClick={() => onOutcome(item, 'helped')}>Seemed helpful</button>
+                <button type="button" className={quietButtonClass} disabled={pending} onClick={() => onOutcome(item, 'no_change')}>No clear change</button>
+                <button type="button" className={quietButtonClass} disabled={pending} onClick={() => onOutcome(item, 'made_worse')}>Seemed worse</button>
+                <button type="button" className={quietButtonClass} disabled={pending} onClick={() => onOutcome(item, 'unclear')}>Can't tell</button>
               </div>
             </div>
           ))}

@@ -260,6 +260,12 @@ function recommendationView(row: RecommendationRow, draft: CoachRecommendationDr
 /** Qualify evidence-sensitive rows inside SQL BEFORE limiting the due queue.
  * Stale numeric cards must not starve valid follow-ups further down a large queue.
  */
+/** A self-reported start is not an indefinite request for follow-up. Allow 21
+ * calendar days after its seven-day check-in due date; preserve the saved
+ * response and history after that, but do not prompt or accept late feedback.
+ */
+export const COACH_FOLLOW_UP_GRACE_DAYS = 21 as const
+
 export async function dueFollowUps(
   sql: Sql,
   asOf: string,
@@ -275,6 +281,7 @@ export async function dueFollowUps(
         AND response_at IS NOT NULL
         AND follow_up_on IS NOT NULL
         AND follow_up_on <= $1::date
+        AND follow_up_on >= ($1::date - ${COACH_FOLLOW_UP_GRACE_DAYS})
         AND (
           recommendation_kind NOT IN ('review_intake_adjustment', 'review_activity_adjustment')
           OR (
@@ -664,6 +671,7 @@ export async function writeCoachRecommendationOutcome(
         AND outcome_state IS NULL
         AND follow_up_on IS NOT NULL
         AND follow_up_on <= $3::date
+        AND follow_up_on >= ($3::date - ${COACH_FOLLOW_UP_GRACE_DAYS})
         AND response_at::text = $4::text
       RETURNING id::text AS id`,
     [id, outcome, asOf, expectedResponseAt],
