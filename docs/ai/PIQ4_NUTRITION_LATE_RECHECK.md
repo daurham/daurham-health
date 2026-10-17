@@ -10,8 +10,11 @@ The current Ask Health loader now repeats **one bounded, set-based canonical
 Nutrition completeness SQL query** through the existing
 `loadVerifiedNutritionDays` authority at the end of its source retrieval.
 For the same initial snapshot, the exact set of original confirmed dates
-must still agree with persisted source IDs, calories, completeness flags,
-full Nutrition-entry revisions, and exclusions. A mismatch or failed read
+must still agree with persisted source IDs, calories, protein/carbohydrate/sodium
+values (including absent-vs-zero), completeness flags, canonical entry
+revisions, and exclusions. Even a same-ID, same-kcal nutrient correction after
+a second owner confirmation is detected by comparing the changed nutrient
+totals against the initial intelligence snapshot. A mismatch or failed read
 becomes `changed_or_unavailable` — NOT unlogged food, not no change.
 In that case `addFocusedWeightEnergy` emits only a neutral non-substantive
 source consistency explanation, withholding *all* its weight/intake

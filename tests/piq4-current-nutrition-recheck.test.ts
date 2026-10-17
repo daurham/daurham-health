@@ -1,8 +1,8 @@
 import {describe,expect,it,vi} from 'vitest'
 import type {Sql} from '../server/db.js'
 import {ACTIVITY_INTELLIGENCE_SQL,activitySummaryObservations} from '../server/intelligence/snapshot.js'
-import {recheckCurrentWeightNutrition} from '../server/ask-health/current-weight-nutrition-recheck.js'
-import {VERIFIED_NUTRITION_DAYS_SQL} from '../server/nutrition/maintenance-eligibility.js'
+import {recheckCurrentWeightNutrition,CURRENT_WEIGHT_NUTRIENT_RECHECK_SQL} from '../server/ask-health/current-weight-nutrition-recheck.js'
+
 import {buildHealthIntelligenceSnapshot,type IntelligenceObservation} from '../src/domain/intelligence/shared.js'
 import {focusWeightEnergyContext} from '../src/domain/ask-health/focused-weight-energy.js'
 import {buildAskHealthEvidencePacket,packetFingerprintMaterial} from '../src/domain/ask-health/packet.js'
@@ -59,15 +59,26 @@ describe('PIQ-4.2 activity attribution and late Nutrition corrections',()=>{
   })
   it('rechecks the exact original verified date set against revision-gated canonical rows',async()=>{
     const snapshotValue=snapshot()
-    const db=sql([{date,calories:'2100',source_ids:['entry-a']}])
+    const db=sql([{date,calories:'2100',source_ids:['entry-a'],
+      protein:null,carbs:null,sodium:'1700'}])
     expect(await recheckCurrentWeightNutrition(snapshotValue,today,db)).toBe('verified')
     expect(db.query).toHaveBeenCalledTimes(1)
-    expect(db.query).toHaveBeenCalledWith(VERIFIED_NUTRITION_DAYS_SQL,
+    expect(db.query).toHaveBeenCalledWith(CURRENT_WEIGHT_NUTRIENT_RECHECK_SQL,
       ['2026-10-01',today,today])
     expect(await recheckCurrentWeightNutrition(snapshotValue,today,
-      sql([{date,calories:'2100',source_ids:['entry-b']}]))).toBe('changed_or_unavailable')
+      sql([{date,calories:'2100',source_ids:['entry-b'],protein:null,carbs:null,sodium:'1700'}]))).toBe('changed_or_unavailable')
     expect(await recheckCurrentWeightNutrition(snapshotValue,today,
-      sql([{date,calories:'1900',source_ids:['entry-a']}]))).toBe('changed_or_unavailable')
+      sql([{date,calories:'1900',source_ids:['entry-a'],protein:null,carbs:null,sodium:'1700'}]))).toBe('changed_or_unavailable')
+    expect(await recheckCurrentWeightNutrition(snapshotValue,today,
+      sql([{date,calories:'2100',source_ids:['entry-a'],
+        protein:null,carbs:null,sodium:'2100'}])))
+      .toBe('changed_or_unavailable')
+    expect(await recheckCurrentWeightNutrition(snapshotValue,today,
+      sql([{date,calories:'2100',source_ids:['entry-a'],
+        protein:null,carbs:null,sodium:null}])))
+      .toBe('changed_or_unavailable')
+    expect(CURRENT_WEIGHT_NUTRIENT_RECHECK_SQL).toContain('sum(e.sodium)')
+    expect(CURRENT_WEIGHT_NUTRIENT_RECHECK_SQL).toContain('sum(e.carbs)')
     expect(await recheckCurrentWeightNutrition(snapshotValue,today,sql([])))
       .toBe('changed_or_unavailable')
   })
