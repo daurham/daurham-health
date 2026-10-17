@@ -2774,3 +2774,27 @@ Files: `server/piq-preview-preflight.ts`, `tests/piq4-preview-preflight.test.ts`
 Migrations: none; provider/model calls: none; runtime and production: unchanged.
 Release: blocked pending CI, manual real QA credential configuration,
 exact-SHA preview attestation and owner acceptance (0/9).
+
+
+## 2026-10-17 — PIQ runtime API lock survives inconsistent Vercel git metadata
+
+State: **implemented in PIQ development branch; CI and exact-preview runtime
+validation pending, not owner-accepted**. The existing hard 503 lock previously
+keyed mainly on `VERCEL_GIT_COMMIT_REF` and a blank-ref preview fallback.
+Now it also fails closed when any PIQ-only environment marker key exists,
+even with blank marker values or contradictory Vercel branch/target metadata.
+Markers: `HEALTH_PIQ_EXPECTED_NEON_PROJECT_ID`,
+`HEALTH_PIQ_EXPECTED_PREVIEW_BRANCH_ID`,
+`HEALTH_PIQ_PREVIEW_TEST_OWNER_USER_ID`,
+`HEALTH_PIQ_EXPECTED_PREVIEW_SHA`. No marker can **unlock** the APIs;
+`HEALTH_PIQ_ALLOW_OWNER_QA` is deliberately ignored. Non-PIQ deployment
+without any markers retains prior behavior; production `main` unmodified.
+
+New synthetic dispatcher tests verify known owner, Auth and Ask Health
+routes return the original 503, `no-store` and redacted blocker even
+when Git metadata disagrees with PIQ branch-scoped configuration.
+No migration, database changes, live owner data, model calls, or
+production changes. GitHub CI/test/build and Vercel exact-SHA preview
+are validation prerequisites, not release approval. Mobile owner
+acceptance remains 0/9. Next: verify full branch CI; do not relax the
+lock until separately approved owner QA gate.

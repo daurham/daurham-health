@@ -53,6 +53,44 @@ describe('PIQ-4 owner API runtime release stop', () => {
     }
   })
 
+  it('never unlocks a PIQ preview when the reported Vercel ref or target is wrong', () => {
+    const markers = [
+      'HEALTH_PIQ_EXPECTED_NEON_PROJECT_ID',
+      'HEALTH_PIQ_EXPECTED_PREVIEW_BRANCH_ID',
+      'HEALTH_PIQ_PREVIEW_TEST_OWNER_USER_ID',
+      'HEALTH_PIQ_EXPECTED_PREVIEW_SHA',
+    ] as const
+    for (const key of markers) {
+      for (const target of ['preview', 'production', undefined]) {
+        expect(piqPreviewOwnerApiLocked({
+          VERCEL_ENV: target,
+          VERCEL_GIT_COMMIT_REF: 'fix/unrelated-feature',
+          [key]: '',
+          HEALTH_PIQ_ALLOW_OWNER_QA: 'true',
+        })).toBe(true)
+      }
+    }
+    expect(piqPreviewOwnerApiLocked({
+      VERCEL_ENV: 'preview',
+      VERCEL_GIT_COMMIT_REF: 'main',
+      HEALTH_PIQ_EXPECTED_NEON_PROJECT_ID: 'qa-project',
+    })).toBe(true)
+  })
+
+  it('blocks known owner API paths with mismatched branch metadata and a QA marker', async () => {
+    vi.stubEnv('VERCEL_ENV', 'preview')
+    vi.stubEnv('VERCEL_GIT_COMMIT_REF', 'fix/unrelated-feature')
+    vi.stubEnv('HEALTH_PIQ_EXPECTED_NEON_PROJECT_ID', 'qa-project')
+    vi.stubEnv('HEALTH_PIQ_ALLOW_OWNER_QA', 'true')
+    for (const path of ['/api/profile', '/api/auth/sign-in/email', '/api/ask-health']) {
+      const { res, output } = response()
+      await dispatchHealthApi({ url: path, method: 'GET', headers: {} } as ApiRequest, res)
+      expect(output.statusCode).toBe(503)
+      expect(output.body).toMatchObject({ code: 'PIQ_PREVIEW_OWNER_API_LOCKED' })
+      expect(output.headers['Cache-Control']).toBe('no-store')
+    }
+  })
+
   it('leaves production main, known unrelated previews and local development alone', () => {
     for (const env of [
       { VERCEL_ENV: 'production', VERCEL_GIT_COMMIT_REF: 'main' },
