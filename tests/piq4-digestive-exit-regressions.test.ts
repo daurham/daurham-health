@@ -79,6 +79,8 @@ describe('PIQ-4.1 final digestive boundary regressions (synthetic)',()=>{
       'I have severe abdominal pain',
       'I am having severe stomach pain',
       'I am passing black tarry stools',
+      'I have black tarry stools',
+      'My stool is black and tarry',
     ]){
       expect(detectImmediateSafety(question)).toBe('emergency')
       const response=await answerAskHealth({
@@ -102,6 +104,9 @@ describe('PIQ-4.1 final digestive boundary regressions (synthetic)',()=>{
       'I do not have severe abdominal pain',
       'What if someone passes black tarry stools?',
       'I was passing black tarry stools last week',
+      'What if my stool is black and tarry?',
+      'I do not have black tarry stools',
+      'My stool was black and tarry last month',
     ]){
       expect(detectImmediateSafety(question)).toBeNull()
     }

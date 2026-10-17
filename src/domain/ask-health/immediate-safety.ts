@@ -23,8 +23,13 @@ export function detectImmediateSafety(question: string): ImmediateSafetyKind | n
   // first-person symptoms only. No diagnosis is inferred from saved stool
   // types, food logs, historical events, or speculative questions.
   const severeDigestive = /\b(?:i(?:'m| am)\s+(?:vomiting|throwing up)\s+blood|i\s+(?:have|am having|am experiencing)\s+severe\s+(?:abdominal|stomach|belly)\s+pain|i(?:'m| am)\s+(?:passing|having)\s+(?:(?:black(?:\s+and)?\s+)?tarry)\s+stools?)\b/i
+  // Common first-person, present-tense tarry-stool descriptions name an
+  // observation instead of "passing" stool. Sentence-start anchoring keeps
+  // "What if my stool is black and tarry?" out of this immediate-risk floor.
+  const currentTarryStool = /(?:^|[.!?]\s+)(?:i\s+have\s+(?:black(?:\s+and)?\s+)?tarry\s+stools?\b|my\s+(?:stools?|poop)\s+(?:is|are)\s+(?:black(?:\s+and)?\s+)?tarry\b)/i
   if (chest.test(normalized) || breath.test(normalized) || bleed.test(normalized) ||
-      stroke.test(normalized) || severeDigestive.test(normalized)) {
+      stroke.test(normalized) || severeDigestive.test(normalized) ||
+      currentTarryStool.test(normalized)) {
     return 'emergency'
   }
   return null

@@ -29,6 +29,11 @@ describe('PIQ-3.2 explicit immediate safety floor', () => {
       ['My chest hurts', 'emergency'],
       ['I am bleeding heavily', 'emergency'],
       ['I am having a stroke', 'emergency'],
+      ['I have black tarry stools', 'emergency'],
+      ['I have black and tarry stool now', 'emergency'],
+      ['My stool is black and tarry', 'emergency'],
+      ['My stools are tarry', 'emergency'],
+      ['My poop is black and tarry', 'emergency'],
       ['I want to kill myself', 'self_harm'],
       ["I'm suicidal", 'self_harm'],
     ]
@@ -46,6 +51,13 @@ describe('PIQ-3.2 explicit immediate safety floor', () => {
       'Should I call a doctor if I get chest pain?',
       "I'm not suicidal",
       'I used to want to kill myself',
+      'What if my stool is black and tarry?',
+      'I do not have black tarry stools',
+      'My stool is not black and tarry',
+      'My stool was black and tarry last month',
+      'Why is black tarry stool concerning?',
+      'I had black tarry stools in 2020',
+      'If I have black tarry stools what should I do?',
     ]) {
       expect(detectImmediateSafety(q)).toBeNull()
     }

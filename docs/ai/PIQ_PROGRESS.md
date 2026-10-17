@@ -2844,3 +2844,22 @@ Files: `src/domain/ask-health/general.ts`,
 `tests/piq3-general-routing.test.ts`. No migration, preview unlock,
 provider calls, owner data or production change. Next: exact-SHA full
 CI and later owner/mobile QA. Formal owner acceptance 0/9.
+
+## 2026-10-17 — PIQ-4 digestive safety: affirmative black/tarry-stool synonyms
+
+State: **implemented on PIQ development branch; GitHub CI pending**.
+Current severe-GI shortcut recognized present-tense `I am passing black tarry
+stools` but did not recognize `I have black tarry stools`, `My stool is
+black and tarry`, or `My stools are tarry`. Added sentence-start, first-
+person and present-tense equivalents to `detectImmediateSafety` without
+classifying hypothetical, explicitly negated or historic reports as an
+affirmative *current* emergency. Preexisting deterministic emergency response
+is reused: no model spend, no private Health reads, no diagnosis, no state
+writes. Added tests in `piq3-immediate-safety.test.ts` and the PIQ-4
+digestive-exit integration-style synthetic suite. This remains an intentionally
+narrow red-flag floor; more complex and historical symptoms use the existing
+owner pathway, not a guarantee of a complete medical triage system.
+
+Migrations: none. Production/main: unchanged. PIQ preview API: still hard
+locked. Owner accepted 0/9; no live QA until isolated runtime verified.
+Next: full exact-SHA CI and protected-preview runtime attestation.
