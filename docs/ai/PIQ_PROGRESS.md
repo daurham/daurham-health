@@ -2751,3 +2751,26 @@ Release: pending CI; avoid Vercel retry under exhausted deployment quota.
 Outstanding: manual QA credentials later, usable disposable login, trusted
 origin, runtime binding/QA, backup readiness, mobile owner acceptance (0/9).
 Next: verify exact-SHA GitHub full validation and keep preview locked.
+
+
+## PIQ-4.2 — QA database credential placeholders now block static readiness (2026-10-17)
+
+State: **development-branch implementation; CI and owner acceptance pending.**
+Depends on: PIQ-4 preview preflight and existing runtime binding check.
+Why: The Neon endpoint and database name can match even if the Postgres
+URI contains invalid dummy credentials; earlier configuration review did not
+explicitly distinguish credential readiness from host identity.
+Contract: Add non-secret, pure `PREVIEW_DATABASE_CREDENTIALS_NOT_READY`
+blocker for a missing/unparseable URI, absent/whitespace login, too-short
+or obviously repeated password, and identifiable placeholder username or
+password (including percent-encoded sentinels). Log **only** the blocker
+code; no connection strings, role names or decoded passwords. Retain the
+independent endpoint/TLS checks in `assessDatabaseBinding` and the hard
+503 PIQ API lock. Passing a syntactic check is not a successful SQL login,
+proof the credentials are unique to QA, or authority to use owner records.
+Test: synthetic valid URI; empty, short, uniformly repeated, placeholder,
+percent-encoded sentinel, whitespace, and malformed-percent cases.
+Files: `server/piq-preview-preflight.ts`, `tests/piq4-preview-preflight.test.ts`.
+Migrations: none; provider/model calls: none; runtime and production: unchanged.
+Release: blocked pending CI, manual real QA credential configuration,
+exact-SHA preview attestation and owner acceptance (0/9).

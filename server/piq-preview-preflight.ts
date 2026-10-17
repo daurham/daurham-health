@@ -24,6 +24,7 @@ export type PiqNeonBranchEvidence = {
 export type PiqPreviewBlocker =
   | 'NOT_PREVIEW'
   | 'DATABASE_BINDING_NOT_VERIFIED'
+  | 'PREVIEW_DATABASE_CREDENTIALS_NOT_READY'
   | 'AUTH_BINDING_NOT_VERIFIED'
   | 'PREVIEW_COOKIE_SECRET_NOT_READY'
   | 'RUNTIME_GUARDS_NOT_ENFORCED'
@@ -51,6 +52,28 @@ function present(value: string | undefined): string {
  * operator check; this only refuses missing, malformed and known placeholder values.
  * Never include the candidate secret in a diagnostic or log.
  */
+function previewDatabaseCredentialsReady(raw: string | undefined): boolean {
+  if (!raw?.trim()) return false
+  try {
+    const url = new URL(raw)
+    if (url.protocol !== 'postgres:' && url.protocol !== 'postgresql:') return false
+    // URL credentials can be percent-encoded. Decode first to prevent
+    // simple encoding of an unsafe sentinel bypassing the release check.
+    const user = decodeURIComponent(url.username)
+    const password = decodeURIComponent(url.password)
+    if (!user || user.trim() !== user || /\s/.test(user) ||
+        !password || password.length < 16 || /\s/.test(password)) return false
+    // These are intentionally broad QA placeholder indicators, not a
+    // password-strength estimator. Never include the values in the result.
+    const placeholder = /(?:not[_-]?configured|placeholder|change[_-]?me|dummy|example|default[_-]?(?:user|password)|test[_-]?only)/i
+    if (placeholder.test(user) || placeholder.test(password)) return false
+    if (/^(.)\1+$/.test(password)) return false
+    return true
+  } catch {
+    return false
+  }
+}
+
 function plausiblePreviewCookieSecret(raw: string | undefined): boolean {
   const secret = present(raw)
   if (secret.length < 32 || /\s/.test(secret)) return false
@@ -68,6 +91,9 @@ export function reviewPiqPreviewSafety(input: {
   const blockers: PiqPreviewBlocker[] = []
   if (env.VERCEL_ENV !== 'preview') blockers.push('NOT_PREVIEW')
   if (assessDatabaseBinding(env).status !== 'verified') blockers.push('DATABASE_BINDING_NOT_VERIFIED')
+  if (!previewDatabaseCredentialsReady(env.DATABASE_URL)) {
+    blockers.push('PREVIEW_DATABASE_CREDENTIALS_NOT_READY')
+  }
   if (assessAuthBinding(env).status !== 'verified') blockers.push('AUTH_BINDING_NOT_VERIFIED')
   if (!plausiblePreviewCookieSecret(env.NEON_AUTH_COOKIE_SECRET)) {
     blockers.push('PREVIEW_COOKIE_SECRET_NOT_READY')

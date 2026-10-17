@@ -79,6 +79,27 @@ describe('PIQ-4.1 preview QA static fail-closed isolation preflight',()=>{
     expect(blocked({NEON_AUTH_BASE_URL:prodAuth}))
       .toContain('AUTH_BINDING_NOT_VERIFIED')
   })
+  it('refuses empty, placeholder and suspicious QA database credentials even when the endpoint matches',()=> {
+    const url = (user:string, password:string)=>
+      'postgresql://'+user+':'+password+'@'+previewHost+'/neondb?sslmode=require'
+    const invalid = [
+      url('', 'long-enough-password-for-synthetic-test'),
+      url('piq_qa_not_configured','long-enough-password-for-synthetic-test'),
+      url('owner', ''),
+      url('owner', 'short'),
+      url('owner', 'x'.repeat(64)),
+      url('owner', 'PIQ_QA_DATABASE_CREDENTIALS_NOT_CONFIGURED'),
+      url('owner', 'my_example_password_not_ready'),
+      url('owner', 'change%5Fme%5Fbefore%5Flaunch%5Fxxxxxxxx'),
+      url('owner', 'has%20spaces%20in%20this%20password'),
+      'postgresql://owner:%ZZ@'+previewHost+'/neondb?sslmode=require',
+    ]
+    for (const candidate of invalid) {
+      expect(blocked({DATABASE_URL:candidate})).toContain('PREVIEW_DATABASE_CREDENTIALS_NOT_READY')
+    }
+    expect(reviewPiqPreviewSafety({env,neonBranch:branch}).status)
+      .toBe('configuration_eligible_for_manual_attestation')
+  })
   it('refuses missing, weak or placeholder QA cookie secrets even when all other bindings match',()=>{
     for (const bad of [
       undefined, '', 'too-short', 'x'.repeat(64),
