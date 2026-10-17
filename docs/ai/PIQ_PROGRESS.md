@@ -3260,3 +3260,76 @@ synthetic tests, ensuring person privacy does not suppress proportionate
 urgent guidance. Later establish QA-only credentialed runtime and
 exact-SHA authenticated mobile owner acceptance before considering
 a production merge.
+
+
+## 2026-10-17 — T48 third-party immediate emergency + conditional-language boundary (CI GREEN)
+
+State: **synthetic engineering validated only; PIQ development branch, no owner acceptance or release**.
+
+Problem: following the cross-domain non-owner denial, questions explicitly about
+another person with severe current symptoms were refused as a non-owner data
+request, suppressing even basic urgent advice. At the other extreme, the
+first version of the new present-tense detector mistakenly treated a conditional
+question ("If my son has chest pain, what should I do?") as a confirmed current
+emergency.
+
+Files: `src/domain/ask-health/immediate-safety.ts`,
+`server/ask-health/service.ts`, `src/domain/ask-health/diagnostics.ts`,
+`tests/piq3-third-party-urgent-safety.test.ts`.
+
+Contract: a bounded, conservative English-only current third-party safety
+floor detects explicit reports such as "My wife is having chest pain right
+now", "My son can't breathe", current severe bleeding, stroke,
+vomiting blood, and clearly reported third-person self-harm danger.
+At the authenticated Ask Health service entry, current **owner**
+emergencies still take precedence, followed by a third-party urgent
+path, followed by the previous non-owner data refusal. The urgent
+third-party path returns deterministic action-oriented safety advice
+without any owner evidence loading, prior chat, model call, AI budget
+reservation, cache reuse, citation, or implied diagnosis. The same
+privacy protection applies to direct `explainAskHealth` callers
+that supplied a previously built owner evidence packet. The response
+uses `answerScope=urgent_safety` and the scoped diagnostic path
+`third_party_immediate_safety`, with no private telemetry values.
+
+Do not classify clearly conditional, hypothetical, fictional,
+quoted/educational, negated or historical third-party wording as a
+confirmed present emergency. Excluding a live-emergency classification
+does **not** certify the content as medically harmless or excuse the
+need to supply appropriate generic emergency education in a later
+explicitly hypothetical answer path. Complex third-person speech and
+implicit pronouns remain a known language-understanding limitation.
+
+Implementation commits:
+- `66177d751b4424ef7cf154b27d3a43377171e36f`: initial urgent path and six synthetic tests.
+- `6719f3ba8c3a3a0b81b11ac7d2c4d0ca1aa31ab8`: correct regular-expression literal escaping.
+- `9435da516546115e85cb41e9a03749610990bc7e`: distinguish leading "if/when" hypothetical clauses from real current third-party emergency statements; add three regression examples.
+
+CI: exact prior code run
+https://github.com/daurham/daurham-health/actions/runs/39048515450
+**FAILED** one new regression ("If my son has chest pain" was falsely
+classified as current), while 2,512 other tests passed.
+Fix was implemented; exact-final-code run
+https://github.com/daurham/daurham-health/actions/runs/39049029113
+**PASSED** npm ci, TypeScript, ESLint, Vitest (2,513 passed,
+30 skipped; 332 passing suites), and production build.
+
+Remaining scope: there is no exhaustive medical triage engine, complete
+multilingual/embedded-quote/negation parser, or verified live QA run.
+Third-party hypotheticals that should still receive general first-aid
+education can currently receive the conservative non-owner privacy
+response rather than useful conditional guidance. A future quality
+checkpoint must treat that separately from falsely asserting a
+confirmed current emergency. Review unquoted reported speech and
+multi-person statements without permitting the user's owner records
+to be used as the other person's history. None of these synthetic
+passing cases count toward live owner acceptance; **0/9** formal phases.
+
+No migrations, production changes, main merge, unlocked QA preview,
+new paid provider calls, owner-record access or production DB writes.
+Maintain the documented QA credential/origin/runtime attestation
+and authenticated owner signoff gates.
+
+Next: synthetic safe guidance for **hypothetical third-person emergencies**
+and robust quoted/reporting distinctions without changing the person
+privacy gate; then independent QA-only preview setup and owner acceptance.
