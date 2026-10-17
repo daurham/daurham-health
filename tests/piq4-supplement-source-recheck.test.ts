@@ -1,7 +1,7 @@
 import {describe,expect,it} from 'vitest'
 import type {TodaySupplementInput} from '../src/domain/supplements/types.js'
 import {
-  currentSupplementInputsAgree,recheckCurrentSupplementInputs,
+  currentSupplementInputsAgree,recheckSupplementRangeInputs,
 } from '../server/ask-health/current-supplement-recheck.js'
 import {buildAskHealthEvidencePacket,matchedSavedSupplements,
   packetFingerprintMaterial} from '../src/domain/ask-health/packet.js'
@@ -75,22 +75,58 @@ describe('PIQ-4.2 canonical Supplements final-source agreement',()=>{
       expect([a,b]).toEqual([start,today])
       return [structuredClone(saved)]
     }
-    expect(await recheckCurrentSupplementInputs({
+    expect(await recheckSupplementRangeInputs({
       initial:[saved],start,end:today,today,read,
     })).toBe('verified')
     expect(called).toBe(1)
-    expect(await recheckCurrentSupplementInputs({
+    expect(await recheckSupplementRangeInputs({
       initial:[saved],start,end:today,today,
       read:async()=>[{...saved,adherence:[]}],
     })).toBe('changed_or_unavailable')
-    expect(await recheckCurrentSupplementInputs({
+    expect(await recheckSupplementRangeInputs({
       initial:[saved],start,end:today,today,
       read:async()=>{throw Error('supplement database inaccessible')},
     })).toBe('changed_or_unavailable')
-    expect(await recheckCurrentSupplementInputs({
+    expect(await recheckSupplementRangeInputs({
       initial:[saved],start,end:'2026-10-17',today,read,
     })).toBe('changed_or_unavailable')
     expect(called).toBe(1)
+  })
+  it('rechecks a selected past date against newly corrected saved records',async()=>{
+    const historic='2026-10-15'
+    const same=async(a:string,b:string)=>{
+      expect([a,b]).toEqual([start,historic])
+      return [structuredClone(saved)]
+    }
+    expect(await recheckSupplementRangeInputs({
+      initial:[saved],start,end:historic,today,read:same,
+    })).toBe('verified')
+    expect(await recheckSupplementRangeInputs({
+      initial:[saved],start,end:historic,today,
+      read:async()=>[{
+        ...saved,adherence:[{...saved.adherence[0]!,status:'skipped'}],
+      }],
+    })).toBe('changed_or_unavailable')
+    expect(await recheckSupplementRangeInputs({
+      initial:[saved],start,end:historic,today,
+      read:async()=>{throw Error('late read unavailable')},
+    })).toBe('changed_or_unavailable')
+    const historical=(status:'verified'|'changed_or_unavailable')=>
+      buildAskHealthEvidencePacket({
+        question:'Which supplements did I record taking yesterday?',
+        lens:'general',range:'30d',asOf:historic,healthToday:today,
+        period:{start,end:historic},generatedAt:today+'T21:00:00Z',
+        contextMode:'personalized',overview:null,activity:null,sleep:null,
+        goals:[],experiments:[],benchmarks:[],context:null,patterns:[],
+        supplements:[saved],supplementSourceRecheck:status,
+      })
+    expect(historical('verified').evidence.some(e=>
+      e.id==='supplements.recorded.supp-a')).toBe(true)
+    const conflict=historical('changed_or_unavailable')
+    expect(conflict.evidence.some(e=>e.id==='supplements.recorded.supp-a')).toBe(false)
+    expect(conflict.evidence.find(e=>e.id==='supplements.source_consistency'))
+      .toMatchObject({substantive:false,value:null})
+    expect(JSON.stringify(conflict)).not.toContain('Creatine monohydrate')
   })
   it('uses saved-name matching without creatine / creatinine false positives',()=>{
     expect(matchedSavedSupplements({

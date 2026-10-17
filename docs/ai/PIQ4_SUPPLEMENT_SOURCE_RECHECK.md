@@ -11,9 +11,11 @@ recast as current and should never imply a missing entry was taken or skipped.
 ## Change
 
 The already-existing saved-supplement name matcher is reused by the loader,
-so the late check is eligible only for a **current personalized** request
+so the late check is eligible for a **personalized current or selected historical-as-of** request
 whose General/Nutrition lens or saved supplement-name match may surface
-Supplement facts. No extra reads are added to unrelated Training, Recovery
+Supplement facts. Historical rereads use the exact selected calendar range and
+check the **currently stored** interpretation of those past records, not what
+was known when the date originally occurred. No extra reads are added to unrelated Training, Recovery
 or Experiment questions. The extra check reruns the existing bounded
 supplement service once (currently four local read-only SQL queries) and
 compares all effective saved supplement IDs, names, sort order, scheduled
@@ -38,7 +40,9 @@ These are two optimistic service snapshots, not an atomic transaction.
 The existing `TodaySupplementInput` projection omits some raw event and
 adherence row identifiers/notes/revision timestamps, so this compares
 **effective evidence fields**, not raw database revision identity.
-Historical-as-of supplement reconstruction is not newly attested. A
+An explicitly historical-as-of Supplement range is now rechecked for
+late corrections, but **not** historically versioned: the result cannot
+establish what was saved, known, or intended at that past moment. A
 recorded dose/status is never proof of ingestion, benefit or safety.
 The extra local SQL reads have no paid provider/model cost; no migration,
 data write, main merge, production deployment or owner acceptance is implied.

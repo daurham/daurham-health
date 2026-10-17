@@ -26,7 +26,7 @@ import { routeHealthIntelligence } from '../../src/domain/intelligence/shared.js
 import { loadHealthIntelligenceSnapshot } from '../intelligence/snapshot.js'
 import { getHealthProfile } from '../profile/service.js'
 import { recheckCurrentHealthProfile } from './current-health-profile-recheck.js'
-import { recheckCurrentSupplementInputs } from './current-supplement-recheck.js'
+import { recheckSupplementRangeInputs } from './current-supplement-recheck.js'
 import { matchedSavedSupplements } from '../../src/domain/ask-health/packet.js'
 import { focusTrainingWorkingSets } from '../../src/domain/ask-health/focused-training.js'
 import { recheckCurrentWorkingSets } from './current-working-sets-recheck.js'
@@ -382,7 +382,13 @@ export async function loadAskHealthPacketInput(input: {
   const personalizedCurrent=input.asOf===today&&input.contextMode!=='general_only'
   // The packet only includes Supplements for General/Nutrition lenses or an
   // unambiguous saved name. Reuse the SAME matcher to avoid missing a path.
-  const maySurfaceSupplements=personalizedCurrent&&supplements.length>0&&(
+  // Historical selected-as-of periods also need an exact-range reread:
+  // a late backdated correction must not leak stale old adherence/regimens.
+  // This only attests the current stored interpretation of that period,
+  // NOT the state that existed at the historical time.
+  const supplementPeriodEligible=input.contextMode!=='general_only'&&
+    input.asOf<=today&&period.start<=period.end&&period.end<=input.asOf
+  const maySurfaceSupplements=supplementPeriodEligible&&supplements.length>0&&(
     input.lens==='general'||input.lens==='nutrition'||
     matchedSavedSupplements({question:input.question,supplements}).length>0
   )
@@ -392,7 +398,7 @@ export async function loadAskHealthPacketInput(input: {
         ?recheckCurrentHealthProfile({first:profile,asOf:input.asOf,today})
         :Promise.resolve('not_checked' as const),
       maySurfaceSupplements
-        ?recheckCurrentSupplementInputs({
+        ?recheckSupplementRangeInputs({
           initial:supplements,start:period.start,end:period.end,today,
         }):Promise.resolve('not_checked' as const),
     ])

@@ -77,11 +77,13 @@ export function currentSupplementInputsAgree(input:{
   return first!==null&&late!==null&&first===late
 }
 
-/** Requery the same canonical supplement service at the tail of Ask Health
- * retrieval. That service uses four local read-only SQL queries. It does NOT
- * independently attest raw adherence row IDs or provide transaction locking.
+/** Requery the same selected canonical supplement period at Ask Health tail,
+ * including explicitly selected historical as-of dates. This checks today's
+ * DB interpretation of that period; it does NOT establish what was saved at
+ * the past instant, attest raw IDs, or provide transaction locking.
+ * The service uses four local read-only SQL queries.
  */
-export async function recheckCurrentSupplementInputs(input:{
+export async function recheckSupplementRangeInputs(input:{
   initial:readonly TodaySupplementInput[]
   start:string
   end:string
