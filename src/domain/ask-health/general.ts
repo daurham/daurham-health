@@ -65,8 +65,14 @@ function inventedGeneralOwnerRecord(text: string): boolean {
   // education ("If your intake is low ...") and generic second-person
   // physiology ("Your muscles use ATP") should not be treated as observations.
   const inventedQualitativeState = /(?:^|[.!?]\s+)(?:your|the user's|the owner's)\s+(?:(?:recorded|current|recent|average)\s+)?(?:weight|body fat|sleep|hydration|water intake|protein intake|fiber intake|calorie intake|strength|training (?:progress|performance)|blood pressure|symptoms?)\s+(?:(?:(?:is|was|has been|looks|seems)\s+(?:(?:too|very)\s+)?(?:low|high|poor|good|stable|improving|worsening|increasing|decreasing|abnormal))|(?:(?:has|have)\s+)?(?:improved|worsened|increased|decreased|declined|plateaued))\b|(?:^|[.!?]\s+)you\s+(?:are|have been|have)\s+(?:dehydrated|dehydration|constipated|constipation|high blood pressure)\b/i
+  // An answer with no owner evidence must not assert a concrete habit or
+  // routine just because the claim lacks a measurement or "according to logs".
+  // Sentence-anchored factual verbs + frequency/current-status indicators
+  // distinguish owner assertions from conditional education ("If you ...")
+  // and permission ("You can ..."). This remains a narrow lexical safeguard.
+  const inventedOwnerHabit = /(?:^|[.!?]\s+)you\s+(?:(?:(?:currently|already|regularly|usually|often)\s+)?(?:take|use|consume|drink|eat|train|exercise|lift)\b[^.!?]{0,80}?\b(?:daily|every\s+day|each\s+day|every\s+(?:morning|evening|night)|(?:\d+|once|twice|three|four)\s+times?\s+(?:per|a)\s+(?:day|week)|regularly|most\s+days)\b|(?:currently|already|regularly|usually|often)\s+(?:take|use|consume|drink|eat|train|exercise|lift)\b|(?:(?:are|'re)\s+|(?:have|'ve)\s+been\s+)(?:taking|using|consuming|drinking|eating)\s+(?:creatine|protein|supplements?|medications?|medicine|water)\b)/i
   return claimsSavedData.test(text) || inventedMeasurement.test(text) ||
-    inventedQualitativeState.test(text)
+    inventedQualitativeState.test(text) || inventedOwnerHabit.test(text)
 }
 
 export function generalAnswerInventsPersonalRecord(answer: AskHealthAnswer): boolean {

@@ -2798,3 +2798,27 @@ production changes. GitHub CI/test/build and Vercel exact-SHA preview
 are validation prerequisites, not release approval. Mobile owner
 acceptance remains 0/9. Next: verify full branch CI; do not relax the
 lock until separately approved owner QA gate.
+
+
+## 2026-10-17 — General Only factual habit hallucinations, golden regression (PIQ-3 QA)
+
+State: **implemented on the PIQ development branch; exact-SHA CI pending**.
+Observed gap in the lexical general-answer safety filter: ungrounded
+affirmative owner routine claims without measurements or references (e.g.
+`You take creatine every day.`) were not caught by the prior owner-record,
+numeric and qualitative-state checks. Bounded fix:
+`src/domain/ask-health/general.ts` now screens affirmative, sentence-anchored
+owner habit/medication/supplement/food/training statements that assert a
+current/regular practice or frequency. It intentionally leaves conditional
+and permissive general education (e.g. `If you take creatine ...`,
+`You can take ...`) eligible. This is an extra lexical guard, not a
+complete semantic health-safety or model-quality classifier.
+
+Added synthetic `tests/piq3-general-routing.test.ts` regression cases
+for fresh model responses (one bounded repair and failure), legacy cached
+responses (strip claim/evidence IDs while retaining independent general
+education), and follow-up statements. No real health data, external
+provider/model calls, migrations, new features, auth changes, or
+production writes. Release and formal owner acceptance remain blocked;
+0/9 owner scenarios accepted. Next: validate affected test and complete
+CI; continue owner-realistic QA only after separate credential/isolation gate.

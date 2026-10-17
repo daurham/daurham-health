@@ -300,6 +300,66 @@ describe('PIQ-3.2 educational routing and safety', () => {
     }
   })
 
+  it('withholds invented owner habits while preserving conditional general education', async () => {
+    const personalHabits = [
+      'You take creatine every day.',
+      'You regularly take creatine.',
+      'You are taking creatine.',
+      'You have been taking creatine.',
+      'You train three times per week.',
+      'You drink water daily.',
+      'Creatine helps ATP. You take creatine every morning.',
+    ]
+    const generalEducation = [
+      'You can take creatine daily when appropriate.',
+      'If you take creatine daily, consider your circumstances.',
+      'Your muscles use ATP for short bursts of exercise.',
+      'Some people take creatine every day.',
+      'Creatine can be used daily.',
+      'You may train three times per week.',
+      'If you are taking creatine, consult your clinician when necessary.',
+    ]
+    const hasInventedRecord = (text: string) => generalAnswerInventsPersonalRecord({
+      blocks: [{ text, evidenceRefs: [] }], limitations: [], followUps: [],
+    })
+    for (const text of personalHabits) expect(hasInventedRecord(text), text).toBe(true)
+    for (const text of generalEducation) expect(hasInventedRecord(text), text).toBe(false)
+
+    const poisoned = {
+      blocks: [
+        { text: 'You take creatine every day.', evidenceRefs: ['profile.private'] },
+        { text: 'Creatine helps replenish ATP.', evidenceRefs: [] },
+      ],
+      limitations: [],
+      followUps: ['You train three times a week. Would you like a plan?'],
+    }
+    const safe = sanitizeCachedGeneralAnswer(poisoned)
+    expect(safe.blocks.map(x => x.text)).toEqual(['Creatine helps replenish ATP.'])
+    expect(safe.followUps).toEqual([])
+    expect(JSON.stringify(safe)).not.toMatch(/profile\.private|every day|three times/)
+
+    const gate = createAskHealthGate({ minIntervalMs: 0 })
+    gate.take = async () => ({ ok: true, usageId: null, cached: { answer: poisoned, evidence: [] } })
+    const noProvider = vi.fn()
+    const cached = await answerAskHealth({
+      ...request('What does creatine do?'), contextMode: 'general_only',
+      provider: noProvider, gate,
+    })
+    expect(cached.answer).toEqual(safe)
+    expect(cached.evidence).toEqual([])
+    expect(noProvider).not.toHaveBeenCalled()
+
+    const stub = vi.fn(async () => ({
+      text: answer('You take creatine every day.'), model: 'piq-stub',
+      inputTokens: 8, outputTokens: 10,
+    }))
+    await expect(answerAskHealth({
+      ...request('What does creatine do?'), contextMode: 'general_only',
+      provider: stub, gate: createAskHealthGate({ minIntervalMs: 0 }),
+    })).rejects.toMatchObject({ statusCode: 502, code: 'ASK_HEALTH_INVALID_RESPONSE' })
+    expect(stub).toHaveBeenCalledTimes(2)
+  })
+
   it('screens personal-record hallucinations in follow-up suggestions on fresh and cached General Only', async () => {
     const generalBlock = { text: 'Creatine supports short bursts of intense effort.', evidenceRefs: [] }
     const poisoned = {
