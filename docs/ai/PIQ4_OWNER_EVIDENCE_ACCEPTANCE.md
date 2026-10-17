@@ -28,6 +28,7 @@ production, database migrations, new paid AI calls or treatment advice.
 | Change a Daily Context note or tag during read | Stale note text and tag counts absent, neutral explanation shown | Late Context records |
 | Inconsistent Activity summary vs Intelligence activity record | Direct steps/resting-HR and Activity-linked shared correlations absent; unrelated sleep may remain | Dual Activity read |
 | Replace/delete a Training session or edit effort between the Progress and Intelligence reads | No stale Training count/frequency, set trend, or Training-linked correlation; unrelated domains remain | Dual Training session identity/effort read (does not attest working-set versions) |
+| Edit load/reps/side measurements under the same saved set ID during Ask Health retrieval, or insert/delete/reassign a set | No stale set appearance, strength trend, Training-linked relationship or cross-signal weight inference; neutral source-conflict boundary | Late canonical working-set content read (not atomic; no exercise-definition version attestation) |
 | Request named yesterday/last week; correct a selected source during read | Historical weight/food amounts and coverage removed; no current value substituted | Historical source check |
 | General packet after focused source failure | No stale body/nutrition/activity/goal/shared-Intelligence bypass | Packet precedence |
 | Change selected goal/experiment version/priority | No stale goal status, conflict-free intervention or silent target mutation | Goal/experiment source gates |
