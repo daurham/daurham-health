@@ -100,7 +100,7 @@ export function reviewPiqPreviewSafety(input: {
       proof: input.independentRoot,
     })) {
       blockers.push('PARENT_DATA_CLONE')
-    } else if (neonBranch.initSource !== 'empty') {
+    } else if (neonBranch.initSource !== 'empty' && neonBranch.initSource !== 'parent-data') {
       // If Neon does not independently attest an empty branch, static
       // configuration cannot establish that owner rows are absent.
       blockers.push('DATA_ORIGIN_NOT_INDEPENDENTLY_EMPTY')

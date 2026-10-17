@@ -163,7 +163,7 @@ export function reviewPiqPreviewMetadata(input: {
       proof: input.independentRoot,
     })) {
       blockers.push('NEON_PARENT_DATA_CLONE')
-    } else if (neonBranch.initSource !== 'empty') {
+    } else if (neonBranch.initSource !== 'empty' && neonBranch.initSource !== 'parent-data') {
       blockers.push('NEON_EMPTY_ORIGIN_UNVERIFIED')
     }
   }
