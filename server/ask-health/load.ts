@@ -51,6 +51,7 @@ import {readCurrentWeightPointSource} from './current-weight-point-source.js'
 import {readCurrentWeightProjectionSource} from './current-weight-projection-source.js'
 import {recheckCurrentWeightNutrition} from './current-weight-nutrition-recheck.js'
 import {recheckCurrentWeightActivity} from './current-weight-activity-recheck.js'
+import {recheckHistoricalWeightEnergySources} from './historical-weight-energy-source-recheck.js'
 import { loadTrainingProgressionState } from '../intelligence/training-progression.js'
 
 export async function loadAskHealthPacketInput(input: {
@@ -300,6 +301,26 @@ export async function loadAskHealthPacketInput(input: {
     focusedWeightEnergy.nutritionSourceRecheck=nutritionRecheck
     focusedWeightEnergy.weightActivitySourceRecheck=weightActivityRecheck
   }
+  // Explicitly selected historical source facts are not protected by
+  // current-day goal/intake checks. Recheck their own bounded dates and
+  // exclude today's provisional intake/scale observations.
+  const historicalWeightEnergyDay=input.contextMode!=='general_only'
+    ?focusHistoricalWeightEnergyDay({question:input.question,snapshot:intelligenceSnapshot,today}):null
+  const historicalWeightEnergyWindow=input.contextMode!=='general_only'
+    ?focusHistoricalWeightEnergyWindow({question:input.question,snapshot:intelligenceSnapshot,today}):null
+  const historicalSelection=historicalWeightEnergyDay?.scope==='in_range'
+    ?{start:historicalWeightEnergyDay.date,end:historicalWeightEnergyDay.date}
+    :historicalWeightEnergyWindow?.scope==='in_range'
+      ?{start:historicalWeightEnergyWindow.start,
+         end:historicalWeightEnergyWindow.end<today
+           ?historicalWeightEnergyWindow.end:undefined}
+      :null
+  const historicalWeightEnergySourceRecheck=historicalSelection
+    ?await recheckHistoricalWeightEnergySources({
+      snapshot:intelligenceSnapshot,today,start:historicalSelection.start,
+      end:historicalSelection.end??historicalWeightEnergyWindow!.end,
+    })
+    :'not_checked'
   // Include initially empty sets: a new late Context row is a mutation.
   const contextMayAppear=input.asOf===today &&
     input.contextMode!=='general_only' &&
@@ -326,10 +347,9 @@ export async function loadAskHealthPacketInput(input: {
     benchmarks,
     supplements,
     focusedDigestive,
-    focusedWeightEnergyWindow: input.contextMode !== 'general_only'
-      ? focusHistoricalWeightEnergyWindow({question:input.question,snapshot:intelligenceSnapshot,today}) : null,
-    focusedWeightEnergyDay: input.contextMode !== 'general_only'
-      ? focusHistoricalWeightEnergyDay({question:input.question,snapshot:intelligenceSnapshot,today}) : null,
+    historicalWeightEnergySourceRecheck,
+    focusedWeightEnergyWindow:historicalWeightEnergyWindow,
+    focusedWeightEnergyDay:historicalWeightEnergyDay,
     focusedWeightEnergy,
     focusedTraining: focusTrainingWorkingSets({
       question: input.question,

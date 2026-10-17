@@ -155,6 +155,10 @@ export type AskHealthPacketInput = {
   focusedDigestive?: FocusedDigestiveEvidence | null
   focusedWeightEnergy?: FocusedWeightEnergyEvidence | null
   focusedWeightEnergyDay?: HistoricalWeightEnergyDay | null
+  /** Late source agreement for an explicitly requested historical date/window.
+   * Optional only for isolated deterministic fixtures.
+   */
+  historicalWeightEnergySourceRecheck?: 'not_checked' | 'verified' | 'changed_or_unavailable'
   focusedWeightEnergyWindow?: HistoricalWeightEnergyWindow | null
   stableProfile?: AskStableProfileInput | null
   profile?: AskClinicalProfileInput | null

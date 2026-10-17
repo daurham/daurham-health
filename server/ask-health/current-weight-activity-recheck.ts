@@ -58,6 +58,21 @@ function matches(
   }
   return true
 }
+/** Same last-effective-kg-per-date logic as the original intelligence frame.
+ * This does not expose metric IDs to the AI packet.
+ */
+export function historicalWeightObservationsAgree(
+  snapshot:HealthIntelligenceSnapshot,lateRows:readonly Record<string,unknown>[],
+  start:string,end:string,
+):boolean{
+  const first=snapshot.frame.flatMap(day=>{
+    const o=day.signals['body.weight_kg']
+    return o?[o]:[]
+  })
+  return matches(effective(first,start,end),
+    effective(bodyWeightObservations(lateRows,snapshot.timezone),start,end))
+}
+
 export type WeightActivitySourceRecheck='verified'|'changed_or_unavailable'
 
 export async function recheckCurrentWeightActivity(input:{

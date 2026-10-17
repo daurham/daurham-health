@@ -57,6 +57,10 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
     priority: 0,
   })
 
+  const historicalSourceConflict=input.historicalWeightEnergySourceRecheck==='changed_or_unavailable' &&
+    input.contextMode!=='general_only' &&
+    (input.focusedWeightEnergyDay?.scope==='in_range'||
+      input.focusedWeightEnergyWindow?.scope==='in_range')
   const lens = input.lens
   const wants = lensWants(lens)
   // A failed final current-focused read outranks earlier generic snapshots.
@@ -86,6 +90,21 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
   addFocusedWeightEnergy(input.focusedWeightEnergy ?? null, input.contextMode, push)
   addHistoricalWeightEnergyDay(input.focusedWeightEnergyDay ?? null, input.contextMode, push)
   addHistoricalWeightEnergyWindow(input.focusedWeightEnergyWindow ?? null, input.contextMode, push)
+  if(historicalSourceConflict){
+    const historicalDay=input.focusedWeightEnergyDay?.scope==='in_range'
+    push({
+      id:historicalDay?'weight_energy.historical_day.source_consistency':
+        'weight_energy.historical_window.source_consistency',
+      domain:'intelligence',label:'Selected historical source consistency boundary',
+      value:null,unit:null,
+      period:historicalDay
+        ?{start:input.focusedWeightEnergyDay!.date,end:input.focusedWeightEnergyDay!.date}
+        :{start:input.focusedWeightEnergyWindow!.start,end:input.focusedWeightEnergyWindow!.end},
+      text:'The saved measurements or verified completed food days for the specifically requested past date(s) changed during retrieval, or an independent final source check was unavailable. Historical weight, calorie, comparison, sampling and trend claims are WITHHELD. The missing or corrected information is UNKNOWN, not zero. Re-ask after the saved records settle; these data do not establish a deficit, plateau, or body-fat change.',
+      coverage:{historicalSourceRecheck:'changed_or_unavailable',historicalClaims:'withheld'},
+      detailPath:'/progress/body',userEntered:false,substantive:false,priority:0,
+    })
+  }
   if (wants.supplements || questionMentionsSavedSupplement(input)) {
     addSupplements(input, push)
   }
@@ -129,14 +148,22 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
           item.id.startsWith('weight_energy.historical_window.') ||
           item.id === 'goals.historical_attestation_boundary')
       : drafts
+  // The historical date filter otherwise lets stale source-specific figures
+  // through without a late source read; preserve only its neutral boundary.
+  const historicalSafeDrafts=historicalSourceConflict
+    ?selectedDrafts.filter(item=>item.id==='ask.range'||
+       item.id==='goals.historical_attestation_boundary'||
+       item.id==='weight_energy.historical_day.source_consistency'||
+       item.id==='weight_energy.historical_window.source_consistency')
+    :selectedDrafts
   // Hide ALL relevant generic routes if current focused inputs fail.
   // Historical, General Only and unrelated sleep/supplements are preserved.
   const safeDrafts=focusedSourceConflict
-    ? selectedDrafts.filter(item=>item.id==='ask.range'||
+    ? historicalSafeDrafts.filter(item=>item.id==='ask.range'||
         item.id==='weight_energy.source_consistency'||
         !['body.','nutrition.','activity.','goals.','intelligence.']
           .some(prefix=>item.id.startsWith(prefix)))
-    : selectedDrafts
+    : historicalSafeDrafts
   const evidence=trimEvidence(safeDrafts,maxChars)
   const selectedIds = new Set(evidence.map((item) => item.id))
   const clarification = exerciseClarification(input)
