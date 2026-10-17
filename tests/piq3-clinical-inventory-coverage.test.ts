@@ -106,6 +106,9 @@ describe('T48 pre-cap explicit clinical inventory completeness (synthetic only)'
     // personalized selection stays scoped to currently active items.
     expect(decision.evidence.filter(item => item.id.startsWith('clinical.medication.'))).toHaveLength(8)
     expect(decision.limitations.find(item => item.code === 'clinical_evidence_limited')).toBeUndefined()
+    const explanatory = packet('Show me how my medications could affect sleep', records)
+    expect(explanatory.evidence.filter(item => item.id.startsWith('clinical.medication.'))).toHaveLength(8)
+    expect(explanatory.limitations.find(item => item.code === 'clinical_evidence_limited')).toBeUndefined()
     expect(ids('How do medications generally work?', records, { contextMode: 'smart' }))
       .not.toContain('clinical.medication.19')
   })
