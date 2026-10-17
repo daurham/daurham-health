@@ -91,7 +91,11 @@ export function detectThirdPartyImmediateSafety(question: string): ImmediateSafe
   const normalized = excludeQuotedSpeech(question.trim()).replace(/\u2019/g, "'")
   // A model should not infer an ongoing emergency from examples, conditional
   // questions or hypothetical scenarios.
-  if (/\b(?:what if|suppose|imagine|hypothetical(?:ly)?|fictional|scenario|for example|in a story|would|used to)\b/i.test(normalized)) {
+  // A leading "if/when" clause describes a possibility, not a verified
+  // present-tense report. Current first-person emergencies are checked first
+  // by the service, regardless of other conditional clauses.
+  if (/^\s*(?:if|when)\s+(?:my|our|his|her|their|the|he|she|they)\b/i.test(normalized) ||
+      /\b(?:what if|suppose|imagine|hypothetical(?:ly)?|fictional|scenario|for example|in a story|would|used to)\b/i.test(normalized)) {
     return null
   }
   const person = String.raw`(?:(?:(?:my|our|your|the|his|her|their)\s+(?:(?:young|older|elderly|little|adult|newborn)\s+)?(?:wife|husband|spouse|partner|mother|father|mom|dad|son|daughter|child|baby|kid|brother|sister|friend|roommate|coworker|patient))|(?:he|she|they))`
