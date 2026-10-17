@@ -55,7 +55,9 @@ export function createLiteratureGate(options?: {
         maxPerMinute,
       })
       if (!reserved.ok) {
-        return reserved
+        // Duplicate-request throttling applies only to Ask Health. Preserve
+        // this workflow's existing budget/rate decision contract.
+        return { ok: false, reason: reserved.reason === 'duplicate' ? 'rate' : reserved.reason }
       }
       return { ok: true, cached: null, usageId: reserved.id }
     },
