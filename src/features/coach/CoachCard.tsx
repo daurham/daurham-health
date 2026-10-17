@@ -11,6 +11,7 @@ import type {
 } from '@/domain/coach-intelligence'
 import type { CoachLabItem } from '@/domain/coach-lab'
 import { labExperimentHandoffPath } from '@/domain/lab-handoff'
+import { coachLinkedExperimentCopy } from '@/domain/coach-lab-lifecycle'
 import { XpAmount } from '@/components/XpAmount'
 import { primaryButtonClass, quietButtonClass } from '@/lib'
 import { prefixedPath, useAppPathPrefix } from '@/lib/app-prefix'
@@ -577,21 +578,36 @@ export function CoachIntelligencePanel({
                 <p className="mt-2 text-xs leading-relaxed text-zinc-600">
                   <Link to={prefixedPath(prefix, `/lab/experiments/${item.linkedExperimentId}`)}
                     className="font-medium text-accent underline underline-offset-2">Review linked Lab experiment</Link>
-                  {' '}· Linking does not establish that an experiment started or worked.
+                  {' '}· {item.linkedExperiment
+                    ? coachLinkedExperimentCopy(item.linkedExperiment)
+                    : 'Linking does not establish that an experiment started or worked.'}
+                  {item.linkedExperiment?.windowStart && item.linkedExperiment.windowEnd
+                    ? ` Observation window: ${item.linkedExperiment.windowStart} to ${item.linkedExperiment.windowEnd}.`
+                    : ''}
+                  {item.linkedExperiment?.resultId ? (
+                    <>
+                      {' '}<Link to={prefixedPath(prefix, `/lab/experiment-results/${item.linkedExperiment.resultId}`)}
+                        className="font-medium text-accent underline underline-offset-2">Review recorded Lab result</Link>
+                    </>
+                  ) : null}
+                </p>
+              ) : item.linkedExperimentUnavailable ? (
+                <p className="mt-2 text-xs text-zinc-600">
+                  Linked Lab record status unavailable. Review Personal Lab; a new experiment was not started.
                 </p>
               ) : null}
               <div className="mt-2 flex flex-wrap gap-2">
                 <Link to={prefixedPath(prefix, item.detailPath)} className={primaryButtonClass}>
                   {item.actionText}
                 </Link>
-                {item.experimentEligible ? (
+                {item.experimentEligible && !item.linkedExperimentId && !item.linkedExperimentUnavailable ? (
                   <button type="button" className={quietButtonClass} disabled={pending} onClick={() => onResponse(item, 'do_this')}>
                     I started this
                   </button>
                 ) : null}
                 <button type="button" className={quietButtonClass} disabled={pending} onClick={() => onResponse(item, 'not_now')}>Not now</button>
                 <button type="button" className={quietButtonClass} disabled={pending} onClick={() => onResponse(item, 'not_relevant', 'not_relevant')}>Not relevant</button>
-                {item.experimentEligible && !item.linkedExperimentId ? (
+                {item.experimentEligible && !item.linkedExperimentId && !item.linkedExperimentUnavailable ? (
                   <Link to={prefixedPath(prefix, labExperimentHandoffPath({
                     title: item.title,
                     rationale: item.detail,
