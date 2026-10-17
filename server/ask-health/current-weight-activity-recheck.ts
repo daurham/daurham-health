@@ -1,6 +1,6 @@
 import {getSql,type Sql} from '../db.js'
 import {addCalendarDays} from '../../src/domain/training-plan.js'
-import type {HealthIntelligenceSnapshot,IntelligenceObservation,IntelligenceSignalKey} from '../../src/domain/intelligence/shared.js'
+import type {HealthIntelligenceSnapshot,IntelligenceObservation} from '../../src/domain/intelligence/shared.js'
 import {ACTIVITY_INTELLIGENCE_SQL,BODY_WEIGHT_INTELLIGENCE_SQL,
   activitySummaryObservations,bodyWeightObservations} from '../intelligence/snapshot.js'
 
