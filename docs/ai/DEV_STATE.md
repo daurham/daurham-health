@@ -1,3 +1,10 @@
+## 2026-10-17 PIQ-5.5 owner-selected canonical Lab association — development only
+
+- Branch `piq/00-baseline-20261014` now carries a separate Coach-to-Lab handoff and owner-confirmed link endpoint. An owner may save a new Personal Lab experiment and explicitly link that canonical record to the originating non-calorie Coach recommendation.
+- SQL conditional write validates current recommendation eligibility/context, exact response version, actual owner-created accepted/scheduled/active Lab record, and no prior response or link. Link ID persists as recommendation metadata; Coach only displays extant non-abandoned/superseded Lab links.
+- This **does not** start the experiment or prove implementation, improvement, safety, or adherence. Existing seven-day follow-up is still reserved for separately acknowledged `I started this`; no auto-target changes, schema changes, AI costs, owner PHI read, or production deployment.
+- New regression tests: `tests/piq5-coach-experiment-link.test.tsx` and route assertion. Full branch CI and real owner mobile acceptance remain pending. Continue PIQ-5.5 verified implementation state and PIQ-5.7 golden scenarios after validations. The source-of-truth task ledger is `docs/ai/PIQ_PROGRESS.md`, not the older I0–I10 CURRENT_TASK stub. Owner phase acceptance remains 0/9.
+
 ## 2026-10-17 PIQ-5.5 owner feedback reasons — branch only
 
 - Added optional Coach recommendation dismissal reasons: `Already knew`, `Wrong context`, and `Not practical`, nested in collapsed "Other feedback" disclosure; existing `Not relevant` remains.
