@@ -2585,3 +2585,17 @@ No database read/write, owner data, schema migration, new model spend,
 main merge or release. This does not make a regex an exhaustive semantic
 truth validator. Owner preview remains blocked by copied Neon parent data
 and unverified runtime Auth isolation. Engineering ~91%; accepted 0/9.
+
+## 2026-10-16 — PIQ-4 preview owner-API runtime lockdown (CI pending)
+
+Bounded release safety change: existing preflight only reported unsafe
+provider metadata; it did not prevent PIQ-preview owner API requests.
+Added a hard-fail route-level 503 gate for PIQ Git refs and unknown-ref
+Vercel previews, including Auth, Health, backup export, and Ask Health.
+No environment-only override. Other known preview refs and production
+main are unchanged. Added synthetic dispatch tests and no-cache response.
+Await exact-commit full CI. Development-branch code cannot protect
+older deployed preview SHAs, and the cloned Neon candidate remains
+unsuitable for owner QA. No database, migration, credentials,
+personal records, paid AI or main touched. ~91% engineering,
+formal acceptance 0/9.

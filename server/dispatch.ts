@@ -1,4 +1,5 @@
 import aiUsageHandler from './handlers/ai-usage.js'
+import { piqPreviewOwnerApiLocked } from './piq-preview-access.js'
 import { handleApiError, requestApiPathname, sendJson, type ApiRequest, type ApiResponse } from './http.js'
 import authHandler from './handlers/auth.js'
 import bodyMeasurementsHandler from './handlers/body-measurements.js'
@@ -431,6 +432,15 @@ export async function dispatchHealthApi(req: ApiRequest, res: ApiResponse): Prom
     const route = matchHealthApiRoute(requestApiPathname(req))
     if (!route) {
       sendJson(res, 404, { error: 'Not found' })
+      return
+    }
+    // Refuse unapproved PIQ preview access before any owner/Auth/backup handler.
+    if (piqPreviewOwnerApiLocked(process.env)) {
+      res.setHeader('Cache-Control', 'no-store')
+      sendJson(res, 503, {
+        error: 'PIQ preview owner APIs are disabled pending isolation approval.',
+        code: 'PIQ_PREVIEW_OWNER_API_LOCKED',
+      })
       return
     }
     await HANDLERS[route](req, res)

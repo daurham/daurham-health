@@ -45,3 +45,19 @@ This is a release-gate hardening step, not runtime approval. The currently
 parent-data-cloned Neon preview and older deployed code remain blocked. No owner
 records, credentials, Vercel deployments, migration, paid provider, or production
 changes are authorized by these checks.
+
+## 2026-10-16 — Runtime PIQ candidate API stop (CI pending)
+
+Metadata-only preview release checks were advisory; they did not stop live
+API requests. New `server/piq-preview-access.ts` and `dispatchHealthApi`
+gate recognized routes **before** any owner/Auth/Health/backup handler:
+`piq/*` Git refs (regardless of claimed Vercel target) and Vercel
+previews with no identifiable Git ref receive a fixed uncacheable 503
+`PIQ_PREVIEW_OWNER_API_LOCKED`. Known unrelated previews and `main`
+are unchanged. No config-only bypass is permitted. An explicit reviewed
+code/release transition remains necessary **after** independent empty
+Neon origin, runtime Auth/DB/owner identity, migration/backup safety,
+and owner approval. Synthetic dispatch tests only, no SQL/PHI/provider
+calls. The old deployed preview SHA is **not protected** by undelivered
+development code. Existing inherited-data preview remains unsafe
+for owner QA.

@@ -790,3 +790,12 @@ This removes a possible legacy owner-evidence ID disclosure via cached
 educational output. Fresh General Only output already uses an empty
 evidence-ID universe. Synthetic cache/provider-spend assertions added.
 PIQ branch only, no owner/DB/AI access or release; owner QA outstanding.
+
+## 2026-10-16 — PIQ preview API hard stop (CI pending)
+
+Static PIQ metadata gates previously never enforced server request
+isolation. The branch-specific API dispatch stop now returns an
+uncacheable 503 before owner/Auth handlers on PIQ candidates, with
+synthetic direct/rewrite route tests. The gate has no env-only
+unlock. Older Vercel READY deployment does not include it until
+matching commit deployment. Production untouched; owner QA blocked.

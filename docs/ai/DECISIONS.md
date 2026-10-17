@@ -984,3 +984,13 @@ detected personal-claim text. Preserve safe educational blocks, ordinary
 follow-ups and original cache immutability. This is a pure defense-in-depth
 cache sanitation step with no additional provider or SQL work; it does
 not attest semantic medical correctness or owner preview approval.
+
+## Decision: Unapproved PIQ candidate APIs fail closed at dispatch (2026-10-16)
+
+Advisory provider metadata preflights cannot be treated as runtime
+access enforcement. Disable all recognized owner API routes, including
+Auth and backup, on `piq/*` Git refs and Vercel previews missing ref
+identity. Keep known other branches and `main` unchanged.
+No environment-only bypass: independent isolation, migration,
+and owner signoff must precede an explicit reviewed release change.
+No DB/owner/provider access needed for deterministic tests.
