@@ -1,7 +1,7 @@
 import {describe,expect,it} from 'vitest'
 import {buildHealthIntelligenceSnapshot,type IntelligenceObservation} from '../src/domain/intelligence/shared.js'
 import {addCalendarDays} from '../src/domain/training-plan.js'
-import {screenScaleWindowSignalCoverage} from '../src/domain/ask-health/scale-window-signal-coverage.js'
+import {screenScaleWindowSignalCoverage,screenScaleShiftTiming} from '../src/domain/ask-health/scale-window-signal-coverage.js'
 import {focusWeightEnergyContext} from '../src/domain/ask-health/focused-weight-energy.js'
 import {buildAskHealthEvidencePacket,packetFingerprintMaterial} from '../src/domain/ask-health/packet.js'
 
@@ -89,5 +89,60 @@ describe('PIQ4 ten-day scale-window coverage contract',()=>{
     expect(actual.text).not.toContain('Both comparison windows contain')
     expect(packetFingerprintMaterial(measured.packet))
       .not.toBe(packetFingerprintMaterial(unmeasured.packet))
+  })
+})
+
+describe('PIQ4 date-order gate for qualified food shifts and later scale records',()=>{
+  const snapshotFor=(observations:IntelligenceObservation[])=>snapshot(observations)
+  const timing=(observations:IntelligenceObservation[],
+    shiftDays:readonly string[],coverageOverride?:'sampled_both_windows'|'sparse_or_mixed')=>{
+    const snapshot=snapshotFor(observations)
+    const coverage=screenScaleWindowSignalCoverage({
+      snapshot,completeThrough:'2026-10-15',today,
+    })
+    return screenScaleShiftTiming({
+      snapshot,completeThrough:'2026-10-15',today,
+      coverage:coverageOverride?{...coverage,weightSampling:coverageOverride}:coverage,
+      shifts:[{kind:'sodium',dates:shiftDays}],
+    })
+  }
+  it('does not treat a same-day scale reading as occurring after a full-day food log',()=>{
+    expect(timing(weights,['2026-10-14','2026-10-15'])).toEqual({
+      sodium:'no_later_scale_record',carbohydrate:'not_checked',
+    })
+    expect(timing(weights,['2026-10-13','2026-10-14'])).toEqual({
+      sodium:'later_scale_recorded',carbohydrate:'not_checked',
+    })
+  })
+  it('requires both weigh-in sampling and qualified source dates before any ordering',()=>{
+    expect(timing(weights.slice(-3),['2026-10-13','2026-10-14']).sodium)
+      .toBe('weight_window_insufficient')
+    expect(timing(weights,['2026-10-13','2026-10-14','2026-10-14']).sodium)
+      .toBe('source_dates_unverified')
+    expect(timing(weights,['2026-10-12','2026-10-13']).sodium)
+      .toBe('source_dates_unverified')
+    expect(timing(weights,['2026-10-15','2026-10-16']).sodium)
+      .toBe('source_dates_unverified')
+    expect(timing(weights,['2026-10-13','2026-10-14'],'sparse_or_mixed').sodium)
+      .toBe('weight_window_insufficient')
+    const snap=snapshotFor(weights)
+    const coverage=screenScaleWindowSignalCoverage({snapshot:snap,
+      completeThrough:'2026-10-15',today})
+    expect(screenScaleShiftTiming({snapshot:snap,coverage,today,
+      completeThrough:'2026-10-15',shifts:[
+        {kind:'sodium',dates:['2026-10-13','2026-10-14']},
+        {kind:'sodium',dates:['2026-10-14','2026-10-15']},
+      ]}).sodium).toBe('source_dates_unverified')
+  })
+  it('requires an independently source-identified usual-condition later weigh-in',()=>{
+    const unsuitable=weights.map(w=>w.date==='2026-10-15'
+      ?{...w,quality:'different_conditions'}:w)
+    expect(timing(unsuitable,['2026-10-13','2026-10-14']).sodium)
+      .toBe('weight_window_insufficient')
+    const removed=weights.filter(w=>w.date!=='2026-10-15')
+    // Still 2 recent usual weight dates: the day after the last food log
+    // is missing. There is no basis for a post-log scale claim.
+    expect(timing(removed,['2026-10-13','2026-10-14']).sodium)
+      .toBe('no_later_scale_record')
   })
 })

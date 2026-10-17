@@ -120,4 +120,22 @@ describe('PIQ-4.2 validated alternative scale-noise context, no causal authority
    const missing=evaluate({wrongNutrientIds:true})
    expect(packetFingerprintMaterial(qualified.packet)).not.toBe(packetFingerprintMaterial(missing.packet))
  })
+ it('does not describe same-day or earlier scale readings as a later response',()=>{
+   const r=evaluate()
+   const evidence=r.packet.evidence.find(x=>x.id==='weight_energy.scale_context')!
+   expect(evidence.coverage).toMatchObject({
+     sodiumScaleTiming:'no_later_scale_record',
+     carbohydrateScaleTiming:'no_later_scale_record',
+   })
+   expect(evidence.text).toContain('no usual-condition scale record exists on a later calendar day')
+   expect(evidence.text).toContain('Same-day food totals cannot be ordered')
+   expect(evidence.text).not.toContain('you retained fluid')
+ })
+ it('keeps general-only and explicitly historical weight questions outside chronology',()=>{
+   const historical=evaluate({},'Why did my scale stall last week?')
+   expect(historical.focus).toBeNull()
+   const general=evaluate({},'Why has my weight loss stalled?','general_only')
+   expect(general.packet.evidence.some(x=>x.id==='weight_energy.scale_context')).toBe(false)
+ })
+
 })

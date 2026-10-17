@@ -575,6 +575,22 @@ function addFocusedWeightEnergy(
   // Absence of a qualifying comparison MUST NOT imply stable intake.
   const contextual = focus.qualifiedScaleContext
   const scaleCoverage=focus.scaleWindowSignalCoverage
+  const shiftTiming=focus.scaleShiftTiming
+  const shiftTimingLabels:{kind:'sodium'|'carbohydrate';state:string}[]=[
+    {kind:'sodium',state:shiftTiming.sodium},
+    {kind:'carbohydrate',state:shiftTiming.carbohydrate},
+  ]
+  const chronologyDescription=shiftTimingLabels
+    .filter(item=>item.state!=='not_checked')
+    .map(item=>item.kind+': '+
+      (item.state==='later_scale_recorded'
+        ?'a usual-condition scale record exists on a later calendar day than the latest qualified food-log day, but this is NOT a verified nutrient effect'
+        :item.state==='no_later_scale_record'
+          ?'no usual-condition scale record exists on a later calendar day than the latest qualified food-log day; a later scale comparison is unavailable'
+          :item.state==='weight_window_insufficient'
+            ?'usual-condition weight coverage is insufficient for date-order comparison'
+            :'source dates could not be verified for comparison'))
+    .join('; ')
   push({
     id:'weight_energy.scale_context',
     domain:'intelligence',
@@ -594,7 +610,11 @@ function addFocusedWeightEnergy(
         'Missing or unverified food days and unrecorded circumstances are unknown, not normal or zero.')+
       ' In these ten completed comparison days, source-identified water logs exist on '+
       scaleCoverage.recordedWaterDays+' day(s) and step logs on '+
-      scaleCoverage.recordedStepDays+' day(s). Neither proves whole-day hydration, physical activity, or a cause for scale change; missing logs never imply zero.',
+      scaleCoverage.recordedStepDays+' day(s). Neither proves whole-day hydration, physical activity, or a cause for scale change; missing logs never imply zero.'+
+      (chronologyDescription
+        ?' Calendar-day ordering of qualified food logs versus scale readings: '+chronologyDescription+
+          '. Same-day food totals cannot be ordered relative to a weigh-in; no chronology here measures weight response or establishes causation.'
+        :''),
     coverage:{
       verifiedNutrientShiftCount:contextual.length,
       screenedNutrients:'sodium, carbohydrate',
@@ -609,6 +629,8 @@ function addFocusedWeightEnergy(
       nonUsualWeightDays:scaleCoverage.nonUsualWeightDays,
       recordedWaterDays:scaleCoverage.recordedWaterDays,
       recordedStepDays:scaleCoverage.recordedStepDays,
+      sodiumScaleTiming:shiftTiming.sodium,
+      carbohydrateScaleTiming:shiftTiming.carbohydrate,
     },
     detailPath:'/nutrition',userEntered:false,substantive:false,priority:1,
   })

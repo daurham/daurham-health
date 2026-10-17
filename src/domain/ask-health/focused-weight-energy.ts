@@ -11,7 +11,7 @@ import { UNCHECKED_EXPERIMENT_OUTCOME, type ExperimentOutcomeReview } from './ex
 import { UNCHECKED_RECENT_RESULT, type RecentExperimentResultReview } from './recent-experiment-result-review.js'
 import { UNCHECKED_WEIGHT_ENERGY_RECONCILIATION, type WeightEnergyReconciliation } from './weight-energy-reconciliation.js'
 import { UNCHECKED_CANONICAL_GOAL_STATUS, type CanonicalGoalStatusReview } from './canonical-goal-status-review.js'
-import {screenScaleWindowSignalCoverage,type ScaleWindowSignalCoverage} from './scale-window-signal-coverage.js'
+import {screenScaleWindowSignalCoverage,screenScaleShiftTiming,type ScaleWindowSignalCoverage,type ScaleShiftTiming} from './scale-window-signal-coverage.js'
 
 /**
  * PIQ-4.2 FIRST SLICE — purely descriptive, explicitly bounded weight/intake
@@ -44,6 +44,8 @@ export type FocusedWeightEnergyEvidence = {
     'id' | 'kind' | 'title' | 'detail' | 'dates' | 'detailPath'>>
   /** Same-window weigh-in and logged-signal coverage, NOT causal evidence. */
   scaleWindowSignalCoverage:ScaleWindowSignalCoverage
+  /** Date-level ordering only; does not infer nutrient timing within a day or a weight cause. */
+  scaleShiftTiming:ScaleShiftTiming
   /** Read-time current target/experiment revision status, NOT permission to adjust calories. */
   currentSettings: WeightEnergyCurrentSettings
   /** Read-only canonical matched-exercise decline flags, never strength-retention proof. */
@@ -121,6 +123,19 @@ export function focusWeightEnergyContext(input: {
   const boundedStart = expectedStart < snapshot.period.start
     ? snapshot.period.start : expectedStart
   const selected = frame.filter(d => d.date >= boundedStart && d.date <= maintenance.completeThrough)
+  const qualifiedScaleContext = maintenance.noiseFactors
+    .filter(item => (item.kind === 'sodium' || item.kind === 'carbohydrate') &&
+      item.dates.every(date => date >= boundedStart && date <= maintenance.completeThrough))
+    .map(({id,kind,title,detail,dates,detailPath}) => ({
+      id,kind,title,detail,dates,detailPath,
+    }))
+  const scaleWindowSignalCoverage=screenScaleWindowSignalCoverage({
+    snapshot,completeThrough:maintenance.completeThrough,today,
+  })
+  const scaleShiftTiming=screenScaleShiftTiming({
+    snapshot,completeThrough:maintenance.completeThrough,today,
+    coverage:scaleWindowSignalCoverage,shifts:qualifiedScaleContext,
+  })
   return {
     start: boundedStart,
     end: span?.end ?? maintenance.completeThrough,
@@ -140,15 +155,9 @@ export function focusWeightEnergyContext(input: {
     // Reuse the engine's actual 3d-vs-prior-7d, whole-day-verified,
     // source-ID-matching sodium/carb tests. Never copy its less-qualified
     // event-count water/bowel contrasts into an Ask Health weight conclusion.
-    qualifiedScaleContext: maintenance.noiseFactors
-      .filter(item => (item.kind === 'sodium' || item.kind === 'carbohydrate') &&
-        item.dates.every(date => date >= boundedStart && date <= maintenance.completeThrough))
-      .map(({id,kind,title,detail,dates,detailPath}) => ({
-        id,kind,title,detail,dates,detailPath,
-      })),
-    scaleWindowSignalCoverage:screenScaleWindowSignalCoverage({
-      snapshot,completeThrough:maintenance.completeThrough,today,
-    }),
+    qualifiedScaleContext,
+    scaleWindowSignalCoverage,
+    scaleShiftTiming,
     currentSettings: {...UNCHECKED_WEIGHT_ENERGY_SETTINGS},
     exercisePreservationReview: {...UNCHECKED_EXERCISE_PRESERVATION},
     weightGoalObservation: {...UNCHECKED_WEIGHT_GOAL_OBSERVATION},
