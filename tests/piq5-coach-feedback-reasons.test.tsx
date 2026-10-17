@@ -35,7 +35,7 @@ describe('PIQ-5.5 optional owner feedback', () => {
       expect(html).toContain('>' + text + '</button>')
     }
     expect(html).toContain('This does not change your health records or safety rules.')
-    expect((html.match(/<article\\b/g) ?? [])).toHaveLength(1)
+    expect((html.match(/<article\b/g) ?? [])).toHaveLength(1)
   })
 
   it('rejects unexpected reason values or reasons on a start, before any SQL read or write', async () => {
