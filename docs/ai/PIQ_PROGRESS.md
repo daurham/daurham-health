@@ -3333,3 +3333,71 @@ and authenticated owner signoff gates.
 Next: synthetic safe guidance for **hypothetical third-person emergencies**
 and robust quoted/reporting distinctions without changing the person
 privacy gate; then independent QA-only preview setup and owner acceptance.
+
+
+## 2026-10-17 — PIQ-3 T41 conditional third-party emergency education (CI GREEN)
+
+**State:** validated on isolated PIQ development branch, not owner-accepted, 
+not preview-unlocked, and not released. This closes the bounded conditional
+third-party guidance gap identified after the T48 whole-packet person isolation.
+
+**Problem:** the non-owner privacy refusal was correctly withholding owner
+records but made straightforward questions such as "If my son has chest pain,
+what should I do?" unhelpful. These are not confirmed current emergencies
+but should still receive proportionate general preparation guidance.
+
+**Behavior:** a narrow English conditional-question classifier recognizes
+presently hypothetical, explicit third-party severe chest pain, breathing
+emergency, severe bleeding, stroke, vomiting blood or imminent self-harm
+framing. It reuses the existing narrow symptom/person recognizer after removing
+only the conditional preamble. A separate deterministic **general** answer
+describes what to do *if* the scenario occurs, explicitly stating that no
+current emergency was established. It does not falsely label an owner as
+the third-party patient or assert a diagnosis. The immediate first-person
+and present-third-party emergency routes retain higher priority.
+
+**Privacy/cost:** full owner evidence is withheld *before DB load*, cached
+personal responses, conversation, Gemini provider and AI usage gate. Direct
+`explainAskHealth` callers accidentally handing a populated owner packet
+receive the same sanitized response. New privacy-safe diagnostic path:
+`third_party_hypothetical_safety`; independent deterministic prompt label:
+`ask-health-conditional-safety-v1`. `answerScope=general` (not an
+alarm claiming `urgent_safety`).
+
+**Negative cases:** explicit negation, unquoted historic reports, ordinary
+family questions, quoted speech, fictional examples, unrelated secondary
+clauses and existing first-person actual emergencies. Both initial "If..."
+and prefixed "What should I do if..."/"How can I help if..." question
+structures remain hypothetical in the current-emergency detector.
+
+**Synthetic regression:** five new tests with several positive and negative
+variations plus updated non-current safety fixtures, testing all four Context
+Modes, direct preloaded-owner packet, self-harm example, zero DB/provider/
+budget calls, no private evidence or previous chat, and owner emergency
+precedence.
+
+**Commits:** `c552de93d64dc588bb247f9dca78f977c93af581`
+and conditional-prefix correction
+`f0d51851f5d2958ed424852e4c03d8e9aad3f575`.
+**Exact-code CI:** https://github.com/daurham/daurham-health/actions/runs/39050535140
+**SUCCESS**, npm ci, TypeScript, ESLint, Vitest **2,518 passing;
+30 skipped (332 suites passed)** and production build.
+
+**Scope:** This is a bounded classifier and general first-response guide,
+not comprehensive medical triage, clinically approved release language,
+multilingual person-resolution, conversation-wide medical context, or
+proof of live owner/mobile effectiveness. Mixed real-and-hypothetical
+third-party urgency, reported speech and broader clinical screening
+remain quality constraints for live review, rather than authorization
+for endless speculative micro-patches. Owner acceptance remains **0/9**.
+
+**No** production main merge, production DB access, new migration,
+owner-record query, QA API unlock, paid AI provider call or health-data
+write. Keep isolated QA-only preview credentials, trusted origin,
+runtime attestation, rollback and owner mobile QA as mandatory release gates.
+
+**Next milestone:** shift from this bounded PIQ-3 safety subsection toward
+**PIQ-5 Coach recommendation eligibility and quiet high-value UX**, using
+the existing PIQ-1 recommendation lifecycle and PIQ-4 evidence truth,
+while separately resolving protected preview acceptance. Prefer
+milestone-level outcome integration over counting further lexical cases.
