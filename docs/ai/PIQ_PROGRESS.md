@@ -2888,3 +2888,44 @@ and status/fingerprint tests in `tests/ai-usage.test.ts`. No migrations or
 database edits, paid model calls, personal owner records, production writes or
 PIQ lock changes. Golden T43 stays partial until exact-SHA CI and real
 multi-tab/cold-instance QA; production unchanged.
+
+
+## 2026-10-17 — PIQ-4 T42 / PIQ-3 in-flight UI regression validation (CI GREEN)
+
+State: **validated development-only**, not deployed or owner-accepted.
+Depends on: T42 canonical change notifications, PIQ-3 context-mode controls.
+Why: cross-tab stale-response safeguards introduced a legitimate Ask Health
+`useEffect` subscription and new-chat freshness-marker reset. Existing
+static test assumptions incorrectly rejected those changes, making
+full-branch GitHub validation red despite their intended safety behavior.
+
+Files: `tests/insights.test.ts`, `tests/piq3-context-mode-page.test.tsx`.
+Contract: Insights must prefill Ask Health lens/range/question without a
+provider request or auto-submission; only explicit form submission calls
+`submit(draft)`. New chat remains disabled while pending, clears the
+owner-dependent freshness marker and then resets history. Lens/mode/range/
+question pending guards and T42 stale-response protections remain covered.
+No source-file, runtime, clinical, data, or provider behavior was relaxed.
+
+Evidence: test commits `a30408b4655a55c82b3acf3ed6919876c7ed8aee`
+and `fe8dec4a82c75cd3ac8b0473982b9ec1cfe25acd`; the exact
+`fe8dec4` branch GitHub Actions run
+https://github.com/daurham/daurham-health/actions/runs/39017579374
+**PASSED** npm ci, TypeScript, ESLint, Vitest (2,487 passed, 30 skipped)
+and production build. Earlier `767911f` had exactly two failing
+static assertions; these were reconciled with live component source rather
+than disabling a guard. GitHub run only verifies synthetic/unit/code
+behavior; it is not authenticated mobile owner acceptance.
+
+Migrations: none. Provider spend: none. Production/main: untouched.
+Vercel preview owner API: remains locked. QA credentials still deliberate
+invalid placeholders; exact-SHA preview and real owner QA remain blocked
+by credential/trusted-origin and platform deployment-quota gates.
+Formal acceptance: 0/9. Golden registry: 50 specifications, not 50
+live passing scenarios; independent owner acceptance remains outstanding.
+
+Next: continue bounded quality/fixture work without paid model calls
+while preserving the preview lock; later configure distinct QA-only database
+and cookie credentials through the approved secret path, attest exact-SHA
+preview/runtime/owner isolation, then run the owner acceptance matrix
+before considering any production promotion.
