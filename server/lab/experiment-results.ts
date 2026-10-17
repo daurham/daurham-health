@@ -22,9 +22,8 @@ import { getSql, type Sql } from '../db.js'
 import { HttpError } from '../http.js'
 import { currentHealthDate, healthCalendarTimeZone } from '../health-time.js'
 import { VERIFIED_NUTRITION_DAYS_SQL } from '../nutrition/maintenance-eligibility.js'
-import { addCalendarDays } from '../../src/domain/progress/dates.js'
 import { isCalendarDate } from '../../src/domain/training.js'
-import { assessNutritionExperimentComparison, type ExperimentComparisonReview } from '../../src/domain/experiment-comparison.js'
+import { assessNutritionExperimentComparison, nutritionComparisonLoadStart, type ExperimentComparisonReview } from '../../src/domain/experiment-comparison.js'
 
 type ExperimentRow = {
   id: string
@@ -386,7 +385,7 @@ async function loadEvidence(
     loadTraining(sql, experiment.id, start, end),
     loadBody(sql, requirements, start, end, timezone),
     requirements.some((item) => item.requirementKind === 'nutrition_metric')
-      ? loadNutrition(sql, reportedChangeDate ? addCalendarDays(reportedChangeDate, -7) : start, end, today)
+      ? loadNutrition(sql, nutritionComparisonLoadStart(start, reportedChangeDate), end, today)
       : Promise.resolve([] as ExperimentEvidence['nutrition']),
     loadActivity(sql, start, end, timezone),
     loadSleep(sql, start, end, timezone),
