@@ -186,9 +186,10 @@ export type BuildMaintenanceInput = {
   contexts: readonly DailyContext[]
   weightGoal?: MaintenanceWeightGoal | null
   adjustmentContext?: MaintenanceAdjustmentContext | null
-  /** An explicit, read-time verified whitelist. Undefined preserves legacy fixture semantics;
-   * the server must ALWAYS provide a Set, including the empty set on missing/mismatched DB data. */
-  eligibleNutritionDates?: ReadonlySet<string>
+  /** Required verified owner full-day whitelist; empty means NO eligible days.
+   * Source quality of individual food entries cannot establish day completeness.
+   * The server reads this independently; failures must supply an empty Set. */
+  eligibleNutritionDates: ReadonlySet<string>
 }
 
 type WindowEvidence = {
@@ -302,7 +303,7 @@ function windowEvidence(
 ): WindowEvidence {
   const start = addCalendarDays(completeThrough, -(days - 1))
   const calorieAll = signal(frame, 'nutrition.calories', start, completeThrough)
-    .filter((item) => eligibleNutritionDates === undefined || eligibleNutritionDates.has(item.date))
+    .filter((item) => eligibleNutritionDates?.has(item.date) === true)
   const calories = calorieAll.filter(reliableNutrition)
   const weights = signal(frame, 'body.weight_kg', start, completeThrough)
   const usualWeights = weights.filter((item) => weightQuality(item) === 'usual')
@@ -1123,13 +1124,19 @@ export function explainMaintenanceEvidence(
 }
 
 export function buildMaintenanceState(input: BuildMaintenanceInput): MaintenanceState {
+  // TypeScript requires a verified whitelist; unchecked JS callers still
+  // fail closed instead of treating source-quality-only days as complete.
+  const verifiedInput: BuildMaintenanceInput = {
+    ...input,
+    eligibleNutritionDates: input.eligibleNutritionDates ?? new Set<string>(),
+  }
   const completeThrough = input.today != null && input.asOf === input.today
     ? addCalendarDays(input.asOf, -1)
     : input.asOf
-  const estimate = buildEstimate(input, completeThrough)
-  const noise = noiseFactors(input, completeThrough)
-  const plateau = plateauAssessment(estimate, input.weightGoal, noise)
-  const safety = calorieAdjustmentSafety(input, estimate, plateau, completeThrough)
+  const estimate = buildEstimate(verifiedInput, completeThrough)
+  const noise = noiseFactors(verifiedInput, completeThrough)
+  const plateau = plateauAssessment(estimate, verifiedInput.weightGoal, noise)
+  const safety = calorieAdjustmentSafety(verifiedInput, estimate, plateau, completeThrough)
   return {
     version: MAINTENANCE_ENGINE_VERSION,
     asOf: input.asOf,
@@ -1140,7 +1147,7 @@ export function buildMaintenanceState(input: BuildMaintenanceInput): Maintenance
     interventions: interventionsFor(estimate, plateau, safety),
     calibration: calibrationFor(estimate, plateau, input.weightGoal),
     calorieAdjustmentSafety: safety,
-    evidenceExplanation: explainMaintenanceEvidence(estimate, plateau, safety, noise, input.eligibleNutritionDates !== undefined),
+    evidenceExplanation: explainMaintenanceEvidence(estimate, plateau, safety, noise, input.eligibleNutritionDates != null),
     decisionRevision: input.adjustmentContext?.revisionStatus === 'consistent'
       ? input.adjustmentContext.decisionRevision ?? null : null,
   }

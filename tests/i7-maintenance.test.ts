@@ -11,6 +11,11 @@ import { addCalendarDays } from '../src/domain/training-plan.ts'
 const AS_OF = '2026-10-08'
 const START = '2026-09-09'
 
+/** Only test fixtures simulate independently confirmed full-day nutrition. */
+const SYNTHETIC_CONFIRMED_DAYS = new Set(
+  Array.from({ length: 28 }, (_, i) => addCalendarDays('2026-09-10', i)),
+)
+
 const UNITS: Record<IntelligenceObservation['key'], string> = {
   'activity.steps': 'steps',
   'activity.active_energy_kcal': 'kcal',
@@ -112,6 +117,7 @@ describe('I7 observed maintenance estimator', () => {
   it('combines robust intake with Theil-Sen weight change to estimate observed maintenance', () => {
     const weightDeltaPerDay = -0.05
     const state = buildMaintenanceState({
+      eligibleNutritionDates: SYNTHETIC_CONFIRMED_DAYS,
       asOf: AS_OF,
       today: AS_OF,
       intelligence: snapshot(completeSeries({ intake: 2000, weightDeltaPerDay })),
@@ -134,6 +140,7 @@ describe('I7 observed maintenance estimator', () => {
       bodyQuality: 'different_conditions',
     })
     const state = buildMaintenanceState({
+      eligibleNutritionDates: SYNTHETIC_CONFIRMED_DAYS,
       asOf: AS_OF,
       today: AS_OF,
       intelligence: snapshot(observations),
@@ -152,6 +159,7 @@ describe('I7 observed maintenance estimator', () => {
 
   it('calls a multi-week flat trend a likely plateau only with an unmet directional weight goal', () => {
     const state = buildMaintenanceState({
+      eligibleNutritionDates: SYNTHETIC_CONFIRMED_DAYS,
       asOf: AS_OF,
       today: AS_OF,
       intelligence: snapshot(completeSeries({ intake: 2100, weightDeltaPerDay: 0 })),
@@ -176,6 +184,7 @@ describe('I7 observed maintenance estimator', () => {
 
   it('treats the same flat evidence as stability when there is no unmet directional weight goal', () => {
     const state = buildMaintenanceState({
+      eligibleNutritionDates: SYNTHETIC_CONFIRMED_DAYS,
       asOf: AS_OF,
       today: AS_OF,
       intelligence: snapshot(completeSeries({ intake: 2100, weightDeltaPerDay: 0 })),
@@ -192,6 +201,7 @@ describe('I7 observed maintenance estimator', () => {
     observations.push(obs('nutrition.calories', AS_OF, 9000, { quality: 'high_confidence', provenance: 'reference' }))
     observations.push(obs('body.weight_kg', AS_OF, 95, { quality: 'usual', provenance: 'owner' }))
     const state = buildMaintenanceState({
+      eligibleNutritionDates: SYNTHETIC_CONFIRMED_DAYS,
       asOf: AS_OF,
       today: AS_OF,
       intelligence: snapshot(observations),
@@ -259,6 +269,7 @@ describe('I7 short-term scale-noise context', () => {
       return true
     })
     const state = buildMaintenanceState({
+      eligibleNutritionDates: SYNTHETIC_CONFIRMED_DAYS,
       asOf: AS_OF,
       today: AS_OF,
       intelligence: snapshot(observations),

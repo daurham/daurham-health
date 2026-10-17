@@ -29,7 +29,7 @@ function build(input: {
   })
   const maintenance = buildMaintenanceState({
     asOf: AS_OF, today: AS_OF, intelligence, contexts: [],
-    ...(verified ? { eligibleNutritionDates: verified } : {}),
+    eligibleNutritionDates: verified ?? new Set<string>(),
     weightGoal: { goalId: 'weight', goalVersionId: 'v1', label: 'Weight', targetState: 'unmet', direction: input.ownerGoal ?? 'lose' },
     adjustmentContext: {
       status: 'available', currentCalorieTarget: input.target ?? 2300, activeExperimentCount: 0,
@@ -99,11 +99,11 @@ describe('PIQ-1.2 independent maintenance evidence vs calorie review explanation
     expect(maintenance.estimate.observedMaintenanceKcal).toBeNull()
   })
 
-  it('does not label legacy source-only samples as confirmed whole-day coverage', () => {
+  it('T03: missing verified completeness withholds source-only maintenance calibration', () => {
     const { maintenance } = build({ verified: null })
-    expect(maintenance.estimate.state).toBe('available')
-    expect(maintenance.evidenceExplanation.nutrition.status).toBe('limited')
-    expect(maintenance.evidenceExplanation.nutrition.detail).toContain('source quality alone cannot prove a complete day')
+    expect(maintenance.estimate.state).toBe('insufficient_evidence')
+    expect(maintenance.estimate.observedMaintenanceKcal).toBeNull()
+    expect(maintenance.evidenceExplanation.nutrition.status).toBe('insufficient')
   })
 
   it('keeps action not applicable when a weight trend is moving toward the target', () => {

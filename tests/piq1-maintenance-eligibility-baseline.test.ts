@@ -29,7 +29,7 @@ function state(observations: IntelligenceObservation[], eligibleNutritionDates?:
       timezone: 'America/Phoenix', today: AS_OF, observations,
     }),
     contexts: [],
-    eligibleNutritionDates,
+    eligibleNutritionDates: eligibleNutritionDates ?? new Set<string>(),
     weightGoal: {
       goalId: 'synthetic-goal', goalVersionId: 'synthetic-version',
       label: 'Weight', targetState: 'unmet', direction: 'lose',
@@ -72,12 +72,32 @@ describe('PIQ-1.1 baseline: demonstrate existing maintenance hazard and future e
     expect(decision.estimate.state).toBe('insufficient_evidence')
   })
 
-  it('T03 KNOWN GAP: 28 precisely sourced SINGLE-600-kcal-meal days can yield a maintenance estimate', () => {
-    const prior = state(series(600, -0.075))
-    expect(prior.estimate.state).toBe('available')
-    expect(prior.estimate.averageIntakeKcal).toBe(600)
-    expect(prior.estimate.observedMaintenanceKcal).not.toBeNull()
-    // This green test documents a PRODUCT FAILURE, not correct behavior.
+  it('T03 FIXED: 28 precise single-meal days are not verified whole-day intake', () => {
+    const missing = state(series(600, -0.075))
+    expect(missing.estimate.state).toBe('insufficient_evidence')
+    expect(missing.estimate.averageIntakeKcal).toBeNull()
+    expect(missing.estimate.observedMaintenanceKcal).toBeNull()
+    expect(missing.calorieAdjustmentSafety.status).toBe('blocked')
+    expect(missing.interventions.some((x) => x.kind === 'review_intake_adjustment')).toBe(false)
+  })
+
+  it('T03 FIXED: untyped JS callers with missing or null whitelist also fail closed', () => {
+    const records = series(2100, -0.05)
+    const complete = new Set(records.filter((r) => r.key === 'nutrition.calories').map((r) => r.date))
+    expect(state(records, complete).estimate.state).toBe('available')
+    const input = {
+      asOf: AS_OF, today: AS_OF,
+      intelligence: buildHealthIntelligenceSnapshot({
+        range: '30d', start: '2026-09-09', end: AS_OF,
+        asOf: AS_OF, timezone: 'America/Phoenix', today: AS_OF, observations: records,
+      }), contexts: [],
+    }
+    for (const untyped of [input, { ...input, eligibleNutritionDates: null }]) {
+      const result = buildMaintenanceState(untyped as unknown as Parameters<typeof buildMaintenanceState>[0])
+      expect(result.estimate.state).toBe('insufficient_evidence')
+      expect(result.estimate.observedMaintenanceKcal).toBeNull()
+      expect(result.interventions.some((x) => x.kind === 'review_intake_adjustment')).toBe(false)
+    }
   })
 
   it('with no owner complete-day confirmations, applying the future strict gate would withhold that estimate', () => {
@@ -86,13 +106,14 @@ describe('PIQ-1.1 baseline: demonstrate existing maintenance hazard and future e
     expect(protectedState.estimate.state).toBe('insufficient_evidence')
     expect(protectedState.estimate.observedMaintenanceKcal).toBeNull()
     expect(protectedState.interventions.some((item) => item.kind === 'review_intake_adjustment')).toBe(false)
-    // This filter is test-only until owner storage and read integration land.
+    // Real server maintenance also uses canonical day-completeness verification.
   })
 
-  it('single-meal baseline can still show a descriptive flat-weight estimate but no longer authorizes a cut', () => {
+  it('single-meal flat-weight baseline cannot estimate maintenance or authorize a cut', () => {
     const records = series(1400, 0)
     const prior = state(records)
-    expect(prior.estimate.state).toBe('available')
+    expect(prior.estimate.state).toBe('insufficient_evidence')
+    expect(prior.estimate.observedMaintenanceKcal).toBeNull()
     expect(prior.interventions.some((item) => item.kind === 'review_intake_adjustment')).toBe(false)
     expect(prior.calorieAdjustmentSafety.status).toBe('blocked')
     expect(prior.interventions.find((item) => item.id === 'maintenance:review-safety')?.suggestedDeltaKcal).toBeNull()
