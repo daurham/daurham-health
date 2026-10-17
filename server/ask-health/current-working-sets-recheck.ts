@@ -89,7 +89,7 @@ export async function recheckCurrentWorkingSets(input:{
     return 'changed_or_unavailable'
   try{
     const sql=input.sqlOverride??await getSql()
-    const rows=await sql.query(RECHECK_WORKING_SETS_SQL,[start,end,exerciseId])
+    const rows=(await sql.query(RECHECK_WORKING_SETS_SQL,[start,end,exerciseId]))
       as Array<Record<string,unknown>>
     const late=rows.map(mapProgressSetRow)
     return canonicalWorkingSetsAgree({initial,late,start,end,exerciseId})
