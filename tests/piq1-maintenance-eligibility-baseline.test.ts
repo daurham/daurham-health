@@ -116,7 +116,7 @@ describe('PIQ-1.1 baseline: demonstrate existing maintenance hazard and future e
     expect(prior.estimate.observedMaintenanceKcal).toBeNull()
     expect(prior.interventions.some((item) => item.kind === 'review_intake_adjustment')).toBe(false)
     expect(prior.calorieAdjustmentSafety.status).toBe('blocked')
-    expect(prior.interventions.find((item) => item.id === 'maintenance:review-safety')?.suggestedDeltaKcal).toBeNull()
+    expect(prior.interventions.every((item) => item.suggestedDeltaKcal == null)).toBe(true)
     const confirmedSubset = new Set([addCalendarDays('2026-09-10', 0), addCalendarDays('2026-09-10', 1)])
     const protectedState = state(safeFixtureFilter(records, confirmedSubset))
     expect(protectedState.estimate.state).toBe('insufficient_evidence')
