@@ -2700,3 +2700,29 @@ independent requirements. No Vercel variables, deployment, Neon
 data, credentials, owner accounts, migrations or production edited.
 All tests are synthetic; proof must never originate from the app
 request or environment as a self-attestation.
+
+## 2026-10-17 — Disposable QA identity and branch-only Vercel setup (PARTIAL, fail-closed)
+
+With explicit owner approval, created one disposable test-only Neon Auth user
+`2420a606-0f6e-46e4-8aab-65a39e25f6e3` under *separate* QA project
+`lively-wave-25801832`; the reserved `example.com` address is not a
+working sign-in identity and no password/session exists. GitHub commit
+`57cb41ed272cc5cfe10b46057d121599a7f2e75e` fixed the provenance
+blocker double-report and passed full GitHub Actions CI (39010442965).
+
+Created/verified 37 Vercel environment variable entries exclusively for
+Preview + `piq/00-baseline-20261014`. These include distinct Neon Auth
+service and QA owner IDs, endpoint metadata, runtime DB/Auth binding flags,
+project/branch identity and exact-SHA config. An automatic database-credential
+handoff was blocked by platform security controls. No secret was printed or
+committed. To avoid falling back to shared production Preview credentials,
+branch-specific DB connection aliases, database username/password aliases
+and the cookie secret were explicitly overridden with **invalid sentinel
+values**. No connected database, authenticated sessions, or owner API access
+may be claimed. The release stays blocked by the runtime PIQ API hard lock
+and intentional invalid DB/cookie values; the current Vercel deployment may
+predate the new environment settings. Documented safe manual future handoff
+in `docs/ai/PIQ4_QA_CREDENTIAL_SETUP.md`.
+
+No production/Main changes, production health data reads, migrations,
+production account copying, paid AI calls, or personal health QA.
