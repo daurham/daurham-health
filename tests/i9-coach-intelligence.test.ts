@@ -110,6 +110,10 @@ describe('I9 Coach intelligence', () => {
     const state = control({
       state: 'insufficient_evidence',
       primaryOpportunity: null,
+      nutritionQuality: {
+        ...control().nutritionQuality,
+        state: 'limited', loggedDays: 3, reliableDays: 1,
+      },
       limitations: [{ code: 'nutrition_quality_floor', text: 'Nutrition evidence is limited.', detailPath: '/nutrition' }],
     })
     expect(buildCoachFollowUpQuestion(state)?.title).toContain('food logging')
