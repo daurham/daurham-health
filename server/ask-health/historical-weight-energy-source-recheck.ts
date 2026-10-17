@@ -29,7 +29,7 @@ export async function recheckHistoricalWeightEnergySources(input:{
     !/^\d{4}-\d{2}-\d{2}$/.test(end)||
     start<snapshot.period.start||end>snapshot.period.end||
     end>snapshot.asOf||end>=today||start>end||
-    addCalendarDays(start,35)<end||!snapshot.timezone||
+    addCalendarDays(start,89)<end||!snapshot.timezone||
     snapshot.coverage.find(c=>c.key==='nutrition.calories')?.completenessCheck!=='available')
     return 'changed_or_unavailable'
   try{

@@ -8,7 +8,7 @@ Current-day focused source rechecks intentionally do not cover those dates.
 
 `server/ask-health/historical-weight-energy-source-recheck.ts` performs
 exactly TWO additional bounded local SQL source reads for an explicitly
-selected in-range past day or window of up to 36 calendar days. The first
+selected in-range past day or window of up to 90 calendar days. The first
 reuses the canonical owner-complete, current-revision, source-identified
 Nutrition SQL, including actual calories, protein, carbohydrates and sodium.
 It compares the same requested date set, exact calorie IDs/values, nutrient

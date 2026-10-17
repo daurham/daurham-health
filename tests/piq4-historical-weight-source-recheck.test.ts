@@ -9,7 +9,7 @@ import {recheckHistoricalWeightEnergySources} from '../server/ask-health/histori
 import {CURRENT_WEIGHT_NUTRIENT_RECHECK_SQL} from '../server/ask-health/current-weight-nutrition-recheck.js'
 import {LATE_WEIGHT_INTELLIGENCE_SQL} from '../server/ask-health/current-weight-activity-recheck.js'
 
-const today='2026-10-16',start='2026-10-01',date='2026-10-03'
+const today='2026-10-16',start='2026-10-01',date='2026-10-08'
 const records:IntelligenceObservation[]=[
   {key:'nutrition.calories',date,value:2100,unit:'kcal',quality:'high_confidence',
     provenance:'owner',sourceIds:['food-a']},
@@ -24,7 +24,7 @@ const snapshot=(observations:readonly IntelligenceObservation[]=records)=>
 const candidate={date,calories:'2100',source_ids:['food-a'],
   protein:null,carbs:null,sodium:null}
 const weight={metric_id:'weight-a',session_id:'session-a',
-  value:'83',unit:'kg',measured_at:'2026-10-03T13:00:00Z',
+  value:'83',unit:'kg',measured_at:'2026-10-08T13:00:00Z',
   timezone:'America/Phoenix',comparability:'usual',source_kind:'manual'}
 const db=(food:unknown=[candidate],weights:unknown=[weight])=>
   ({query:vi.fn(async(query:string)=>query===CURRENT_WEIGHT_NUTRIENT_RECHECK_SQL
@@ -37,8 +37,8 @@ const check=(food:unknown=[candidate],weights:unknown=[weight],
 const packet=(status:'not_checked'|'verified'|'changed_or_unavailable',
   period:'day'|'window')=>{
   const question=period==='day'
-    ?'What was my scale weight and calories on 2026-10-03?'
-    :'What was my weight change from 2026-10-03 through 2026-10-09?'
+    ?'What was my scale weight and calories on 2026-10-08?'
+    :'What was my weight change last week?'
   const snap=snapshot()
   const focusDay=period==='day'
     ?focusHistoricalWeightEnergyDay({question,snapshot:snap,today}):null
@@ -66,7 +66,7 @@ describe('PIQ4 selected historical source recheck and source conflict',()=>{
     expect(sql.query).toHaveBeenCalledWith(CURRENT_WEIGHT_NUTRIENT_RECHECK_SQL,
       [date,date,today])
     expect(sql.query).toHaveBeenCalledWith(LATE_WEIGHT_INTELLIGENCE_SQL,
-      [date,'America/Phoenix','2026-10-01'])
+      [date,'America/Phoenix','2026-10-06'])
   })
   it('fails closed on corrected caloric intake, source identity, conditions and weight',async()=>{
     for(const food of [{...candidate,calories:'2300'},
@@ -81,8 +81,8 @@ describe('PIQ4 selected historical source recheck and source conflict',()=>{
   it('fails on deletes, added confirmed days and missing source data',async()=>{
     expect(await check([])).toBe('changed_or_unavailable')
     expect(await check([candidate],[])).toBe('changed_or_unavailable')
-    expect(await check([candidate,{...candidate,date:'2026-10-04'}], [weight],
-      {start:date,end:'2026-10-04'})).toBe('changed_or_unavailable')
+    expect(await check([candidate,{...candidate,date:'2026-10-09'}], [weight],
+      {start:date,end:'2026-10-09'})).toBe('changed_or_unavailable')
     expect(await recheckHistoricalWeightEnergySources({
       snapshot:snapshot(),today,start:date,end:date,
       sqlOverride:{query:vi.fn(async()=>{throw Error('offline')})} as unknown as Sql}))
