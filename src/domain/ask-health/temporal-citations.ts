@@ -4,12 +4,12 @@ import { associationStrength } from '../intelligence/spearman.js'
 import type { AskEvidence, AskHealthAnswer, AskHealthPacket } from './types.js'
 
 /** Conservative structural safeguard, not a semantic fact checker.
- * We only inspect clearly affirmative, owner-specific historical
- * measurements/trends. A valid ID or a broad selected-range summary is NOT
- * proof that it describes the day or calendar window the owner asked about.
+ * Historical claims require matching date/value/domain evidence. Current
+ * affirmative owner metrics require substantive citations in matching domains.
+ * A neutral source-conflict warning (or an unrelated cited fact) is not proof
+ * that a measurement was observed. General mechanisms remain uncited.
  *
- * No AI calls: if one such statement has no temporally scoped source, withhold
- * it and disclose the gap instead of spending a second provider request.
+ * No AI calls: withhold unsupported claims instead of spending a repair call.
  */
 export type TemporalCitationScope = { start: string; end: string }
 
@@ -408,8 +408,11 @@ export function groundHistoricalAnswer(
   const scope = temporalCitationScope(question, packet.asOf, packet.healthToday)
   const dateIssue = historicalDateIssue(question, packet.asOf, packet.healthToday)
   const byId = new Map(packet.evidence.map((item) => [item.id, item]))
-  if (!scope && !dateIssue && !answer.blocks.concat(answer.limitations).some((block) =>
-    definitiveOwnerCause(block.text) || affirmativeOwnerAssociation(block.text))) return answer
+  const currentMetricClaim = !scope && !dateIssue && answer.blocks.concat(answer.limitations)
+    .some((block) => affirmativeOwnerMetricClaim(block.text))
+  if (!scope && !dateIssue && !currentMetricClaim &&
+      !answer.blocks.concat(answer.limitations).some((block) =>
+        definitiveOwnerCause(block.text) || affirmativeOwnerAssociation(block.text))) return answer
   let withheld = 0
   const keep = (block: AskHealthAnswer['blocks'][number]) => {
     if (definitiveOwnerCause(block.text) ||
@@ -419,6 +422,21 @@ export function groundHistoricalAnswer(
       return false
     }
     if (!affirmativeOwnerMetricClaim(block.text)) return true
+    // Numeric/current owner assertions cannot borrow generic prose, a
+    // non-substantive source-consistency warning, or an unrelated domain.
+    // This is citation integrity only, not a proof that cited prose is true.
+    if (!scope && !dateIssue) {
+      const substantiveCitations = block.evidenceRefs.flatMap((id) => {
+        const source = byId.get(id)
+        return source?.substantive ? [source] : []
+      })
+      const claimedDomains = explicitlyClaimedMetricDomains(block.text)
+      if (substantiveCitations.length > 0 &&
+          claimedDomains.every((domain) =>
+            substantiveCitations.some((source) => source.domain === domain))) return true
+      withheld += 1
+      return false
+    }
     if (dateIssue) {
       withheld += 1
       return false
@@ -464,13 +482,17 @@ export function groundHistoricalAnswer(
       ? 'A personal historical claim was withheld because its cited date, metric domain, recorded numeric value, or association was not established for the requested ' +
         scope.start + (scope.end === scope.start ? ' date.' : ' through ' + scope.end + ' window.') +
         ' An observational association does not prove a cause.'
-      : 'An owner-specific causal or relationship claim was withheld because the supplied evidence cannot establish causation or did not include a qualifying personal relationship calculation.'
+      : currentMetricClaim
+        ? 'An owner-specific measurement claim was withheld because it lacked substantive cited Health evidence for the claimed metric domain. Unrelated records and source-consistency warnings are not proof of a personal measurement.'
+        : 'An owner-specific causal or relationship claim was withheld because the supplied evidence cannot establish causation or did not include a qualifying personal relationship calculation.'
   return {
     blocks: blocks.length > 0
       ? blocks
       : [{ text: scope || dateIssue
         ? 'I cannot verify a personal measurement or trend for the requested historical period from the supplied, date-matched Health evidence.'
-        : 'I cannot verify a personal cause or association from the supplied Health evidence.', evidenceRefs: [] }],
+        : currentMetricClaim
+          ? 'I cannot verify that personal measurement from the supplied Health evidence.'
+          : 'I cannot verify a personal cause or association from the supplied Health evidence.', evidenceRefs: [] }],
     limitations: [...limitations, { text: message, evidenceRefs: [] }],
     followUps: answer.followUps,
   }
