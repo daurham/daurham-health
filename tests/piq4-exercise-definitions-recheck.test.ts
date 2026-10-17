@@ -43,8 +43,10 @@ const packet=(status:'verified'|'changed_or_unavailable')=>{
     asOf:today,healthToday:today,generatedAt:today+'T21:00:00Z',
     period:{start,end:today},contextMode:'personalized',
     overview:{exercises:[
-      {name:'Barbell Bench Press',appearanceCount:1},
-      {name:'Dumbbell Bench Press',appearanceCount:1},
+      {name:'Barbell Bench Press',exerciseId:'exercise-a',
+        appearanceCount:1,trend:{status:'insufficient_data'}},
+      {name:'Dumbbell Bench Press',exerciseId:'exercise-b',
+        appearanceCount:1,trend:{status:'insufficient_data'}},
     ]} as unknown as AskHealthPacketInput['overview'],
     activity:null,sleep:null,
     goals:[],experiments:[],benchmarks:[],supplements:[],context:null,
