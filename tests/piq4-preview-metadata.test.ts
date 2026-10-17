@@ -11,10 +11,10 @@ const gitSha = 'a'.repeat(40)
 const ciSha = 'b'.repeat(40)
 const github: PiqCandidateMetadata = {
   source: 'github_api', ref: expectedRef, headSha: gitSha,
-  ci: { source: 'github_actions', headSha: gitSha, status: 'completed', conclusion: 'success' },
+  ci: { source: 'github_actions', workflowPath: '.github/workflows/validation.yml', headSha: gitSha, status: 'completed', conclusion: 'success' },
 }
 const deployed: PiqDeploymentMetadata = {
-  source: 'vercel_api', ref: expectedRef, sha: gitSha,
+  source: 'vercel_api', projectId: 'vercel-health-preview', ref: expectedRef, sha: gitSha,
   state: 'READY', target: null,
 }
 const neon: PiqNeonBranchEvidence = {
@@ -23,6 +23,7 @@ const neon: PiqNeonBranchEvidence = {
 }
 const args = {
   expectedRef,
+  expectedVercelProjectId: 'vercel-health-preview',
   expectedNeonProjectId: 'project-synthetic',
   expectedNeonBranchId: 'br-empty-preview',
   productionNeonBranchId: 'br-production',
@@ -66,6 +67,32 @@ describe('PIQ-4 read-only, exact-SHA preview metadata gate', () => {
     ]) {
       expect(check({ candidate: { ...github, ci } }).blockers).toContain('CI_NOT_SUCCESSFUL')
     }
+  })
+
+  it('rejects a successful partial workflow even if ref and commit SHA match', () => {
+    const partial = {
+      ...github,
+      ci: { ...github.ci!, workflowPath: '.github/workflows/piq1-postgres.yml' },
+    }
+    const result = check({ candidate: partial })
+    expect(result.status).toBe('blocked')
+    expect(result.blockers).toContain('CI_FULL_VALIDATION_WORKFLOW_UNVERIFIED')
+    expect(check({ candidate: {
+      ...github, ci: { ...github.ci!, workflowPath: '' },
+    } }).blockers).toContain('CI_FULL_VALIDATION_WORKFLOW_UNVERIFIED')
+    expect(check().blockers).not.toContain('CI_FULL_VALIDATION_WORKFLOW_UNVERIFIED')
+  })
+
+  it('rejects a READY deployment from another Vercel project, even at the right SHA', () => {
+    expect(check({ deployment: {
+      ...deployed, projectId: 'other-vercel-project',
+    } }).blockers).toContain('DEPLOYMENT_PROJECT_MISMATCH')
+    expect(check({ deployment: {
+      ...deployed, projectId: '',
+    } }).blockers).toContain('DEPLOYMENT_PROJECT_MISMATCH')
+    expect(check({ expectedVercelProjectId: '' }).blockers)
+      .toContain('DEPLOYMENT_PROJECT_MISMATCH')
+    expect(check().blockers).not.toContain('DEPLOYMENT_PROJECT_MISMATCH')
   })
 
   it('rejects ready preview at older SHA, wrong branch, non-preview or non-ready deployment', () => {

@@ -15,6 +15,7 @@ export type PiqCandidateMetadata = {
   headSha: string
   ci: {
     source: 'github_actions'
+    workflowPath: string
     headSha: string
     status: string
     conclusion: string | null
@@ -23,6 +24,7 @@ export type PiqCandidateMetadata = {
 
 export type PiqDeploymentMetadata = {
   source: 'vercel_api'
+  projectId: string
   ref: string
   sha: string
   state: string
@@ -34,8 +36,10 @@ export type PiqPreviewMetadataBlocker =
   | 'CANDIDATE_REF_NOT_PIQ'
   | 'CANDIDATE_SHA_INVALID'
   | 'EXACT_SHA_CI_UNVERIFIED'
+  | 'CI_FULL_VALIDATION_WORKFLOW_UNVERIFIED'
   | 'CI_NOT_SUCCESSFUL'
   | 'DEPLOYMENT_METADATA_UNAVAILABLE'
+  | 'DEPLOYMENT_PROJECT_MISMATCH'
   | 'DEPLOYMENT_NOT_PREVIEW'
   | 'DEPLOYMENT_REF_MISMATCH'
   | 'DEPLOYMENT_COMMIT_MISMATCH'
@@ -61,6 +65,7 @@ export type PiqPreviewMetadataResult = {
 }
 
 const hexSha = /^[a-f0-9]{40}$/i
+const fullValidationWorkflow = '.github/workflows/validation.yml'
 const outstanding: PiqPreviewRuntimeRequirement[] = [
   'RUNTIME_DB_BINDING_ATTESTATION_REQUIRED',
   'RUNTIME_AUTH_AND_OWNER_ISOLATION_REQUIRED',
@@ -71,6 +76,7 @@ const outstanding: PiqPreviewRuntimeRequirement[] = [
 
 export function reviewPiqPreviewMetadata(input: {
   expectedRef: string
+  expectedVercelProjectId: string
   expectedNeonProjectId: string
   expectedNeonBranchId: string
   productionNeonBranchId: string
@@ -90,6 +96,12 @@ export function reviewPiqPreviewMetadata(input: {
       blockers.push('CANDIDATE_REF_NOT_PIQ')
     }
     if (!hexSha.test(candidate.headSha)) blockers.push('CANDIDATE_SHA_INVALID')
+    // A green short-lived PostgreSQL or other partial workflow is not the
+    // full TS/lint/Vitest/build validation required for a PIQ preview.
+    if (!candidate.ci || candidate.ci.source !== 'github_actions' ||
+        candidate.ci.workflowPath !== fullValidationWorkflow) {
+      blockers.push('CI_FULL_VALIDATION_WORKFLOW_UNVERIFIED')
+    }
     if (!candidate.ci || candidate.ci.source !== 'github_actions' ||
         !hexSha.test(candidate.ci.headSha) ||
         candidate.headSha.toLowerCase() !== candidate.ci.headSha.toLowerCase()) {
@@ -103,6 +115,12 @@ export function reviewPiqPreviewMetadata(input: {
   if (!deployment || deployment.source !== 'vercel_api') {
     blockers.push('DEPLOYMENT_METADATA_UNAVAILABLE')
   } else {
+    // A ready deployment of this SHA in a different Vercel project says
+    // nothing about the intended Health preview runtime or its bindings.
+    if (!input.expectedVercelProjectId || !deployment.projectId ||
+        deployment.projectId !== input.expectedVercelProjectId) {
+      blockers.push('DEPLOYMENT_PROJECT_MISMATCH')
+    }
     // Vercel currently represents preview as target:null, not "preview".
     if (deployment.target !== null && deployment.target !== 'preview') {
       blockers.push('DEPLOYMENT_NOT_PREVIEW')

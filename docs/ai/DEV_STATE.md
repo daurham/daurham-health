@@ -761,3 +761,13 @@ Code `0570462c7b120f077cb4c47d195e78c36ec089e9`, [Actions 39006416516](https://g
 ## 2026-10-16 — PIQ-4 release safety metadata exact SHA/origin checker
 
 New `server/piq-preview-metadata.ts` + synthetic tests `tests/piq4-preview-metadata.test.ts` validated on code `6d4b0a01a82533c166dbac298a368a94fbf08db8`, [Actions 39007230291](https://github.com/daurham/daurham-health/actions/runs/39007230291). Cross-source metadata require GitHub success exact SHA = Vercel READY preview deployed SHA, PIQ ref, and independent Neon empty-origin branch/identity. A valid metadata result is explicitly **not authorization**; runtime DB/Auth/tenant/data, migration backup and owner approval remain mandatory. Read-only discovery: current returned Vercel READY preview SHA `852be816b8efd3077f61f46ff04a024e5a4cff02` ≠ code candidate; existing Neon PIQ branch `br-damp-pine-aw5cconp` is `parent-data` from parent, unsafe for test-owner writes. No health data read or prod/branch write or paid AI. Engineering ~90–91%, owner acceptance 0/9.
+
+## 2026-10-16 — PIQ-4 release metadata hardening: full CI and Vercel project (CI pending)
+
+The offline metadata checker now verifies the exact successful **full branch
+validation** workflow path (not an arbitrary green partial Actions workflow)
+and the intended Vercel project ID (not a matching SHA/ref on another project).
+Synthetic tests added; commit requires an exact-SHA CI pass before validated
+status. No DB/PHI/model access, schema work, preview authorization, main merge
+or manual deployment. Preview still blocked by inherited Neon data and
+unmatched deployed commit; owner acceptance 0/9 (~91% engineering).

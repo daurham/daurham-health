@@ -30,3 +30,18 @@ As of October 16, 2026, PIQ preview Neon `br-damp-pine-aw5cconp` reports `init_s
 Pure module `server/piq-preview-metadata.ts` (`6d4b0a01a82533c166dbac298a368a94fbf08db8`) and `tests/piq4-preview-metadata.test.ts` cross-check **independently supplied GitHub commit & successful Actions exact SHA**, **Vercel preview ref/READY deployment exact SHA**, and **Neon independently reported project/branch/empty-init origin**. Status is always `blocked` or `metadata_consistent_not_authorized`. There is *no* allow/disclose-rows, migrate, delete, create, deploy or permission action; enum-only blocker results contain no credentials, account IDs or sensitive values. Even aligned metadata cannot attest runtime DB binding, Auth tenant, private-row absence, migration/backup readiness or owner approval.
 
 Read-only observation: GitHub code `6d4b0a01a82533c166dbac298a368a94fbf08db8` has its CI identified at [Actions 39007230291](https://github.com/daurham/daurham-health/actions/runs/39007230291). Most recent returned Vercel PIQ branch deployment is READY on docs checkpoint `852be816b8efd3077f61f46ff04a024e5a4cff02`, not the exact validated code candidate. The candidate Neon PIQ branch `br-damp-pine-aw5cconp` in project `holy-recipe-28496000` reports `init_source=parent-data`, parent `br-sparkling-dust-aw1q03rt`, so it is NOT independent empty test data. **Both cases fail** the appropriate metadata checks; the preview remains unsafe for owner QA. Do not create/delete Neon branches, change deployment configuration, access owner rows, or apply migrations without the separate necessary authorizations.
+
+## October 16 — exact full-workflow and Vercel-project identity gate (offline)
+
+The release metadata checker now requires GitHub's independently reported successful
+**full** `.github/workflows/validation.yml` run on the exact candidate SHA, not simply
+a green partial PostgreSQL/other workflow. Vercel deployment metadata must also
+match the separately expected Health Vercel **project ID** as well as preview ref,
+exact SHA, target and READY state. Missing/incorrect workflow or project evidence
+is a blocker. The test suite uses only synthetic records, and enum-only output
+never reveals project IDs.
+
+This is a release-gate hardening step, not runtime approval. The currently
+parent-data-cloned Neon preview and older deployed code remain blocked. No owner
+records, credentials, Vercel deployments, migration, paid provider, or production
+changes are authorized by these checks.

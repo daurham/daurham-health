@@ -2526,3 +2526,22 @@ Regression file `tests/piq3-focused-digestive-bristol.test.ts` covers narrow-top
 **Current read-only evidence:** As checked before this code commit, the most recent returned PIQ Vercel preview reports branch SHA `852be816b8efd3077f61f46ff04a024e5a4cff02` (a docs-only checkpoint), which differs from the code candidate `6d4b0a01a82533c166dbac298a368a94fbf08db8`; older code `0570462c7b120f077cb4c47d195e78c36ec089e9` passed full CI but is not the same deployed SHA. Neon candidate PIQ branch `br-damp-pine-aw5cconp` reports `init_source=parent-data` from a parent branch, which may contain owner records. **Owner preview QA is blocked.** The project/branch metadata check was read-only and is not a schema migration assessment or authorization.
 
 **Next:** Establish an independently empty, access-isolated test database and Auth/owner tenancy, verify the exact serving preview SHA with provider metadata, then owner/mobile answer-quality QA and target-approved read-only migration inventory. Do not automatically create/delete branches or promote main to clear a gate.
+
+## 2026-10-16 — PIQ-4 release gate: full CI workflow and preview-project identity (validation pending)
+
+**Development branch only; full CI to be verified on this commit.** Hardened
+`server/piq-preview-metadata.ts` to reject a GitHub Actions success from
+`.github/workflows/piq1-postgres.yml` (or any other partial workflow), even when
+the commit SHA matches, unless the independently supplied provider record
+identifies `.github/workflows/validation.yml`. Additionally require the Vercel
+preview deployment to belong to the expected Health Vercel project. Missing
+identity blocks owner QA. Synthetic regression tests cover incorrect/missing
+workflow and wrong/missing project, plus the successful path. No code path can
+authorize PHI/owner QA merely because metadata agrees. Await exact-SHA full
+GitHub CI before calling this implementation validated.
+
+**Release remains blocked:** current preview code SHA mismatch, Neon branch
+inherits parent data, runtime DB/Auth/owner identity and empty-row verification
+unattested, no owner/mobile acceptance, read-only migration/backups and approval
+pending. Engineering remains approximately 91%; formal owner acceptance 0/9.
+No Vercel deployment or other provider mutation was initiated for this step.

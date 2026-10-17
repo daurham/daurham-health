@@ -951,3 +951,15 @@ Allergy entries are current owner-entered statements, not medically verified dia
 ## Decision: Generic Sleep cross-read mismatch must suppress dependent claims (2026-10-16)
 
 **Validated** `c790488`, [CI 39001090617](https://github.com/daurham/daurham-health/actions/runs/39001090617) full pass. Separate canonical nightly Summary reads for Sleep Progress and shared Intelligence can disagree mid-request; the app must not arbitrarily prefer one for personalized sleep duration, Sleep-baseline or linked cross-domain relationship claims. Use the already loaded values **without an additional database round trip**, require matching nightly summary row ID, Health-calendar date/timezone, analysis eligibility, total minutes and frame unit/provenance. Suppress generic Sleep and Sleep-operand Intelligence on mismatch/unavailable source and emit a neutral non-substantive boundary. Preserve sleep-stage analysis rules and existing stage data separately; comparison does not attest stage revisions, source-arbitration history or overnight vitals. No automatic health decision, provider call, migration, real owner record access, production release or phase acceptance.
+
+## Decision: Exact full-CI workflow and Vercel project identity are required before preview metadata is consistent (2026-10-16)
+
+A successful Actions run on the right SHA is insufficient if it belongs to
+a subset workflow such as `piq1-postgres.yml`. The PIQ preview gate must
+require GitHub-provided identity of the full
+`.github/workflows/validation.yml` workflow and exact commit success.
+Likewise, a READY Vercel deployment matching branch/SHA in a different
+Vercel project is not evidence for the intended Health preview; require
+project ID equality from independent provider metadata. Missing evidence
+fails closed. These narrow checks are synthetic/read-only and cannot
+attest runtime DB/Auth separation, empty data, migrations or owner approval.
