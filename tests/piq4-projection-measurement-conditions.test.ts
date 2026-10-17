@@ -60,7 +60,7 @@ describe('PIQ-4.2 same-series body measurement conditions',()=>{
   it('recognizes only explicitly usual conditions across every eligible point',()=>{
     expect(assessWeightProjectionHistory(rows,today))
       .toBe('date_spread_sufficient')
-    for(const state of ['unknown','different_conditions',null,undefined]){
+    for(const state of ['unknown','different_conditions',null]){
       const candidate=rows.map((r,i)=>i===2?{...r,comparability:state}:r)
       expect(assessWeightProjectionHistory(candidate,today))
         .toBe('measurement_conditions_unverified')
@@ -72,6 +72,11 @@ describe('PIQ-4.2 same-series body measurement conditions',()=>{
         intervention:'not_authorized',
       })
     }
+    // A field absent from the canonical SQL result is an untrusted source,
+    // not merely an owner-selected unknown condition.
+    const malformed=rows.map((r,i)=>i===2?{
+      ...r,comparability:undefined}:r)
+    expect(fingerprintBodyProjectionRows('weight',malformed)).toBeNull()
   })
   it('includes condition changes in private revision even for identical weight',async()=>{
     const modified=rows.map((r,i)=>i===0?{...r,comparability:'different_conditions'}:r)
