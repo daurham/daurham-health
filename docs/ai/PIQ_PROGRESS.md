@@ -2568,3 +2568,20 @@ truth verification; owner preview acceptance still required.
 Neon PIQ branch remains a parent-data clone, and runtime Auth/DB/owner
 isolation is unverified. No main merge, migration, database mutation or
 live owner QA. Approximately 91% engineering, formal acceptance 0/9.
+
+## 2026-10-16 — PIQ-3 General Only cached evidence-reference scrub (validation pending)
+
+**Branch-only code and synthetic test; exact-SHA CI pending.** Legacy cached
+General Only responses with entirely harmless educational text could still
+return stale owner `evidenceRefs` because the prior sanitizer returned
+the entire unchanged answer when the personal-claim regex found no textual
+issue. The sanitizer now clears every cached block/limitation reference
+regardless of the detector outcome, preserving safe education and
+legitimate follow-up suggestions. Detected unsupported owner text continues
+to be withheld, including unsafe follow-ups. The test stubs a legacy cache
+with private-looking evidence IDs, proves the original object remains
+unchanged, the response contains no IDs, and no provider is called.
+No database read/write, owner data, schema migration, new model spend,
+main merge or release. This does not make a regex an exhaustive semantic
+truth validator. Owner preview remains blocked by copied Neon parent data
+and unverified runtime Auth isolation. Engineering ~91%; accepted 0/9.

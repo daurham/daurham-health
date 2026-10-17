@@ -78,14 +78,20 @@ export function generalAnswerInventsPersonalRecord(answer: AskHealthAnswer): boo
 /** Old cached general answers do not receive the current provider validation
  * pass. Redact invented owner claims from blocks, limitations and follow-ups
  * at read time without a new paid call.
- * Independent general education can survive; citations remain empty.
+ * Independent general education can survive; personal evidence references must
+ * always be stripped, even when every cached text block appears harmless.
  */
 export function sanitizeCachedGeneralAnswer(answer: AskHealthAnswer): AskHealthAnswer {
-  if (!generalAnswerInventsPersonalRecord(answer)) return answer
+  const invented = generalAnswerInventsPersonalRecord(answer)
+  // General Only never returns personal evidence IDs, including in legacy
+  // cache entries whose educational wording happens to be innocuous.
   const blocks = answer.blocks.filter((item) => !inventedGeneralOwnerRecord(item.text))
     .map((item) => ({ ...item, evidenceRefs: [] }))
   const limitations = answer.limitations.filter((item) => !inventedGeneralOwnerRecord(item.text))
     .map((item) => ({ ...item, evidenceRefs: [] }))
+  if (!invented) {
+    return { blocks, limitations, followUps: [...answer.followUps] }
+  }
   return {
     blocks: blocks.length > 0 ? blocks :
       [{ text: 'That cached response claimed personal measurements I cannot verify in General Only. Ask again using an appropriate mode for your saved Health records.', evidenceRefs: [] }],

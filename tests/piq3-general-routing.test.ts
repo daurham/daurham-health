@@ -202,6 +202,40 @@ describe('PIQ-3.2 educational routing and safety', () => {
     expect(stub).toHaveBeenCalledTimes(2)
   })
 
+  it('strips legacy personal evidence refs from cached education without spending or losing follow-ups', async () => {
+    const legacy = {
+      blocks: [{ text: 'Creatine helps regenerate ATP.', evidenceRefs: ['profile.sensitive', 'body.weight'] }],
+      limitations: [{ text: 'Effects vary between individuals.', evidenceRefs: ['supplements.schedule'] }],
+      followUps: ['What is progressive overload?'],
+    }
+    // No textual owner claim: the prior sanitizer returned this cache unmodified.
+    expect(generalAnswerInventsPersonalRecord(legacy)).toBe(false)
+    const sanitized = sanitizeCachedGeneralAnswer(legacy)
+    expect(sanitized.blocks).toEqual([
+      { text: 'Creatine helps regenerate ATP.', evidenceRefs: [] },
+    ])
+    expect(sanitized.limitations).toEqual([
+      { text: 'Effects vary between individuals.', evidenceRefs: [] },
+    ])
+    expect(sanitized.followUps).toEqual(['What is progressive overload?'])
+    expect(legacy.blocks[0]?.evidenceRefs).toEqual(['profile.sensitive', 'body.weight'])
+
+    const gate = createAskHealthGate({ minIntervalMs: 0 })
+    gate.take = async () => ({
+      ok: true, usageId: null, cached: { answer: legacy, evidence: [] },
+    })
+    const noProvider = vi.fn()
+    const result = await answerAskHealth({
+      ...request('What does creatine do?'), contextMode: 'general_only',
+      provider: noProvider, gate,
+    })
+    expect(result.meta).toMatchObject({ cached: true, answerScope: 'general' })
+    expect(result.evidence).toEqual([])
+    expect(result.answer).toEqual(sanitized)
+    expect(JSON.stringify(result.answer)).not.toContain('profile.sensitive')
+    expect(noProvider).not.toHaveBeenCalled()
+  })
+
   it('redacts poisoned cached General Only claims but keeps general education at zero provider cost', async () => {
     const poisoned = {
       blocks: [

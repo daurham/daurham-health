@@ -974,3 +974,13 @@ unsupported outputs through the existing bounded validation/retry path.
 Restrict new nonnumeric detection to direct affirmative personal-state
 claims so hypothetical general education remains useful. This regex
 guard does not establish medical accuracy and does not inspect owner data.
+
+## Decision: Cached General Only must carry zero personal evidence references (2026-10-16)
+
+Personal evidence IDs are forbidden in General Only even when the cached
+natural-language text looks like harmless general education. Always
+clear block/limitation evidence references at delivery, not only on
+detected personal-claim text. Preserve safe educational blocks, ordinary
+follow-ups and original cache immutability. This is a pure defense-in-depth
+cache sanitation step with no additional provider or SQL work; it does
+not attest semantic medical correctness or owner preview approval.

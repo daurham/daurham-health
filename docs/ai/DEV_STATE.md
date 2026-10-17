@@ -781,3 +781,12 @@ plus narrow affirmative nonnumeric owner states; safe educational
 conditionals remain. Synthetic stub regression only, no paid model
 or Health data. Await exact commit CI. Preview remains blocked by
 Neon parent-data clone and unknown runtime owner/Auth isolation.
+
+## 2026-10-16 — General Only legacy cached references stripped (CI pending)
+
+Corrected cached General Only response processing: sanitize all block and
+limitation `evidenceRefs`, including when text has no personal claim.
+This removes a possible legacy owner-evidence ID disclosure via cached
+educational output. Fresh General Only output already uses an empty
+evidence-ID universe. Synthetic cache/provider-spend assertions added.
+PIQ branch only, no owner/DB/AI access or release; owner QA outstanding.
