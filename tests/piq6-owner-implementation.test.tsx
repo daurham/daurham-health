@@ -157,4 +157,138 @@ describe('PIQ-6 explicit owner-reported effective implementation, independent of
     expect(lab).toContain('Record my implementation')
     expect(lab).toContain('Starting Lab did not confirm any behavior change')
   })
+
+  it('requires explicit owner confirmation, matching revision and a bounded reason for correction or retraction', async () => {
+    const { writeOwnerExperimentImplementationRevision } =
+      await import('../server/lab/implementation.js')
+    const query = vi.fn()
+    const correct = {
+      expectedRevision: 0, confirmCorrection: true, reason: 'Correcting the date',
+      effectiveDate: '2026-10-15', behaviorChange: 'Walk after dinner',
+    }
+    const retract = {
+      expectedRevision: 0, confirmRetraction: true, reason: 'I never actually did this',
+    }
+    for (const body of [
+      null, {}, { ...correct, expectedRevision: -1 },
+      { ...correct, expectedRevision: 1.5 }, { ...correct, expectedRevision: '0' },
+      { ...correct, expectedRevision: 2147483647 },
+      { ...correct, confirmCorrection: false },
+      { ...correct, reason: 'x' },
+      { ...correct, reason: 'x'.repeat(501) },
+      { ...correct, effectiveDate: '2026-10-18' },
+      { ...correct, effectiveDate: '2026-02-30' },
+      { ...correct, behaviorChange: '' },
+    ]) {
+      await expect(writeOwnerExperimentImplementationRevision(
+        fake(query), EXPERIMENT, body, TODAY, 'corrected',
+      )).rejects.toMatchObject({ statusCode: 400 })
+    }
+    for (const body of [
+      { ...retract, confirmRetraction: false },
+      { ...retract, effectiveDate: '2026-10-15' },
+      { ...retract, behaviorChange: 'surprise replacement' },
+      { ...retract, reason: '' },
+    ]) {
+      await expect(writeOwnerExperimentImplementationRevision(
+        fake(query), EXPERIMENT, body, TODAY, 'retracted',
+      )).rejects.toMatchObject({ statusCode: 400 })
+    }
+    expect(query).not.toHaveBeenCalled()
+  })
+
+  it('atomically appends a corrected snapshot with a sequential compare-and-swap revision', async () => {
+    const { writeOwnerExperimentImplementationRevision } =
+      await import('../server/lab/implementation.js')
+    const query = vi.fn().mockResolvedValue([{ revision: 2 }])
+    await writeOwnerExperimentImplementationRevision(fake(query), EXPERIMENT, {
+      expectedRevision: 1, confirmCorrection: true, reason: '  Date was wrong  ',
+      effectiveDate: '2026-10-15', behaviorChange: '  Walk every evening  ',
+    }, TODAY, 'corrected')
+    expect(query).toHaveBeenCalledTimes(1)
+    const [statement, args] = query.mock.calls[0] as [string, unknown[]]
+    expect(args[0]).toBe(EXPERIMENT)
+    expect(args[2]).toBe(1)
+    expect(args.slice(3)).toEqual([
+      'corrected', '2026-10-15', 'Walk every evening', 'Date was wrong', TODAY,
+    ])
+    for (const sql of [
+      'INSERT INTO experiment_implementation_revisions',
+      'COALESCE(latest.revision, 0) = $3::int',
+      'latest.action IS DISTINCT FROM \'retracted\'',
+      'ON CONFLICT (experiment_id, revision) DO NOTHING',
+      "lab.status IN ('active', 'completed', 'inconclusive', 'abandoned', 'superseded')",
+      '$5::date <= $8::date',
+      '$5::date >= lab.window_start',
+      '$5::date <= lab.window_end',
+    ]) expect(statement).toContain(sql)
+    expect(statement).not.toContain('UPDATE experiment_implementations')
+    expect(statement).not.toContain('DELETE FROM experiment_implementations')
+  })
+
+  it('appends retraction without replacement data and rejects stale or already retracted revisions', async () => {
+    const { writeOwnerExperimentImplementationRevision } =
+      await import('../server/lab/implementation.js')
+    const query = vi.fn().mockResolvedValueOnce([{ revision: 1 }]).mockResolvedValueOnce([])
+    const input = { expectedRevision: 0, confirmRetraction: true, reason: 'Never followed the plan' }
+    await writeOwnerExperimentImplementationRevision(fake(query), EXPERIMENT, input, TODAY, 'retracted')
+    const [, args] = query.mock.calls[0] as [string, unknown[]]
+    expect(args.slice(2)).toEqual([0, 'retracted', null, null, 'Never followed the plan', TODAY])
+    await expect(writeOwnerExperimentImplementationRevision(
+      fake(query), EXPERIMENT, input, TODAY, 'retracted',
+    )).rejects.toMatchObject({ statusCode: 409 })
+  })
+
+  it('the canonical Lab projection and linked Coach drop retracted implementation details', () => {
+    const base = {
+      id: EXPERIMENT, origin: 'owner_created', status: 'completed',
+      window_start: '2026-10-01', window_end: '2026-10-16',
+      result_id: null, classification: null,
+      implementation_date: '2026-10-15',
+      implementation_change: 'Prior statement should not appear',
+    }
+    const record = projectCoachLinkedExperiment({
+      ...base, implementation_retracted: true,
+    }, TODAY)!
+    expect(record.implementation).toBeNull()
+    expect(record.implementationRetracted).toBe(true)
+    const view: CoachRecommendationView = {
+      id: CARD, fingerprint: 'coach:i9:synthetic', kind: 'training_progression',
+      domain: 'training', title: 'Review', detail: 'Inspect records',
+      actionText: 'Review', detailPath: '/training',
+      confidence: 'limited', evidenceRefs: [], responseState: null, responseAt: null,
+      experimentEligible: true, linkedExperimentId: EXPERIMENT, linkedExperiment: record,
+    }
+    const state: CoachIntelligenceState = {
+      version: 'coach-intelligence-v1', asOf: TODAY, state: 'act',
+      headline: 'Review', summary: 'Inspect records', noChangeRecommended: false,
+      nextBestActions: [view], followUps: [], question: null, questionBudgetDays: 3,
+    }
+    const html = renderToStaticMarkup(<MemoryRouter><CoachIntelligencePanel
+      state={state} pending={false} onResponse={() => undefined}
+      onOutcome={() => undefined} /></MemoryRouter>)
+    expect(html).toContain('Owner retracted the implementation report')
+    expect(html).not.toContain('Prior statement should not appear')
+    expect(html).not.toContain('Owner reported changing')
+    expect(html).not.toContain('>I started this</button>')
+  })
+
+  it('the journal migration keeps original reports intact and the ledger suppresses retracted claims', () => {
+    const migration = readFileSync('migrations/0058_experiment_implementation_revisions.sql', 'utf8')
+    const ledger = readFileSync('server/intelligence/change-ledger.ts', 'utf8')
+    const lab = readFileSync('src/features/lab/ExperimentPages.tsx', 'utf8')
+    const server = readFileSync('server/lab/service.ts', 'utf8')
+    const coach = readFileSync('server/intelligence/coach-intelligence.ts', 'utf8')
+    expect(migration).toContain('UNIQUE (experiment_id, revision)')
+    expect(migration).toContain("action IN ('corrected', 'retracted')")
+    expect(migration).toContain('recorded_at TIMESTAMPTZ')
+    expect(ledger).toContain("latest.action IS DISTINCT FROM 'retracted'")
+    expect(ledger).toContain('COALESCE(latest.effective_date, implementation.effective_date)')
+    expect(coach).toContain("WHEN latest_implementation.action = 'retracted' THEN NULL")
+    expect(server).toContain("implementations[0]?.action === 'retracted'")
+    expect(lab).toContain('Correct report')
+    expect(lab).toContain('Retract report')
+    expect(lab).toContain('Review and, if appropriate, invalidate the result separately')
+  })
+
 })
