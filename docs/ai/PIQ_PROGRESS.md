@@ -1,8 +1,8 @@
 # PIQ Progress — durable implementation log
 
-> Started: 2026-10-14 (America/Phoenix) · Last updated: 2026-10-14  
+> Started: 2026-10-14 (America/Phoenix) · Last updated: 2026-10-16  
 > Source of objective: [HEALTH_INTELLIGENCE_QUALITY_MASTER_PLAN.md](./HEALTH_INTELLIGENCE_QUALITY_MASTER_PLAN.md)  
-> Work branch: `piq/00-baseline-20261014` · Phase: **PIQ-0 (baseline + evaluation)**  
+> Work branch: `piq/00-baseline-20261014` · Phase: **PIQ-4.2 (development; formal owner acceptance 0/9)**  
 > This file is the *status ledger*, not a replacement for the master plan. Never infer production status from a Git branch.
 
 ## The North Star (do not redefine)
@@ -11,7 +11,9 @@ Daurham Health must become an evidence-aware personal analyst and coach: answer 
 
 **No new treatment recommendation, automatic goal change, migration, owner-data write, or production promotion is authorized by establishing this baseline.**
 
-## Phase scorecard — evidence, not estimates of time
+## Initial 2026-10-14 phase scorecard (historical baseline, NOT live status)
+
+The entries below record the original baseline. For current implementation status use the newest timestamped checkpoints at the end of this ledger. No phase is owner-accepted solely because engineering tests pass.
 
 | Phase | State | Notes / exit requirement |
 | --- | --- | --- |
@@ -2466,3 +2468,13 @@ Regression file `tests/piq3-focused-digestive-bristol.test.ts` covers narrow-top
 **Closed:** The Supplements late-range check formerly ran only for Health-local today. An explicitly selected past as-of date could still use a stale regimen or recorded adherence if the owner corrected an old schedule/status/taken/skipped row during request retrieval. The loader now applies the **same exact saved-name selection and selected-date source comparison** to eligible owner-personalized historical-as-of periods. The existing service rereads only the selected date range (four local read-only queries), and evidence suppresses supplement facts with a privacy-safe neutral conflict warning if previously loaded effective records have changed, been deleted or become unavailable. New regression verifies an as-of yesterday scenario, changed saved taken→skipped record and unavailable read.
 
 **Semantic boundary:** This confirms consistency of the *currently stored representation of the requested past date*, NOT what the owner had saved or knew at the time. No raw historical revisions, ingestion confirmation or retroactive causality claims are verified. General Only remains excluded; no unrelated supplement queries or provider calls added. **Next:** move from PIQ-4.2 automated source checks into owner-preview acceptance readiness, using targeted adversarial data fixtures and source-identity limitations before requesting approval for any rollout.
+
+## 2026-10-16 — PIQ-4.2 owner-preview current-claim citation guard (CI GREEN)
+
+**Validated exact code:** `cba590d44a7388e8502dabac9eb4f1b32754138a`, [GitHub Actions 39004654452](https://github.com/daurham/daurham-health/actions/runs/39004654452) SUCCESS (npm ci, npx tsc -b, npx eslint ., full Vitest, npm run build). Development branch only, ~88% engineering estimate, **0/9 owner-accepted** phases. The initial code commit `178c66737dd55e330742743ce1a0c62c30176426` failed first CI solely because one legacy test expected the previous v11 prompt; commit `cba590d44a7388e8502dabac9eb4f1b32754138a` aligned the test to intentional v12 and passed all required checks.
+
+**Problem and fix:** JSON schema validation could accept an affirmative current owner measurement without any evidence citation. Such a claim could still be emitted after the packet withheld changed Activity/other data, or by attaching a neutral source-warning ID / unrelated Sleep metric. The existing `groundHistoricalAnswer` final boundary now also verifies **undated/current affirmative owner measurement claims** have at least one cited substantive item and all explicitly named measurement domains have substantive cited evidence. Unsafe claims/limitations are dropped with a neutral explanation; unrelated educational text remains. Applies to fresh AND cached replies, with cache/prompt version `ask-health-v12`. No extra Gemini repair or database reads.
+
+**Tests:** `tests/piq4-owner-current-claim-guard.test.ts` rehearses uncited figures, cited non-substantive source warnings, wrong-domain citations following source invalidation, supported owner claims, conditional/hypothetical explanations, owner claims in limitations, cache replay and call counts. Synthetic only; no PHI, paid AI, real database access, schema mutation, production promotion or owner-data inspection.
+
+**Limit:** citation scope/domain is **not semantic proof** or current numeric value equality, does not recognize every nonnumeric personal assertion, cannot make concurrent multi-source reads atomic and does not certify medical accuracy. PIQ-4 owner-preview realistic/phone QA, production database read-only migration preflight, budget observation and explicit owner authorization are still required. **Next:** focus bounded current numeric equality/source-claim QA, then isolated preview and no-go gates.

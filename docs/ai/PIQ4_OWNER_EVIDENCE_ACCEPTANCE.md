@@ -22,6 +22,7 @@ production, database migrations, new paid AI calls or treatment advice.
 | --- | --- | --- |
 | General education in General Only | Helpful general answer; no private Health DB context retrieved or sent | Personal-data-free route |
 | Current weight plateau with sparse food/scale records | No personal deficit, plateau or calorie reduction concluded; limited observations explained | Current focused Nutrition/weight/projection gates |
+| Current answer invents an uncited owner metric (or cites a neutral source warning / unrelated domain) | Withhold the unsupported claim and disclose citation gap; keep independently useful general explanation; no extra model repair | Current-claim evidence boundary, synthetic offline tests; full semantic owner review remains |
 | Same-day sodium/carb food and weigh-in | Same-day order explicitly unknown; no causal water-retention claim | Scale chronology |
 | Change Nutrition calories or same-calorie sodium/protein while Ask Health retrieves | Affected maintenance/food/weight claims withheld, not patched from stale averages | Late Nutrition source |
 | Replace a weigh-in or edit its comparability state during read | Focused weight/goal/scale interpretation withheld | Late weight/Activity source |
@@ -48,7 +49,7 @@ readiness separately with a read-only check before asking for approval to
 apply pending migrations. Never infer acceptance from CI, do not silently
 merge to main, and never mark phase `accepted` without explicit owner signoff.
 
-Known residual: the current cross-source reads are optimistic and not one
+Known residual: current affirmative owner measurement claims now require substantive, matching-domain citations. The guard does not prove cited numeric correctness, validate every non-numeric owner statement, or replace human model-answer review. The current cross-source reads are optimistic and not one
 atomic snapshot. Generic training, sleep, supplements and clinical-profile
 revision attestation remains incomplete. A provider can still reason about
 a general mechanism with a cited limitation, but must not convert that into
