@@ -3797,3 +3797,12 @@ isolated preview authorization, and actual owner mobile acceptance.
 **Presentation:** Outcome choices now read `Seemed helpful`, `No clear change`, `Seemed worse`, `Can't tell` while preserving existing stored outcome codes. Both start acknowledgement and follow-up explicitly state self-report versus verified action/causal outcome. Legacy review-only rows remain excluded by the existing ownerStarted gate. No new table, migration, AI calls, auto-adjusted target, real owner record access, or production release.
 
 **Validation:** Added static UI semantics and SQL contract regression checks in `tests/piq1-coach-historical-context.test.tsx` and `tests/piq1-coach-outcome-cas.test.ts`. Full branch CI required. Still outstanding: direct canonical plan/change-ledger linkage, optional usefulness/incorrect-context feedback, dismissal memory, PIQ-5.7 integrated scenarios, owner mobile QA, and overall owner acceptance **0/9**. `main`/production remain untouched.
+
+
+## 2026-10-17 — PIQ-5.5 owner dismissal feedback taxonomy (engineering; CI pending)
+
+**Purpose:** Record why a recommendation was low-value, rather than treating every dismissal as equivalent. Preserves single-card Coach presentation and default quiet behavior.
+
+**Change:** Collapsed **Other feedback** choices `Already knew`, `Wrong context`, `Not practical` supplement `Not relevant`. All use the existing persisted `not_relevant` response and suppression rule, recording a narrow allowlisted `metadata.feedbackReason` value. API rejects unknown reasons and any reason submitted with another response. Atomic expected-response timestamp and full current-evidence checks remain unchanged; a stale tab cannot overwrite another decision. On card regeneration the reason survives metadata upsert, and on other response types it is cleared. No automatically modified goals, interventions, health facts, experiment status or clinical-safety criteria.
+
+**Verification planned:** SQL metadata lifecycle tests, validation fail-closed tests, API payload and panel render tests plus standard branch CI. This does **not** implement adaptive learning from ratings or verified plan change linkage. The next PIQ-5.5 slice should link owner-reviewed interventions to canonical plan/change-ledger/experiment records only with explicit owner-approved action, then run integrated PIQ-5.7 scenarios. Still **0/9** owner-accepted phases. Development branch only; no migration, production deployment or main merge.

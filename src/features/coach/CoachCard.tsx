@@ -7,6 +7,7 @@ import type {
   CoachRecommendationResponse,
   CoachRecommendationFollowUp,
   CoachRecommendationView,
+  CoachRecommendationFeedbackReason,
 } from '@/domain/coach-intelligence'
 import type { CoachLabItem } from '@/domain/coach-lab'
 import { labExperimentHandoffPath } from '@/domain/lab-handoff'
@@ -269,12 +270,13 @@ export function CoachCard({ state, pending, error, onState }: {
     }
   }
 
-  async function respondToRecommendation(item: CoachRecommendationView, response: CoachRecommendationResponse) {
+  async function respondToRecommendation(item: CoachRecommendationView, response: CoachRecommendationResponse,
+    feedbackReason?: CoachRecommendationFeedbackReason) {
     setActionPending(true)
     setActionError(null)
     setNotice(null)
     try {
-      const next = await respondCoachRecommendation(item.id, response, item.responseAt, item.contextRevision)
+      const next = await respondCoachRecommendation(item.id, response, item.responseAt, item.contextRevision, feedbackReason)
       setIntelligence(next)
       if (response === 'do_this') {
         setNotice('Your reported start was saved. This does not verify a plan change; Coach will ask for your impression after seven days.')
@@ -389,7 +391,7 @@ export function CoachCard({ state, pending, error, onState }: {
           <CoachIntelligencePanel
             state={intelligence}
             pending={actionPending}
-            onResponse={(item, response) => void respondToRecommendation(item, response)}
+            onResponse={(item, response, reason) => void respondToRecommendation(item, response, reason)}
             onOutcome={(id, outcome) => void recordRecommendationOutcome(id, outcome)}
           />
         ) : intelligenceError ? (
@@ -434,7 +436,8 @@ export function CoachIntelligencePanel({
 }: {
   state: CoachIntelligenceState
   pending: boolean
-  onResponse: (item: CoachRecommendationView, response: CoachRecommendationResponse) => void
+  onResponse: (item: CoachRecommendationView, response: CoachRecommendationResponse,
+    feedbackReason?: CoachRecommendationFeedbackReason) => void
   onOutcome: (item: CoachRecommendationFollowUp, outcome: CoachRecommendationOutcome) => void
 }) {
   const prefix = useAppPathPrefix()
@@ -580,7 +583,7 @@ export function CoachIntelligencePanel({
                   </button>
                 ) : null}
                 <button type="button" className={quietButtonClass} disabled={pending} onClick={() => onResponse(item, 'not_now')}>Not now</button>
-                <button type="button" className={quietButtonClass} disabled={pending} onClick={() => onResponse(item, 'not_relevant')}>Not relevant</button>
+                <button type="button" className={quietButtonClass} disabled={pending} onClick={() => onResponse(item, 'not_relevant', 'not_relevant')}>Not relevant</button>
                 {item.experimentEligible ? (
                   <Link to={prefixedPath(prefix, labExperimentHandoffPath({
                     title: item.title,
@@ -591,6 +594,17 @@ export function CoachIntelligencePanel({
                   </Link>
                 ) : null}
               </div>
+              <details className="mt-2 rounded-md border border-zinc-200 bg-white px-2.5 py-2">
+                <summary className="cursor-pointer text-xs font-medium text-zinc-600">Other feedback</summary>
+                <p className="mt-2 text-xs leading-relaxed text-zinc-500">
+                  Help Coach avoid repeating low-value suggestions. This does not change your health records or safety rules.
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <button type="button" className={quietButtonClass} disabled={pending} onClick={() => onResponse(item, 'not_relevant', 'already_knew')}>Already knew</button>
+                  <button type="button" className={quietButtonClass} disabled={pending} onClick={() => onResponse(item, 'not_relevant', 'wrong_context')}>Wrong context</button>
+                  <button type="button" className={quietButtonClass} disabled={pending} onClick={() => onResponse(item, 'not_relevant', 'not_practical')}>Not practical</button>
+                </div>
+              </details>
               {item.experimentEligible ? (
                 <p className="mt-2 text-[11px] leading-relaxed text-zinc-500">
                   Reviewing is not acceptance. Only select “I started this” after actually taking action. This records your report, not a verified plan or target change.

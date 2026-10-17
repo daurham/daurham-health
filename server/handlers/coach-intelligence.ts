@@ -1,8 +1,10 @@
 import {
   COACH_RECOMMENDATION_OUTCOMES,
   COACH_RECOMMENDATION_RESPONSES,
+  COACH_RECOMMENDATION_FEEDBACK_REASONS,
   type CoachRecommendationOutcome,
   type CoachRecommendationResponse,
+  type CoachRecommendationFeedbackReason,
 } from '../../src/domain/coach-intelligence.js'
 import { withOwnerAuth } from '../auth/with-owner.js'
 import { healthTimeContext } from '../health-time.js'
@@ -56,9 +58,17 @@ async function handleCoachIntelligence(req: ApiRequest, res: ApiResponse) {
       sendJson(res, 400, { error: 'Invalid Coach recommendation response' })
       return
     }
+    const hasFeedbackReason = Object.prototype.hasOwnProperty.call(body, 'feedbackReason')
+    if (hasFeedbackReason && (response !== 'not_relevant' ||
+        typeof body.feedbackReason !== 'string' ||
+        !(COACH_RECOMMENDATION_FEEDBACK_REASONS as readonly string[]).includes(body.feedbackReason))) {
+      sendJson(res, 400, { error: 'Invalid Coach recommendation feedback reason' })
+      return
+    }
     sendJson(res, 200, await respondCoachRecommendation(route.id, response, date, body.ownerStarted === true,
       Object.prototype.hasOwnProperty.call(body, 'expectedResponseAt') ? body.expectedResponseAt as string | null : undefined,
-      typeof body.expectedContextRevision === 'string' ? body.expectedContextRevision : undefined))
+      typeof body.expectedContextRevision === 'string' ? body.expectedContextRevision : undefined,
+      hasFeedbackReason ? body.feedbackReason as CoachRecommendationFeedbackReason : undefined))
     return
   }
   const outcome = typeof body.outcome === 'string' ? body.outcome as CoachRecommendationOutcome : null

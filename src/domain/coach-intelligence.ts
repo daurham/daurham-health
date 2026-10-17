@@ -15,6 +15,12 @@ export const COACH_RECOMMENDATION_RESPONSES = [
 ] as const
 export type CoachRecommendationResponse = (typeof COACH_RECOMMENDATION_RESPONSES)[number]
 
+/** A voluntary reason to stop repeating this suggestion, not a health fact. */
+export const COACH_RECOMMENDATION_FEEDBACK_REASONS = [
+  'not_relevant', 'already_knew', 'wrong_context', 'not_practical',
+] as const
+export type CoachRecommendationFeedbackReason = (typeof COACH_RECOMMENDATION_FEEDBACK_REASONS)[number]
+
 export const COACH_RECOMMENDATION_OUTCOMES = [
   'helped',
   'no_change',

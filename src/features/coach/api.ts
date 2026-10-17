@@ -3,6 +3,7 @@ import type {
   CoachIntelligenceState,
   CoachRecommendationOutcome,
   CoachRecommendationResponse,
+  CoachRecommendationFeedbackReason,
 } from '@/domain/coach-intelligence'
 import type { CoachLabItem } from '@/domain/coach-lab'
 import { healthFetch, readApiError } from '@/lib'
@@ -106,13 +107,16 @@ export function respondCoachRecommendation(
   response: CoachRecommendationResponse,
   expectedResponseAt: string | null,
   expectedContextRevision?: string,
+  feedbackReason?: CoachRecommendationFeedbackReason,
 ): Promise<CoachIntelligenceState> {
   return sendCoachIntelligence(
     `/api/intelligence/coach/recommendations/${recommendationId}/respond`,
     'POST',
     response === 'do_this'
       ? { response, ownerStarted: true, expectedResponseAt, expectedContextRevision }
-      : { response, expectedResponseAt, expectedContextRevision },
+      : response === 'not_relevant' && feedbackReason
+        ? { response, expectedResponseAt, expectedContextRevision, feedbackReason }
+        : { response, expectedResponseAt, expectedContextRevision },
   )
 }
 

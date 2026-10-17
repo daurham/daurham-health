@@ -1,3 +1,9 @@
+## 2026-10-17 PIQ-5.5 owner feedback reasons — branch only
+
+- Added optional Coach recommendation dismissal reasons: `Already knew`, `Wrong context`, and `Not practical`, nested in collapsed "Other feedback" disclosure; existing `Not relevant` remains.
+- All map to the existing `not_relevant` suppression response, but persist a strictly validated `feedbackReason` enum within the existing recommendation metadata JSON. Repeated reads/upserts preserve this reason; a future different response clears it. No schema migration or AI calls.
+- Reason handling is isolated from safety/eligibility ranking: owner feedback cannot relax a hard medical or evidence gate, start an action or create follow-ups. Work remains development-only and needs CI and actual owner/mobile QA. Earlier note about the seven-day owner-start and 21-day follow-up grace still applies.
+
 ## 2026-10-15 PIQ-1.4 saved workout edit/delete freshness — branch only
 
 - Program authority: `docs/ai/HEALTH_INTELLIGENCE_QUALITY_MASTER_PLAN.md`; detailed phase evidence and remaining gates: `docs/ai/PIQ_PROGRESS.md`.

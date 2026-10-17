@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import {
   COACH_INTELLIGENCE_VERSION,
   COACH_QUESTION_BUDGET_DAYS,
+  COACH_RECOMMENDATION_FEEDBACK_REASONS,
   buildCoachFollowUpQuestion,
   coachQuestionPresentation,
   buildCoachRecommendationDrafts,
@@ -18,6 +19,7 @@ import {
   type CoachIntelligenceState,
   type CoachRecommendationDraft,
   type CoachRecommendationFollowUp,
+  type CoachRecommendationFeedbackReason,
   type CoachRecommendationMemory,
   type CoachRecommendationOutcome,
   type CoachRecommendationResponse,
@@ -165,7 +167,12 @@ export async function surfaceDraft(sql: Sql, draft: CoachRecommendationDraft, as
            THEN coach_recommendations.metadata
          ELSE EXCLUDED.metadata ||
            CASE WHEN coach_recommendations.metadata ->> 'ownerStarted' = 'true'
-             THEN '{"ownerStarted":true}'::jsonb ELSE '{}'::jsonb END
+             THEN '{"ownerStarted":true}'::jsonb ELSE '{}'::jsonb END ||
+           CASE WHEN coach_recommendations.response_state = 'not_relevant'
+             AND coach_recommendations.metadata ->> 'feedbackReason'
+               IN ('not_relevant', 'already_knew', 'wrong_context', 'not_practical')
+             THEN jsonb_build_object('feedbackReason', coach_recommendations.metadata ->> 'feedbackReason')
+             ELSE '{}'::jsonb END
        END,
        updated_at = now()
      RETURNING ${ROW_COLUMNS}`,
@@ -552,7 +559,13 @@ export async function writeCoachRecommendationResponse(
   assertCurrent: (row: RecommendationRow) => Promise<void>,
   ownerStarted = false,
   expectedResponseAt?: string | null,
+  feedbackReason?: CoachRecommendationFeedbackReason,
 ): Promise<void> {
+  if (feedbackReason !== undefined &&
+      (response !== 'not_relevant' ||
+       !(COACH_RECOMMENDATION_FEEDBACK_REASONS as readonly string[]).includes(feedbackReason))) {
+    throw new HttpError(400, 'Invalid Coach recommendation feedback reason')
+  }
   if (expectedResponseAt === undefined || (expectedResponseAt !== null &&
       (typeof expectedResponseAt !== 'string' || expectedResponseAt.length === 0 || expectedResponseAt.length > 80))) {
     throw new HttpError(428, 'This Coach card needs a fresh response version. Reload Coach before deciding.')
@@ -583,7 +596,10 @@ export async function writeCoachRecommendationResponse(
         SET response_state = $2,
             metadata = CASE WHEN $2 = 'do_this'
               THEN jsonb_set(COALESCE(metadata, '{}'::jsonb), '{ownerStarted}', 'true'::jsonb, true)
-              ELSE COALESCE(metadata, '{}'::jsonb) - 'ownerStarted' END,
+              ELSE (COALESCE(metadata, '{}'::jsonb) - 'ownerStarted' - 'feedbackReason') ||
+                CASE WHEN $2 = 'not_relevant'
+                  THEN jsonb_build_object('feedbackReason', $6::text)
+                  ELSE '{}'::jsonb END END,
             suppress_until = $3::date,
             follow_up_on = $4::date,
             response_at = now(),
@@ -607,7 +623,8 @@ export async function writeCoachRecommendationResponse(
           )
         )
       RETURNING id::text AS id`,
-      [id, response, suppressUntil, followUpOn, expectedResponseAt],
+      [id, response, suppressUntil, followUpOn, expectedResponseAt,
+        response === 'not_relevant' ? feedbackReason ?? 'not_relevant' : null],
     )
     if (changed.length !== 1) {
       throw new HttpError(409, 'This Coach decision changed or a competing plateau option is already active. Reopen Coach to review the latest state.')
@@ -627,6 +644,7 @@ export async function respondCoachRecommendation(
   ownerStarted = false,
   expectedResponseAt?: string | null,
   expectedContextRevision?: string,
+  feedbackReason?: CoachRecommendationFeedbackReason,
 ): Promise<CoachIntelligenceState> {
   const sql = await getSql()
   await writeCoachRecommendationResponse(
@@ -641,6 +659,7 @@ export async function respondCoachRecommendation(
     },
     ownerStarted,
     expectedResponseAt,
+    feedbackReason,
   )
   return loadCoachIntelligenceState(asOf)
 }
