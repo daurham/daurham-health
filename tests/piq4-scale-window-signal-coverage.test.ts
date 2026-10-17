@@ -35,8 +35,13 @@ describe('PIQ4 ten-day scale-window coverage contract',()=>{
       weightSampling:'sparse_or_mixed',nonUsualWeightDays:1,
       baselineUsualWeightDays:6})
     const duplicate=weights.map((w,i)=>i===0?{...w,sourceIds:['x','x']}:w)
-    expect(screen(duplicate)).toMatchObject({weightSampling:'sparse_or_mixed',
+    // The invalid point does not count, but six other valid baseline
+    // dates still exceed the documented three-date sampling floor.
+    expect(screen(duplicate)).toMatchObject({weightSampling:'sampled_both_windows',
       baselineUsualWeightDays:6,nonUsualWeightDays:0})
+    const sparse=weights.map((w,i)=>i<5?{...w,sourceIds:['x','x']}:w)
+    expect(screen(sparse)).toMatchObject({weightSampling:'sparse_or_mixed',
+      baselineUsualWeightDays:2,nonUsualWeightDays:0})
   })
   it('counts recorded water/steps but never provisional today or unattributed events',()=>{
     const data=[...weights,row('hydration.ml',dates[2]!,220),
