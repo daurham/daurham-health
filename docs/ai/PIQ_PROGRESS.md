@@ -3832,3 +3832,10 @@ isolated preview authorization, and actual owner mobile acceptance.
 **Failure-mode correction:** Prior code dropped cancelled or inaccessible links from the view, unintentionally displaying the new-experiment handoff again. Archived canonical links now remain navigable as historical. On missing, invalid or temporarily unreachable linked Lab records, Coach displays status unavailable and does **not** offer a duplicate experiment creation or owner-start action. Underlying saved provenance remains intact.
 
 **Validation gates:** Regression coverage includes Lab state mappings, end-of-window boundary, origin/status/result validation, available result links, archived states, and fail-closed missing-source behavior. Still must pass GitHub branch TypeScript/ESLint/unit tests/build and owner mobile acceptance. This is not PIQ-6 evaluation closure; verified intervention adherence, confounders, contextual changes and outcomes remain separate future work. No production migration/merge. Owner phase acceptance remains **0/9**.
+
+
+## 2026-10-17 — PIQ-5.5 linked Lab lifecycle validation GREEN
+
+**Code checkpoint:** `d4f715ad01c43b5c75ef92e3db72398d0516dea9`. Exact GitHub Actions run https://github.com/daurham/daurham-health/actions/runs/39061473074 completed successfully: `npm ci`, `npx tsc -b`, `npx eslint .`, **2,576 tests passed, 30 skipped, 340 test suites passed**, and `npm run build`. An earlier attempt exposed a conditional Coach help-text regression (telling the owner to press a hidden “I started this” control). The UI was corrected before the successful run. No production deploy, migration, AI usage, owner records inspection, or change to `main`.
+
+**Next:** PIQ-5.7 integrated realistic scenarios, then PIQ-6 owner-approved intervention start/adherence/evaluation linking, PIQ-7 deployment/privacy/cost hardening, and owner mobile QA. No PIQ phases formally owner-accepted (0/9); green engineering is not release acceptance.

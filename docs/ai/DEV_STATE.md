@@ -1,3 +1,7 @@
+## 2026-10-17 Verified Coach-linked Lab lifecycle checkpoint
+
+Branch code commit `d4f715ad01c43b5c75ef92e3db72398d0516dea9` passed GitHub Actions 39061473074: 2,576 tests passing, 30 skipped; TypeScript, ESLint and build green. Canonical Lab state is a read-only owner-created experiment projection, not an adopted intervention or causal outcome. Continue PIQ-5.7 integrated scenarios and PIQ-6 actual implementation/evaluation; owner QA and rollout gates remain closed. Owner phase acceptance 0/9.
+
 ## 2026-10-17 PIQ-5.5 linked Lab lifecycle projection — engineering, CI pending
 
 - Added read-only canonical lifecycle `src/domain/coach-lab-lifecycle.ts` for owner-created linked experiments. Coach shows accepted/scheduled/active/completed/inconclusive/archived with truthful observational limits, a verified result link only when present, and observation windows. Does not assume actual behavior, adherence, improvement or causation.
