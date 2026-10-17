@@ -5,6 +5,7 @@ import type { OccurrenceState } from '../supplements/types.js'
 import { ASK_HEALTH_PACKET_VERSION, ASK_PACKET_MAX_CHARS, type AskLens } from './config.js'
 import { MIN_VERIFIED_NUTRITION_TARGET_DAYS } from './nutrition-integrity.js'
 import { digestiveQuestionTopics } from './focused-digestive.js'
+import { askHealthNonOwnerSubject, NON_OWNER_ASK_HEALTH_TEXT } from './person-scope.js'
 import { guardInconsistentActivityIntelligence } from './activity-source-reconciliation.js'
 import { guardInconsistentSleepIntelligence } from './sleep-source-reconciliation.js'
 import { guardInconsistentTrainingIntelligence } from './training-source-reconciliation.js'
@@ -59,6 +60,43 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
     substantive: false,
     priority: 0,
   })
+
+  // Defense in depth for direct packet callers: don't include ANY owner's
+  // personal domain (including goals, nutrition, intelligence, context notes,
+  // profile versions, source-coverage audit or private clarification).
+  // The API service denies these requests even earlier, before database I/O.
+  if (askHealthNonOwnerSubject(input.question)) {
+    const evidence = drafts.map(strip)
+    return {
+      packetVersion: ASK_HEALTH_PACKET_VERSION,
+      lens: input.lens,
+      range: input.range,
+      rangeStart: period.start,
+      rangeEnd: period.end,
+      asOf: input.asOf,
+      ...(input.healthToday ? { healthToday: input.healthToday } : {}),
+      generatedAt: input.generatedAt,
+      evidence,
+      limitations: [{
+        code: 'non_owner_person_scope',
+        evidenceId: 'ask.range',
+        text: NON_OWNER_ASK_HEALTH_TEXT,
+      }],
+      contextSummary: { knows: [], missing: [] },
+      clarification: null,
+      currentProfileRevision: null,
+      evidenceSelectionAudit: {
+        candidateCount: 1,
+        selectedCount: 1,
+        removedCount: 0,
+        removedSubstantiveCount: 0,
+        maxChars: input.maxChars ?? ASK_PACKET_MAX_CHARS,
+        selectedSerializedChars: JSON.stringify(evidence).length,
+        exceedsMaxChars: false,
+      },
+      sourceCoverageAudit: null,
+    }
+  }
 
   const historicalSourceConflict=input.historicalWeightEnergySourceRecheck==='changed_or_unavailable' &&
     input.contextMode!=='general_only' &&
@@ -195,7 +233,7 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
       detailPath:'/settings#health-profile',userEntered:false,
       substantive:false,priority:0,
     })
-  }else if (input.contextMode !== 'general_only' && !clinicalQuestionHasNonOwnerSubject(input.question)) {
+  }else if (input.contextMode !== 'general_only' && !askHealthNonOwnerSubject(input.question)) {
     // PIQ privacy: even explicit inventory words in a third-party question
     // cannot authorize borrowing the signed-in owner's saved Health Profile.
     addStableProfile(input.stableProfile ?? null, input.question, input.asOf, push, input.contextMode === 'deep')
@@ -247,7 +285,7 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
   // Compare only the requested categories, never disclose omitted details.
   const selectorClinicalCategories = input.profile &&
     input.contextMode !== 'general_only' &&
-    !clinicalQuestionHasNonOwnerSubject(input.question) &&
+    !askHealthNonOwnerSubject(input.question) &&
     input.currentHealthProfileSourceRecheck !== 'changed_or_unavailable' &&
     (input.healthToday == null || input.asOf === input.healthToday) &&
     !input.focusedWeightEnergyDay && !input.focusedWeightEnergyWindow &&
@@ -2334,7 +2372,7 @@ export function selectAskHealthMedications(
   profile: AskClinicalProfileInput,
   question: string,
 ): Array<{ index: number; medication: AskClinicalProfileInput['medications'][number] }> {
-  if (clinicalQuestionHasNonOwnerSubject(question)) return []
+  if (askHealthNonOwnerSubject(question)) return []
   const q = ' ' + (question.toLowerCase().match(/[a-z0-9]+/g) ?? []).join(' ') + ' '
   const names = profile.medications.map((medication, index) => ({ medication, index }))
   const explicit = /\b(?:medications?|meds?|medicines?|prescriptions?|prescribed|drugs?|drug interactions?|side effects?|adverse effects?)\b/i.test(question)
@@ -2364,7 +2402,7 @@ export function selectAskHealthAllergies(
   profile: AskClinicalProfileInput,
   question: string,
 ): Array<{ index: number; allergy: AskClinicalProfileInput['allergies'][number] }> {
-  if (clinicalQuestionHasNonOwnerSubject(question)) return []
+  if (askHealthNonOwnerSubject(question)) return []
   const records = profile.allergies.map((allergy, index) => ({ allergy, index }))
   const personal = /\b(?:my|mine|me|i|myself)\b/i.test(question)
   if (!personal) return []
@@ -2391,7 +2429,7 @@ export function selectAskHealthConditions(
   profile: AskClinicalProfileInput,
   question: string,
 ): Array<{ index: number; condition: AskClinicalProfileInput['conditions'][number] }> {
-  if (clinicalQuestionHasNonOwnerSubject(question)) return []
+  if (askHealthNonOwnerSubject(question)) return []
   if (!/\b(?:i|me|my|mine|myself)\b/i.test(question)) return []
   const records = profile.conditions.map((condition, index) => ({ condition, index }))
   const words = ' ' + (question.toLowerCase().match(/[a-z0-9]+/g) ?? []).join(' ') + ' '
@@ -2411,7 +2449,7 @@ export function selectAskHealthConditions(
 export function selectAskHealthProfileTextFields(
   question: string,
 ): Array<'persistentHealthContext' | 'trainingLimitations' | 'dietaryContext'> {
-  if (clinicalQuestionHasNonOwnerSubject(question)) return []
+  if (askHealthNonOwnerSubject(question)) return []
   if (!/\b(?:i|me|my|mine|myself)\b/i.test(question)) return []
   const profileRequest = /\bmy\s+(?:medical history|health history|health profile|health context|health background|profile)\b/i.test(question)
     || /\b(?:what|which|show|list)\b.{0,70}\b(?:health|medical)\s+(?:facts?|background|history|profile|context)\b.{0,70}\b(?:about me|recorded|saved)\b/i.test(question)
@@ -2422,37 +2460,6 @@ export function selectAskHealthProfileTextFields(
   if (training) relevant.push('trainingLimitations')
   if (diet) relevant.push('dietaryContext')
   return relevant
-}
-
-/** A first-person phrase in someone else's question is not an instruction to
- * include the account owner's clinical profile. This is intentionally
- * conservative: ambiguous mixed-family questions withhold the owner's
- * clinical profile rather than silently attaching their sensitive data.
- *
- * This scoped guard does NOT classify medical risk, establish identities,
- * or replace full cross-domain conversation/intent review.
- */
-function clinicalQuestionHasNonOwnerSubject(question: string): boolean {
-  // Explicit family/member third-person referents in a question that could
-  // otherwise be mistaken for a first-person clinical-profile request.
-  if (/\b(?:my|our|your|the|his|her|their)\s+(?:(?:young|older|elderly|little|adult|newborn)\s+)?(?:wife|husband|spouse|partner|mother|father|mom|dad|son|daughter|child|baby|kid|brother|sister|friend|roommate|coworker|patient)(?:['’]s)?\b/i.test(question)) {
-    return true
-  }
-  // Another person's explicitly possessive clinical history is never
-  // equivalent to the owner's current Health Profile.
-  if (/\b(?:her|his|their|someone else's)\s+(?:current\s+|saved\s+|recorded\s+)?(?:allerg(?:y|ies)|medications?|meds?|medicines?|prescriptions?|conditions?|diagnos(?:is|es)|medical history|health profile)\b/i.test(question)) {
-    return true
-  }
-  // First-person inside an educational or reported quotation does not
-  // identify the person whose canonical health data this question concerns.
-  const unquoted = question
-    .replace(/“[^”]*”/g, ' ')
-    .replace(/"[^"]*"/g, ' ')
-    .replace(/(?<!\w)'(?:[^']|'(?=\w))*'(?!\w)/g, ' ')
-    .replace(/(?<!\w)‘(?:[^’]|’(?=\w))*’(?!\w)/g, ' ')
-  const containsQuotation = unquoted !== question
-  return containsQuotation &&
-    /\b(?:phrase|sentence|quote|quotation|example|dialogue|translate|grammar|what does|what do|meaning|mean|someone|asked|said|wrote|told|imaginary|fictional)\b/i.test(unquoted)
 }
 
 /** An explicit request for a saved inventory is different from a named-fact
