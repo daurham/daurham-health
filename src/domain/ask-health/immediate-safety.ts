@@ -94,7 +94,10 @@ export function detectThirdPartyImmediateSafety(question: string): ImmediateSafe
   // A leading "if/when" clause describes a possibility, not a verified
   // present-tense report. Current first-person emergencies are checked first
   // by the service, regardless of other conditional clauses.
+  // "What should I do if my daughter..." is conditional too, even when
+  // "if" is embedded after an introductory question instead of at the start.
   if (/^\s*(?:if|when)\s+(?:my|our|his|her|their|the|he|she|they)\b/i.test(normalized) ||
+      /^\s*(?:what|how|should|can)\b[^.!?]{0,100}\b(?:if|when)\s+(?:my|our|his|her|their|the|he|she|they)\b/i.test(normalized) ||
       /\b(?:what if|suppose|imagine|hypothetical(?:ly)?|fictional|scenario|for example|in a story|would|used to)\b/i.test(normalized)) {
     return null
   }
