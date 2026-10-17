@@ -3050,3 +3050,74 @@ checks for explicit owner medication/allergy/condition inventory questions;
 distinguish intentionally selected subsets from genuinely exhaustive
 records. Then revisit isolated preview credentials and user-visible
 acceptance; do not merge main or bypass the release gate.
+
+
+## 2026-10-17 — T48 explicit clinical inventory pre-selection completeness (CI GREEN)
+
+State: **engineering-validated on PIQ development branch only; not owner accepted**.
+Depends on T48 profile revision + post-selection evidence-cap warning.
+Problem: the `clinical_evidence_limited` warning previously detected
+records selected by retrieval and then trimmed to `maxChars`, but could
+not detect a saved inventory clipped BEFORE that step by the question
+selector's 8/12/16-record limits. Worse, default Personalized mode
+prioritized active saved medications and conditions even for explicit
+questions such as "Which medicines have I recorded?", misleadingly
+dropping paused/discontinued records.
+
+Files: `src/domain/ask-health/packet.ts`,
+`tests/piq3-clinical-inventory-coverage.test.ts`.
+Contract: an explicit owner request to list/show/identify saved
+medications, allergies or conditions selects the corresponding stored
+category including non-active statuses, retaining stable source IDs.
+Existing per-category bounded selection limits remain (up to 16
+medications and 12 each allergies/conditions); no unlimited disclosure.
+When such an explicit category request cannot include all source records
+at the selector stage, emit the **same deterministic limitation** already
+used for subsequent evidence-byte-cap omissions; disclose only omitted
+categories, never omitted clinical labels, names, doses, reactions or
+record counts. Avoid listing-category inference for ordinary educational,
+named-fact, symptom, or "show me how" questions. No broad owner-record
+list is selected in General Only. Source-profile disagreement and
+historical/date-restricted questions do not claim a current-inventory
+completeness audit. A verified complete selection does not produce a
+false missing-record warning. Limitation remains separately visible in
+the Ask Health response UI and affects the private cache fingerprint
+even when selected evidence content is otherwise unchanged.
+
+Tests: six new synthetic cases exercise 20 saved medication records
+(including paused and discontinued status), mixed allergy/condition
+inventories, exact-cap complete lists, unrelated/named/imperative
+non-inventory questions, source-disagreement/historical/General-Only,
+and different stored-list lengths with identical selected evidence.
+The fixture verifies non-disclosure of omitted names to Gemini and
+avoids conflating selected evidence with full Health Profile.
+
+Implementation: `d9b220be8c23cf699e90ed2bb7e6fc67afa86410`;
+narrower imperative detection `8c4c6932dcbd3a78e77450cf5a0e193782f1f08a`,
+format correction `78aa6c60ef59879e451cf708533b154ec080df15`,
+and stable-ID regression assertion `2fc56f6deda02a22077b11dfc7a16747a74a8b5d`.
+The first full run exposed a **test-only ordering assumption**: evidence
+is priority-sorted, so paused/discontinued records must be asserted
+by stable source ID, not response position. Earlier queued runs were
+superseded/cancelled. Exact-application-SHA final GitHub Actions run
+https://github.com/daurham/daurham-health/actions/runs/39036627430
+**PASSED** npm ci, TypeScript, ESLint, 2,496 tests passed
+(30 skipped, 329 passed files), and production build.
+
+Limitations: this is a **question-intent scoped** list-completeness
+boundary, not exhaustive clinical reasoner, interaction checking,
+historical version reconstruction, inference that saved statuses
+represent actual ingestion/exposure, or proof of live Gemini behavior.
+Other implicit/complex phrasing can still require clinical-context
+selection QA. The 50 golden items are specifications, not 50
+owner-accepted passes.
+
+No migrations, production/main changes, preview API unlock,
+owner health record access, additional live Gemini calls or DB writes.
+Protected QA credential/runtime attestation and mobile owner acceptance
+remain blocked. Formal owner acceptance **0/9**.
+
+Next: bounded synthetic privacy/intent adversarial cases and independent
+QA runtime preparation; only then protected preview owner testing and
+a production release proposal. Do not unlock preview, run migrations
+on production, or merge to `main` without the approved QA/release gate.
