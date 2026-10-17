@@ -49,6 +49,7 @@ import {reviewCanonicalSelectedGoal} from '../../src/domain/ask-health/canonical
 import {readCurrentWeightPointSource} from './current-weight-point-source.js'
 import {readCurrentWeightProjectionSource} from './current-weight-projection-source.js'
 import {recheckCurrentWeightNutrition} from './current-weight-nutrition-recheck.js'
+import {recheckCurrentWeightActivity} from './current-weight-activity-recheck.js'
 import { loadTrainingProgressionState } from '../intelligence/training-progression.js'
 
 export async function loadAskHealthPacketInput(input: {
@@ -287,8 +288,16 @@ export async function loadAskHealthPacketInput(input: {
   // the first intelligence load. Recheck once at the end of all other reads
   // before forwarding any stale maintenance/nutrient/scale conclusions.
   if(focusedWeightEnergy&&input.asOf===today){
-    focusedWeightEnergy.nutritionSourceRecheck=
-      await recheckCurrentWeightNutrition(intelligenceSnapshot,today)
+    const [nutritionRecheck,weightActivityRecheck]=await Promise.all([
+      recheckCurrentWeightNutrition(intelligenceSnapshot,today),
+      recheckCurrentWeightActivity({
+        snapshot:intelligenceSnapshot,today,
+        start:focusedWeightEnergy.start,
+        end:focusedWeightEnergy.completeThrough,
+      }),
+    ])
+    focusedWeightEnergy.nutritionSourceRecheck=nutritionRecheck
+    focusedWeightEnergy.weightActivitySourceRecheck=weightActivityRecheck
   }
   return {
     lens: input.lens,

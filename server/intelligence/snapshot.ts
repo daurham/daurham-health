@@ -98,6 +98,9 @@ function addExcluded(
 export const ACTIVITY_INTELLIGENCE_SQL =
   "SELECT id::text AS summary_id, summary_date::text AS date, steps_count, active_energy_kcal, exercise_minutes, resting_heart_rate_bpm FROM activity_daily_summaries WHERE timezone = $1 AND summary_date <= $2::date ORDER BY summary_date"
 
+export const BODY_WEIGHT_INTELLIGENCE_SQL=
+  "SELECT metrics.id::text AS metric_id, sessions.id::text AS session_id, metrics.value, metrics.unit, sessions.measured_at, sessions.timezone, sessions.comparability, sources.source_kind FROM body_metrics metrics JOIN body_measurement_sessions sessions ON sessions.id = metrics.measurement_session_id JOIN data_sources sources ON sources.id = sessions.source_id WHERE metrics.metric_key = 'weight' AND (sessions.measured_at AT TIME ZONE $2)::date <= $1::date ORDER BY sessions.measured_at, metrics.id"
+
 export function activitySummaryObservations(rows:readonly Record<string,unknown>[]):IntelligenceObservation[]{
   const observations:IntelligenceObservation[]=[]
   for(const row of rows){
@@ -127,6 +130,34 @@ function bodyWeightKg(value: number, unit: string): number | null {
   if (normalized === 'kg' || normalized === 'kilogram' || normalized === 'kilograms') return value
   if (normalized === 'lb' || normalized === 'lbs' || normalized === 'pound' || normalized === 'pounds') return poundsToKilograms(value)
   return null
+}
+
+/** Mirror the initial intelligence row conversion for the final source check.
+ * SQL row order is canonical, including multiple weights on the same day.
+ */
+export function bodyWeightObservations(
+  rows:readonly Record<string,unknown>[],defaultTimezone:string,
+):IntelligenceObservation[]{
+  const observations:IntelligenceObservation[]=[]
+  for(const row of rows){
+    const raw=numberOrNull(row.value)
+    if(raw==null)continue
+    const kg=bodyWeightKg(raw,String(row.unit))
+    if(kg==null)continue
+    const measured=row.measured_at instanceof Date
+      ?row.measured_at:new Date(String(row.measured_at))
+    if(Number.isNaN(measured.getTime()))continue
+    const timezone=typeof row.timezone==='string'&&row.timezone
+      ?row.timezone:defaultTimezone
+    const metricId=String(row.metric_id)
+    push(observations,{
+      key:'body.weight_kg',date:calendarDateFromInstant(measured,timezone),
+      value:kg,unit:'kg',provenance:provenanceFromSourceKind(row.source_kind),
+      quality:typeof row.comparability==='string'?row.comparability:'unknown',
+      sourceIds:[metricId],
+    })
+  }
+  return observations
 }
 
 export async function loadHealthIntelligenceSnapshot(input: {
@@ -167,7 +198,7 @@ export async function loadHealthIntelligenceSnapshot(input: {
       [input.asOf],
     ),
     sql.query(
-      "SELECT metrics.id::text AS metric_id, sessions.id::text AS session_id, metrics.value, metrics.unit, sessions.measured_at, sessions.timezone, sessions.comparability, sources.source_kind FROM body_metrics metrics JOIN body_measurement_sessions sessions ON sessions.id = metrics.measurement_session_id JOIN data_sources sources ON sources.id = sessions.source_id WHERE metrics.metric_key = 'weight' AND (sessions.measured_at AT TIME ZONE $2)::date <= $1::date ORDER BY sessions.measured_at, metrics.id",
+      BODY_WEIGHT_INTELLIGENCE_SQL,
       [input.asOf, time.timezone],
     ),
     sql.query(
@@ -315,22 +346,7 @@ export async function loadHealthIntelligenceSnapshot(input: {
       addExcluded(excludedCounts, ['body.weight_kg'])
       continue
     }
-    const raw = numberOrNull(row.value)
-    if (raw == null) continue
-    const weightKg = bodyWeightKg(raw, String(row.unit))
-    if (weightKg == null) continue
-    const measured = row.measured_at instanceof Date ? row.measured_at : new Date(String(row.measured_at))
-    if (Number.isNaN(measured.getTime())) continue
-    const timezone = typeof row.timezone === 'string' && row.timezone ? row.timezone : time.timezone
-    push(observations, {
-      key: 'body.weight_kg',
-      date: calendarDateFromInstant(measured, timezone),
-      value: weightKg,
-      unit: 'kg',
-      provenance: provenanceFromSourceKind(row.source_kind),
-      quality: typeof row.comparability === 'string' ? row.comparability : 'unknown',
-      sourceIds: [metricId],
-    })
+    observations.push(...bodyWeightObservations([row],time.timezone))
   }
 
   const hydrationByDate = new Map<string, { amount: number; ids: string[] }>()
