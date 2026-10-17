@@ -29,19 +29,32 @@ const state: CoachIntelligenceState = {
   followUps: [], question: null, questionBudgetDays: 3,
 }
 describe('PIQ-1.5 viewing advice is not an intervention', () => {
-  it('renders Review and Add context as navigation, with an independently labeled start acknowledgement', () => {
+  it('preserves Review and Add context navigation under the one-card default, separate from started acknowledgement', () => {
     const html = renderToStaticMarkup(
       <MemoryRouter><CoachIntelligencePanel state={state} pending={false}
         onResponse={() => undefined} onOutcome={() => undefined} /></MemoryRouter>,
     )
     expect(html).toMatch(/href="\/training"[^>]*>Review training<\/a>/)
-    expect(html).toMatch(/href="\/nutrition"[^>]*>Add context<\/a>/)
+    expect(html).toContain('See 1 more recommendations')
+    expect(html).not.toContain('>Add context</a>')
     expect(html).toContain('I started this</button>')
     expect((html.match(/I started this<\/button>/g) ?? [])).toHaveLength(1)
     expect(html).toContain('Reviewing is not acceptance')
     expect(html).toContain('Explore experiment</a>')
     expect(html).not.toContain('>Experiment</button>')
     expect(html).not.toContain('>Add context</button>')
+
+    // A formerly secondary evidence-review card remains a navigable link
+    // when it becomes the primary, never an implicit started intervention.
+    const evidenceFirst = renderToStaticMarkup(
+      <MemoryRouter><CoachIntelligencePanel
+        state={{ ...state, nextBestActions: state.nextBestActions.slice(1) }}
+        pending={false} onResponse={() => undefined} onOutcome={() => undefined}
+      /></MemoryRouter>,
+    )
+    expect(evidenceFirst).toMatch(/href="\/nutrition"[^>]*>Add context<\/a>/)
+    expect(evidenceFirst).not.toContain('I started this</button>')
+    expect(evidenceFirst).not.toContain('See 1 more recommendations')
   })
 
   it('keeps a review and experiment preview independent from the only explicit started-response callback', () => {
