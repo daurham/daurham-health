@@ -8,6 +8,7 @@ describe('I9 Coach intelligence routing', () => {
     expect(matchCoachIntelligenceRoute('/api/intelligence/coach')).toEqual({ kind: 'root' })
     expect(matchCoachIntelligenceRoute(`/api/intelligence/coach/recommendations/${id}/respond`)).toEqual({ kind: 'respond', id })
     expect(matchCoachIntelligenceRoute(`/api/intelligence/coach/recommendations/${id}/outcome`)).toEqual({ kind: 'outcome', id })
+    expect(matchCoachIntelligenceRoute(`/api/intelligence/coach/recommendations/${id}/link-experiment`)).toEqual({ kind: 'link-experiment', id })
   })
 
   it('rejects malformed recommendation ids and unknown actions', () => {
