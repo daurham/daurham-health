@@ -3464,3 +3464,83 @@ model call, QA preview unlock or production data access.
 **Formal owner acceptance 0/9.**
 Next: PIQ-5.1/5.2 **eligibility-before-ranking** golden scenarios
 alongside isolated preview Auth/DB setup and genuine owner mobile QA.
+
+
+## 2026-10-17 — PIQ-5.1 / PIQ-5.2 operational task eligibility BEFORE recommendation ranking (CI GREEN)
+
+**State:** validated engineering on PIQ development branch only, no owner
+acceptance or release. Builds directly on the earlier PIQ-5.6 quiet
+one-card UI; this checkpoint changes upstream **selection/ranking**.
+
+**Gap:** canonical Weekly Coach can appropriately report "today is a
+preferred training day", an overdue measurement, retest, review capture,
+or generic food-log coverage task, and Goal Control used to elevate
+any top-ranked Weekly focus into its `primaryOpportunity`. Coach then
+assigned that candidate unconditional 100-point priority, crowding out
+training progression and eligible qualified maintenance decisions.
+Merely hiding two extra cards did not solve the priority problem.
+
+**Contract:** shared pure
+`src/domain/coach-opportunity-eligibility.ts` uses an exact explicit
+operational-kind allowlist:
+`training_plan_today`, `body_cadence`,
+`benchmark_retest`, `review_capture`, and
+`nutrition_coverage`. A known task stays in its ordinary Weekly
+Coach/Training/Body/Personal Lab/Nutrition experience and remains
+eligible for quests, due notices and separate follow-up workflows,
+but does **not** automatically become a **decision-grade** Goal Control
+`primaryOpportunity`. The latter instead falls back to existing
+eligible, safety-checked Maintenance and precise Training progression
+insights. A second filter in
+`buildCoachRecommendationDrafts` denies a stale or manually
+constructed operational opportunity even if Goal Control upstream
+was bypassed. The established calorie-review safety and dependency
+rules remain unchanged. Unknown/future opportunity kinds are not
+broadly suppressed; true goal reviews, experiment results and
+training progression remain eligible.
+
+**Regression:** five new synthetic integration/domain tests verify
+task-vs-insight classification; suppressed task candidates in Goal
+Control and Coach; genuine time-sensitive goal/experiment focus
+retention; direct stale candidate rejection; and immutable Weekly
+Coach focus source. An earlier I6 test was outdated: it expected an
+overdue waist measurement task alone to force Goal Control into
+`act` state and promote that task. The reconciled test asserts the
+task remains in Weekly Coach, but by itself does not warrant changing
+the owner's health plan.
+
+Files:
+`src/domain/coach-opportunity-eligibility.ts`,
+`src/domain/goal-control.ts`,
+`src/domain/coach-intelligence.ts`,
+`tests/piq5-coach-operational-eligibility.test.ts`,
+`tests/i6-goal-control.test.ts`.
+First code commit `ecd334a721e5e2cada1ce954528ccd7f16093360`
+failed exactly one now-outdated I6 behavior expectation (2,526 other
+tests passed), CI https://github.com/daurham/daurham-health/actions/runs/39051790813.
+Corrective test commit
+`387f5f4834fae10c0e12103e46f9364024320158`;
+**exact final code CI**
+https://github.com/daurham/daurham-health/actions/runs/39052082560
+**SUCCESS** npm ci, `npx tsc -b`, `npx eslint .`, full Vitest
+**2,527 passed, 30 skipped; 334 suites passed**, and
+`npm run build`.
+
+**Limitations and next milestone:** eligibility so far distinguishes
+**known operational kinds**, not the full PIQ-5.2 safety/decision/novelty
+scoring rubric. Still validate stale or already-done owner actions
+with actual runtime refresh, competing recommendation eligibility,
+ranking meaningful cross-domain insight above training improvement,
+ongoing follow-up burden, "no change" after owner action, and mobile
+interaction/accessibility for expand/collapse. The later PIQ-6 real
+owner intervention lifecycle remains independent. Do not claim PIQ-5
+completed from this bounded change. Owner mobile QA and the protected
+isolated Auth/preview runtime remain blocked; formal owner acceptance
+**0/9**.
+
+No production or `main` change, new migration, owner-record read,
+live provider call, target/medical change, QA API unlock or data write.
+Next: PIQ-5.2 scenario-level eligibility and substantive ranking,
+then PIQ-5.3 meaningful evidence/action payload and high-value question
+policy; separately complete independent QA preview connectivity and
+owner acceptance before release consideration.
