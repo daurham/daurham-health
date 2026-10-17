@@ -42,7 +42,10 @@ describe('PIQ-6.3 verified nutrition outcome maturity', () => {
     expect(query).toContain("n.evidence_quality")
     expect(query).toContain('JOIN verified_days d ON d.date = e.log_date::text')
     expect(query).toContain('WHERE e.log_date BETWEEN $1::date AND $2::date')
-    expect(query).toContain('SUM(e.protein) AS protein')
+    expect(query).toContain('bool_and(e.protein IS NOT NULL AND e.protein >= 0)')
+    expect(query).toContain('THEN SUM(e.protein) ELSE NULL END AS protein')
+    expect(query).toContain('bool_and(e.carbs IS NOT NULL AND e.carbs >= 0)')
+    expect(query).toContain('bool_and(e.fat IS NOT NULL AND e.fat >= 0)')
   })
 
   it('an empty eligible set is missing, not an interpretable experiment outcome', () => {

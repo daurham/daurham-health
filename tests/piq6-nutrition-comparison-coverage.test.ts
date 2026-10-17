@@ -86,5 +86,6 @@ describe('PIQ-6.3 owner-date nutrition comparison coverage', () => {
     expect(EXPERIMENT_VERIFIED_NUTRITION_SQL).toContain("owner_report = 'complete'")
     expect(EXPERIMENT_VERIFIED_NUTRITION_SQL).toContain('current_source.revision')
     expect(EXPERIMENT_VERIFIED_NUTRITION_SQL).toContain('c.health_date < $3::date')
+    expect(EXPERIMENT_VERIFIED_NUTRITION_SQL).toContain('bool_and(e.protein IS NOT NULL AND e.protein >= 0)')
   })
 })
