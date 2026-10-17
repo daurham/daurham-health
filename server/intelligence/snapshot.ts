@@ -95,6 +95,29 @@ function addExcluded(
   for (const key of keys) counts[key] = (counts[key] ?? 0) + amount
 }
 
+export const ACTIVITY_INTELLIGENCE_SQL =
+  "SELECT id::text AS summary_id, summary_date::text AS date, steps_count, active_energy_kcal, exercise_minutes, resting_heart_rate_bpm FROM activity_daily_summaries WHERE timezone = $1 AND summary_date <= $2::date ORDER BY summary_date"
+
+export function activitySummaryObservations(rows:readonly Record<string,unknown>[]):IntelligenceObservation[]{
+  const observations:IntelligenceObservation[]=[]
+  for(const row of rows){
+    const date=String(row.date)
+    const sourceIds=typeof row.summary_id==='string'&&row.summary_id.trim()
+      ?[row.summary_id]:[]
+    const metrics:Array<[IntelligenceSignalKey,unknown,string]>=[
+      ['activity.steps',row.steps_count,'steps'],
+      ['activity.active_energy_kcal',row.active_energy_kcal,'kcal'],
+      ['activity.exercise_minutes',row.exercise_minutes,'min'],
+      ['activity.resting_heart_rate_bpm',row.resting_heart_rate_bpm,'bpm'],
+    ]
+    for(const [key,raw,unit] of metrics){
+      const value=numberOrNull(raw)
+      if(value!=null)push(observations,{key,date,value,unit,provenance:'device',sourceIds})
+    }
+  }
+  return observations
+}
+
 function earliestDate(observations: readonly IntelligenceObservation[], asOf: string): string {
   return observations.reduce((min, item) => item.date < min ? item.date : min, asOf)
 }
@@ -128,7 +151,7 @@ export async function loadHealthIntelligenceSnapshot(input: {
       "SELECT entity_kind, entity_id, issue_snapshot FROM data_quality_reviews WHERE review_status = 'excluded_from_analysis'",
     ),
     sql.query(
-      "SELECT summary_date::text AS date, steps_count, active_energy_kcal, exercise_minutes, resting_heart_rate_bpm FROM activity_daily_summaries WHERE timezone = $1 AND summary_date <= $2::date ORDER BY summary_date",
+      ACTIVITY_INTELLIGENCE_SQL,
       [time.timezone, input.asOf],
     ),
     sql.query(
@@ -170,19 +193,7 @@ export async function loadHealthIntelligenceSnapshot(input: {
   const observations: IntelligenceObservation[] = []
   const excludedCounts: Partial<Record<IntelligenceSignalKey, number>> = {}
 
-  for (const row of activityRows as Array<Record<string, unknown>>) {
-    const date = String(row.date)
-    const metrics: Array<[IntelligenceSignalKey, unknown, string]> = [
-      ['activity.steps', row.steps_count, 'steps'],
-      ['activity.active_energy_kcal', row.active_energy_kcal, 'kcal'],
-      ['activity.exercise_minutes', row.exercise_minutes, 'min'],
-      ['activity.resting_heart_rate_bpm', row.resting_heart_rate_bpm, 'bpm'],
-    ]
-    for (const [key, raw, unit] of metrics) {
-      const value = numberOrNull(raw)
-      if (value != null) push(observations, { key, date, value, unit, provenance: 'device' })
-    }
-  }
+  observations.push(...activitySummaryObservations(activityRows as Array<Record<string,unknown>>))
 
   for (const row of sleepRows as Array<Record<string, unknown>>) {
     if (row.analysis_eligible !== true || row.observation_status === 'partial_observation' || row.observation_status === 'in_bed_only') continue

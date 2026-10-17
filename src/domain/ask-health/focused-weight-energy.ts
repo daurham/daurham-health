@@ -46,6 +46,8 @@ export type FocusedWeightEnergyEvidence = {
   scaleWindowSignalCoverage:ScaleWindowSignalCoverage
   /** Date-level ordering only; does not infer nutrient timing within a day or a weight cause. */
   scaleShiftTiming:ScaleShiftTiming
+  /** Current read-time completeness recheck; never an intervention permit. */
+  nutritionSourceRecheck:'not_checked'|'verified'|'changed_or_unavailable'
   /** Read-time current target/experiment revision status, NOT permission to adjust calories. */
   currentSettings: WeightEnergyCurrentSettings
   /** Read-only canonical matched-exercise decline flags, never strength-retention proof. */
@@ -158,6 +160,7 @@ export function focusWeightEnergyContext(input: {
     qualifiedScaleContext,
     scaleWindowSignalCoverage,
     scaleShiftTiming,
+    nutritionSourceRecheck:'not_checked',
     currentSettings: {...UNCHECKED_WEIGHT_ENERGY_SETTINGS},
     exercisePreservationReview: {...UNCHECKED_EXERCISE_PRESERVATION},
     weightGoalObservation: {...UNCHECKED_WEIGHT_GOAL_OBSERVATION},

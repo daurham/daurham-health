@@ -523,6 +523,20 @@ function addFocusedWeightEnergy(
   if (!focus || contextMode === 'general_only') return
   const estimate = focus.estimate
   const period = {start:focus.start,end:focus.end}
+  if(focus.nutritionSourceRecheck==='changed_or_unavailable'){
+    push({
+      id:'weight_energy.source_consistency',
+      domain:'intelligence',
+      label:'Current Nutrition source consistency boundary',
+      value:null,unit:null,period,
+      text:'The owner-confirmed Nutrition source may have changed or its independent read-time recheck was unavailable. Current weight/intake maintenance estimates, nutrient shifts, protein averages and linked scale interpretations are WITHHELD. A missing or corrected log is UNKNOWN, not zero; re-run the question after Nutrition entries and completeness status settle. No calorie adjustment or personalized plateau conclusion is authorized.',
+      coverage:{nutritionSourceRecheck:'changed_or_unavailable',
+        intakeEstimate:'withheld',nutrientShiftContext:'withheld',
+        scaleInterpretation:'withheld',intervention:'not_authorized'},
+      detailPath:'/nutrition',userEntered:false,substantive:false,priority:0,
+    })
+    return
+  }
   const quality = estimate.quality
   const sufficient = estimate.state === 'available' &&
     estimate.observedMaintenanceKcal != null &&

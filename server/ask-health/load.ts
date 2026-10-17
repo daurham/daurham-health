@@ -48,6 +48,7 @@ import {reconcileWeightEnergyEvidence} from '../../src/domain/ask-health/weight-
 import {reviewCanonicalSelectedGoal} from '../../src/domain/ask-health/canonical-goal-status-review.js'
 import {readCurrentWeightPointSource} from './current-weight-point-source.js'
 import {readCurrentWeightProjectionSource} from './current-weight-projection-source.js'
+import {recheckCurrentWeightNutrition} from './current-weight-nutrition-recheck.js'
 import { loadTrainingProgressionState } from '../intelligence/training-progression.js'
 
 export async function loadAskHealthPacketInput(input: {
@@ -281,6 +282,13 @@ export async function loadAskHealthPacketInput(input: {
       recentResults:focusedWeightEnergy.recentExperimentResultReview,
       proteinTraining:focusedWeightEnergy.proteinTrainingContext,
     })
+  }
+  // A saved nutrition confirmation can be invalidated by a late edit after
+  // the first intelligence load. Recheck once at the end of all other reads
+  // before forwarding any stale maintenance/nutrient/scale conclusions.
+  if(focusedWeightEnergy&&input.asOf===today){
+    focusedWeightEnergy.nutritionSourceRecheck=
+      await recheckCurrentWeightNutrition(intelligenceSnapshot)
   }
   return {
     lens: input.lens,
