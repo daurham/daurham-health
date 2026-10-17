@@ -1,7 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { formatCalendarRange } from '@/domain/calendar-format'
-import { labExperimentHandoffLabel, readLabExperimentHandoff } from '@/domain/lab-handoff'
+import { labExperimentDetailHandoffPath, labExperimentHandoffLabel, readLabExperimentHandoff } from '@/domain/lab-handoff'
+import { linkCoachExperiment } from '@/features/coach/api'
 import { dangerButtonClass, LoadErrorNotice, primaryButtonClass, quietButtonClass, secondaryButtonClass } from '@/lib'
 import {
   abandonExperiment,
@@ -55,7 +56,7 @@ export function NewExperimentPage() {
         supplements,
         benchmarks: benchmarkId ? [{ benchmarkDefinitionId: benchmarkId, role: 'primary' }] : [],
       })
-      navigate(`/lab/experiments/${created.id}`)
+      navigate(handoff ? labExperimentDetailHandoffPath(created.id, handoff) : `/lab/experiments/${created.id}`)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Could not save the experiment')
       setSaving(false)
@@ -160,6 +161,10 @@ export function NewExperimentPage() {
 
 export function ExperimentDetailPage() {
   const { experimentId } = useParams()
+  const [searchParams] = useSearchParams()
+  const coachHandoff = readLabExperimentHandoff(searchParams)?.coachRecommendation
+  const [coachLinkSaved, setCoachLinkSaved] = useState(false)
+  const [coachLinkPending, setCoachLinkPending] = useState(false)
   const navigate = useNavigate()
   const catalogs = useLabCatalogs()
   const [experiment, setExperiment] = useState<ExperimentDetail | null>(null)
@@ -204,6 +209,21 @@ export function ExperimentDetailPage() {
     }
   }
 
+  async function confirmCoachLink() {
+    if (!experimentId || !coachHandoff) return
+    setCoachLinkPending(true)
+    setError(null)
+    try {
+      await linkCoachExperiment(coachHandoff.recommendationId, experimentId,
+        coachHandoff.responseAt, coachHandoff.contextRevision)
+      setCoachLinkSaved(true)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Could not link the experiment to Coach')
+    } finally {
+      setCoachLinkPending(false)
+    }
+  }
+
   if (!experimentId) {
     return null
   }
@@ -239,6 +259,18 @@ export function ExperimentDetailPage() {
         ) : null}
       </div>
       {error ? <LoadErrorNotice message={error} /> : null}
+      {coachHandoff ? (
+        <section className="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700">
+          <p className="font-medium">Coach recommendation handoff</p>
+          <p className="mt-1">This owner-selected link does not prove the experiment was started or helped.</p>
+          {coachLinkSaved ? <p className="mt-2 font-medium">Linked to Coach. You can schedule or start the experiment separately.</p> : (
+            <button type="button" className={secondaryButtonClass} disabled={coachLinkPending}
+              onClick={() => void confirmCoachLink()}>
+              {coachLinkPending ? 'Linking…' : 'Link this experiment to Coach'}
+            </button>
+          )}
+        </section>
+      ) : null}
       <section className="space-y-2 text-sm text-zinc-800">
         <p>
           <span className="font-medium">Question. </span>
