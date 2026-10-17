@@ -560,7 +560,11 @@ describe('ask health handoff and boundaries', () => {
     expect(ask?.suggestedQuestion).toContain('step average increased')
     const page = readFileSync('src/features/ask-health/AskHealthPage.tsx', 'utf8')
     const section = readFileSync('src/features/progress/InsightsSection.tsx', 'utf8')
-    expect(page).not.toContain('useEffect')
+    // Cross-tab canonical-data invalidation now requires a useEffect on Ask Health.
+    // The Insights handoff must still only prefill; it must never auto-submit.
+    expect(page).toContain("params.get('question')")
+    expect(page).toMatch(/<form[\s\S]*?onSubmit=\{\(event\) => \{\s*event\.preventDefault\(\)\s*void submit\(draft\)/)
+    expect(page).toContain('subscribeHealthDataChanges')
     expect(page).toContain("params.get('question')")
     expect(section).toContain('Ask Health about this')
     expect(section).not.toContain('healthFetch')
