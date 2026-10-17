@@ -11,6 +11,7 @@ import { UNCHECKED_EXPERIMENT_OUTCOME, type ExperimentOutcomeReview } from './ex
 import { UNCHECKED_RECENT_RESULT, type RecentExperimentResultReview } from './recent-experiment-result-review.js'
 import { UNCHECKED_WEIGHT_ENERGY_RECONCILIATION, type WeightEnergyReconciliation } from './weight-energy-reconciliation.js'
 import { UNCHECKED_CANONICAL_GOAL_STATUS, type CanonicalGoalStatusReview } from './canonical-goal-status-review.js'
+import {screenScaleWindowSignalCoverage,type ScaleWindowSignalCoverage} from './scale-window-signal-coverage.js'
 
 /**
  * PIQ-4.2 FIRST SLICE — purely descriptive, explicitly bounded weight/intake
@@ -41,6 +42,8 @@ export type FocusedWeightEnergyEvidence = {
    */
   qualifiedScaleContext: Array<Pick<ScaleNoiseFactor,
     'id' | 'kind' | 'title' | 'detail' | 'dates' | 'detailPath'>>
+  /** Same-window weigh-in and logged-signal coverage, NOT causal evidence. */
+  scaleWindowSignalCoverage:ScaleWindowSignalCoverage
   /** Read-time current target/experiment revision status, NOT permission to adjust calories. */
   currentSettings: WeightEnergyCurrentSettings
   /** Read-only canonical matched-exercise decline flags, never strength-retention proof. */
@@ -143,6 +146,9 @@ export function focusWeightEnergyContext(input: {
       .map(({id,kind,title,detail,dates,detailPath}) => ({
         id,kind,title,detail,dates,detailPath,
       })),
+    scaleWindowSignalCoverage:screenScaleWindowSignalCoverage({
+      snapshot,completeThrough:maintenance.completeThrough,today,
+    }),
     currentSettings: {...UNCHECKED_WEIGHT_ENERGY_SETTINGS},
     exercisePreservationReview: {...UNCHECKED_EXERCISE_PRESERVATION},
     weightGoalObservation: {...UNCHECKED_WEIGHT_GOAL_OBSERVATION},

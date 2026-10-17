@@ -574,20 +574,27 @@ function addFocusedWeightEnergy(
   // explanation of scale mass or evidence supporting a calorie change.
   // Absence of a qualifying comparison MUST NOT imply stable intake.
   const contextual = focus.qualifiedScaleContext
+  const scaleCoverage=focus.scaleWindowSignalCoverage
   push({
     id:'weight_energy.scale_context',
     domain:'intelligence',
     label:'Recent verified nutrient shifts that might complicate scale interpretation',
     value:null,unit:null,period,
-    text:contextual.length > 0
+    text:(contextual.length > 0
       ? 'The existing maintenance screening found ' + contextual.length +
         ' recent recorded nutrient shift(s) on owner-confirmed, source-reliable food days: ' +
         contextual.map(item => item.title + '. ' + item.detail).join(' ') +
         ' These are possible short-term scale-weight contexts, NOT demonstrated causes of body-mass changes, proof of fat gain, a personal association or grounds to lower calorie targets. ' +
-        'Hydration and bowel trends are not screened as explanatory shifts here because event logs cannot establish whole-day completeness.'
+        'Hydration and bowel trends are not screened as explanatory shifts here because event logs cannot establish whole-day completeness.'+
+        (scaleCoverage.weightSampling==='sampled_both_windows'
+          ? ' Both comparison windows contain recorded usual-condition weights, but contemporaneous readings do NOT establish any personalized weight/nutrient association.'
+          : ' The comparison windows lack sufficient usual-condition weight sampling; this is a food-log observation ONLY, not an observed scale-weight explanation.')
       : 'No recent sodium or carbohydrate shift qualified for this source-verified comparison. ' +
         'That does NOT establish stable sodium/carbohydrate intake, exclude fluid/GI confounding, or prove that body fat has stopped changing. ' +
-        'Missing or unverified food days and unrecorded circumstances are unknown, not normal or zero.',
+        'Missing or unverified food days and unrecorded circumstances are unknown, not normal or zero.')+
+      ' In these ten completed comparison days, source-identified water logs exist on '+
+      scaleCoverage.recordedWaterDays+' day(s) and step logs on '+
+      scaleCoverage.recordedStepDays+' day(s). Neither proves whole-day hydration, physical activity, or a cause for scale change; missing logs never imply zero.',
     coverage:{
       verifiedNutrientShiftCount:contextual.length,
       screenedNutrients:'sodium, carbohydrate',
@@ -596,6 +603,12 @@ function addFocusedWeightEnergy(
       baselineWindowDays:7,
       sodiumQualifiedRecentDates:contextual.find(item => item.kind === 'sodium')?.dates.length ?? 0,
       carbohydrateQualifiedRecentDates:contextual.find(item => item.kind === 'carbohydrate')?.dates.length ?? 0,
+      weightSampling:scaleCoverage.weightSampling,
+      recentUsualWeightDays:scaleCoverage.recentUsualWeightDays,
+      baselineUsualWeightDays:scaleCoverage.baselineUsualWeightDays,
+      nonUsualWeightDays:scaleCoverage.nonUsualWeightDays,
+      recordedWaterDays:scaleCoverage.recordedWaterDays,
+      recordedStepDays:scaleCoverage.recordedStepDays,
     },
     detailPath:'/nutrition',userEntered:false,substantive:false,priority:1,
   })
