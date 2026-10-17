@@ -154,6 +154,8 @@ export type CoachRecommendationView = {
   responseAt: string | null
   /** Opaque version of the non-calorie advice and relevant evidence. */
   contextRevision?: string
+  /** Owner-linked Lab record; linkage does not establish an experiment start. */
+  linkedExperimentId?: string
   experimentEligible: boolean
 }
 
