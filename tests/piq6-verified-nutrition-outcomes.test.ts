@@ -39,7 +39,7 @@ describe('PIQ-6.3 verified nutrition outcome maturity', () => {
     expect(query).toContain('c.entry_revision = current_source.revision')
     expect(query).toContain('c.health_date < $3::date')
     expect(query).toContain("review_status = 'excluded_from_analysis'")
-    expect(query).toContain("e.evidence_quality")
+    expect(query).toContain("n.evidence_quality")
     expect(query).toContain('JOIN verified_days d ON d.date = e.log_date::text')
     expect(query).toContain('WHERE e.log_date BETWEEN $1::date AND $2::date')
     expect(query).toContain('SUM(e.protein) AS protein')
