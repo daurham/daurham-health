@@ -21,6 +21,7 @@ import type { AdherenceWindow, OccurrenceState, ScheduleWindow, StatusEventWindo
 import { getSql, type Sql } from '../db.js'
 import { HttpError } from '../http.js'
 import { currentHealthDate, healthCalendarTimeZone } from '../health-time.js'
+import { VERIFIED_NUTRITION_DAYS_SQL } from '../nutrition/maintenance-eligibility.js'
 
 type ExperimentRow = {
   id: string
@@ -244,7 +245,7 @@ async function buildEvaluation(
   const effectiveEnd = open ? null : window.effectiveEndDate
   const loadEnd = effectiveEnd ?? plannedEnd
   const requirements = await loadRequirements(sql, experiment.protocol_version_id)
-  const evidence = await loadEvidence(sql, experiment, requirements, start, loadEnd, timezone)
+  const evidence = await loadEvidence(sql, experiment, requirements, start, loadEnd, timezone, today)
   const evaluation = evaluateExperiment({
     windowStart: start,
     plannedWindowEnd: plannedEnd,
@@ -347,6 +348,7 @@ async function loadEvidence(
   start: string,
   end: string,
   timezone: string,
+  today: string,
 ): Promise<ExperimentEvidence> {
   const benchmarkIds = requirements.map((item) => item.selector.benchmarkDefinitionId).filter((id): id is string => Boolean(id))
   const supplementIds = [
@@ -357,7 +359,9 @@ async function loadEvidence(
     loadBenchmarks(sql, experiment.id, benchmarkIds),
     loadTraining(sql, experiment.id, start, end),
     loadBody(sql, requirements, start, end, timezone),
-    loadNutrition(sql, start, end),
+    requirements.some((item) => item.requirementKind === 'nutrition_metric')
+      ? loadNutrition(sql, start, end, today)
+      : Promise.resolve([] as ExperimentEvidence['nutrition']),
     loadActivity(sql, start, end, timezone),
     loadSleep(sql, start, end, timezone),
     loadAdherence(sql, [...new Set(supplementIds)], start, end),
@@ -501,14 +505,30 @@ async function loadBody(
   })
 }
 
-async function loadNutrition(sql: Sql, start: string, end: string) {
+/**
+ * PIQ-6.3: a nutrition outcome needs reliable full-day observations, not just
+ * the sum of whichever meals happened to be logged. Reuse the exact verified
+ * owner-confirmation, source-revision and exclusion gate used by Maintenance.
+ * The CTE and the nutrient sums share one SQL statement / MVCC snapshot.
+ * No unconfirmed, partial, stale, excluded, low-quality or current day is
+ * promoted to a complete experimental outcome.
+ */
+export const EXPERIMENT_VERIFIED_NUTRITION_SQL = [
+  'WITH verified_days AS (',
+  VERIFIED_NUTRITION_DAYS_SQL,
+  ')',
+  'SELECT e.log_date::text AS log_date,',
+  '  SUM(e.calories) AS calories, SUM(e.protein) AS protein,',
+  '  SUM(e.carbs) AS carbs, SUM(e.fat) AS fat',
+  'FROM nutrition_entries e',
+  'JOIN verified_days d ON d.date = e.log_date::text',
+  'WHERE e.log_date BETWEEN $1::date AND $2::date',
+  'GROUP BY e.log_date',
+].join('\n')
+
+async function loadNutrition(sql: Sql, start: string, end: string, today: string) {
   const rows = (await sql.query(
-    `SELECT log_date::text AS log_date,
-            SUM(calories) AS calories, SUM(protein) AS protein, SUM(carbs) AS carbs, SUM(fat) AS fat
-     FROM nutrition_entries
-     WHERE log_date BETWEEN $1::date AND $2::date
-     GROUP BY log_date`,
-    [start, end],
+    EXPERIMENT_VERIFIED_NUTRITION_SQL, [start, end, today],
   )) as Array<Record<string, unknown>>
   const points: ExperimentEvidence['nutrition'] = []
   for (const row of rows) {
