@@ -1,4 +1,5 @@
 import type { GoalControlEvidenceCoverage, GoalControlLimitation, GoalControlNutritionQuality, GoalControlState } from './goal-control.js'
+import { isOperationalCoachOpportunity } from './coach-opportunity-eligibility.js'
 import type { MaintenanceEvidenceExplanation } from './maintenance.js'
 import { progressionSeriesForOpportunity, type TrainingProgressionSeries } from './training-progression.js'
 import type { IntelligenceConfidence } from './intelligence/shared.js'
@@ -211,7 +212,7 @@ function opportunityDraft(
   control: GoalControlState,
 ): CoachRecommendationDraft | null {
   const opportunity = control.primaryOpportunity
-  if (!opportunity) return null
+  if (!opportunity || isOperationalCoachOpportunity(opportunity.kind)) return null
   // Both a stale weekly focus and a manually reconstructed Goal Control
   // object must fail closed: only the matching current Maintenance decision
   // may create a numerical calorie review. Never promote its alternative

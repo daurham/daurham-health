@@ -1,4 +1,5 @@
 import { addCalendarDays, type TrainingDayIntent } from './training-plan.js'
+import { isOperationalCoachOpportunity } from './coach-opportunity-eligibility.js'
 import { confidenceFromSample, INTELLIGENCE_SIGNAL_REGISTRY, relationshipScreeningMetadataMatchesDefinition, type HealthIntelligenceSnapshot, type IntelligenceConfidence, type IntelligenceCoverage, type IntelligenceSignalKey } from './intelligence/shared.js'
 import type { WeeklyCandidate, WeeklyCoachBrief, WeeklyGoalSnapshot, WeeklyTrainingPlanSnapshot } from './weekly-coach/types.js'
 import type { MaintenanceState } from './maintenance.js'
@@ -914,7 +915,12 @@ export function buildGoalControlState(input: BuildGoalControlInput): GoalControl
           item.id === weeklyFocus.id && item.kind === weeklyFocus.kind))
       ? null
       : weeklyFocus
-  const primaryOpportunity = safeWeeklyFocus ??
+  // Weekly Coach may quite properly focus on a due task or scheduled workout.
+  // Such tasks remain in Training/Nutrition/Lab, but cannot occupy the
+  // decision-grade Goal Control/Coach slot ahead of verified insights.
+  const meaningfulWeeklyFocus = safeWeeklyFocus &&
+    !isOperationalCoachOpportunity(safeWeeklyFocus.kind) ? safeWeeklyFocus : null
+  const primaryOpportunity = meaningfulWeeklyFocus ??
     maintenanceOpportunity(input.maintenance, nutrition) ??
     trainingProgressionOpportunity(input.trainingProgression)
   const limitations = limitationsFor(input.intelligence, input.goals, nutrition, confidence)
