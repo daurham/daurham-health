@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { RESULT_CAUSALITY_FOOTER } from '@/domain/experiment-results'
+import { nutritionComparisonCopy } from '@/domain/experiment-comparison'
 import { dailyContextTagLabel, type DailyContextTagKey } from '@/domain/context'
 import { LoadErrorNotice, primaryButtonClass, secondaryButtonClass } from '@/lib'
 import {
@@ -208,6 +209,19 @@ function ResultBody({ result }: { result: ExperimentResultView }) {
           </article>
         ))}
       </section>
+      {result.comparisonReview ? (
+        <section className="space-y-1 rounded-lg border border-zinc-200 p-3 text-sm">
+          <h2 className="font-semibold text-zinc-900">Before/after recording coverage</h2>
+          <p>{nutritionComparisonCopy(result.comparisonReview)}</p>
+          {result.comparisonReview.metrics.map((metric) => (
+            <p key={metric.metricKey} className="text-zinc-600">
+              {metric.metricKey}: {metric.beforeDays}/{metric.beforeExpected} prior full days,
+              {' '}{metric.afterDays}/{metric.afterExpected} post-change full days.
+            </p>
+          ))}
+          <p className="text-zinc-500">This is a current preview-only data coverage check, not a recorded result or proof that the change worked.</p>
+        </section>
+      ) : null}
       {result.contextControls && result.contextControls.length > 0 ? (
         <section className="space-y-1 text-sm">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Context recorded</h2>

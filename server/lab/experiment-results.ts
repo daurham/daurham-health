@@ -22,6 +22,9 @@ import { getSql, type Sql } from '../db.js'
 import { HttpError } from '../http.js'
 import { currentHealthDate, healthCalendarTimeZone } from '../health-time.js'
 import { VERIFIED_NUTRITION_DAYS_SQL } from '../nutrition/maintenance-eligibility.js'
+import { addCalendarDays } from '../../src/domain/progress/dates.js'
+import { isCalendarDate } from '../../src/domain/training.js'
+import { assessNutritionExperimentComparison, type ExperimentComparisonReview } from '../../src/domain/experiment-comparison.js'
 
 type ExperimentRow = {
   id: string
@@ -34,13 +37,14 @@ type ExperimentRow = {
   version: number
   window_start: string | null
   window_end: string | null
+  reported_implementation_date?: string | null
 }
 
 export async function previewExperimentResult(experimentId: string, body: unknown, today?: string) {
   const resolvedToday = today ?? await currentHealthDate()
   const attestation = parsedAttestation(body)
   const built = await buildEvaluation(experimentId, attestation, resolvedToday)
-  return publicPreview(built.evaluation, built.experiment, built.fingerprint)
+  return { ...publicPreview(built.evaluation, built.experiment, built.fingerprint), comparisonReview: built.comparisonReview }
 }
 
 export async function commitExperimentResult(experimentId: string, body: unknown, today?: string) {
@@ -245,7 +249,20 @@ async function buildEvaluation(
   const effectiveEnd = open ? null : window.effectiveEndDate
   const loadEnd = effectiveEnd ?? plannedEnd
   const requirements = await loadRequirements(sql, experiment.protocol_version_id)
-  const evidence = await loadEvidence(sql, experiment, requirements, start, loadEnd, timezone, today)
+  // The owner-confirmed implementation date is separate from scheduling or Lab 'active'.
+  // No read of extra baseline days is necessary when there is no current report.
+  const reportedChangeDate = experiment.reported_implementation_date &&
+    isCalendarDate(experiment.reported_implementation_date) &&
+    experiment.reported_implementation_date >= start &&
+    experiment.reported_implementation_date <= loadEnd &&
+    experiment.reported_implementation_date <= today
+    ? experiment.reported_implementation_date : null
+  const evidence = await loadEvidence(sql, experiment, requirements, start, loadEnd, timezone, today, reportedChangeDate)
+  const comparisonReview: ExperimentComparisonReview = assessNutritionExperimentComparison({
+    reportedImplementationDate: experiment.reported_implementation_date ?? null,
+    windowStart: start, effectiveEndDate: loadEnd, today,
+    requirements, nutrition: evidence.nutrition,
+  })
   const evaluation = evaluateExperiment({
     windowStart: start,
     plannedWindowEnd: plannedEnd,
@@ -274,7 +291,7 @@ async function buildEvaluation(
         }),
       )
     : null
-  return { experiment, evaluation, fingerprint }
+  return { experiment, evaluation, fingerprint, comparisonReview }
 }
 
 function publicPreview(evaluation: ExperimentEvaluation, experiment: ExperimentRow, fingerprint: string | null) {
@@ -308,9 +325,17 @@ async function loadExperiment(sql: Sql, id: string): Promise<ExperimentRow> {
   const rows = (await sql.query(
     `SELECT e.id::text AS id, e.title, e.question, e.hypothesis, e.status,
             e.protocol_version_id::text AS protocol_version_id, v.protocol_id::text AS protocol_id, v.version,
-            e.window_start::text AS window_start, e.window_end::text AS window_end
+            e.window_start::text AS window_start, e.window_end::text AS window_end,
+            CASE WHEN revision.action = 'retracted' THEN NULL
+              ELSE COALESCE(revision.effective_date, implementation.effective_date)::text
+              END AS reported_implementation_date
      FROM experiments e
      JOIN lab_protocol_versions v ON v.id = e.protocol_version_id
+     LEFT JOIN experiment_implementations implementation ON implementation.experiment_id = e.id
+     LEFT JOIN LATERAL (
+       SELECT action, effective_date FROM experiment_implementation_revisions
+       WHERE experiment_id = e.id ORDER BY revision DESC LIMIT 1
+     ) revision ON TRUE
      WHERE e.id = $1::uuid`,
     [id],
   )) as ExperimentRow[]
@@ -349,6 +374,7 @@ async function loadEvidence(
   end: string,
   timezone: string,
   today: string,
+  reportedChangeDate: string | null,
 ): Promise<ExperimentEvidence> {
   const benchmarkIds = requirements.map((item) => item.selector.benchmarkDefinitionId).filter((id): id is string => Boolean(id))
   const supplementIds = [
@@ -360,7 +386,7 @@ async function loadEvidence(
     loadTraining(sql, experiment.id, start, end),
     loadBody(sql, requirements, start, end, timezone),
     requirements.some((item) => item.requirementKind === 'nutrition_metric')
-      ? loadNutrition(sql, start, end, today)
+      ? loadNutrition(sql, reportedChangeDate ? addCalendarDays(reportedChangeDate, -7) : start, end, today)
       : Promise.resolve([] as ExperimentEvidence['nutrition']),
     loadActivity(sql, start, end, timezone),
     loadSleep(sql, start, end, timezone),

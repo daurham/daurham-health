@@ -346,6 +346,8 @@ export type ExperimentResultView = {
   footer: string
   status?: string
   invalidationReason?: string | null
+  /** Preview-only coverage screen; not a saved efficacy result. */
+  comparisonReview?: import('@/domain/experiment-comparison').ExperimentComparisonReview
 }
 
 export function previewExperimentResult(id: string, body: unknown): Promise<ExperimentResultView> {
