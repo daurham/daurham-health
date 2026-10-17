@@ -94,21 +94,21 @@ export function detectThirdPartyImmediateSafety(question: string): ImmediateSafe
   if (/\b(?:what if|suppose|imagine|hypothetical(?:ly)?|fictional|scenario|for example|in a story|would|used to)\b/i.test(normalized)) {
     return null
   }
-  const person = String.raw`(?:(?:(?:my|our|your|the|his|her|their)\\s+(?:(?:young|older|elderly|little|adult|newborn)\\s+)?(?:wife|husband|spouse|partner|mother|father|mom|dad|son|daughter|child|baby|kid|brother|sister|friend|roommate|coworker|patient))|(?:he|she|they))`
-  const present = String.raw`\\b${person}\\s+(?:is\\s+|are\\s+|['’]s\\s+)?`
+  const person = String.raw`(?:(?:(?:my|our|your|the|his|her|their)\s+(?:(?:young|older|elderly|little|adult|newborn)\s+)?(?:wife|husband|spouse|partner|mother|father|mom|dad|son|daughter|child|baby|kid|brother|sister|friend|roommate|coworker|patient))|(?:he|she|they))`
+  const present = String.raw`\b${person}\s+(?:is\s+|are\s+|['’]s\s+)?`
   const patterns = [
-    new RegExp(present + String.raw`(?:having|experiencing|feeling|has|have)\\s+(?:(?:new|sudden|severe|crushing|sharp)\\s+)?chest pain\\b`, 'i'),
-    new RegExp(present + String.raw`(?:can(?:not|['’]t))\\s+breathe\\b`, 'i'),
-    new RegExp(present + String.raw`(?:having|experiencing|has|have)\\s+(?:severe\\s+)?(?:trouble|difficulty)\\s+breathing\\b`, 'i'),
-    new RegExp(present + String.raw`(?:bleeding heavily|bleeding uncontrollably|experiencing severe bleeding|having uncontrolled bleeding)\\b`, 'i'),
-    new RegExp(present + String.raw`(?:having|experiencing)\\s+(?:a\\s+)?stroke\\b`, 'i'),
-    new RegExp(present + String.raw`(?:vomiting|throwing up)\\s+blood\\b`, 'i'),
-    new RegExp(String.raw`\\b${person}['’]s\\s+chest\\s+(?:hurts|is hurting|feels (?:tight|painful))\\b`, 'i'),
+    new RegExp(present + String.raw`(?:having|experiencing|feeling|has|have)\s+(?:(?:new|sudden|severe|crushing|sharp)\s+)?chest pain\b`, 'i'),
+    new RegExp(present + String.raw`(?:can(?:not|['’]t))\s+breathe\b`, 'i'),
+    new RegExp(present + String.raw`(?:having|experiencing|has|have)\s+(?:severe\s+)?(?:trouble|difficulty)\s+breathing\b`, 'i'),
+    new RegExp(present + String.raw`(?:bleeding heavily|bleeding uncontrollably|experiencing severe bleeding|having uncontrolled bleeding)\b`, 'i'),
+    new RegExp(present + String.raw`(?:having|experiencing)\s+(?:a\s+)?stroke\b`, 'i'),
+    new RegExp(present + String.raw`(?:vomiting|throwing up)\s+blood\b`, 'i'),
+    new RegExp(String.raw`\b${person}['’]s\s+chest\s+(?:hurts|is hurting|feels (?:tight|painful))\b`, 'i'),
     /\b(?:his|her|their)\s+chest\s+(?:hurts|is hurting|feels (?:tight|painful))\b/i,
   ]
   const selfHarm = [
-    new RegExp(present + String.raw`suicidal\\b`, 'i'),
-    new RegExp(String.raw`\\b${person}\\s+(?:wants|plans|intends)\\s+to\\s+(?:kill|hurt)\\s+(?:himself|herself|themself|themselves)\\b`, 'i'),
+    new RegExp(present + String.raw`suicidal\b`, 'i'),
+    new RegExp(String.raw`\b${person}\s+(?:wants|plans|intends)\s+to\s+(?:kill|hurt)\s+(?:himself|herself|themself|themselves)\b`, 'i'),
   ]
   if (selfHarm.some((pattern) => pattern.test(normalized))) return 'self_harm'
   return patterns.some((pattern) => pattern.test(normalized)) ? 'emergency' : null
