@@ -195,7 +195,7 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
       detailPath:'/settings#health-profile',userEntered:false,
       substantive:false,priority:0,
     })
-  }else{
+  }else if (input.contextMode !== 'general_only') {
     addStableProfile(input.stableProfile ?? null, input.question, input.asOf, push, input.contextMode === 'deep')
     addClinicalProfile(input.profile ?? null, input.question, push, input.contextMode)
   }
@@ -236,15 +236,36 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
   const selectedIds = new Set(evidence.map((item) => item.id))
   // T48: report only the categories of question-selected clinical records
   // trimmed by the evidence cap. Never include omitted names, doses or notes.
-  const omittedClinicalCategories = [...new Set(safeDrafts
+  const cappedClinicalCategories = [...new Set(safeDrafts
     .filter((item) => item.substantive && !selectedIds.has(item.id))
     .map((item) => clinicalOmissionCategory(item.id))
     .filter((category): category is string => category !== null))].sort()
+  // An explicit inventory may already have been limited by the question
+  // selector (12/16 records), before the size cap sees those records.
+  // Compare only the requested categories, never disclose omitted details.
+  const selectorClinicalCategories = input.profile &&
+    input.contextMode !== 'general_only' &&
+    input.currentHealthProfileSourceRecheck !== 'changed_or_unavailable' &&
+    (input.healthToday == null || input.asOf === input.healthToday) &&
+    !input.focusedWeightEnergyDay && !input.focusedWeightEnergyWindow &&
+    !historicalSourceConflict
+    ? (['medications', 'allergies', 'conditions'] as const)
+      .filter((category) => explicitlyRequestsClinicalInventory(input.question, category))
+      .filter((category) => input.profile![category].some((_, index) =>
+        !safeDrafts.some((item) => item.id === clinicalItemId(category, index))))
+    : []
+  const omittedClinicalCategories = [...new Set([
+    ...cappedClinicalCategories, ...selectorClinicalCategories,
+  ])].sort()
   const clinicalCapLimitation: AskLimitation[] = omittedClinicalCategories.length > 0 ? [{
     code: 'clinical_evidence_limited',
     evidenceId: 'ask.range',
     text: 'Some question-selected saved ' + omittedClinicalCategories.join(', ') +
-      ' did not fit the evidence limit. This is not a complete review of those Health Profile records. ' +
+      (selectorClinicalCategories.length > 0
+        ? ' were excluded by the initial selection limit' +
+          (cappedClinicalCategories.length > 0 ? ' or did not fit the evidence limit.' : '.')
+        : ' did not fit the evidence limit.') +
+      ' This is not a complete review of those Health Profile records. ' +
       'Do not treat absent details as absent conditions, medications or allergies, or use this partial view ' +
       'to rule out a medication interaction or allergy risk. Review your Health Profile or narrow the question.',
   }] : []
@@ -2396,6 +2417,31 @@ export function selectAskHealthProfileTextFields(
   return relevant
 }
 
+/** An explicit request for a saved inventory is different from a named-fact
+ * question or an interaction/safety question. Only those owner-initiated
+ * inventory requests permit broad category selection and completeness claims.
+ */
+function explicitlyRequestsClinicalInventory(
+  question: string,
+  category: 'medications' | 'allergies' | 'conditions',
+): boolean {
+  if (!/\b(?:my|mine|me|i)\b/i.test(question)) return false
+  const term = category === 'medications'
+    ? /\b(?:medications?|meds?|medicines?|prescriptions?|drugs?)\b/i
+    : category === 'allergies'
+      ? /\b(?:allerg(?:y|ies|ens?)|intolerances?|reactions?)\b/i
+      : /\b(?:conditions?|diagnos(?:is|es))\b/i
+  if (!term.test(question)) return false
+  return /\b(?:list|show|display|enumerate)\b/i.test(question) ||
+    /\b(?:what|which)\b.{0,100}\b(?:do i have|have i|are my|is my|my saved|my recorded|my listed|on my (?:list|profile))\b/i.test(question)
+}
+
+function clinicalItemId(category: 'medications' | 'allergies' | 'conditions', index: number): string {
+  const singular = category === 'allergies' ? 'allergy'
+    : category === 'conditions' ? 'condition' : 'medication'
+  return 'clinical.' + singular + '.' + index
+}
+
 function addClinicalProfile(profile: AskClinicalProfileInput | null, question: string, push: (item: PushItem) => void, mode?: AskHealthPacketInput['contextMode']) {
   if (!profile) return
   // Explicit owner context only. Never invent a binary range when unset or
@@ -2448,8 +2494,10 @@ function addClinicalProfile(profile: AskClinicalProfileInput | null, question: s
   if (selectedText.includes('dietaryContext'))
     addText('clinical.dietary_context', 'Dietary context', profile.dietaryContext, 2)
 
-  const conditions = mode === 'deep'
+  const conditions = explicitlyRequestsClinicalInventory(question, 'conditions')
     ? profile.conditions.map((condition, index) => ({ condition, index })).slice(0, 12)
+    : mode === 'deep'
+      ? profile.conditions.map((condition, index) => ({ condition, index })).slice(0, 12)
     : mode === 'personalized'
       ? profile.conditions.map((condition, index) => ({ condition, index })).filter(({ condition }) => condition.status === 'active').slice(0, 8)
       : selectAskHealthConditions(profile, question)
@@ -2472,7 +2520,8 @@ function addClinicalProfile(profile: AskClinicalProfileInput | null, question: s
     })
   })
 
-  const allergies = mode === 'deep' || mode === 'personalized'
+  const allergies = explicitlyRequestsClinicalInventory(question, 'allergies') ||
+    mode === 'deep' || mode === 'personalized'
     ? profile.allergies.map((allergy, index) => ({ allergy, index })).slice(0, 12)
     : selectAskHealthAllergies(profile, question)
   allergies.forEach(({ allergy: item, index }) => {
@@ -2492,8 +2541,10 @@ function addClinicalProfile(profile: AskClinicalProfileInput | null, question: s
     })
   })
 
-  const medications = mode === 'deep'
-    ? profile.medications.map((medication, index) => ({ medication, index })).slice(0, 12)
+  const medications = explicitlyRequestsClinicalInventory(question, 'medications')
+    ? profile.medications.map((medication, index) => ({ medication, index })).slice(0, 16)
+    : mode === 'deep'
+      ? profile.medications.map((medication, index) => ({ medication, index })).slice(0, 12)
     : mode === 'personalized'
       ? profile.medications.map((medication, index) => ({ medication, index })).filter(({ medication }) => medication.status === 'active').slice(0, 8)
       : selectAskHealthMedications(profile, question)
