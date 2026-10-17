@@ -462,6 +462,31 @@ export function CoachIntelligencePanel({
             <article key={item.id} className="rounded-lg bg-zinc-50 p-2.5">
               <p className="text-sm font-semibold text-zinc-900">{item.title}</p>
               <p className="mt-1 text-xs leading-relaxed text-zinc-600">{item.detail}</p>
+              {item.rationale ? (
+                <details className="mt-2 rounded-md border border-zinc-200 bg-white px-2.5 py-2">
+                  <summary className="cursor-pointer text-xs font-medium text-zinc-700">Why this recommendation?</summary>
+                  <dl className="mt-2 space-y-2 border-t border-zinc-100 pt-2 text-xs leading-relaxed text-zinc-600">
+                    {([
+                      ['What was observed', item.rationale.observation],
+                      ['Why it matters', item.rationale.relevance],
+                      ['Uncertainty', item.rationale.uncertainty],
+                      ['Other possible explanations', item.rationale.alternatives],
+                      ['Safe next step', item.rationale.nextStep],
+                      ['Why review now', item.rationale.timing],
+                      ['How to check', item.rationale.successCheck],
+                    ] as const).map(([heading, content]) => (
+                      <div key={heading}>
+                        <dt className="font-semibold text-zinc-800">{heading}</dt>
+                        <dd className="mt-0.5">{content}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                  <Link to={prefixedPath(prefix, item.detailPath)}
+                    className="motion-interactive mt-2 inline-flex text-xs font-medium text-accent underline underline-offset-2">
+                    Open source records
+                  </Link>
+                </details>
+              ) : null}
               {item.evidenceGap ? (
                 <details className="mt-2 rounded-md border border-zinc-200 bg-white px-2.5 py-2">
                   <summary className="cursor-pointer text-xs font-medium text-zinc-700">

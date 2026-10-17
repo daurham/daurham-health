@@ -84,6 +84,16 @@ function recentNutritionEvidence(control: GoalControlState): CoachNutritionEvide
   return { ...control.nutritionQuality, period: { ...control.nutritionQuality.period } }
 }
 
+export type CoachRecommendationRationale = {
+  observation: string
+  relevance: string
+  uncertainty: string
+  alternatives: string
+  nextStep: string
+  timing: string
+  successCheck: string
+}
+
 export type CoachRecommendationDraft = {
   fingerprint: string
   sourceId: string
@@ -98,6 +108,7 @@ export type CoachRecommendationDraft = {
   trainingEvidence?: CoachTrainingEvidence
   nutritionEvidence?: CoachNutritionEvidence
   evidenceGap?: CoachEvidenceGap
+  rationale?: CoachRecommendationRationale
   evidenceRefs: string[]
   priority: number
   experimentEligible: boolean
@@ -130,6 +141,7 @@ export type CoachRecommendationView = {
   trainingEvidence?: CoachTrainingEvidence
   nutritionEvidence?: CoachNutritionEvidence
   evidenceGap?: CoachEvidenceGap
+  rationale?: CoachRecommendationRationale
   evidenceRefs: string[]
   responseState: CoachRecommendationResponse | null
   /** Opaque exact DB response timestamp; null means never responded. */
@@ -336,6 +348,66 @@ function limitationDraft(limitation: GoalControlLimitation, control: GoalControl
   }
 }
 
+
+/**
+ * Narrative derived from the matched exact evidence only. Missing source data
+ * means no explanation: don't infer measurements, diagnoses, causes or starts.
+ * This never grants permission to change goals, targets or training plans.
+ */
+export function buildCoachRecommendationRationale(
+  draft: CoachRecommendationDraft, control: GoalControlState,
+): CoachRecommendationRationale | null {
+  const series = draft.kind === 'training_progression' ? draft.trainingEvidence : null
+  if (series) {
+    const goalRelation = control.trainingProgression?.goalRelationships.find((relation) =>
+      draft.sourceId === 'training-progression:' + relation.exerciseId &&
+      control.goals.some((goal) => goal.id === relation.goalId && goal.lifecycle === 'active'))
+    const goal = goalRelation
+      ? control.goals.find((item) => item.id === goalRelation.goalId && item.lifecycle === 'active')
+      : null
+    const delta = series.changePct != null && Number.isFinite(series.changePct)
+      ? ' Recorded change versus prior exposures: ' + (series.changePct > 0 ? '+' : '') +
+        series.changePct.toFixed(1) + '%.' : ''
+    return {
+      observation: series.exerciseName + ': ' + series.exposureCount +
+        ' comparable recorded exposures between ' + series.window.start + ' and ' +
+        series.window.end + '; latest exposure ' + (series.latestDate ?? 'unknown') +
+        '. Trend: ' + series.state.replace(/_/g, ' ') + '.' + delta,
+      relevance: goal ? 'This exercise matches the active ' + goal.label +
+        ' goal, but the trend alone does not establish its cause.'
+        : 'An exact-exercise Training trend was recorded; a current matching goal was not verified.',
+      uncertainty: draft.confidence + ' confidence for this exact exercise only. ' +
+        'Recorded sets cannot establish technique, recovery or causality.' +
+        (series.limitationKinds.length ? ' Logged limitations: ' +
+          series.limitationKinds.join(', ') + '.' : ''),
+      alternatives: 'Changes in effort, technique, equipment or recovery may affect performance; the trend does not establish which explanation applies.',
+      nextStep: 'Review the matched Training sets and recent context before making any plan change. No extra workout is required today.',
+      timing: 'Consider this when reviewing upcoming Training; the logged trend is not an urgent instruction.',
+      successCheck: 'Reassess this exact exercise after new comparable logged sessions. No outcome is assumed before additional evidence.',
+    }
+  }
+  const nutrition = draft.kind === 'improve_evidence' && draft.domain === 'nutrition'
+    ? draft.nutritionEvidence : null
+  if (nutrition) {
+    return {
+      observation: 'From ' + nutrition.period.start + ' to ' + nutrition.period.end +
+        ', calories were logged on ' + nutrition.loggedDays + ' days; only ' +
+        nutrition.reliableDays + ' were verified complete and source-reliable. ' +
+        'The complete-day requirement is ' + nutrition.requiredReliableDays + '.',
+      relevance: 'A nutrition-target review needs trustworthy complete-day intake evidence, not merely food-entry counts.',
+      uncertainty: 'Missing or unverified days are unknown, not zero intake. ' +
+        nutrition.estimateHeavyDays + ' logged days are estimate-heavy; ' +
+        nutrition.unknownQualityDays + ' have unknown quality or provenance.',
+      alternatives: 'Partial food logging could explain the evidence gap without any change in actual intake.',
+      nextStep: 'Review one recent Nutrition day for missed items. Confirm completeness only if all intake that day is truly recorded.',
+      timing: 'Check coverage before considering a calorie change; this finding does not justify adjusting targets.',
+      successCheck: 'Recheck the rolling seven completed days after at least ' +
+        nutrition.requiredReliableDays + ' reliable complete days are confirmed. Meeting that threshold is not proof of a health outcome.',
+    }
+  }
+  return null
+}
+
 export function buildCoachRecommendationDrafts(control: GoalControlState): CoachRecommendationDraft[] {
   if (control.state === 'maintain') return []
   const drafts: CoachRecommendationDraft[] = []
@@ -352,7 +424,10 @@ export function buildCoachRecommendationDrafts(control: GoalControlState): Coach
     if (seen.has(item.fingerprint)) return false
     seen.add(item.fingerprint)
     return true
-  }))
+  })).map((item) => {
+    const rationale = buildCoachRecommendationRationale(item, control)
+    return rationale ? { ...item, rationale } : item
+  })
 }
 
 
