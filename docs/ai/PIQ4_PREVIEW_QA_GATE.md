@@ -206,3 +206,28 @@ in `docs/ai/PIQ4_QA_CREDENTIAL_SETUP.md`.
 
 No production/Main changes, production health data reads, migrations,
 production account copying, paid AI calls, or personal health QA.
+
+
+## PIQ-4.2 — QA cookie-secret completeness in static release preflight (2026-10-17)
+
+State: **implemented on development branch; validation pending CI**, not deployed or owner-accepted.
+Depends on: PIQ-4 preview/isolation guards.
+Why: `reviewPiqPreviewSafety` previously considered configuration eligible for
+manual attestation even when `NEON_AUTH_COOKIE_SECRET` was entirely missing.
+That could mislead an operator while the preview login is nonfunctional.
+Files: `server/piq-preview-preflight.ts`, `tests/piq4-preview-preflight.test.ts`.
+Contract: Fail closed with constant `PREVIEW_COOKIE_SECRET_NOT_READY` on missing,
+shorter-than-32, whitespace, uniform repeated-character or known placeholder
+cookie secrets. Never log the candidate value. This is **only syntactic
+readiness**, not cryptographic entropy or proof the QA secret differs from
+production. The owner/operator must supply an independently generated QA
+secret and independently attest non-reuse. A valid-looking cookie does not
+bypass `piq-preview-access.ts`, the inherited-data gate, Git SHA matching,
+owner-account matching or real runtime tests.
+Test: test valid 64-character synthetic secret + unknown/missing/short,
+repeated and placeholder cases; ensure result does not disclose secret.
+Migrations: none. Provider/model cost: none. Production/runtime changes: none.
+Release: pending CI; avoid Vercel retry under exhausted deployment quota.
+Outstanding: manual QA credentials later, usable disposable login, trusted
+origin, runtime binding/QA, backup readiness, mobile owner acceptance (0/9).
+Next: verify exact-SHA GitHub full validation and keep preview locked.

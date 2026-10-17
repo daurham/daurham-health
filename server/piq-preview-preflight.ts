@@ -25,6 +25,7 @@ export type PiqPreviewBlocker =
   | 'NOT_PREVIEW'
   | 'DATABASE_BINDING_NOT_VERIFIED'
   | 'AUTH_BINDING_NOT_VERIFIED'
+  | 'PREVIEW_COOKIE_SECRET_NOT_READY'
   | 'RUNTIME_GUARDS_NOT_ENFORCED'
   | 'COMMIT_PIN_MISSING_OR_INVALID'
   | 'DEPLOYED_COMMIT_MISMATCH'
@@ -45,6 +46,19 @@ function present(value: string | undefined): string {
   return value?.trim() ?? ''
 }
 
+/** Read-only, non-cryptographic sanity check for a separately generated QA cookie secret.
+ * Strength/randomness and difference from production require an independent
+ * operator check; this only refuses missing, malformed and known placeholder values.
+ * Never include the candidate secret in a diagnostic or log.
+ */
+function plausiblePreviewCookieSecret(raw: string | undefined): boolean {
+  const secret = present(raw)
+  if (secret.length < 32 || /\s/.test(secret)) return false
+  if (/(?:not[_-]?configured|placeholder|change[_-]?me|example|dummy|default[_-]?secret)/i.test(secret)) return false
+  if (/^(.)\1+$/.test(secret)) return false
+  return true
+}
+
 export function reviewPiqPreviewSafety(input: {
   env: NodeJS.ProcessEnv
   neonBranch: PiqNeonBranchEvidence | null
@@ -55,6 +69,9 @@ export function reviewPiqPreviewSafety(input: {
   if (env.VERCEL_ENV !== 'preview') blockers.push('NOT_PREVIEW')
   if (assessDatabaseBinding(env).status !== 'verified') blockers.push('DATABASE_BINDING_NOT_VERIFIED')
   if (assessAuthBinding(env).status !== 'verified') blockers.push('AUTH_BINDING_NOT_VERIFIED')
+  if (!plausiblePreviewCookieSecret(env.NEON_AUTH_COOKIE_SECRET)) {
+    blockers.push('PREVIEW_COOKIE_SECRET_NOT_READY')
+  }
   if (present(env.HEALTH_DB_BINDING_ENFORCE).toLowerCase() !== 'true' ||
       present(env.HEALTH_AUTH_BINDING_ENFORCE).toLowerCase() !== 'true') {
     blockers.push('RUNTIME_GUARDS_NOT_ENFORCED')

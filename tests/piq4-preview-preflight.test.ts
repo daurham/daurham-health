@@ -7,6 +7,7 @@ const prodAuth='https://synthetic-prod.neon.example.test/api/auth'
 const previewAuth='https://synthetic-preview.neon.example.test/api/auth'
 const sha='a'.repeat(40)
 const secret='synthetic-private-password-do-not-print'
+const cookieSecret='8290b7c5c0de12a4db28e41e56a74d8b320be27391d6cb7f5c893a061ed429a1'
 const sql=(host:string)=>'postgresql://owner:'+secret+'@'+host+'/neondb?sslmode=require'
 const env:NodeJS.ProcessEnv={
   VERCEL_ENV:'preview',
@@ -22,6 +23,7 @@ const env:NodeJS.ProcessEnv={
   HEALTH_DB_PREVIEW_GIT_REF:'piq/00-baseline-20261014',
   HEALTH_AUTH_BINDING_ENFORCE:'true',
   NEON_AUTH_BASE_URL:previewAuth,
+  NEON_AUTH_COOKIE_SECRET:cookieSecret,
   HEALTH_AUTH_PRODUCTION_BASE_URL:prodAuth,
   HEALTH_AUTH_PREVIEW_BASE_URL:previewAuth,
   HEALTH_AUTH_PREVIEW_GIT_REF:'piq/00-baseline-20261014',
@@ -77,6 +79,18 @@ describe('PIQ-4.1 preview QA static fail-closed isolation preflight',()=>{
     expect(blocked({NEON_AUTH_BASE_URL:prodAuth}))
       .toContain('AUTH_BINDING_NOT_VERIFIED')
   })
+  it('refuses missing, weak or placeholder QA cookie secrets even when all other bindings match',()=>{
+    for (const bad of [
+      undefined, '', 'too-short', 'x'.repeat(64),
+      'PIQ_QA_COOKIE_NOT_CONFIGURED'.padEnd(64, 'z'),
+      'replace_with_placeholder_generated_later'.padEnd(64, 'x'),
+      'b6b9cf66269ab1eb60a2 test secret 12345678901234567890123456',
+    ]) {
+      expect(blocked({NEON_AUTH_COOKIE_SECRET:bad})).toContain('PREVIEW_COOKIE_SECRET_NOT_READY')
+    }
+    expect(reviewPiqPreviewSafety({env,neonBranch:branch}).status)
+      .toBe('configuration_eligible_for_manual_attestation')
+  })
   it('pins complete deployed SHA and forbids prod or unexpected refs',()=>{
     expect(blocked({HEALTH_PIQ_EXPECTED_PREVIEW_SHA:'b'.repeat(40)}))
       .toContain('DEPLOYED_COMMIT_MISMATCH')
@@ -101,7 +115,7 @@ describe('PIQ-4.1 preview QA static fail-closed isolation preflight',()=>{
       neonBranch:{...branch,initSource:'parent-data'},
     })
     const serialized=JSON.stringify(result)
-    for (const sensitive of [secret,prodHost,previewHost,prodAuth,previewAuth,'prod-owner-not-qa','qa-disposable-owner']) {
+    for (const sensitive of [secret,cookieSecret,prodHost,previewHost,prodAuth,previewAuth,'prod-owner-not-qa','qa-disposable-owner']) {
       expect(serialized).not.toContain(sensitive)
     }
     expect(result.status).toBe('blocked')
