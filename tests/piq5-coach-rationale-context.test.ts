@@ -161,7 +161,7 @@ describe('PIQ-5.3 context-specific, source-linked rationale', () => {
     const why = buildCoachRecommendationRationale(evidence, context())
     expect(why?.observation).toContain('2 recorded dates out of 28')
     expect(why?.observation).toContain('2026-09-19')
-    expect(why?.uncertainty).toContain('does not establish complete tracking')
+    expect(why?.uncertainty).toContain('do not establish complete tracking')
     expect(why?.nextStep).toContain('Do not invent or backfill')
     expect(JSON.stringify(why)).not.toContain('zero sleep')
   })
