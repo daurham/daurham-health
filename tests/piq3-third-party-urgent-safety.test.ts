@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   detectImmediateSafety,
   detectThirdPartyImmediateSafety,
+  detectThirdPartyHypotheticalSafety,
 } from '../src/domain/ask-health/immediate-safety.js'
 import { buildAskHealthEvidencePacket } from '../src/domain/ask-health/packet.js'
 import { answerAskHealth, explainAskHealth } from '../server/ask-health/service.js'
@@ -161,5 +162,114 @@ describe('T48 third-party current-emergency safety without borrowing owner recor
     expect(response.meta.answerScope).toBe('urgent_safety')
     expect(load).not.toHaveBeenCalled()
     expect(response.evidence).toEqual([])
+  })
+})
+
+
+describe('T41 conditional third-party emergency education (does not assert live danger)', () => {
+  it('detects direct first-clause hypothetical questions and excludes ungrounded cases', () => {
+    const scenarios: Array<[string, 'emergency' | 'self_harm']> = [
+      ['If my son has chest pain, what should I do?', 'emergency'],
+      ["If my child can't breathe, what happens?", 'emergency'],
+      ['When my wife is having trouble breathing should I call for help?', 'emergency'],
+      ['What should I do if my dad has chest pain?', 'emergency'],
+      ['How can I help if my sister is bleeding heavily?', 'emergency'],
+      ['If my friend is suicidal, what should I do?', 'self_harm'],
+      ['What should I do if my brother wants to hurt himself?', 'self_harm'],
+    ]
+    for (const [question, kind] of scenarios) {
+      expect(detectThirdPartyHypotheticalSafety(question), question).toBe(kind)
+      expect(detectThirdPartyImmediateSafety(question), question).toBeNull()
+    }
+    for (const question of [
+      'What causes chest pain?',
+      'If my son does not have chest pain, what then?',
+      'My mom had chest pain yesterday',
+      'My wife said "If my son has chest pain, what should I do?"',
+      'Imagine if my wife is having chest pain',
+      'If my wife is taking vitamin D, should I?',
+      "If my wife can't make it to the gym, should I go?",
+      'My wife is having chest pain now',
+      'If my wife is exercising and my son has chest pain, what now?',
+      'When my daughter had chest pain last year, we went to urgent care',
+      "If my friend isn't suicidal, what should I do?",
+    ]) {
+      expect(detectThirdPartyHypotheticalSafety(question), question).toBeNull()
+    }
+  })
+
+  it('answers a hypothetical emergency usefully with no owner data, cost or urgent alarm across all modes', async () => {
+    for (const contextMode of ['smart', 'personalized', 'deep', 'general_only'] as const) {
+      load.mockReset()
+      const provider = model()
+      const gate = createAskHealthGate({ budgetUsd: 0 })
+      const take = vi.spyOn(gate, 'take')
+      const response = await answerAskHealth({
+        ...args('If my son has chest pain, what should I do?', contextMode),
+        provider, gate, model: 'piq-stub',
+      })
+      expect(load).not.toHaveBeenCalled()
+      expect(provider).not.toHaveBeenCalled()
+      expect(take).not.toHaveBeenCalled()
+      expect(response.meta).toMatchObject({
+        answerScope: 'general', contextMode, provider: 'health',
+        model: 'deterministic', cached: false,
+        promptVersion: 'ask-health-conditional-safety-v1',
+        diagnostic: { path: 'third_party_hypothetical_safety', substantiveEvidenceCount: 0 },
+      })
+      expect(response.evidence).toEqual([])
+      expect(response.meta.evidenceOverview.items).toEqual([])
+      expect(response.answer.blocks[0]?.text).toContain('If someone develops')
+      expect(response.answer.blocks[0]?.text).toContain('not a claim that it is happening now')
+      expect(JSON.stringify(response)).not.toContain('PRIVATE_PREVIOUS_CONVERSATION')
+    }
+  })
+
+  it('provides hypothetical suicide crisis education without guessing a personal diagnosis', async () => {
+    load.mockReset()
+    const provider = model()
+    const response = await answerAskHealth({
+      ...args('If my friend is suicidal, what should I do?', 'deep'),
+      provider, gate: createAskHealthGate({ budgetUsd: 0 }), model: 'piq-stub',
+    })
+    expect(load).not.toHaveBeenCalled()
+    expect(provider).not.toHaveBeenCalled()
+    expect(response.meta.answerScope).toBe('general')
+    expect(response.meta.diagnostic.path).toBe('third_party_hypothetical_safety')
+    expect(response.answer.blocks[0]?.text).toContain('a crisis service')
+    expect(response.answer.limitations[0]?.text).toContain('not a diagnosis')
+  })
+
+  it('scrubs an accidentally preloaded private packet from direct conditional guidance', async () => {
+    const prior = packet('What are my goals?')
+    expect(prior.evidence.map(x => x.id)).toContain('goals.PRIVATE_GOAL_ID')
+    const provider = model()
+    const gate = createAskHealthGate({ budgetUsd: 0 })
+    const take = vi.spyOn(gate, 'take')
+    const result = await explainAskHealth({
+      packet: prior, question: "If my daughter can't breathe, what should I do?",
+      contextMode: 'personalized',
+      conversation: [{ role: 'user', text: 'PRIVATE_PREVIOUS_CONVERSATION' }],
+      provider, gate, model: 'piq-stub',
+    })
+    expect(result.meta.diagnostic.path).toBe('third_party_hypothetical_safety')
+    expect(result.evidence).toEqual([])
+    expect(result.meta.context).toEqual({ knows: [], missing: [] })
+    expect(JSON.stringify(result)).not.toContain('PRIVATE_GOAL_ID')
+    expect(JSON.stringify(result)).not.toContain('PRIVATE_PREVIOUS_CONVERSATION')
+    expect(provider).not.toHaveBeenCalled()
+    expect(take).not.toHaveBeenCalled()
+  })
+
+  it('does not let conditional questions suppress actual first-person emergencies', async () => {
+    load.mockReset()
+    const question = 'If my wife has chest pain later, what should I do? I have chest pain right now'
+    const response = await answerAskHealth({
+      ...args(question, 'personalized'),
+      provider: model(), gate: createAskHealthGate({ budgetUsd: 0 }),
+    })
+    expect(response.meta.answerScope).toBe('urgent_safety')
+    expect(response.meta.diagnostic.path).toBe('immediate_safety')
+    expect(load).not.toHaveBeenCalled()
   })
 })

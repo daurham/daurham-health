@@ -133,3 +133,47 @@ export function thirdPartyImmediateSafetyAnswer(kind: ImmediateSafetyKind): AskH
     followUps: [],
   }
 }
+
+
+/**
+ * A question about a POSSIBLE future third-party emergency is not a report
+ * that an event is occurring. This narrow conditional-education route answers
+ * the actionable "what should I do if...?" question without borrowing the
+ * signed-in owner's private health record or charging a provider.
+ *
+ * We deliberately do not infer an actual emergency from quotations,
+ * fictional examples, a historical report, or a family relationship alone.
+ * Broader natural-language triage remains outside this heuristic.
+ */
+export function detectThirdPartyHypotheticalSafety(question: string): ImmediateSafetyKind | null {
+  const normalized = excludeQuotedSpeech(question.trim()).replace(/\u2019/g, "'")
+  const conditional = /^(?:(?:what (?:should|can|do) (?:i|we) do|how (?:should|can|do) (?:i|we) (?:help|respond)|should (?:i|we) (?:call|seek|get) (?:help|a doctor|emergency services)|what happens)\s+)?(?:if|when)\s+/i
+  const match = normalized.match(conditional)
+  if (!match) return null
+  // Strip the hypothetical introduction to reuse the same *subject and
+  // symptom* vocabulary as the current-emergency route, without setting
+  // urgent_safety metadata or asserting this event is happening now.
+  const scenario = normalized.slice(match[0].length)
+  // No content should be inferred from a quote or a fictional setup.
+  if (/\b(?:imagine|fictional|hypothetical(?:ly)?|in a story|for example)\b/i.test(scenario)) return null
+  // Only the conditional's first statement, not an unrelated later clause.
+  const firstClause = scenario.split(/(?:[,;.!?]|\s+\b(?:then|but|and)\b)/i)[0] ?? ''
+  if (!firstClause.trim()) return null
+  return detectThirdPartyImmediateSafety(firstClause)
+}
+
+export function thirdPartyHypotheticalSafetyAnswer(kind: ImmediateSafetyKind): AskHealthAnswer {
+  return {
+    blocks: [{
+      text: kind === 'self_harm'
+        ? 'If another person says they intend to hurt themselves or is in immediate danger, take it seriously. Contact local emergency services or a crisis service; stay nearby if it is safe and follow professional guidance. This is general planning advice, not a claim that anyone is currently in danger.'
+        : 'If someone develops these potentially serious symptoms, call your local emergency number right away. Stay with the person, follow the emergency dispatcher’s instructions, and do not have them drive themselves. This is guidance for a possible situation, not a claim that it is happening now.',
+      evidenceRefs: [],
+    }],
+    limitations: [{
+      text: 'This general guidance is based only on the hypothetical question. No saved Health records or previous conversation were used; it is not a diagnosis or individual risk assessment.',
+      evidenceRefs: [],
+    }],
+    followUps: [],
+  }
+}

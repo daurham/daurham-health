@@ -20,7 +20,7 @@ import type { AskEvidence } from '../../src/domain/ask-health/types.js'
 import { NutritionInterpretError } from '../../src/domain/nutrition/interpret.js'
 import { routeAskHealthIntent } from '../../src/domain/ask-health/intent.js'
 import type { AskContextMode } from '../../src/domain/ask-health/config.js'
-import { detectImmediateSafety, immediateSafetyAnswer, detectThirdPartyImmediateSafety, thirdPartyImmediateSafetyAnswer, type ImmediateSafetyKind } from '../../src/domain/ask-health/immediate-safety.js'
+import { detectImmediateSafety, immediateSafetyAnswer, detectThirdPartyImmediateSafety, thirdPartyImmediateSafetyAnswer, detectThirdPartyHypotheticalSafety, thirdPartyHypotheticalSafetyAnswer, type ImmediateSafetyKind } from '../../src/domain/ask-health/immediate-safety.js'
 import { askHealthNonOwnerSubject, NON_OWNER_ASK_HEALTH_TEXT } from '../../src/domain/ask-health/person-scope.js'
 import {
   ASK_HEALTH_GENERAL_PROMPT_VERSION, GENERAL_ASK_SYSTEM_PROMPT,
@@ -113,6 +113,15 @@ export async function answerAskHealth(input: {
       generatedAt: input.generatedAt ?? new Date().toISOString(),
     }, contextMode, thirdPartyImmediate)
   }
+  if (!ownImmediate) {
+    const conditionalSafety = detectThirdPartyHypotheticalSafety(input.question)
+    if (conditionalSafety) {
+      return thirdPartyHypotheticalResponse({
+        lens: input.lens, range: input.range, asOf: input.asOf,
+        generatedAt: input.generatedAt ?? new Date().toISOString(),
+      }, contextMode, conditionalSafety)
+    }
+  }
   // No owner-data read, provider call, conversation reuse or budget charge
   // for an explicitly different person's health question.
   // First-person immediate safety still has priority when both appear.
@@ -202,6 +211,12 @@ export async function explainAskHealth(input: {
     // A direct caller may have already assembled a personal packet. The
     // urgent response must not use or cite any part of that packet.
     return thirdPartyUrgentResponse(input.packet, contextMode, thirdPartyImmediate)
+  }
+  const conditionalSafety = detectThirdPartyHypotheticalSafety(input.question)
+  if (conditionalSafety) {
+    // Explicitly hypothetical third-party questions receive bounded, useful
+    // education, even when a direct caller incorrectly supplies owner data.
+    return thirdPartyHypotheticalResponse(input.packet, contextMode, conditionalSafety)
   }
   if (askHealthNonOwnerSubject(input.question)) {
     // Do not trust a pre-built personal packet from a direct caller.
@@ -372,6 +387,22 @@ function thirdPartyUrgentResponse(
   })
 }
 
+function thirdPartyHypotheticalResponse(
+  packet: Pick<AskHealthPacket, 'lens' | 'range' | 'asOf' | 'generatedAt'>,
+  contextMode: AskContextMode,
+  kind: ImmediateSafetyKind,
+): AskHealthResponse {
+  return responseFor({ packet: blankGeneralAskPacket(packet) }, {
+    answer: thirdPartyHypotheticalSafetyAnswer(kind),
+    provider: 'health',
+    model: 'deterministic',
+    cached: false,
+    general: true,
+    hypotheticalSafety: true,
+    contextMode,
+  })
+}
+
 function nonOwnerResponse(
   packet: Pick<AskHealthPacket, 'lens' | 'range' | 'asOf' | 'generatedAt'>,
   contextMode: AskContextMode,
@@ -437,7 +468,7 @@ async function settleFailure(gate: AskHealthGate, usageId: string | null, error:
 
 function responseFor(
   input: { packet: AskHealthPacket },
-  result: { answer: AskHealthAnswer; provider: string; model: string; cached: boolean; general?: boolean; urgentSafety?: boolean; personScopeBlocked?: boolean; thirdPartySafety?: boolean; contextMode?: AskContextMode },
+  result: { answer: AskHealthAnswer; provider: string; model: string; cached: boolean; general?: boolean; urgentSafety?: boolean; personScopeBlocked?: boolean; thirdPartySafety?: boolean; hypotheticalSafety?: boolean; contextMode?: AskContextMode },
 ): AskHealthResponse {
   return {
     answer: result.answer,
@@ -448,11 +479,11 @@ function responseFor(
 
 function metaFor(
   input: { packet: AskHealthPacket },
-  result: { provider: string; model: string; cached: boolean; general?: boolean; urgentSafety?: boolean; personScopeBlocked?: boolean; thirdPartySafety?: boolean; contextMode?: AskContextMode },
+  result: { provider: string; model: string; cached: boolean; general?: boolean; urgentSafety?: boolean; personScopeBlocked?: boolean; thirdPartySafety?: boolean; hypotheticalSafety?: boolean; contextMode?: AskContextMode },
 ): AskHealthResponse['meta'] {
   return {
     packetVersion: ASK_HEALTH_PACKET_VERSION,
-    promptVersion: result.urgentSafety ? 'ask-health-immediate-safety-v1' : result.general ? ASK_HEALTH_GENERAL_PROMPT_VERSION : ASK_HEALTH_PROMPT_VERSION,
+    promptVersion: result.urgentSafety ? 'ask-health-immediate-safety-v1' : result.hypotheticalSafety ? 'ask-health-conditional-safety-v1' : result.general ? ASK_HEALTH_GENERAL_PROMPT_VERSION : ASK_HEALTH_PROMPT_VERSION,
     answerScope: result.urgentSafety ? 'urgent_safety' : result.general ? 'general' : 'personal',
     contextMode: result.contextMode ?? 'smart',
     evidenceOverview: {
