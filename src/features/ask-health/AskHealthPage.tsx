@@ -14,7 +14,7 @@ import { readAskCorrectionState } from '@/domain/ask-health/corrections'
 import { OptionalClarification } from './OptionalClarification'
 import { deepDiveRangeHint } from '@/domain/ask-health/context-range'
 import { subscribeHealthDataChanges } from '@/lib/health-changes'
-import { shouldWithholdChangedAskResponse } from '@/domain/ask-health/stale-response'
+import { askResponseDependsOnOwnerData, shouldWithholdChangedAskResponse } from '@/domain/ask-health/stale-response'
 
 const LENSES = ['general', 'training', 'nutrition', 'recovery', 'experiments'] as const
 
@@ -112,7 +112,7 @@ export function AskHealthPage() {
         setError('Your Health records changed while this answer was being prepared. Ask again for current advice.')
         return
       }
-      lastPersonalQuestionRef.current = response.meta.answerScope === 'personal' ? trimmed : null
+      lastPersonalQuestionRef.current = askResponseDependsOnOwnerData(response.meta.answerScope) ? trimmed : null
       const assistant = response.answer.blocks.map((block) => block.text).join('\n')
       setTurns((current) =>
         [...current, { role: 'user' as const, text: trimmed }, { role: 'assistant' as const, text: assistant }].slice(-6),

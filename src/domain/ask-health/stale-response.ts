@@ -6,10 +6,18 @@
  * this is a conservative client-side display guard, not a server-wide
  * cross-instance revision attestation.
  */
+export function askResponseDependsOnOwnerData(
+  scope: 'general' | 'personal' | 'urgent_safety' | undefined,
+): boolean {
+  // Missing metadata from an older or malformed response is NOT permission
+  // to display it as source-independent education.
+  return scope !== 'general' && scope !== 'urgent_safety'
+}
+
 export function shouldWithholdChangedAskResponse(
   scope: 'general' | 'personal' | 'urgent_safety' | undefined,
   startedRevision: number,
   currentRevision: number,
 ): boolean {
-  return scope === 'personal' && startedRevision !== currentRevision
+  return askResponseDependsOnOwnerData(scope) && startedRevision !== currentRevision
 }
