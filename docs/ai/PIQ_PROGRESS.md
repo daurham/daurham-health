@@ -3401,3 +3401,66 @@ runtime attestation, rollback and owner mobile QA as mandatory release gates.
 the existing PIQ-1 recommendation lifecycle and PIQ-4 evidence truth,
 while separately resolving protected preview acceptance. Prefer
 milestone-level outcome integration over counting further lexical cases.
+
+
+## 2026-10-17 — PIQ-5.6 one-card Coach disclosure (CI GREEN; partial Coach milestone)
+
+**State:** validated as a branch-only *UI slice* of PIQ-5, not PIQ-5
+phase completion or owner acceptance. The previous PIQ-3 conditional
+emergency behavior remains validated in exact-commit CI.
+
+**Behavior:** `CoachIntelligencePanel` now renders at most **one full
+recommendation card** by default. If its server-returned list has
+additional items, a keyboard-accessible `button` with `aria-expanded`
+reveals/hides the remaining cards without fetching or generating new
+advice. Expansion is bound to the first card's date/id/evidence-revision
+so a changed primary recommendation cannot inherit an old expanded state.
+A single recommendation has no extra disclosure button; a genuinely
+quiet `no change` state remains quiet.
+
+**Safety/integrity:** existing primary and secondary recommendation
+link destinations, evidence disclosures, `I started this` explicit
+acknowledgement, Not now / Not relevant and Experiment preview actions
+are unchanged. The server keeps its full eligibility and suppression
+logic, existing stored recommendation state and dependencies; the
+client does not declare a task completed, adopt treatment, change
+goals/targets, or modify AI usage. The Daily/Stretch/Weekly quests
+remain separate and visible as before.
+
+**Tests:** four new SSR UI regressions prove one card by default,
+accurate more-actions count, no unnecessary control and no-change
+handling. Updated the older PIQ-1.5 review-only regression to verify
+that a former secondary evidence card still navigates to `Add context`
+when it is primary and never inherits an intervention-start button.
+The pre-change test expected both cards initially, which was no longer
+the correct visual contract; independent navigation and explicit-start
+semantics were retained rather than removed.
+
+**Validation:** initial exact-code run
+https://github.com/daurham/daurham-health/actions/runs/39051010132
+**FAILED** one outdated visibility expectation with 2,521 other tests
+passing; final exact-code run
+https://github.com/daurham/daurham-health/actions/runs/39051245171
+**PASSED** npm ci, TypeScript, ESLint, full Vitest (**2,522 passed,
+30 skipped; 333 suites passed**), and production build.
+Files: `src/features/coach/CoachCard.tsx`,
+`tests/piq5-coach-quiet-surface.test.tsx`,
+`tests/piq1-coach-review-only.test.tsx`.
+Commits: `8143c7a09b163914f026cc77c3589059ecb7a387`,
+`0ba65df4e3e23617a70f0a17a6c5543ebae40c5f`.
+
+**Remaining PIQ-5 milestone:** validate **recommendation content,
+ranking and eligibility**, distinguish mere operational reminders
+from decisions that change owner behavior, require current supporting
+evidence before ranking, test novel vs stale and already-completed
+actions, cap routine question burden, integrate owner feedback and
+check actual mobile readability. UI-first concealment is NOT evidence
+that the server's highest-ranked recommendation is useful or that a
+hidden card can be accessed on owner devices. Finish PIQ-5 as a coherent
+decision-quality outcome, not by accumulating incidental UI fixes.
+
+No `main` merge, production release, database migration, owner data,
+model call, QA preview unlock or production data access.
+**Formal owner acceptance 0/9.**
+Next: PIQ-5.1/5.2 **eligibility-before-ranking** golden scenarios
+alongside isolated preview Auth/DB setup and genuine owner mobile QA.
