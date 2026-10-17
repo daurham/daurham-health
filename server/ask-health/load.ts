@@ -26,6 +26,7 @@ import { routeHealthIntelligence } from '../../src/domain/intelligence/shared.js
 import { loadHealthIntelligenceSnapshot } from '../intelligence/snapshot.js'
 import { getHealthProfile } from '../profile/service.js'
 import { focusTrainingWorkingSets } from '../../src/domain/ask-health/focused-training.js'
+import { recheckCurrentWorkingSets } from './current-working-sets-recheck.js'
 import { reconcileAskTrainingSources } from '../../src/domain/ask-health/training-source-reconciliation.js'
 import { attachBristolTypes, digestiveQuestionTopics, focusDigestiveContext } from '../../src/domain/ask-health/focused-digestive.js'
 import { bowelSnapshotEventIds, selectDigestiveBowelWindow, summarizeBowelWindow, type DigestiveBowelWindow } from '../../src/domain/ask-health/digestive-window.js'
@@ -354,6 +355,21 @@ export async function loadAskHealthPacketInput(input: {
         first:contexts,start:period.start,end:period.end,today,
       })
     : 'not_checked'
+  const focusedTraining=focusTrainingWorkingSets({
+    question:input.question,exercises:rows.exercises,sets:rows.sets,
+    start:period.start,end:period.end,today,asOf:input.asOf,
+  })
+  // The late set-content recheck is only needed where set-based strength
+  // evidence can appear. Session count/effort has a separate zero-query gate.
+  const needsWorkingSets=input.asOf===today&&
+    input.contextMode!=='general_only'&&
+    (input.lens==='training'||input.lens==='general'||focusedTraining!=null)
+  const workingSetSourceRecheck=needsWorkingSets
+    ?await recheckCurrentWorkingSets({
+      initial:rows.sets,start:period.start,end:period.end,today,
+      exerciseId:input.lens==='general'||input.lens==='training'
+        ?null:focusedTraining?.exerciseId??null,
+    }):'not_checked'
   return {
     lens: input.lens,
     range: input.range,
@@ -369,6 +385,7 @@ export async function loadAskHealthPacketInput(input: {
     sleep,
     sleepSnapshotConsistency,
     trainingSnapshotConsistency,
+    workingSetSourceRecheck,
     goals,
     experiments,
     benchmarks,
@@ -378,15 +395,7 @@ export async function loadAskHealthPacketInput(input: {
     focusedWeightEnergyWindow:historicalWeightEnergyWindow,
     focusedWeightEnergyDay:historicalWeightEnergyDay,
     focusedWeightEnergy,
-    focusedTraining: focusTrainingWorkingSets({
-      question: input.question,
-      exercises: rows.exercises,
-      sets: rows.sets,
-      start: period.start,
-      end: period.end,
-      today,
-      asOf: input.asOf,
-    }),
+    focusedTraining,
     context: contextSnapshot(contexts),
     currentContextSourceRecheck,
     patterns,

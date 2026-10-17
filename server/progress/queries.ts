@@ -103,6 +103,29 @@ export function mapCheckpointRow(row: Record<string, unknown>): ProgressCheckpoi
   }
 }
 
+/** Shared canonical representation for Progress and late Training source reads. */
+export function mapProgressSetRow(row: Record<string, unknown>): CanonicalSetRecord {
+  return {
+    setId: String(row.set_id),
+    sessionId: String(row.session_id),
+    sessionExerciseId: String(row.session_exercise_id),
+    exerciseId: String(row.exercise_id),
+    sessionDate: asCalendarDate(row.session_date),
+    sessionCreatedAt: asIso(row.session_created_at),
+    sessionExercisePosition: asInt(row.session_exercise_position) ?? 1,
+    setNumber: asInt(row.set_number) ?? 1,
+    setType: String(row.set_type),
+    loadState: String(row.load_state),
+    weightKg: asNumber(row.weight_kg),
+    reps: asInt(row.reps),
+    durationSec: asInt(row.duration_sec),
+    leftReps: asInt(row.left_reps),
+    rightReps: asInt(row.right_reps),
+    leftDurationSec: asInt(row.left_duration_sec),
+    rightDurationSec: asInt(row.right_duration_sec),
+  }
+}
+
 export async function loadProgressCanonicalRows(): Promise<ProgressCanonicalRows> {
   const sql = await getSql()
   const [exerciseRows, sessionRows, setRows, bodyRows, checkpointRows, nutritionEntries, nutritionTargets] =
@@ -212,25 +235,7 @@ export async function loadProgressCanonicalRows(): Promise<ProgressCanonicalRows
     }
   })
 
-  const sets: CanonicalSetRecord[] = (setRows as Record<string, unknown>[]).map((row) => ({
-    setId: String(row.set_id),
-    sessionId: String(row.session_id),
-    sessionExerciseId: String(row.session_exercise_id),
-    exerciseId: String(row.exercise_id),
-    sessionDate: asCalendarDate(row.session_date),
-    sessionCreatedAt: asIso(row.session_created_at),
-    sessionExercisePosition: asInt(row.session_exercise_position) ?? 1,
-    setNumber: asInt(row.set_number) ?? 1,
-    setType: String(row.set_type),
-    loadState: String(row.load_state),
-    weightKg: asNumber(row.weight_kg),
-    reps: asInt(row.reps),
-    durationSec: asInt(row.duration_sec),
-    leftReps: asInt(row.left_reps),
-    rightReps: asInt(row.right_reps),
-    leftDurationSec: asInt(row.left_duration_sec),
-    rightDurationSec: asInt(row.right_duration_sec),
-  }))
+  const sets: CanonicalSetRecord[] = (setRows as Record<string, unknown>[]).map(mapProgressSetRow)
 
   const bodyObservations: BodyObservation[] = (bodyRows as Record<string, unknown>[]).map((row) => {
     const measuredAt = row.measured_at instanceof Date ? row.measured_at : new Date(String(row.measured_at))

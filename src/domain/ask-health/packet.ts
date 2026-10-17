@@ -66,13 +66,15 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
       input.focusedWeightEnergyWindow?.scope==='in_range')
   const lens = input.lens
   const wants = lensWants(lens)
+  const trainingSourceConflict=input.trainingSnapshotConsistency==='changed_or_unavailable' ||
+    input.workingSetSourceRecheck==='changed_or_unavailable'
   // A failed final current-focused read outranks earlier generic snapshots.
   const focusedSourceConflict=input.focusedWeightEnergy!=null &&
     input.contextMode!=='general_only' && input.asOf===input.healthToday &&
     (input.focusedWeightEnergy.nutritionSourceRecheck==='changed_or_unavailable' ||
       input.focusedWeightEnergy.weightActivitySourceRecheck==='changed_or_unavailable' ||
       input.activitySnapshotConsistency==='changed_or_unavailable' ||
-      input.trainingSnapshotConsistency==='changed_or_unavailable')
+      trainingSourceConflict)
   const digestiveGuard = digestivePacketGuard(input)
   const intelligence = guardInconsistentTrainingIntelligence(
     guardInconsistentSleepIntelligence(
@@ -82,7 +84,7 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
       ),
       input.sleepSnapshotConsistency,
     ),
-    input.trainingSnapshotConsistency,
+    trainingSourceConflict?'changed_or_unavailable':input.trainingSnapshotConsistency,
   )
   if (wants.body) {
     addBody(input, push, limitations, wants.bodyDetail)
@@ -114,13 +116,14 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
       })
     }else addSleep(input,push,limitations)
   }
-  if (input.trainingSnapshotConsistency==='changed_or_unavailable' &&
-    (wants.training||input.focusedTraining)) {
+  if (trainingSourceConflict && (wants.training||input.focusedTraining)) {
     push({
       id:'training.source_consistency',domain:'training',
       label:'Training source disagreement',value:null,unit:null,period,
-      text:'The independently loaded canonical Training sessions and shared Health Intelligence records disagree on saved session dates, identity, counts or effort. Training frequency, logged set performance and Training-linked correlations are WITHHELD. Missing or corrected sessions are UNKNOWN, not proof of no training or strength loss.',
-      coverage:{trainingSourceAgreement:'changed_or_unavailable',trainingEvidence:'withheld'},
+      text:'Independently checked Training session or working-set sources changed or could not be verified consistently. Training frequency, logged strength performance and Training-linked correlations are WITHHELD; no set, repetition, load or missing day may be treated as reliable evidence of progress or decline.',
+      coverage:{trainingSourceAgreement:input.trainingSnapshotConsistency??'not_checked',
+        workingSetSourceAgreement:input.workingSetSourceRecheck??'not_checked',
+        trainingEvidence:'withheld'},
       detailPath:'/progress/strength',userEntered:false,substantive:false,priority:0,
     })
   }else{

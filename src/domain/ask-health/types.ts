@@ -151,6 +151,8 @@ export type AskHealthPacketInput = {
   sleepSnapshotConsistency?: 'not_checked' | 'verified' | 'changed_or_unavailable'
   /** Session count, IDs and effort agreement, not working-set revision attestation. */
   trainingSnapshotConsistency?: 'not_checked' | 'verified' | 'changed_or_unavailable'
+  /** Final bounded canonical working-set content recheck for selected current strength evidence. */
+  workingSetSourceRecheck?: 'not_checked' | 'verified' | 'changed_or_unavailable'
   goals: readonly AskGoalInput[]
   experiments: readonly AskExperimentInput[]
   benchmarks: readonly AskBenchmarkInput[]
