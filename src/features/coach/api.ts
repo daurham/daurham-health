@@ -120,6 +120,20 @@ export function respondCoachRecommendation(
   )
 }
 
+/** A separate owner action; linking never marks an intervention as started. */
+export function linkCoachExperiment(
+  recommendationId: string,
+  experimentId: string,
+  expectedResponseAt: string | null,
+  expectedContextRevision: string,
+): Promise<CoachIntelligenceState> {
+  return sendCoachIntelligence(
+    `/api/intelligence/coach/recommendations/${recommendationId}/link-experiment`,
+    'POST',
+    { experimentId, expectedResponseAt, expectedContextRevision, ownerConfirmed: true },
+  )
+}
+
 export function recordCoachRecommendationOutcome(
   recommendationId: string,
   outcome: CoachRecommendationOutcome,
