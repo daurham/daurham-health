@@ -377,8 +377,11 @@ export async function hydrateCoachLinkedExperiments(
               lab.window_start::text AS window_start, lab.window_end::text AS window_end,
               result.id::text AS result_id, result.classification,
               result.protocol_attestation, result.stopped_for_safety,
-              implementation.effective_date::text AS implementation_date,
-              implementation.behavior_change AS implementation_change
+              CASE WHEN latest_implementation.action = 'retracted' THEN NULL
+                ELSE COALESCE(latest_implementation.effective_date, implementation.effective_date)::text END AS implementation_date,
+              CASE WHEN latest_implementation.action = 'retracted' THEN NULL
+                ELSE COALESCE(latest_implementation.behavior_change, implementation.behavior_change) END AS implementation_change,
+              (latest_implementation.action = 'retracted') AS implementation_retracted
          FROM experiments AS lab
          LEFT JOIN LATERAL (
            SELECT id, classification, protocol_attestation, stopped_for_safety FROM experiment_results
@@ -386,6 +389,12 @@ export async function hydrateCoachLinkedExperiments(
             ORDER BY created_at DESC, id DESC LIMIT 1
          ) AS result ON TRUE
          LEFT JOIN experiment_implementations AS implementation ON implementation.experiment_id = lab.id
+         LEFT JOIN LATERAL (
+           SELECT action, effective_date, behavior_change
+             FROM experiment_implementation_revisions
+            WHERE experiment_id = lab.id
+            ORDER BY revision DESC LIMIT 1
+         ) AS latest_implementation ON TRUE
         WHERE lab.id = ANY($1::uuid[]) AND lab.origin = 'owner_created'`,
       [ids],
     )) as CoachLinkedLabRow[]

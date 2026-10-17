@@ -584,6 +584,8 @@ export function CoachIntelligencePanel({
                   {item.linkedExperiment?.implementation ? (
                     <> {' '}Owner reported changing “{item.linkedExperiment.implementation.behaviorChange}” effective
                       {' '}{item.linkedExperiment.implementation.effectiveDate}. This is self-reported; adherence and benefit are unverified.</>
+                  ) : item.linkedExperiment?.implementationRetracted ? (
+                    <> {' '}Owner retracted the implementation report; no current behavior-change claim remains.</>
                   ) : null}
                   {item.linkedExperiment?.windowStart && item.linkedExperiment.windowEnd
                     ? ` Observation window: ${item.linkedExperiment.windowStart} to ${item.linkedExperiment.windowEnd}.`

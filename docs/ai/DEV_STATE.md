@@ -1,3 +1,9 @@
+## 2026-10-17 — PIQ-6.1 owner correction/retraction journal (branch CI pending)
+
+- Additive migration 0058 after 0057, creating append-only revision rows (action, reason, effective date/details, revision, timestamp). Stale-write guarded by unique experiment/revision. Owner-only POST endpoints and correction/retraction UX use expectedRevision from canonical Lab detail.
+- Original 0057 row is immutable; latest correction wins in Lab, Coach and Ledger; retraction removes behavior-change claims but retains audit and contextual retraction status; result not automatically changed and explicit warning if correction/retraction postdated result.
+- No migration was executed. 0057 AND 0058 must be applied to target DB before any deployment of this branch. No main/prod promotion; 0/9 owner phase acceptance.
+
 ## 2026-10-17 PIQ-6.1 engineering verification of explicit implementation journal
 
 - Tested commit `141b3103cc216de36c34f896555570753a6b682d`; Actions run `39064788711` green, 2,594 tests passed / 30 skipped, TS, ESLint, build all passed. Lab-service test mock was updated to read absent/present implementation records and assert that a plain Start is not implementation.

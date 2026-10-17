@@ -382,10 +382,20 @@ async function experimentDetail(sql: Sql, id: string, today?: string) {
     [id],
   )) as Array<{ id: string; workout_date: string; session_name: string | null; benchmark_protocol_version_id: string | null }>
   const implementations = (await sql.query(
-    `SELECT effective_date::text AS effective_date, behavior_change, owner_confirmed_at
-       FROM experiment_implementations WHERE experiment_id = $1::uuid`,
+    `SELECT COALESCE(latest.effective_date, implementation.effective_date)::text AS effective_date,
+            COALESCE(latest.behavior_change, implementation.behavior_change) AS behavior_change,
+            implementation.owner_confirmed_at, COALESCE(latest.revision, 0) AS revision,
+            COALESCE(latest.action, 'recorded') AS action
+       FROM experiment_implementations AS implementation
+       LEFT JOIN LATERAL (
+         SELECT revision, action, effective_date, behavior_change
+           FROM experiment_implementation_revisions
+          WHERE experiment_id = implementation.experiment_id
+          ORDER BY revision DESC LIMIT 1
+       ) AS latest ON TRUE
+      WHERE implementation.experiment_id = $1::uuid`,
     [id],
-  )) as Array<{ effective_date: string; behavior_change: string; owner_confirmed_at: Date | string }>
+  )) as Array<{ effective_date: string; behavior_change: string; owner_confirmed_at: Date | string; revision: number | string; action: string }>
   const validResults = (await sql.query(
     `SELECT id::text AS id FROM experiment_results WHERE experiment_id = $1::uuid AND status = 'valid'`,
     [id],
@@ -421,11 +431,14 @@ async function experimentDetail(sql: Sql, id: string, today?: string) {
       benchmarkProtocolVersionId: item.benchmark_protocol_version_id,
     })),
     currentResultId,
-    implementation: implementations[0] ? {
+    implementation: implementations[0] && implementations[0].action !== 'retracted' ? {
       effectiveDate: implementations[0].effective_date,
       behaviorChange: implementations[0].behavior_change,
       ownerConfirmedAt: instant(implementations[0].owner_confirmed_at),
+      revision: Number(implementations[0].revision),
     } : null,
+    implementationRetracted: implementations[0]?.action === 'retracted',
+    implementationRevision: implementations[0] ? Number(implementations[0].revision) : null,
     reviewReady: experimentNeedsReview({
       status: row.status,
       windowEnd: row.window_end,

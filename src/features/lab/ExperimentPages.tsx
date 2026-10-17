@@ -10,6 +10,8 @@ import {
   addExperimentProtocolVersion,
   createExperiment,
   confirmExperimentImplementation,
+  correctExperimentImplementation,
+  retractExperimentImplementation,
   deleteExperiment,
   fetchExperiment,
   scheduleExperiment,
@@ -175,6 +177,11 @@ export function ExperimentDetailPage() {
   const [implementationDate, setImplementationDate] = useState('')
   const [implementationChange, setImplementationChange] = useState('')
   const [implementationConfirmed, setImplementationConfirmed] = useState(false)
+  const [implementationEdit, setImplementationEdit] = useState<'correct' | 'retract' | null>(null)
+  const [correctedDate, setCorrectedDate] = useState('')
+  const [correctedChange, setCorrectedChange] = useState('')
+  const [revisionReason, setRevisionReason] = useState('')
+  const [revisionConfirmed, setRevisionConfirmed] = useState(false)
   const [editingProtocol, setEditingProtocol] = useState(false)
   const [instructions, setInstructions] = useState('')
   const [requirements, setRequirements] = useState<RequirementDraft[]>([])
@@ -208,6 +215,9 @@ export function ExperimentDetailPage() {
     try {
       setExperiment(await action())
       setEditingProtocol(false)
+      setImplementationEdit(null)
+      setRevisionReason('')
+      setRevisionConfirmed(false)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Could not update the experiment')
     }
@@ -303,9 +313,15 @@ export function ExperimentDetailPage() {
             <span className="font-medium">Owner-confirmed change. </span>
             {experiment.implementation.behaviorChange} · effective {experiment.implementation.effectiveDate}.
             {' '}This is your report, not independent proof of adherence or an outcome.
+            {experiment.implementation.revision > 0 ? ' Owner-corrected report; prior versions are preserved.' : ''}
           </p>
+        ) : experiment.implementationRetracted ? (
+          <p className="text-zinc-600">Owner retracted this implementation report. Prior evidence is retained in the audit history; no current implementation claim is shown.</p>
         ) : active ? (
           <p className="text-zinc-600">Lab is marked active; no actual behavior change has been confirmed.</p>
+        ) : null}
+        {experiment.currentResultId && (experiment.implementationRetracted || (experiment.implementation?.revision ?? 0) > 0) ? (
+          <p className="text-zinc-700">The recorded experiment result may reflect the earlier report. Review and, if appropriate, invalidate the result separately.</p>
         ) : null}
         <p>
           <span className="font-medium">Protocol. </span>
@@ -410,7 +426,64 @@ export function ExperimentDetailPage() {
             </button>
           </>
         ) : null}
-        {active && !experiment.implementation ? (
+        {experiment.implementation ? (
+          <section className="w-full space-y-2 rounded-lg border border-zinc-200 p-3" aria-label="Correct implementation report">
+            <p className="text-xs text-zinc-600">Reports can be corrected or retracted, but earlier versions remain in the audit history. This does not change outcomes automatically.</p>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" className={secondaryButtonClass} onClick={() => {
+                setImplementationEdit('correct')
+                setCorrectedDate(experiment.implementation?.effectiveDate ?? '')
+                setCorrectedChange(experiment.implementation?.behaviorChange ?? '')
+                setRevisionReason('')
+                setRevisionConfirmed(false)
+              }}>Correct report</button>
+              <button type="button" className={quietButtonClass} onClick={() => {
+                setImplementationEdit('retract')
+                setRevisionReason('')
+                setRevisionConfirmed(false)
+              }}>Retract report</button>
+            </div>
+            {implementationEdit ? (
+              <div className="space-y-2">
+                {implementationEdit === 'correct' ? (
+                  <>
+                    <label className="block text-sm text-zinc-700">Correct effective date
+                      <input className={fieldClass} type="date" min={experiment.windowStart ?? undefined}
+                        max={experiment.windowEnd ?? undefined} value={correctedDate}
+                        onChange={(event) => setCorrectedDate(event.target.value)} />
+                    </label>
+                    <label className="block text-sm text-zinc-700">Correct description of the change
+                      <textarea className={fieldClass} rows={2} maxLength={500} value={correctedChange}
+                        onChange={(event) => setCorrectedChange(event.target.value)} />
+                    </label>
+                  </>
+                ) : <p className="text-sm text-zinc-700">Retracting removes your current implementation claim from Coach and the Change Ledger; the audit history remains.</p>}
+                <label className="block text-sm text-zinc-700">Reason for {implementationEdit === 'correct' ? 'correction' : 'retraction'}
+                  <textarea className={fieldClass} rows={2} maxLength={500} value={revisionReason}
+                    onChange={(event) => setRevisionReason(event.target.value)} />
+                </label>
+                <label className="flex items-start gap-2 text-sm text-zinc-700">
+                  <input type="checkbox" className="mt-1" checked={revisionConfirmed}
+                    onChange={(event) => setRevisionConfirmed(event.target.checked)} />
+                  I confirm this {implementationEdit === 'correct' ? 'correction' : 'retraction'} is accurate.
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" className={implementationEdit === 'correct' ? primaryButtonClass : dangerButtonClass}
+                    disabled={!revisionConfirmed || revisionReason.trim().length < 3 ||
+                      (implementationEdit === 'correct' && (!correctedDate || !correctedChange.trim()))}
+                    onClick={() => void run(() => implementationEdit === 'correct'
+                      ? correctExperimentImplementation(experiment.id, experiment.implementation!.revision,
+                        correctedDate, correctedChange, revisionReason)
+                      : retractExperimentImplementation(experiment.id, experiment.implementation!.revision, revisionReason))}>
+                    {implementationEdit === 'correct' ? 'Save corrected report' : 'Confirm retraction'}
+                  </button>
+                  <button type="button" className={quietButtonClass} onClick={() => setImplementationEdit(null)}>Cancel</button>
+                </div>
+              </div>
+            ) : null}
+          </section>
+        ) : null}
+        {active && !experiment.implementation && !experiment.implementationRetracted ? (
           <section className="w-full space-y-2 rounded-lg border border-zinc-200 bg-zinc-50 p-3" aria-label="Confirm experiment implementation">
             <h2 className="text-sm font-semibold text-zinc-900">Record a change you actually made</h2>
             <p className="text-xs text-zinc-600">

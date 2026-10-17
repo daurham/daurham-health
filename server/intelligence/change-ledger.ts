@@ -210,12 +210,21 @@ async function explicitEntries(sql: Sql, timezone: string): Promise<ChangeLedger
   }
 
   const implemented = (await sql.query(
-    `SELECT implementation.experiment_id::text AS experiment_id, implementation.effective_date::text AS effective_date,
-            implementation.behavior_change, lab.title
+    `SELECT implementation.experiment_id::text AS experiment_id,
+            COALESCE(latest.effective_date, implementation.effective_date)::text AS effective_date,
+            COALESCE(latest.behavior_change, implementation.behavior_change) AS behavior_change,
+            COALESCE(latest.revision, 0) AS revision, lab.title
        FROM experiment_implementations AS implementation
        JOIN experiments AS lab ON lab.id = implementation.experiment_id
-      ORDER BY implementation.effective_date, implementation.experiment_id`,
-  )) as Array<{ experiment_id: string; effective_date: string; behavior_change: string; title: string }>
+       LEFT JOIN LATERAL (
+         SELECT revision, action, effective_date, behavior_change
+           FROM experiment_implementation_revisions
+          WHERE experiment_id = implementation.experiment_id
+          ORDER BY revision DESC LIMIT 1
+       ) AS latest ON TRUE
+      WHERE latest.action IS DISTINCT FROM 'retracted'
+      ORDER BY effective_date, implementation.experiment_id`,
+  )) as Array<{ experiment_id: string; effective_date: string; behavior_change: string; revision: number | string; title: string }>
   for (const row of implemented) {
     entries.push({
       id: 'experiment-implementation:' + row.experiment_id,
@@ -225,7 +234,7 @@ async function explicitEntries(sql: Sql, timezone: string): Promise<ChangeLedger
       detail: row.behavior_change + ' · Owner-confirmed report, not verified adherence or benefit.',
       sourceKind: 'experiment_implementation',
       sourceId: row.experiment_id,
-      metadata: { experimentId: row.experiment_id, evidenceKind: 'owner_reported' },
+      metadata: { experimentId: row.experiment_id, evidenceKind: 'owner_reported', revision: Number(row.revision) },
     })
   }
 

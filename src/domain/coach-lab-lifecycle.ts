@@ -22,6 +22,7 @@ export type CoachLinkedExperiment = {
   stoppedForSafety: boolean | null
   /** Separate voluntary owner report; not inferred from Lab start or date window. */
   implementation: { effectiveDate: string; behaviorChange: string } | null
+  implementationRetracted: boolean
 }
 
 export type CoachLinkedLabRow = {
@@ -36,6 +37,7 @@ export type CoachLinkedLabRow = {
   stopped_for_safety?: unknown
   implementation_date?: unknown
   implementation_change?: unknown
+  implementation_retracted?: unknown
 }
 
 function dateOrNull(value: unknown): string | null {
@@ -73,13 +75,15 @@ export function projectCoachLinkedExperiment(row: CoachLinkedLabRow, today: stri
     implementationDate != null && implementationDate >= windowStart &&
     implementationDate <= windowEnd && implementationDate <= today &&
     ['active', 'completed', 'inconclusive', 'abandoned', 'superseded'].includes(status)
-  const implementation = implementedInWindow && implementationText.length > 0 && implementationText.length <= 500
+  const implementationRetracted = row.implementation_retracted === true
+  const implementation = !implementationRetracted && implementedInWindow &&
+    implementationText.length > 0 && implementationText.length <= 500
     ? { effectiveDate: implementationDate, behaviorChange: implementationText } : null
   return {
     id: row.id, status, windowStart, windowEnd,
     reviewReady: experimentNeedsReview({ status, windowEnd, today, hasValidResult: resultId != null }),
     resultId, classification: recorded ? classification : null,
-    protocolAttestation, stoppedForSafety, implementation,
+    protocolAttestation, stoppedForSafety, implementation, implementationRetracted,
   }
 }
 

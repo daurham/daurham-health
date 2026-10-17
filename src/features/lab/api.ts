@@ -60,7 +60,9 @@ export type ExperimentDetail = {
   benchmarks: Array<{ benchmarkDefinitionId: string; title: string; role: string; protocolId: string }>
   sessions: Array<{ id: string; workoutDate: string; sessionName: string | null; benchmarkProtocolVersionId: string | null }>
   currentResultId?: string | null
-  implementation?: { effectiveDate: string; behaviorChange: string; ownerConfirmedAt: string } | null
+  implementation?: { effectiveDate: string; behaviorChange: string; ownerConfirmedAt: string; revision: number } | null
+  implementationRetracted?: boolean
+  implementationRevision?: number | null
   reviewReady?: boolean
 }
 
@@ -139,6 +141,23 @@ export function startExperiment(id: string): Promise<ExperimentDetail> {
 export function confirmExperimentImplementation(id: string, effectiveDate: string, behaviorChange: string): Promise<ExperimentDetail> {
   return sendJson(`/api/lab/experiments/${id}/implementation`, 'POST', {
     confirmImplemented: true, effectiveDate, behaviorChange,
+  })
+}
+
+/** Optimistic compare-and-append: never mutates the original implementation. */
+export function correctExperimentImplementation(
+  id: string, expectedRevision: number, effectiveDate: string, behaviorChange: string, reason: string,
+): Promise<ExperimentDetail> {
+  return sendJson(`/api/lab/experiments/${id}/implementation-correct`, 'POST', {
+    confirmCorrection: true, expectedRevision, effectiveDate, behaviorChange, reason,
+  })
+}
+
+export function retractExperimentImplementation(
+  id: string, expectedRevision: number, reason: string,
+): Promise<ExperimentDetail> {
+  return sendJson(`/api/lab/experiments/${id}/implementation-retract`, 'POST', {
+    confirmRetraction: true, expectedRevision, reason,
   })
 }
 

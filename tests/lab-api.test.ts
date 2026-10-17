@@ -57,7 +57,11 @@ const experimentResults = vi.hoisted(() => ({
   listTimelineExperimentResults: vi.fn(),
 }))
 
-const implementation = vi.hoisted(() => ({ confirmOwnerExperimentImplementation: vi.fn() }))
+const implementation = vi.hoisted(() => ({
+  confirmOwnerExperimentImplementation: vi.fn(),
+  correctOwnerExperimentImplementation: vi.fn(),
+  retractOwnerExperimentImplementation: vi.fn(),
+}))
 
 vi.mock('../server/lab/service.ts', () => service)
 vi.mock('../server/lab/implementation.ts', () => implementation)
@@ -132,7 +136,7 @@ describe('personal lab API auth', () => {
     service.listExperiments.mockResolvedValue({ experiments: [] })
     service.createOwnerExperiment.mockResolvedValue({ id: EXPERIMENT, status: 'accepted', origin: 'owner_created' })
     service.startExperiment.mockResolvedValue({ id: EXPERIMENT, status: 'active' })
-    implementation.confirmOwnerExperimentImplementation.mockReset()
+    for (const fn of Object.values(implementation)) fn.mockReset()
     service.getExperiment.mockResolvedValue({ id: EXPERIMENT, status: 'active' })
   })
 
@@ -183,6 +187,25 @@ describe('personal lab API auth', () => {
     expect(saved.status()).toBe(200)
     expect(implementation.confirmOwnerExperimentImplementation).toHaveBeenCalledWith(EXPERIMENT, input)
     expect(service.startExperiment).not.toHaveBeenCalled()
+  })
+
+  it('allows only the owner to correct or retract with distinct authenticated routes', async () => {
+    const owner = { id: 'owner-1', email: 'owner@example.com' }
+    const body = { expectedRevision: 0, reason: 'Incorrect description', confirmCorrection: true,
+      effectiveDate: '2026-10-14', behaviorChange: 'Corrected walk' }
+    for (const [suffix, action, mock] of [
+      ['implementation-correct', 'implementation-correct', implementation.correctOwnerExperimentImplementation],
+      ['implementation-retract', 'implementation-retract', implementation.retractOwnerExperimentImplementation],
+    ] as const) {
+      const url = `/api/lab/experiments/${EXPERIMENT}/${suffix}`
+      expect(matchLabRoute(url)).toEqual({ kind: 'experiment', id: EXPERIMENT, action })
+      expect((await call('POST', url, null, {}, body)).status()).toBe(401)
+      expect((await call('POST', url, { id: 'other', email: 'other@example.com' }, {}, body)).status()).toBe(403)
+      expect(mock).not.toHaveBeenCalled()
+      expect((await call('GET', url, owner)).status()).toBe(405)
+      expect((await call('POST', url, owner, {}, body)).status()).toBe(200)
+      expect(mock).toHaveBeenCalledWith(EXPERIMENT, body)
+    }
   })
 
   it('keeps benchmark results owner-only and immutable', async () => {

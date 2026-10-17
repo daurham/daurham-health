@@ -373,11 +373,13 @@ const harness = vi.hoisted(() => {
       state.protocols = state.protocols.filter((item) => item.id !== params[0])
       return []
     }
-    if (text.includes('FROM experiment_implementations WHERE experiment_id')) {
+    if (text.includes('FROM experiment_implementations AS implementation') ||
+        text.includes('FROM experiment_implementations WHERE experiment_id')) {
       return state.implementations
         .filter((item) => item.experiment_id === params[0])
         .map(({ effective_date, behavior_change, owner_confirmed_at }) => ({
           effective_date, behavior_change, owner_confirmed_at,
+          revision: 0, action: 'recorded',
         }))
     }
     if (text.includes('FROM workout_sessions WHERE experiment_id')) {
@@ -478,6 +480,7 @@ describe('personal lab service', () => {
       effectiveDate: '2026-10-01',
       behaviorChange: 'Added a deliberately recorded intervention',
       ownerConfirmedAt: '2026-10-02T12:00:00.000Z',
+      revision: 0,
     })
     await expect(
       addExperimentProtocolVersion(created.id, {
