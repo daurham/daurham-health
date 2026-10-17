@@ -360,6 +360,73 @@ describe('PIQ-3.2 educational routing and safety', () => {
     expect(stub).toHaveBeenCalledTimes(2)
   })
 
+  it('rejects invented owner diagnoses, lab findings and clinician claims without private evidence', async () => {
+    const clinicalClaims = [
+      'You have anemia.',
+      'You likely have diabetes.',
+      'You were diagnosed with hypertension.',
+      'You are experiencing dehydration.',
+      'Your symptoms suggest a thyroid problem.',
+      'Your bloodwork shows anemia.',
+      'Your doctor prescribed metformin.',
+      'The symptoms you described point to dehydration.',
+      'Creatine is involved in ATP. Your recent lab results indicate anemia.',
+    ]
+    const generalEducation = [
+      'If you have anemia, ask a clinician.',
+      'Some people have anemia.',
+      'Your symptoms may vary by condition.',
+      'If your symptoms suggest dehydration, consider hydration.',
+      'A clinician may diagnose anemia based on a blood test.',
+      'A doctor can prescribe medication.',
+      'Your muscles use ATP.',
+      'If your doctor prescribed metformin, follow the instructions.',
+    ]
+    const ownerClaim = (text: string) => generalAnswerInventsPersonalRecord({
+      blocks: [{ text, evidenceRefs: [] }], limitations: [], followUps: [],
+    })
+    for (const text of clinicalClaims) expect(ownerClaim(text), text).toBe(true)
+    for (const text of generalEducation) expect(ownerClaim(text), text).toBe(false)
+
+    const cachedAnswer = {
+      blocks: [
+        { text: 'Creatine helps maintain ATP in short efforts.', evidenceRefs: [] },
+        { text: 'Your bloodwork shows anemia.', evidenceRefs: ['clinical.private'] },
+      ],
+      limitations: [],
+      followUps: ['Your doctor prescribed metformin. Why?'],
+    }
+    const cleaned = sanitizeCachedGeneralAnswer(cachedAnswer)
+    expect(cleaned.blocks.map(b => b.text)).toEqual([
+      'Creatine helps maintain ATP in short efforts.',
+    ])
+    expect(cleaned.blocks[0]?.evidenceRefs).toEqual([])
+    expect(cleaned.followUps).toEqual([])
+    expect(JSON.stringify(cleaned)).not.toContain('clinical.private')
+    const gate = createAskHealthGate({ minIntervalMs: 0 })
+    gate.take = async () => ({
+      ok: true, usageId: null, cached: { answer: cachedAnswer, evidence: [] },
+    })
+    const noModelCall = vi.fn()
+    const fromCache = await answerAskHealth({
+      ...request('What does creatine do?'), contextMode: 'general_only',
+      provider: noModelCall, gate,
+    })
+    expect(fromCache.answer).toEqual(cleaned)
+    expect(fromCache.evidence).toEqual([])
+    expect(noModelCall).not.toHaveBeenCalled()
+
+    const inventedProvider = vi.fn(async () => ({
+      text: answer('Your symptoms suggest a thyroid problem.'),
+      model: 'piq-stub', inputTokens: 12, outputTokens: 10,
+    }))
+    await expect(answerAskHealth({
+      ...request('What does creatine do?'), contextMode: 'general_only',
+      provider: inventedProvider, gate: createAskHealthGate({ minIntervalMs: 0 }),
+    })).rejects.toMatchObject({ statusCode: 502, code: 'ASK_HEALTH_INVALID_RESPONSE' })
+    expect(inventedProvider).toHaveBeenCalledTimes(2)
+  })
+
   it('screens personal-record hallucinations in follow-up suggestions on fresh and cached General Only', async () => {
     const generalBlock = { text: 'Creatine supports short bursts of intense effort.', evidenceRefs: [] }
     const poisoned = {

@@ -2822,3 +2822,25 @@ provider/model calls, migrations, new features, auth changes, or
 production writes. Release and formal owner acceptance remain blocked;
 0/9 owner scenarios accepted. Next: validate affected test and complete
 CI; continue owner-realistic QA only after separate credential/isolation gate.
+
+
+## 2026-10-17 — General Only invented diagnosis/clinician/lab guard (PIQ-3)
+
+State: development-branch implementation, **CI pending**, live owner
+acceptance not started. In General Only, provider output may fabricate
+a personalized diagnosis, clinician prescription, or lab result without
+claiming it came from saved records or supplying a number. Added a
+sentence-anchored lexical check for affirmative assertions including
+"You have anemia", "Your symptoms suggest...", "Your bloodwork
+shows...", and "Your doctor prescribed..."; conditional education
+("If you have anemia...", "Your symptoms may vary") remains allowed.
+This is a supplemental heuristic, not a complete model-safety
+classifier or substitute for clinical QA. Updated the synthetic
+General Only regression suite to cover safe-vs-unsafe false positives,
+poisoned cached claims/evidence/follow-ups (no provider spend), and
+fresh invalid provider responses (bounded repair/failure).
+
+Files: `src/domain/ask-health/general.ts`,
+`tests/piq3-general-routing.test.ts`. No migration, preview unlock,
+provider calls, owner data or production change. Next: exact-SHA full
+CI and later owner/mobile QA. Formal owner acceptance 0/9.

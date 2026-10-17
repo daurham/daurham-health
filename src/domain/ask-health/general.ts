@@ -71,8 +71,14 @@ function inventedGeneralOwnerRecord(text: string): boolean {
   // distinguish owner assertions from conditional education ("If you ...")
   // and permission ("You can ..."). This remains a narrow lexical safeguard.
   const inventedOwnerHabit = /(?:^|[.!?]\s+)you\s+(?:(?:(?:currently|already|regularly|usually|often)\s+)?(?:take|use|consume|drink|eat|train|exercise|lift)\b[^.!?]{0,80}?\b(?:daily|every\s+day|each\s+day|every\s+(?:morning|evening|night)|(?:\d+|once|twice|three|four)\s+times?\s+(?:per|a)\s+(?:day|week)|regularly|most\s+days)\b|(?:currently|already|regularly|usually|often)\s+(?:take|use|consume|drink|eat|train|exercise|lift)\b|(?:(?:are|'re)\s+|(?:have|'ve)\s+been\s+)(?:taking|using|consuming|drinking|eating)\s+(?:creatine|protein|supplements?|medications?|medicine|water)\b)/i
+  // General Only has no diagnosis, clinician encounter, lab result or symptom
+  // history. Reject affirmative owner-specific clinical conclusions, even when
+  // they lack numeric measurements or an explicit "according to your records".
+  // Keep conditional education ("If you have anemia ...") unaffected.
+  const inventedClinicalAssessment = /(?:^|[.!?]\s+)(?:you\s+(?:(?:likely|probably|definitely|certainly)\s+)?(?:have|are experiencing|were diagnosed with)\s+(?:an?\s+)?(?:diabetes|prediabetes|anemia|hypertension|high blood pressure|hypothyroidism|dehydration|constipation|heart attack|stroke|infection|vitamin deficiency)\b|your\s+(?:(?:reported|recent|current)\s+)?(?:symptoms?|bloodwork|lab results?|test results?|medical history)\s+(?:suggests?|indicates?|shows?|confirms?|proves?|points?\s+to)\b|your\s+(?:doctor|clinician|provider)\s+(?:diagnosed|prescribed|confirmed|told)\b|(?:the\s+)?symptoms?\s+you\s+(?:reported|described)\s+(?:suggest|indicate|point to)\b)/i
   return claimsSavedData.test(text) || inventedMeasurement.test(text) ||
-    inventedQualitativeState.test(text) || inventedOwnerHabit.test(text)
+    inventedQualitativeState.test(text) || inventedOwnerHabit.test(text) ||
+    inventedClinicalAssessment.test(text)
 }
 
 export function generalAnswerInventsPersonalRecord(answer: AskHealthAnswer): boolean {
