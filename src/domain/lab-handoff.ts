@@ -36,3 +36,11 @@ export function readLabExperimentHandoff(params: URLSearchParams): LabExperiment
 export function labExperimentHandoffLabel(source: LabExperimentHandoffSource): string {
   return source === 'coach' ? 'Coach recommendation' : 'Weekly Coach review'
 }
+
+/** URL parameters are navigation hints, never authority for the owner API. */
+export function labExperimentDetailHandoffPath(experimentId: string, handoff: LabExperimentHandoff): string {
+  const base = `/lab/experiments/${experimentId}`
+  if (!UUID.test(experimentId) || handoff.source !== 'coach' || !handoff.coachRecommendation) return base
+  return labExperimentHandoffPath({ ...handoff, title: '', rationale: '' })
+    .replace('/lab/experiments/new', base)
+}
