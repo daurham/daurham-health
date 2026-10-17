@@ -210,9 +210,18 @@ describe('PIQ-1.6 exact Training evidence confidence', () => {
         ...control.primaryOpportunity!, id: 'other:bench-press',
       },
     }
-    const draft = buildCoachRecommendationDrafts(bad).find((item) => item.kind === 'training_progression')
+    const ranked = buildCoachRecommendationDrafts(bad)
+    // The separately generated exact-exercise opportunity is allowed to
+    // rank above the malformed primary, but its five exposures must never
+    // be copied to the unrelated "other:bench-press" candidate.
+    const draft = ranked.find((item) =>
+      item.kind === 'training_progression' && item.sourceId === 'other:bench-press')
     expect(draft?.confidence).toBe('unknown')
     expect(draft?.trainingEvidence).toBeUndefined()
+    const matched = ranked.find((item) =>
+      item.sourceId === 'training-progression:bench-press')
+    expect(matched?.confidence).toBe('limited')
+    expect(matched?.trainingEvidence?.exposureCount).toBe(5)
     const html = renderToStaticMarkup(<MemoryRouter><GoalControlCard state={bad} /></MemoryRouter>)
     expect(html).toContain('Exact-exercise Training trend confidence: unknown')
   })
