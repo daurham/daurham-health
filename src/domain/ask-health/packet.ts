@@ -792,6 +792,10 @@ function addFocusedWeightEnergy(
             ? 'The latest Goal Control weight point changed or no longer matches its private source fingerprint; target and deadline reports are WITHHELD. '
             :canonical.state==='measurement_source_unavailable'
               ? 'The latest Goal Control weight-point recheck is unavailable; target and deadline reports are WITHHELD. '
+              :canonical.state==='projection_source_changed'
+                ? 'The weight history used to calculate Goal Control projections changed during retrieval; canonical target and deadline reports are WITHHELD. '
+                :canonical.state==='projection_source_unavailable'
+                  ? 'The weight history source recheck could not be verified; canonical target and deadline reports are WITHHELD. '
           :canonical.state==='primary_not_weight'
             ? 'No active weight goal was selected as primary; this screen withholds weight-goal achievement and urgency. '
             : 'Exact selected-goal status or source versions could not be reconciled. '
@@ -801,12 +805,13 @@ function addFocusedWeightEnergy(
     value:null,unit:null,period,
     text:canonicalText+
       'Deadline attention is descriptive; a past or due deadline with missing observation is NOT proof the goal is unmet. '+
-      'A matching latest-point fingerprint is only an optimistic read-time check, NOT a transaction lock; the historical projection series is not atomically versioned with this decision. No plateau, efficacy, clinical urgency or calorie intervention follows.',
+      'The latest-point and projection-series fingerprints are optimistic read-time checks, NOT transaction locks; historical measurements are not atomically versioned with this decision. No plateau, efficacy, clinical urgency or calorie intervention follows.',
     coverage:{
       canonicalGoalReview:canonical.state,
       reportedTargetState:canonical.targetReport,
       deadlineAttention:canonical.deadlineAttention,
       measurementRevision:canonical.measurementRevision,
+      projectionRevision:canonical.projectionRevision,
       intervention:canonical.intervention,
     },
     detailPath:'/goals',userEntered:false,substantive:false,priority:0,
