@@ -27,6 +27,7 @@ import {
 } from '../../src/domain/coach-intelligence.js'
 import type { GoalControlState } from '../../src/domain/goal-control.js'
 import { projectCoachLinkedExperiment, type CoachLinkedLabRow } from '../../src/domain/coach-lab-lifecycle.js'
+import { projectCoachLabOverlapReview, type CoachLabOverlapRow } from '../../src/domain/coach-lab-overlaps.js'
 import { addCalendarDays } from '../../src/domain/training-plan.js'
 import { getSql, type Sql } from '../db.js'
 import { HttpError } from '../http.js'
@@ -404,6 +405,83 @@ export async function hydrateCoachLinkedExperiments(
     }
   } catch {
     // Missing or unreachable source does not mean there never was a link.
+  }
+  // Run one bounded, read-only check for the verified experiment windows.
+  // A missing/unreachable Change Ledger source must never look like stability.
+  const eligible = [...verified.values()].filter((link) =>
+    (link.status === 'active' || link.status === 'completed' || link.status === 'inconclusive') &&
+    link.windowStart != null && link.windowEnd != null &&
+    link.windowStart <= today && link.windowEnd >= link.windowStart)
+  if (eligible.length > 0) {
+    const eligibleIds = eligible.map((link) => link.id)
+    try {
+      const overlaps = (await sql.query(
+        `SELECT lab.id::text AS experiment_id, events.kind, COUNT(*)::int AS event_count
+           FROM experiments AS lab
+           JOIN LATERAL (
+             SELECT 'nutrition_target'::text AS kind, effective_from AS event_on
+               FROM nutrition_targets WHERE effective_from BETWEEN lab.window_start AND LEAST(lab.window_end, $2::date)
+             UNION ALL
+             SELECT 'training_plan', effective_from
+               FROM training_plan_versions WHERE effective_from BETWEEN lab.window_start AND LEAST(lab.window_end, $2::date)
+             UNION ALL
+             SELECT 'supplement_status', effective_date
+               FROM supplement_status_events WHERE effective_date BETWEEN lab.window_start AND LEAST(lab.window_end, $2::date)
+             UNION ALL
+             SELECT 'daily_context', context.context_date
+               FROM daily_context AS context
+               JOIN daily_context_tags AS tags ON tags.context_id = context.id
+              WHERE context.context_date BETWEEN lab.window_start AND LEAST(lab.window_end, $2::date)
+                AND tags.tag_key IN ('sick','travel','alcohol','unusual_stress','pain',
+                   'poor_sleep_opportunity','new_supplement','medication_change','unusual_physical_labor')
+             UNION ALL
+             SELECT 'goal_started', started_on
+               FROM goals WHERE started_on BETWEEN lab.window_start AND LEAST(lab.window_end, $2::date)
+             UNION ALL
+             SELECT 'confirmed_behavior_shift', detected_on
+               FROM change_candidates
+              WHERE status = 'confirmed'
+                AND window_start <= LEAST(lab.window_end, $2::date)
+                AND window_end >= lab.window_start
+             UNION ALL
+             SELECT 'other_experiment',
+                    COALESCE(latest.effective_date, implementation.effective_date)
+               FROM experiment_implementations AS implementation
+               LEFT JOIN LATERAL (
+                 SELECT action, effective_date
+                   FROM experiment_implementation_revisions
+                  WHERE experiment_id = implementation.experiment_id
+                  ORDER BY revision DESC LIMIT 1
+               ) AS latest ON TRUE
+              WHERE implementation.experiment_id <> lab.id
+                AND latest.action IS DISTINCT FROM 'retracted'
+                AND COALESCE(latest.effective_date, implementation.effective_date)
+                    BETWEEN lab.window_start AND LEAST(lab.window_end, $2::date)
+           ) AS events ON TRUE
+          WHERE lab.id = ANY($1::uuid[]) AND lab.origin = 'owner_created'
+            AND lab.status IN ('active','completed','inconclusive')
+          GROUP BY lab.id, events.kind`,
+        [eligibleIds, today],
+      )) as CoachLabOverlapRow[]
+      const grouped = new Map(eligibleIds.map((id) => [id, [] as CoachLabOverlapRow[]]))
+      let invalidRows = false
+      for (const row of overlaps) {
+        if (typeof row.experiment_id !== 'string' || !grouped.has(row.experiment_id)) {
+          invalidRows = true
+          break
+        }
+        grouped.get(row.experiment_id)!.push(row)
+      }
+      for (const link of eligible) {
+        link.overlapReview = invalidRows
+          ? { state: 'unavailable', observations: [] }
+          : projectCoachLabOverlapReview(grouped.get(link.id) ?? [], link.id)
+      }
+    } catch {
+      for (const link of eligible) {
+        link.overlapReview = { state: 'unavailable', observations: [] }
+      }
+    }
   }
   for (const item of items) {
     if (!item.linkedExperimentId) continue

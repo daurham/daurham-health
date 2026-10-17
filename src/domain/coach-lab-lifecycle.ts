@@ -5,6 +5,7 @@ import {
 } from './experiment-results.js'
 import { EXPERIMENT_STATUSES, type ExperimentStatus } from './lab.js'
 import { isCalendarDate } from './training.js'
+import type { CoachLabOverlapReview } from './coach-lab-overlaps.js'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
@@ -23,6 +24,7 @@ export type CoachLinkedExperiment = {
   /** Separate voluntary owner report; not inferred from Lab start or date window. */
   implementation: { effectiveDate: string; behaviorChange: string } | null
   implementationRetracted: boolean
+  overlapReview?: CoachLabOverlapReview
 }
 
 export type CoachLinkedLabRow = {

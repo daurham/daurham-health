@@ -12,6 +12,7 @@ import type {
 import type { CoachLabItem } from '@/domain/coach-lab'
 import { labExperimentHandoffPath } from '@/domain/lab-handoff'
 import { coachLinkedExperimentCopy, coachLinkedImplementationEvidenceCopy } from '@/domain/coach-lab-lifecycle'
+import { coachLabOverlapCopy } from '@/domain/coach-lab-overlaps'
 import { XpAmount } from '@/components/XpAmount'
 import { primaryButtonClass, quietButtonClass } from '@/lib'
 import { prefixedPath, useAppPathPrefix } from '@/lib/app-prefix'
@@ -590,6 +591,9 @@ export function CoachIntelligencePanel({
                   {item.linkedExperiment?.windowStart && item.linkedExperiment.windowEnd
                     ? ` Observation window: ${item.linkedExperiment.windowStart} to ${item.linkedExperiment.windowEnd}.`
                     : ''}
+                  {item.linkedExperiment?.overlapReview ? (
+                    <> {' '}{coachLabOverlapCopy(item.linkedExperiment.overlapReview)}</>
+                  ) : null}
                   {item.linkedExperiment?.resultId ? (
                     <>
                       {' '}{coachLinkedImplementationEvidenceCopy(item.linkedExperiment)}

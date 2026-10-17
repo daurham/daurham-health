@@ -1,3 +1,8 @@
+## 2026-10-17 PIQ-6.3 observed timing overlap warning (CI pending)
+
+- Read-only one-query aggregation for 7 existing Change Ledger-relevant sources, current date/window/verified owner Lab scope; present only aggregate counts by source-kind. Owner's own implementation excluded; retracted other experiments excluded; unavailable and missing-data categories remain explicit.
+- No causal claim or automatic result, target, protocol changes. Not an outcome evaluator or complete confounder registry. Migrations 0057/0058 still unapplied, stay on PIQ branch, phase owner acceptance 0/9.
+
 ## 2026-10-17 PIQ-6.1 append-only owner correction acceptance checkpoint
 
 - GitHub Actions `39065588376` is SUCCESS on commit `79643a999321eb5de7f7d318cf93b70d48c791b3`; TypeScript, ESLint, production build, 2,600 Vitest cases passed (30 skipped).
