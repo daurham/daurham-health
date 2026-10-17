@@ -288,7 +288,7 @@ describe('literature synthesis', () => {
 
   it('shares the monthly budget and rate gate with other AI request types', () => {
     const ledgerSource = readFileSync('server/ai-usage/ledger.ts', 'utf8')
-    const attempts = ledgerSource.slice(ledgerSource.indexOf('WITH attempts'), ledgerSource.indexOf('charged AS'))
+    const attempts = ledgerSource.slice(ledgerSource.indexOf('WITH attempts'), ledgerSource.indexOf('rate AS'))
     expect(attempts).not.toContain('request_type')
     expect(readFileSync('server/literature/gate.ts', 'utf8')).toContain("requestType: LITERATURE_REQUEST_TYPE")
     expect(readFileSync('src/domain/literature/config.ts', 'utf8')).toContain("literature_synthesis")

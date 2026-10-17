@@ -585,7 +585,7 @@ describe('weekly coach generation', () => {
 
   it('shares the monthly budget and does not filter the rate gate by request type', () => {
     const ledger = readFileSync('server/ai-usage/ledger.ts', 'utf8')
-    const attempts = ledger.slice(ledger.indexOf('WITH attempts'), ledger.indexOf('charged AS'))
+    const attempts = ledger.slice(ledger.indexOf('WITH attempts'), ledger.indexOf('rate AS'))
     expect(attempts).not.toContain('request_type')
     const gateSource = readFileSync('server/weekly-coach/gate.ts', 'utf8')
     expect(gateSource).toContain("requestType: WEEKLY_COACH_REQUEST_TYPE")
