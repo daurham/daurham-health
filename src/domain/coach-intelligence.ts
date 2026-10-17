@@ -660,9 +660,23 @@ export function keepCurrentCoachFollowUps<
   ).slice(0, limit)
 }
 
-function questionForLimitation(limitation: GoalControlLimitation): Omit<CoachFollowUpQuestionDraft, 'fingerprint' | 'kind' | 'confidence' | 'evidenceRefs'> | null {
+/**
+ * Only ask a question when its answer could change a current decision.
+ * Check-in existence must be known; a failed source read is NOT evidence that
+ * the owner has neglected to complete today's check-in.
+ */
+export type CoachQuestionContext = { todayWellnessCompleted?: boolean | null }
+
+function questionForLimitation(
+  limitation: GoalControlLimitation, control: GoalControlState,
+  context: CoachQuestionContext,
+): Omit<CoachFollowUpQuestionDraft, 'fingerprint' | 'kind' | 'confidence' | 'evidenceRefs'> | null {
   if (!limitation.detailPath) return null
   if (limitation.code === 'nutrition_quality_floor') {
+    // Zero entries need ordinary Nutrition logging, not a nagging question.
+    // Already adequate verified coverage cannot justify this prompt either.
+    if (control.nutritionQuality.loggedDays === 0 ||
+        control.nutritionQuality.state === 'met') return null
     return {
       domain: 'nutrition',
       title: 'Was recent food logging unusually rough or incomplete?',
@@ -674,13 +688,16 @@ function questionForLimitation(limitation: GoalControlLimitation): Omit<CoachFol
   if (limitation.code.startsWith('missing:sleep')) {
     return {
       domain: 'recovery',
-      title: 'Was recent sleep disrupted in a way the imported data would miss?',
-      detail: 'Context such as an interrupted night can explain why a short window is less comparable.',
-      actionText: 'Add context',
-      detailPath: '/check-in',
+      title: 'Are sleep records missing or incomplete for this comparison?',
+      detail: 'Review the recorded nights and source coverage before interpreting a sleep or recovery trend.',
+      actionText: 'Review sleep records',
+      detailPath: '/progress/sleep',
     }
   }
   if (limitation.code.startsWith('missing:wellness')) {
+    // Never ask the owner to repeat today's check-in. Fail closed when the
+    // check-in state could not be read (unknown is not "not done").
+    if (context.todayWellnessCompleted !== false) return null
     return {
       domain: 'recovery',
       title: 'How have energy, soreness, and hunger felt recently?',
@@ -690,6 +707,10 @@ function questionForLimitation(limitation: GoalControlLimitation): Omit<CoachFol
     }
   }
   if (limitation.code.startsWith('goal_unknown:')) {
+    const goalId = limitation.code.slice('goal_unknown:'.length)
+    if (!control.goals.some((goal) => goal.id === goalId &&
+        goal.lifecycle === 'active' && goal.state === 'unknown' &&
+        goal.detailPath === limitation.detailPath)) return null
     return {
       domain: 'goals',
       title: 'Is this still a goal you want Coach to optimize right now?',
@@ -698,28 +719,45 @@ function questionForLimitation(limitation: GoalControlLimitation): Omit<CoachFol
       detailPath: limitation.detailPath,
     }
   }
-  return {
-    domain: 'health',
-    title: 'Is there recent context Health is missing?',
-    detail: limitation.text,
-    actionText: 'Add context',
-    detailPath: limitation.detailPath,
-  }
+  // No generic "tell us more" filler when a limitation does not suggest a
+  // specific question with decision value.
+  return null
 }
 
-export function buildCoachFollowUpQuestion(control: GoalControlState): CoachFollowUpQuestionDraft | null {
+export function buildCoachFollowUpQuestion(
+  control: GoalControlState,
+  context: CoachQuestionContext = {},
+): CoachFollowUpQuestionDraft | null {
   if (control.state !== 'insufficient_evidence') return null
-  const limitation = control.limitations[0]
-  if (!limitation) return null
-  const question = questionForLimitation(limitation)
-  if (!question) return null
-  return {
-    fingerprint: fingerprint(`question:${limitation.code}`),
-    kind: 'follow_up_question',
-    confidence: 'limited',
-    evidenceRefs: [`limitation:${limitation.code}`],
-    ...question,
+  // The first limitation may already be addressed or may be only a generic
+  // uncertainty notice. Prefer one verified, actionable question or silence.
+  for (const limitation of control.limitations) {
+    const question = questionForLimitation(limitation, control, context)
+    if (!question) continue
+    return {
+      fingerprint: fingerprint(`question:${limitation.code}`),
+      kind: 'follow_up_question',
+      confidence: 'limited',
+      evidenceRefs: [`limitation:${limitation.code}`],
+      ...question,
+    }
   }
+  return null
+}
+
+/**
+ * Read the newest question in the existing three-owner-day budget window
+ * before offering another one. A historical question that is now resolved
+ * must not be displayed, and it must not be replaced by a different prompt
+ * until the existing budget expires.
+ */
+export function coachQuestionPresentation(
+  current: CoachFollowUpQuestionDraft | null,
+  recent: { fingerprint: string } | null,
+): 'reuse' | 'create' | null {
+  if (!current) return null
+  if (!recent) return 'create'
+  return recent.fingerprint === current.fingerprint ? 'reuse' : null
 }
 
 export function recommendationIsSuppressed(memory: CoachRecommendationMemory | undefined, asOf: string): boolean {

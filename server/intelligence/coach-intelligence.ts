@@ -3,6 +3,7 @@ import {
   COACH_INTELLIGENCE_VERSION,
   COACH_QUESTION_BUDGET_DAYS,
   buildCoachFollowUpQuestion,
+  coachQuestionPresentation,
   buildCoachRecommendationDrafts,
   keepVisibleCoachDependencies,
   keepCurrentCalorieDecisionDrafts,
@@ -373,18 +374,32 @@ export async function loadCoachIntelligenceState(asOf: string): Promise<CoachInt
   }
 
   let question: CoachFollowUpQuestion | null = null
-  const recent = await recentQuestion(sql, asOf)
-  if (recent) {
-    question = questionView(recent)
-  } else {
-    const draft = buildCoachFollowUpQuestion(control)
-    const row = await surfaceQuestion(sql, draft, asOf)
-    if (draft && row) {
-      question = {
-        id: row.id,
-        ...draft,
-      }
+  // Check canonical owner-day check-in existence only if wellness evidence
+  // could generate an actual question. A failed query never means "not done".
+  let todayWellnessCompleted: boolean | null = null
+  if (control.state === 'insufficient_evidence' &&
+      control.limitations.some((item) => item.code.startsWith('missing:wellness'))) {
+    try {
+      const rows = await sql.query(
+        'SELECT EXISTS (SELECT 1 FROM daily_wellness WHERE wellness_date = $1::date) AS completed',
+        [asOf],
+      )
+      todayWellnessCompleted = typeof rows[0]?.completed === 'boolean'
+        ? rows[0].completed : null
+    } catch {
+      todayWellnessCompleted = null
     }
+  }
+  const candidateQuestion = buildCoachFollowUpQuestion(control, { todayWellnessCompleted })
+  const recent = await recentQuestion(sql, asOf)
+  const disposition = coachQuestionPresentation(candidateQuestion, recent)
+  if (disposition === 'reuse' && recent && candidateQuestion) {
+    // Return the *current* scoped wording, not potentially outdated stored
+    // question text. This is a view only: no new write or cooldown reset.
+    question = { ...questionView(recent), ...candidateQuestion }
+  } else if (disposition === 'create' && candidateQuestion) {
+    const row = await surfaceQuestion(sql, candidateQuestion, asOf)
+    if (row) question = { id: row.id, ...candidateQuestion }
   }
 
   const validFingerprints = new Set(drafts.map((draft) => draft.fingerprint))
