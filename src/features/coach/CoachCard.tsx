@@ -438,6 +438,13 @@ export function CoachIntelligencePanel({
   onOutcome: (item: CoachRecommendationFollowUp, outcome: CoachRecommendationOutcome) => void
 }) {
   const prefix = useAppPathPrefix()
+  // Default to one high-priority recommendation. Keep additional actions
+  // available without filling Today's Coach surface with repetitive cards.
+  const [expandedFor, setExpandedFor] = useState<string | null>(null)
+  const primary = state.nextBestActions[0]
+  const primaryKey = primary ? [state.asOf, primary.id, primary.contextRevision ?? ''].join(':') : null
+  const expanded = primaryKey != null && expandedFor === primaryKey
+  const shownActions = expanded ? state.nextBestActions : state.nextBestActions.slice(0, 1)
   return (
     <section className="border-t border-zinc-100 px-3 py-3" aria-label="Coach next best actions">
       <div className="flex items-center justify-between gap-2">
@@ -451,7 +458,7 @@ export function CoachIntelligencePanel({
         <p className="mt-1 text-xs leading-relaxed text-zinc-600">{state.summary}</p>
       ) : (
         <div className="mt-2 space-y-2">
-          {state.nextBestActions.map((item) => (
+          {shownActions.map((item) => (
             <article key={item.id} className="rounded-lg bg-zinc-50 p-2.5">
               <p className="text-sm font-semibold text-zinc-900">{item.title}</p>
               <p className="mt-1 text-xs leading-relaxed text-zinc-600">{item.detail}</p>
@@ -566,6 +573,16 @@ export function CoachIntelligencePanel({
               ) : null}
             </article>
           ))}
+          {state.nextBestActions.length > 1 ? (
+            <button
+              type="button"
+              className="motion-interactive rounded-md px-2 py-1.5 text-xs font-medium text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              aria-expanded={expanded}
+              onClick={() => setExpandedFor(expanded ? null : primaryKey)}
+            >
+              {expanded ? 'Show fewer recommendations' : 'See ' + (state.nextBestActions.length - 1) + ' more recommendations'}
+            </button>
+          ) : null}
         </div>
       )}
       {state.followUps.length > 0 ? (
