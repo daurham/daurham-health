@@ -1,4 +1,5 @@
 import type { GoalControlEvidenceCoverage, GoalControlLimitation, GoalControlNutritionQuality, GoalControlState } from './goal-control.js'
+import type { CoachLinkedExperiment } from './coach-lab-lifecycle.js'
 import { isOperationalCoachOpportunity } from './coach-opportunity-eligibility.js'
 import type { MaintenanceEvidenceExplanation } from './maintenance.js'
 import { progressionSeriesForOpportunity, type TrainingProgressionSeries } from './training-progression.js'
@@ -156,6 +157,10 @@ export type CoachRecommendationView = {
   contextRevision?: string
   /** Owner-linked Lab record; linkage does not establish an experiment start. */
   linkedExperimentId?: string
+  /** Current canonical Lab status, hydrated from an owner-scoped read. */
+  linkedExperiment?: CoachLinkedExperiment
+  /** Saved association whose Lab row cannot currently be verified. */
+  linkedExperimentUnavailable?: boolean
   experimentEligible: boolean
 }
 
