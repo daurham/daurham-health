@@ -24,7 +24,7 @@ function draft(
   }
 }
 const observedTraining = {
-  exerciseName: 'Bench Press', state: 'plateau' as const,
+  exerciseName: 'Bench Press', state: 'stalled' as const,
   metric: 'e1rm_kg' as const, exposureCount: 6,
   latestDate: '2026-10-15', changePct: 0,
   limitationKinds: [], explanation: 'Six verified exposures.',
