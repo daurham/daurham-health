@@ -63,6 +63,28 @@ describe('PIQ-3.2 explicit immediate safety floor', () => {
     }
   })
 
+  it('[T41] excludes quoted third-party/historical/hypothetical speech from current-owner emergency detection', () => {
+    const quoted = [
+      'My wife said "I have chest pain right now".',
+      "My wife said 'I have chest pain right now'.",
+      "My wife said 'I can't breathe'.",
+      'My wife said “I can’t breathe”.',
+      "A friend told me 'I'm suicidal'.",
+      "The person said 'I am bleeding heavily'.",
+      'I said "I have severe abdominal pain" last year.',
+      'What does "I have chest pain" mean?',
+    ]
+    for (const message of quoted) {
+      expect(detectImmediateSafety(message), message).toBeNull()
+    }
+    // A real owner statement outside a quotation still wins.
+    expect(detectImmediateSafety(
+      "My wife said 'I'm having a stroke' but I am having chest pain.",
+    )).toBe('emergency')
+    expect(detectImmediateSafety("I'm having chest pain right now.")).toBe('emergency')
+    expect(detectImmediateSafety("I can't breathe.")).toBe('emergency')
+  })
+
   it('answers explicit emergencies without reading owner records or calling AI or charging its gate', async () => {
     load.mockClear()
     const provider = vi.fn()

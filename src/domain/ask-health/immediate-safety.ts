@@ -8,8 +8,23 @@ import type { AskHealthAnswer } from './types.js'
  */
 export type ImmediateSafetyKind = 'emergency' | 'self_harm'
 
+/** Exclude quoted speech from the narrow *current owner's* emergency detector.
+ * Quoted first-person sentences can belong to a family member, a historical
+ * recounting or an educational example. Avoid treating the quotation as the
+ * owner's own statement. More complex cases still use normal Ask Health
+ * routing; this is not a medical/safety adjudication of the quote.
+ */
+function excludeQuotedSpeech(value: string): string {
+  return value
+    .replace(/“[^”]*”/g, ' ')
+    .replace(/"[^"]*"/g, ' ')
+    // Only quotation marks at word boundaries; don't break I'm / can't.
+    .replace(/(?<!\w)'(?:[^']|'(?=\w))*'(?!\w)/g, ' ')
+    .replace(/(?<!\w)‘(?:[^’]|’(?=\w))*’(?!\w)/g, ' ')
+}
+
 export function detectImmediateSafety(question: string): ImmediateSafetyKind | null {
-  const normalized = question.replace(/\u2019/g, "'").trim()
+  const normalized = excludeQuotedSpeech(question.trim()).replace(/\u2019/g, "'")
   // Distinct from educational "What causes chest pain?" and owner statements
   // such as "I do not have chest pain" or "I had chest pain last year".
   const crisis = /\b(?:i (?:want|plan|intend|am going|feel ready) to (?:kill|hurt) myself|i(?:'m| am) suicidal|i(?:'m| am) about to (?:kill|hurt) myself)\b/i
