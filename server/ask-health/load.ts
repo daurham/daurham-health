@@ -12,6 +12,7 @@ import { listActivityDailySummaries } from '../activity/queries.js'
 import { listGoalAskSnapshots } from '../goals/service.js'
 import { requiresHistoricalGoalBoundary } from '../../src/domain/ask-health/historical-goal-scope.js'
 import { listDailyContexts } from '../context/service.js'
+import { recheckCurrentDailyContexts } from './current-context-consistency.js'
 import { listTimelineBenchmarkResults } from '../lab/results.js'
 import { getSql } from '../db.js'
 import { loadProgressCanonicalRows } from '../progress/queries.js'
@@ -299,6 +300,15 @@ export async function loadAskHealthPacketInput(input: {
     focusedWeightEnergy.nutritionSourceRecheck=nutritionRecheck
     focusedWeightEnergy.weightActivitySourceRecheck=weightActivityRecheck
   }
+  // Include initially empty sets: a new late Context row is a mutation.
+  const contextMayAppear=input.asOf===today &&
+    input.contextMode!=='general_only' &&
+    ['general','recovery','experiments'].includes(input.lens)
+  const currentContextSourceRecheck=contextMayAppear
+    ? await recheckCurrentDailyContexts({
+        first:contexts,start:period.start,end:period.end,today,
+      })
+    : 'not_checked'
   return {
     lens: input.lens,
     range: input.range,
@@ -331,6 +341,7 @@ export async function loadAskHealthPacketInput(input: {
       asOf: input.asOf,
     }),
     context: contextSnapshot(contexts),
+    currentContextSourceRecheck,
     patterns,
     stableProfile: askStableProfileForDate(profile, input.asOf, today),
     profile: askClinicalProfileForDate(profile, input.asOf, today),

@@ -148,6 +148,8 @@ export type AskHealthPacketInput = {
   benchmarks: readonly AskBenchmarkInput[]
   supplements: readonly TodaySupplementInput[]
   context: AskContextInput | null
+  /** Current context source consistency; optional for historical/test callers. */
+  currentContextSourceRecheck?: 'not_checked' | 'verified' | 'changed_or_unavailable'
   patterns: readonly AskPatternInput[]
   focusedTraining?: FocusedTrainingEvidence | null
   focusedDigestive?: FocusedDigestiveEvidence | null

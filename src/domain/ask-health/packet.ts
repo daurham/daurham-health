@@ -59,6 +59,11 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
 
   const lens = input.lens
   const wants = lensWants(lens)
+  // A failed final current-focused read outranks earlier generic snapshots.
+  const focusedSourceConflict=input.focusedWeightEnergy!=null &&
+    input.contextMode!=='general_only' && input.asOf===input.healthToday &&
+    (input.focusedWeightEnergy.nutritionSourceRecheck==='changed_or_unavailable' ||
+      input.focusedWeightEnergy.weightActivitySourceRecheck==='changed_or_unavailable')
   const digestiveGuard = digestivePacketGuard(input)
   const intelligence = guardedDigestiveIntelligence(input.intelligence, digestiveGuard)
   if (wants.body) {
@@ -91,7 +96,16 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
     addLab(input, push)
   }
   if (wants.context && !digestiveGuard.crossSourceConflict) {
-    addContext(input.context, push)
+    if (input.currentContextSourceRecheck === 'changed_or_unavailable') {
+      push({
+        id:'context.source_consistency',domain:'context',
+        label:'Current Daily Context source consistency boundary',
+        value:null,unit:null,period,
+        text:'Saved Daily Context notes or tags changed during this read or could not be rechecked. Prior notes and tag counts are WITHHELD. Missing context is UNKNOWN, not a normal or symptom-free day.',
+        coverage:{contextSourceRecheck:'changed_or_unavailable',contextClaims:'withheld'},
+        detailPath:'/context',userEntered:false,substantive:false,priority:0,
+      })
+    } else addContext(input.context,push)
   }
   if (wants.patterns) {
     addPatterns(input.patterns, push)
@@ -115,7 +129,15 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
           item.id.startsWith('weight_energy.historical_window.') ||
           item.id === 'goals.historical_attestation_boundary')
       : drafts
-  const evidence = trimEvidence(selectedDrafts, maxChars)
+  // Hide ALL relevant generic routes if current focused inputs fail.
+  // Historical, General Only and unrelated sleep/supplements are preserved.
+  const safeDrafts=focusedSourceConflict
+    ? selectedDrafts.filter(item=>item.id==='ask.range'||
+        item.id==='weight_energy.source_consistency'||
+        !['body.','nutrition.','activity.','goals.','intelligence.']
+          .some(prefix=>item.id.startsWith(prefix)))
+    : selectedDrafts
+  const evidence=trimEvidence(safeDrafts,maxChars)
   const selectedIds = new Set(evidence.map((item) => item.id))
   const clarification = exerciseClarification(input)
   const selectedSerializedChars = JSON.stringify(evidence).length
@@ -131,8 +153,10 @@ export function buildAskHealthEvidencePacket(input: AskHealthPacketInput): AskHe
     evidence,
     limitations: limitations.filter((item) => evidence.some((fact) => fact.id === item.evidenceId)),
     contextSummary: {
-      knows: input.focusedWeightEnergyDay || input.focusedWeightEnergyWindow ? [] : intelligence?.knows ?? [],
-      missing: input.focusedWeightEnergyDay || input.focusedWeightEnergyWindow ? [] : intelligence?.missing ?? [],
+      knows: input.focusedWeightEnergyDay || input.focusedWeightEnergyWindow || focusedSourceConflict
+        ? [] : intelligence?.knows ?? [],
+      missing: input.focusedWeightEnergyDay || input.focusedWeightEnergyWindow || focusedSourceConflict
+        ? [] : intelligence?.missing ?? [],
     },
     clarification,
     evidenceSelectionAudit: {
