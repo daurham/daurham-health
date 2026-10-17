@@ -34,7 +34,10 @@ describe('PIQ-3 Context Mode actual page and in-flight controls', () => {
     // JSX source contract complements the initial SSR check: SSR cannot enter
     // the asynchronous pending state without a DOM test environment.
     const source = readFileSync('src/features/ask-health/AskHealthPage.tsx', 'utf8')
-    expect(source).toMatch(/className=\{quietButtonClass\}\s+disabled=\{pending\}\s+onClick=\{\(\) => \{\s+setTurns\(\[\]\)/)
+    expect(source).toMatch(/className=\{quietButtonClass\}\s+disabled=\{pending\}\s+onClick=\{\(\) => \{/)
+    // New chat now also clears T42's personal-answer freshness marker before
+    // resetting history, so a later cross-tab change cannot invalidate it.
+    expect(source).toMatch(/onClick=\{\(\) => \{\s+lastPersonalQuestionRef\.current = null\s+setTurns\(\[\]\)/)
     expect(source).toMatch(/aria-pressed=\{item === lens\}\s+disabled=\{pending\}/)
     expect(source).toMatch(/<select id="ask-context-mode" value=\{contextMode\} disabled=\{pending\}/)
     expect(source).toContain('<fieldset disabled={pending}>')
