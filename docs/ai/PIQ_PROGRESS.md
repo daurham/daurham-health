@@ -3544,3 +3544,84 @@ Next: PIQ-5.2 scenario-level eligibility and substantive ranking,
 then PIQ-5.3 meaningful evidence/action payload and high-value question
 policy; separately complete independent QA preview connectivity and
 owner acceptance before release consideration.
+
+
+## 2026-10-17 — PIQ-5.2 decision-ranking and post-suppression slot fill (CI GREEN)
+
+**State:** branch-only engineering validation; not deployed, released or
+formally owner-accepted. This follows the PIQ-5.1 operational task
+eligibility filter and PIQ-5.6 one-card-by-default UI.
+
+**Gap:** `buildCoachRecommendationDrafts` used to arbitrarily assign
+the Weekly Focus `priority=100`, Training `80`, Maintenance secondary
+`70`, Evidence `60`, then truncate to **three** before reading owner
+memory. If a top card was dismissed, already explicitly started or
+invalidated by a late decision-source recheck, later eligible
+recommendations could be starved and Today could appear empty even
+with a useful candidate available.
+
+**Behavior:** `rankCoachRecommendationDrafts` applies an explicit,
+deterministic ordered rubric to *already recognized* recommendation
+kinds, reserving the top category for time-sensitive goal or safety-
+aware plan reviews, followed by qualifying goal/intake decisions.
+An **exact-exercise Training** trend with matching source identity,
+at least 4 recorded exposures and moderate/high *exercise-specific*
+confidence can outrank generic result review. A sparse/unverified
+exercise signal stays lower-priority rather than borrowing Goal Control
+global confidence. Experiment reviews, nutrition/measurement quality
+decisions, dependent activity alternatives and requests for evidence
+receive distinct lower display tiers. Within each category, exact
+candidate confidence, original priority and stable fingerprint break
+ties. This is editorial presentation ordering, **not** a calculated
+medical utility/risk score, an intervention safety claim or a new
+diagnosis. Existing calorie/plan safety gates still decide eligibility.
+
+**Crucial order:** the domain builder retains the **complete bounded
+candidate set** and stable fingerprints instead of slicing early.
+The server retrieves response/suppression memory for all candidates,
+removes dismissed/already-explicitly-started ones, enforces visibility
+dependencies, rechecks current calorie decision revision, and removes
+competing interventions. `selectCoachRecommendationSlots` finally
+limits the **surviving** set to three *before* writing display rows.
+Saved-ID and historical owner follow-up eligibility continue to use
+the full candidate set; the UI still displays one primary card by
+default with optional expansion for surviving extras.
+
+**Offline tests:** new
+`tests/piq5-coach-decision-ranking.test.ts` covers seven scenarios:
+verified trend versus generic review, time-sensitive goal prioritization,
+sparse/unknown exercise evidence, response-memory backfill, orphan
+activity alternatives, stale calorie revision / active intervention
+removal, and deterministic nonmutating tie-breaking. One pre-existing
+PIQ-1.6 source-confidence test initially assumed the **first**
+`training_progression` result was the intentionally mismatched
+candidate; new ranking legitimately presents the separate matched
+exercise first. The corrected regression now asserts the
+`sourceId` of **both** candidates, proves the malformed candidate
+gets no borrowed evidence, and ensures the correct exercise retains
+its five recorded exposures.
+
+**Validated application and tests SHA:**
+`30982abe76e8ae8a68d8a21d8440c3d601db43fa`.
+[GitHub Actions 39053335815](https://github.com/daurham/daurham-health/actions/runs/39053335815)
+**SUCCESS** for npm ci, `npx tsc -b`, `npx eslint .`,
+Vitest **2,534 passed, 30 skipped; 335 test suites passed** and
+`npm run build`. Earlier commit
+`749483f377ece8060140592bcaf6f28a9a7fb42c` failed just the
+old source-unaware test expectation (2,533 other passing).
+
+**Scope/limits:** synthetic/CI only; no real owner outcome comparison,
+provider invocation, database migration, independent QA Auth/preview
+unlock, saved clinical data access, or owner mobile acceptance.
+The ordered categories do not yet prove all candidate evidence is
+clinically correct; PIQ-5.3 answer usefulness, competing explanations,
+specific owner-safe next actions, novel signal suppression and
+PIQ-5.4 question burden still require end-to-end testing. Formal
+owner-accepted phases **0/9**. No `main` or production change.
+
+**Next:** prioritize PIQ-5.3 **meaningful recommendation payload**:
+show concrete observation/window, why it matters, uncertainty and
+competing explanations, an explicitly optional low-burden action,
+outcome-check criterion, and source navigation using existing
+verified fields. Do not fabricate trend size or permit a model to
+recommend an intervention without existing hard eligibility.
