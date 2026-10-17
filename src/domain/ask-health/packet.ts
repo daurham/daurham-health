@@ -1908,7 +1908,18 @@ function addGoals(
   const matched = numbers.length
     ? active.filter((goal) => numbers.some((number) => goal.targetText.includes(number) || goal.label.includes(number)))
     : active
-  const goals = (matched.length > 0 ? matched : active).filter((goal) => goalKindForLens(goal, input.lens)).slice(0, 8)
+  const focus=input.focusedWeightEnergy
+  const screenedGoals=(matched.length > 0 ? matched : active).filter(goal=>{
+    if(!focus||focus.canonicalGoalStatus.state==='canonical_reported'||
+       goal.kind!=='body_metric')return true
+    // A selected weight goal that was WITHHELD by canonical reconciliation
+    // must not re-enter the same packet via the generic Goals section.
+    // If its private identity could not be established, fail closed for body
+    // metrics rather than accidentally emit the selected goal's raw status.
+    return focus.selectedWeightGoalId!==null&&
+      goal.id!==focus.selectedWeightGoalId
+  })
+  const goals = screenedGoals.filter((goal) => goalKindForLens(goal, input.lens)).slice(0, 8)
   for (const goal of goals) {
     push({
       id: `goals.${goal.id}`,

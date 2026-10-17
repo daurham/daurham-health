@@ -57,6 +57,8 @@ export type FocusedWeightEnergyEvidence = {
   recentExperimentResultReview: RecentExperimentResultReview
   /** Read-only cross-signal reconciliation; never a calorie decision gate. */
   reconciliation: WeightEnergyReconciliation
+  /** Server-only current selected weight-goal ID for packet conflict suppression; never evidence. */
+  selectedWeightGoalId: string | null
   /** Exact-ID/version current Goal Control report; measurement sources NOT locked. */
   canonicalGoalStatus: CanonicalGoalStatusReview
   /** Distinguishes "not checked" from a positive safety finding. */
@@ -149,6 +151,7 @@ export function focusWeightEnergyContext(input: {
     experimentOutcomeReview: {...UNCHECKED_EXPERIMENT_OUTCOME},
     recentExperimentResultReview: {...UNCHECKED_RECENT_RESULT},
     reconciliation: {...UNCHECKED_WEIGHT_ENERGY_RECONCILIATION},
+    selectedWeightGoalId: null,
     canonicalGoalStatus: {...UNCHECKED_CANONICAL_GOAL_STATUS},
     goalVerification: 'not_checked',
     decisionVerification: 'not_checked',

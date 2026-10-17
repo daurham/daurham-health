@@ -239,6 +239,13 @@ export async function loadAskHealthPacketInput(input: {
       asOf:input.asOf,settings:focusedWeightEnergy.currentSettings,
       goal:currentGoalRead,primary:currentPrimaryRead,
     })
+    // Private selection key: prevent a raw Goals packet row from bypassing
+    // the verified canonical weight-goal boundary below. Unavailable selection
+    // fails closed for all body-metric goals, preserving other goal kinds.
+    focusedWeightEnergy.selectedWeightGoalId =
+      focusedWeightEnergy.primaryGoalPriority.state==='selected_active_weight_goal'&&
+      currentGoalRead?.status==='available'&&currentGoalRead.rows.length===1
+        ? currentGoalRead.rows[0]!.id : null
     focusedWeightEnergy.experimentTimingReview = screenExperimentTimingReview({
       asOf:input.asOf,today,
       settings:focusedWeightEnergy.currentSettings,read:currentExperimentWindows,
