@@ -88,7 +88,7 @@ describe('PIQ-6.5 post-result goal/profile metadata revisions',()=>{
     expect(querySql).toContain('s.snapshot_fingerprint = $2::text')
     expect(querySql).not.toContain('clinical_conditions')
     expect(querySql).not.toContain('target_min')
-    expect(EXPERIMENT_CONTEXT_REVISION_SQL).not.toContain('\\\\n')
+    expect(EXPERIMENT_CONTEXT_REVISION_SQL).not.toContain('\\n')
     expect(EXPERIMENT_CONTEXT_REVISION_SQL).toContain('\nFROM experiment_results r')
     expect(querySql).not.toContain('SELECT *')
     const detail=s.slice(s.indexOf('export async function getExperimentResult'),
