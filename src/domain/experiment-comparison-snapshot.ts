@@ -17,6 +17,7 @@ export type ExperimentComparisonSnapshot = {
   review: ExperimentComparisonReview
   /** New v1 records can seal exact eligible source values; legacy v1 omits it. */
   sourceValueSeal?: string | null
+  contextRevisionSeal?: string | null
 }
 
 export function createExperimentComparisonSnapshot(input: {
@@ -26,6 +27,7 @@ export function createExperimentComparisonSnapshot(input: {
   implementationRevision: number | null
   review: ExperimentComparisonReview
   sourceValueSeal?: string | null
+  contextRevisionSeal?: string | null
 }): ExperimentComparisonSnapshot {
   return {
     snapshotVersion: 1,
@@ -37,6 +39,7 @@ export function createExperimentComparisonSnapshot(input: {
     },
     review: input.review,
     ...(input.sourceValueSeal !== undefined ? {sourceValueSeal:input.sourceValueSeal} : {}),
+    ...(input.contextRevisionSeal !== undefined ? {contextRevisionSeal:input.contextRevisionSeal} : {}),
   }
 }
 
@@ -89,6 +92,9 @@ export function parseExperimentComparisonSnapshot(value: unknown): ExperimentCom
   const sourceSeal = root.sourceValueSeal
   if (sourceSeal !== undefined && sourceSeal !== null &&
       (typeof sourceSeal !== 'string' || !/^[0-9a-f]{64}$/.test(sourceSeal))) return null
+  const contextSeal=root.contextRevisionSeal
+  if(contextSeal!==undefined&&contextSeal!==null&&
+     (typeof contextSeal!=='string'||!/^[0-9a-f]{64}$/.test(contextSeal)))return null
   const review = object(root.review)
   if (!review || !statuses.includes(review.state as typeof statuses[number]) ||
       typeof review.reason !== 'string' || !(review.reason in reasons) ||
@@ -119,6 +125,7 @@ export function parseExperimentComparisonSnapshot(value: unknown): ExperimentCom
     snapshotVersion: 1, recordedHealthDate: root.recordedHealthDate,
     implementation: { provenance: source, effectiveDate: date, revision },
     ...(sourceSeal !== undefined ? {sourceValueSeal:sourceSeal as string | null} : {}),
+    ...(contextSeal !== undefined ? {contextRevisionSeal:contextSeal as string | null} : {}),
     review: {
       state: review.state as ExperimentComparisonReview['state'],
       reason: review.reason as ExperimentComparisonReview['reason'],
