@@ -149,7 +149,7 @@ export async function commitExperimentResult(experimentId: string, body: unknown
                    ELSE COALESCE(change.effective_date,implementation.effective_date)::text
               END) IS NOT DISTINCT FROM $18::text
          AND change.revision IS NOT DISTINCT FROM $19::integer
-         AND (${EXPERIMENT_FINALIZATION_SOURCE_CAS_EXPRESSION}) = $30::text`,
+         AND (${EXPERIMENT_FINALIZATION_SOURCE_CAS_EXPRESSION}) = $32::text`,
       [
         resultId,
         experimentId,
@@ -512,6 +512,8 @@ async function buildEvaluation(
     experimentId:experiment.id,experimentStart:start,
     benchmarkIds:[...new Set(requirements.map(r=>r.selector.benchmarkDefinitionId).filter((id):id is string=>Boolean(id)))].sort(),
     bodyMetricKeys:[...new Set(requirements.filter(r=>r.requirementKind==='body_metric').map(r=>r.selector.metricKey).filter((key):key is string=>Boolean(key)))].sort(),
+    supplementIds:[...new Set([...requirements.map(r=>r.selector.supplementId).filter((id):id is string=>Boolean(id)),...evidence.adherence.map(s=>s.supplementId)])].sort(),
+    protocolVersionId:experiment.protocol_version_id,
   }
   const sourceValueSeal = comparisonReview.state === 'descriptive_coverage'
     ? await computeExperimentSourceValueSeal({
@@ -605,8 +607,7 @@ async function loadExperiment(sql: Sql, id: string): Promise<ExperimentRow> {
 
 async function loadRequirements(sql: Sql, protocolVersionId: string): Promise<ExperimentRequirementSpec[]> {
   const rows = (await sql.query(
-    `SELECT id::text AS id, role, requirement_kind, selector, label, required, criteria
-     FROM lab_protocol_requirements WHERE protocol_version_id = $1::uuid ORDER BY position`,
+    EXPERIMENT_REQUIREMENT_SOURCE_SQL,
     [protocolVersionId],
   )) as Array<Record<string, unknown>>
   return rows.map((row) => {
@@ -638,7 +639,7 @@ async function loadEvidence(
   const benchmarkIds = requirements.map((item) => item.selector.benchmarkDefinitionId).filter((id): id is string => Boolean(id))
   const supplementIds = [
     ...requirements.map((item) => item.selector.supplementId).filter((id): id is string => Boolean(id)),
-    ...((await sql.query(`SELECT supplement_id::text AS id FROM experiment_supplements WHERE experiment_id = $1::uuid`, [experiment.id])) as Array<{ id: string }>).map((row) => row.id),
+    ...((await sql.query(EXPERIMENT_SUPPLEMENT_LINK_SOURCE_SQL, [experiment.id])) as Array<{ id: string }>).map((row) => row.id),
   ]
   const [benchmarks, training, body, nutrition, activity, sleep, adherence, context, controls] = await Promise.all([
     loadBenchmarks(sql, experiment.id, benchmarkIds),
@@ -834,16 +835,40 @@ export const EXPERIMENT_CONTEXT_SOURCE_SQL = `SELECT c.context_date::text AS con
      LEFT JOIN daily_context_tags t ON t.context_id = c.id
      WHERE c.context_date BETWEEN $1::date AND $2::date`
 
+/** Exact source query shared by Lab evidence reads and the finalization CAS. */
+export const EXPERIMENT_REQUIREMENT_SOURCE_SQL = `SELECT id::text AS id, role, requirement_kind, selector, label, required, criteria
+     FROM lab_protocol_requirements WHERE protocol_version_id = $1::uuid ORDER BY position`
+/** Exact source query shared by Lab evidence reads and the finalization CAS. */
+export const EXPERIMENT_SUPPLEMENT_LINK_SOURCE_SQL = `SELECT supplement_id::text AS id FROM experiment_supplements WHERE experiment_id = $1::uuid`
+/** Exact source query shared by Lab evidence reads and the finalization CAS. */
+export const EXPERIMENT_CONTROL_SOURCE_SQL = `SELECT tag_key FROM lab_protocol_context_controls WHERE protocol_version_id = $1::uuid`
+/** Exact source query shared by Lab evidence reads and the finalization CAS. */
+export const EXPERIMENT_SUPPLEMENT_SOURCE_SQL = `SELECT id::text AS id, name FROM supplements WHERE id = ANY($1::uuid[])`
+/** Exact source query shared by Lab evidence reads and the finalization CAS. */
+export const EXPERIMENT_SUPPLEMENT_SCHEDULE_SOURCE_SQL = `SELECT id::text AS id, supplement_id::text AS supplement_id, slot_label, dose_amount, dose_unit, weekday_mask,
+            effective_from::text AS effective_from, effective_through::text AS effective_through, sort_order
+     FROM supplement_schedules WHERE supplement_id = ANY($1::uuid[])`
+/** Exact source query shared by Lab evidence reads and the finalization CAS. */
+export const EXPERIMENT_SUPPLEMENT_STATUS_SOURCE_SQL = `SELECT supplement_id::text AS supplement_id, effective_date::text AS effective_date, status
+     FROM supplement_status_events WHERE supplement_id = ANY($1::uuid[]) ORDER BY effective_date, created_at`
+/** Exact source query shared by Lab evidence reads and the finalization CAS. */
+export const EXPERIMENT_SUPPLEMENT_ADHERENCE_SOURCE_SQL = `SELECT a.schedule_id::text AS schedule_id, a.scheduled_date::text AS scheduled_date, a.status
+     FROM supplement_adherence a
+     JOIN supplement_schedules s ON s.id = a.schedule_id
+     WHERE s.supplement_id = ANY($1::uuid[]) AND a.scheduled_date BETWEEN $2::date AND $3::date`
+
 export type FinalizationSourceGuardScope = {
   start:string;end:string;today:string;timezone:string;
   nutrition:boolean;sleep:boolean;
-  experimentId:string;experimentStart:string;benchmarkIds:string[];bodyMetricKeys:string[]
+  experimentId:string;experimentStart:string;benchmarkIds:string[];bodyMetricKeys:string[];
+  supplementIds:string[];protocolVersionId:string
 }
 function finalizationSourceGuardParams(scope:FinalizationSourceGuardScope):[
-  string,string,string,string,boolean,boolean,string,string,string[],string[]
+  string,string,string,string,boolean,boolean,string,string,string[],string[],string[],string
 ] {
   return [scope.start,scope.end,scope.today,scope.timezone,scope.nutrition,
-    scope.sleep,scope.experimentId,scope.experimentStart,scope.benchmarkIds,scope.bodyMetricKeys]
+    scope.sleep,scope.experimentId,scope.experimentStart,scope.benchmarkIds,scope.bodyMetricKeys,
+    scope.supplementIds,scope.protocolVersionId]
 }
 export function buildFinalizationSourceDigestExpression(firstParameter:number):string {
   if(!Number.isInteger(firstParameter)||firstParameter<1||firstParameter>50)
@@ -869,6 +894,15 @@ export function buildFinalizationSourceDigestExpression(firstParameter:number):s
       bind(num==='1'?8:2)+'::date',
   )
   const bodySql=EXPERIMENT_BODY_SOURCE_SQL.replace('$1::text[]',bind(10)+'::text[]')
+  const bySupplement=(sql:string)=>sql.replace('$1::uuid[]',bind(11)+'::uuid[]')
+  const supplementSql=bySupplement(EXPERIMENT_SUPPLEMENT_SOURCE_SQL)
+  const scheduleSql=bySupplement(EXPERIMENT_SUPPLEMENT_SCHEDULE_SOURCE_SQL)
+  const statusSql=bySupplement(EXPERIMENT_SUPPLEMENT_STATUS_SOURCE_SQL)
+  const adherenceSql=bySupplement(EXPERIMENT_SUPPLEMENT_ADHERENCE_SOURCE_SQL)
+    .replace('$2::date',bind(8)+'::date').replace('$3::date',bind(2)+'::date')
+  const linkSql=EXPERIMENT_SUPPLEMENT_LINK_SOURCE_SQL.replace('$1::uuid',bind(7)+'::uuid')
+  const requirementSql=EXPERIMENT_REQUIREMENT_SOURCE_SQL.replace('$1::uuid',bind(12)+'::uuid')
+  const controlSql=EXPERIMENT_CONTROL_SOURCE_SQL.replace('$1::uuid',bind(12)+'::uuid')
   return `md5(
     (CASE WHEN ${bind(5)}::boolean THEN COALESCE((
       SELECT jsonb_agg(to_jsonb(n) ORDER BY n.log_date)::text
@@ -905,6 +939,37 @@ export function buildFinalizationSourceDigestExpression(firstParameter:number):s
     COALESCE((
       SELECT jsonb_agg(to_jsonb(m) ORDER BY m.id)::text
       FROM (${bodySql}) m
+    ),'[]') || ':' ||
+    COALESCE((
+      SELECT jsonb_agg(to_jsonb(supp) ORDER BY supp.id)::text
+      FROM (${supplementSql}) supp
+    ),'[]') || ':' ||
+    COALESCE((
+      SELECT jsonb_agg(to_jsonb(schedule) ORDER BY schedule.supplement_id,schedule.id)::text
+      FROM (${scheduleSql}) schedule
+    ),'[]') || ':' ||
+    COALESCE((
+      SELECT jsonb_agg(to_jsonb(event) ORDER BY event.supplement_id,event.effective_date,event.status)::text
+      FROM (${statusSql}) event
+    ),'[]') || ':' ||
+    COALESCE((
+      SELECT jsonb_agg(to_jsonb(adherence) ORDER BY adherence.schedule_id,adherence.scheduled_date)::text
+      FROM (${adherenceSql}) adherence
+    ),'[]') || ':' ||
+    COALESCE((
+      SELECT jsonb_agg(to_jsonb(link) ORDER BY link.id)::text
+      FROM (
+        SELECT l.supplement_id::text AS id,l.role FROM experiment_supplements l
+        WHERE l.experiment_id = ${bind(7)}::uuid
+      ) link
+    ),'[]') || ':' ||
+    COALESCE((
+      SELECT jsonb_agg(to_jsonb(requirement) ORDER BY requirement.id)::text
+      FROM (${requirementSql}) requirement
+    ),'[]') || ':' ||
+    COALESCE((
+      SELECT jsonb_agg(to_jsonb(control) ORDER BY control.tag_key)::text
+      FROM (${controlSql}) control
     ),'[]')
   )`
 }
@@ -983,7 +1048,7 @@ async function loadContext(sql: Sql, start: string, end: string) {
 
 async function loadControls(sql: Sql, protocolVersionId: string) {
   const rows = (await sql.query(
-    `SELECT tag_key FROM lab_protocol_context_controls WHERE protocol_version_id = $1::uuid`,
+    EXPERIMENT_CONTROL_SOURCE_SQL,
     [protocolVersionId],
   )) as Array<{ tag_key: string }>
   return rows.map((row) => ({ tagKey: row.tag_key }))
@@ -991,23 +1056,17 @@ async function loadControls(sql: Sql, protocolVersionId: string) {
 
 async function loadAdherence(sql: Sql, supplementIds: string[], start: string, end: string) {
   if (supplementIds.length === 0) return []
-  const supplements = (await sql.query(`SELECT id::text AS id, name FROM supplements WHERE id = ANY($1::uuid[])`, [supplementIds])) as Array<{ id: string; name: string }>
+  const supplements = (await sql.query(EXPERIMENT_SUPPLEMENT_SOURCE_SQL, [supplementIds])) as Array<{ id: string; name: string }>
   const schedules = (await sql.query(
-    `SELECT id::text AS id, supplement_id::text AS supplement_id, slot_label, dose_amount, dose_unit, weekday_mask,
-            effective_from::text AS effective_from, effective_through::text AS effective_through, sort_order
-     FROM supplement_schedules WHERE supplement_id = ANY($1::uuid[])`,
+    EXPERIMENT_SUPPLEMENT_SCHEDULE_SOURCE_SQL,
     [supplementIds],
   )) as Array<Record<string, unknown>>
   const events = (await sql.query(
-    `SELECT supplement_id::text AS supplement_id, effective_date::text AS effective_date, status
-     FROM supplement_status_events WHERE supplement_id = ANY($1::uuid[]) ORDER BY effective_date, created_at`,
+    EXPERIMENT_SUPPLEMENT_STATUS_SOURCE_SQL,
     [supplementIds],
   )) as Array<{ supplement_id: string; effective_date: string; status: StatusEventWindow['status'] }>
   const adherence = (await sql.query(
-    `SELECT a.schedule_id::text AS schedule_id, a.scheduled_date::text AS scheduled_date, a.status
-     FROM supplement_adherence a
-     JOIN supplement_schedules s ON s.id = a.schedule_id
-     WHERE s.supplement_id = ANY($1::uuid[]) AND a.scheduled_date BETWEEN $2::date AND $3::date`,
+    EXPERIMENT_SUPPLEMENT_ADHERENCE_SOURCE_SQL,
     [supplementIds, start, end],
   )) as Array<{ schedule_id: string; scheduled_date: string; status: 'taken' | 'skipped' }>
   return supplements.map((supplement) => {
