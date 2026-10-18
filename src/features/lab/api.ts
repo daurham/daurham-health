@@ -370,6 +370,15 @@ export function fetchExperimentResult(id: string): Promise<ExperimentResultView>
   return sendJson(`/api/lab/experiment-results/${id}`, 'GET')
 }
 
+export function fetchExperimentOutcomeFeedbackHistoryPage(
+  id:string,beforeVersion:number,latestVersion:number,
+):Promise<import('@/domain/experiment-evidence-memory').FeedbackHistoryPage> {
+  return sendJson(
+    `/api/lab/experiment-results/${id}/outcome-feedback-history?beforeVersion=${beforeVersion}&latestVersion=${latestVersion}`,
+    'GET',
+  )
+}
+
 export function submitExperimentOutcomeFeedback(
   id: string,
   body: { action: 'record' | 'withdraw'; expectedVersion: number; confirmFeedback: true;
