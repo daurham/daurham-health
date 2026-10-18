@@ -61,70 +61,7 @@ const EXPERIMENT = new RegExp(
   `^/api/lab/experiments(?:/(${UUID})(?:/(schedule|start|implementation|implementation-correct|implementation-retract|abandon|supersede|accept|protocol-version|result)(?:/(preview))?)?)?$`,
   'i',
 )
-const EXPERIMENT_RESULT = new RegExp(`^/api/lab/experiment-results/(${UUID})(?:/(invalidate|outcome-feedback))?import {
-  abandonExperiment,
-  acceptExperiment,
-  addBenchmarkProtocolVersion,
-  addExperimentProtocolVersion,
-  archiveBenchmark,
-  createBenchmark,
-  createOwnerExperiment,
-  deleteUntouchedExperiment,
-  getBenchmark,
-  getExperiment,
-  listBenchmarks,
-  listExperiments,
-  patchBenchmark,
-  patchExperiment,
-  scheduleExperiment,
-  startExperiment,
-  supersedeExperiment,
-} from '../lab/service.js'
-import {
-  commitBenchmarkResult,
-  getBenchmarkResult,
-  getLabProtocolVersion,
-  invalidateBenchmarkResult,
-  listBenchmarkResults,
-  previewBenchmarkResult,
-} from '../lab/results.js'
-import {
-  commitExperimentResult,
-  getExperimentResult,
-  invalidateExperimentResult,
-  previewExperimentResult,
-} from '../lab/experiment-results.js'
-import { getBenchmarkRetest, listBenchmarkRetests } from '../lab/retests.js'
-import { submitOwnerOutcomeFeedback } from '../lab/outcome-feedback.js'
-import {
-  confirmOwnerExperimentImplementation, correctOwnerExperimentImplementation,
-  retractOwnerExperimentImplementation,
-} from '../lab/implementation.js'
-import {
-  acceptExperimentSuggestion,
-  draftExperimentSuggestion,
-  listExperimentSuggestions,
-  readExperimentSuggestion,
-} from '../lab/suggestions.js'
-import { parseRetestAsOf } from '../../src/domain/lab-retests.js'
-import { withOwnerAuth } from '../auth/with-owner.js'
-import { currentHealthDate } from '../health-time.js'
-import {
-  handleApiError,
-  HttpError,
-  readJsonBody,
-  requestApiPathname,
-  sendJson,
-  type ApiRequest,
-  type ApiResponse,
-} from '../http.js'
-
-const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}'
-const EXPERIMENT = new RegExp(
-  `^/api/lab/experiments(?:/(${UUID})(?:/(schedule|start|implementation|implementation-correct|implementation-retract|abandon|supersede|accept|protocol-version|result)(?:/(preview))?)?)?$`,
-  'i',
-)
-, 'i')
+const EXPERIMENT_RESULT = new RegExp(`^/api/lab/experiment-results/(${UUID})(?:/(invalidate|outcome-feedback))?$`, 'i')
 const BENCHMARK = new RegExp(`^/api/lab/benchmarks(?:/(${UUID})(?:/(protocol-version|archive|results|retest)(?:/(preview))?)?)?$`, 'i')
 const RETESTS = /^\/api\/lab\/retests$/i
 const RESULT = new RegExp(`^/api/lab/benchmark-results/(${UUID})(?:/(invalidate))?$`, 'i')
