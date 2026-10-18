@@ -780,7 +780,7 @@ async function loadBody(
   if (metricKeys.length === 0) return []
   const rows = (await sql.query(
     EXPERIMENT_BODY_SOURCE_SQL,
-    [metricKeys],
+    [metricKeys, start, end],
   )) as Array<Record<string, unknown>>
   return rows.flatMap((row) => {
     const value = finite(row.value)
@@ -826,10 +826,17 @@ export const EXPERIMENT_VERIFIED_NUTRITION_SQL = [
 export const EXPERIMENT_ACTIVITY_SOURCE_SQL = `SELECT summary_date::text AS summary_date, steps_count, active_energy_kcal, exercise_minutes, resting_heart_rate_bpm
      FROM activity_daily_summaries
      WHERE timezone = $3 AND summary_date BETWEEN $1::date AND $2::date`
+/** The same UTC-safe bounded envelope is used by source loading and the
+ * immutable result INSERT digest. Recorded IANA timezones can place an
+ * observation on a neighboring UTC date. This conservative two-day pad
+ * retains the canonical JS local-calendar eligibility check.
+ */
 export const EXPERIMENT_BODY_SOURCE_SQL = `SELECT m.id::text AS id, m.metric_key, m.value, m.unit, s.measured_at, s.timezone
      FROM body_metrics m
      JOIN body_measurement_sessions s ON s.id = m.measurement_session_id
-     WHERE m.metric_key = ANY($1::text[])`
+     WHERE m.metric_key = ANY($1::text[])
+       AND s.measured_at >= (($2::date - INTERVAL '2 days') AT TIME ZONE 'UTC')
+       AND s.measured_at < (($3::date + INTERVAL '3 days') AT TIME ZONE 'UTC')`
 export const EXPERIMENT_CONTEXT_SOURCE_SQL = `SELECT c.context_date::text AS context_date, t.tag_key
      FROM daily_context c
      LEFT JOIN daily_context_tags t ON t.context_id = c.id
@@ -893,7 +900,10 @@ export function buildFinalizationSourceDigestExpression(firstParameter:number):s
     /\$(1|2)::date/g,(_whole,num:string)=>
       bind(num==='1'?8:2)+'::date',
   )
-  const bodySql=EXPERIMENT_BODY_SOURCE_SQL.replace('$1::text[]',bind(10)+'::text[]')
+  const bodySql=EXPERIMENT_BODY_SOURCE_SQL
+    .replace('$1::text[]',bind(10)+'::text[]')
+    .replace('$2::date',bind(1)+'::date')
+    .replace('$3::date',bind(2)+'::date')
   const bySupplement=(sql:string)=>sql.replace('$1::uuid[]',bind(11)+'::uuid[]')
   const supplementSql=bySupplement(EXPERIMENT_SUPPLEMENT_SOURCE_SQL)
   const scheduleSql=bySupplement(EXPERIMENT_SUPPLEMENT_SCHEDULE_SOURCE_SQL)

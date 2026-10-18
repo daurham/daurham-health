@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import pg from 'pg'
 import {readFileSync} from 'node:fs'
-import {EXPERIMENT_FINALIZATION_SOURCE_DIGEST_SQL, EXPERIMENT_FINALIZATION_SOURCE_CAS_EXPRESSION} from '../server/lab/experiment-results.js'
+import {EXPERIMENT_FINALIZATION_SOURCE_DIGEST_SQL, EXPERIMENT_FINALIZATION_SOURCE_CAS_EXPRESSION, EXPERIMENT_BODY_SOURCE_SQL} from '../server/lab/experiment-results.js'
 import type { Sql } from '../server/db.js'
 import { inspectMigrations } from '../server/migrate.js'
 import { assessMigrationHistory, readMigrationHistory } from '../server/migration-history.js'
@@ -1357,6 +1357,46 @@ describe.skipIf(!url)('PIQ-1.1 full numbered migration chain and backup on isola
       await second.query('UPDATE body_metrics SET value=186.5 WHERE id=$1',[body.rows[0].id])
       expect(await digest()).not.toBe(afterBody)
       expect((await client.query(statement,args(randomUUID(),afterBody))).rowCount).toBe(0)
+      // Bounded UTC scan excludes unrelated old body values while retaining
+      // observations whose local calendar day differs from their UTC day.
+      const beforeUnrelatedBody=await digest()
+      const unrelatedSession=await second.query(
+        "INSERT INTO body_measurement_sessions (measured_at,timezone,source_id) VALUES ('2026-07-01T12:00:00Z',$1,$2) RETURNING id",
+        [tz,src],
+      )
+      await second.query(
+        "INSERT INTO body_metrics (measurement_session_id,metric_key,value,unit,value_kind) VALUES ($1,'weight',199,'lb','manual')",
+        [unrelatedSession.rows[0].id],
+      )
+      expect(await digest()).toBe(beforeUnrelatedBody)
+      const oldRows=await client.query(EXPERIMENT_BODY_SOURCE_SQL,[['weight'],from,through])
+      expect(oldRows.rows.every(row=>Number(row.value)!==199)).toBe(true)
+
+      const beforeLocalBoundary=await digest()
+      const eastern=await second.query(
+        "INSERT INTO body_measurement_sessions (measured_at,timezone,source_id) VALUES ('2026-09-19T12:15:00Z','Pacific/Kiritimati',$1) RETURNING id",
+        [src],
+      )
+      await second.query(
+        "INSERT INTO body_metrics (measurement_session_id,metric_key,value,unit,value_kind) VALUES ($1,'weight',185,'lb','manual')",
+        [eastern.rows[0].id],
+      )
+      expect(await digest()).not.toBe(beforeLocalBoundary)
+      const afterEastern=await digest()
+      const western=await second.query(
+        "INSERT INTO body_measurement_sessions (measured_at,timezone,source_id) VALUES ('2026-09-22T11:00:00Z','Etc/GMT+12',$1) RETURNING id",
+        [src],
+      )
+      await second.query(
+        "INSERT INTO body_metrics (measurement_session_id,metric_key,value,unit,value_kind) VALUES ($1,'weight',184,'lb','manual')",
+        [western.rows[0].id],
+      )
+      expect(await digest()).not.toBe(afterEastern)
+      expect((await client.query(statement,args(randomUUID(),afterEastern))).rowCount).toBe(0)
+      const boundedBody=await client.query(EXPERIMENT_BODY_SOURCE_SQL,[['weight'],from,through])
+      expect(boundedBody.rows.map(row=>Number(row.value))).toEqual(expect.arrayContaining([185,184]))
+      // JS local-calendar filtering remains the observation eligibility rule.
+
       // Supplement evidence: a linked supplement, schedule, lifecycle event,
       // explicit adherence status and protocol control each invalidate the
       // old exact digest. Empty/unrecorded days are NOT inferred skipped.
