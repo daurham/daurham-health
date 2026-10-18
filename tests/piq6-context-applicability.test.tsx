@@ -7,7 +7,8 @@ import {
 } from '../src/domain/experiment-context-applicability.js'
 import type { ExperimentComparisonSnapshot } from '../src/domain/experiment-comparison-snapshot.js'
 import { ExperimentEvidenceReviewSection } from '../src/features/lab/ExperimentResultPages.js'
-import { EXPERIMENT_CONTEXT_REVISION_SQL } from '../server/lab/experiment-results.js'
+import { EXPERIMENT_CONTEXT_REVISION_SQL, EXPERIMENT_CONTEXT_SIGNATURE_SQL } from '../server/lab/experiment-results.js'
+import { computeContextRevisionSignature } from '../src/domain/experiment-context-revision-signature.js'
 
 const snapshot:ExperimentComparisonSnapshot={
   snapshotVersion:1,recordedHealthDate:'2026-10-09',
@@ -77,6 +78,29 @@ describe('PIQ-6.5 post-result goal/profile metadata revisions',()=>{
     expect(html).toContain('not used to rank recommendations')
     expect(html).not.toContain('disease')
   })
+  it('detects captured revision mismatches while preserving legacy timestamp logic',()=>{
+    const seal='a'.repeat(64),same='a'.repeat(64),other='b'.repeat(64)
+    const captured={...snapshot,contextRevisionSeal:seal}
+    const match=query(unchanged,{snapshot:captured,currentContextSeal:same,currentLinkedGoalCount:1})
+    expect(match).toMatchObject({state:'not_established',contextBaselineComparison:'matched',
+      canRankRecommendations:false,linkedGoalCount:1})
+    expect(experimentContextApplicabilityCopy(match)).toContain('does not prove')
+    const different=query(unchanged,{snapshot:captured,currentContextSeal:other,currentLinkedGoalCount:1})
+    expect(different.state).toBe('needs_recheck')
+    expect(different.contextBaselineComparison).toBe('changed')
+    expect(experimentContextApplicabilityCopy(different)).toContain('no longer matches')
+    // A previously unlinked goal can be added without changing count-vs-date
+    // in the legacy post-capture scanner.
+    const linkedNow=query(unchanged,{snapshot:captured,currentContextSeal:other,currentLinkedGoalCount:0})
+    expect(linkedNow.state).toBe('needs_recheck')
+    const unknown=query(unchanged,{snapshot:captured,currentContextSeal:null,currentLinkedGoalCount:1})
+    expect(unknown.state).toBe('unavailable')
+    expect(query(unchanged,{snapshot:{...snapshot,contextRevisionSeal:null},
+      currentContextSeal:same,currentLinkedGoalCount:1}).state).toBe('unavailable')
+    expect(query(unchanged,{snapshot:captured,currentContextSeal:same,
+      currentLinkedGoalCount:null}).state).toBe('unavailable')
+    expect(query(unchanged).contextBaselineComparison).toBe('legacy')
+  })
   it('the single bounded read only checks post-capture timestamps, not sensitive profile or goal values',()=>{
     const s=readFileSync('server/lab/experiment-results.ts','utf8')
     const querySql=s.slice(s.indexOf('export const EXPERIMENT_CONTEXT_REVISION_SQL'),
@@ -91,11 +115,23 @@ describe('PIQ-6.5 post-result goal/profile metadata revisions',()=>{
     expect(EXPERIMENT_CONTEXT_REVISION_SQL).not.toContain('\\n')
     expect(EXPERIMENT_CONTEXT_REVISION_SQL).toContain('\nFROM experiment_results r')
     expect(querySql).not.toContain('SELECT *')
+    expect(EXPERIMENT_CONTEXT_SIGNATURE_SQL).toContain('eg.goal_version_id::text')
+    expect(EXPERIMENT_CONTEXT_SIGNATURE_SQL).toContain('v.id::text AS current_version_id')
+    expect(EXPERIMENT_CONTEXT_SIGNATURE_SQL).toContain('FROM experiments e')
+    expect(EXPERIMENT_CONTEXT_SIGNATURE_SQL).not.toContain('clinical_conditions')
+    expect(EXPERIMENT_CONTEXT_SIGNATURE_SQL).not.toContain('target_min')
+    expect(EXPERIMENT_CONTEXT_SIGNATURE_SQL).not.toContain('persistent_health_context')
+    expect(EXPERIMENT_CONTEXT_SIGNATURE_SQL).not.toContain('SELECT *')
     const detail=s.slice(s.indexOf('export async function getExperimentResult'),
       s.indexOf('export async function invalidateExperimentResult'))
     expect(detail).toContain('contextApplicability = assessExperimentContextApplicability({')
+    expect(detail).toContain('currentContextSeal:currentContext?.seal ?? null')
     expect(detail).toContain('contextRevisionMetadata = null')
     expect(detail).not.toContain('INSERT INTO')
     expect(detail).not.toContain('UPDATE goals')
+    const commit=s.slice(s.indexOf('export async function commitExperimentResult'),
+      s.indexOf('export const EXPERIMENT_CONTEXT_SIGNATURE_SQL'))
+    expect(commit).toContain('contextRevisionSeal: capturedContext?.seal ?? null')
+    expect(commit).toContain('await readContextRevisionSignature(sql,experimentId)')
   })
 })

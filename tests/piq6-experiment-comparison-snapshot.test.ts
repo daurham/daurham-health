@@ -46,6 +46,17 @@ describe('PIQ-6.3 committed experiment comparison snapshots',()=>{
     }
     expect(await experimentEvidenceFingerprint(sealed)).not.toBe(await experimentEvidenceFingerprint(legacy))
   })
+  it('supports optional privacy-limited revision baseline with strict input validation',()=>{
+    const old=makeSnapshot()
+    expect(Object.prototype.hasOwnProperty.call(old,'contextRevisionSeal')).toBe(false)
+    const sealed={...old,contextRevisionSeal:'f'.repeat(64)}
+    expect(parseExperimentComparisonSnapshot(sealed)).toEqual(sealed)
+    const nullable={...old,contextRevisionSeal:null}
+    expect(parseExperimentComparisonSnapshot(nullable)).toEqual(nullable)
+    for(const invalid of ['g'.repeat(64),'f'.repeat(63),12,'',false]) {
+      expect(parseExperimentComparisonSnapshot({...old,contextRevisionSeal:invalid})).toBeNull()
+    }
+  })
   it('preserves corrected provenance and numeric revision in historical snapshot',()=>{
     const snapshot=makeSnapshot('corrected')
     expect(parseExperimentComparisonSnapshot(snapshot)?.implementation).toEqual({
