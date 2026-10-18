@@ -27,6 +27,7 @@ import { assessExperimentComparison, experimentComparisonLoadStart, type Experim
 import {
   createExperimentComparisonSnapshot, parseExperimentComparisonSnapshot, type ImplementationProvenance,
 } from '../../src/domain/experiment-comparison-snapshot.js'
+import { readOwnerOutcomeFeedback } from './outcome-feedback.js'
 
 type ExperimentRow = {
   id: string
@@ -171,6 +172,7 @@ export async function getExperimentResult(id: string) {
   const comparisonSnapshotStatus = !stored ? 'not_recorded' :
     comparisonSnapshot ? 'verified' : 'unavailable_integrity_check'
   const classification = String(row.classification) as Parameters<typeof classificationCopy>[0]
+  const ownerFeedback = await readOwnerOutcomeFeedback(sql, id, await currentHealthDate())
   return {
     id: row.id,
     experimentId: row.experiment_id,
@@ -197,6 +199,8 @@ export async function getExperimentResult(id: string) {
     comparisonReview: comparisonSnapshot?.review ?? null,
     comparisonSnapshotStatus,
     comparisonCapturedAt: comparisonSnapshot ? stored!.captured_at : null,
+    outcomeFeedbackReadiness: ownerFeedback.readiness,
+    outcomeFeedbackLatest: ownerFeedback.latest,
     requirements: requirements.map((item) => ({
       id: item.id,
       requirementId: item.requirement_id,

@@ -351,6 +351,8 @@ export type ExperimentResultView = {
   comparisonSnapshot?: import('@/domain/experiment-comparison-snapshot').ExperimentComparisonSnapshot | null
   comparisonSnapshotStatus?: 'verified' | 'not_recorded' | 'unavailable_integrity_check'
   comparisonCapturedAt?: string | null
+  outcomeFeedbackReadiness?: import('@/domain/experiment-outcome-feedback').OutcomeFeedbackReadiness
+  outcomeFeedbackLatest?: import('@/domain/experiment-outcome-feedback').OutcomeFeedbackEvent | null
 }
 
 export function previewExperimentResult(id: string, body: unknown): Promise<ExperimentResultView> {
@@ -363,6 +365,14 @@ export function commitExperimentResult(id: string, body: unknown): Promise<Exper
 
 export function fetchExperimentResult(id: string): Promise<ExperimentResultView> {
   return sendJson(`/api/lab/experiment-results/${id}`, 'GET')
+}
+
+export function submitExperimentOutcomeFeedback(
+  id: string,
+  body: { action: 'record' | 'withdraw'; expectedVersion: number; confirmFeedback: true;
+    unloggedFactors?: 'none_reported' | 'other_changes' | 'unsure'; ownerNote?: string | null },
+): Promise<{ recorded: true; version: number; action: string }> {
+  return sendJson(`/api/lab/experiment-results/${id}/outcome-feedback`, 'POST', body)
 }
 
 export function invalidateExperimentResult(id: string, reason: string): Promise<ExperimentResultView> {
