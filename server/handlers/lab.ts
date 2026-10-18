@@ -32,7 +32,7 @@ import {
   previewExperimentResult,
 } from '../lab/experiment-results.js'
 import { getBenchmarkRetest, listBenchmarkRetests } from '../lab/retests.js'
-import { submitOwnerOutcomeFeedback } from '../lab/outcome-feedback.js'
+import { readOwnerFeedbackHistoryPage, submitOwnerOutcomeFeedback } from '../lab/outcome-feedback.js'
 import {
   confirmOwnerExperimentImplementation, correctOwnerExperimentImplementation,
   retractOwnerExperimentImplementation,
@@ -61,7 +61,7 @@ const EXPERIMENT = new RegExp(
   `^/api/lab/experiments(?:/(${UUID})(?:/(schedule|start|implementation|implementation-correct|implementation-retract|abandon|supersede|accept|protocol-version|result)(?:/(preview))?)?)?$`,
   'i',
 )
-const EXPERIMENT_RESULT = new RegExp(`^/api/lab/experiment-results/(${UUID})(?:/(invalidate|outcome-feedback))?$`, 'i')
+const EXPERIMENT_RESULT = new RegExp(`^/api/lab/experiment-results/(${UUID})(?:/(invalidate|outcome-feedback|outcome-feedback-history))?$`, 'i')
 const BENCHMARK = new RegExp(`^/api/lab/benchmarks(?:/(${UUID})(?:/(protocol-version|archive|results|retest)(?:/(preview))?)?)?$`, 'i')
 const RETESTS = /^\/api\/lab\/retests$/i
 const RESULT = new RegExp(`^/api/lab/benchmark-results/(${UUID})(?:/(invalidate))?$`, 'i')
@@ -253,6 +253,13 @@ export async function handleLab(req: ApiRequest, res: ApiResponse) {
     return
   }
   if (route.kind === 'experiment-result') {
+    if (route.action === 'outcome-feedback-history' && req.method === 'GET') {
+      const url = new URL(req.url ?? '/', 'http://health.local')
+      sendJson(res, 200, await readOwnerFeedbackHistoryPage(
+        route.id,url.searchParams.get('beforeVersion'),url.searchParams.get('latestVersion'),
+      ))
+      return
+    }
     if (route.action === 'outcome-feedback' && req.method === 'POST') {
       sendJson(res, 200, await submitOwnerOutcomeFeedback(route.id, await readJsonBody(req)))
       return
@@ -265,7 +272,7 @@ export async function handleLab(req: ApiRequest, res: ApiResponse) {
       sendJson(res, 200, await invalidateExperimentResult(route.id, await readJsonBody(req)))
       return
     }
-    methodNotAllowed(res, route.action ? 'POST' : 'GET')
+    methodNotAllowed(res, route.action === 'outcome-feedback-history' ? 'GET' : route.action ? 'POST' : 'GET')
     return
   }
   if (route.kind === 'retests') {
