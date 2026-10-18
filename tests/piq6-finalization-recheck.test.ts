@@ -78,8 +78,16 @@ describe('PIQ-6.5 immutable result finalization recheck',()=>{
     expect(commit).toContain('AND e.protocol_version_id = $3::uuid')
     expect(commit).toContain('e.window_start IS NOT DISTINCT FROM $15::date')
     expect(commit).toContain('e.window_end IS NOT DISTINCT FROM $16::date')
+    expect(commit).toContain('LEFT JOIN experiment_implementations implementation')
+
     expect(commit).toContain('built.experiment.window_start')
     expect(commit).toContain('built.experiment.window_end')
+    expect(commit).toContain('ORDER BY revision DESC LIMIT 1')
+    expect(commit).toContain('AND change.revision IS NOT DISTINCT FROM $19::integer')
+    expect(commit).toContain('AND (CASE WHEN change.action = \'retracted\' THEN NULL')
+    expect(commit).toContain('built.experiment.implementation_provenance')
+    expect(commit).toContain('built.experiment.reported_implementation_date ?? null')
+    expect(commit).toContain('built.experiment.implementation_revision')
     expect(commit).toContain('await sql.transaction(statements)')
     // A zero-row guarded INSERT must cause subsequent foreign-key child
     // inserts (including mandatory 0059 snapshot) to abort the transaction.
