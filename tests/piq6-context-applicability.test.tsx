@@ -8,7 +8,6 @@ import {
 import type { ExperimentComparisonSnapshot } from '../src/domain/experiment-comparison-snapshot.js'
 import { ExperimentEvidenceReviewSection } from '../src/features/lab/ExperimentResultPages.js'
 import { EXPERIMENT_CONTEXT_REVISION_SQL, EXPERIMENT_CONTEXT_SIGNATURE_SQL } from '../server/lab/experiment-results.js'
-import { computeContextRevisionSignature } from '../src/domain/experiment-context-revision-signature.js'
 
 const snapshot:ExperimentComparisonSnapshot={
   snapshotVersion:1,recordedHealthDate:'2026-10-09',
