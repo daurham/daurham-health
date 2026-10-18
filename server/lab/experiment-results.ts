@@ -1049,7 +1049,7 @@ export function buildFeedbackOutcomeSourceDigestExpression(firstParameter:number
         WHERE timezone=${bind(6)}::text
           AND sleep_date BETWEEN ${bind(1)}::date AND ${bind(2)}::date
       ) s
-    ),'[]') ELSE 'unused-sleep' END)
+    ),'[]') ELSE 'unused-sleep' END))
   `
 }
 export const EXPERIMENT_FEEDBACK_SOURCE_DIGEST_SQL =
