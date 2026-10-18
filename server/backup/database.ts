@@ -1,9 +1,9 @@
 import { readFileSync } from 'node:fs'
+import { readdir } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Sql } from '../db.js'
 import { formatDatabaseError, getSql } from '../db.js'
-import { listMigrationFiles } from '../migrate.js'
 import {
   BACKUP_TABLES,
   LATEST_SCHEMA_MIGRATION,
@@ -22,6 +22,17 @@ import {
 } from './format.js'
 
 const appVersion = readPackageVersion()
+
+/** Resolve the repository's migration manifest without importing the migration
+ * CLI into the runtime API graph. Match the same file naming and numeric sort
+ * used by server/migrate.ts; a missing bundle path fails closed.
+ */
+async function restoreMigrationFiles():Promise<string[]> {
+  const dir=path.join(path.dirname(fileURLToPath(import.meta.url)),'../../migrations')
+  return (await readdir(dir))
+    .filter(name=>/^\d{4}_.+\.sql$/.test(name))
+    .sort((a,b)=>a.localeCompare(b,'en',{numeric:true}))
+}
 
 function readPackageVersion(): string {
   try {
@@ -190,7 +201,7 @@ export async function applyRestore(sql: Sql, bytes: Uint8Array): Promise<Restore
     throw new Error('Restore refused: ' +
       [...new Set([...inspected.plan.conflicts, ...inspected.verified.errors])].join('; '))
   }
-  const expectedMigrations = await listMigrationFiles()
+  const expectedMigrations = await restoreMigrationFiles()
   const statements = [...restoreDestinationGuardStatements(expectedMigrations),
     ...restoreStatements(inspected.verified.tables)]
   await sql.transaction(
