@@ -1,6 +1,6 @@
 export const BACKUP_FORMAT = 'daurham-health-backup'
 export const BACKUP_FORMAT_VERSION = 1
-export const LATEST_SCHEMA_MIGRATION = '0059_experiment_comparison_snapshots.sql'
+export const LATEST_SCHEMA_MIGRATION = '0060_experiment_outcome_feedback_events.sql'
 export const PORTABLE_EXPORT_BYTE_LIMIT = 3_500_000
 
 export type ColumnKind = 'uuid' | 'text' | 'date' | 'timestamptz' | 'numeric' | 'int' | 'bool' | 'json' | 'bytea'
@@ -1498,6 +1498,26 @@ export const BACKUP_TABLES: readonly BackupTable[] = [
       col('snapshot', 'json'),
       col('snapshot_fingerprint', 'text'),
       col('captured_at', 'timestamptz'),
+    ],
+  }),
+  // 0060: owner observations about unlogged factors; append-only corrections
+  // and withdrawals remain visible in full backup/restore history.
+  table({
+    name: 'experiment_outcome_feedback_events',
+    backupClass: 'canonical',
+    primaryKey: ['id'],
+    seeded: false,
+    portable: true,
+    references: [{ column: 'experiment_result_id', table: 'experiment_results' }],
+    columns: [
+      col('id', 'uuid'),
+      col('experiment_result_id', 'uuid'),
+      col('version', 'int'),
+      col('action', 'text'),
+      col('unlogged_factors', 'text'),
+      col('owner_note', 'text'),
+      col('comparison_fingerprint', 'text'),
+      col('recorded_at', 'timestamptz'),
     ],
   }),
   table({

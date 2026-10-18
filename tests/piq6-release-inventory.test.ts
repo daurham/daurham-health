@@ -8,11 +8,12 @@ const names = BACKUP_TABLES.map((table)=>table.name)
 const implementation='experiment_implementations'
 const revision='experiment_implementation_revisions'
 const snapshot='experiment_result_comparison_snapshots'
+const feedback='experiment_outcome_feedback_events'
 
 describe('PIQ-6 release migration and owner-backup inventory', () => {
   it('pins declared backup head to the newest actual migration and preserves safe prefix upgrades',async()=>{
     const files=await listMigrationFiles()
-    expect(files.at(-1)).toBe('0059_experiment_comparison_snapshots.sql')
+    expect(files.at(-1)).toBe('0060_experiment_outcome_feedback_events.sql')
     expect(LATEST_SCHEMA_MIGRATION).toBe(files.at(-1))
     const applied=files.filter((filename)=>Number(filename.slice(0,4))<=56)
     const assessment=assessMigrationHistory(files,{
@@ -20,7 +21,7 @@ describe('PIQ-6 release migration and owner-backup inventory', () => {
     },LATEST_SCHEMA_MIGRATION)
     expect(assessment.status).toBe('pending')
     expect(assessment.reason).toBe('PENDING')
-    expect(assessment.pendingMigrations).toEqual(files.slice(-3))
+    expect(assessment.pendingMigrations).toEqual(files.slice(-4))
     expect(assessMigrationHistory(files,{historyTableExists:true,existingOtherTableCount:79,appliedMigrations:files},LATEST_SCHEMA_MIGRATION).status).toBe('current')
   })
   it('exports owner-confirmed implementation and append-only revision provenance',()=>{
@@ -48,6 +49,17 @@ describe('PIQ-6 release migration and owner-backup inventory', () => {
       'experiment_result_id','snapshot_version','snapshot','snapshot_fingerprint','captured_at',
     ])
     expect(names.indexOf('experiment_results')).toBeLessThan(names.indexOf(snapshot))
+  })
+  it('retains append-only owner feedback, including withdrawals, in backup records',()=>{
+    expect(backupTable(feedback)).toMatchObject({
+      backupClass:'canonical',portable:true,seeded:false,primaryKey:['id'],
+      references:[{column:'experiment_result_id',table:'experiment_results'}],
+    })
+    expect(backupTable(feedback)?.columns.map(x=>x.name)).toEqual([
+      'id','experiment_result_id','version','action','unlogged_factors','owner_note',
+      'comparison_fingerprint','recorded_at',
+    ])
+    expect(names.indexOf(feedback)).toBeGreaterThan(names.indexOf('experiment_results'))
   })
   it('fresh-DB restore inserts provenance in FK order without trying to update immutable rows',()=>{
     const results=restoreStatements({
