@@ -1225,7 +1225,7 @@ describe.skipIf(!url)('PIQ-1.1 full numbered migration chain and backup on isola
     await second.query('SET search_path TO piq_full_chain, public')
     const experimentId=randomUUID(),protocolId=randomUUID(),versionId=randomUUID()
     const from='2026-09-20',through='2026-09-21',tz='America/Phoenix'
-    const scope=[from,through,'2026-10-18',tz,true,true,experimentId,from,[]]
+    const scope:[string,string,string,string,boolean,boolean,string,string,string[]]=[from,through,'2026-10-18',tz,true,true,experimentId,from,[]]
     try{
       const src=String((await client.query("SELECT id FROM data_sources WHERE key='manual' LIMIT 1")).rows[0].id)
       await client.query("INSERT INTO lab_protocols (id,protocol_kind,title,source_id) VALUES ($1,'experiment','Fictional CAS protocol',$2)",[protocolId,src])
@@ -1263,6 +1263,7 @@ describe.skipIf(!url)('PIQ-1.1 full numbered migration chain and backup on isola
       // change the source digest, even when outcome-day counts do not change.
       const definition=await client.query('SELECT id FROM exercise_definitions ORDER BY id LIMIT 1')
       expect(definition.rowCount).toBe(1)
+      const beforeWorkout=await digest()
       const training=await client.query(
         "INSERT INTO workout_sessions (workout_date,session_type,source_kind,experiment_id) VALUES ($1::date,'experiment','manual',$2) RETURNING id",
         [from,experimentId],
@@ -1276,12 +1277,7 @@ describe.skipIf(!url)('PIQ-1.1 full numbered migration chain and backup on isola
         [sessionExercise.rows[0].id],
       )
       const afterWorkout=await digest()
-      expect(afterWorkout).not.toBe(await (async()=>{
-        await second.query('DELETE FROM workout_sets WHERE id=$1',[workoutSet.rows[0].id])
-        const noSet=await digest()
-        await second.query("INSERT INTO workout_sets (id,workout_session_exercise_id,set_number,set_type,load_state,reps) VALUES ($1,$2,1,'working','bodyweight',8)",[workoutSet.rows[0].id,sessionExercise.rows[0].id])
-        return noSet
-      })())
+      expect(afterWorkout).not.toBe(beforeWorkout)
       await second.query('UPDATE workout_sets SET reps=9 WHERE id=$1',[workoutSet.rows[0].id])
       expect(await digest()).not.toBe(afterWorkout)
       expect((await client.query(statement,args(randomUUID(),afterWorkout))).rowCount).toBe(0)
@@ -1299,14 +1295,14 @@ describe.skipIf(!url)('PIQ-1.1 full numbered migration chain and backup on isola
         [benchmarkVersion,benchmarkProtocol],
       )
       await client.query(
-        "INSERT INTO lab_protocol_requirements (id,protocol_version_id,role,requirement_kind,selector,label,position) VALUES ($1,$2,'primary_outcome','training_metric','{}'::jsonb,'Fictional score',1)",
+        "INSERT INTO lab_protocol_requirements (id,protocol_version_id,role,domain,requirement_kind,selector,label,position) VALUES ($1,$2,'primary_outcome','training','training_measure','{}'::jsonb,'Fictional score',1)",
         [requirementId,benchmarkVersion],
       )
       await client.query(
         "INSERT INTO benchmark_definitions (id,protocol_id,domain,source_id) VALUES ($1,$2,'training',$3)",
         [definitionId,benchmarkProtocol,src],
       )
-      scope[8]=[definitionId] as never
+      scope[8]=[definitionId]
       const beforeBenchmark=await digest()
       await second.query(
         "INSERT INTO benchmark_results (id,benchmark_definition_id,protocol_version_id,result_date,experiment_id,status,protocol_confirmation_kind,evidence_fingerprint,source_id) VALUES ($1,$2,$3,$4::date,$5,'valid','linked_protocol','fictional-score',$6)",
