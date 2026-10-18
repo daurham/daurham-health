@@ -26,6 +26,8 @@ on:
       # Changes to release qualification itself require a fresh exact-SHA
       # Postgres run, not just a passing full app workflow on an older SHA.
       - 'server/piq-preview-metadata.ts'
+      - 'server/piq-postgres-fixture.ts'
+      - 'tests/piq7-postgres-fixture-guard.test.ts'
       - 'tests/piq4-preview-metadata.test.ts'
       - 'tests/piq4-neon-root-provenance.test.ts'
       - 'tests/piq7-preview-private-routes.test.ts'
