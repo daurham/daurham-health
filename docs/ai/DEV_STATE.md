@@ -1182,3 +1182,33 @@ Auth/DB root, isolation, staging/restore/rollback, migration 0057-0060
 production-state inspection, cost/latency, real-mobile QA, owner
 question usefulness and explicit release acceptance. No production
 deploy/migration or main merge. Formal owner acceptance 0/9.
+
+
+## 2026-10-18 — PIQ-7 exact-SHA dual-CI metadata qualification
+
+Preview metadata now requires independent exact-commit green application
+workflow **and** exact-commit green isolated PostgreSQL workflow.
+Only a GitHub-Actions-sourced record for
+`.github/workflows/piq1-postgres.yml` with matching 40-hex
+candidate HEAD, completed/success, is eligible. This never grants
+owner-data access: `metadata_consistent_not_authorized` retains
+runtime DB/Auth identity, empty-owner provenance, migration/backups
+and explicit human-approval holds.
+
+The PG workflow trigger list now includes all `migrations/**`,
+`server/lab/**`, `server/backup/**`, plus PIQ preview metadata
+qualification code/tests, not only prior hardcoded migration names.
+Workflow dispatch is available for exact release candidates with no
+triggering changes; a prior SHA's green run does not satisfy this rule.
+Initial branch CI 39164164588 found a missing postgresCi record in
+an older *synthetic* independent-root test fixture. Fix `59e6dabb`
+updated that fixture; initial isolated PG CI 39164164631 was green.
+Consult latest commit run statuses for final validation.
+
+Read-only Vercel project metadata showed a READY PIQ preview
+deployment pinned to the prior `da138d9` SHA, not the current
+candidate. Read-only Neon QA metadata showed ready root and
+snapshot-validation child, but no authorized runtime connection,
+clean owner data, Auth/session QA or backup/restore proof. No production
+mutation or owner health data access. Release and formal 0/9 owner
+acceptance remain blocked; no `main` merge.

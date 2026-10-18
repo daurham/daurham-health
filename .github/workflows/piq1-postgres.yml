@@ -23,6 +23,11 @@ on:
       - 'tests/piq1-*.integration.test.ts'
       - 'tests/piq6-finalization-*.test.ts'
       - 'tests/piq6-feedback-source-cas.test.ts'
+      # Changes to release qualification itself require a fresh exact-SHA
+      # Postgres run, not just a passing full app workflow on an older SHA.
+      - 'server/piq-preview-metadata.ts'
+      - 'tests/piq4-preview-metadata.test.ts'
+      - 'tests/piq4-neon-root-provenance.test.ts'
       - 'tests/piq-release-migration-preflight.test.ts'
       - 'tests/piq1-weekly-completeness.test.ts'
       - 'tests/piq1-maintenance-eligibility-baseline.test.ts'
