@@ -173,6 +173,163 @@ describe.skipIf(!url)('PIQ-1.1 full numbered migration chain and backup on isola
       .toMatchObject({ status: 'current', reason: 'CURRENT' })
   })
 
+  it('PIQ-7: isolated Lab provenance archive replays into an empty subset and rolls back a failed replay', async () => {
+    // A synthetic recovery drill on the disposable, fully migrated Postgres.
+    // This is intentionally NOT a full production backup or seeded-table restore.
+    await client.query('BEGIN')
+    try {
+      await client.query('SAVEPOINT piq7_empty_subset')
+      const source = (await client.query(
+        "SELECT * FROM data_sources WHERE key='manual' LIMIT 1",
+      )).rows[0] as Record<string, unknown>
+      expect(source?.id).toBeTruthy()
+      const src = String(source.id)
+      const protocolId = randomUUID(), versionId = randomUUID()
+      const experimentId = randomUUID(), resultId = randomUUID()
+      const revisionId = randomUUID(), eventId = randomUUID(), withdrawalId = randomUUID()
+      await client.query(
+        "INSERT INTO lab_protocols (id,protocol_kind,title,source_id) VALUES ($1,'experiment','Synthetic restore drill',$2)",
+        [protocolId,src],
+      )
+      await client.query(
+        "INSERT INTO lab_protocol_versions (id,protocol_id,version,instructions,is_current) VALUES ($1,$2,1,'Synthetic only',true)",
+        [versionId,protocolId],
+      )
+      await client.query(
+        "INSERT INTO experiments (id,title,question,origin,status,origin_kind,protocol_version_id,source_id,window_start,window_end) VALUES ($1,'Synthetic archive','Can the archive be replayed?','owner_created','completed','owner_created',$2,$3,'2026-09-20','2026-09-27')",
+        [experimentId,versionId,src],
+      )
+      await client.query(
+        "INSERT INTO experiment_implementations (experiment_id,effective_date,behavior_change) VALUES ($1,'2026-09-20','Synthetic intervention')",
+        [experimentId],
+      )
+      await client.query(
+        "INSERT INTO experiment_implementation_revisions (id,experiment_id,revision,action,effective_date,behavior_change,reason) VALUES ($1,$2,1,'corrected','2026-09-21','Synthetic correction','Synthetic timeline update')",
+        [revisionId,experimentId],
+      )
+      await client.query(
+        "INSERT INTO experiment_results (id,experiment_id,protocol_version_id,classification,status,window_start,planned_window_end,effective_end_date,protocol_attestation,stopped_for_safety,evidence_fingerprint,source_id) VALUES ($1,$2,$3,'incomplete','valid','2026-09-20','2026-09-27','2026-09-27','followed',false,'synthetic-recovery',$4)",
+        [resultId,experimentId,versionId,src],
+      )
+      const snapshot={
+        snapshotVersion:1,recordedHealthDate:'2026-10-17',
+        implementation:{provenance:'corrected',effectiveDate:'2026-09-21',revision:1},
+        review:{state:'insufficient_coverage',reason:'insufficient_observations',
+          baselineWindow:{start:'2026-09-13',end:'2026-09-19'},
+          followUpWindow:{start:'2026-09-21',end:'2026-09-27'},
+          metrics:[]},
+      }
+      const fingerprint=await experimentEvidenceFingerprint(snapshot)
+      await client.query(
+        "INSERT INTO experiment_result_comparison_snapshots (experiment_result_id,snapshot_version,snapshot,snapshot_fingerprint) VALUES ($1,1,$2::jsonb,$3)",
+        [resultId,JSON.stringify(snapshot),fingerprint],
+      )
+      await client.query(
+        "INSERT INTO experiment_outcome_feedback_events (id,experiment_result_id,version,action,unlogged_factors,owner_note,comparison_fingerprint) VALUES ($1,$2,1,'recorded','other_changes','Synthetic travel during experiment',$3)",
+        [eventId,resultId,fingerprint],
+      )
+      await client.query(
+        "INSERT INTO experiment_outcome_feedback_events (id,experiment_result_id,version,action,comparison_fingerprint) VALUES ($1,$2,2,'withdrawn',$3)",
+        [withdrawalId,resultId,fingerprint],
+      )
+      const targets=[
+        ['lab_protocols','id',protocolId],
+        ['lab_protocol_versions','id',versionId],
+        ['experiments','id',experimentId],
+        ['experiment_implementations','experiment_id',experimentId],
+        ['experiment_implementation_revisions','experiment_id',experimentId],
+        ['experiment_results','id',resultId],
+        ['experiment_result_comparison_snapshots','experiment_result_id',resultId],
+        ['experiment_outcome_feedback_events','experiment_result_id',resultId],
+      ] as const
+      const serialize=(table:string,record:Record<string,unknown>):BackupRow=>{
+        const definition=backupTable(table)
+        if(!definition)throw new Error('Missing PIQ recovery inventory table')
+        return Object.fromEntries(definition.columns.map(col=>{
+          const value=record[col.name]
+          if(value==null)return [col.name,null]
+          if(col.kind==='bool')return [col.name,Boolean(value)]
+          if(col.kind==='bytea'&&Buffer.isBuffer(value))return [col.name,value.toString('base64')]
+          if(col.kind==='date')return [col.name,
+            value instanceof Date?value.toISOString().slice(0,10):String(value).slice(0,10)]
+          if(col.kind==='timestamptz'&&value instanceof Date)return [col.name,value.toISOString()]
+          if(col.kind==='json')return [col.name,typeof value==='string'?value:JSON.stringify(value)]
+          return [col.name,String(value)]
+        })) as BackupRow
+      }
+      const original:Record<string,BackupRow[]>={data_sources:[serialize('data_sources',source)]}
+      for(const [table,key,id] of targets){
+        // Identifiers are from a fixed in-test whitelist, not client data.
+        const rows=await client.query('SELECT * FROM '+table+' WHERE '+key+'=$1::uuid',[id])
+        original[table]=rows.rows.map(row=>serialize(table,row as Record<string,unknown>))
+        expect(original[table]?.length).toBe(table==='experiment_outcome_feedback_events'?2:1)
+      }
+      const bytes=buildBackupArchive({
+        profile:'full',createdAt:'2026-10-18T00:00:00.000Z',
+        schemaMigration:LATEST_SCHEMA_MIGRATION,appVersionOrCommit:'fictional-piq7-rehearsal',
+        rowsByTable:original,
+      })
+      const verified=verifyBackupArchive(bytes)
+      expect(verified.errors).toEqual([])
+      expect(verified.tables.experiment_outcome_feedback_events?.map(row=>row.action))
+        .toEqual(['recorded','withdrawn'])
+      expect(verified.tables.experiment_result_comparison_snapshots?.[0]?.snapshot_fingerprint)
+        .toBe(fingerprint)
+
+      // Undo fixture inserts without issuing forbidden DELETE/UPDATE against
+      // append-only evidence tables. Recovery destination is now empty.
+      await client.query('ROLLBACK TO SAVEPOINT piq7_empty_subset')
+      const emptyCounts:Record<string,number>={}
+      for(const [table] of targets){
+        const rows=await client.query('SELECT count(*)::int AS n FROM '+table)
+        emptyCounts[table]=Number(rows.rows[0]?.n)
+        expect(emptyCounts[table]).toBe(0)
+      }
+      expect(planRestore({
+        verified,destinationSchema:LATEST_SCHEMA_MIGRATION,destinationCounts:emptyCounts,
+      }).blocked).toBe(false)
+      const statements=restoreStatements(verified.tables).filter(statement=>
+        targets.some(([table])=>statement.text.startsWith('INSERT INTO '+table+' (')))
+      expect(statements).toHaveLength(targets.length)
+
+      // Simulate a late failure and ensure a transaction rollback removes
+      // even the immutable snapshot and append-only feedback inserts.
+      await client.query('SAVEPOINT piq7_before_replay')
+      for(const statement of statements)await client.query(statement.text,statement.params)
+      await expect(client.query(
+        "INSERT INTO experiment_outcome_feedback_events (id,experiment_result_id,version,action,comparison_fingerprint) VALUES ($1,$2,2,'withdrawn',$3)",
+        [randomUUID(),resultId,fingerprint],
+      )).rejects.toMatchObject({code:'23505'})
+      await client.query('ROLLBACK TO SAVEPOINT piq7_before_replay')
+      for(const [table] of targets){
+        const rows=await client.query('SELECT count(*)::int AS n FROM '+table)
+        expect(Number(rows.rows[0]?.n)).toBe(0)
+      }
+
+      // Successful replay into the empty PIQ portion of the same migrated
+      // disposable schema preserves precise canonical rows and FK ordering.
+      for(const statement of statements)await client.query(statement.text,statement.params)
+      for(const [table,key,id] of targets){
+        const rows=await client.query('SELECT * FROM '+table+' WHERE '+key+'=$1::uuid',[id])
+        expect(rows.rows.map(row=>serialize(table,row as Record<string,unknown>)))
+          .toEqual(verified.tables[table])
+      }
+      const restored=await client.query(
+        'SELECT snapshot,snapshot_fingerprint FROM experiment_result_comparison_snapshots WHERE experiment_result_id=$1',
+        [resultId],
+      )
+      expect(parseExperimentComparisonSnapshot(restored.rows[0].snapshot)).toEqual(snapshot)
+      expect(restored.rows[0].snapshot_fingerprint).toBe(fingerprint)
+      expect(planRestore({
+        verified,destinationSchema:LATEST_SCHEMA_MIGRATION,
+        destinationCounts:{...emptyCounts,experiment_results:1},
+      }).blocked).toBe(true)
+    } finally {
+      // The rehearsal makes no permanent changes even to CI's fixture DB.
+      await client.query('ROLLBACK')
+    }
+  },30_000)
+
   it('PIQ-2.3: owner-selected primary goal has immutable revisions and no inferred default', async () => {
     await client.query('BEGIN')
     try {
