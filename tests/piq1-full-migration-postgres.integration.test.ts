@@ -101,7 +101,7 @@ function serializedConfirmation(row: Record<string, unknown>): BackupRow {
   })) as BackupRow
 }
 
-describe.skipIf(!url)('PIQ-1.1 full 0001–0056 migration-chain and backup on isolated PostgreSQL', () => {
+describe.skipIf(!url)('PIQ-1.1 full numbered migration chain and backup on isolated PostgreSQL', () => {
   beforeAll(async () => {
     if (!url) return
     await client.connect()
@@ -110,7 +110,7 @@ describe.skipIf(!url)('PIQ-1.1 full 0001–0056 migration-chain and backup on is
     await client.query('CREATE TABLE schema_migrations (filename text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())')
     const migrations = await inspectMigrations()
     expect(migrations.at(-1)?.filename).toBe(LATEST_SCHEMA_MIGRATION)
-    expect(migrations).toHaveLength(56)
+    expect(migrations).toHaveLength(Number(LATEST_SCHEMA_MIGRATION.slice(0, 4)))
     for (const migration of migrations) {
       await client.query('BEGIN')
       try {
@@ -138,7 +138,7 @@ describe.skipIf(!url)('PIQ-1.1 full 0001–0056 migration-chain and backup on is
 
   it('applied each migration exactly once without creating historical owner confirmations', async () => {
     const history = await client.query('SELECT filename FROM schema_migrations ORDER BY filename')
-    expect(history.rowCount).toBe(56)
+    expect(history.rowCount).toBe(Number(LATEST_SCHEMA_MIGRATION.slice(0, 4)))
     expect(history.rows.at(-1)?.filename).toBe(LATEST_SCHEMA_MIGRATION)
     const count = await client.query('SELECT count(*)::int AS count FROM nutrition_day_completeness')
     expect(count.rows[0].count).toBe(0)
@@ -150,7 +150,7 @@ describe.skipIf(!url)('PIQ-1.1 full 0001–0056 migration-chain and backup on is
     const history = await readMigrationHistory(adapter)
     const expected = (await inspectMigrations()).map((item) => item.filename)
     expect(assessMigrationHistory(expected, history, LATEST_SCHEMA_MIGRATION))
-      .toMatchObject({ status: 'current', reason: 'CURRENT', appliedCount: 56 })
+      .toMatchObject({ status: 'current', reason: 'CURRENT', appliedCount: Number(LATEST_SCHEMA_MIGRATION.slice(0, 4)) })
     await client.query('BEGIN')
     try {
       await client.query(
