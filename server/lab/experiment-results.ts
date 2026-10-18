@@ -28,6 +28,10 @@ import {
   createExperimentComparisonSnapshot, parseExperimentComparisonSnapshot, type ImplementationProvenance,
 } from '../../src/domain/experiment-comparison-snapshot.js'
 import { readOwnerOutcomeFeedback } from './outcome-feedback.js'
+import {
+  describeCurrentOutcomeComparison, unavailableCurrentComparison,
+  type CurrentOutcomeComparison,
+} from '../../src/domain/experiment-current-outcomes.js'
 
 type ExperimentRow = {
   id: string
@@ -176,7 +180,39 @@ export async function getExperimentResult(id: string) {
   const comparisonSnapshotStatus = !stored ? 'not_recorded' :
     comparisonSnapshot ? 'verified' : 'unavailable_integrity_check'
   const classification = String(row.classification) as Parameters<typeof classificationCopy>[0]
-  const ownerFeedback = await readOwnerOutcomeFeedback(sql, id, await currentHealthDate())
+  const today = await currentHealthDate()
+  const ownerFeedback = await readOwnerOutcomeFeedback(sql, id, today)
+  // Optional current arithmetic is derived from the original prespecified
+  // metric/window and current verified readings. Never persist it as the saved
+  // experiment result or treat it as a historical as-known-then snapshot.
+  let currentOutcomeComparison: CurrentOutcomeComparison | null = null
+  if (comparisonSnapshot) {
+    if (ownerFeedback.readiness.state !== 'ready') {
+      currentOutcomeComparison = unavailableCurrentComparison('not_ready', today)
+    } else {
+      const before = comparisonSnapshot.review.baselineWindow
+      const after = comparisonSnapshot.review.followUpWindow
+      if (before && after) {
+        try {
+          const needNutrition = comparisonSnapshot.review.metrics.some(m => m.outcomeKind === 'nutrition_metric')
+          const needSleep = comparisonSnapshot.review.metrics.some(m => m.outcomeKind === 'sleep_metric')
+          const timezone = needSleep ? await healthCalendarTimeZone() : ''
+          const [nutrition,sleep] = await Promise.all([
+            needNutrition ? loadNutrition(sql,before.start,after.end,today) : Promise.resolve([]),
+            needSleep ? loadSleep(sql,before.start,after.end,timezone) : Promise.resolve([]),
+          ])
+          currentOutcomeComparison = describeCurrentOutcomeComparison({
+            snapshot:comparisonSnapshot,readiness:ownerFeedback.readiness,
+            nutrition,sleep,asOf:today,
+          })
+        } catch {
+          currentOutcomeComparison = unavailableCurrentComparison('source_unavailable',today)
+        }
+      } else {
+        currentOutcomeComparison = unavailableCurrentComparison('not_ready',today)
+      }
+    }
+  }
   return {
     id: row.id,
     experimentId: row.experiment_id,
@@ -210,6 +246,7 @@ export async function getExperimentResult(id: string) {
     outcomeFeedbackReadiness: ownerFeedback.readiness,
     outcomeFeedbackLatest: ownerFeedback.latest,
     outcomeFeedbackHistory: ownerFeedback.history,
+    currentOutcomeComparison,
     requirements: requirements.map((item) => ({
       id: item.id,
       requirementId: item.requirement_id,

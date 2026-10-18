@@ -4,6 +4,7 @@ import { RESULT_CAUSALITY_FOOTER } from '@/domain/experiment-results'
 import { experimentComparisonCopy } from '@/domain/experiment-comparison'
 import { feedbackPromptCopy, type OutcomeFeedbackAnswer } from '@/domain/experiment-outcome-feedback'
 import { feedbackHistoryCopy } from '@/domain/experiment-evidence-memory'
+import { currentOutcomeComparisonCopy, type CurrentOutcomeComparison } from '@/domain/experiment-current-outcomes'
 import { dailyContextTagLabel, type DailyContextTagKey } from '@/domain/context'
 import { LoadErrorNotice, primaryButtonClass, secondaryButtonClass } from '@/lib'
 import {
@@ -191,6 +192,7 @@ export function ExperimentResultDetailPage() {
       </p>
       {error ? <LoadErrorNotice message={error} /> : null}
       <ResultBody result={result} />
+      {result.currentOutcomeComparison ? <CurrentOutcomeComparisonSection comparison={result.currentOutcomeComparison} /> : null}
       {(result.outcomeFeedbackHistory?.status !== 'unavailable' &&
         (result.outcomeFeedbackReadiness?.state === 'ready' ||
         (result.outcomeFeedbackLatest && result.outcomeFeedbackLatest.action !== 'withdrawn'))) ? (
@@ -284,6 +286,40 @@ export function ExperimentResultDetailPage() {
         <p className="text-sm text-zinc-600">This result is historical. The experiment is open for review again.</p>
       )}
     </div>
+  )
+}
+
+
+/** Explicitly descriptive, opt-in disclosure: no positive/negative clinical
+ * verdict and no automatic writes to Lab, Goals, Coach or XP.
+ */
+export function CurrentOutcomeComparisonSection({comparison}: {comparison: CurrentOutcomeComparison}) {
+  return (
+    <details className="rounded-lg border border-zinc-200 p-3 text-sm">
+      <summary className="cursor-pointer font-semibold">Current-record before/after comparison</summary>
+      <p className="mt-2 text-zinc-600">{currentOutcomeComparisonCopy(comparison)}</p>
+      {comparison.state === 'available' ? (
+        <>
+          <p className="mt-2 text-xs text-zinc-500">
+            As of {comparison.asOf}. Baseline {comparison.baselineWindow?.start}–{comparison.baselineWindow?.end};
+            follow-up {comparison.followUpWindow?.start}–{comparison.followUpWindow?.end}.
+            Observed-day averages only; missing days are not zero.
+          </p>
+          <ul className="mt-2 space-y-2">
+            {comparison.metrics.map((metric) => (
+              <li key={metric.requirementId} className="rounded border border-zinc-100 p-2">
+                <p className="font-medium">{metric.metricKey.replaceAll('_',' ')}</p>
+                <p className="text-zinc-700">
+                  Before: {metric.beforeMean} {metric.unit} ({metric.beforeDays} days).
+                  After: {metric.afterMean} {metric.unit} ({metric.afterDays} days).
+                  Recorded difference: {metric.change > 0 ? '+' : ''}{metric.change} {metric.unit}.
+                </p>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
+    </details>
   )
 }
 
