@@ -4,33 +4,28 @@ on:
     branches:
       - piq/00-baseline-20261014
     paths:
+      # Any new numbered migration or Lab/feedback write must exercise real
+      # PostgreSQL. Exact-SHA preview eligibility also requires this workflow.
       - '.github/workflows/piq1-postgres.yml'
-      - 'migrations/0008_nutrition.sql'
-      - 'migrations/0046_evidence_semantics_change_watchdog.sql'
-      - 'migrations/0053_nutrition_day_completeness.sql'
-      - 'migrations/0054_coach_plateau_active_unique.sql'
-      - 'migrations/0055_profile_physio_sex.sql'
-      - 'migrations/0056_primary_goal_intent_events.sql'
+      - 'migrations/**'
+      - 'server/lab/**'
+      - 'server/backup/**'
       - 'server/profile/service.ts'
-      - 'src/domain/health-profile.ts'
       - 'server/nutrition/day-completeness.ts'
       - 'server/nutrition/maintenance-eligibility.ts'
       - 'server/weekly-coach/load.ts'
-      - 'src/domain/weekly-coach/build.ts'
-      - 'tests/piq1-weekly-completeness.test.ts'
-      - 'tests/piq1-maintenance-eligibility-baseline.test.ts'
-      - 'src/domain/nutrition/day-completeness.ts'
-      - 'tests/piq1-nutrition-postgres.integration.test.ts'
-      - 'tests/piq1-full-migration-postgres.integration.test.ts'
-      - 'server/lab/experiment-results.ts'
-      - 'tests/piq6-finalization-source-cas.test.ts'
-      - 'tests/piq6-finalization-recheck.test.ts'
       - 'server/migrate.ts'
       - 'server/migration-history.ts'
       - 'server/migration-preflight.ts'
+      - 'src/domain/health-profile.ts'
+      - 'src/domain/weekly-coach/build.ts'
+      - 'src/domain/nutrition/day-completeness.ts'
+      - 'tests/piq1-*.integration.test.ts'
+      - 'tests/piq6-finalization-*.test.ts'
+      - 'tests/piq6-feedback-source-cas.test.ts'
       - 'tests/piq-release-migration-preflight.test.ts'
-      - 'server/backup/format.ts'
-      - 'server/backup/inventory.ts'
+      - 'tests/piq1-weekly-completeness.test.ts'
+      - 'tests/piq1-maintenance-eligibility-baseline.test.ts'
   workflow_dispatch:
 
 jobs:

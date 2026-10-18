@@ -21,6 +21,13 @@ export type PiqCandidateMetadata = {
     status: string
     conclusion: string | null
   } | null
+  postgresCi: {
+    source: 'github_actions'
+    workflowPath: string
+    headSha: string
+    status: string
+    conclusion: string | null
+  } | null
 }
 
 export type PiqDeploymentMetadata = {
@@ -39,6 +46,9 @@ export type PiqPreviewMetadataBlocker =
   | 'EXACT_SHA_CI_UNVERIFIED'
   | 'CI_FULL_VALIDATION_WORKFLOW_UNVERIFIED'
   | 'CI_NOT_SUCCESSFUL'
+  | 'POSTGRES_CI_WORKFLOW_UNVERIFIED'
+  | 'EXACT_SHA_POSTGRES_CI_UNVERIFIED'
+  | 'POSTGRES_CI_NOT_SUCCESSFUL'
   | 'DEPLOYMENT_METADATA_UNAVAILABLE'
   | 'DEPLOYMENT_PROJECT_MISMATCH'
   | 'DEPLOYMENT_NOT_PREVIEW'
@@ -67,6 +77,7 @@ export type PiqPreviewMetadataResult = {
 
 const hexSha = /^[a-f0-9]{40}$/i
 const fullValidationWorkflow = '.github/workflows/validation.yml'
+const isolatedPostgresWorkflow = '.github/workflows/piq1-postgres.yml'
 const outstanding: PiqPreviewRuntimeRequirement[] = [
   'RUNTIME_DB_BINDING_ATTESTATION_REQUIRED',
   'RUNTIME_AUTH_AND_OWNER_ISOLATION_REQUIRED',
@@ -112,6 +123,23 @@ export function reviewPiqPreviewMetadata(input: {
     } else if (candidate.ci.status !== 'completed' ||
                candidate.ci.conclusion !== 'success') {
       blockers.push('CI_NOT_SUCCESSFUL')
+    }
+    // Green TypeScript/Vitest/build on its own does not exercise a real SQL
+    // backend. For the *exact release candidate SHA*, additionally require
+    // the isolated full-migration PostgreSQL workflow. A successful run
+    // on any earlier feature SHA cannot satisfy a newer docs/code HEAD.
+    const postgres = candidate.postgresCi
+    if (!postgres || postgres.source !== 'github_actions' ||
+        postgres.workflowPath !== isolatedPostgresWorkflow) {
+      blockers.push('POSTGRES_CI_WORKFLOW_UNVERIFIED')
+    }
+    if (!postgres || postgres.source !== 'github_actions' ||
+        !hexSha.test(postgres.headSha) ||
+        candidate.headSha.toLowerCase() !== postgres.headSha.toLowerCase()) {
+      blockers.push('EXACT_SHA_POSTGRES_CI_UNVERIFIED')
+    } else if (postgres.status !== 'completed' ||
+               postgres.conclusion !== 'success') {
+      blockers.push('POSTGRES_CI_NOT_SUCCESSFUL')
     }
   }
 

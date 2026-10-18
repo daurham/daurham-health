@@ -12,6 +12,7 @@ const ciSha = 'b'.repeat(40)
 const github: PiqCandidateMetadata = {
   source: 'github_api', ref: expectedRef, headSha: gitSha,
   ci: { source: 'github_actions', workflowPath: '.github/workflows/validation.yml', headSha: gitSha, status: 'completed', conclusion: 'success' },
+  postgresCi: { source: 'github_actions', workflowPath: '.github/workflows/piq1-postgres.yml', headSha: gitSha, status: 'completed', conclusion: 'success' },
 }
 const deployed: PiqDeploymentMetadata = {
   source: 'vercel_api', projectId: 'vercel-health-preview', ref: expectedRef, sha: gitSha,
@@ -81,6 +82,32 @@ describe('PIQ-4 read-only, exact-SHA preview metadata gate', () => {
       ...github, ci: { ...github.ci!, workflowPath: '' },
     } }).blockers).toContain('CI_FULL_VALIDATION_WORKFLOW_UNVERIFIED')
     expect(check().blockers).not.toContain('CI_FULL_VALIDATION_WORKFLOW_UNVERIFIED')
+  })
+
+  it('requires real-PostgreSQL CI at the *same* candidate SHA, never a previous green run', () => {
+    for (const postgresCi of [
+      null,
+      { ...github.postgresCi!, workflowPath: '.github/workflows/validation.yml' },
+      { ...github.postgresCi!, source: 'vercel_api' as 'github_actions' },
+    ]) {
+      const result=check({candidate:{...github,postgresCi}})
+      expect(result.status).toBe('blocked')
+      expect(result.blockers).toContain('POSTGRES_CI_WORKFLOW_UNVERIFIED')
+    }
+    expect(check({candidate:{...github,postgresCi:{
+      ...github.postgresCi!,headSha:ciSha,
+    }}}).blockers).toContain('EXACT_SHA_POSTGRES_CI_UNVERIFIED')
+    for (const progress of [
+      {status:'in_progress',conclusion:null},
+      {status:'completed',conclusion:'failure'},
+    ]) {
+      expect(check({candidate:{...github,postgresCi:{
+        ...github.postgresCi!,...progress,
+      }}}).blockers).toContain('POSTGRES_CI_NOT_SUCCESSFUL')
+    }
+    expect(check().blockers).not.toContain('POSTGRES_CI_WORKFLOW_UNVERIFIED')
+    expect(check().blockers).not.toContain('EXACT_SHA_POSTGRES_CI_UNVERIFIED')
+    expect(check().blockers).not.toContain('POSTGRES_CI_NOT_SUCCESSFUL')
   })
 
   it('rejects a READY deployment from another Vercel project, even at the right SHA', () => {
