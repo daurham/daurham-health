@@ -8,7 +8,7 @@ import {
   parseOutcomeFeedbackSubmission, reviewOutcomeFeedbackReadiness,
   type OutcomeFeedbackEvent, type OutcomeFeedbackReadiness,
 } from '../../src/domain/experiment-outcome-feedback.js'
-import { reviewFeedbackHistory, type FeedbackHistory } from '../../src/domain/experiment-evidence-memory.js'
+import { reconcileLatestFeedback, reviewFeedbackHistory, type FeedbackHistory } from '../../src/domain/experiment-evidence-memory.js'
 
 type DbGate = {
   status: string
@@ -107,13 +107,19 @@ export async function readOwnerOutcomeFeedback(sql: Sql, resultId: string, today
     },
     today,
   })
+  const auditedHistory = reviewFeedbackHistory({
+    rows: historyRows, expectedFingerprint: record.snapshot_fingerprint,
+    snapshotVerified: verified === true, readiness,
+  })
+  const reconciled = reconcileLatestFeedback(auditedHistory, latest[0] ?? null)
+  // Fail closed on mismatched reads rather than exposing an unaudited current
+  // answer. Feedback can only be appended while this boundary is verified.
+  const history: FeedbackHistory = reconciled.verified ? auditedHistory :
+    { status: 'unavailable', events: [], review: 'unavailable' }
   return {
     readiness,
-    history: reviewFeedbackHistory({
-      rows: historyRows, expectedFingerprint: record.snapshot_fingerprint,
-      snapshotVerified: verified === true, readiness,
-    }),
-    latest: latest[0] ?? null,
+    history,
+    latest: reconciled.latest,
     snapshotFingerprint: record.snapshot_fingerprint,
     currentRevision: record.current_revision ?? 0,
     currentDate: record.current_date,
@@ -125,6 +131,7 @@ export async function submitOwnerOutcomeFeedback(resultId: string, body: unknown
   if ('error' in parsed) throw new HttpError(400, parsed.error)
   const sql = await getSql()
   const state = await readOwnerOutcomeFeedback(sql, resultId, await currentHealthDate())
+  if (state.history.status === 'unavailable') throw new HttpError(409, 'Feedback history could not be verified. Refresh before changing feedback.')
   const version = state.latest?.version ?? 0
   if (parsed.expectedVersion !== version) throw new HttpError(409, 'Feedback changed. Refresh before saving.')
   if (parsed.action === 'record' && state.readiness.state !== 'ready') {

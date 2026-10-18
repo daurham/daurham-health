@@ -12,6 +12,35 @@ export type FeedbackHistory = {
 }
 export const MAX_FEEDBACK_HISTORY = 25
 
+/**
+ * PIQ-6.5 integrity boundary: the separately queried current feedback must
+ * agree exactly with the newest verified append-only audit event. A missing,
+ * corrupt, or cross-query inconsistent record is not safe to revise or present
+ * as current owner evidence. Even a partial (bounded) audit must have a
+ * checked latest entry.
+ */
+export function reconcileLatestFeedback(history: FeedbackHistory, latest: unknown): {
+  verified: boolean
+  latest: OutcomeFeedbackEvent | null
+} {
+  const rejected = { verified: false, latest: null }
+  if (history.status === 'unavailable') return rejected
+  if (history.status === 'empty') return latest == null ? { verified: true, latest: null } : rejected
+  const head = history.events[0]
+  if (!head || !latest || typeof latest !== 'object' || Array.isArray(latest)) return rejected
+  const row = latest as Record<string, unknown>
+  if (row.version !== head.version || row.action !== head.action ||
+      row.unloggedFactors !== head.unloggedFactors || row.ownerNote !== head.ownerNote ||
+      row.recordedAt !== head.recordedAt) return rejected
+  return {
+    verified: true,
+    latest: {
+      version: head.version, action: head.action, unloggedFactors: head.unloggedFactors,
+      ownerNote: head.ownerNote, recordedAt: head.recordedAt,
+    },
+  }
+}
+
 function parseRow(value: unknown): FeedbackHistoryEntry | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
   const row = value as Record<string, unknown>

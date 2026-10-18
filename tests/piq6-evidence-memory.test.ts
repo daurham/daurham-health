@@ -1,5 +1,6 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { feedbackHistoryCopy, reviewFeedbackHistory, MAX_FEEDBACK_HISTORY } from '../src/domain/experiment-evidence-memory.js'
+import { feedbackHistoryCopy, reconcileLatestFeedback, reviewFeedbackHistory, MAX_FEEDBACK_HISTORY } from '../src/domain/experiment-evidence-memory.js'
 import type { OutcomeFeedbackReadiness } from '../src/domain/experiment-outcome-feedback.js'
 
 const digest = 'a'.repeat(64)
@@ -64,5 +65,44 @@ describe('PIQ-6.5 auditable owner context, not efficacy memory',()=>{
     expect(view(rows.slice(0,-1)).status).toBe('unavailable')
     expect(view([...rows,...rows]).status).toBe('unavailable')
     expect(view([...rows.slice(0,-1),{...rows.at(-1),comparisonFingerprint:'b'.repeat(64)}]).status).toBe('unavailable')
+  })
+})
+
+describe('PIQ-6.5 independently verified current-feedback boundary', () => {
+  const current = (item: ReturnType<typeof event>) => ({
+    version: item.version, action: item.action, unloggedFactors: item.unloggedFactors,
+    ownerNote: item.ownerNote, recordedAt: item.recordedAt,
+  })
+  it('accepts matching audited current entries and real no-feedback state', () => {
+    expect(reconcileLatestFeedback(view([]), null)).toEqual({ verified:true, latest:null })
+    const one = event(1)
+    expect(reconcileLatestFeedback(view([one]), current(one))).toEqual({
+      verified:true, latest:current(one),
+    })
+    const partialRows = Array.from({length:MAX_FEEDBACK_HISTORY+1}, (_,i) =>
+      event(MAX_FEEDBACK_HISTORY+1-i))
+    expect(reconcileLatestFeedback(view(partialRows), current(partialRows[0]!)).verified).toBe(true)
+  })
+  it('rejects a separately fetched stale, mismatched, or invented latest entry', () => {
+    const one = event(1)
+    const two = event(2)
+    const audited = view([two, one])
+    for (const latest of [
+      null, current(one), {...current(two),ownerNote:'Different user report'},
+      {...current(two),recordedAt:'2026-10-18 00:00:00+00'},
+      {...current(two),unloggedFactors:'none_reported'}, 'corrupt',
+    ]) {
+      expect(reconcileLatestFeedback(audited, latest)).toEqual({ verified:false, latest:null })
+    }
+    expect(reconcileLatestFeedback(view([]), current(one)).verified).toBe(false)
+    expect(reconcileLatestFeedback(view([event(2)]), current(two)).verified).toBe(false)
+    expect(reconcileLatestFeedback(view([event(3,'withdrawn'),two,one]), current(event(3,'withdrawn'))).verified).toBe(true)
+  })
+  it('enforces fail-closed server mutation and owner-page controls on unavailable audit', () => {
+    const service = readFileSync('server/lab/outcome-feedback.ts','utf8')
+    const page = readFileSync('src/features/lab/ExperimentResultPages.tsx','utf8')
+    expect(service).toContain("if (state.history.status === 'unavailable') throw new HttpError(409")
+    expect(service).toContain('reconcileLatestFeedback(auditedHistory, latest[0] ?? null)')
+    expect(page).toContain("result.outcomeFeedbackHistory?.status !== 'unavailable'")
   })
 })

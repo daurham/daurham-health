@@ -191,8 +191,9 @@ export function ExperimentResultDetailPage() {
       </p>
       {error ? <LoadErrorNotice message={error} /> : null}
       <ResultBody result={result} />
-      {(result.outcomeFeedbackReadiness?.state === 'ready' ||
-        (result.outcomeFeedbackLatest && result.outcomeFeedbackLatest.action !== 'withdrawn')) ? (
+      {(result.outcomeFeedbackHistory?.status !== 'unavailable' &&
+        (result.outcomeFeedbackReadiness?.state === 'ready' ||
+        (result.outcomeFeedbackLatest && result.outcomeFeedbackLatest.action !== 'withdrawn'))) ? (
         <section className="space-y-3 rounded-lg border border-zinc-200 p-3 text-sm">
           <h2 className="font-semibold">Optional follow-up review</h2>
           <p className="text-zinc-700">{feedbackPromptCopy()}</p>
