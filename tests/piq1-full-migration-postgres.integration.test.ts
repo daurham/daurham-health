@@ -8,6 +8,7 @@ import { inspectMigrations } from '../server/migrate.js'
 import { assessMigrationHistory, readMigrationHistory } from '../server/migration-history.js'
 import { LATEST_SCHEMA_MIGRATION, backupTable } from '../server/backup/inventory.js'
 import { buildBackupArchive, restoreStatements, verifyBackupArchive, planRestore, type BackupRow } from '../server/backup/format.js'
+import { restoreDestinationGuardStatements } from '../server/backup/database.js'
 import { getNutritionDayCompleteness, saveNutritionDayCompleteness } from '../server/nutrition/day-completeness.js'
 import { readMaintenanceDecisionSnapshot, isMaintenanceDecisionRevisionCurrent } from '../server/intelligence/maintenance-revision.js'
 import { activeCalorieDecisionInRevision, dueFollowUps, requireCurrentCalorieRecommendation, surfaceDraft, writeCoachRecommendationResponse, writeCoachRecommendationOutcome } from '../server/intelligence/coach-intelligence.js'
@@ -153,6 +154,34 @@ describe.skipIf(!url)('PIQ-1.1 full numbered migration chain and backup on isola
     expect(count.rows[0].count).toBe(0)
     const unreviewed = await getNutritionDayCompleteness(date, adapter, today)
     expect(unreviewed.assessment).toMatchObject({ state: 'unknown', eligibleForMaintenance: false })
+  })
+
+  it('PIQ-7: restore rechecks empty destination AFTER locking tables, before write', async () => {
+    const guards=restoreDestinationGuardStatements()
+    expect(guards).toHaveLength(3)
+    await client.query('BEGIN')
+    try {
+      for(const statement of guards)await client.query(statement.text,statement.params)
+      await client.query('SAVEPOINT restore_conflict')
+      const inserted=await client.query(
+        "INSERT INTO lab_protocols (id,protocol_kind,title,source_id) SELECT $1,'experiment','Synthetic restore conflict',id FROM data_sources WHERE key='manual' LIMIT 1 RETURNING id",
+        [randomUUID()],
+      )
+      expect(inserted.rowCount).toBe(1)
+      await expect(client.query(guards[2].text,guards[2].params))
+        .rejects.toMatchObject({code:'P0001',message:'PIQ_RESTORE_DESTINATION_NOT_EMPTY'})
+      await client.query('ROLLBACK TO SAVEPOINT restore_conflict')
+      await client.query('RELEASE SAVEPOINT restore_conflict')
+      await client.query('SAVEPOINT restore_schema')
+      await client.query("DELETE FROM schema_migrations WHERE filename=$1", [LATEST_SCHEMA_MIGRATION])
+      await expect(client.query(guards[2].text,guards[2].params))
+        .rejects.toMatchObject({code:'P0001',message:'PIQ_RESTORE_SCHEMA_CHANGED'})
+      await client.query('ROLLBACK TO SAVEPOINT restore_schema')
+      await client.query('RELEASE SAVEPOINT restore_schema')
+      await client.query(guards[2].text,guards[2].params)
+    } finally {
+      await client.query('ROLLBACK')
+    }
   })
 
   it('PIQ-7: the migrated PostgreSQL schema passes a read-only migration prefix check', async () => {

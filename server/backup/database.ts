@@ -17,6 +17,7 @@ import {
   type BackupProfile,
   type BackupRow,
   type RestorePlan,
+  type SqlStatement,
 } from './format.js'
 
 const appVersion = readPackageVersion()
@@ -133,12 +134,49 @@ export async function inspectRestore(sql: Sql, bytes: Uint8Array): Promise<{ ver
   }
 }
 
+/** Serialize the destination's emptiness/schema checks with actual restore
+ * INSERTs. The earlier preview is only advisory: a concurrent writer can
+ * populate tables after inspectRestore but before the transaction starts.
+ *
+ * ACCESS EXCLUSIVE is intentional and limited to a separately authorized
+ * restore onto an EMPTY database. Fail rather than merge two data histories.
+ */
+export function restoreDestinationGuardStatements(): SqlStatement[] {
+  const tables = BACKUP_TABLES.map((definition) => definition.name)
+  if (tables.some((name) => !/^[a-z_][a-z0-9_]*$/.test(name))) {
+    throw new Error('Restore inventory has an unsafe SQL identifier')
+  }
+  const nonSeeded = BACKUP_TABLES.filter((definition) => !definition.seeded)
+  const hasRows = nonSeeded.map((definition) =>
+    `EXISTS (SELECT 1 FROM ${definition.name} LIMIT 1)`,
+  ).join(' OR\n      ')
+  const expected = LATEST_SCHEMA_MIGRATION.replaceAll("'", "''")
+  const migrationCount = Number(LATEST_SCHEMA_MIGRATION.slice(0, 4))
+  return [
+    { text: "SET LOCAL lock_timeout = '5s'", params: [] },
+    { text: `LOCK TABLE schema_migrations, ${tables.join(', ')} IN ACCESS EXCLUSIVE MODE`, params: [] },
+    { text: `DO $piq_restore_guard$
+BEGIN
+  IF (SELECT COUNT(*) FROM schema_migrations) <> ${migrationCount}
+     OR (SELECT MAX(filename) FROM schema_migrations) <> '${expected}' THEN
+    RAISE EXCEPTION 'PIQ_RESTORE_SCHEMA_CHANGED';
+  END IF;
+  IF ${hasRows} THEN
+    RAISE EXCEPTION 'PIQ_RESTORE_DESTINATION_NOT_EMPTY';
+  END IF;
+END $piq_restore_guard$`, params: [] },
+  ]
+}
+
 export async function applyRestore(sql: Sql, bytes: Uint8Array): Promise<RestorePlan> {
   const inspected = await inspectRestore(sql, bytes)
   if (inspected.plan.blocked || inspected.verified.errors.length > 0) {
-    return inspected.plan
+    // The CLI must never print "Restore committed" on a blocked plan.
+    throw new Error('Restore refused: ' +
+      [...new Set([...inspected.plan.conflicts, ...inspected.verified.errors])].join('; '))
   }
-  const statements = restoreStatements(inspected.verified.tables)
+  const statements = [...restoreDestinationGuardStatements(),
+    ...restoreStatements(inspected.verified.tables)]
   await sql.transaction(
     (txn) => statements.map((statement) => txn.query(statement.text, statement.params)),
     { isolationLevel: 'ReadCommitted' },
