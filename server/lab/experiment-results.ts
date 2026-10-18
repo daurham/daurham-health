@@ -149,7 +149,7 @@ export async function commitExperimentResult(experimentId: string, body: unknown
                    ELSE COALESCE(change.effective_date,implementation.effective_date)::text
               END) IS NOT DISTINCT FROM $18::text
          AND change.revision IS NOT DISTINCT FROM $19::integer
-         AND (${EXPERIMENT_FINALIZATION_SOURCE_CAS_EXPRESSION}) = $26::text`,
+         AND (${EXPERIMENT_FINALIZATION_SOURCE_CAS_EXPRESSION}) = $29::text`,
       [
         resultId,
         experimentId,
@@ -509,6 +509,8 @@ async function buildEvaluation(
     today,timezone,
     nutrition:requirements.some(r=>r.requirementKind==='nutrition_metric'),
     sleep:requirements.some(r=>r.requirementKind==='sleep_metric'),
+    experimentId:experiment.id,experimentStart:start,
+    benchmarkIds:[...new Set(requirements.map(r=>r.selector.benchmarkDefinitionId).filter((id):id is string=>Boolean(id)))].sort(),
   }
   const sourceValueSeal = comparisonReview.state === 'descriptive_coverage'
     ? await computeExperimentSourceValueSeal({
@@ -654,10 +656,8 @@ async function loadEvidence(
   return { benchmarks, training, body, nutrition, activity, sleep, adherence, context, contextControls: controls }
 }
 
-async function loadBenchmarks(sql: Sql, experimentId: string, definitionIds: string[]) {
-  if (definitionIds.length === 0) return []
-  const rows = (await sql.query(
-    `SELECT r.id::text AS id, r.benchmark_definition_id::text AS benchmark_definition_id, p.title,
+/** Canonical SELECTs are shared verbatim between evidence reads and CAS digests. */
+export const EXPERIMENT_BENCHMARK_SOURCE_SQL = `SELECT r.id::text AS id, r.benchmark_definition_id::text AS benchmark_definition_id, p.title,
             r.protocol_version_id::text AS protocol_version_id, v.version, r.result_date::text AS result_date,
             r.created_at::text AS created_at, r.experiment_id::text AS experiment_id, r.status,
             req.id::text AS requirement_id, req.label, val.value, val.unit
@@ -669,7 +669,23 @@ async function loadBenchmarks(sql: Sql, experimentId: string, definitionIds: str
      LEFT JOIN lab_protocol_requirements req ON req.id = val.requirement_id AND req.role = 'primary_outcome'
      WHERE r.benchmark_definition_id = ANY($1::uuid[])
        AND (r.experiment_id = $2::uuid OR r.result_date < (SELECT window_start FROM experiments WHERE id = $2::uuid))
-     ORDER BY r.result_date, r.created_at, req.position`,
+     ORDER BY r.result_date, r.created_at, req.position`
+export const EXPERIMENT_TRAINING_SOURCE_SQL = `SELECT s.id::text AS session_id, s.workout_date::text AS workout_date, s.experiment_id::text AS experiment_id,
+            e.id::text AS session_exercise_id, e.exercise_definition_id::text AS exercise_definition_id, e.position,
+            d.measurement_kind, d.analytics_rep_mode,
+            ws.id::text AS set_id, ws.set_number, ws.set_type, ws.reps, ws.duration_sec, ws.left_reps, ws.right_reps,
+            ws.left_duration_sec, ws.right_duration_sec, ws.load_state, ws.weight_kg
+     FROM workout_sessions s
+     JOIN workout_session_exercises e ON e.workout_session_id = s.id
+     JOIN exercise_definitions d ON d.id = e.exercise_definition_id
+     LEFT JOIN workout_sets ws ON ws.workout_session_exercise_id = e.id
+     WHERE s.experiment_id = $1::uuid AND s.workout_date BETWEEN $2::date AND $3::date
+     ORDER BY s.workout_date, s.id, e.position, ws.set_number`
+
+async function loadBenchmarks(sql: Sql, experimentId: string, definitionIds: string[]) {
+  if (definitionIds.length === 0) return []
+  const rows = (await sql.query(
+    EXPERIMENT_BENCHMARK_SOURCE_SQL,
     [definitionIds, experimentId],
   )) as Array<Record<string, unknown>>
   const grouped = new Map<string, ExperimentEvidence['benchmarks'][number]>()
@@ -698,17 +714,7 @@ async function loadBenchmarks(sql: Sql, experimentId: string, definitionIds: str
 
 async function loadTraining(sql: Sql, experimentId: string, start: string, end: string) {
   const rows = (await sql.query(
-    `SELECT s.id::text AS session_id, s.workout_date::text AS workout_date, s.experiment_id::text AS experiment_id,
-            e.id::text AS session_exercise_id, e.exercise_definition_id::text AS exercise_definition_id, e.position,
-            d.measurement_kind, d.analytics_rep_mode,
-            ws.id::text AS set_id, ws.set_number, ws.set_type, ws.reps, ws.duration_sec, ws.left_reps, ws.right_reps,
-            ws.left_duration_sec, ws.right_duration_sec, ws.load_state, ws.weight_kg
-     FROM workout_sessions s
-     JOIN workout_session_exercises e ON e.workout_session_id = s.id
-     JOIN exercise_definitions d ON d.id = e.exercise_definition_id
-     LEFT JOIN workout_sets ws ON ws.workout_session_exercise_id = e.id
-     WHERE s.experiment_id = $1::uuid AND s.workout_date BETWEEN $2::date AND $3::date
-     ORDER BY s.workout_date, s.id, e.position, ws.set_number`,
+    EXPERIMENT_TRAINING_SOURCE_SQL,
     [experimentId, start, end],
   )) as Array<Record<string, unknown>>
   const sessions = new Map<string, ExperimentEvidence['training'][number]>()
@@ -817,12 +823,14 @@ export const EXPERIMENT_VERIFIED_NUTRITION_SQL = [
  */
 export type FinalizationSourceGuardScope = {
   start:string;end:string;today:string;timezone:string;
-  nutrition:boolean;sleep:boolean
+  nutrition:boolean;sleep:boolean;
+  experimentId:string;experimentStart:string;benchmarkIds:string[]
 }
 function finalizationSourceGuardParams(scope:FinalizationSourceGuardScope):[
-  string,string,string,string,boolean,boolean
+  string,string,string,string,boolean,boolean,string,string,string[]
 ] {
-  return [scope.start,scope.end,scope.today,scope.timezone,scope.nutrition,scope.sleep]
+  return [scope.start,scope.end,scope.today,scope.timezone,scope.nutrition,
+    scope.sleep,scope.experimentId,scope.experimentStart,scope.benchmarkIds]
 }
 export function buildFinalizationSourceDigestExpression(firstParameter:number):string {
   if(!Number.isInteger(firstParameter)||firstParameter<1||firstParameter>50)
@@ -830,6 +838,14 @@ export function buildFinalizationSourceDigestExpression(firstParameter:number):s
   const bind=(n:number)=>'$'+(firstParameter+n-1)
   const nutritionSql=EXPERIMENT_VERIFIED_NUTRITION_SQL.replace(
     /\$(1|2|3)::date/g,(_match,num:string)=>bind(Number(num))+'::date',
+  )
+  const trainingSql=EXPERIMENT_TRAINING_SOURCE_SQL.replace(
+    /\$(1|2|3)::(uuid|date)/g,(_whole,num:string,type:string)=>
+      bind(({1:7,2:8,3:2} as Record<string,number>)[num]! )+'::'+type,
+  )
+  const benchmarkSql=EXPERIMENT_BENCHMARK_SOURCE_SQL.replace(
+    /\$(1|2)::uuid(\[\])?/g,(_whole,num:string,array:string|undefined)=>
+      bind(num==='1'?9:7)+'::uuid'+(array??''),
   )
   return `md5(
     (CASE WHEN ${bind(5)}::boolean THEN COALESCE((
@@ -845,7 +861,17 @@ export function buildFinalizationSourceDigestExpression(firstParameter:number):s
         WHERE timezone = ${bind(4)}::text
           AND sleep_date BETWEEN ${bind(1)}::date AND ${bind(2)}::date
       ) s
-    ),'[]') ELSE 'unused-sleep' END)
+    ),'[]') ELSE 'unused-sleep' END) || ':' ||
+    COALESCE((
+      SELECT jsonb_agg(to_jsonb(t) ORDER BY t.workout_date,t.session_id,
+        t.session_exercise_id,t.set_number,t.set_id)::text
+      FROM (${trainingSql}) t
+    ),'[]') || ':' ||
+    COALESCE((
+      SELECT jsonb_agg(to_jsonb(b) ORDER BY b.result_date,b.created_at,
+        b.id,b.requirement_id)::text
+      FROM (${benchmarkSql}) b
+    ),'[]')
   )`
 }
 export const EXPERIMENT_FINALIZATION_SOURCE_DIGEST_SQL =
