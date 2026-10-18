@@ -15,6 +15,8 @@ export type ExperimentComparisonSnapshot = {
     revision: number | null
   }
   review: ExperimentComparisonReview
+  /** New v1 records can seal exact eligible source values; legacy v1 omits it. */
+  sourceValueSeal?: string | null
 }
 
 export function createExperimentComparisonSnapshot(input: {
@@ -23,6 +25,7 @@ export function createExperimentComparisonSnapshot(input: {
   implementationEffectiveDate: string | null
   implementationRevision: number | null
   review: ExperimentComparisonReview
+  sourceValueSeal?: string | null
 }): ExperimentComparisonSnapshot {
   return {
     snapshotVersion: 1,
@@ -33,6 +36,7 @@ export function createExperimentComparisonSnapshot(input: {
       revision: input.implementationRevision,
     },
     review: input.review,
+    ...(input.sourceValueSeal !== undefined ? {sourceValueSeal:input.sourceValueSeal} : {}),
   }
 }
 
@@ -82,6 +86,9 @@ export function parseExperimentComparisonSnapshot(value: unknown): ExperimentCom
     if (!days(revision) || revision < 1) return null
   } else if (revision !== null) return null
 
+  const sourceSeal = root.sourceValueSeal
+  if (sourceSeal !== undefined && sourceSeal !== null &&
+      (typeof sourceSeal !== 'string' || !/^[0-9a-f]{64}$/.test(sourceSeal))) return null
   const review = object(root.review)
   if (!review || !statuses.includes(review.state as typeof statuses[number]) ||
       typeof review.reason !== 'string' || !(review.reason in reasons) ||
@@ -111,6 +118,7 @@ export function parseExperimentComparisonSnapshot(value: unknown): ExperimentCom
   return {
     snapshotVersion: 1, recordedHealthDate: root.recordedHealthDate,
     implementation: { provenance: source, effectiveDate: date, revision },
+    ...(sourceSeal !== undefined ? {sourceValueSeal:sourceSeal as string | null} : {}),
     review: {
       state: review.state as ExperimentComparisonReview['state'],
       reason: review.reason as ExperimentComparisonReview['reason'],
