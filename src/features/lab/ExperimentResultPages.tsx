@@ -1,9 +1,9 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { RESULT_CAUSALITY_FOOTER } from '@/domain/experiment-results'
 import { experimentComparisonCopy } from '@/domain/experiment-comparison'
 import { feedbackPromptCopy, type OutcomeFeedbackAnswer } from '@/domain/experiment-outcome-feedback'
-import { feedbackHistoryCopy } from '@/domain/experiment-evidence-memory'
+import { feedbackHistoryCopy, type FeedbackHistoryEntry } from '@/domain/experiment-evidence-memory'
 import { currentOutcomeComparisonCopy, type CurrentOutcomeComparison } from '@/domain/experiment-current-outcomes'
 import { experimentEvidenceReviewCopy, type ExperimentEvidenceReview } from '@/domain/experiment-evidence-review'
 import { dailyContextTagLabel, type DailyContextTagKey } from '@/domain/context'
@@ -11,6 +11,7 @@ import { LoadErrorNotice, primaryButtonClass, secondaryButtonClass } from '@/lib
 import {
   commitExperimentResult,
   fetchExperimentResult,
+  fetchExperimentOutcomeFeedbackHistoryPage,
   invalidateExperimentResult,
   previewExperimentResult,
   submitExperimentOutcomeFeedback,
@@ -131,8 +132,21 @@ export function ExperimentResultDetailPage() {
   const [feedbackAnswer, setFeedbackAnswer] = useState<OutcomeFeedbackAnswer | ''>('')
   const [feedbackNote, setFeedbackNote] = useState('')
   const [feedbackBusy, setFeedbackBusy] = useState(false)
+  const [olderFeedback, setOlderFeedback] = useState<FeedbackHistoryEntry[]>([])
+  const [olderBusy, setOlderBusy] = useState(false)
+  const [olderError, setOlderError] = useState<string | null>(null)
+  const [olderHasMore, setOlderHasMore] = useState<boolean | null>(null)
+  const historyGeneration = useRef(0)
+
+  function resetOlderHistory() {
+    historyGeneration.current += 1
+    setOlderFeedback([])
+    setOlderError(null)
+    setOlderHasMore(null)
+  }
 
   useEffect(() => {
+    resetOlderHistory()
     if (!resultId) return
     let cancelled = false
     fetchExperimentResult(resultId)
@@ -153,8 +167,37 @@ export function ExperimentResultDetailPage() {
     }
   }, [resultId])
 
+  async function loadOlderFeedback() {
+    const history = result?.outcomeFeedbackHistory
+    const latestVersion = result?.outcomeFeedbackLatest?.version
+    const cursor = olderFeedback.length > 0
+      ? olderFeedback[olderFeedback.length - 1]?.version
+      : history?.events[history.events.length - 1]?.version
+    if (!resultId || history?.status !== 'partial' || !latestVersion ||
+        !cursor || cursor <= 1 || olderBusy || olderHasMore === false) return
+    const generation = historyGeneration.current
+    setOlderBusy(true)
+    setOlderError(null)
+    try {
+      const page = await fetchExperimentOutcomeFeedbackHistoryPage(resultId, cursor, latestVersion)
+      if (historyGeneration.current !== generation) return
+      if (page.latestVersion !== latestVersion || page.events[0]?.version !== cursor - 1) {
+        throw new Error('History changed. Refresh the result before browsing further.')
+      }
+      setOlderFeedback((prev) => [...prev, ...page.events])
+      setOlderHasMore(page.status === 'partial')
+    } catch (caught) {
+      if (historyGeneration.current === generation) {
+        setOlderError(caught instanceof Error ? caught.message : 'Could not load older feedback')
+      }
+    } finally {
+      if (historyGeneration.current === generation) setOlderBusy(false)
+    }
+  }
+
   async function submitFeedback(action: 'record' | 'withdraw') {
     if (!resultId || !result) return
+    resetOlderHistory()
     setFeedbackBusy(true)
     setError(null)
     try {
@@ -174,6 +217,7 @@ export function ExperimentResultDetailPage() {
 
   async function invalidate() {
     if (!resultId) return
+    resetOlderHistory()
     setError(null)
     try {
       setResult(await invalidateExperimentResult(resultId, reason))
@@ -245,14 +289,14 @@ export function ExperimentResultDetailPage() {
           <h2 className="font-semibold">Owner feedback history</h2>
           <p className="text-zinc-600">{feedbackHistoryCopy(result.outcomeFeedbackHistory)}</p>
           {result.outcomeFeedbackHistory.status === 'partial' ? (
-            <p className="text-xs text-zinc-500">Showing only the most recent 25 entries, not the complete audit.</p>
+            <p className="text-xs text-zinc-500">Showing the newest 25 revisions. Older verified revisions can be loaded below.</p>
           ) : null}
           {result.outcomeFeedbackHistory.status === 'complete' ||
             result.outcomeFeedbackHistory.status === 'partial' ? (
             <details>
               <summary className="cursor-pointer text-sm font-medium">Review saved versions</summary>
               <ol className="mt-2 space-y-2">
-                {result.outcomeFeedbackHistory.events.map((entry) => (
+                {[...result.outcomeFeedbackHistory.events, ...olderFeedback].map((entry) => (
                   <li key={entry.version} className="rounded border border-zinc-100 p-2">
                     <p className="font-medium">
                       Version {entry.version} · {entry.action} · {entry.recordedAt.slice(0, 10)}
@@ -269,6 +313,19 @@ export function ExperimentResultDetailPage() {
                   </li>
                 ))}
               </ol>
+              {(olderHasMore ?? result.outcomeFeedbackHistory.status === 'partial') ? (
+                <button type="button" className={secondaryButtonClass}
+                  disabled={olderBusy || feedbackBusy}
+                  onClick={() => void loadOlderFeedback()}>
+                  {olderBusy ? 'Loading older versions…' : 'Load 25 older versions'}
+                </button>
+              ) : null}
+              {olderError ? (
+                <p role="alert" className="mt-2 text-xs text-red-700">{olderError}</p>
+              ) : null}
+              {olderHasMore === false ? (
+                <p className="mt-2 text-xs text-zinc-500">All recorded feedback versions are now displayed.</p>
+              ) : null}
             </details>
           ) : null}
           <p className="text-xs text-zinc-500">The history describes owner-reported context, not a proven benefit or medical recommendation.</p>
