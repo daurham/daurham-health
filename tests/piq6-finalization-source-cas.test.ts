@@ -10,6 +10,13 @@ import {
   EXPERIMENT_ACTIVITY_SOURCE_SQL,
   EXPERIMENT_BODY_SOURCE_SQL,
   EXPERIMENT_CONTEXT_SOURCE_SQL,
+  EXPERIMENT_REQUIREMENT_SOURCE_SQL,
+  EXPERIMENT_SUPPLEMENT_LINK_SOURCE_SQL,
+  EXPERIMENT_CONTROL_SOURCE_SQL,
+  EXPERIMENT_SUPPLEMENT_SOURCE_SQL,
+  EXPERIMENT_SUPPLEMENT_SCHEDULE_SOURCE_SQL,
+  EXPERIMENT_SUPPLEMENT_STATUS_SOURCE_SQL,
+  EXPERIMENT_SUPPLEMENT_ADHERENCE_SOURCE_SQL,
 } from '../server/lab/experiment-results.js'
 
 describe('PIQ-6.5 PostgreSQL statement-snapshot primary nutrition/sleep CAS',()=>{
@@ -48,19 +55,31 @@ describe('PIQ-6.5 PostgreSQL statement-snapshot primary nutrition/sleep CAS',()=
     expect(EXPERIMENT_ACTIVITY_SOURCE_SQL).toContain('active_energy_kcal')
     expect(EXPERIMENT_BODY_SOURCE_SQL).toContain('s.measured_at')
     expect(EXPERIMENT_CONTEXT_SOURCE_SQL).toContain('t.tag_key')
+    expect(EXPERIMENT_REQUIREMENT_SOURCE_SQL).toContain('criteria')
+    expect(EXPERIMENT_SUPPLEMENT_LINK_SOURCE_SQL).toContain('experiment_supplements')
+    expect(EXPERIMENT_CONTROL_SOURCE_SQL).toContain('lab_protocol_context_controls')
+    expect(EXPERIMENT_SUPPLEMENT_SOURCE_SQL).toContain('FROM supplements')
+    expect(EXPERIMENT_SUPPLEMENT_SCHEDULE_SOURCE_SQL).toContain('FROM supplement_schedules')
+    expect(EXPERIMENT_SUPPLEMENT_STATUS_SOURCE_SQL).toContain('FROM supplement_status_events')
+    expect(EXPERIMENT_SUPPLEMENT_ADHERENCE_SOURCE_SQL).toContain('FROM supplement_adherence')
+    for(const item of ['supp','schedule','event','adherence','link','requirement','control']){
+      expect(read).toContain('jsonb_agg(to_jsonb('+item+')')
+    }
+    expect(read).toContain('$11::uuid[]')
+    expect(read).toContain('$12::uuid')
     expect(EXPERIMENT_FINALIZATION_SOURCE_DIGEST_SQL).toBe('SELECT '+read+' AS digest')
   })
-  it('moves every source query parameter to the 20-29 INSERT parameter window',()=>{
+  it('moves every source query parameter to the 20-31 INSERT parameter window',()=>{
     const read=buildFinalizationSourceDigestExpression(1)
     const write=buildFinalizationSourceDigestExpression(20)
     expect(EXPERIMENT_FINALIZATION_SOURCE_CAS_EXPRESSION).toEqual(write)
-    for (const index of [1,2,3,4,5,6,7,8,9,10]) {
+    for (const index of [1,2,3,4,5,6,7,8,9,10,11,12]) {
       const readParam=new RegExp('\\$'+index+'(?![0-9])')
       const writeParam=new RegExp('\\$'+(index+19)+'(?![0-9])')
       expect(read).toMatch(readParam)
       expect(write).toMatch(writeParam)
     }
-    for(const index of [1,2,3,4,5,6,7,8,9,10,19,30]) {
+    for(const index of [1,2,3,4,5,6,7,8,9,10,11,12,19,32]) {
       const bad=new RegExp('\\$'+index+'(?![0-9])')
       expect(write).not.toMatch(bad)
     }
@@ -75,7 +94,7 @@ describe('PIQ-6.5 PostgreSQL statement-snapshot primary nutrition/sleep CAS',()=
     expect(commit).toContain('const canonicalSourceDigest = await readFinalizationSourceDigest(sql,built.sourceGuardScope)')
     expect(commit).toContain('const rechecked = await buildEvaluation(experimentId,attestation,resolvedToday)')
     expect(commit).toContain('JSON.stringify(built.sourceGuardScope)!==JSON.stringify(rechecked.sourceGuardScope)')
-    expect(commit).toContain('AND (${EXPERIMENT_FINALIZATION_SOURCE_CAS_EXPRESSION}) = $30::text')
+    expect(commit).toContain('AND (${EXPERIMENT_FINALIZATION_SOURCE_CAS_EXPRESSION}) = $32::text')
     expect(commit).toContain('...finalizationSourceGuardParams(built.sourceGuardScope)')
     expect(commit).toContain('canonicalSourceDigest,')
     expect(commit).toContain('sql.query(EXPERIMENT_COMPARISON_SNAPSHOT_INSERT_SQL')

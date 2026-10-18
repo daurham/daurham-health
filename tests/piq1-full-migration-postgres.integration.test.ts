@@ -1225,7 +1225,7 @@ describe.skipIf(!url)('PIQ-1.1 full numbered migration chain and backup on isola
     await second.query('SET search_path TO piq_full_chain, public')
     const experimentId=randomUUID(),protocolId=randomUUID(),versionId=randomUUID()
     const from='2026-09-20',through='2026-09-21',tz='America/Phoenix'
-    const scope:[string,string,string,string,boolean,boolean,string,string,string[],string[]]=[from,through,'2026-10-18',tz,true,true,experimentId,from,[],[]]
+    const scope:[string,string,string,string,boolean,boolean,string,string,string[],string[],string[],string]=[from,through,'2026-10-18',tz,true,true,experimentId,from,[],[],[],versionId]
     try{
       const src=String((await client.query("SELECT id FROM data_sources WHERE key='manual' LIMIT 1")).rows[0].id)
       await client.query("INSERT INTO lab_protocols (id,protocol_kind,title,source_id) VALUES ($1,'experiment','Fictional CAS protocol',$2)",[protocolId,src])
@@ -1357,6 +1357,75 @@ describe.skipIf(!url)('PIQ-1.1 full numbered migration chain and backup on isola
       await second.query('UPDATE body_metrics SET value=186.5 WHERE id=$1',[body.rows[0].id])
       expect(await digest()).not.toBe(afterBody)
       expect((await client.query(statement,args(randomUUID(),afterBody))).rowCount).toBe(0)
+      // Supplement evidence: a linked supplement, schedule, lifecycle event,
+      // explicit adherence status and protocol control each invalidate the
+      // old exact digest. Empty/unrecorded days are NOT inferred skipped.
+      const supplementId=randomUUID()
+      await client.query(
+        "INSERT INTO supplements (id,name,source_id) VALUES ($1,'Synthetic supplement',$2)",
+        [supplementId,src],
+      )
+      scope[10]=[supplementId]
+      const beforeLink=await digest()
+      await second.query(
+        "INSERT INTO experiment_supplements (experiment_id,supplement_id,role) VALUES ($1,$2,'tracked')",
+        [experimentId,supplementId],
+      )
+      expect(await digest()).not.toBe(beforeLink)
+      expect((await client.query(statement,args(randomUUID(),beforeLink))).rowCount).toBe(0)
+
+      const beforeSchedule=await digest()
+      const schedule=await second.query(
+        "INSERT INTO supplement_schedules (supplement_id,slot_label,dose_amount,dose_unit,weekday_mask,effective_from,source_id) VALUES ($1,'breakfast',1,'capsule',127,$2::date,$3) RETURNING id",
+        [supplementId,from,src],
+      )
+      expect(await digest()).not.toBe(beforeSchedule)
+      expect((await client.query(statement,args(randomUUID(),beforeSchedule))).rowCount).toBe(0)
+      const beforeScheduleEdit=await digest()
+      await second.query('UPDATE supplement_schedules SET dose_amount=2 WHERE id=$1',[schedule.rows[0].id])
+      expect(await digest()).not.toBe(beforeScheduleEdit)
+      expect((await client.query(statement,args(randomUUID(),beforeScheduleEdit))).rowCount).toBe(0)
+
+      const beforeStatus=await digest()
+      await second.query(
+        "INSERT INTO supplement_status_events (supplement_id,effective_date,status,source_id) VALUES ($1,$2::date,'active',$3)",
+        [supplementId,from,src],
+      )
+      expect(await digest()).not.toBe(beforeStatus)
+      expect((await client.query(statement,args(randomUUID(),beforeStatus))).rowCount).toBe(0)
+
+      const beforeAdherence=await digest()
+      const adherence=await second.query(
+        "INSERT INTO supplement_adherence (schedule_id,scheduled_date,status,source_id) VALUES ($1,$2::date,'taken',$3) RETURNING id",
+        [schedule.rows[0].id,from,src],
+      )
+      expect(await digest()).not.toBe(beforeAdherence)
+      expect((await client.query(statement,args(randomUUID(),beforeAdherence))).rowCount).toBe(0)
+      const beforeCorrection=await digest()
+      await second.query("UPDATE supplement_adherence SET status='skipped' WHERE id=$1",[adherence.rows[0].id])
+      expect(await digest()).not.toBe(beforeCorrection)
+      expect((await client.query(statement,args(randomUUID(),beforeCorrection))).rowCount).toBe(0)
+
+      const beforeControl=await digest()
+      await second.query(
+        "INSERT INTO lab_protocol_context_controls (protocol_version_id,tag_key,control_mode) VALUES ($1,'travel','observe')",
+        [versionId],
+      )
+      expect(await digest()).not.toBe(beforeControl)
+      expect((await client.query(statement,args(randomUUID(),beforeControl))).rowCount).toBe(0)
+      const beforeSupplementRename=await digest()
+      await second.query("UPDATE supplements SET name='Synthetic supplement corrected' WHERE id=$1",[supplementId])
+      expect(await digest()).not.toBe(beforeSupplementRename)
+      expect((await client.query(statement,args(randomUUID(),beforeSupplementRename))).rowCount).toBe(0)
+      // The protocol requirements themselves are included, so a late selector
+      // change cannot pass using only the frozen prespecified supplement IDs.
+      const beforeRequirement=await digest()
+      await second.query(
+        "INSERT INTO lab_protocol_requirements (id,protocol_version_id,position,role,domain,requirement_kind,selector,label) VALUES ($1,$2,1,'adherence','supplements','supplement_adherence',$3::jsonb,'Fictional daily adherence')",
+        [randomUUID(),versionId,JSON.stringify({supplementId})],
+      )
+      expect(await digest()).not.toBe(beforeRequirement)
+      expect((await client.query(statement,args(randomUUID(),beforeRequirement))).rowCount).toBe(0)
       // A failed parent insert cannot persist its dependent immutable snapshot.
       await client.query('BEGIN')
       try{
