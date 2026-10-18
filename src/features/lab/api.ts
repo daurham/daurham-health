@@ -346,8 +346,11 @@ export type ExperimentResultView = {
   footer: string
   status?: string
   invalidationReason?: string | null
-  /** Preview-only coverage screen; not a saved efficacy result. */
-  comparisonReview?: import('@/domain/experiment-comparison').ExperimentComparisonReview
+  /** Preview coverage screen, or cryptographically checked committed snapshot. Never an effect estimate. */
+  comparisonReview?: import('@/domain/experiment-comparison').ExperimentComparisonReview | null
+  comparisonSnapshot?: import('@/domain/experiment-comparison-snapshot').ExperimentComparisonSnapshot | null
+  comparisonSnapshotStatus?: 'verified' | 'not_recorded' | 'unavailable_integrity_check'
+  comparisonCapturedAt?: string | null
 }
 
 export function previewExperimentResult(id: string, body: unknown): Promise<ExperimentResultView> {

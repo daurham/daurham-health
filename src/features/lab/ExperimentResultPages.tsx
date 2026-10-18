@@ -209,18 +209,31 @@ function ResultBody({ result }: { result: ExperimentResultView }) {
           </article>
         ))}
       </section>
+      {result.comparisonSnapshotStatus === 'not_recorded' ? (
+        <p className="text-sm text-zinc-600">A before/after coverage assessment was not recorded with this historical result. It cannot be reconstructed as if it were available at the time.</p>
+      ) : result.comparisonSnapshotStatus === 'unavailable_integrity_check' ? (
+        <p role="alert" className="text-sm text-zinc-700">The stored before/after assessment could not be verified. It is unavailable, not an accepted comparison.</p>
+      ) : null}
       {result.comparisonReview ? (
         <section className="space-y-1 rounded-lg border border-zinc-200 p-3 text-sm">
           <h2 className="font-semibold text-zinc-900">Before/after recording coverage</h2>
           <p>{experimentComparisonCopy(result.comparisonReview)}</p>
           {result.comparisonReview.metrics.map((metric) => (
-            <p key={metric.metricKey} className="text-zinc-600">
+            <p key={metric.requirementId} className="text-zinc-600">
               {metric.outcomeKind === 'sleep_metric' ? 'Sleep' : 'Nutrition'} · {metric.metricKey}:
               {' '}{metric.beforeDays}/{metric.beforeExpected} prior {metric.outcomeKind === 'sleep_metric' ? 'eligible nights' : 'full days'},
               {' '}{metric.afterDays}/{metric.afterExpected} post-change {metric.outcomeKind === 'sleep_metric' ? 'eligible nights' : 'full days'}.
             </p>
           ))}
-          <p className="text-zinc-500">This is a current preview-only data coverage check, not a recorded result or proof that the change worked.</p>
+          {result.comparisonSnapshotStatus === 'verified' ? (
+            <p className="text-zinc-500">
+              Recorded with this result on {result.comparisonSnapshot?.recordedHealthDate}.
+              {' '}Implementation source: {result.comparisonSnapshot?.implementation.provenance}.
+              {' '}This is a preserved coverage assessment, not proof that the change worked.
+            </p>
+          ) : (
+            <p className="text-zinc-500">Preview only: coverage not yet saved, and not proof that the change worked.</p>
+          )}
         </section>
       ) : null}
       {result.contextControls && result.contextControls.length > 0 ? (

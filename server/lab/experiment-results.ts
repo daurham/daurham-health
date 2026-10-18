@@ -24,6 +24,9 @@ import { currentHealthDate, healthCalendarTimeZone } from '../health-time.js'
 import { VERIFIED_NUTRITION_DAYS_SQL } from '../nutrition/maintenance-eligibility.js'
 import { isCalendarDate } from '../../src/domain/training.js'
 import { assessExperimentComparison, experimentComparisonLoadStart, type ExperimentComparisonReview } from '../../src/domain/experiment-comparison.js'
+import {
+  createExperimentComparisonSnapshot, parseExperimentComparisonSnapshot, type ImplementationProvenance,
+} from '../../src/domain/experiment-comparison-snapshot.js'
 
 type ExperimentRow = {
   id: string
@@ -37,6 +40,8 @@ type ExperimentRow = {
   window_start: string | null
   window_end: string | null
   reported_implementation_date?: string | null
+  implementation_provenance: ImplementationProvenance
+  implementation_revision: number | null
 }
 
 export async function previewExperimentResult(experimentId: string, body: unknown, today?: string) {
@@ -69,6 +74,17 @@ export async function commitExperimentResult(experimentId: string, body: unknown
   const resultId = randomUUID()
   const status = experimentStatusForClassification(built.evaluation.classification)
   const requirementIds = built.evaluation.requirements.map(() => randomUUID())
+  // Created in the SAME transaction as the immutable experiment result.
+  // A later implementation correction may produce a replacement result, never
+  // rewrite the original result's recorded comparison quality.
+  const snapshot = createExperimentComparisonSnapshot({
+    recordedHealthDate: resolvedToday,
+    implementationProvenance: built.experiment.implementation_provenance,
+    implementationEffectiveDate: built.experiment.reported_implementation_date ?? null,
+    implementationRevision: built.experiment.implementation_revision,
+    review: built.comparisonReview,
+  })
+  const snapshotFingerprint = await experimentEvidenceFingerprint(snapshot)
   const statements = [
     sql.query(
       `INSERT INTO experiment_results (
@@ -106,6 +122,8 @@ export async function commitExperimentResult(experimentId: string, body: unknown
       ),
     ),
     ...evidenceInserts(sql, resultId, built.evaluation, requirementIds),
+    sql.query(EXPERIMENT_COMPARISON_SNAPSHOT_INSERT_SQL,
+      [resultId, JSON.stringify(snapshot), snapshotFingerprint]),
     sql.query(`UPDATE experiments SET status = $2, updated_at = now() WHERE id = $1::uuid AND status = 'active'`, [
       experimentId,
       status,
@@ -141,6 +159,17 @@ export async function getExperimentResult(id: string) {
      FROM experiment_result_evidence WHERE experiment_result_id = $1::uuid`,
     [id],
   )) as Array<Record<string, unknown>>
+  const snapshots = (await sql.query(EXPERIMENT_COMPARISON_SNAPSHOT_READ_SQL, [id])) as Array<{
+    snapshot: unknown; snapshot_version: number; snapshot_fingerprint: string; captured_at: string
+  }>
+  const stored = snapshots[0]
+  const parsedSnapshot = stored?.snapshot_version === 1
+    ? parseExperimentComparisonSnapshot(stored.snapshot) : null
+  const fingerprintOk = parsedSnapshot && stored
+    ? await experimentEvidenceFingerprint(parsedSnapshot) === stored.snapshot_fingerprint : false
+  const comparisonSnapshot = fingerprintOk ? parsedSnapshot : null
+  const comparisonSnapshotStatus = !stored ? 'not_recorded' :
+    comparisonSnapshot ? 'verified' : 'unavailable_integrity_check'
   const classification = String(row.classification) as Parameters<typeof classificationCopy>[0]
   return {
     id: row.id,
@@ -164,6 +193,10 @@ export async function getExperimentResult(id: string) {
     invalidationReason: row.invalidation_reason,
     supersedesResultId: row.supersedes_result_id,
     footer: RESULT_CAUSALITY_FOOTER,
+    comparisonSnapshot,
+    comparisonReview: comparisonSnapshot?.review ?? null,
+    comparisonSnapshotStatus,
+    comparisonCapturedAt: comparisonSnapshot ? stored!.captured_at : null,
     requirements: requirements.map((item) => ({
       id: item.id,
       requirementId: item.requirement_id,
@@ -325,6 +358,13 @@ async function loadExperiment(sql: Sql, id: string): Promise<ExperimentRow> {
     `SELECT e.id::text AS id, e.title, e.question, e.hypothesis, e.status,
             e.protocol_version_id::text AS protocol_version_id, v.protocol_id::text AS protocol_id, v.version,
             e.window_start::text AS window_start, e.window_end::text AS window_end,
+            CASE
+              WHEN revision.action = 'retracted' THEN 'retracted'
+              WHEN revision.action = 'corrected' THEN 'corrected'
+              WHEN implementation.experiment_id IS NOT NULL THEN 'original'
+              ELSE 'unreported'
+            END AS implementation_provenance,
+            revision.revision AS implementation_revision,
             CASE WHEN revision.action = 'retracted' THEN NULL
               ELSE COALESCE(revision.effective_date, implementation.effective_date)::text
               END AS reported_implementation_date
@@ -332,7 +372,7 @@ async function loadExperiment(sql: Sql, id: string): Promise<ExperimentRow> {
      JOIN lab_protocol_versions v ON v.id = e.protocol_version_id
      LEFT JOIN experiment_implementations implementation ON implementation.experiment_id = e.id
      LEFT JOIN LATERAL (
-       SELECT action, effective_date FROM experiment_implementation_revisions
+       SELECT action, effective_date, revision FROM experiment_implementation_revisions
        WHERE experiment_id = e.id ORDER BY revision DESC LIMIT 1
      ) revision ON TRUE
      WHERE e.id = $1::uuid`,
@@ -777,3 +817,14 @@ function finite(value: unknown): number | null {
   const parsed = typeof value === 'number' ? value : Number(value)
   return Number.isFinite(parsed) ? parsed : null
 }
+
+/** 0059: these statements are part of the normal result transaction/read,
+ * not a provisional side write. Older results explicitly report no snapshot. */
+export const EXPERIMENT_COMPARISON_SNAPSHOT_INSERT_SQL =
+  `INSERT INTO experiment_result_comparison_snapshots
+     (experiment_result_id, snapshot_version, snapshot, snapshot_fingerprint)
+   VALUES ($1::uuid, 1, $2::jsonb, $3)`
+
+export const EXPERIMENT_COMPARISON_SNAPSHOT_READ_SQL =
+  `SELECT snapshot, snapshot_version, snapshot_fingerprint, captured_at::text AS captured_at
+   FROM experiment_result_comparison_snapshots WHERE experiment_result_id = $1::uuid`
