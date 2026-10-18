@@ -2,11 +2,13 @@ import {describe, expect, it, vi} from 'vitest'
 import {buildBackupArchive} from '../server/backup/format.js'
 import {BACKUP_TABLES,LATEST_SCHEMA_MIGRATION} from '../server/backup/inventory.js'
 import {applyRestore,restoreDestinationGuardStatements} from '../server/backup/database.js'
+import {listMigrationFiles} from '../server/migrate.js'
 import type {Sql} from '../server/db.js'
 
 describe('PIQ-7 restore application never silently succeeds on blocked or changed destination',()=>{
-  it('locks ALL backed-up tables, limits lock wait and checks destination/schema in transaction',()=>{
-    const guard=restoreDestinationGuardStatements()
+  it('locks ALL backed-up tables, limits lock wait and checks destination/schema in transaction',async()=>{
+    const expected=await listMigrationFiles()
+    const guard=restoreDestinationGuardStatements(expected)
     expect(guard).toHaveLength(3)
     expect(guard[0]?.text).toContain('lock_timeout')
     const lock=guard[1]?.text??''
@@ -19,6 +21,11 @@ describe('PIQ-7 restore application never silently succeeds on blocked or change
     expect(guard[2]?.text).toContain('PIQ_RESTORE_SCHEMA_CHANGED')
     expect(guard[2]?.text).toContain('PIQ_RESTORE_DESTINATION_NOT_EMPTY')
     expect(guard[2]?.text).toContain(LATEST_SCHEMA_MIGRATION)
+    expect(guard[2]?.text).toContain('array_agg(filename ORDER BY filename)')
+    for(const name of expected)expect(guard[2]?.text).toContain("'"+name+"'")
+    expect(()=>restoreDestinationGuardStatements(expected.slice(1))).toThrow('migration manifest')
+    expect(()=>restoreDestinationGuardStatements(expected.map((name,i)=>i===12?'0013_fake.sql':name)))
+      .not.toThrow() // the live database still rejects this nonmatching expected list
   })
   it('throws on a blocked preflight instead of reporting a false successful restore',async()=>{
     const backup=buildBackupArchive({

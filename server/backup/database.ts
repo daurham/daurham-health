@@ -3,6 +3,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Sql } from '../db.js'
 import { formatDatabaseError, getSql } from '../db.js'
+import { listMigrationFiles } from '../migrate.js'
 import {
   BACKUP_TABLES,
   LATEST_SCHEMA_MIGRATION,
@@ -141,7 +142,16 @@ export async function inspectRestore(sql: Sql, bytes: Uint8Array): Promise<{ ver
  * ACCESS EXCLUSIVE is intentional and limited to a separately authorized
  * restore onto an EMPTY database. Fail rather than merge two data histories.
  */
-export function restoreDestinationGuardStatements(): SqlStatement[] {
+export function restoreDestinationGuardStatements(expectedMigrations: readonly string[]): SqlStatement[] {
+  // A matching latest migration and row count do NOT prove a complete
+  // unmodified prefix. Compare every filename against the actual repository.
+  if (expectedMigrations.length !== Number(LATEST_SCHEMA_MIGRATION.slice(0, 4)) ||
+      expectedMigrations.at(-1) !== LATEST_SCHEMA_MIGRATION ||
+      expectedMigrations.some((name, i) =>
+        !/^\d{4}_[a-z0-9_]+\.sql$/.test(name) ||
+        Number(name.slice(0, 4)) !== i + 1)) {
+    throw new Error('Restore repository migration manifest is invalid')
+  }
   const tables = BACKUP_TABLES.map((definition) => definition.name)
   if (tables.some((name) => !/^[a-z_][a-z0-9_]*$/.test(name))) {
     throw new Error('Restore inventory has an unsafe SQL identifier')
@@ -150,15 +160,20 @@ export function restoreDestinationGuardStatements(): SqlStatement[] {
   const hasRows = nonSeeded.map((definition) =>
     `EXISTS (SELECT 1 FROM ${definition.name} LIMIT 1)`,
   ).join(' OR\n      ')
-  const expected = LATEST_SCHEMA_MIGRATION.replaceAll("'", "''")
-  const migrationCount = Number(LATEST_SCHEMA_MIGRATION.slice(0, 4))
+  // Canonical exact SQL array, with each filename validated as a restricted
+  // identifier first. Generated SQL never interpolates caller credentials.
+  const expectedHistory = 'ARRAY[' +
+    expectedMigrations.map((name) => "'" + name + "'").join(', ') +
+    ']::text[]'
   return [
     { text: "SET LOCAL lock_timeout = '5s'", params: [] },
     { text: `LOCK TABLE schema_migrations, ${tables.join(', ')} IN ACCESS EXCLUSIVE MODE`, params: [] },
     { text: `DO $piq_restore_guard$
 BEGIN
-  IF (SELECT COUNT(*) FROM schema_migrations) <> ${migrationCount}
-     OR (SELECT MAX(filename) FROM schema_migrations) <> '${expected}' THEN
+  IF COALESCE(
+       (SELECT array_agg(filename ORDER BY filename) FROM schema_migrations),
+       ARRAY[]::text[]
+     ) <> ${expectedHistory} THEN
     RAISE EXCEPTION 'PIQ_RESTORE_SCHEMA_CHANGED';
   END IF;
   IF ${hasRows} THEN
@@ -175,7 +190,8 @@ export async function applyRestore(sql: Sql, bytes: Uint8Array): Promise<Restore
     throw new Error('Restore refused: ' +
       [...new Set([...inspected.plan.conflicts, ...inspected.verified.errors])].join('; '))
   }
-  const statements = [...restoreDestinationGuardStatements(),
+  const expectedMigrations = await listMigrationFiles()
+  const statements = [...restoreDestinationGuardStatements(expectedMigrations),
     ...restoreStatements(inspected.verified.tables)]
   await sql.transaction(
     (txn) => statements.map((statement) => txn.query(statement.text, statement.params)),

@@ -157,7 +157,7 @@ describe.skipIf(!url)('PIQ-1.1 full numbered migration chain and backup on isola
   })
 
   it('PIQ-7: restore rechecks empty destination AFTER locking tables, before write', async () => {
-    const guards=restoreDestinationGuardStatements()
+    const guards=restoreDestinationGuardStatements((await inspectMigrations()).map(x=>x.filename))
     expect(guards).toHaveLength(3)
     await client.query('BEGIN')
     try {
@@ -178,6 +178,21 @@ describe.skipIf(!url)('PIQ-1.1 full numbered migration chain and backup on isola
         .rejects.toMatchObject({code:'P0001',message:'PIQ_RESTORE_SCHEMA_CHANGED'})
       await client.query('ROLLBACK TO SAVEPOINT restore_schema')
       await client.query('RELEASE SAVEPOINT restore_schema')
+      // Same COUNT and MAX, but a middle migration filename was replaced.
+      // The old count/max guard would have allowed this corrupt history.
+      await client.query('SAVEPOINT restore_middle_filename')
+      await client.query(
+        "UPDATE schema_migrations SET filename='0054_corrupt_substitute.sql' WHERE filename='0054_coach_plateau_active_unique.sql'",
+      )
+      const stillCounted=await client.query('SELECT COUNT(*)::int AS n,MAX(filename) AS latest FROM schema_migrations')
+      expect(stillCounted.rows[0]).toMatchObject({
+        n:Number(LATEST_SCHEMA_MIGRATION.slice(0,4)),
+        latest:LATEST_SCHEMA_MIGRATION,
+      })
+      await expect(client.query(guards[2].text,guards[2].params))
+        .rejects.toMatchObject({code:'P0001',message:'PIQ_RESTORE_SCHEMA_CHANGED'})
+      await client.query('ROLLBACK TO SAVEPOINT restore_middle_filename')
+      await client.query('RELEASE SAVEPOINT restore_middle_filename')
       await client.query(guards[2].text,guards[2].params)
     } finally {
       await client.query('ROLLBACK')
