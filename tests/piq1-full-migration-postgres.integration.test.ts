@@ -320,6 +320,23 @@ describe.skipIf(!url)('PIQ-1.1 full numbered migration chain and backup on isola
       )
       expect(parseExperimentComparisonSnapshot(restored.rows[0].snapshot)).toEqual(snapshot)
       expect(restored.rows[0].snapshot_fingerprint).toBe(fingerprint)
+      // Recovery must preserve the schema's immutable audit protections.
+      for(const mutation of [
+        {text:"UPDATE experiment_result_comparison_snapshots SET snapshot='{}'::jsonb WHERE experiment_result_id=$1",id:resultId},
+        {text:"UPDATE experiment_outcome_feedback_events SET owner_note='tampered' WHERE id=$1",id:eventId},
+      ]){
+        await client.query('SAVEPOINT piq7_immutable_recheck')
+        try{
+          await expect(client.query(mutation.text,[mutation.id]))
+            .rejects.toMatchObject({code:'P0001'})
+        }finally{
+          await client.query('ROLLBACK TO SAVEPOINT piq7_immutable_recheck')
+          await client.query('RELEASE SAVEPOINT piq7_immutable_recheck')
+        }
+      }
+      expect((await client.query(
+        "SELECT id FROM data_sources WHERE key='manual' LIMIT 1",
+      )).rows[0].id).toBe(src)
       expect(planRestore({
         verified,destinationSchema:LATEST_SCHEMA_MIGRATION,
         destinationCounts:{...emptyCounts,experiment_results:1},

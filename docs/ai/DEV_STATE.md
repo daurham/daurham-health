@@ -1212,3 +1212,25 @@ snapshot-validation child, but no authorized runtime connection,
 clean owner data, Auth/session QA or backup/restore proof. No production
 mutation or owner health data access. Release and formal 0/9 owner
 acceptance remain blocked; no `main` merge.
+
+
+## 2026-10-18 — PIQ-7 partial Lab archive/replay and failed restore rollback
+
+Added a synthetic, real PostgreSQL 16 recovery test: archive fictional
+protocol/experiment/implementation revisions/immutable result snapshot/
+append-only feedback+withdrawal, verify checksums/FKs, clear fixtures by
+SAVEPOINT rollback, replay actual restore SQL into an empty Lab subset,
+force an error late in the write batch, rollback all attempted inserts,
+then replay successfully and check restored canonical values, hash,
+immutable mutation triggers and refusal to merge with existing rows.
+Migration-seeded data_sources are deliberately untouched. Initial PG
+workflow for `fa77212` passed 32/32. Refer to final HEAD's exact-SHA
+app and database workflows for completed gate validation.
+
+This is NOT a full `backup:restore --apply` onto a separate fresh
+Neon root, not a whole-schema integrity or encrypted-backup rehearsal,
+and does not validate production migration 0057–0060/rollback.
+No production DB/owner row/Auth access, no deployment or main merge.
+PIQ-7 isolated QA environment + separate Auth, privacy/backup/recovery
+proof, iPhone/iPad UAT, model-cost and usefulness acceptance remain
+outstanding; formal phase acceptance 0/9.
