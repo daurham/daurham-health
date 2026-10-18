@@ -1238,3 +1238,8 @@ outstanding; formal phase acceptance 0/9.
 ## 2026-10-18 — PIQ-7 secure local backup creation (pending CI)
 
 CLI `backup:create` now validates its full archive *before* saving, uses exclusive owner-only file creation (`wx`, `0600` on Unix), and refuses existing paths and symlinks. Synthetic filesystem tests cover the private mode, malformed input, no-clobber semantics and link protection. Existing full/portable archive format, backup API, and restore transaction are unchanged. This does not encrypt backups or prove full recovery. Check exact-SHA full and PG workflow after commit. No production/main/DB changes. PIQ-7 QA environment/Auth/migration/backup acceptance and 0/9 owner acceptance stay pending.
+
+
+## 2026-10-18 — PIQ-7 private backup atomic name publication (CI pending)
+
+CLI backup:create writes the verified full archive into a random private same-directory temporary file, flushes it, and uses an exclusive hard link to expose only complete bytes without overwriting. The temporary entry is removed on ordinary success/error. Synthetic tests cover invalid input, owner-only mode, existing output, symlink, concurrent writers and no temporary leftovers. Hardlink-incompatible filesystems fail rather than degrade. Crashes can leave private partial files; encryption/directory durability are not guaranteed. No database/API/migration/owner/provider/production changes. Await exact-SHA full and PG CI. PIQ-7 and owner acceptance 0/9 remain pending.

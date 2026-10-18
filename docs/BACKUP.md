@@ -12,7 +12,7 @@ Authentication is not in the backup. After a restore, sign in with the existing 
 npm run backup:create -- ./backups/health-2026-09-22.health-backup.zip
 ```
 
-The command verifies the archive **before** saving it, creates a new file with owner-only read/write permissions (`0600` on Unix), and refuses to overwrite an existing file or symbolic link. Choose a fresh filename each time. The directory must already exist. A full archive contains private health data; restricted local permissions are **not encryption**. Keep backups in encrypted storage, protect transfers, and follow an appropriate retention plan.
+The command verifies the archive **before** saving it, writes and flushes a private temporary file (`0600` on Unix), then atomically publishes the complete archive using an exclusive same-directory hard link. It refuses to overwrite an existing file or symbolic link and removes temporary files on normal errors. Choose a fresh filename each time. The directory must already exist and support hard links; otherwise creation fails closed. An abrupt crash can leave a private `*.partial` temporary file, but not a truncated final filename. Filesystem permissions and atomic publication are **not encryption**, and they do not guarantee crash-durable directory metadata. A full archive contains private health data; restricted local permissions are **not encryption**. Keep backups in encrypted storage, protect transfers, and follow an appropriate retention plan.
 
 ## Verify
 

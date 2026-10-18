@@ -1012,3 +1012,8 @@ a deliberate owner-approved release step; do not merge `main`.
 ## Decision: local full backups must be private and exclusive (PIQ-7, 2026-10-18)
 
 Full health backup CLI output is sensitive even when authentication credentials are excluded. Verify the ZIP before creating an on-disk file; create only a new output with `wx` and `0600` on Unix to avoid group/world disclosure, accidental overwrite or symlink following. Preserve original archive content/restore semantics; never call file permissions encryption. Users remain responsible for encrypted storage, retention and authentic recovery rehearsal. This change is limited to the CLI output path, development branch only, pending CI and formal owner release gates.
+
+
+## Decision: publish full CLI backup files only after complete private writes (PIQ-7, 2026-10-18)
+
+Restrictive permissions do not prevent usable-looking truncated archives after interrupted writes. Preserve full archive format; verify first, write unguessable same-directory owner-only temporary file, flush, then atomically publish using exclusive hard-link rather than overwriting rename. Clean up temporary entries on ordinary errors. This is not encryption or a guarantee of crash-durable directory metadata; hardlink-incompatible filesystems fail closed. Test concurrent writers, conflicts and archive integrity. Development-only safeguarding does not authorize a production release.
