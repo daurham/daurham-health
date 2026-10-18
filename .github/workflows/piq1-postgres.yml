@@ -1,4 +1,4 @@
-name: PIQ-1.1 isolated PostgreSQL verification
+name: PIQ isolated PostgreSQL verification
 on:
   push:
     branches:
@@ -22,6 +22,9 @@ on:
       - 'src/domain/nutrition/day-completeness.ts'
       - 'tests/piq1-nutrition-postgres.integration.test.ts'
       - 'tests/piq1-full-migration-postgres.integration.test.ts'
+      - 'server/lab/experiment-results.ts'
+      - 'tests/piq6-finalization-source-cas.test.ts'
+      - 'tests/piq6-finalization-recheck.test.ts'
       - 'server/migrate.ts'
       - 'server/migration-history.ts'
       - 'server/migration-preflight.ts'

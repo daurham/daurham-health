@@ -1,5 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import pg from 'pg'
+import {readFileSync} from 'node:fs'
+import {EXPERIMENT_FINALIZATION_SOURCE_DIGEST_SQL, EXPERIMENT_FINALIZATION_SOURCE_CAS_EXPRESSION} from '../server/lab/experiment-results.js'
 import type { Sql } from '../server/db.js'
 import { inspectMigrations } from '../server/migrate.js'
 import { assessMigrationHistory, readMigrationHistory } from '../server/migration-history.js'
@@ -1216,5 +1218,63 @@ describe.skipIf(!url)('PIQ-1.1 full numbered migration chain and backup on isola
       await client.query('ROLLBACK')
     }
   }, 30_000)
+
+  it('PIQ-6.5: real migrated PostgreSQL rejects changes between digest read and result INSERT',async()=>{
+    const second=new Client({connectionString:url!})
+    await second.connect()
+    await second.query('SET search_path TO piq_full_chain, public')
+    const experimentId=randomUUID(),protocolId=randomUUID(),versionId=randomUUID()
+    const from='2026-09-20',through='2026-09-21',tz='America/Phoenix'
+    const scope=[from,through,'2026-10-18',tz,true,true]
+    try{
+      const src=String((await client.query("SELECT id FROM data_sources WHERE key='manual' LIMIT 1")).rows[0].id)
+      await client.query("INSERT INTO lab_protocols (id,protocol_kind,title,source_id) VALUES ($1,'experiment','Fictional CAS protocol',$2)",[protocolId,src])
+      await client.query("INSERT INTO lab_protocol_versions (id,protocol_id,version,instructions,is_current) VALUES ($1,$2,1,'Fictional only',true)",[versionId,protocolId])
+      await client.query("INSERT INTO experiments (id,title,question,origin,status,protocol_version_id,source_id,origin_kind,window_start,window_end) VALUES ($1,'Fictional CAS','Can evidence change?','owner_created','active',$2,$3,'owner_created',$4::date,$5::date)",[experimentId,versionId,src,from,through])
+      await client.query("INSERT INTO experiment_implementations (experiment_id,effective_date,behavior_change) VALUES ($1,$2::date,'Fictional implementation')",[experimentId,from])
+      const food=await client.query("INSERT INTO nutrition_entries (log_date,timezone,food_name,serving_quantity,serving_unit,calories,protein,carbs,fat,source_kind,evidence_quality) VALUES ($1::date,$2,'Fictional meal',1,'serving',1800,120,180,65,'manual','owner_entered') RETURNING id",[from,tz])
+      const day=await getNutritionDayCompleteness(from,adapter,'2026-10-18')
+      await saveNutritionDayCompleteness({date:from,ownerReport:'complete',expectedRevision:day.entryRevision,expectedVersion:0,zeroIntakeFast:false},adapter,'2026-10-18')
+      const night=await client.query("INSERT INTO sleep_nightly_summaries (sleep_date,timezone,logical_source_key,source_name,start_at,end_at,total_sleep_minutes,observation_status,analysis_eligible,stage_analysis_eligible,selection_reason,calculation_version) VALUES ($1::date,$2,'fixture-watch','Synthetic','2026-09-21T04:00:00Z','2026-09-21T11:00:00Z',420,'analysis_eligible',true,false,'source_priority','piq-test') RETURNING id",[through,tz])
+      // Derive exactly the literal SQL actually used by the finalization code.
+      const source=readFileSync('server/lab/experiment-results.ts','utf8')
+      const start=source.indexOf('sql.query(\n      \`INSERT INTO experiment_results (')
+      const end=source.indexOf('\`,\n      [',start)
+      expect(start).toBeGreaterThan(0)
+      expect(end).toBeGreaterThan(start)
+      const statement=source.slice(start+"sql.query(\n      \`".length,end)
+        .replace('\${EXPERIMENT_FINALIZATION_SOURCE_CAS_EXPRESSION}',EXPERIMENT_FINALIZATION_SOURCE_CAS_EXPRESSION)
+      expect(statement).toContain('AND change.revision IS NOT DISTINCT FROM $19::integer')
+      const digest=async()=>String((await client.query(EXPERIMENT_FINALIZATION_SOURCE_DIGEST_SQL,scope)).rows[0].digest)
+      const args=(id:string,hash:string,action='original',date=from,rev:number|null=null)=>[
+        id,experimentId,versionId,'incomplete',from,through,through,'followed',
+        false,null,null,'synthetic-fingerprint',src,null,from,through,action,date,rev,...scope,hash,
+      ]
+      const original=await digest()
+      expect(original).toMatch(/^[0-9a-f]{32}$/)
+      await second.query('UPDATE nutrition_entries SET protein=121 WHERE id=$1',[food.rows[0].id])
+      const afterFood=await digest()
+      expect(afterFood).not.toBe(original)
+      expect((await client.query(statement,args(randomUUID(),original))).rowCount).toBe(0)
+      await second.query('UPDATE sleep_nightly_summaries SET total_sleep_minutes=421 WHERE id=$1',[night.rows[0].id])
+      expect(await digest()).not.toBe(afterFood)
+      expect((await client.query(statement,args(randomUUID(),afterFood))).rowCount).toBe(0)
+      // A failed parent insert cannot persist its dependent immutable snapshot.
+      await client.query('BEGIN')
+      try{
+        const missing=randomUUID()
+        expect((await client.query(statement,args(missing,original))).rowCount).toBe(0)
+        await expect(client.query("INSERT INTO experiment_result_comparison_snapshots (experiment_result_id,snapshot_version,snapshot,snapshot_fingerprint) VALUES ($1,1,'{}'::jsonb,$2)",[missing,'a'.repeat(64)])).rejects.toMatchObject({code:'23503'})
+      }finally{await client.query('ROLLBACK')}
+      const current=await digest()
+      await second.query("UPDATE experiments SET status='completed' WHERE id=$1",[experimentId])
+      expect((await client.query(statement,args(randomUUID(),current))).rowCount).toBe(0)
+      await second.query("UPDATE experiments SET status='active' WHERE id=$1",[experimentId])
+      await second.query("INSERT INTO experiment_implementation_revisions (id,experiment_id,revision,action,effective_date,behavior_change,reason) VALUES ($1,$2,1,'corrected',$3::date,'Fictional correction','Fictional revision test')",[randomUUID(),experimentId,through])
+      expect((await client.query(statement,args(randomUUID(),current))).rowCount).toBe(0)
+      expect((await client.query(statement,args(randomUUID(),current,'corrected',through,1))).rowCount).toBe(1)
+      expect((await client.query('SELECT count(*)::int AS total FROM experiment_results WHERE experiment_id=$1',[experimentId])).rows[0].total).toBe(1)
+    }finally{await second.end()}
+  },40_000)
 
 })
