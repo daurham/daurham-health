@@ -73,7 +73,39 @@ describe('PIQ-6.5 bounded evidence-review status, never a learned causal fact',(
     expect(review({history:{status:'complete',review:'needs_recheck',events:[event('unsure')]}}).state).toBe('needs_recheck')
     expect(review({readiness:{state:'not_ready',reason:'implementation_changed'}}).state).toBe('needs_recheck')
     expect(review({current:null}).state).toBe('not_assessable')
-    expect(review({current:{...current,state:'unavailable',reason:'changed_coverage',metrics:[]}}).state).toBe('not_assessable')
+    expect(review({current:{...current,state:'unavailable',reason:'changed_coverage',metrics:[]}}).state).toBe('coverage_changed')
+  })
+  it('surfaces post-finalization value edits and changed verified coverage without replaying the saved result',()=>{
+    for(const [reason,state,copy] of [
+      ['source_values_changed','source_changed','have changed since'],
+      ['changed_coverage','coverage_changed','no longer matches'],
+      ['source_values_unverified','source_unverified','no verifiable original'],
+    ] as const) {
+      const currentState:CurrentOutcomeComparison={
+        state:'unavailable',reason,asOf:'2026-10-17',
+        baselineWindow:null,followUpWindow:null,metrics:[],
+      }
+      const before=JSON.stringify(snapshot)
+      const result=review({current:currentState,history:history('none_reported')})
+      expect(result).toMatchObject({state,primaryMetricCount:0,feedbackVersion:1,
+        observationsAsOf:null,canRankRecommendations:false})
+      expect(experimentEvidenceReviewCopy(result)).toContain(copy)
+      const html=renderToStaticMarkup(React.createElement(ExperimentEvidenceReviewSection,{review:result}))
+      expect(html).toContain('role="alert"')
+      expect(html).not.toContain('Recorded difference:')
+      expect(html).not.toContain('Travel')
+      expect(JSON.stringify(snapshot)).toBe(before)
+    }
+    // Withdrawal, invalid snapshots and changed implementations retain
+    // higher-priority fail-closed behavior than any source drift message.
+    const changed:CurrentOutcomeComparison={...current,state:'unavailable',
+      reason:'source_values_changed',metrics:[]}
+    expect(review({current:changed,history:history('withdrawn')}).state).toBe('withdrawn')
+    expect(review({current:changed,readiness:{state:'not_ready',reason:'implementation_changed'}}).state)
+      .toBe('needs_recheck')
+    expect(review({current:changed,snapshotStatus:'unavailable_integrity_check'}).state)
+      .toBe('unavailable')
+    expect(review({current:{...changed,reason:'source_unavailable'}}).state).toBe('not_assessable')
   })
   it('does not reclassify a 25-entry truncated feedback history as complete',()=>{
     const r=review({history:{status:'partial',review:'owner_context_recorded',events:[event('other_changes')]}})

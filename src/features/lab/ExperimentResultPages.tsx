@@ -367,7 +367,13 @@ export function ExperimentEvidenceReviewSection({
   return (
     <section className="space-y-2 rounded-lg border border-zinc-200 p-3 text-sm">
       <h2 className="font-semibold">Evidence review status</h2>
-      <p className="text-zinc-700">{experimentEvidenceReviewCopy(review)}</p>
+      <p
+        className="text-zinc-700"
+        role={review.state === 'source_changed' || review.state === 'coverage_changed' ||
+          review.state === 'source_unverified' ? 'alert' : undefined}
+      >
+        {experimentEvidenceReviewCopy(review)}
+      </p>
       {review.observationsAsOf && review.snapshotRecordedDate ? (
         <p className="text-xs text-zinc-500">
           Saved screen: {review.snapshotRecordedDate} · Current observations: {review.observationsAsOf}

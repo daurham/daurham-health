@@ -9,6 +9,7 @@ import type { OutcomeFeedbackReadiness } from './experiment-outcome-feedback.js'
  */
 export type ExperimentEvidenceReview = {
   state: 'unavailable' | 'withdrawn' | 'needs_recheck' | 'not_assessable' |
+    'source_changed' | 'coverage_changed' | 'source_unverified' |
     'partial_audit' | 'observation_only' | 'context_reported' |
     'context_unsure' | 'none_recalled'
   snapshotRecordedDate: string | null
@@ -45,8 +46,20 @@ export function reviewExperimentEvidence(input: {
   if (input.readiness.state !== 'ready' || input.history.review === 'needs_recheck') {
     return { ...empty('needs_recheck'),feedbackVersion: latest?.version ?? null }
   }
-  if (!input.current || input.current.state !== 'available' ||
-      input.current.metrics.length < 1 || input.current.metrics.length > 8 ||
+  // The historical coverage snapshot stays immutable. If current verified
+  // prespecified values, recording coverage, or the stored value seal have
+  // changed, surface that reason in the *primary* evidence review status,
+  // rather than hiding it behind the collapsed current-comparison details.
+  // This does not imply a physiological effect or rewrite owner feedback.
+  if (input.current?.state === 'unavailable') {
+    const status = input.current.reason === 'source_values_changed'
+      ? 'source_changed' : input.current.reason === 'changed_coverage'
+        ? 'coverage_changed' : input.current.reason === 'source_values_unverified'
+          ? 'source_unverified' : 'not_assessable'
+    return { ...empty(status),feedbackVersion: latest?.version ?? null }
+  }
+  if (!input.current || input.current.metrics.length < 1 ||
+      input.current.metrics.length > 8 ||
       input.current.asOf <= input.snapshot.recordedHealthDate) {
     return { ...empty('not_assessable'),feedbackVersion: latest?.version ?? null }
   }
@@ -89,6 +102,12 @@ export function experimentEvidenceReviewCopy(review: ExperimentEvidenceReview): 
       return 'The result or implementation changed. This observation needs review before it can be considered current.'
     case 'not_assessable':
       return 'A comparable current-record observation is not available. The historical result is unchanged.'
+    case 'source_changed':
+      return 'Recorded nutrition or sleep outcome values have changed since this result was saved. Current before/after figures are withheld; review the corrected records. The historical result and owner feedback have not been rewritten.'
+    case 'coverage_changed':
+      return 'Current verified outcome recording coverage no longer matches the saved experiment screen. Before/after figures are withheld; check added, removed, or unverified days. The historical result is preserved.'
+    case 'source_unverified':
+      return 'The saved outcome has no verifiable original source-value seal, or current records could not be sealed. Historical before/after values cannot be confirmed and are withheld.'
     case 'partial_audit':
       return 'The latest feedback exists, but the full version history is not displayed. Do not treat this as a calibrated finding.'
     case 'observation_only':
