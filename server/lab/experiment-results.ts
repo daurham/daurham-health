@@ -819,6 +819,21 @@ export const EXPERIMENT_VERIFIED_NUTRITION_SQL = [
  * READ COMMITTED snapshot. At write time the digest is recalculated WITHIN
  * the INSERT statement. This does not seal all experiment evidence.
  */
+/** Shared between evidence loading and the bounded finalization source CAS.
+ * Never hashes body notes, context free text or activity evidence JSON.
+ */
+export const EXPERIMENT_ACTIVITY_SOURCE_SQL = `SELECT summary_date::text AS summary_date, steps_count, active_energy_kcal, exercise_minutes, resting_heart_rate_bpm
+     FROM activity_daily_summaries
+     WHERE timezone = $3 AND summary_date BETWEEN $1::date AND $2::date`
+export const EXPERIMENT_BODY_SOURCE_SQL = `SELECT m.id::text AS id, m.metric_key, m.value, m.unit, s.measured_at, s.timezone
+     FROM body_metrics m
+     JOIN body_measurement_sessions s ON s.id = m.measurement_session_id
+     WHERE m.metric_key = ANY($1::text[])`
+export const EXPERIMENT_CONTEXT_SOURCE_SQL = `SELECT c.context_date::text AS context_date, t.tag_key
+     FROM daily_context c
+     LEFT JOIN daily_context_tags t ON t.context_id = c.id
+     WHERE c.context_date BETWEEN $1::date AND $2::date`
+
 export type FinalizationSourceGuardScope = {
   start:string;end:string;today:string;timezone:string;
   nutrition:boolean;sleep:boolean;
@@ -921,21 +936,6 @@ async function loadNutrition(sql: Sql, start: string, end: string, today: string
   }
   return points
 }
-
-/** Shared between evidence loading and the bounded finalization source CAS.
- * Never hashes body notes, context free text or activity evidence JSON.
- */
-export const EXPERIMENT_ACTIVITY_SOURCE_SQL = `SELECT summary_date::text AS summary_date, steps_count, active_energy_kcal, exercise_minutes, resting_heart_rate_bpm
-     FROM activity_daily_summaries
-     WHERE timezone = $3 AND summary_date BETWEEN $1::date AND $2::date`
-export const EXPERIMENT_BODY_SOURCE_SQL = `SELECT m.id::text AS id, m.metric_key, m.value, m.unit, s.measured_at, s.timezone
-     FROM body_metrics m
-     JOIN body_measurement_sessions s ON s.id = m.measurement_session_id
-     WHERE m.metric_key = ANY($1::text[])`
-export const EXPERIMENT_CONTEXT_SOURCE_SQL = `SELECT c.context_date::text AS context_date, t.tag_key
-     FROM daily_context c
-     LEFT JOIN daily_context_tags t ON t.context_id = c.id
-     WHERE c.context_date BETWEEN $1::date AND $2::date`
 
 async function loadActivity(sql: Sql, start: string, end: string, timezone: string) {
   const rows = (await sql.query(
