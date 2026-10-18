@@ -35,6 +35,17 @@ describe('PIQ-6.3 committed experiment comparison snapshots',()=>{
     expect(snapshot.review.state).toBe('insufficient_coverage')
     expect(snapshot.review.reason).toBe('insufficient_observations')
   })
+  it('round-trips optional verified values seal while preserving unsealed legacy v1',()=>{
+    const legacy = makeSnapshot()
+    expect(Object.prototype.hasOwnProperty.call(legacy,'sourceValueSeal')).toBe(false)
+    const sealed={...legacy,sourceValueSeal:'a'.repeat(64)}
+    expect(parseExperimentComparisonSnapshot(sealed)).toEqual(sealed)
+    expect(parseExperimentComparisonSnapshot({...legacy,sourceValueSeal:null})).toEqual({...legacy,sourceValueSeal:null})
+    for (const invalid of ['', 'g'.repeat(64), 'a'.repeat(63), 12, true]) {
+      expect(parseExperimentComparisonSnapshot({...legacy,sourceValueSeal:invalid})).toBeNull()
+    }
+    expect(await experimentEvidenceFingerprint(sealed)).not.toBe(await experimentEvidenceFingerprint(legacy))
+  })
   it('preserves corrected provenance and numeric revision in historical snapshot',()=>{
     const snapshot=makeSnapshot('corrected')
     expect(parseExperimentComparisonSnapshot(snapshot)?.implementation).toEqual({

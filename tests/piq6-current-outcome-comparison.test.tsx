@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
-  describeCurrentOutcomeComparison, currentOutcomeComparisonCopy,
+  describeCurrentOutcomeComparison, currentOutcomeComparisonCopy, verifyCurrentOutcomeSourceSeal,
 } from '../src/domain/experiment-current-outcomes.js'
 import type { ExperimentComparisonSnapshot } from '../src/domain/experiment-comparison-snapshot.js'
 import type { OutcomeFeedbackReadiness } from '../src/domain/experiment-outcome-feedback.js'
@@ -37,6 +37,22 @@ describe('PIQ-6.5 current descriptive values, never frozen effect or efficacy',(
       unit:'g/day',beforeDays:4,afterDays:4,beforeMean:80,afterMean:110,change:30}])
     expect(currentOutcomeComparisonCopy(result)).toContain('not frozen')
     expect(currentOutcomeComparisonCopy(result)).toContain('does not prove')
+  })
+  it('withholds current numeric values when the source seal changes or is absent',()=>{
+    const visible=assess()
+    const a='a'.repeat(64),b='b'.repeat(64)
+    expect(verifyCurrentOutcomeSourceSeal(visible,a,a)).toEqual(visible)
+    expect(verifyCurrentOutcomeSourceSeal(visible,a,b))
+      .toMatchObject({state:'unavailable',reason:'source_values_changed',metrics:[]})
+    expect(verifyCurrentOutcomeSourceSeal(visible,undefined,b))
+      .toMatchObject({state:'unavailable',reason:'source_values_unverified',metrics:[]})
+    expect(verifyCurrentOutcomeSourceSeal(visible,a,null).reason).toBe('source_values_unverified')
+    const withheld=verifyCurrentOutcomeSourceSeal(visible,a,b)
+    const html=renderToStaticMarkup(React.createElement(CurrentOutcomeComparisonSection,{comparison:withheld}))
+    expect(html).not.toContain('Recorded difference:')
+    expect(html).toContain('withheld')
+    const coverageError={...visible,state:'unavailable' as const,reason:'changed_coverage' as const,metrics:[]}
+    expect(verifyCurrentOutcomeSourceSeal(coverageError,a,a).reason).toBe('changed_coverage')
   })
   it('never invents missing days as zero or lets changed source coverage masquerade as original',()=>{
     expect(assess({nutrition:nutrition.slice(0,-1)}).reason).toBe('changed_coverage')
