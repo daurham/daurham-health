@@ -1115,3 +1115,38 @@ presentation-only patch ran full branch CI, no new PG gate.
 PIQ-7 deployment separation, production schema/backup/rollback,
 mobile owner UAT and full owner acceptance remain open (0/9).
 `main` and production remain unchanged.
+
+
+## 2026-10-18 — PIQ-6.5 follow-up feedback source-seal POST CAS (green)
+
+Feature `a9460652842ea35cef97228efcd2dfbbc36c6775`,
+source restoration `bde6a5cbc9758c2620441901dd2c00ea20d5fee9`,
+and SQL parenthesis fix `82794792bbec26d297ccd84219afb6973c8f3aa6`
+validate a previously missing owner-feedback POST gate. For recorded
+or revised follow-up, the owner-only server verifies original sealed
+prespecified nutrition/sleep values against current verified values,
+rejects missing/changed source-value seals and coverage, detects
+interleaved checksum drift across canonical reads, and checks that
+same SQL projection once more inside the INSERT statement snapshot.
+The existing feedback-version and implementation revision CAS remains
+in place. Explicit withdrawal still works without a current source
+seal; no audit event or experiment historical result is changed.
+
+Final full CI 39161702219 passed 2,716 application tests (32 skipped),
+360 passing test files, TS, ESLint and Vite build. Final independent
+PostgreSQL 16 workflow 39161702170 passed 31/31 tests through all
+60 synthetic migrations, including a stale-source INSERT rejection
+and a current-source INSERT acceptance. Intermediate failed CI runs
+were diagnosed and corrected; they are not part of final validation.
+No live owner data, paid provider, schema migration, production
+deployment, or `main` touched.
+
+Remaining: detail GET still permits the feedback form display based
+on snapshot/implementation readiness; the now-stricter POST can
+return an accurate 409 when a post-finalization source correction
+has occurred. Align owner read-side availability/wording later,
+preserving no automatic historical replay. READ COMMITTED statement
+CAS is not serializable isolation, and future data changes still
+require review. PIQ-7 independent-root Auth/DB, backup/rollback,
+owner mobile and usefulness UAT, production migration state and
+explicit release approval remain pending; formal acceptance 0/9.
