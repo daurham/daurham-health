@@ -1195,6 +1195,8 @@ describe.skipIf(!url)('PIQ-1.1 full numbered migration chain and backup on isola
         { version:2,action:'withdrawn',unlogged_factors:null,owner_note:null },
       ])
       const historyRows = await client.query(OWNER_OUTCOME_FEEDBACK_HISTORY_SQL, [resultId])
+      expect(historyRows.rowCount).toBe(2)
+      expect(historyRows.rows[0]?.comparisonFingerprint).toBe(hash)
       const inspected = reviewFeedbackHistory({
         rows: historyRows.rows, expectedFingerprint: hash, snapshotVerified: true,
         readiness: { state:'not_ready',reason:'not_current_result' },
