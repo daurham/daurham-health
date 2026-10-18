@@ -76,7 +76,7 @@ export const OWNER_OUTCOME_FEEDBACK_INSERT_SQL = [
 
 export const OWNER_OUTCOME_FEEDBACK_HISTORY_SQL = [
   'SELECT version,action,unlogged_factors AS "unloggedFactors", owner_note AS "ownerNote",',
-  ' snapshot_fingerprint AS "comparisonFingerprint", recorded_at::text AS "recordedAt"',
+  ' comparison_fingerprint AS "comparisonFingerprint", recorded_at::text AS "recordedAt"',
   'FROM experiment_outcome_feedback_events WHERE experiment_result_id = $1::uuid',
   'ORDER BY version DESC LIMIT 26',
 ].join('\n')
