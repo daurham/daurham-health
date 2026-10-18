@@ -57,6 +57,8 @@ const experimentResults = vi.hoisted(() => ({
   listTimelineExperimentResults: vi.fn(),
 }))
 
+const feedback = vi.hoisted(() => ({ submitOwnerOutcomeFeedback: vi.fn() }))
+
 const implementation = vi.hoisted(() => ({
   confirmOwnerExperimentImplementation: vi.fn(),
   correctOwnerExperimentImplementation: vi.fn(),
@@ -65,6 +67,7 @@ const implementation = vi.hoisted(() => ({
 
 vi.mock('../server/lab/service.ts', () => service)
 vi.mock('../server/lab/implementation.ts', () => implementation)
+vi.mock('../server/lab/outcome-feedback.ts', () => feedback)
 vi.mock('../server/lab/results.ts', () => results)
 vi.mock('../server/lab/retests.ts', () => retests)
 vi.mock('../server/lab/experiment-results.ts', () => experimentResults)
@@ -137,6 +140,8 @@ describe('personal lab API auth', () => {
     service.createOwnerExperiment.mockResolvedValue({ id: EXPERIMENT, status: 'accepted', origin: 'owner_created' })
     service.startExperiment.mockResolvedValue({ id: EXPERIMENT, status: 'active' })
     for (const fn of Object.values(implementation)) fn.mockReset()
+    feedback.submitOwnerOutcomeFeedback.mockReset()
+    feedback.submitOwnerOutcomeFeedback.mockResolvedValue({ recorded: true, version: 1, action: 'recorded' })
     service.getExperiment.mockResolvedValue({ id: EXPERIMENT, status: 'active' })
   })
 
@@ -206,6 +211,19 @@ describe('personal lab API auth', () => {
       expect((await call('POST', url, owner, {}, body)).status()).toBe(200)
       expect(mock).toHaveBeenCalledWith(EXPERIMENT, body)
     }
+  })
+
+  it('keeps optional outcome feedback owner-only and POST-only', async () => {
+    const path = `/api/lab/experiment-results/${EXPERIMENT}/outcome-feedback`
+    const owner = { id: 'owner-1', email: 'owner@example.com' }
+    const body = { confirmFeedback: true, action: 'record', expectedVersion: 0, unloggedFactors: 'unsure' }
+    expect(matchLabRoute(path)).toEqual({kind:'experiment-result',id:EXPERIMENT,action:'outcome-feedback'})
+    expect((await call('POST',path,null,{},body)).status()).toBe(401)
+    expect((await call('POST',path,{id:'other',email:'other@example.com'}, {},body)).status()).toBe(403)
+    expect(feedback.submitOwnerOutcomeFeedback).not.toHaveBeenCalled()
+    expect((await call('GET',path,owner)).status()).toBe(405)
+    expect((await call('POST',path,owner,{},body)).status()).toBe(200)
+    expect(feedback.submitOwnerOutcomeFeedback).toHaveBeenCalledWith(EXPERIMENT,body)
   })
 
   it('keeps benchmark results owner-only and immutable', async () => {
