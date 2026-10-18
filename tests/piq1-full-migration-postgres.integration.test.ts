@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import pg from 'pg'
 import {readFileSync} from 'node:fs'
-import {EXPERIMENT_FINALIZATION_SOURCE_DIGEST_SQL, EXPERIMENT_FINALIZATION_SOURCE_CAS_EXPRESSION, EXPERIMENT_BODY_SOURCE_SQL} from '../server/lab/experiment-results.js'
+import {EXPERIMENT_FINALIZATION_SOURCE_DIGEST_SQL, EXPERIMENT_FINALIZATION_SOURCE_CAS_EXPRESSION, EXPERIMENT_BODY_SOURCE_SQL, EXPERIMENT_SUPPLEMENT_STATUS_SOURCE_SQL} from '../server/lab/experiment-results.js'
 import type { Sql } from '../server/db.js'
 import { inspectMigrations } from '../server/migrate.js'
 import { assessMigrationHistory, readMigrationHistory } from '../server/migration-history.js'
@@ -1433,6 +1433,49 @@ describe.skipIf(!url)('PIQ-1.1 full numbered migration chain and backup on isola
       )
       expect(await digest()).not.toBe(beforeStatus)
       expect((await client.query(statement,args(randomUUID(),beforeStatus))).rowCount).toBe(0)
+
+      // A latest prior event is enough to reconstruct the starting
+      // lifecycle. Superseded older events and future events cannot change
+      // a date already in the closed evaluated experiment window.
+      const priorEvent=await second.query(
+        "INSERT INTO supplement_status_events (supplement_id,effective_date,status,source_id) VALUES ($1,'2026-09-18','paused',$2) RETURNING id",
+        [supplementId,src],
+      )
+      const beforeSuperseded=await digest()
+      const supersededEvent=await second.query(
+        "INSERT INTO supplement_status_events (supplement_id,effective_date,status,source_id) VALUES ($1,'2026-09-01','discontinued',$2) RETURNING id",
+        [supplementId,src],
+      )
+      expect(await digest()).toBe(beforeSuperseded)
+      await second.query(
+        "UPDATE supplement_status_events SET status='active' WHERE id=$1",
+        [supersededEvent.rows[0].id],
+      )
+      expect(await digest()).toBe(beforeSuperseded)
+      const afterPriorEvent=await digest()
+      await second.query(
+        "UPDATE supplement_status_events SET status='active' WHERE id=$1",
+        [priorEvent.rows[0].id],
+      )
+      expect(await digest()).not.toBe(afterPriorEvent)
+      expect((await client.query(statement,args(randomUUID(),afterPriorEvent))).rowCount).toBe(0)
+      const beforeFutureEvent=await digest()
+      await second.query(
+        "INSERT INTO supplement_status_events (supplement_id,effective_date,status,source_id) VALUES ($1,'2026-10-05','paused',$2)",
+        [supplementId,src],
+      )
+      expect(await digest()).toBe(beforeFutureEvent)
+      const windowStatuses=await client.query(EXPERIMENT_SUPPLEMENT_STATUS_SOURCE_SQL,
+        [[supplementId],from,through])
+      expect(windowStatuses.rows.map(row=>String(row.effective_date))).toEqual(['2026-09-18',from])
+      // An explicit in-window lifecycle change is still guarded.
+      const beforeInWindow=await digest()
+      await second.query(
+        "INSERT INTO supplement_status_events (supplement_id,effective_date,status,source_id) VALUES ($1,$2::date,'paused',$3)",
+        [supplementId,through,src],
+      )
+      expect(await digest()).not.toBe(beforeInWindow)
+      expect((await client.query(statement,args(randomUUID(),beforeInWindow))).rowCount).toBe(0)
 
       const beforeAdherence=await digest()
       const adherence=await second.query(

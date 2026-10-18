@@ -856,8 +856,27 @@ export const EXPERIMENT_SUPPLEMENT_SCHEDULE_SOURCE_SQL = `SELECT id::text AS id,
             effective_from::text AS effective_from, effective_through::text AS effective_through, sort_order
      FROM supplement_schedules WHERE supplement_id = ANY($1::uuid[])`
 /** Exact source query shared by Lab evidence reads and the finalization CAS. */
-export const EXPERIMENT_SUPPLEMENT_STATUS_SOURCE_SQL = `SELECT supplement_id::text AS supplement_id, effective_date::text AS effective_date, status
-     FROM supplement_status_events WHERE supplement_id = ANY($1::uuid[]) ORDER BY effective_date, created_at`
+/** Preserve the latest pre-window lifecycle state plus every in-window change.
+ * Earlier superseded events and future events cannot affect resolveOccurrence
+ * within the evaluated dates. UNIQUE (supplement_id, effective_date) makes
+ * the DISTINCT ON predecessor deterministic. The exact SELECT is shared
+ * by finalization and the single-statement source CAS.
+ */
+export const EXPERIMENT_SUPPLEMENT_STATUS_SOURCE_SQL = `SELECT event.supplement_id::text AS supplement_id,
+       event.effective_date::text AS effective_date, event.status
+     FROM supplement_status_events event
+     WHERE event.supplement_id = ANY($1::uuid[])
+       AND event.effective_date BETWEEN $2::date AND $3::date
+     UNION ALL
+     SELECT previous.supplement_id::text AS supplement_id,
+       previous.effective_date::text AS effective_date, previous.status
+     FROM (
+       SELECT DISTINCT ON (supplement_id) supplement_id, effective_date, status
+       FROM supplement_status_events
+       WHERE supplement_id = ANY($1::uuid[]) AND effective_date < $2::date
+       ORDER BY supplement_id, effective_date DESC
+     ) previous
+     ORDER BY supplement_id, effective_date`
 /** Exact source query shared by Lab evidence reads and the finalization CAS. */
 export const EXPERIMENT_SUPPLEMENT_ADHERENCE_SOURCE_SQL = `SELECT a.schedule_id::text AS schedule_id, a.scheduled_date::text AS scheduled_date, a.status
      FROM supplement_adherence a
@@ -908,6 +927,8 @@ export function buildFinalizationSourceDigestExpression(firstParameter:number):s
   const supplementSql=bySupplement(EXPERIMENT_SUPPLEMENT_SOURCE_SQL)
   const scheduleSql=bySupplement(EXPERIMENT_SUPPLEMENT_SCHEDULE_SOURCE_SQL)
   const statusSql=bySupplement(EXPERIMENT_SUPPLEMENT_STATUS_SOURCE_SQL)
+    .replaceAll('$2::date',bind(8)+'::date')
+    .replace('$3::date',bind(2)+'::date')
   const adherenceSql=bySupplement(EXPERIMENT_SUPPLEMENT_ADHERENCE_SOURCE_SQL)
     .replace('$2::date',bind(8)+'::date').replace('$3::date',bind(2)+'::date')
   const requirementSql=EXPERIMENT_REQUIREMENT_SOURCE_SQL.replace('$1::uuid',bind(12)+'::uuid')
@@ -1080,7 +1101,7 @@ async function loadAdherence(sql: Sql, supplementIds: string[], start: string, e
   )) as Array<Record<string, unknown>>
   const events = (await sql.query(
     EXPERIMENT_SUPPLEMENT_STATUS_SOURCE_SQL,
-    [supplementIds],
+    [supplementIds, start, end],
   )) as Array<{ supplement_id: string; effective_date: string; status: StatusEventWindow['status'] }>
   const adherence = (await sql.query(
     EXPERIMENT_SUPPLEMENT_ADHERENCE_SOURCE_SQL,

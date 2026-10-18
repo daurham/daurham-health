@@ -75,6 +75,13 @@ describe('PIQ-6.5 PostgreSQL statement-snapshot primary nutrition/sleep CAS',()=
     expect(EXPERIMENT_SUPPLEMENT_SOURCE_SQL).toContain('FROM supplements')
     expect(EXPERIMENT_SUPPLEMENT_SCHEDULE_SOURCE_SQL).toContain('FROM supplement_schedules')
     expect(EXPERIMENT_SUPPLEMENT_STATUS_SOURCE_SQL).toContain('FROM supplement_status_events')
+    expect(EXPERIMENT_SUPPLEMENT_STATUS_SOURCE_SQL).toContain('SELECT DISTINCT ON (supplement_id)')
+    expect(EXPERIMENT_SUPPLEMENT_STATUS_SOURCE_SQL).toContain('effective_date BETWEEN $2::date AND $3::date')
+    expect(EXPERIMENT_SUPPLEMENT_STATUS_SOURCE_SQL).toContain('effective_date < $2::date')
+    expect(read).toContain('effective_date BETWEEN $8::date AND $2::date')
+    expect(read).toContain('effective_date < $8::date')
+    expect(buildFinalizationSourceDigestExpression(20)).toContain('effective_date BETWEEN $27::date AND $21::date')
+    expect(buildFinalizationSourceDigestExpression(20)).toContain('effective_date < $27::date')
     expect(EXPERIMENT_SUPPLEMENT_ADHERENCE_SOURCE_SQL).toContain('FROM supplement_adherence')
     for(const item of ['supp','schedule','event','adherence','link','requirement','control']){
       expect(read).toContain('jsonb_agg(to_jsonb('+item+')')
