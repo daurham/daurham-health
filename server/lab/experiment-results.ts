@@ -30,6 +30,7 @@ import {
 import { readOwnerOutcomeFeedback } from './outcome-feedback.js'
 import { reviewExperimentEvidence } from '../../src/domain/experiment-evidence-review.js'
 import { assessExperimentContextApplicability } from '../../src/domain/experiment-context-applicability.js'
+import { computeContextRevisionSignature } from '../../src/domain/experiment-context-revision-signature.js'
 import { computeExperimentSourceValueSeal } from '../../src/domain/experiment-source-value-seal.js'
 import {
   describeCurrentOutcomeComparison, unavailableCurrentComparison, verifyCurrentOutcomeSourceSeal,
@@ -79,6 +80,9 @@ export async function commitExperimentResult(experimentId: string, body: unknown
   }
   await assertSupersedes(sql, experimentId, attestation.supersedesResultId)
   const sourceId = await manualSourceId(sql)
+  // Optional relevance baseline: null is explicit failure to verify and
+  // cannot ever be treated as an unchanged owner context.
+  const capturedContext = await readContextRevisionSignature(sql,experimentId).catch(()=>null)
   const resultId = randomUUID()
   const status = experimentStatusForClassification(built.evaluation.classification)
   const requirementIds = built.evaluation.requirements.map(() => randomUUID())
@@ -92,6 +96,7 @@ export async function commitExperimentResult(experimentId: string, body: unknown
     implementationRevision: built.experiment.implementation_revision,
     review: built.comparisonReview,
     sourceValueSeal: built.sourceValueSeal,
+    contextRevisionSeal: capturedContext?.seal ?? null,
   })
   const snapshotFingerprint = await experimentEvidenceFingerprint(snapshot)
   const statements = [
@@ -140,6 +145,30 @@ export async function commitExperimentResult(experimentId: string, body: unknown
   ]
   await sql.transaction(statements)
   return getExperimentResult(resultId)
+}
+
+/** Read only revision IDs/timestamps. No profile notes, conditions or goal targets.
+ * experiment_goals has one row per experiment (primary key).
+ */
+export const EXPERIMENT_CONTEXT_SIGNATURE_SQL = [
+  'SELECT EXTRACT(EPOCH FROM p.updated_at)::text AS profile_updated_at,',
+  '       eg.goal_id::text AS goal_id, eg.goal_version_id::text AS linked_version_id,',
+  '       EXTRACT(EPOCH FROM eg.created_at)::text AS link_created_at,',
+  '       EXTRACT(EPOCH FROM g.updated_at)::text AS goal_updated_at,',
+  '       g.status AS goal_status,',
+  '       EXTRACT(EPOCH FROM g.archived_at)::text AS goal_archived_at,',
+  '       v.id::text AS current_version_id',
+  'FROM experiments e',
+  'LEFT JOIN health_profile p ON p.singleton_id = 1',
+  'LEFT JOIN experiment_goals eg ON eg.experiment_id = e.id',
+  'LEFT JOIN goals g ON g.id = eg.goal_id',
+  'LEFT JOIN goal_versions v ON v.goal_id = g.id AND v.is_current',
+  'WHERE e.id = $1::uuid',
+].join('\n')
+
+async function readContextRevisionSignature(sql:Sql,experimentId:string){
+  const rows=await sql.query(EXPERIMENT_CONTEXT_SIGNATURE_SQL,[experimentId])
+  return computeContextRevisionSignature(rows)
 }
 
 export const EXPERIMENT_CONTEXT_REVISION_SQL = [
@@ -212,10 +241,15 @@ export async function getExperimentResult(id: string) {
       contextRevisionMetadata = null
     }
   }
+  const currentContext = comparisonSnapshot?.contextRevisionSeal
+    ? await readContextRevisionSignature(sql,String(row.experiment_id)).catch(()=>null)
+    : null
   const contextApplicability = assessExperimentContextApplicability({
     snapshot: comparisonSnapshot,
     snapshotCapturedAt: comparisonSnapshot ? stored!.captured_at : null,
     metadata: contextRevisionMetadata, asOf: today,
+    currentContextSeal:currentContext?.seal ?? null,
+    currentLinkedGoalCount:currentContext?.linkedGoalCount ?? null,
   })
 
   // Optional current arithmetic is derived from the original prespecified
