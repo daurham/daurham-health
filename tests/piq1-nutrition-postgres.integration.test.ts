@@ -2,6 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import pg from 'pg'
 import type { Sql } from '../server/db.js'
+import { assertPiqPostgresFixtureTarget, assertPiqPostgresFixtureSession } from '../server/piq-postgres-fixture.js'
 import { buildHealthIntelligenceSnapshot, type IntelligenceObservation } from '../src/domain/intelligence/shared.js'
 import { loadVerifiedNutritionDays, loadVerifiedWeeklyNutritionDates } from '../server/nutrition/maintenance-eligibility.js'
 import { getNutritionDayCompleteness, saveNutritionDayCompleteness, SOURCE_REVISION_SQL } from '../server/nutrition/day-completeness.js'
@@ -15,6 +16,7 @@ import { getNutritionDayCompleteness, saveNutritionDayCompleteness, SOURCE_REVIS
  * No claims about replay of all historical migrations or production schema.
  */
 const url = process.env.PIQ_POSTGRES_URL
+if (url !== undefined) assertPiqPostgresFixtureTarget(url)
 const { Client } = pg
 const db = new Client({ connectionString: url ?? 'postgres://unconfigured:unconfigured@127.0.0.1:1/none' })
 const other = new Client({ connectionString: url ?? 'postgres://unconfigured:unconfigured@127.0.0.1:1/none' })
@@ -47,7 +49,9 @@ describe.skipIf(!url)('PIQ-1.1 isolated PostgreSQL migration and real confirmati
   beforeAll(async () => {
     if (!url) return
     await db.connect()
+    await assertPiqPostgresFixtureSession(db)
     await other.connect()
+    await assertPiqPostgresFixtureSession(other)
     await db.query(file('migrations/0008_nutrition.sql'))
     const evidence = file('migrations/0046_evidence_semantics_change_watchdog.sql')
     const column = evidence.match(/ALTER TABLE nutrition_entries\s+ADD COLUMN evidence_quality TEXT NOT NULL DEFAULT 'legacy_unknown';/m)?.[0]

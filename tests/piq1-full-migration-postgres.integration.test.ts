@@ -3,6 +3,7 @@ import pg from 'pg'
 import {readFileSync} from 'node:fs'
 import {EXPERIMENT_FINALIZATION_SOURCE_DIGEST_SQL, EXPERIMENT_FINALIZATION_SOURCE_CAS_EXPRESSION, EXPERIMENT_BODY_SOURCE_SQL, EXPERIMENT_SUPPLEMENT_STATUS_SOURCE_SQL, EXPERIMENT_SUPPLEMENT_SCHEDULE_SOURCE_SQL, EXPERIMENT_FEEDBACK_SOURCE_DIGEST_SQL, EXPERIMENT_FEEDBACK_SOURCE_CAS_EXPRESSION} from '../server/lab/experiment-results.js'
 import type { Sql } from '../server/db.js'
+import { assertPiqPostgresFixtureTarget, assertPiqPostgresFixtureSession } from '../server/piq-postgres-fixture.js'
 import { inspectMigrations } from '../server/migrate.js'
 import { assessMigrationHistory, readMigrationHistory } from '../server/migration-history.js'
 import { LATEST_SCHEMA_MIGRATION, backupTable } from '../server/backup/inventory.js'
@@ -32,6 +33,7 @@ import {
  * Database and schema are disposable. Does not export a private owner record.
  */
 const url = process.env.PIQ_POSTGRES_URL
+if (url !== undefined) assertPiqPostgresFixtureTarget(url)
 const { Client } = pg
 const client = new Client({
   connectionString: url ?? 'postgres://unconfigured:unconfigured@127.0.0.1:1/none',
@@ -111,6 +113,7 @@ describe.skipIf(!url)('PIQ-1.1 full numbered migration chain and backup on isola
   beforeAll(async () => {
     if (!url) return
     await client.connect()
+    await assertPiqPostgresFixtureSession(client)
     await client.query('CREATE SCHEMA piq_full_chain')
     await client.query('SET search_path TO piq_full_chain, public')
     await client.query('CREATE TABLE schema_migrations (filename text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())')
