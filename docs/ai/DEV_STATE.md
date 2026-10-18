@@ -1062,3 +1062,30 @@ source correction semantics, and clear PIQ-7 independent-root
 preview/auth, backup/rollback, schema and mobile owner acceptance.
 READ COMMITTED CAS is not serializable multi-table isolation.
 Formal owner-accepted PIQ phases 0/9.
+
+
+## 2026-10-18 — PIQ-6.5 schedule-window intersection guard (green)
+
+Commit `1a85d723955eaef522fa2c9879f07a828a625cb1` narrows
+Lab experiment supplement schedules to effective intervals overlapping
+the evaluated start/end date, inclusive of both edges and open-ended
+schedules. The exact SQL and bounded scope are shared by evidence
+loading and parent result INSERT source-digest CAS. Old disjoint or
+future-starting schedule revisions do not trigger false source drift;
+on-boundary schedule changes and prior-expired schedules edited to
+overlap still invalidate a stale result. No missing dose is inferred
+skipped. The same 12-position source scope is retained.
+
+Validation: full CI 39155229781, TypeScript/lint/Vite build green,
+2,713 tests passed (32 skipped, 359 passing test files); isolated
+PostgreSQL 16 CI 39155229758, 31/31 synthetic integration tests green.
+No new migration, paid provider, live owner read/write or main merge.
+This establishes narrower source eligibility, not a measured query-
+planner or real-user latency improvement.
+
+Remaining release gates: real-scale isolated query-plan benchmarking,
+post-finalization evidence correction semantics, 0057–0060 production
+migration state/restore/rollback, separate QA Auth+DB, mobile owner
+validation, owner usefulness review and explicit promotion approval.
+Formal owner acceptance remains 0/9; never conflate green CI with
+production qualification.
