@@ -28,6 +28,7 @@ on:
       - 'server/piq-preview-metadata.ts'
       - 'tests/piq4-preview-metadata.test.ts'
       - 'tests/piq4-neon-root-provenance.test.ts'
+      - 'tests/piq7-preview-private-routes.test.ts'
       - 'tests/piq-release-migration-preflight.test.ts'
       - 'tests/piq1-weekly-completeness.test.ts'
       - 'tests/piq1-maintenance-eligibility-baseline.test.ts'
