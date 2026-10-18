@@ -308,7 +308,7 @@ export function CurrentOutcomeComparisonSection({comparison}: {comparison: Curre
           <ul className="mt-2 space-y-2">
             {comparison.metrics.map((metric) => (
               <li key={metric.requirementId} className="rounded border border-zinc-100 p-2">
-                <p className="font-medium">{metric.metricKey.replaceAll('_',' ')}</p>
+                <p className="font-medium">{metric.metricKey.replace(/_/g, ' ')}</p>
                 <p className="text-zinc-700">
                   Before: {metric.beforeMean} {metric.unit} ({metric.beforeDays} days).
                   After: {metric.afterMean} {metric.unit} ({metric.afterDays} days).
