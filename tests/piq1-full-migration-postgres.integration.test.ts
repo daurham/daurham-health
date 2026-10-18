@@ -9,6 +9,8 @@ import { getNutritionDayCompleteness, saveNutritionDayCompleteness } from '../se
 import { readMaintenanceDecisionSnapshot, isMaintenanceDecisionRevisionCurrent } from '../server/intelligence/maintenance-revision.js'
 import { activeCalorieDecisionInRevision, dueFollowUps, requireCurrentCalorieRecommendation, surfaceDraft, writeCoachRecommendationResponse, writeCoachRecommendationOutcome } from '../server/intelligence/coach-intelligence.js'
 import { randomUUID } from 'node:crypto'
+import { experimentEvidenceFingerprint } from '../src/domain/experiment-results.js'
+import { parseExperimentComparisonSnapshot } from '../src/domain/experiment-comparison-snapshot.js'
 import { readPrimaryGoalIntent, savePrimaryGoalIntent } from '../server/goals/primary-intent.js'
 import { getHealthProfile, putHealthProfile } from '../server/profile/service.js'
 import { PERFORMED_STRENGTH_EXERCISES_SQL } from '../server/training/plan-service.js'
@@ -1025,6 +1027,126 @@ describe.skipIf(!url)('PIQ-1.1 full numbered migration chain and backup on isola
     } finally {
       await other.end()
       await client.query('DELETE FROM health_profile')
+    }
+  }, 30_000)
+
+  it('PIQ-6.3: actual PostgreSQL preserves owner change corrections and immutable saved comparison after result invalidation', async () => {
+    // Everything in this test is fictional, in a disposable CI-only schema, and rolled back.
+    await client.query('BEGIN')
+    try {
+      const source = await client.query("SELECT id FROM data_sources WHERE key = 'manual' LIMIT 1")
+      expect(source.rowCount).toBe(1)
+      const sourceId = source.rows[0].id as string
+      const protocolId = randomUUID()
+      const versionId = randomUUID()
+      const experimentId = randomUUID()
+      const resultId = randomUUID()
+      await client.query(
+        "INSERT INTO lab_protocols (id, protocol_kind, title, source_id) VALUES ($1, 'experiment', 'Fictional PIQ snapshot schema fixture', $2)",
+        [protocolId, sourceId],
+      )
+      await client.query(
+        "INSERT INTO lab_protocol_versions (id, protocol_id, version, instructions, is_current) VALUES ($1,$2,1,'Fictional only',true)",
+        [versionId, protocolId],
+      )
+      await client.query(
+        `INSERT INTO experiments (id,title,question,origin,status,protocol_version_id,source_id,origin_kind,window_start,window_end)
+         VALUES ($1,'Fictional PIQ comparison','Are snapshot rows preserved?','owner_created','completed',$2,$3,'owner_created',
+           '2026-10-01'::date,'2026-10-07'::date)`,
+        [experimentId,versionId,sourceId],
+      )
+      await client.query(
+        "INSERT INTO experiment_implementations (experiment_id,effective_date,behavior_change) VALUES ($1,'2026-10-04','Fictional behavior')",
+        [experimentId],
+      )
+      await client.query(
+        `INSERT INTO experiment_implementation_revisions (id,experiment_id,revision,action,effective_date,behavior_change,reason)
+         VALUES ($1,$2,1,'corrected','2026-10-05','Fictional corrected behavior','Synthetic date correction')`,
+        [randomUUID(),experimentId],
+      )
+      await client.query(
+        `INSERT INTO experiment_results (id,experiment_id,protocol_version_id,classification,status,
+           window_start,planned_window_end,effective_end_date,protocol_attestation,stopped_for_safety,evidence_fingerprint,source_id)
+         VALUES ($1,$2,$3,'incomplete','valid','2026-10-01','2026-10-07','2026-10-07','followed',false,'synthetic-only',$4)`,
+        [resultId,experimentId,versionId,sourceId],
+      )
+      const snapshot = {
+        snapshotVersion: 1, recordedHealthDate: '2026-10-17',
+        implementation: { provenance: 'corrected', effectiveDate: '2026-10-05', revision: 1 },
+        review: {
+          state: 'insufficient_coverage', reason: 'insufficient_observations',
+          baselineWindow: { start: '2026-09-28', end: '2026-10-04' },
+          followUpWindow: { start: '2026-10-05', end: '2026-10-07' },
+          metrics: [{
+            requirementId: randomUUID(), outcomeKind: 'nutrition_metric', metricKey: 'protein',
+            beforeDays: 3, afterDays: 1, beforeExpected: 7, afterExpected: 3,
+          }],
+        },
+      }
+      const hash = await experimentEvidenceFingerprint(snapshot)
+      await client.query(
+        `INSERT INTO experiment_result_comparison_snapshots (experiment_result_id,snapshot_version,snapshot,snapshot_fingerprint)
+         VALUES ($1,1,$2::jsonb,$3)`,
+        [resultId,JSON.stringify(snapshot),hash],
+      )
+      const saved = await client.query(
+        'SELECT snapshot,snapshot_fingerprint FROM experiment_result_comparison_snapshots WHERE experiment_result_id=$1',
+        [resultId],
+      )
+      expect(saved.rowCount).toBe(1)
+      expect(parseExperimentComparisonSnapshot(saved.rows[0].snapshot)).toEqual(snapshot)
+      expect(await experimentEvidenceFingerprint(saved.rows[0].snapshot)).toBe(hash)
+      expect(saved.rows[0].snapshot_fingerprint).toBe(hash)
+
+      // Reject updates/deletes, invalid version and duplicate rows with REAL PostgreSQL constraints.
+      // SAVEPOINT isolates each deliberate error without aborting the rest of the fixture.
+      async function rejectsSafely(sql: string, params: unknown[], pgCode: string) {
+        await client.query('SAVEPOINT synthetic_snapshot_rejection')
+        try {
+          await expect(client.query(sql,params)).rejects.toMatchObject({ code: pgCode })
+        } finally {
+          await client.query('ROLLBACK TO SAVEPOINT synthetic_snapshot_rejection')
+          await client.query('RELEASE SAVEPOINT synthetic_snapshot_rejection')
+        }
+      }
+      await rejectsSafely(
+        "UPDATE experiment_result_comparison_snapshots SET snapshot = '{}'::jsonb WHERE experiment_result_id=$1",
+        [resultId], 'P0001',
+      )
+      await rejectsSafely(
+        'DELETE FROM experiment_result_comparison_snapshots WHERE experiment_result_id=$1',
+        [resultId], 'P0001',
+      )
+      await rejectsSafely(
+        "INSERT INTO experiment_result_comparison_snapshots (experiment_result_id,snapshot_version,snapshot,snapshot_fingerprint) VALUES ($1,2,'{}'::jsonb,$2)",
+        [randomUUID(),'a'.repeat(64)], '23514',
+      )
+      await rejectsSafely(
+        "INSERT INTO experiment_result_comparison_snapshots (experiment_result_id,snapshot_version,snapshot,snapshot_fingerprint) VALUES ($1,1,'{}'::jsonb,$2)",
+        [resultId,'a'.repeat(64)], '23505',
+      )
+
+      // A newer retraction must not rewrite an older result's original recorded snapshot.
+      await client.query(
+        `INSERT INTO experiment_implementation_revisions (id,experiment_id,revision,action,effective_date,behavior_change,reason)
+         VALUES ($1,$2,2,'retracted',NULL,NULL,'Fictional retraction after review')`,
+        [randomUUID(),experimentId],
+      )
+      await client.query(
+        "UPDATE experiment_results SET status='invalidated',invalidated_at=now(),invalidation_reason='Synthetic corrected source' WHERE id=$1",
+        [resultId],
+      )
+      const after = await client.query(
+        `SELECT r.status,s.snapshot,s.snapshot_fingerprint
+         FROM experiment_results r JOIN experiment_result_comparison_snapshots s ON s.experiment_result_id=r.id
+         WHERE r.id=$1`,
+        [resultId],
+      )
+      expect(after.rows[0].status).toBe('invalidated')
+      expect(parseExperimentComparisonSnapshot(after.rows[0].snapshot)).toEqual(snapshot)
+      expect(after.rows[0].snapshot_fingerprint).toBe(hash)
+    } finally {
+      await client.query('ROLLBACK')
     }
   }, 30_000)
 
