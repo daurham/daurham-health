@@ -1011,3 +1011,25 @@ The historical evidence-memory ranking gate stays disabled. PIQ-7
 independent preview DB/Auth, release/rollback, mobile owner QA and
 formal owner acceptance are outstanding (0/9). Next review: staging
 query cost / statement timing and post-finalization source drift.
+
+
+## 2026-10-18 — PIQ-6.5 bounded body evidence loader / INSERT source CAS (green)
+
+Commit `b038b09b3f6ff738a389d337af5828d661a7008c`,
+branch CI 39153220945 (2,713 passed, 32 skipped, TypeScript,
+ESLint, Vite build green), and isolated PostgreSQL 39153220879
+(31/31 tests green) verified a bounded measured_at UTC envelope in
+the shared body-metric loader / finalization source digest. This
+limits unrelated historical rows and retains +14/-12 local-date
+boundary records through a conservative two-day UTC safety pad.
+Canonical JS local calendar eligibility is unchanged. In-window
+corrections still block stale result INSERT; out-of-window old
+measurements are not a reason to invalidate the read-time digest.
+No schema migration, owner data/model call or deployment took place.
+No latency improvement has been measured on real-world datasets.
+
+Remaining PIQ-6.5/7 gates: realistic SQL EXPLAIN/performance on
+synthetic staging; digest coverage after the INSERT statement;
+Neon/Vercel independently isolated Auth QA, owner device signoff,
+schema/backup/rollback, and explicit release approval (formal 0/9).
+`main` remains unchanged.
