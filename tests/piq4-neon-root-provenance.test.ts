@@ -81,6 +81,8 @@ describe('PIQ independently verified new-project root provenance', () => {
       source: 'github_api' as const, ref: 'piq/new-review', headSha: 'a'.repeat(40),
       ci: { source: 'github_actions' as const, workflowPath: '.github/workflows/validation.yml',
         headSha: 'a'.repeat(40), status: 'completed', conclusion: 'success' },
+      postgresCi: { source: 'github_actions' as const, workflowPath: '.github/workflows/piq1-postgres.yml',
+        headSha: 'a'.repeat(40), status: 'completed', conclusion: 'success' },
     }
     const deployment = { source: 'vercel_api' as const, projectId: 'health',
       ref: 'piq/new-review', sha: 'a'.repeat(40), state: 'READY', target: null }
