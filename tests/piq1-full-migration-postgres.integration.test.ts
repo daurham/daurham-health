@@ -10,6 +10,7 @@ import { readMaintenanceDecisionSnapshot, isMaintenanceDecisionRevisionCurrent }
 import { activeCalorieDecisionInRevision, dueFollowUps, requireCurrentCalorieRecommendation, surfaceDraft, writeCoachRecommendationResponse, writeCoachRecommendationOutcome } from '../server/intelligence/coach-intelligence.js'
 import { randomUUID } from 'node:crypto'
 import { experimentEvidenceFingerprint } from '../src/domain/experiment-results.js'
+import { OWNER_OUTCOME_FEEDBACK_INSERT_SQL } from '../server/lab/outcome-feedback.js'
 import { parseExperimentComparisonSnapshot } from '../src/domain/experiment-comparison-snapshot.js'
 import { readPrimaryGoalIntent, savePrimaryGoalIntent } from '../server/goals/primary-intent.js'
 import { getHealthProfile, putHealthProfile } from '../server/profile/service.js'
@@ -1126,6 +1127,33 @@ describe.skipIf(!url)('PIQ-1.1 full numbered migration chain and backup on isola
         [resultId,'a'.repeat(64)], '23505',
       )
 
+      // 0060: An explicitly owner-confirmed follow-up is append-only. The
+      // write uses a single SQL CAS against original recorded evidence and
+      // owner implementation revision/date, not an optimistic UI check alone.
+      const feedback1 = await client.query(OWNER_OUTCOME_FEEDBACK_INSERT_SQL, [
+        resultId, randomUUID(), 0, 'recorded', 'other_changes',
+        'Fictional travel during follow-up', hash, 1, '2026-10-05',
+      ])
+      expect(feedback1.rowCount).toBe(1)
+      expect(Number(feedback1.rows[0]?.version)).toBe(1)
+      const stale = await client.query(OWNER_OUTCOME_FEEDBACK_INSERT_SQL, [
+        resultId, randomUUID(), 0, 'recorded', 'none_reported', null, hash, 1, '2026-10-05',
+      ])
+      expect(stale.rowCount).toBe(0)
+      await rejectsSafely(
+        "UPDATE experiment_outcome_feedback_events SET owner_note = 'changed' WHERE experiment_result_id=$1",
+        [resultId], 'P0001',
+      )
+      await rejectsSafely(
+        'DELETE FROM experiment_outcome_feedback_events WHERE experiment_result_id=$1',
+        [resultId], 'P0001',
+      )
+      await rejectsSafely(
+        `INSERT INTO experiment_outcome_feedback_events
+          (id,experiment_result_id,version,action,unlogged_factors,comparison_fingerprint)
+          VALUES ($1,$2,2,'withdrawn','none_reported',$3)`,
+        [randomUUID(), resultId, hash], '23514',
+      )
       // A newer retraction must not rewrite an older result's original recorded snapshot.
       await client.query(
         `INSERT INTO experiment_implementation_revisions (id,experiment_id,revision,action,effective_date,behavior_change,reason)
@@ -1145,6 +1173,26 @@ describe.skipIf(!url)('PIQ-1.1 full numbered migration chain and backup on isola
       expect(after.rows[0].status).toBe('invalidated')
       expect(parseExperimentComparisonSnapshot(after.rows[0].snapshot)).toEqual(snapshot)
       expect(after.rows[0].snapshot_fingerprint).toBe(hash)
+
+      // A stale accepted answer cannot be revised after the intervention was
+      // retracted or its source result invalidated. Explicit withdrawal is
+      // still permitted to keep owner controls available on historical rows.
+      const blocked = await client.query(OWNER_OUTCOME_FEEDBACK_INSERT_SQL, [
+        resultId, randomUUID(), 1, 'revised', 'none_reported', null, hash, 2, null,
+      ])
+      expect(blocked.rowCount).toBe(0)
+      const withdrawn = await client.query(OWNER_OUTCOME_FEEDBACK_INSERT_SQL, [
+        resultId, randomUUID(), 1, 'withdrawn', null, null, hash, 2, null,
+      ])
+      expect(withdrawn.rowCount).toBe(1)
+      const history = await client.query(
+        'SELECT version,action,unlogged_factors,owner_note FROM experiment_outcome_feedback_events WHERE experiment_result_id=$1 ORDER BY version',
+        [resultId],
+      )
+      expect(history.rows).toMatchObject([
+        { version:1,action:'recorded',unlogged_factors:'other_changes',owner_note:'Fictional travel during follow-up' },
+        { version:2,action:'withdrawn',unlogged_factors:null,owner_note:null },
+      ])
     } finally {
       await client.query('ROLLBACK')
     }
