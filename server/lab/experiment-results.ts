@@ -149,7 +149,7 @@ export async function commitExperimentResult(experimentId: string, body: unknown
                    ELSE COALESCE(change.effective_date,implementation.effective_date)::text
               END) IS NOT DISTINCT FROM $18::text
          AND change.revision IS NOT DISTINCT FROM $19::integer
-         AND (${EXPERIMENT_FINALIZATION_SOURCE_CAS_EXPRESSION}) = $29::text`,
+         AND (${EXPERIMENT_FINALIZATION_SOURCE_CAS_EXPRESSION}) = $30::text`,
       [
         resultId,
         experimentId,
@@ -511,6 +511,7 @@ async function buildEvaluation(
     sleep:requirements.some(r=>r.requirementKind==='sleep_metric'),
     experimentId:experiment.id,experimentStart:start,
     benchmarkIds:[...new Set(requirements.map(r=>r.selector.benchmarkDefinitionId).filter((id):id is string=>Boolean(id)))].sort(),
+    bodyMetricKeys:[...new Set(requirements.filter(r=>r.requirementKind==='body_metric').map(r=>r.selector.metricKey).filter((key):key is string=>Boolean(key)))].sort(),
   }
   const sourceValueSeal = comparisonReview.state === 'descriptive_coverage'
     ? await computeExperimentSourceValueSeal({
@@ -777,10 +778,7 @@ async function loadBody(
   const metricKeys = requirements.filter((item) => item.requirementKind === 'body_metric').map((item) => item.selector.metricKey).filter(Boolean)
   if (metricKeys.length === 0) return []
   const rows = (await sql.query(
-    `SELECT m.id::text AS id, m.metric_key, m.value, m.unit, s.measured_at, s.timezone
-     FROM body_metrics m
-     JOIN body_measurement_sessions s ON s.id = m.measurement_session_id
-     WHERE m.metric_key = ANY($1::text[])`,
+    EXPERIMENT_BODY_SOURCE_SQL,
     [metricKeys],
   )) as Array<Record<string, unknown>>
   return rows.flatMap((row) => {
@@ -824,13 +822,13 @@ export const EXPERIMENT_VERIFIED_NUTRITION_SQL = [
 export type FinalizationSourceGuardScope = {
   start:string;end:string;today:string;timezone:string;
   nutrition:boolean;sleep:boolean;
-  experimentId:string;experimentStart:string;benchmarkIds:string[]
+  experimentId:string;experimentStart:string;benchmarkIds:string[];bodyMetricKeys:string[]
 }
 function finalizationSourceGuardParams(scope:FinalizationSourceGuardScope):[
-  string,string,string,string,boolean,boolean,string,string,string[]
+  string,string,string,string,boolean,boolean,string,string,string[],string[]
 ] {
   return [scope.start,scope.end,scope.today,scope.timezone,scope.nutrition,
-    scope.sleep,scope.experimentId,scope.experimentStart,scope.benchmarkIds]
+    scope.sleep,scope.experimentId,scope.experimentStart,scope.benchmarkIds,scope.bodyMetricKeys]
 }
 export function buildFinalizationSourceDigestExpression(firstParameter:number):string {
   if(!Number.isInteger(firstParameter)||firstParameter<1||firstParameter>50)
@@ -847,6 +845,15 @@ export function buildFinalizationSourceDigestExpression(firstParameter:number):s
     /\$(1|2)::uuid(\[\])?/g,(_whole,num:string,array:string|undefined)=>
       bind(num==='1'?9:7)+'::uuid'+(array??''),
   )
+  const activitySql=EXPERIMENT_ACTIVITY_SOURCE_SQL.replace(
+    /\$(1|2|3)::date/g,(_whole,num:string)=>
+      bind(num==='1'?8:2)+'::date',
+  ).replace('$3',bind(4))
+  const contextSql=EXPERIMENT_CONTEXT_SOURCE_SQL.replace(
+    /\$(1|2)::date/g,(_whole,num:string)=>
+      bind(num==='1'?8:2)+'::date',
+  )
+  const bodySql=EXPERIMENT_BODY_SOURCE_SQL.replace('$1::text[]',bind(10)+'::text[]')
   return `md5(
     (CASE WHEN ${bind(5)}::boolean THEN COALESCE((
       SELECT jsonb_agg(to_jsonb(n) ORDER BY n.log_date)::text
@@ -871,6 +878,18 @@ export function buildFinalizationSourceDigestExpression(firstParameter:number):s
       SELECT jsonb_agg(to_jsonb(b) ORDER BY b.result_date,b.created_at,
         b.id,b.requirement_id)::text
       FROM (${benchmarkSql}) b
+    ),'[]') || ':' ||
+    COALESCE((
+      SELECT jsonb_agg(to_jsonb(a) ORDER BY a.summary_date)::text
+      FROM (${activitySql}) a
+    ),'[]') || ':' ||
+    COALESCE((
+      SELECT jsonb_agg(to_jsonb(c) ORDER BY c.context_date,c.tag_key)::text
+      FROM (${contextSql}) c
+    ),'[]') || ':' ||
+    COALESCE((
+      SELECT jsonb_agg(to_jsonb(m) ORDER BY m.id)::text
+      FROM (${bodySql}) m
     ),'[]')
   )`
 }
@@ -903,11 +922,24 @@ async function loadNutrition(sql: Sql, start: string, end: string, today: string
   return points
 }
 
+/** Shared between evidence loading and the bounded finalization source CAS.
+ * Never hashes body notes, context free text or activity evidence JSON.
+ */
+export const EXPERIMENT_ACTIVITY_SOURCE_SQL = `SELECT summary_date::text AS summary_date, steps_count, active_energy_kcal, exercise_minutes, resting_heart_rate_bpm
+     FROM activity_daily_summaries
+     WHERE timezone = $3 AND summary_date BETWEEN $1::date AND $2::date`
+export const EXPERIMENT_BODY_SOURCE_SQL = `SELECT m.id::text AS id, m.metric_key, m.value, m.unit, s.measured_at, s.timezone
+     FROM body_metrics m
+     JOIN body_measurement_sessions s ON s.id = m.measurement_session_id
+     WHERE m.metric_key = ANY($1::text[])`
+export const EXPERIMENT_CONTEXT_SOURCE_SQL = `SELECT c.context_date::text AS context_date, t.tag_key
+     FROM daily_context c
+     LEFT JOIN daily_context_tags t ON t.context_id = c.id
+     WHERE c.context_date BETWEEN $1::date AND $2::date`
+
 async function loadActivity(sql: Sql, start: string, end: string, timezone: string) {
   const rows = (await sql.query(
-    `SELECT summary_date::text AS summary_date, steps_count, active_energy_kcal, exercise_minutes, resting_heart_rate_bpm
-     FROM activity_daily_summaries
-     WHERE timezone = $3 AND summary_date BETWEEN $1::date AND $2::date`,
+    EXPERIMENT_ACTIVITY_SOURCE_SQL,
     [start, end, timezone],
   )) as Array<Record<string, unknown>>
   const points: ExperimentEvidence['activity'] = []
@@ -937,10 +969,7 @@ async function loadSleep(sql: Sql, start: string, end: string, timezone: string)
 
 async function loadContext(sql: Sql, start: string, end: string) {
   const rows = (await sql.query(
-    `SELECT c.context_date::text AS context_date, t.tag_key
-     FROM daily_context c
-     LEFT JOIN daily_context_tags t ON t.context_id = c.id
-     WHERE c.context_date BETWEEN $1::date AND $2::date`,
+    EXPERIMENT_CONTEXT_SOURCE_SQL,
     [start, end],
   )) as Array<{ context_date: string; tag_key: string | null }>
   const grouped = new Map<string, string[]>()
