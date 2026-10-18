@@ -1,6 +1,6 @@
 export const BACKUP_FORMAT = 'daurham-health-backup'
 export const BACKUP_FORMAT_VERSION = 1
-export const LATEST_SCHEMA_MIGRATION = '0056_primary_goal_intent_events.sql'
+export const LATEST_SCHEMA_MIGRATION = '0059_experiment_comparison_snapshots.sql'
 export const PORTABLE_EXPORT_BYTE_LIMIT = 3_500_000
 
 export type ColumnKind = 'uuid' | 'text' | 'date' | 'timestamptz' | 'numeric' | 'int' | 'bool' | 'json' | 'bytea'
@@ -677,6 +677,40 @@ export const BACKUP_TABLES: readonly BackupTable[] = [
       col('source_id', 'uuid'),
       col('created_at', 'timestamptz'),
       col('updated_at', 'timestamptz'),
+    ],
+  }),
+  // Owner-reported intervention records and correction/retraction history are
+  // canonical evidence provenance. Parent-before-child ordering is mandatory.
+  table({
+    name: 'experiment_implementations',
+    backupClass: 'canonical',
+    primaryKey: ['experiment_id'],
+    seeded: false,
+    portable: true,
+    references: [{ column: 'experiment_id', table: 'experiments' }],
+    columns: [
+      col('experiment_id', 'uuid'),
+      col('effective_date', 'date'),
+      col('behavior_change', 'text'),
+      col('owner_confirmed_at', 'timestamptz'),
+    ],
+  }),
+  table({
+    name: 'experiment_implementation_revisions',
+    backupClass: 'canonical',
+    primaryKey: ['id'],
+    seeded: false,
+    portable: true,
+    references: [{ column: 'experiment_id', table: 'experiment_implementations' }],
+    columns: [
+      col('id', 'uuid'),
+      col('experiment_id', 'uuid'),
+      col('revision', 'int'),
+      col('action', 'text'),
+      col('effective_date', 'date'),
+      col('behavior_change', 'text'),
+      col('reason', 'text'),
+      col('recorded_at', 'timestamptz'),
     ],
   }),
   table({
@@ -1447,6 +1481,23 @@ export const BACKUP_TABLES: readonly BackupTable[] = [
       col('created_at', 'timestamptz'),
       col('invalidated_at', 'timestamptz'),
       col('invalidation_reason', 'text'),
+    ],
+  }),
+  // 0059: immutable point-in-time coverage judgment must survive owner backups.
+  // Restoring into a fresh database inserts rows (never updates), preserving hash.
+  table({
+    name: 'experiment_result_comparison_snapshots',
+    backupClass: 'canonical',
+    primaryKey: ['experiment_result_id'],
+    seeded: false,
+    portable: true,
+    references: [{ column: 'experiment_result_id', table: 'experiment_results' }],
+    columns: [
+      col('experiment_result_id', 'uuid'),
+      col('snapshot_version', 'int'),
+      col('snapshot', 'json'),
+      col('snapshot_fingerprint', 'text'),
+      col('captured_at', 'timestamptz'),
     ],
   }),
   table({
