@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { RESULT_CAUSALITY_FOOTER } from '@/domain/experiment-results'
 import { experimentComparisonCopy } from '@/domain/experiment-comparison'
+import { feedbackPromptCopy, type OutcomeFeedbackAnswer } from '@/domain/experiment-outcome-feedback'
 import { dailyContextTagLabel, type DailyContextTagKey } from '@/domain/context'
 import { LoadErrorNotice, primaryButtonClass, secondaryButtonClass } from '@/lib'
 import {
@@ -9,6 +10,7 @@ import {
   fetchExperimentResult,
   invalidateExperimentResult,
   previewExperimentResult,
+  submitExperimentOutcomeFeedback,
   type ExperimentResultView,
 } from './api'
 import { fieldClass } from './protocol-form'
@@ -123,13 +125,22 @@ export function ExperimentResultDetailPage() {
   const [result, setResult] = useState<ExperimentResultView | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [reason, setReason] = useState('')
+  const [feedbackAnswer, setFeedbackAnswer] = useState<OutcomeFeedbackAnswer | ''>('')
+  const [feedbackNote, setFeedbackNote] = useState('')
+  const [feedbackBusy, setFeedbackBusy] = useState(false)
 
   useEffect(() => {
     if (!resultId) return
     let cancelled = false
     fetchExperimentResult(resultId)
       .then((next) => {
-        if (!cancelled) setResult(next)
+        if (!cancelled) {
+          setResult(next)
+          if (next.outcomeFeedbackLatest?.action !== 'withdrawn') {
+            setFeedbackAnswer(next.outcomeFeedbackLatest?.unloggedFactors ?? '')
+            setFeedbackNote(next.outcomeFeedbackLatest?.ownerNote ?? '')
+          }
+        }
       })
       .catch((caught: unknown) => {
         if (!cancelled) setError(caught instanceof Error ? caught.message : 'Could not load the result')
@@ -138,6 +149,25 @@ export function ExperimentResultDetailPage() {
       cancelled = true
     }
   }, [resultId])
+
+  async function submitFeedback(action: 'record' | 'withdraw') {
+    if (!resultId || !result) return
+    setFeedbackBusy(true)
+    setError(null)
+    try {
+      await submitExperimentOutcomeFeedback(resultId, {
+        action, expectedVersion: result.outcomeFeedbackLatest?.version ?? 0, confirmFeedback: true,
+        ...(action === 'record' ? { unloggedFactors: feedbackAnswer as OutcomeFeedbackAnswer,
+          ownerNote: feedbackAnswer === 'other_changes' ? feedbackNote : null } : {}),
+      })
+      setResult(await fetchExperimentResult(resultId))
+      if (action === 'withdraw') { setFeedbackAnswer(''); setFeedbackNote('') }
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Could not save feedback')
+    } finally {
+      setFeedbackBusy(false)
+    }
+  }
 
   async function invalidate() {
     if (!resultId) return
@@ -160,6 +190,50 @@ export function ExperimentResultDetailPage() {
       </p>
       {error ? <LoadErrorNotice message={error} /> : null}
       <ResultBody result={result} />
+      {(result.outcomeFeedbackReadiness?.state === 'ready' ||
+        (result.outcomeFeedbackLatest && result.outcomeFeedbackLatest.action !== 'withdrawn')) ? (
+        <section className="space-y-3 rounded-lg border border-zinc-200 p-3 text-sm">
+          <h2 className="font-semibold">Optional follow-up review</h2>
+          <p className="text-zinc-700">{feedbackPromptCopy()}</p>
+          {result.outcomeFeedbackLatest?.action !== 'withdrawn' && result.outcomeFeedbackLatest ? (
+            <p className="text-xs text-zinc-500">An answer was recorded. You can revise or withdraw it without changing the experiment result.</p>
+          ) : null}
+          {result.outcomeFeedbackReadiness?.state === 'ready' ? (
+            <>
+              <label className="block space-y-1">
+                <span>Were any other important factors unlogged?</span>
+                <select className={fieldClass} value={feedbackAnswer}
+                  onChange={(event) => setFeedbackAnswer(event.target.value as OutcomeFeedbackAnswer | '')}>
+                  <option value="">Choose an answer</option>
+                  <option value="none_reported">No other changes I recall</option>
+                  <option value="other_changes">Yes, other changes or circumstances</option>
+                  <option value="unsure">I'm not sure</option>
+                </select>
+              </label>
+              {feedbackAnswer === 'other_changes' ? (
+                <label className="block space-y-1">
+                  <span>Optional context (500 characters max)</span>
+                  <textarea className={fieldClass} value={feedbackNote} maxLength={500}
+                    onChange={(event) => setFeedbackNote(event.target.value)} />
+                </label>
+              ) : null}
+              <button type="button" className={primaryButtonClass}
+                disabled={feedbackBusy || !feedbackAnswer} onClick={() => void submitFeedback('record')}>
+                {feedbackBusy ? 'Saving…' : result.outcomeFeedbackLatest ? 'Revise feedback' : 'Save feedback'}
+              </button>
+            </>
+          ) : (
+            <p className="text-zinc-600">The original record is no longer eligible for a new review. Recorded feedback can still be withdrawn.</p>
+          )}
+          {result.outcomeFeedbackLatest && result.outcomeFeedbackLatest.action !== 'withdrawn' ? (
+            <button type="button" className={secondaryButtonClass}
+              disabled={feedbackBusy} onClick={() => void submitFeedback('withdraw')}>
+              Withdraw previous feedback
+            </button>
+          ) : null}
+          <p className="text-xs text-zinc-500">Your answer is voluntary. It does not alter targets, rewards, results or treatment decisions.</p>
+        </section>
+      ) : null}
       {result.status === 'valid' ? (
         <div className="space-y-2">
           <label className="block text-sm text-zinc-800">
