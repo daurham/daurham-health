@@ -1238,12 +1238,12 @@ describe.skipIf(!url)('PIQ-1.1 full numbered migration chain and backup on isola
       const night=await client.query("INSERT INTO sleep_nightly_summaries (sleep_date,timezone,logical_source_key,source_name,start_at,end_at,total_sleep_minutes,observation_status,analysis_eligible,stage_analysis_eligible,selection_reason,calculation_version) VALUES ($1::date,$2,'fixture-watch','Synthetic','2026-09-21T04:00:00Z','2026-09-21T11:00:00Z',420,'analysis_eligible',true,false,'source_priority','piq-test') RETURNING id",[through,tz])
       // Derive exactly the literal SQL actually used by the finalization code.
       const source=readFileSync('server/lab/experiment-results.ts','utf8')
-      const start=source.indexOf('sql.query(\n      \`INSERT INTO experiment_results (')
-      const end=source.indexOf('\`,\n      [',start)
+      const start=source.indexOf('sql.query(\n      `INSERT INTO experiment_results (')
+      const end=source.indexOf('`,\n      [',start)
       expect(start).toBeGreaterThan(0)
       expect(end).toBeGreaterThan(start)
-      const statement=source.slice(start+"sql.query(\n      \`".length,end)
-        .replace('\${EXPERIMENT_FINALIZATION_SOURCE_CAS_EXPRESSION}',EXPERIMENT_FINALIZATION_SOURCE_CAS_EXPRESSION)
+      const statement=source.slice(start+"sql.query(\n      `".length,end)
+        .replace('${EXPERIMENT_FINALIZATION_SOURCE_CAS_EXPRESSION}',EXPERIMENT_FINALIZATION_SOURCE_CAS_EXPRESSION)
       expect(statement).toContain('AND change.revision IS NOT DISTINCT FROM $19::integer')
       const digest=async()=>String((await client.query(EXPERIMENT_FINALIZATION_SOURCE_DIGEST_SQL,scope)).rows[0].digest)
       const args=(id:string,hash:string,action='original',date=from,rev:number|null=null)=>[
