@@ -122,11 +122,29 @@ export async function commitExperimentResult(experimentId: string, body: unknown
               $5::date, $6::date, $7::date, $8,
               $9, $10, $11, $12, $13::uuid, $14::uuid
        FROM experiments e
+       LEFT JOIN experiment_implementations implementation
+         ON implementation.experiment_id = e.id
+       LEFT JOIN LATERAL (
+         SELECT action,effective_date,revision
+         FROM experiment_implementation_revisions
+         WHERE experiment_id = e.id
+         ORDER BY revision DESC LIMIT 1
+       ) change ON TRUE
        WHERE e.id = $2::uuid
          AND e.status = 'active'
          AND e.protocol_version_id = $3::uuid
          AND e.window_start IS NOT DISTINCT FROM $15::date
-         AND e.window_end IS NOT DISTINCT FROM $16::date`,
+         AND e.window_end IS NOT DISTINCT FROM $16::date
+         AND (CASE
+                WHEN change.action = 'retracted' THEN 'retracted'
+                WHEN change.action = 'corrected' THEN 'corrected'
+                WHEN implementation.experiment_id IS NOT NULL THEN 'original'
+                ELSE 'unreported'
+              END) = $17::text
+         AND (CASE WHEN change.action = 'retracted' THEN NULL
+                   ELSE COALESCE(change.effective_date,implementation.effective_date)::text
+              END) IS NOT DISTINCT FROM $18::text
+         AND change.revision IS NOT DISTINCT FROM $19::integer`,
       [
         resultId,
         experimentId,
@@ -144,6 +162,9 @@ export async function commitExperimentResult(experimentId: string, body: unknown
         attestation.supersedesResultId,
         built.experiment.window_start,
         built.experiment.window_end,
+        built.experiment.implementation_provenance,
+        built.experiment.reported_implementation_date ?? null,
+        built.experiment.implementation_revision,
       ],
     ),
     ...built.evaluation.requirements.map((item, index) =>
