@@ -30,8 +30,9 @@ import {
 import { readOwnerOutcomeFeedback } from './outcome-feedback.js'
 import { reviewExperimentEvidence } from '../../src/domain/experiment-evidence-review.js'
 import { assessExperimentContextApplicability } from '../../src/domain/experiment-context-applicability.js'
+import { computeExperimentSourceValueSeal } from '../../src/domain/experiment-source-value-seal.js'
 import {
-  describeCurrentOutcomeComparison, unavailableCurrentComparison,
+  describeCurrentOutcomeComparison, unavailableCurrentComparison, verifyCurrentOutcomeSourceSeal,
   type CurrentOutcomeComparison,
 } from '../../src/domain/experiment-current-outcomes.js'
 
@@ -90,6 +91,7 @@ export async function commitExperimentResult(experimentId: string, body: unknown
     implementationEffectiveDate: built.experiment.reported_implementation_date ?? null,
     implementationRevision: built.experiment.implementation_revision,
     review: built.comparisonReview,
+    sourceValueSeal: built.sourceValueSeal,
   })
   const snapshotFingerprint = await experimentEvidenceFingerprint(snapshot)
   const statements = [
@@ -235,10 +237,16 @@ export async function getExperimentResult(id: string) {
             needNutrition ? loadNutrition(sql,before.start,after.end,today) : Promise.resolve([]),
             needSleep ? loadSleep(sql,before.start,after.end,timezone) : Promise.resolve([]),
           ])
-          currentOutcomeComparison = describeCurrentOutcomeComparison({
+          const computed = describeCurrentOutcomeComparison({
             snapshot:comparisonSnapshot,readiness:ownerFeedback.readiness,
             nutrition,sleep,asOf:today,
           })
+          const currentSeal = computed.state === 'available'
+            ? await computeExperimentSourceValueSeal({review:comparisonSnapshot.review,nutrition,sleep})
+            : null
+          currentOutcomeComparison = verifyCurrentOutcomeSourceSeal(
+            computed,comparisonSnapshot.sourceValueSeal,currentSeal,
+          )
         } catch {
           currentOutcomeComparison = unavailableCurrentComparison('source_unavailable',today)
         }
@@ -414,7 +422,11 @@ async function buildEvaluation(
         }),
       )
     : null
-  return { experiment, evaluation, fingerprint, comparisonReview }
+  const sourceValueSeal = comparisonReview.state === 'descriptive_coverage'
+    ? await computeExperimentSourceValueSeal({
+      review: comparisonReview,nutrition:evidence.nutrition,sleep:evidence.sleep,
+    }) : null
+  return { experiment, evaluation, fingerprint, comparisonReview, sourceValueSeal }
 }
 
 function publicPreview(evaluation: ExperimentEvaluation, experiment: ExperimentRow, fingerprint: string | null) {
