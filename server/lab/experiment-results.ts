@@ -923,7 +923,7 @@ export function buildFinalizationSourceDigestExpression(firstParameter:number):s
     .replace('$1::text[]',bind(10)+'::text[]')
     .replace('$2::date',bind(1)+'::date')
     .replace('$3::date',bind(2)+'::date')
-  const bySupplement=(sql:string)=>sql.replace('$1::uuid[]',bind(11)+'::uuid[]')
+  const bySupplement=(sql:string)=>sql.replaceAll('$1::uuid[]',bind(11)+'::uuid[]')
   const supplementSql=bySupplement(EXPERIMENT_SUPPLEMENT_SOURCE_SQL)
   const scheduleSql=bySupplement(EXPERIMENT_SUPPLEMENT_SCHEDULE_SOURCE_SQL)
   const statusSql=bySupplement(EXPERIMENT_SUPPLEMENT_STATUS_SOURCE_SQL)
