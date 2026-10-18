@@ -811,10 +811,9 @@ export const EXPERIMENT_VERIFIED_NUTRITION_SQL = [
   'GROUP BY e.log_date',
 ].join('\n')
 
-/** Strictly source-level guard: one PG statement has one READ COMMITTED
- * snapshot. At write time the digest is recalculated INSIDE the same INSERT
- * statement rather than in an earlier, separate request. This is not a
- * cross-table serializable snapshot of all experiment evidence.
+/** Strictly source-level guard: one PostgreSQL statement has one
+ * READ COMMITTED snapshot. At write time the digest is recalculated WITHIN
+ * the INSERT statement. This does not seal all experiment evidence.
  */
 export type FinalizationSourceGuardScope = {
   start:string;end:string;today:string;timezone:string;
@@ -825,244 +824,10 @@ function finalizationSourceGuardParams(scope:FinalizationSourceGuardScope):[
 ] {
   return [scope.start,scope.end,scope.today,scope.timezone,scope.nutrition,scope.sleep]
 }
-export function buildFinalizationSourceDigestExpression(firstParameter:number):string{
+export function buildFinalizationSourceDigestExpression(firstParameter:number):string {
   if(!Number.isInteger(firstParameter)||firstParameter<1||firstParameter>50)
     throw new Error('Invalid finalization source parameter offset')
-  const bind=(n:number)=>'
-  const rows = (await sql.query(
-    EXPERIMENT_VERIFIED_NUTRITION_SQL, [start, end, today],
-  )) as Array<Record<string, unknown>>
-  const points: ExperimentEvidence['nutrition'] = []
-  for (const row of rows) {
-    for (const key of ['calories', 'protein', 'carbs', 'fat'] as const) {
-      points.push({ date: String(row.log_date), metricKey: key, value: finite(row[key]) })
-    }
-  }
-  return points
-}
-
-async function loadActivity(sql: Sql, start: string, end: string, timezone: string) {
-  const rows = (await sql.query(
-    `SELECT summary_date::text AS summary_date, steps_count, active_energy_kcal, exercise_minutes, resting_heart_rate_bpm
-     FROM activity_daily_summaries
-     WHERE timezone = $3 AND summary_date BETWEEN $1::date AND $2::date`,
-    [start, end, timezone],
-  )) as Array<Record<string, unknown>>
-  const points: ExperimentEvidence['activity'] = []
-  for (const row of rows) {
-    for (const key of ['steps_count', 'active_energy_kcal', 'exercise_minutes', 'resting_heart_rate_bpm'] as const) {
-      points.push({ date: String(row.summary_date), metricKey: key, value: finite(row[key]) })
-    }
-  }
-  return points
-}
-
-async function loadSleep(sql: Sql, start: string, end: string, timezone: string) {
-  const rows = (await sql.query(
-    `SELECT sleep_date::text AS sleep_date, total_sleep_minutes, analysis_eligible, logical_source_key
-     FROM sleep_nightly_summaries
-     WHERE timezone = $3 AND sleep_date BETWEEN $1::date AND $2::date`,
-    [start, end, timezone],
-  )) as Array<Record<string, unknown>>
-  return rows.map((row) => ({
-    date: String(row.sleep_date),
-    metricKey: 'total_sleep_minutes',
-    value: finite(row.total_sleep_minutes),
-    eligible: row.analysis_eligible === true,
-    sourceKey: typeof row.logical_source_key === 'string' ? row.logical_source_key : undefined,
-  }))
-}
-
-async function loadContext(sql: Sql, start: string, end: string) {
-  const rows = (await sql.query(
-    `SELECT c.context_date::text AS context_date, t.tag_key
-     FROM daily_context c
-     LEFT JOIN daily_context_tags t ON t.context_id = c.id
-     WHERE c.context_date BETWEEN $1::date AND $2::date`,
-    [start, end],
-  )) as Array<{ context_date: string; tag_key: string | null }>
-  const grouped = new Map<string, string[]>()
-  for (const row of rows) {
-    const tags = grouped.get(row.context_date) ?? []
-    if (row.tag_key) tags.push(row.tag_key)
-    grouped.set(row.context_date, tags)
-  }
-  return [...grouped.entries()].map(([date, tags]) => ({ date, tags }))
-}
-
-async function loadControls(sql: Sql, protocolVersionId: string) {
-  const rows = (await sql.query(
-    `SELECT tag_key FROM lab_protocol_context_controls WHERE protocol_version_id = $1::uuid`,
-    [protocolVersionId],
-  )) as Array<{ tag_key: string }>
-  return rows.map((row) => ({ tagKey: row.tag_key }))
-}
-
-async function loadAdherence(sql: Sql, supplementIds: string[], start: string, end: string) {
-  if (supplementIds.length === 0) return []
-  const supplements = (await sql.query(`SELECT id::text AS id, name FROM supplements WHERE id = ANY($1::uuid[])`, [supplementIds])) as Array<{ id: string; name: string }>
-  const schedules = (await sql.query(
-    `SELECT id::text AS id, supplement_id::text AS supplement_id, slot_label, dose_amount, dose_unit, weekday_mask,
-            effective_from::text AS effective_from, effective_through::text AS effective_through, sort_order
-     FROM supplement_schedules WHERE supplement_id = ANY($1::uuid[])`,
-    [supplementIds],
-  )) as Array<Record<string, unknown>>
-  const events = (await sql.query(
-    `SELECT supplement_id::text AS supplement_id, effective_date::text AS effective_date, status
-     FROM supplement_status_events WHERE supplement_id = ANY($1::uuid[]) ORDER BY effective_date, created_at`,
-    [supplementIds],
-  )) as Array<{ supplement_id: string; effective_date: string; status: StatusEventWindow['status'] }>
-  const adherence = (await sql.query(
-    `SELECT a.schedule_id::text AS schedule_id, a.scheduled_date::text AS scheduled_date, a.status
-     FROM supplement_adherence a
-     JOIN supplement_schedules s ON s.id = a.schedule_id
-     WHERE s.supplement_id = ANY($1::uuid[]) AND a.scheduled_date BETWEEN $2::date AND $3::date`,
-    [supplementIds, start, end],
-  )) as Array<{ schedule_id: string; scheduled_date: string; status: 'taken' | 'skipped' }>
-  return supplements.map((supplement) => {
-    const ownSchedules: ScheduleWindow[] = schedules
-      .filter((row) => row.supplement_id === supplement.id)
-      .map((row) => ({
-        id: String(row.id),
-        supplementId: supplement.id,
-        slotLabel: row.slot_label == null ? null : String(row.slot_label),
-        doseAmount: Number(row.dose_amount),
-        doseUnit: String(row.dose_unit),
-        weekdayMask: Number(row.weekday_mask),
-        effectiveFrom: String(row.effective_from),
-        effectiveThrough: row.effective_through == null ? null : String(row.effective_through),
-        sortOrder: Number(row.sort_order ?? 0),
-      }))
-    const ownEvents: StatusEventWindow[] = events
-      .filter((row) => row.supplement_id === supplement.id)
-      .map((row) => ({ effectiveDate: row.effective_date, status: row.status }))
-    const ownAdherence: AdherenceWindow[] = adherence
-      .filter((row) => ownSchedules.some((schedule) => schedule.id === row.schedule_id))
-      .map((row) => ({
-        scheduleId: row.schedule_id,
-        scheduledDate: row.scheduled_date,
-        status: row.status,
-        actualDoseAmount: null,
-        actualDoseUnit: null,
-      }))
-    const days: Array<{ date: string; state: OccurrenceState }> = []
-    let cursor = start
-    while (cursor <= end) {
-      for (const schedule of ownSchedules) {
-        const observation = ownAdherence.find((item) => item.scheduleId === schedule.id && item.scheduledDate === cursor) ?? null
-        days.push({
-          date: cursor,
-          state: resolveOccurrence({ events: ownEvents, schedule, date: cursor, adherence: observation }),
-        })
-      }
-      cursor = nextDate(cursor)
-    }
-    return { supplementId: supplement.id, name: supplement.name, days }
-  })
-}
-
-function nextDate(date: string): string {
-  const [year, month, day] = date.split('-').map(Number)
-  const utc = new Date(Date.UTC(year!, (month ?? 1) - 1, day ?? 1))
-  utc.setUTCDate(utc.getUTCDate() + 1)
-  return utc.toISOString().slice(0, 10)
-}
-
-function evidenceInserts(sql: Sql, resultId: string, evaluation: ExperimentEvaluation, requirementIds: string[]) {
-  const statements = []
-  evaluation.requirements.forEach((requirement, index) => {
-    for (const evidence of requirement.evidence) {
-      statements.push(
-        sql.query(
-          `INSERT INTO experiment_result_evidence (
-             id, experiment_result_id, requirement_result_id, evidence_kind, evidence_ref, evidence_snapshot, observation_date
-           ) VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5::jsonb, $6::jsonb, $7::date)`,
-          [
-            randomUUID(),
-            resultId,
-            requirementIds[index],
-            evidence.evidenceKind,
-            JSON.stringify(evidence.evidenceRef),
-            JSON.stringify(evidence.evidenceSnapshot),
-            evidence.observationDate,
-          ],
-        ),
-      )
-    }
-  })
-  for (const control of evaluation.contextControls) {
-    statements.push(
-      sql.query(
-        `INSERT INTO experiment_result_evidence (
-           id, experiment_result_id, requirement_result_id, evidence_kind, evidence_ref, evidence_snapshot, observation_date
-         ) VALUES ($1::uuid, $2::uuid, NULL, 'daily_context', $3::jsonb, $4::jsonb, NULL)`,
-        [
-          randomUUID(),
-          resultId,
-          JSON.stringify({ tagKey: control.tagKey }),
-          JSON.stringify({ recordedDates: control.recordedDates, recordedDayCount: control.recordedDayCount }),
-        ],
-      ),
-    )
-  }
-  return statements
-}
-
-async function assertSupersedes(sql: Sql, experimentId: string, supersedesResultId: string | null) {
-  if (!supersedesResultId) return
-  const rows = (await sql.query(
-    `SELECT experiment_id::text AS experiment_id, status FROM experiment_results WHERE id = $1::uuid`,
-    [supersedesResultId],
-  )) as Array<{ experiment_id: string; status: string }>
-  const row = rows[0]
-  if (!row || row.experiment_id !== experimentId) {
-    throw new HttpError(400, 'A replacement must name a result from this experiment.')
-  }
-  if (row.status !== 'invalidated') {
-    throw new HttpError(409, 'Invalidate the previous result before replacing it.')
-  }
-}
-
-async function manualSourceId(sql: Sql): Promise<string> {
-  const rows = (await sql.query(`SELECT id::text AS id FROM data_sources WHERE key = 'manual'`, [])) as Array<{ id: string }>
-  const id = rows[0]?.id
-  if (!id) throw new HttpError(503, 'Manual data source is not configured')
-  return id
-}
-
-function parsedAttestation(body: unknown): Exclude<ReturnType<typeof parseResultAttestation>, { error: string }> & { protocolFollowed: ProtocolAttestation } {
-  const parsed = parseResultAttestation(body)
-  if ('error' in parsed) throw new HttpError(400, parsed.error)
-  return parsed
-}
-
-function invalidationReason(body: unknown): string | null {
-  if (body == null || typeof body !== 'object') return null
-  const reason = (body as { reason?: unknown }).reason
-  if (reason == null || reason === '') return null
-  if (typeof reason !== 'string') throw new HttpError(400, 'Invalidation reason must be text.')
-  const text = reason.trim()
-  if (text.length > 500) throw new HttpError(400, 'Invalidation reason must be 500 characters or fewer.')
-  return text.length === 0 ? null : text
-}
-
-function finite(value: unknown): number | null {
-  if (value == null) return null
-  const parsed = typeof value === 'number' ? value : Number(value)
-  return Number.isFinite(parsed) ? parsed : null
-}
-
-/** 0059: these statements are part of the normal result transaction/read,
- * not a provisional side write. Older results explicitly report no snapshot. */
-export const EXPERIMENT_COMPARISON_SNAPSHOT_INSERT_SQL =
-  `INSERT INTO experiment_result_comparison_snapshots
-     (experiment_result_id, snapshot_version, snapshot, snapshot_fingerprint)
-   VALUES ($1::uuid, 1, $2::jsonb, $3)`
-
-export const EXPERIMENT_COMPARISON_SNAPSHOT_READ_SQL =
-  `SELECT snapshot, snapshot_version, snapshot_fingerprint, captured_at::text AS captured_at
-   FROM experiment_result_comparison_snapshots WHERE experiment_result_id = $1::uuid`
-+(firstParameter+n-1)
+  const bind=(n:number)=>'$'+(firstParameter+n-1)
   const nutritionSql=EXPERIMENT_VERIFIED_NUTRITION_SQL.replace(
     /\$(1|2|3)::date/g,(_match,num:string)=>bind(Number(num))+'::date',
   )
@@ -1083,7 +848,6 @@ export const EXPERIMENT_COMPARISON_SNAPSHOT_READ_SQL =
     ),'[]') ELSE 'unused-sleep' END)
   )`
 }
-
 export const EXPERIMENT_FINALIZATION_SOURCE_DIGEST_SQL =
   'SELECT '+buildFinalizationSourceDigestExpression(1)+' AS digest'
 export const EXPERIMENT_FINALIZATION_SOURCE_CAS_EXPRESSION =
