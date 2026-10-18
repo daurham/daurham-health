@@ -1225,7 +1225,7 @@ describe.skipIf(!url)('PIQ-1.1 full numbered migration chain and backup on isola
     await second.query('SET search_path TO piq_full_chain, public')
     const experimentId=randomUUID(),protocolId=randomUUID(),versionId=randomUUID()
     const from='2026-09-20',through='2026-09-21',tz='America/Phoenix'
-    const scope:[string,string,string,string,boolean,boolean,string,string,string[]]=[from,through,'2026-10-18',tz,true,true,experimentId,from,[]]
+    const scope:[string,string,string,string,boolean,boolean,string,string,string[],string[]]=[from,through,'2026-10-18',tz,true,true,experimentId,from,[],[]]
     try{
       const src=String((await client.query("SELECT id FROM data_sources WHERE key='manual' LIMIT 1")).rows[0].id)
       await client.query("INSERT INTO lab_protocols (id,protocol_kind,title,source_id) VALUES ($1,'experiment','Fictional CAS protocol',$2)",[protocolId,src])
@@ -1318,6 +1318,45 @@ describe.skipIf(!url)('PIQ-1.1 full numbered migration chain and backup on isola
       await second.query('UPDATE benchmark_result_values SET value=51 WHERE id=$1',[benchmarkValue.rows[0].id])
       expect(await digest()).not.toBe(withBenchmark)
       expect((await client.query(statement,args(randomUUID(),withBenchmark))).rowCount).toBe(0)
+
+      // Activity: exact canonical daily summary totals are snapshotted at
+      // INSERT time, not inferred from a prior cached coaching snapshot.
+      const activity=await client.query(
+        "INSERT INTO activity_daily_summaries (summary_date,timezone,steps_count,calculation_version,source_id) VALUES ($1::date,$2,2000,'synthetic',$3) RETURNING id",
+        [from,tz,src],
+      )
+      const beforeActivity=await digest()
+      await second.query('UPDATE activity_daily_summaries SET steps_count=2001 WHERE id=$1',[activity.rows[0].id])
+      expect(await digest()).not.toBe(beforeActivity)
+      expect((await client.query(statement,args(randomUUID(),beforeActivity))).rowCount).toBe(0)
+      // Context notes never enter the projection; only dated owner-reported tags.
+      const context=await client.query(
+        "INSERT INTO daily_context (id,context_date,source_id) VALUES ($1,$2::date,$3) RETURNING id",
+        [randomUUID(),from,src],
+      )
+      const beforeContext=await digest()
+      await second.query("INSERT INTO daily_context_tags (context_id,tag_key) VALUES ($1,'travel')",[context.rows[0].id])
+      expect(await digest()).not.toBe(beforeContext)
+      expect((await client.query(statement,args(randomUUID(),beforeContext))).rowCount).toBe(0)
+      // Body: only the requirement-selected metric-key projection participates.
+      // It is broader than the final displayed date range, deliberately
+      // conservative until the canonical JS and SQL local-date rules unify.
+      scope[9]=['weight']
+      const beforeBody=await digest()
+      const measurement=await client.query(
+        "INSERT INTO body_measurement_sessions (measured_at,timezone,source_id) VALUES ('2026-09-20T13:00:00Z',$1,$2) RETURNING id",
+        [tz,src],
+      )
+      const body=await client.query(
+        "INSERT INTO body_metrics (measurement_session_id,metric_key,value,unit,value_kind) VALUES ($1,'weight',187,'lb','manual') RETURNING id",
+        [measurement.rows[0].id],
+      )
+      expect(await digest()).not.toBe(beforeBody)
+      expect((await client.query(statement,args(randomUUID(),beforeBody))).rowCount).toBe(0)
+      const afterBody=await digest()
+      await second.query('UPDATE body_metrics SET value=186.5 WHERE id=$1',[body.rows[0].id])
+      expect(await digest()).not.toBe(afterBody)
+      expect((await client.query(statement,args(randomUUID(),afterBody))).rowCount).toBe(0)
       // A failed parent insert cannot persist its dependent immutable snapshot.
       await client.query('BEGIN')
       try{
