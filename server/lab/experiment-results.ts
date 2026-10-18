@@ -900,7 +900,6 @@ export function buildFinalizationSourceDigestExpression(firstParameter:number):s
   const statusSql=bySupplement(EXPERIMENT_SUPPLEMENT_STATUS_SOURCE_SQL)
   const adherenceSql=bySupplement(EXPERIMENT_SUPPLEMENT_ADHERENCE_SOURCE_SQL)
     .replace('$2::date',bind(8)+'::date').replace('$3::date',bind(2)+'::date')
-  const linkSql=EXPERIMENT_SUPPLEMENT_LINK_SOURCE_SQL.replace('$1::uuid',bind(7)+'::uuid')
   const requirementSql=EXPERIMENT_REQUIREMENT_SOURCE_SQL.replace('$1::uuid',bind(12)+'::uuid')
   const controlSql=EXPERIMENT_CONTROL_SOURCE_SQL.replace('$1::uuid',bind(12)+'::uuid')
   return `md5(
