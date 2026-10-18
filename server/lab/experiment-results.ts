@@ -31,6 +31,7 @@ import { readOwnerOutcomeFeedback } from './outcome-feedback.js'
 import { reviewExperimentEvidence } from '../../src/domain/experiment-evidence-review.js'
 import { assessExperimentContextApplicability } from '../../src/domain/experiment-context-applicability.js'
 import { computeContextRevisionSignature } from '../../src/domain/experiment-context-revision-signature.js'
+import { resultFinalizationEvidenceUnchanged, type ResultFinalizationEvidenceSignature } from '../../src/domain/experiment-finalization-recheck.js'
 import { computeExperimentSourceValueSeal } from '../../src/domain/experiment-source-value-seal.js'
 import {
   describeCurrentOutcomeComparison, unavailableCurrentComparison, verifyCurrentOutcomeSourceSeal,
@@ -83,6 +84,17 @@ export async function commitExperimentResult(experimentId: string, body: unknown
   // Optional relevance baseline: null is explicit failure to verify and
   // cannot ever be treated as an unchanged owner context.
   const capturedContext = await readContextRevisionSignature(sql,experimentId).catch(()=>null)
+  // The earlier result preview/evidence pass may now be stale. Re-read
+  // independently and abort if classification, requirements, source values,
+  // implementation, protocol, windows or context revision identities differ.
+  const rechecked = await buildEvaluation(experimentId,attestation,resolvedToday)
+  const recheckedContext = await readContextRevisionSignature(sql,experimentId).catch(()=>null)
+  if (!resultFinalizationEvidenceUnchanged(
+    finalizationEvidenceSignature(built,capturedContext?.seal ?? null),
+    finalizationEvidenceSignature(rechecked,recheckedContext?.seal ?? null),
+  )) {
+    throw new HttpError(409,'Experiment evidence or context changed during finalization. Review the result again.')
+  }
   const resultId = randomUUID()
   const status = experimentStatusForClassification(built.evaluation.classification)
   const requirementIds = built.evaluation.requirements.map(() => randomUUID())
@@ -105,11 +117,16 @@ export async function commitExperimentResult(experimentId: string, body: unknown
          id, experiment_id, protocol_version_id, classification, status,
          window_start, planned_window_end, effective_end_date, protocol_attestation,
          stopped_for_safety, safety_reason, owner_note, evidence_fingerprint, source_id, supersedes_result_id
-       ) VALUES (
-         $1::uuid, $2::uuid, $3::uuid, $4, 'valid',
-         $5::date, $6::date, $7::date, $8,
-         $9, $10, $11, $12, $13::uuid, $14::uuid
-       )`,
+       )
+       SELECT $1::uuid, e.id, $3::uuid, $4, 'valid',
+              $5::date, $6::date, $7::date, $8,
+              $9, $10, $11, $12, $13::uuid, $14::uuid
+       FROM experiments e
+       WHERE e.id = $2::uuid
+         AND e.status = 'active'
+         AND e.protocol_version_id = $3::uuid
+         AND e.window_start IS NOT DISTINCT FROM $15::date
+         AND e.window_end IS NOT DISTINCT FROM $16::date`,
       [
         resultId,
         experimentId,
@@ -125,6 +142,8 @@ export async function commitExperimentResult(experimentId: string, body: unknown
         built.fingerprint,
         sourceId,
         attestation.supersedesResultId,
+        built.experiment.window_start,
+        built.experiment.window_end,
       ],
     ),
     ...built.evaluation.requirements.map((item, index) =>
@@ -461,6 +480,32 @@ async function buildEvaluation(
       review: comparisonReview,nutrition:evidence.nutrition,sleep:evidence.sleep,
     }) : null
   return { experiment, evaluation, fingerprint, comparisonReview, sourceValueSeal }
+}
+
+/** Only bounded metadata and digests; no raw health records or private notes. */
+function finalizationEvidenceSignature(
+  built: Awaited<ReturnType<typeof buildEvaluation>>,
+  contextRevisionSeal: string | null,
+): ResultFinalizationEvidenceSignature {
+  const { experiment,evaluation } = built
+  return {
+    resultFingerprint:built.fingerprint,
+    classification:evaluation.classification,
+    effectiveEndDate:evaluation.effectiveEndDate,
+    comparisonReview:built.comparisonReview,
+    sourceValueSeal:built.sourceValueSeal,
+    experiment:{
+      id:experiment.id,
+      status:experiment.status,
+      protocolVersionId:experiment.protocol_version_id,
+      windowStart:experiment.window_start,
+      windowEnd:experiment.window_end,
+      implementationProvenance:experiment.implementation_provenance,
+      implementationDate:experiment.reported_implementation_date ?? null,
+      implementationRevision:experiment.implementation_revision,
+    },
+    contextRevisionSeal,
+  }
 }
 
 function publicPreview(evaluation: ExperimentEvaluation, experiment: ExperimentRow, fingerprint: string | null) {
