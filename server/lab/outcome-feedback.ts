@@ -8,6 +8,7 @@ import {
   parseOutcomeFeedbackSubmission, reviewOutcomeFeedbackReadiness,
   type OutcomeFeedbackEvent, type OutcomeFeedbackReadiness,
 } from '../../src/domain/experiment-outcome-feedback.js'
+import { reviewFeedbackHistory, type FeedbackHistory } from '../../src/domain/experiment-evidence-memory.js'
 
 type DbGate = {
   status: string
@@ -73,9 +74,17 @@ export const OWNER_OUTCOME_FEEDBACK_INSERT_SQL = [
   'RETURNING version',
 ].join('\n')
 
+export const OWNER_OUTCOME_FEEDBACK_HISTORY_SQL = [
+  'SELECT version,action,unlogged_factors AS "unloggedFactors", owner_note AS "ownerNote",',
+  ' snapshot_fingerprint AS "comparisonFingerprint", recorded_at::text AS "recordedAt"',
+  'FROM experiment_outcome_feedback_events WHERE experiment_result_id = $1::uuid',
+  'ORDER BY version DESC LIMIT 26',
+].join('\\n')
+
 export async function readOwnerOutcomeFeedback(sql: Sql, resultId: string, today: string): Promise<{
   readiness: OutcomeFeedbackReadiness
   latest: OutcomeFeedbackEvent | null
+  history: FeedbackHistory
   snapshotFingerprint: string | null
   currentRevision: number
   currentDate: string | null
@@ -87,16 +96,22 @@ export async function readOwnerOutcomeFeedback(sql: Sql, resultId: string, today
   const verified = snapshot && record.snapshot_fingerprint
     ? await experimentEvidenceFingerprint(snapshot) === record.snapshot_fingerprint : false
   const latest = await sql.query(OWNER_OUTCOME_FEEDBACK_LATEST_SQL, [resultId]) as OutcomeFeedbackEvent[]
+  const historyRows = await sql.query(OWNER_OUTCOME_FEEDBACK_HISTORY_SQL, [resultId]) as unknown
+  const readiness = reviewOutcomeFeedbackReadiness({
+    resultStatus: record.status, classification: record.classification,
+    protocolAttestation: record.protocol_attestation, stoppedForSafety: record.stopped_for_safety,
+    snapshot: verified ? snapshot : null,
+    currentImplementation: {
+      provenance: record.current_provenance, effectiveDate: record.current_date,
+      revision: record.current_revision,
+    },
+    today,
+  })
   return {
-    readiness: reviewOutcomeFeedbackReadiness({
-      resultStatus: record.status, classification: record.classification,
-      protocolAttestation: record.protocol_attestation, stoppedForSafety: record.stopped_for_safety,
-      snapshot: verified ? snapshot : null,
-      currentImplementation: {
-        provenance: record.current_provenance, effectiveDate: record.current_date,
-        revision: record.current_revision,
-      },
-      today,
+    readiness,
+    history: reviewFeedbackHistory({
+      rows: historyRows, expectedFingerprint: record.snapshot_fingerprint,
+      snapshotVerified: verified === true, readiness,
     }),
     latest: latest[0] ?? null,
     snapshotFingerprint: record.snapshot_fingerprint,

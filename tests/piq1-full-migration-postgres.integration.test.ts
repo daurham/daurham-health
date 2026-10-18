@@ -10,7 +10,8 @@ import { readMaintenanceDecisionSnapshot, isMaintenanceDecisionRevisionCurrent }
 import { activeCalorieDecisionInRevision, dueFollowUps, requireCurrentCalorieRecommendation, surfaceDraft, writeCoachRecommendationResponse, writeCoachRecommendationOutcome } from '../server/intelligence/coach-intelligence.js'
 import { randomUUID } from 'node:crypto'
 import { experimentEvidenceFingerprint } from '../src/domain/experiment-results.js'
-import { OWNER_OUTCOME_FEEDBACK_INSERT_SQL } from '../server/lab/outcome-feedback.js'
+import { OWNER_OUTCOME_FEEDBACK_INSERT_SQL, OWNER_OUTCOME_FEEDBACK_HISTORY_SQL } from '../server/lab/outcome-feedback.js'
+import { reviewFeedbackHistory } from '../src/domain/experiment-evidence-memory.js'
 import { parseExperimentComparisonSnapshot } from '../src/domain/experiment-comparison-snapshot.js'
 import { readPrimaryGoalIntent, savePrimaryGoalIntent } from '../server/goals/primary-intent.js'
 import { getHealthProfile, putHealthProfile } from '../server/profile/service.js'
@@ -1193,6 +1194,14 @@ describe.skipIf(!url)('PIQ-1.1 full numbered migration chain and backup on isola
         { version:1,action:'recorded',unlogged_factors:'other_changes',owner_note:'Fictional travel during follow-up' },
         { version:2,action:'withdrawn',unlogged_factors:null,owner_note:null },
       ])
+      const historyRows = await client.query(OWNER_OUTCOME_FEEDBACK_HISTORY_SQL, [resultId])
+      const inspected = reviewFeedbackHistory({
+        rows: historyRows.rows, expectedFingerprint: hash, snapshotVerified: true,
+        readiness: { state:'not_ready',reason:'not_current_result' },
+      })
+      expect(inspected.status).toBe('complete')
+      expect(inspected.events.map(item => item.version)).toEqual([2,1])
+      expect(inspected.review).toBe('withdrawn')
     } finally {
       await client.query('ROLLBACK')
     }

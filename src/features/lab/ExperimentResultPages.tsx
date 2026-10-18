@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { RESULT_CAUSALITY_FOOTER } from '@/domain/experiment-results'
 import { experimentComparisonCopy } from '@/domain/experiment-comparison'
 import { feedbackPromptCopy, type OutcomeFeedbackAnswer } from '@/domain/experiment-outcome-feedback'
+import { feedbackHistoryCopy } from '@/domain/experiment-evidence-memory'
 import { dailyContextTagLabel, type DailyContextTagKey } from '@/domain/context'
 import { LoadErrorNotice, primaryButtonClass, secondaryButtonClass } from '@/lib'
 import {
@@ -232,6 +233,40 @@ export function ExperimentResultDetailPage() {
             </button>
           ) : null}
           <p className="text-xs text-zinc-500">Your answer is voluntary. It does not alter targets, rewards, results or treatment decisions.</p>
+        </section>
+      ) : null}
+      {result.outcomeFeedbackHistory && result.outcomeFeedbackHistory.status !== 'empty' ? (
+        <section className="space-y-2 rounded-lg border border-zinc-200 p-3 text-sm">
+          <h2 className="font-semibold">Owner feedback history</h2>
+          <p className="text-zinc-600">{feedbackHistoryCopy(result.outcomeFeedbackHistory)}</p>
+          {result.outcomeFeedbackHistory.status === 'partial' ? (
+            <p className="text-xs text-zinc-500">Showing only the most recent 25 entries, not the complete audit.</p>
+          ) : null}
+          {result.outcomeFeedbackHistory.status === 'complete' ||
+            result.outcomeFeedbackHistory.status === 'partial' ? (
+            <details>
+              <summary className="cursor-pointer text-sm font-medium">Review saved versions</summary>
+              <ol className="mt-2 space-y-2">
+                {result.outcomeFeedbackHistory.events.map((entry) => (
+                  <li key={entry.version} className="rounded border border-zinc-100 p-2">
+                    <p className="font-medium">
+                      Version {entry.version} · {entry.action} · {entry.recordedAt.slice(0, 10)}
+                    </p>
+                    <p className="text-zinc-600">
+                      {entry.action === 'withdrawn' ? 'Owner withdrew this answer.' :
+                        entry.unloggedFactors === 'none_reported' ? 'No additional factors recalled.' :
+                        entry.unloggedFactors === 'other_changes' ? 'Other changes or circumstances reported.' :
+                        'Owner was unsure of other factors.'}
+                    </p>
+                    {entry.action !== 'withdrawn' && entry.ownerNote ? (
+                      <p className="whitespace-pre-wrap text-zinc-600">{entry.ownerNote}</p>
+                    ) : null}
+                  </li>
+                ))}
+              </ol>
+            </details>
+          ) : null}
+          <p className="text-xs text-zinc-500">The history describes owner-reported context, not a proven benefit or medical recommendation.</p>
         </section>
       ) : null}
       {result.status === 'valid' ? (

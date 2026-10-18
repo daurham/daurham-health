@@ -209,6 +209,7 @@ export async function getExperimentResult(id: string) {
     comparisonCapturedAt: comparisonSnapshot ? stored!.captured_at : null,
     outcomeFeedbackReadiness: ownerFeedback.readiness,
     outcomeFeedbackLatest: ownerFeedback.latest,
+    outcomeFeedbackHistory: ownerFeedback.history,
     requirements: requirements.map((item) => ({
       id: item.id,
       requirementId: item.requirement_id,
