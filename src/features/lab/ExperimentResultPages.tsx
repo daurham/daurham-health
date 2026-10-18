@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { RESULT_CAUSALITY_FOOTER } from '@/domain/experiment-results'
 import { experimentComparisonCopy } from '@/domain/experiment-comparison'
-import { feedbackPromptCopy, type OutcomeFeedbackAnswer } from '@/domain/experiment-outcome-feedback'
+import { feedbackPromptCopy, feedbackReadinessCopy, type OutcomeFeedbackReadiness, type OutcomeFeedbackAnswer } from '@/domain/experiment-outcome-feedback'
 import { feedbackHistoryCopy, type FeedbackHistoryEntry } from '@/domain/experiment-evidence-memory'
 import { currentOutcomeComparisonCopy, type CurrentOutcomeComparison } from '@/domain/experiment-current-outcomes'
 import { experimentEvidenceReviewCopy, type ExperimentEvidenceReview } from '@/domain/experiment-evidence-review'
@@ -247,6 +247,8 @@ export function ExperimentResultDetailPage() {
       ) : null}
       {(result.outcomeFeedbackHistory?.status !== 'unavailable' &&
         (result.outcomeFeedbackReadiness?.state === 'ready' ||
+        result.outcomeFeedbackReadiness?.reason === 'source_evidence_changed' ||
+        result.outcomeFeedbackReadiness?.reason === 'source_evidence_unverified' ||
         (result.outcomeFeedbackLatest && result.outcomeFeedbackLatest.action !== 'withdrawn'))) ? (
         <section className="space-y-3 rounded-lg border border-zinc-200 p-3 text-sm">
           <h2 className="font-semibold">Optional follow-up review</h2>
@@ -279,7 +281,7 @@ export function ExperimentResultDetailPage() {
               </button>
             </>
           ) : (
-            <p className="text-zinc-600">The original record is no longer eligible for a new review. Recorded feedback can still be withdrawn.</p>
+            <FeedbackReadinessNotice readiness={result.outcomeFeedbackReadiness} />
           )}
           {result.outcomeFeedbackLatest && result.outcomeFeedbackLatest.action !== 'withdrawn' ? (
             <button type="button" className={secondaryButtonClass}
@@ -354,6 +356,20 @@ export function ExperimentResultDetailPage() {
   )
 }
 
+
+/** Keep the feedback form truthful when source-corrected records are withheld.
+ * Render only a notice here: actual write eligibility is rechecked by POST.
+ */
+export function FeedbackReadinessNotice({readiness}:{readiness?:OutcomeFeedbackReadiness}) {
+  if(!readiness || readiness.state === 'ready')return null
+  const evidenceBlocked=readiness.reason === 'source_evidence_changed' ||
+    readiness.reason === 'source_evidence_unverified'
+  return (
+    <p className="text-sm text-zinc-700" role={evidenceBlocked?'alert':undefined}>
+      {feedbackReadinessCopy(readiness)}
+    </p>
+  )
+}
 
 /** Owner-only provenance status. No treatment claim, "worked" badge, AI
  * interpretation or recommendation-ranking side effect.

@@ -1,6 +1,7 @@
 import { addCalendarDays } from './progress/dates.js'
 import { isCalendarDate } from './training.js'
 import type { ExperimentComparisonSnapshot, ImplementationProvenance } from './experiment-comparison-snapshot.js'
+import type { CurrentOutcomeComparison } from './experiment-current-outcomes.js'
 
 export type OutcomeFeedbackAnswer = 'none_reported' | 'other_changes' | 'unsure'
 export type OutcomeFeedbackAction = 'recorded' | 'revised' | 'withdrawn'
@@ -15,7 +16,8 @@ export type OutcomeFeedbackReadiness = {
   state: 'ready' | 'not_ready'
   reason: 'ready' | 'not_current_result' | 'protocol_not_followed' | 'unsupported_classification' |
     'missing_implementation' | 'implementation_changed' | 'unverified_snapshot' |
-    'insufficient_outcome_coverage' | 'follow_up_not_mature'
+    'insufficient_outcome_coverage' | 'follow_up_not_mature' |
+    'source_evidence_changed' | 'source_evidence_unverified'
 }
 
 export function reviewOutcomeFeedbackReadiness(input: {
@@ -64,6 +66,39 @@ export function reviewOutcomeFeedbackReadiness(input: {
     return block('follow_up_not_mature')
   }
   return { state: 'ready', reason: 'ready' }
+}
+
+/** Page-level availability of a NEW/REVISED feedback report.
+ * The result GET already loaded and sealed the prespecified current outcome
+ * values; use that verified projection rather than a second costly source
+ * read. The POST separately re-verifies source values and its INSERT uses a
+ * statement-snapshot CAS because GET is never a write authorization.
+ */
+export function feedbackReadinessForCurrentOutcomes(
+  readiness: OutcomeFeedbackReadiness,
+  current: CurrentOutcomeComparison | null,
+): OutcomeFeedbackReadiness {
+  if (readiness.state !== 'ready') return readiness
+  if (current?.state === 'available' && current.reason === 'current_records') {
+    return readiness
+  }
+  return {
+    state: 'not_ready',
+    reason: current?.reason === 'source_values_changed' ||
+      current?.reason === 'changed_coverage'
+      ? 'source_evidence_changed' : 'source_evidence_unverified',
+  }
+}
+
+export function feedbackReadinessCopy(readiness:OutcomeFeedbackReadiness):string {
+  switch(readiness.reason) {
+    case 'source_evidence_changed':
+      return 'New or revised feedback is unavailable because recorded outcome values or verified observation days changed after this result was saved. Review the corrected records. You can still withdraw earlier feedback.'
+    case 'source_evidence_unverified':
+      return 'New or revised feedback is unavailable because the saved or current outcome values could not be verified against the original source seal. You can still withdraw earlier feedback.'
+    default:
+      return 'The original record is not currently eligible for a new review. Any previously recorded feedback can still be withdrawn.'
+  }
 }
 
 export function feedbackPromptCopy(): string {

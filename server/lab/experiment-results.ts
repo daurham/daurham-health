@@ -33,6 +33,7 @@ import { assessExperimentContextApplicability } from '../../src/domain/experimen
 import { computeContextRevisionSignature } from '../../src/domain/experiment-context-revision-signature.js'
 import { resultFinalizationEvidenceUnchanged, type ResultFinalizationEvidenceSignature } from '../../src/domain/experiment-finalization-recheck.js'
 import { computeExperimentSourceValueSeal } from '../../src/domain/experiment-source-value-seal.js'
+import { feedbackReadinessForCurrentOutcomes } from '../../src/domain/experiment-outcome-feedback.js'
 import {
   describeCurrentOutcomeComparison, unavailableCurrentComparison, verifyCurrentOutcomeSourceSeal,
   type CurrentOutcomeComparison,
@@ -336,6 +337,11 @@ export async function getExperimentResult(id: string) {
       }
     }
   }
+  // This is only UI/read-side availability. A record/revision POST must
+  // still verify the source seal and INSERT-time digest independently.
+  const feedbackReadiness = feedbackReadinessForCurrentOutcomes(
+    ownerFeedback.readiness,currentOutcomeComparison,
+  )
   return {
     id: row.id,
     experimentId: row.experiment_id,
@@ -366,7 +372,7 @@ export async function getExperimentResult(id: string) {
     comparisonReview: comparisonSnapshot?.review ?? null,
     comparisonSnapshotStatus,
     comparisonCapturedAt: comparisonSnapshot ? stored!.captured_at : null,
-    outcomeFeedbackReadiness: ownerFeedback.readiness,
+    outcomeFeedbackReadiness: feedbackReadiness,
     outcomeFeedbackLatest: ownerFeedback.latest,
     outcomeFeedbackHistory: ownerFeedback.history,
     currentOutcomeComparison,
