@@ -1225,7 +1225,7 @@ describe.skipIf(!url)('PIQ-1.1 full numbered migration chain and backup on isola
     await second.query('SET search_path TO piq_full_chain, public')
     const experimentId=randomUUID(),protocolId=randomUUID(),versionId=randomUUID()
     const from='2026-09-20',through='2026-09-21',tz='America/Phoenix'
-    const scope=[from,through,'2026-10-18',tz,true,true]
+    const scope=[from,through,'2026-10-18',tz,true,true,experimentId,from,[]]
     try{
       const src=String((await client.query("SELECT id FROM data_sources WHERE key='manual' LIMIT 1")).rows[0].id)
       await client.query("INSERT INTO lab_protocols (id,protocol_kind,title,source_id) VALUES ($1,'experiment','Fictional CAS protocol',$2)",[protocolId,src])
@@ -1259,6 +1259,69 @@ describe.skipIf(!url)('PIQ-1.1 full numbered migration chain and backup on isola
       await second.query('UPDATE sleep_nightly_summaries SET total_sleep_minutes=421 WHERE id=$1',[night.rows[0].id])
       expect(await digest()).not.toBe(afterFood)
       expect((await client.query(statement,args(randomUUID(),afterFood))).rowCount).toBe(0)
+      // A fictional workout edit in the same training evidence projection must
+      // change the source digest, even when outcome-day counts do not change.
+      const definition=await client.query('SELECT id FROM exercise_definitions ORDER BY id LIMIT 1')
+      expect(definition.rowCount).toBe(1)
+      const training=await client.query(
+        "INSERT INTO workout_sessions (workout_date,session_type,source_kind,experiment_id) VALUES ($1::date,'experiment','manual',$2) RETURNING id",
+        [from,experimentId],
+      )
+      const sessionExercise=await client.query(
+        "INSERT INTO workout_session_exercises (workout_session_id,exercise_definition_id,position,exercise_name) VALUES ($1,$2,1,'Fictional press') RETURNING id",
+        [training.rows[0].id,definition.rows[0].id],
+      )
+      const workoutSet=await client.query(
+        "INSERT INTO workout_sets (workout_session_exercise_id,set_number,set_type,load_state,reps) VALUES ($1,1,'working','bodyweight',8) RETURNING id",
+        [sessionExercise.rows[0].id],
+      )
+      const afterWorkout=await digest()
+      expect(afterWorkout).not.toBe(await (async()=>{
+        await second.query('DELETE FROM workout_sets WHERE id=$1',[workoutSet.rows[0].id])
+        const noSet=await digest()
+        await second.query("INSERT INTO workout_sets (id,workout_session_exercise_id,set_number,set_type,load_state,reps) VALUES ($1,$2,1,'working','bodyweight',8)",[workoutSet.rows[0].id,sessionExercise.rows[0].id])
+        return noSet
+      })())
+      await second.query('UPDATE workout_sets SET reps=9 WHERE id=$1',[workoutSet.rows[0].id])
+      expect(await digest()).not.toBe(afterWorkout)
+      expect((await client.query(statement,args(randomUUID(),afterWorkout))).rowCount).toBe(0)
+      // A new benchmark with the selected definition changes the digest.
+      // Rebinding scope to include the selected benchmark definition is
+      // intentional: the experiment now prespecifies the benchmark.
+      const benchmarkProtocol=randomUUID(),benchmarkVersion=randomUUID(),
+        definitionId=randomUUID(),requirementId=randomUUID(),benchmarkResultId=randomUUID()
+      await client.query(
+        "INSERT INTO lab_protocols (id,protocol_kind,title,source_id) VALUES ($1,'benchmark','Fictional benchmark',$2)",
+        [benchmarkProtocol,src],
+      )
+      await client.query(
+        "INSERT INTO lab_protocol_versions (id,protocol_id,version,instructions,is_current) VALUES ($1,$2,1,'Fictional benchmark',true)",
+        [benchmarkVersion,benchmarkProtocol],
+      )
+      await client.query(
+        "INSERT INTO lab_protocol_requirements (id,protocol_version_id,role,requirement_kind,selector,label,position) VALUES ($1,$2,'primary_outcome','training_metric','{}'::jsonb,'Fictional score',1)",
+        [requirementId,benchmarkVersion],
+      )
+      await client.query(
+        "INSERT INTO benchmark_definitions (id,protocol_id,domain,source_id) VALUES ($1,$2,'training',$3)",
+        [definitionId,benchmarkProtocol,src],
+      )
+      scope[8]=[definitionId] as never
+      const beforeBenchmark=await digest()
+      await second.query(
+        "INSERT INTO benchmark_results (id,benchmark_definition_id,protocol_version_id,result_date,experiment_id,status,protocol_confirmation_kind,evidence_fingerprint,source_id) VALUES ($1,$2,$3,$4::date,$5,'valid','linked_protocol','fictional-score',$6)",
+        [benchmarkResultId,definitionId,benchmarkVersion,through,experimentId,src],
+      )
+      const benchmarkValue=await second.query(
+        "INSERT INTO benchmark_result_values (id,benchmark_result_id,requirement_id,value,unit,value_kind) VALUES ($1,$2,$3,50,'reps','observed') RETURNING id",
+        [randomUUID(),benchmarkResultId,requirementId],
+      )
+      expect(await digest()).not.toBe(beforeBenchmark)
+      expect((await client.query(statement,args(randomUUID(),beforeBenchmark))).rowCount).toBe(0)
+      const withBenchmark=await digest()
+      await second.query('UPDATE benchmark_result_values SET value=51 WHERE id=$1',[benchmarkValue.rows[0].id])
+      expect(await digest()).not.toBe(withBenchmark)
+      expect((await client.query(statement,args(randomUUID(),withBenchmark))).rowCount).toBe(0)
       // A failed parent insert cannot persist its dependent immutable snapshot.
       await client.query('BEGIN')
       try{

@@ -5,6 +5,8 @@ import {
   EXPERIMENT_FINALIZATION_SOURCE_DIGEST_SQL,
   EXPERIMENT_FINALIZATION_SOURCE_CAS_EXPRESSION,
   EXPERIMENT_VERIFIED_NUTRITION_SQL,
+  EXPERIMENT_TRAINING_SOURCE_SQL,
+  EXPERIMENT_BENCHMARK_SOURCE_SQL,
 } from '../server/lab/experiment-results.js'
 
 describe('PIQ-6.5 PostgreSQL statement-snapshot primary nutrition/sleep CAS',()=>{
@@ -18,20 +20,31 @@ describe('PIQ-6.5 PostgreSQL statement-snapshot primary nutrition/sleep CAS',()=
     expect(read).toContain('jsonb_agg(to_jsonb(n) ORDER BY n.log_date)')
     expect(read).toContain('jsonb_agg(to_jsonb(s) ORDER BY s.sleep_date)')
     expect(read).toContain('md5(')
+    expect(read).toContain('$7::uuid')
+    expect(read).toContain('$9::uuid[]')
     expect(EXPERIMENT_VERIFIED_NUTRITION_SQL).toContain('current_source.revision')
+    expect(read).toContain('FROM workout_sessions s')
+    expect(read).toContain('JOIN workout_session_exercises e')
+    expect(read).toContain('LEFT JOIN workout_sets ws')
+    expect(read).toContain('FROM benchmark_results r')
+    expect(read).toContain('LEFT JOIN benchmark_result_values val')
+    expect(read).toContain('jsonb_agg(to_jsonb(t)')
+    expect(read).toContain('jsonb_agg(to_jsonb(b)')
+    expect(EXPERIMENT_TRAINING_SOURCE_SQL).toContain('ws.weight_kg')
+    expect(EXPERIMENT_BENCHMARK_SOURCE_SQL).toContain('val.value')
     expect(EXPERIMENT_FINALIZATION_SOURCE_DIGEST_SQL).toBe('SELECT '+read+' AS digest')
   })
-  it('moves every source query parameter to exactly the 20-25 INSERT parameter window',()=>{
+  it('moves every source query parameter to the 20-28 INSERT parameter window',()=>{
     const read=buildFinalizationSourceDigestExpression(1)
     const write=buildFinalizationSourceDigestExpression(20)
     expect(EXPERIMENT_FINALIZATION_SOURCE_CAS_EXPRESSION).toEqual(write)
-    for (const index of [1,2,3,4,5,6]) {
+    for (const index of [1,2,3,4,5,6,7,8,9]) {
       const readParam=new RegExp('\\$'+index+'(?![0-9])')
       const writeParam=new RegExp('\\$'+(index+19)+'(?![0-9])')
       expect(read).toMatch(readParam)
       expect(write).toMatch(writeParam)
     }
-    for(const index of [1,2,3,4,5,6,19,26]) {
+    for(const index of [1,2,3,4,5,6,7,8,9,19,29]) {
       const bad=new RegExp('\\$'+index+'(?![0-9])')
       expect(write).not.toMatch(bad)
     }
@@ -46,7 +59,7 @@ describe('PIQ-6.5 PostgreSQL statement-snapshot primary nutrition/sleep CAS',()=
     expect(commit).toContain('const canonicalSourceDigest = await readFinalizationSourceDigest(sql,built.sourceGuardScope)')
     expect(commit).toContain('const rechecked = await buildEvaluation(experimentId,attestation,resolvedToday)')
     expect(commit).toContain('JSON.stringify(built.sourceGuardScope)!==JSON.stringify(rechecked.sourceGuardScope)')
-    expect(commit).toContain('AND (${EXPERIMENT_FINALIZATION_SOURCE_CAS_EXPRESSION}) = $26::text')
+    expect(commit).toContain('AND (${EXPERIMENT_FINALIZATION_SOURCE_CAS_EXPRESSION}) = $29::text')
     expect(commit).toContain('...finalizationSourceGuardParams(built.sourceGuardScope)')
     expect(commit).toContain('canonicalSourceDigest,')
     expect(commit).toContain('sql.query(EXPERIMENT_COMPARISON_SNAPSHOT_INSERT_SQL')
