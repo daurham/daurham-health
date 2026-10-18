@@ -7,6 +7,7 @@ import {
 } from '../src/domain/experiment-context-applicability.js'
 import type { ExperimentComparisonSnapshot } from '../src/domain/experiment-comparison-snapshot.js'
 import { ExperimentEvidenceReviewSection } from '../src/features/lab/ExperimentResultPages.js'
+import { EXPERIMENT_CONTEXT_REVISION_SQL } from '../server/lab/experiment-results.js'
 
 const snapshot:ExperimentComparisonSnapshot={
   snapshotVersion:1,recordedHealthDate:'2026-10-09',
@@ -87,6 +88,8 @@ describe('PIQ-6.5 post-result goal/profile metadata revisions',()=>{
     expect(querySql).toContain('s.snapshot_fingerprint = $2::text')
     expect(querySql).not.toContain('clinical_conditions')
     expect(querySql).not.toContain('target_min')
+    expect(EXPERIMENT_CONTEXT_REVISION_SQL).not.toContain('\\\\n')
+    expect(EXPERIMENT_CONTEXT_REVISION_SQL).toContain('\nFROM experiment_results r')
     expect(querySql).not.toContain('SELECT *')
     const detail=s.slice(s.indexOf('export async function getExperimentResult'),
       s.indexOf('export async function invalidateExperimentResult'))
