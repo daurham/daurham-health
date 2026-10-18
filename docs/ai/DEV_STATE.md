@@ -1033,3 +1033,32 @@ synthetic staging; digest coverage after the INSERT statement;
 Neon/Vercel independently isolated Auth QA, owner device signoff,
 schema/backup/rollback, and explicit release approval (formal 0/9).
 `main` remains unchanged.
+
+
+## 2026-10-18 — PIQ-6.5 bounded supplement lifecycle status source (green)
+
+Feature commit `58c3443c6af36e2189aba1624976299e8bb2db45`
+and parameter-binding correction `c80f306b740e2e1a80b9932839b7817dcc683245`
+passed full development-branch CI 39154167931 (2,713 tests,
+32 skipped, TypeScript, ESLint, Vite production build) and isolated
+PostgreSQL 16 CI 39154167935 (31/31 synthetic integration tests,
+full migration chain through 0060). The initial feature-only database
+run failed on the repeated supplement-ID SQL parameter; replaceAll
+fixed that exact bind and final runs were separately green.
+
+The canonical experiment-adherence status query now reads the latest
+pre-window event per supplement plus all in-window lifecycle events.
+Superseded earlier and future status rows are neither needed by
+`resolveOccurrence` nor a reason to invalidate the write-time source
+digest. Existing unique supplement/date constraint makes predecessor
+selection deterministic. The same SELECT and properly remapped
+parameters govern evidence loading and INSERT-statement CAS.
+Unknown adherence is never manufactured as skipped. No schema,
+owner data, Gemini, Vercel production or `main` touched.
+
+Future tasks: assess performance of large schedule/adherence history
+under realistic synthetic workloads, address remaining post-result
+source correction semantics, and clear PIQ-7 independent-root
+preview/auth, backup/rollback, schema and mobile owner acceptance.
+READ COMMITTED CAS is not serializable multi-table isolation.
+Formal owner-accepted PIQ phases 0/9.
