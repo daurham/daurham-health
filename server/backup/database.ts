@@ -27,11 +27,19 @@ const appVersion = readPackageVersion()
  * CLI into the runtime API graph. Match the same file naming and numeric sort
  * used by server/migrate.ts; a missing bundle path fails closed.
  */
-async function restoreMigrationFiles():Promise<string[]> {
-  const dir=path.join(path.dirname(fileURLToPath(import.meta.url)),'../../migrations')
-  return (await readdir(dir))
-    .filter(name=>/^\d{4}_.+\.sql$/.test(name))
-    .sort((a,b)=>a.localeCompare(b,'en',{numeric:true}))
+/** Vercel's bundled api/index.js is not at the original source file path.
+ * The function includes migrations/*.sql and resolves it from its cwd.
+ * Missing bundled migrations fail closed rather than trusting DB metadata.
+ */
+export async function runtimeMigrationFiles():Promise<string[]> {
+  const dir=path.join(process.cwd(),'migrations')
+  try {
+    return (await readdir(dir))
+      .filter(name=>/^\d{4}_.+\.sql$/.test(name))
+      .sort((a,b)=>a.localeCompare(b,'en',{numeric:true}))
+  } catch {
+    throw new Error('Migration manifest unavailable in runtime bundle')
+  }
 }
 
 function readPackageVersion(): string {
@@ -93,7 +101,7 @@ export function assertBackupMigrationHistory(
 }
 
 export async function readBackupTables(sql: Sql): Promise<{ schemaMigration: string; rowsByTable: Record<string, BackupRow[]> }> {
-  const expectedMigrations = await restoreMigrationFiles()
+  const expectedMigrations = await runtimeMigrationFiles()
   const results = await sql.transaction(
     (txn) => [
       txn.query('SELECT filename FROM schema_migrations ORDER BY filename'),
@@ -221,7 +229,7 @@ export async function applyRestore(sql: Sql, bytes: Uint8Array): Promise<Restore
     throw new Error('Restore refused: ' +
       [...new Set([...inspected.plan.conflicts, ...inspected.verified.errors])].join('; '))
   }
-  const expectedMigrations = await restoreMigrationFiles()
+  const expectedMigrations = await runtimeMigrationFiles()
   const statements = [...restoreDestinationGuardStatements(expectedMigrations),
     ...restoreStatements(inspected.verified.tables)]
   await sql.transaction(

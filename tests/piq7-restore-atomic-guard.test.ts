@@ -4,10 +4,22 @@ import {BACKUP_TABLES,LATEST_SCHEMA_MIGRATION} from '../server/backup/inventory.
 import {applyRestore,restoreDestinationGuardStatements,
   assertBackupMigrationHistory,readBackupTables} from '../server/backup/database.js'
 import {listMigrationFiles} from '../server/migrate.js'
-import {listMigrationFiles} from '../server/migrate.js'
+import {readFileSync} from 'node:fs'
+import {runtimeMigrationFiles} from '../server/backup/database.js'
 import type {Sql} from '../server/db.js'
 
 describe('PIQ-7 restore application never silently succeeds on blocked or changed destination',()=>{
+  it('includes migration files for Vercel and uses the runtime working directory',async()=>{
+    const config=JSON.parse(readFileSync('vercel.json','utf8')) as {
+      functions?:Record<string,{includeFiles?:string|Array<string>}>
+    }
+    expect(config.functions?.['api/index.ts']?.includeFiles).toContain('migrations/*.sql')
+    expect(await runtimeMigrationFiles()).toEqual(await listMigrationFiles())
+    const source=readFileSync('server/backup/database.ts','utf8')
+    expect(source).toContain("path.join(process.cwd(),'migrations')")
+    expect(source).not.toContain("path.join(path.dirname(fileURLToPath(import.meta.url)),'../../migrations')")
+    // CI validates packaging configuration, not runtime filesystem proof.
+  })
   it('refuses an export if any historic migration differs despite matching count and latest',async()=>{
     const expected=await listMigrationFiles()
     expect(()=>assertBackupMigrationHistory(expected,expected)).not.toThrow()
