@@ -851,10 +851,17 @@ export const EXPERIMENT_SUPPLEMENT_LINK_SOURCE_SQL = `SELECT supplement_id::text
 export const EXPERIMENT_CONTROL_SOURCE_SQL = `SELECT tag_key FROM lab_protocol_context_controls WHERE protocol_version_id = $1::uuid`
 /** Exact source query shared by Lab evidence reads and the finalization CAS. */
 export const EXPERIMENT_SUPPLEMENT_SOURCE_SQL = `SELECT id::text AS id, name FROM supplements WHERE id = ANY($1::uuid[])`
-/** Exact source query shared by Lab evidence reads and the finalization CAS. */
+/** A schedule can affect experiment adherence iff its effective interval
+ * intersects the evaluated window. Include both edges and open-ended
+ * schedules; do not pull disjoint historical/future schedules into the
+ * source digest. This SELECT is identical for evidence and INSERT CAS.
+ */
 export const EXPERIMENT_SUPPLEMENT_SCHEDULE_SOURCE_SQL = `SELECT id::text AS id, supplement_id::text AS supplement_id, slot_label, dose_amount, dose_unit, weekday_mask,
             effective_from::text AS effective_from, effective_through::text AS effective_through, sort_order
-     FROM supplement_schedules WHERE supplement_id = ANY($1::uuid[])`
+     FROM supplement_schedules
+     WHERE supplement_id = ANY($1::uuid[])
+       AND effective_from <= $3::date
+       AND (effective_through IS NULL OR effective_through >= $2::date)`
 /** Exact source query shared by Lab evidence reads and the finalization CAS. */
 /** Preserve the latest pre-window lifecycle state plus every in-window change.
  * Earlier superseded events and future events cannot affect resolveOccurrence
@@ -926,6 +933,8 @@ export function buildFinalizationSourceDigestExpression(firstParameter:number):s
   const bySupplement=(sql:string)=>sql.replaceAll('$1::uuid[]',bind(11)+'::uuid[]')
   const supplementSql=bySupplement(EXPERIMENT_SUPPLEMENT_SOURCE_SQL)
   const scheduleSql=bySupplement(EXPERIMENT_SUPPLEMENT_SCHEDULE_SOURCE_SQL)
+    .replace('$2::date',bind(8)+'::date')
+    .replace('$3::date',bind(2)+'::date')
   const statusSql=bySupplement(EXPERIMENT_SUPPLEMENT_STATUS_SOURCE_SQL)
     .replaceAll('$2::date',bind(8)+'::date')
     .replace('$3::date',bind(2)+'::date')
@@ -1097,7 +1106,7 @@ async function loadAdherence(sql: Sql, supplementIds: string[], start: string, e
   const supplements = (await sql.query(EXPERIMENT_SUPPLEMENT_SOURCE_SQL, [supplementIds])) as Array<{ id: string; name: string }>
   const schedules = (await sql.query(
     EXPERIMENT_SUPPLEMENT_SCHEDULE_SOURCE_SQL,
-    [supplementIds],
+    [supplementIds, start, end],
   )) as Array<Record<string, unknown>>
   const events = (await sql.query(
     EXPERIMENT_SUPPLEMENT_STATUS_SOURCE_SQL,

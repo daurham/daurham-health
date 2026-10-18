@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import pg from 'pg'
 import {readFileSync} from 'node:fs'
-import {EXPERIMENT_FINALIZATION_SOURCE_DIGEST_SQL, EXPERIMENT_FINALIZATION_SOURCE_CAS_EXPRESSION, EXPERIMENT_BODY_SOURCE_SQL, EXPERIMENT_SUPPLEMENT_STATUS_SOURCE_SQL} from '../server/lab/experiment-results.js'
+import {EXPERIMENT_FINALIZATION_SOURCE_DIGEST_SQL, EXPERIMENT_FINALIZATION_SOURCE_CAS_EXPRESSION, EXPERIMENT_BODY_SOURCE_SQL, EXPERIMENT_SUPPLEMENT_STATUS_SOURCE_SQL, EXPERIMENT_SUPPLEMENT_SCHEDULE_SOURCE_SQL} from '../server/lab/experiment-results.js'
 import type { Sql } from '../server/db.js'
 import { inspectMigrations } from '../server/migrate.js'
 import { assessMigrationHistory, readMigrationHistory } from '../server/migration-history.js'
@@ -1425,6 +1425,56 @@ describe.skipIf(!url)('PIQ-1.1 full numbered migration chain and backup on isola
       await second.query('UPDATE supplement_schedules SET dose_amount=2 WHERE id=$1',[schedule.rows[0].id])
       expect(await digest()).not.toBe(beforeScheduleEdit)
       expect((await client.query(statement,args(randomUUID(),beforeScheduleEdit))).rowCount).toBe(0)
+
+      // Interval intersection: schedules ending before the experiment,
+      // or beginning later, must not affect evaluated dates or cause a
+      // false stale-result rejection. Boundary-overlapping schedules must.
+      const beforeUnrelatedSchedules=await digest()
+      const oldSchedule=await second.query(
+        "INSERT INTO supplement_schedules (supplement_id,dose_amount,dose_unit,weekday_mask,effective_from,effective_through,source_id) VALUES ($1,1,'capsule',127,'2026-08-01','2026-09-19',$2) RETURNING id",
+        [supplementId,src],
+      )
+      const futureSchedule=await second.query(
+        "INSERT INTO supplement_schedules (supplement_id,dose_amount,dose_unit,weekday_mask,effective_from,effective_through,source_id) VALUES ($1,1,'capsule',127,'2026-09-22',NULL,$2) RETURNING id",
+        [supplementId,src],
+      )
+      expect(await digest()).toBe(beforeUnrelatedSchedules)
+      const boundedSchedules=await client.query(EXPERIMENT_SUPPLEMENT_SCHEDULE_SOURCE_SQL,
+        [[supplementId],from,through])
+      expect(boundedSchedules.rows.map(row=>row.id)).toEqual([schedule.rows[0].id])
+      await second.query('UPDATE supplement_schedules SET dose_amount=3 WHERE id=$1',
+        [oldSchedule.rows[0].id])
+      await second.query('UPDATE supplement_schedules SET dose_amount=3 WHERE id=$1',
+        [futureSchedule.rows[0].id])
+      expect(await digest()).toBe(beforeUnrelatedSchedules)
+      // Inclusive overlap from a schedule that starts before this window
+      // and ends on the *first* observation date.
+      const beforeBoundarySchedule=await digest()
+      const boundarySchedule=await second.query(
+        "INSERT INTO supplement_schedules (supplement_id,dose_amount,dose_unit,weekday_mask,effective_from,effective_through,source_id) VALUES ($1,1,'capsule',127,'2026-09-01',$2::date,$3) RETURNING id",
+        [supplementId,from,src],
+      )
+      expect(await digest()).not.toBe(beforeBoundarySchedule)
+      expect((await client.query(statement,args(randomUUID(),beforeBoundarySchedule))).rowCount).toBe(0)
+      const included=await client.query(EXPERIMENT_SUPPLEMENT_SCHEDULE_SOURCE_SQL,
+        [[supplementId],from,through])
+      expect(included.rows.map(row=>row.id)).toEqual(expect.arrayContaining([
+        schedule.rows[0].id,boundarySchedule.rows[0].id,
+      ]))
+      const beforeBoundaryScheduleEdit=await digest()
+      await second.query('UPDATE supplement_schedules SET dose_amount=2 WHERE id=$1',
+        [boundarySchedule.rows[0].id])
+      expect(await digest()).not.toBe(beforeBoundaryScheduleEdit)
+      expect((await client.query(statement,args(randomUUID(),beforeBoundaryScheduleEdit))).rowCount).toBe(0)
+      // Extending an earlier, previously disjoint schedule into the
+      // window is also a source change and must invalidate a stale read.
+      const beforeCrossingEdit=await digest()
+      await second.query(
+        'UPDATE supplement_schedules SET effective_through=$2::date WHERE id=$1',
+        [oldSchedule.rows[0].id,from],
+      )
+      expect(await digest()).not.toBe(beforeCrossingEdit)
+      expect((await client.query(statement,args(randomUUID(),beforeCrossingEdit))).rowCount).toBe(0)
 
       const beforeStatus=await digest()
       await second.query(
