@@ -1146,7 +1146,11 @@ describe.skipIf(!url)('PIQ-1.1 full numbered migration chain and backup on isola
         resultId, randomUUID(), 0, 'recorded', 'other_changes',
         'Fictional travel during follow-up', hash, 1, '2026-10-05',
         ...feedbackSourceScope, feedbackSourceDigest,
-      ])
+      ]).catch((error:unknown)=>{
+        const position=Number((error as {position?:string}).position)-1
+        throw new Error('Feedback SQL parse window: '+guardedFeedbackSql.slice(
+          Math.max(0,position-180),position+180))
+      })
       expect(feedback1.rowCount).toBe(1)
       expect(Number(feedback1.rows[0]?.version)).toBe(1)
       const stale = await client.query(OWNER_OUTCOME_FEEDBACK_INSERT_SQL, [
