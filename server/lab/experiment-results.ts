@@ -29,6 +29,7 @@ import {
 } from '../../src/domain/experiment-comparison-snapshot.js'
 import { readOwnerOutcomeFeedback } from './outcome-feedback.js'
 import { reviewExperimentEvidence } from '../../src/domain/experiment-evidence-review.js'
+import { assessExperimentContextApplicability } from '../../src/domain/experiment-context-applicability.js'
 import {
   describeCurrentOutcomeComparison, unavailableCurrentComparison,
   type CurrentOutcomeComparison,
@@ -139,6 +140,21 @@ export async function commitExperimentResult(experimentId: string, body: unknown
   return getExperimentResult(resultId)
 }
 
+export const EXPERIMENT_CONTEXT_REVISION_SQL = [
+  'SELECT (SELECT updated_at > s.captured_at FROM health_profile',
+  '        WHERE singleton_id = 1) AS profile_changed,',
+  '       (SELECT COUNT(*)::int FROM experiment_goals eg',
+  '        WHERE eg.experiment_id = r.experiment_id) AS linked_goal_count,',
+  '       EXISTS (SELECT 1 FROM experiment_goals eg',
+  '               JOIN goals g ON g.id = eg.goal_id',
+  '               WHERE eg.experiment_id = r.experiment_id',
+  '                 AND (g.updated_at > s.captured_at OR g.archived_at > s.captured_at))',
+  '         AS linked_goal_changed',
+  'FROM experiment_results r',
+  'JOIN experiment_result_comparison_snapshots s ON s.experiment_result_id = r.id',
+  'WHERE r.id = $1::uuid AND s.snapshot_fingerprint = $2::text',
+].join('\\n')
+
 export async function getExperimentResult(id: string) {
   const sql = await getSql()
   const rows = (await sql.query(
@@ -183,6 +199,23 @@ export async function getExperimentResult(id: string) {
   const classification = String(row.classification) as Parameters<typeof classificationCopy>[0]
   const today = await currentHealthDate()
   const ownerFeedback = await readOwnerOutcomeFeedback(sql, id, today)
+  // A signal about post-result metadata changes, NOT evidence of persistent
+  // applicability. Failure is nonfatal but explicitly produces unavailable.
+  let contextRevisionMetadata: unknown = null
+  if (comparisonSnapshot && stored) {
+    try {
+      const revisions = await sql.query(EXPERIMENT_CONTEXT_REVISION_SQL, [id, stored.snapshot_fingerprint])
+      contextRevisionMetadata = revisions[0] ?? null
+    } catch {
+      contextRevisionMetadata = null
+    }
+  }
+  const contextApplicability = assessExperimentContextApplicability({
+    snapshot: comparisonSnapshot,
+    snapshotCapturedAt: comparisonSnapshot ? stored!.captured_at : null,
+    metadata: contextRevisionMetadata, asOf: today,
+  })
+
   // Optional current arithmetic is derived from the original prespecified
   // metric/window and current verified readings. Never persist it as the saved
   // experiment result or treat it as a historical as-known-then snapshot.
@@ -248,6 +281,7 @@ export async function getExperimentResult(id: string) {
     outcomeFeedbackLatest: ownerFeedback.latest,
     outcomeFeedbackHistory: ownerFeedback.history,
     currentOutcomeComparison,
+    contextApplicability,
     evidenceReview: reviewExperimentEvidence({
       snapshot: comparisonSnapshot, snapshotStatus: comparisonSnapshotStatus,
       current: currentOutcomeComparison,

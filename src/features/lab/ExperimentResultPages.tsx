@@ -6,6 +6,7 @@ import { feedbackPromptCopy, type OutcomeFeedbackAnswer } from '@/domain/experim
 import { feedbackHistoryCopy, type FeedbackHistoryEntry } from '@/domain/experiment-evidence-memory'
 import { currentOutcomeComparisonCopy, type CurrentOutcomeComparison } from '@/domain/experiment-current-outcomes'
 import { experimentEvidenceReviewCopy, type ExperimentEvidenceReview } from '@/domain/experiment-evidence-review'
+import { experimentContextApplicabilityCopy, type ExperimentContextApplicability } from '@/domain/experiment-context-applicability'
 import { dailyContextTagLabel, type DailyContextTagKey } from '@/domain/context'
 import { LoadErrorNotice, primaryButtonClass, secondaryButtonClass } from '@/lib'
 import {
@@ -238,7 +239,12 @@ export function ExperimentResultDetailPage() {
       {error ? <LoadErrorNotice message={error} /> : null}
       <ResultBody result={result} />
       {result.currentOutcomeComparison ? <CurrentOutcomeComparisonSection comparison={result.currentOutcomeComparison} /> : null}
-      {result.evidenceReview ? <ExperimentEvidenceReviewSection review={result.evidenceReview} /> : null}
+      {result.evidenceReview ? (
+        <ExperimentEvidenceReviewSection
+          review={result.evidenceReview}
+          contextApplicability={result.contextApplicability}
+        />
+      ) : null}
       {(result.outcomeFeedbackHistory?.status !== 'unavailable' &&
         (result.outcomeFeedbackReadiness?.state === 'ready' ||
         (result.outcomeFeedbackLatest && result.outcomeFeedbackLatest.action !== 'withdrawn'))) ? (
@@ -352,7 +358,12 @@ export function ExperimentResultDetailPage() {
 /** Owner-only provenance status. No treatment claim, "worked" badge, AI
  * interpretation or recommendation-ranking side effect.
  */
-export function ExperimentEvidenceReviewSection({review}: {review: ExperimentEvidenceReview}) {
+export function ExperimentEvidenceReviewSection({
+  review,contextApplicability,
+}: {
+  review: ExperimentEvidenceReview
+  contextApplicability?: ExperimentContextApplicability
+}) {
   return (
     <section className="space-y-2 rounded-lg border border-zinc-200 p-3 text-sm">
       <h2 className="font-semibold">Evidence review status</h2>
@@ -362,6 +373,11 @@ export function ExperimentEvidenceReviewSection({review}: {review: ExperimentEvi
           Saved screen: {review.snapshotRecordedDate} · Current observations: {review.observationsAsOf}
           {' · '}{review.primaryMetricCount} prespecified outcome metric{review.primaryMetricCount === 1 ? '' : 's'}
           {review.feedbackVersion ? ` · Owner feedback version ${review.feedbackVersion}` : ''}
+        </p>
+      ) : null}
+      {contextApplicability ? (
+        <p className="text-xs text-zinc-600">
+          <strong>Current relevance:</strong> {experimentContextApplicabilityCopy(contextApplicability)}
         </p>
       ) : null}
       <p className="text-xs text-zinc-500">
