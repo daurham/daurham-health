@@ -1150,3 +1150,35 @@ CAS is not serializable isolation, and future data changes still
 require review. PIQ-7 independent-root Auth/DB, backup/rollback,
 owner mobile and usefulness UAT, production migration state and
 explicit release approval remain pending; formal acceptance 0/9.
+
+
+## 2026-10-18 — PIQ-6.5 read-side owner feedback availability aligned (green)
+
+Code commit `da138d963167c92c5a1686b4455ca19e425661e5`.
+Branch CI 39163141086 passed 2,720 tests (32 skipped),
+361 passing test files, TypeScript, ESLint and Vite build.
+Isolated PostgreSQL 16 workflow 39163141148 passed 31/31
+integration tests on disposable fully migrated synthetic schema.
+No schema or write-path changes in this pass.
+
+The saved-result GET now derives the optional follow-up form's
+readiness from its *already verified* bounded nutrition/sleep current
+outcome comparison. If the original source seal is absent or cannot
+be confirmed, or if source values/verified observation days changed,
+the owner sees an explicit accessible source-evidence warning and no
+Save/Revise button. An existing answer can still be withdrawn.
+Higher-priority protocol, implementation and maturity reasons retain
+precedence. No extra GET source queries or provider calls.
+
+Server-side feedback POST remains the canonical authority: it
+independently verifies original source values and checks a matching
+digest in the INSERT statement snapshot. Concurrent changes after
+GET still require a 409; a stale already-open page may need an
+explicit refetch after a failed submission. This does not establish
+serializable isolation nor persistent physiological applicability.
+
+Next priority: PIQ-7 release readiness: independent nonproduction
+Auth/DB root, isolation, staging/restore/rollback, migration 0057-0060
+production-state inspection, cost/latency, real-mobile QA, owner
+question usefulness and explicit release acceptance. No production
+deploy/migration or main merge. Formal owner acceptance 0/9.
