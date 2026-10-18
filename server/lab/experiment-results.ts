@@ -28,6 +28,7 @@ import {
   createExperimentComparisonSnapshot, parseExperimentComparisonSnapshot, type ImplementationProvenance,
 } from '../../src/domain/experiment-comparison-snapshot.js'
 import { readOwnerOutcomeFeedback } from './outcome-feedback.js'
+import { reviewExperimentEvidence } from '../../src/domain/experiment-evidence-review.js'
 import {
   describeCurrentOutcomeComparison, unavailableCurrentComparison,
   type CurrentOutcomeComparison,
@@ -247,6 +248,11 @@ export async function getExperimentResult(id: string) {
     outcomeFeedbackLatest: ownerFeedback.latest,
     outcomeFeedbackHistory: ownerFeedback.history,
     currentOutcomeComparison,
+    evidenceReview: reviewExperimentEvidence({
+      snapshot: comparisonSnapshot, snapshotStatus: comparisonSnapshotStatus,
+      current: currentOutcomeComparison,
+      history: ownerFeedback.history, readiness: ownerFeedback.readiness,
+    }),
     requirements: requirements.map((item) => ({
       id: item.id,
       requirementId: item.requirement_id,

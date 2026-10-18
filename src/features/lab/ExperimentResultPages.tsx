@@ -5,6 +5,7 @@ import { experimentComparisonCopy } from '@/domain/experiment-comparison'
 import { feedbackPromptCopy, type OutcomeFeedbackAnswer } from '@/domain/experiment-outcome-feedback'
 import { feedbackHistoryCopy } from '@/domain/experiment-evidence-memory'
 import { currentOutcomeComparisonCopy, type CurrentOutcomeComparison } from '@/domain/experiment-current-outcomes'
+import { experimentEvidenceReviewCopy, type ExperimentEvidenceReview } from '@/domain/experiment-evidence-review'
 import { dailyContextTagLabel, type DailyContextTagKey } from '@/domain/context'
 import { LoadErrorNotice, primaryButtonClass, secondaryButtonClass } from '@/lib'
 import {
@@ -193,6 +194,7 @@ export function ExperimentResultDetailPage() {
       {error ? <LoadErrorNotice message={error} /> : null}
       <ResultBody result={result} />
       {result.currentOutcomeComparison ? <CurrentOutcomeComparisonSection comparison={result.currentOutcomeComparison} /> : null}
+      {result.evidenceReview ? <ExperimentEvidenceReviewSection review={result.evidenceReview} /> : null}
       {(result.outcomeFeedbackHistory?.status !== 'unavailable' &&
         (result.outcomeFeedbackReadiness?.state === 'ready' ||
         (result.outcomeFeedbackLatest && result.outcomeFeedbackLatest.action !== 'withdrawn'))) ? (
@@ -289,6 +291,28 @@ export function ExperimentResultDetailPage() {
   )
 }
 
+
+/** Owner-only provenance status. No treatment claim, "worked" badge, AI
+ * interpretation or recommendation-ranking side effect.
+ */
+export function ExperimentEvidenceReviewSection({review}: {review: ExperimentEvidenceReview}) {
+  return (
+    <section className="space-y-2 rounded-lg border border-zinc-200 p-3 text-sm">
+      <h2 className="font-semibold">Evidence review status</h2>
+      <p className="text-zinc-700">{experimentEvidenceReviewCopy(review)}</p>
+      {review.observationsAsOf && review.snapshotRecordedDate ? (
+        <p className="text-xs text-zinc-500">
+          Saved screen: {review.snapshotRecordedDate} · Current observations: {review.observationsAsOf}
+          {' · '}{review.primaryMetricCount} prespecified outcome metric{review.primaryMetricCount === 1 ? '' : 's'}
+          {review.feedbackVersion ? ` · Owner feedback version ${review.feedbackVersion}` : ''}
+        </p>
+      ) : null}
+      <p className="text-xs text-zinc-500">
+        This is not a verified treatment response or proof of causation. It is not used to rank recommendations or change goals.
+      </p>
+    </section>
+  )
+}
 
 /** Explicitly descriptive, opt-in disclosure: no positive/negative clinical
  * verdict and no automatic writes to Lab, Goals, Coach or XP.

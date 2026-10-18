@@ -355,6 +355,7 @@ export type ExperimentResultView = {
   outcomeFeedbackLatest?: import('@/domain/experiment-outcome-feedback').OutcomeFeedbackEvent | null
   outcomeFeedbackHistory?: import('@/domain/experiment-evidence-memory').FeedbackHistory
   currentOutcomeComparison?: import('@/domain/experiment-current-outcomes').CurrentOutcomeComparison | null
+  evidenceReview?: import('@/domain/experiment-evidence-review').ExperimentEvidenceReview
 }
 
 export function previewExperimentResult(id: string, body: unknown): Promise<ExperimentResultView> {
