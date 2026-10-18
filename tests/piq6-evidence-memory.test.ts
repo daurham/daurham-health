@@ -20,7 +20,7 @@ describe('PIQ-6.5 auditable owner context, not efficacy memory',()=>{
   it('keeps no feedback distinct from negative or successful evidence',()=>{
     expect(view([])).toEqual({status:'empty',events:[],review:'not_recorded'})
     expect(view([event(1)])).toMatchObject({status:'complete',review:'owner_context_recorded'})
-    expect(feedbackHistoryCopy(view([event(1)])).toContain('does not establish')
+    expect(feedbackHistoryCopy(view([event(1)]))).toContain('does not establish')
   })
   it('keeps revision audit and acknowledges later changed circumstances',()=>{
     expect(view([event(2),event(1)])).toMatchObject({status:'complete',events:[{version:2},{version:1}]})
