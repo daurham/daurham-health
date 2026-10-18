@@ -1089,3 +1089,29 @@ migration state/restore/rollback, separate QA Auth+DB, mobile owner
 validation, owner usefulness review and explicit promotion approval.
 Formal owner acceptance remains 0/9; never conflate green CI with
 production qualification.
+
+
+## 2026-10-18 — PIQ-6.5 saved-result evidence-drift warnings (green)
+
+Commit `790bd43ff228cf579d785d57543ffee9eaf0eb2b`,
+validated with branch workflow 39158711330 (2,714 passed,
+32 skipped; TypeScript, ESLint and Vite build all green).
+The existing read-only current-record outcome gate already hides
+before/after values when the prespecified nutrition/sleep source-value
+seal changes or coverage no longer matches. The main owner-visible
+Evidence review status now separately reports source changes,
+coverage changes, or unverifiable seals, with an accessible alert.
+Invalid snapshots, changed implementations and withdrawn feedback
+still take precedence. No historical result, feedback event, goal,
+recommendation, schema or owner data is mutated or replayed.
+
+Remaining concern: owner-feedback *write* readiness is separately
+derived from snapshot/implementation state, not the new current
+source-value drift signal. Do not assume all source-corrected results
+are prevented from receiving new owner feedback until this is
+explicitly reviewed and race-tested. The prior PostgreSQL 31/31
+validation is for preexisting canonical/source-CAS tests; this
+presentation-only patch ran full branch CI, no new PG gate.
+PIQ-7 deployment separation, production schema/backup/rollback,
+mobile owner UAT and full owner acceptance remain open (0/9).
+`main` and production remain unchanged.
