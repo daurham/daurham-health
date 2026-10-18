@@ -35,7 +35,7 @@ describe('PIQ-6.3 committed experiment comparison snapshots',()=>{
     expect(snapshot.review.state).toBe('insufficient_coverage')
     expect(snapshot.review.reason).toBe('insufficient_observations')
   })
-  it('round-trips optional verified values seal while preserving unsealed legacy v1',()=>{
+  it('round-trips optional verified values seal while preserving unsealed legacy v1',async()=>{
     const legacy = makeSnapshot()
     expect(Object.prototype.hasOwnProperty.call(legacy,'sourceValueSeal')).toBe(false)
     const sealed={...legacy,sourceValueSeal:'a'.repeat(64)}
