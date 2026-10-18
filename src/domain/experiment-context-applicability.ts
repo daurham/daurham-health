@@ -12,6 +12,7 @@ export type ExperimentContextApplicability = {
   linkedGoalChangedAfterCapture: boolean | null
   linkedGoalCount: number | null
   canRankRecommendations: false
+  contextBaselineComparison?: 'matched' | 'changed' | 'legacy' | 'unavailable'
 }
 
 type Metadata = {
@@ -25,6 +26,8 @@ export function assessExperimentContextApplicability(input: {
   snapshotCapturedAt: string | null
   metadata: unknown
   asOf: string
+  currentContextSeal?: string | null
+  currentLinkedGoalCount?: number | null
 }): ExperimentContextApplicability {
   const base: ExperimentContextApplicability = {
     state: 'unavailable', asOf: input.asOf,
@@ -33,11 +36,24 @@ export function assessExperimentContextApplicability(input: {
     linkedGoalChangedAfterCapture: null,
     linkedGoalCount: null,
     canRankRecommendations: false,
+    contextBaselineComparison: 'unavailable',
   }
   if (!input.snapshot || !input.snapshotCapturedAt ||
       !Number.isFinite(Date.parse(input.snapshotCapturedAt))) return base
-  // A captured-at timestamp is merely a threshold for detected revisions.
-  // The historical snapshot lacks an initial profile/goal version binding.
+  // New snapshots carry a hashed original goal/profile revision baseline.
+  // No-mismatch remains NOT ESTABLISHED: physiology and circumstances may differ.
+  if(Object.prototype.hasOwnProperty.call(input.snapshot,'contextRevisionSeal')){
+    const original=input.snapshot.contextRevisionSeal
+    const current=input.currentContextSeal
+    const count=input.currentLinkedGoalCount
+    if(!original||!current||!Number.isSafeInteger(count)||
+       count==null||count<0||count>1)return base
+    const same=original===current
+    return {...base,state:same?'not_established':'needs_recheck',
+      linkedGoalCount:count,
+      contextBaselineComparison:same?'matched':'changed'}
+  }
+  // Legacy-only updated-at screening cannot catch link replacement.
   const raw = input.metadata
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return base
   const m = raw as Metadata
@@ -53,6 +69,7 @@ export function assessExperimentContextApplicability(input: {
     profileChangedAfterCapture: m.profile_changed as boolean | null,
     linkedGoalChangedAfterCapture: m.linked_goal_changed,
     linkedGoalCount: m.linked_goal_count,
+    contextBaselineComparison: 'legacy',
   }
 }
 
@@ -61,6 +78,8 @@ export function experimentContextApplicabilityCopy(result: ExperimentContextAppl
     case 'unavailable':
       return 'Current goal and health-profile revision metadata could not be verified. The historical result is preserved, but present-day applicability is unknown.'
     case 'needs_recheck': {
+      if(result.contextBaselineComparison==='changed')
+        return 'Recheck present-day relevance: the saved profile or linked-goal revision baseline no longer matches current records. The historical observation remains unchanged.'
       const changed = [
         result.profileChangedAfterCapture ? 'health profile' : null,
         result.linkedGoalChangedAfterCapture ? 'experiment-linked goals' : null,
@@ -68,6 +87,8 @@ export function experimentContextApplicabilityCopy(result: ExperimentContextAppl
       return `Recheck present-day relevance: the ${changed} were updated after this result was saved. The historical observation has not been changed.`
     }
     case 'not_established':
+      if(result.contextBaselineComparison==='matched')
+        return 'The saved profile and linked-goal revision metadata still match today. This does not prove that health circumstances, goals, or treatment relevance are unchanged.'
       return result.linkedGoalCount === 0
         ? 'No revision was detected in the available health profile, but this experiment has no linked goals to compare. Current relevance is not established.'
         : result.profileChangedAfterCapture === null
