@@ -8,7 +8,11 @@ import {
   parseOutcomeFeedbackSubmission, reviewOutcomeFeedbackReadiness,
   type OutcomeFeedbackEvent, type OutcomeFeedbackReadiness,
 } from '../../src/domain/experiment-outcome-feedback.js'
-import { reconcileLatestFeedback, reviewFeedbackHistory, type FeedbackHistory } from '../../src/domain/experiment-evidence-memory.js'
+import {
+  reconcileLatestFeedback, reviewFeedbackHistory,
+  parseFeedbackHistoryCursor, reviewFeedbackHistoryPage,
+  type FeedbackHistory, type FeedbackHistoryPage,
+} from '../../src/domain/experiment-evidence-memory.js'
 
 type DbGate = {
   status: string
@@ -80,6 +84,35 @@ export const OWNER_OUTCOME_FEEDBACK_HISTORY_SQL = [
   'FROM experiment_outcome_feedback_events WHERE experiment_result_id = $1::uuid',
   'ORDER BY version DESC LIMIT 26',
 ].join('\n')
+
+export const OWNER_OUTCOME_FEEDBACK_HISTORY_PAGE_SQL = [
+  'SELECT version,action,unlogged_factors AS "unloggedFactors", owner_note AS "ownerNote",',
+  ' comparison_fingerprint AS "comparisonFingerprint", recorded_at::text AS "recordedAt"',
+  'FROM experiment_outcome_feedback_events',
+  'WHERE experiment_result_id = $1::uuid AND version < $2::int',
+  'ORDER BY version DESC LIMIT 26',
+].join('\n')
+
+/** No mutation, and no new snapshot; fail closed if audit head changed. */
+export async function readOwnerFeedbackHistoryPage(
+  resultId:string,before:unknown,latest:unknown,
+):Promise<FeedbackHistoryPage> {
+  const cursor=parseFeedbackHistoryCursor(before,latest)
+  if('error' in cursor) throw new HttpError(400,cursor.error)
+  const sql=await getSql()
+  const state=await readOwnerOutcomeFeedback(sql,resultId,await currentHealthDate())
+  if(state.history.status!=='partial'||!state.snapshotFingerprint||
+     !state.latest||state.latest.version!==cursor.latestVersion) {
+    throw new HttpError(409,'Feedback history changed or is not verifiable. Refresh the result.')
+  }
+  const rows=await sql.query(OWNER_OUTCOME_FEEDBACK_HISTORY_PAGE_SQL,[resultId,cursor.beforeVersion])
+  const page=reviewFeedbackHistoryPage({
+    rows,beforeVersion:cursor.beforeVersion,latestVersion:cursor.latestVersion,
+    expectedFingerprint:state.snapshotFingerprint,snapshotVerified:true,
+  })
+  if(!page) throw new HttpError(409,'Older feedback versions could not be verified. Refresh the result.')
+  return page
+}
 
 export async function readOwnerOutcomeFeedback(sql: Sql, resultId: string, today: string): Promise<{
   readiness: OutcomeFeedbackReadiness

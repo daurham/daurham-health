@@ -123,3 +123,54 @@ export function feedbackHistoryCopy(history: FeedbackHistory): string {
       return 'Owner context is recorded and linked to a saved evidence snapshot. This does not establish whether the intervention worked.'
   }
 }
+
+/** Read-only owner history pagination. Each cursor must be a 25-version
+ * boundary anchored to the verified head. No offsets or partial validations.
+ */
+export type FeedbackHistoryPage = {
+  status:'partial'|'complete'
+  events:FeedbackHistoryEntry[]
+  nextBeforeVersion:number|null
+  latestVersion:number
+}
+export function parseFeedbackHistoryCursor(before:unknown,latest:unknown):
+  {beforeVersion:number;latestVersion:number}|{error:string} {
+  const parse=(v:unknown):number|null=>
+    typeof v==='string' && /^[1-9][0-9]{0,9}$/.test(v) &&
+    Number.isSafeInteger(Number(v)) && Number(v)<=2147483647 ? Number(v):null
+  const beforeVersion=parse(before),latestVersion=parse(latest)
+  if(beforeVersion===null||latestVersion===null||beforeVersion<=1||
+     latestVersion-beforeVersion<MAX_FEEDBACK_HISTORY-1||
+     (latestVersion-beforeVersion-(MAX_FEEDBACK_HISTORY-1))%MAX_FEEDBACK_HISTORY!==0) {
+    return {error:'Invalid feedback page cursor. Refresh the result.'}
+  }
+  return {beforeVersion,latestVersion}
+}
+/** Every exposed row is validated against the original snapshot fingerprint
+ * and required consecutive version; sentinel also validated but not exposed.
+ */
+export function reviewFeedbackHistoryPage(input:{
+  rows:unknown;beforeVersion:number;latestVersion:number;
+  expectedFingerprint:string|null;snapshotVerified:boolean
+}):FeedbackHistoryPage|null {
+  if(!input.snapshotVerified||!input.expectedFingerprint||
+     !Number.isSafeInteger(input.beforeVersion)||input.beforeVersion<=1||
+     !Number.isSafeInteger(input.latestVersion)||input.latestVersion<=input.beforeVersion||
+     !Array.isArray(input.rows)||input.rows.length===0||
+     input.rows.length>MAX_FEEDBACK_HISTORY+1) return null
+  const events:FeedbackHistoryEntry[]=[]
+  for(let i=0;i<input.rows.length;i++){
+    const event=parseRow(input.rows[i])
+    const expected=input.beforeVersion-1-i
+    if(expected<1||!event||event.version!==expected||
+       event.comparisonFingerprint!==input.expectedFingerprint) return null
+    if(i<MAX_FEEDBACK_HISTORY) events.push(event)
+  }
+  if(input.rows.length===MAX_FEEDBACK_HISTORY+1){
+    const nextBeforeVersion=events[events.length-1]!.version
+    if(nextBeforeVersion<=1)return null
+    return {status:'partial',events,nextBeforeVersion,latestVersion:input.latestVersion}
+  }
+  if(events[events.length-1]?.version!==1)return null
+  return {status:'complete',events,nextBeforeVersion:null,latestVersion:input.latestVersion}
+}
