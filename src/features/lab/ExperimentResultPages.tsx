@@ -251,7 +251,7 @@ export function ExperimentResultDetailPage() {
   )
 }
 
-function ResultBody({ result }: { result: ExperimentResultView }) {
+export function ResultBody({ result }: { result: ExperimentResultView }) {
   return (
     <div className="space-y-4">
       <section>
@@ -274,7 +274,7 @@ function ResultBody({ result }: { result: ExperimentResultView }) {
         <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">What was observed</h2>
         {result.requirements.map((item) => (
           <article key={item.requirementId} className="rounded-lg border border-zinc-200 bg-white p-3 text-sm">
-            <p className="font-medium">{item.label}</p>
+            <p className="font-medium">{item.label || 'Recorded outcome'}</p>
             <SummaryLines summary={item.summary} />
             <p className="mt-1 text-zinc-600">
               Evidence {item.evaluationStatus}
@@ -324,11 +324,11 @@ function ResultBody({ result }: { result: ExperimentResultView }) {
           )}
         </section>
       ) : null}
-      {result.limitations.length > 0 ? (
+      {(result.limitations?.length ?? 0) > 0 ? (
         <section className="space-y-1 text-sm">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Limitations</h2>
           <ul className="list-disc pl-5">
-            {result.limitations.map((item) => (
+            {result.limitations?.map((item) => (
               <li key={item}>{item}</li>
             ))}
           </ul>

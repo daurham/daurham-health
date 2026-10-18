@@ -151,8 +151,12 @@ export async function getExperimentResult(id: string) {
   const row = rows[0]
   if (!row) throw new HttpError(404, 'Experiment result was not found.')
   const requirements = (await sql.query(
-    `SELECT id::text AS id, requirement_id::text AS requirement_id, evaluation_status, summary_kind, summary, criterion_status
-     FROM experiment_result_requirements WHERE experiment_result_id = $1::uuid`,
+    `SELECT rr.id::text AS id, rr.requirement_id::text AS requirement_id,
+            p.label, rr.evaluation_status, rr.summary_kind, rr.summary, rr.criterion_status
+     FROM experiment_result_requirements rr
+     JOIN lab_protocol_requirements p ON p.id = rr.requirement_id
+     WHERE rr.experiment_result_id = $1::uuid
+     ORDER BY p.position, rr.id`,
     [id],
   )) as Array<Record<string, unknown>>
   const evidence = (await sql.query(
@@ -195,6 +199,10 @@ export async function getExperimentResult(id: string) {
     invalidationReason: row.invalidation_reason,
     supersedesResultId: row.supersedes_result_id,
     footer: RESULT_CAUSALITY_FOOTER,
+    // The ephemeral preview's limitations were not part of the old immutable
+    // result format. Do not invent retrospective caveats; the causality footer
+    // remains explicit, and UI handles older APIs that omit this array.
+    limitations: [],
     comparisonSnapshot,
     comparisonReview: comparisonSnapshot?.review ?? null,
     comparisonSnapshotStatus,
@@ -204,6 +212,7 @@ export async function getExperimentResult(id: string) {
     requirements: requirements.map((item) => ({
       id: item.id,
       requirementId: item.requirement_id,
+      label: item.label,
       evaluationStatus: item.evaluation_status,
       summaryKind: item.summary_kind,
       summary: item.summary,
