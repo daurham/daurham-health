@@ -1426,6 +1426,37 @@ describe.skipIf(!url)('PIQ-1.1 full numbered migration chain and backup on isola
       )
       expect(await digest()).not.toBe(beforeRequirement)
       expect((await client.query(statement,args(randomUUID(),beforeRequirement))).rowCount).toBe(0)
+      // Private Health Profile and linked-Goal revisions must also invalidate
+      // a previously read digest inside the actual parent INSERT statement.
+      const beforeProfile=await digest()
+      await second.query(
+        "INSERT INTO health_profile (singleton_id,updated_at) VALUES (1,clock_timestamp()) ON CONFLICT (singleton_id) DO UPDATE SET updated_at=clock_timestamp()+interval '1 second'",
+      )
+      expect(await digest()).not.toBe(beforeProfile)
+      expect((await client.query(statement,args(randomUUID(),beforeProfile))).rowCount).toBe(0)
+      const goalId=randomUUID(),goalVersionId=randomUUID()
+      await second.query(
+        "INSERT INTO goals (id,goal_kind,status,started_on,source_id) VALUES ($1,'training_frequency','active',$2::date,$3)",
+        [goalId,from,src],
+      )
+      await second.query(
+        "INSERT INTO goal_versions (id,goal_id,version,is_current,target_mode,target_min,target_unit,source_id) VALUES ($1,$2,1,true,'at_least',3,'sessions/week',$3)",
+        [goalVersionId,goalId,src],
+      )
+      const beforeGoalLink=await digest()
+      await second.query(
+        'INSERT INTO experiment_goals (experiment_id,goal_id,goal_version_id) VALUES ($1,$2,$3)',
+        [experimentId,goalId,goalVersionId],
+      )
+      expect(await digest()).not.toBe(beforeGoalLink)
+      expect((await client.query(statement,args(randomUUID(),beforeGoalLink))).rowCount).toBe(0)
+      const beforeGoalStatus=await digest()
+      await second.query(
+        "UPDATE goals SET status='paused',paused_at=clock_timestamp(),updated_at=clock_timestamp() WHERE id=$1",
+        [goalId],
+      )
+      expect(await digest()).not.toBe(beforeGoalStatus)
+      expect((await client.query(statement,args(randomUUID(),beforeGoalStatus))).rowCount).toBe(0)
       // A failed parent insert cannot persist its dependent immutable snapshot.
       await client.query('BEGIN')
       try{

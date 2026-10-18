@@ -902,6 +902,9 @@ export function buildFinalizationSourceDigestExpression(firstParameter:number):s
     .replace('$2::date',bind(8)+'::date').replace('$3::date',bind(2)+'::date')
   const requirementSql=EXPERIMENT_REQUIREMENT_SOURCE_SQL.replace('$1::uuid',bind(12)+'::uuid')
   const controlSql=EXPERIMENT_CONTROL_SOURCE_SQL.replace('$1::uuid',bind(12)+'::uuid')
+  // Protect the private profile/linked-goal revision read at the same INSERT
+  // snapshot; never place clinical text, notes, or goal targets in the digest.
+  const ownerContextSql=EXPERIMENT_CONTEXT_SIGNATURE_SQL.replace('$1::uuid',bind(7)+'::uuid')
   return `md5(
     (CASE WHEN ${bind(5)}::boolean THEN COALESCE((
       SELECT jsonb_agg(to_jsonb(n) ORDER BY n.log_date)::text
@@ -969,6 +972,11 @@ export function buildFinalizationSourceDigestExpression(firstParameter:number):s
     COALESCE((
       SELECT jsonb_agg(to_jsonb(control) ORDER BY control.tag_key)::text
       FROM (${controlSql}) control
+    ),'[]') || ':' ||
+    COALESCE((
+      SELECT jsonb_agg(to_jsonb(owner_context) ORDER BY owner_context.goal_id,
+        owner_context.linked_version_id)::text
+      FROM (${ownerContextSql}) owner_context
     ),'[]')
   )`
 }

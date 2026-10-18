@@ -58,6 +58,14 @@ describe('PIQ-6.5 PostgreSQL statement-snapshot primary nutrition/sleep CAS',()=
     expect(EXPERIMENT_REQUIREMENT_SOURCE_SQL).toContain('criteria')
     expect(EXPERIMENT_SUPPLEMENT_LINK_SOURCE_SQL).toContain('experiment_supplements')
     expect(EXPERIMENT_CONTROL_SOURCE_SQL).toContain('lab_protocol_context_controls')
+    // Metadata read in the independent JS evaluation is also checked within
+    // the final INSERT's PostgreSQL statement snapshot.
+    expect(read).toContain('FROM experiments e')
+    expect(read).toContain('LEFT JOIN health_profile p ON p.singleton_id = 1')
+    expect(read).toContain('LEFT JOIN experiment_goals eg ON eg.experiment_id = e.id')
+    expect(read).toContain('LEFT JOIN goal_versions v ON v.goal_id = g.id AND v.is_current')
+    expect(read).toContain('WHERE e.id = $7::uuid')
+    expect(read).toContain('jsonb_agg(to_jsonb(owner_context)')
     expect(EXPERIMENT_SUPPLEMENT_SOURCE_SQL).toContain('FROM supplements')
     expect(EXPERIMENT_SUPPLEMENT_SCHEDULE_SOURCE_SQL).toContain('FROM supplement_schedules')
     expect(EXPERIMENT_SUPPLEMENT_STATUS_SOURCE_SQL).toContain('FROM supplement_status_events')
