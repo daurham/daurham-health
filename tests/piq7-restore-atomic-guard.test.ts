@@ -1,11 +1,41 @@
 import {describe, expect, it, vi} from 'vitest'
 import {buildBackupArchive} from '../server/backup/format.js'
 import {BACKUP_TABLES,LATEST_SCHEMA_MIGRATION} from '../server/backup/inventory.js'
-import {applyRestore,restoreDestinationGuardStatements} from '../server/backup/database.js'
+import {applyRestore,restoreDestinationGuardStatements,
+  assertBackupMigrationHistory,readBackupTables} from '../server/backup/database.js'
+import {listMigrationFiles} from '../server/migrate.js'
 import {listMigrationFiles} from '../server/migrate.js'
 import type {Sql} from '../server/db.js'
 
 describe('PIQ-7 restore application never silently succeeds on blocked or changed destination',()=>{
+  it('refuses an export if any historic migration differs despite matching count and latest',async()=>{
+    const expected=await listMigrationFiles()
+    expect(()=>assertBackupMigrationHistory(expected,expected)).not.toThrow()
+    const altered=expected.map((filename,i)=>i===53?'0054_tampered_middle.sql':filename)
+    expect(altered).toHaveLength(expected.length)
+    expect(altered.at(-1)).toBe(LATEST_SCHEMA_MIGRATION)
+    expect(()=>assertBackupMigrationHistory(altered,expected)).toThrow('Backup refused')
+    expect(()=>assertBackupMigrationHistory(expected.slice(1),expected)).toThrow('Backup refused')
+    const query=vi.fn(async(sql:string)=>{
+      if(sql==='SELECT filename FROM schema_migrations ORDER BY filename')
+        return altered.map(filename=>({filename}))
+      return []
+    })
+    const fake={
+      transaction:async(callback:(txn:{query:typeof query})=>Promise<unknown>[]) =>
+        Promise.all(callback({query})),
+    } as unknown as Sql
+    await expect(readBackupTables(fake)).rejects.toThrow('Backup refused')
+    expect(query).toHaveBeenCalledWith('SELECT filename FROM schema_migrations ORDER BY filename')
+    query.mockImplementation(async(sql:string)=>{
+      if(sql==='SELECT filename FROM schema_migrations ORDER BY filename')
+        return expected.map(filename=>({filename}))
+      return []
+    })
+    const intact=await readBackupTables(fake)
+    expect(intact.schemaMigration).toBe(LATEST_SCHEMA_MIGRATION)
+    expect(intact.rowsByTable).toMatchObject({})
+  })
   it('locks ALL backed-up tables, limits lock wait and checks destination/schema in transaction',async()=>{
     const expected=await listMigrationFiles()
     const guard=restoreDestinationGuardStatements(expected)

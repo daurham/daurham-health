@@ -8,7 +8,7 @@ import { inspectMigrations } from '../server/migrate.js'
 import { assessMigrationHistory, readMigrationHistory } from '../server/migration-history.js'
 import { LATEST_SCHEMA_MIGRATION, backupTable } from '../server/backup/inventory.js'
 import { buildBackupArchive, restoreStatements, verifyBackupArchive, planRestore, type BackupRow } from '../server/backup/format.js'
-import { restoreDestinationGuardStatements } from '../server/backup/database.js'
+import { restoreDestinationGuardStatements,assertBackupMigrationHistory } from '../server/backup/database.js'
 import { getNutritionDayCompleteness, saveNutritionDayCompleteness } from '../server/nutrition/day-completeness.js'
 import { readMaintenanceDecisionSnapshot, isMaintenanceDecisionRevisionCurrent } from '../server/intelligence/maintenance-revision.js'
 import { activeCalorieDecisionInRevision, dueFollowUps, requireCurrentCalorieRecommendation, surfaceDraft, writeCoachRecommendationResponse, writeCoachRecommendationOutcome } from '../server/intelligence/coach-intelligence.js'
@@ -154,6 +154,28 @@ describe.skipIf(!url)('PIQ-1.1 full numbered migration chain and backup on isola
     expect(count.rows[0].count).toBe(0)
     const unreviewed = await getNutritionDayCompleteness(date, adapter, today)
     expect(unreviewed.assessment).toMatchObject({ state: 'unknown', eligibleForMaintenance: false })
+  })
+
+  it('PIQ-7: backup export rejects a drifted intermediate migration despite same last/count',async()=>{
+    const expected=(await inspectMigrations()).map(m=>m.filename)
+    const before=(await client.query(
+      'SELECT filename FROM schema_migrations ORDER BY filename',
+    )).rows.map((row:{filename:string})=>row.filename)
+    expect(()=>assertBackupMigrationHistory(before,expected)).not.toThrow()
+    await client.query('BEGIN')
+    try {
+      await client.query(
+        "UPDATE schema_migrations SET filename='0054_synthetic_corrupt.sql' WHERE filename='0054_coach_plateau_active_unique.sql'",
+      )
+      const drift=(await client.query(
+        'SELECT filename FROM schema_migrations ORDER BY filename',
+      )).rows.map((row:{filename:string})=>row.filename)
+      expect(drift).toHaveLength(before.length)
+      expect(drift.at(-1)).toBe(LATEST_SCHEMA_MIGRATION)
+      expect(()=>assertBackupMigrationHistory(drift,expected)).toThrow('Backup refused')
+    } finally {
+      await client.query('ROLLBACK')
+    }
   })
 
   it('PIQ-7: restore rechecks empty destination AFTER locking tables, before write', async () => {

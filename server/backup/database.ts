@@ -74,16 +74,36 @@ export async function readSchemaMigration(sql: Sql): Promise<string> {
   return rows[0]?.filename ?? ''
 }
 
+/** A latest filename and count alone do not attest the schema. This exact
+ * sequence check runs against migration rows from the SAME RepeatableRead
+ * transaction snapshot used to read backup tables (no table-wide locks).
+ * Never package a misleading full/portable backup from drifted history.
+ */
+export function assertBackupMigrationHistory(
+  applied: readonly string[], expected: readonly string[],
+): void {
+  if(expected.length !== Number(LATEST_SCHEMA_MIGRATION.slice(0,4)) ||
+     expected.at(-1) !== LATEST_SCHEMA_MIGRATION ||
+     expected.some((name,i)=>!/^\d{4}_[a-z0-9_]+\.sql$/.test(name) ||
+       Number(name.slice(0,4))!==i+1) ||
+     applied.length !== expected.length ||
+     applied.some((name,i)=>name!==expected[i])) {
+    throw new Error('Backup refused: exact database migration history does not match this release')
+  }
+}
+
 export async function readBackupTables(sql: Sql): Promise<{ schemaMigration: string; rowsByTable: Record<string, BackupRow[]> }> {
+  const expectedMigrations = await restoreMigrationFiles()
   const results = await sql.transaction(
     (txn) => [
-      txn.query('SELECT filename FROM schema_migrations ORDER BY filename DESC LIMIT 1'),
+      txn.query('SELECT filename FROM schema_migrations ORDER BY filename'),
       ...BACKUP_TABLES.map((definition) => txn.query(selectSql(definition))),
     ],
     { isolationLevel: 'RepeatableRead', readOnly: true },
   )
   const migrationRows = results[0] as Array<{ filename?: string }>
-  const schemaMigration = migrationRows[0]?.filename ?? ''
+  assertBackupMigrationHistory(migrationRows.map(row=>row.filename??''),expectedMigrations)
+  const schemaMigration = migrationRows.at(-1)?.filename ?? ''
   const rowsByTable: Record<string, BackupRow[]> = {}
   BACKUP_TABLES.forEach((definition, index) => {
     rowsByTable[definition.name] = rowsFromPayload(results[index + 1])
