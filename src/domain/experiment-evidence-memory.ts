@@ -15,7 +15,7 @@ export const MAX_FEEDBACK_HISTORY = 25
 function parseRow(value: unknown): FeedbackHistoryEntry | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
   const row = value as Record<string, unknown>
-  if (!Number.isSafeInteger(row.version) || (row.version as number) < 1 ||
+  if (typeof row.version !== 'number' || !Number.isSafeInteger(row.version) || row.version < 1 ||
       (row.action !== 'recorded' && row.action !== 'revised' && row.action !== 'withdrawn') ||
       typeof row.comparisonFingerprint !== 'string' ||
       !/^[0-9a-f]{64}$/.test(row.comparisonFingerprint) ||

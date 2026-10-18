@@ -1202,6 +1202,14 @@ describe.skipIf(!url)('PIQ-1.1 full numbered migration chain and backup on isola
       expect(inspected.status).toBe('complete')
       expect(inspected.events.map(item => item.version)).toEqual([2,1])
       expect(inspected.review).toBe('withdrawn')
+      expect(reviewFeedbackHistory({
+        rows: historyRows.rows, expectedFingerprint: 'b'.repeat(64),
+        snapshotVerified: true, readiness: {state:'ready',reason:'ready'},
+      })).toMatchObject({status:'unavailable',events:[],review:'unavailable'})
+      expect(reviewFeedbackHistory({
+        rows: historyRows.rows, expectedFingerprint: hash,
+        snapshotVerified: false, readiness: {state:'ready',reason:'ready'},
+      }).review).toBe('unavailable')
     } finally {
       await client.query('ROLLBACK')
     }
