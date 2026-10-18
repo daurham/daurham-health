@@ -79,7 +79,7 @@ export const OWNER_OUTCOME_FEEDBACK_HISTORY_SQL = [
   ' snapshot_fingerprint AS "comparisonFingerprint", recorded_at::text AS "recordedAt"',
   'FROM experiment_outcome_feedback_events WHERE experiment_result_id = $1::uuid',
   'ORDER BY version DESC LIMIT 26',
-].join('\\n')
+].join('\n')
 
 export async function readOwnerOutcomeFeedback(sql: Sql, resultId: string, today: string): Promise<{
   readiness: OutcomeFeedbackReadiness

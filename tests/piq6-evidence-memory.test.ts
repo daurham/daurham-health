@@ -42,7 +42,7 @@ describe('PIQ-6.5 auditable owner context, not efficacy memory',()=>{
       [event(1),event(2)],
       [{...event(1),comparisonFingerprint:'b'.repeat(64)}],
       [{...event(1),unloggedFactors:'zero'}],
-      [{...event(1),ownerNote:'Unreported medical fact'}],
+      [{...event(1),ownerNote:'   '}],
       [{...event(1),recordedAt:'no-date'}],
       [{...event(1),version:0}],
       [{...event(1),action:'withdrawn',unloggedFactors:null,ownerNote:null}],
