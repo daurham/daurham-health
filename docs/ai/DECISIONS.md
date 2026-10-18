@@ -1008,3 +1008,7 @@ these migrations does not validate live app code, Neon root origin
 metadata, Auth sessions, or Vercel runtime bindings. Keep the PIQ
 preview API lock intact until independently attested isolation and
 a deliberate owner-approved release step; do not merge `main`.
+
+## Decision: local full backups must be private and exclusive (PIQ-7, 2026-10-18)
+
+Full health backup CLI output is sensitive even when authentication credentials are excluded. Verify the ZIP before creating an on-disk file; create only a new output with `wx` and `0600` on Unix to avoid group/world disclosure, accidental overwrite or symlink following. Preserve original archive content/restore semantics; never call file permissions encryption. Users remain responsible for encrypted storage, retention and authentic recovery rehearsal. This change is limited to the CLI output path, development branch only, pending CI and formal owner release gates.

@@ -1234,3 +1234,7 @@ No production DB/owner row/Auth access, no deployment or main merge.
 PIQ-7 isolated QA environment + separate Auth, privacy/backup/recovery
 proof, iPhone/iPad UAT, model-cost and usefulness acceptance remain
 outstanding; formal phase acceptance 0/9.
+
+## 2026-10-18 — PIQ-7 secure local backup creation (pending CI)
+
+CLI `backup:create` now validates its full archive *before* saving, uses exclusive owner-only file creation (`wx`, `0600` on Unix), and refuses existing paths and symlinks. Synthetic filesystem tests cover the private mode, malformed input, no-clobber semantics and link protection. Existing full/portable archive format, backup API, and restore transaction are unchanged. This does not encrypt backups or prove full recovery. Check exact-SHA full and PG workflow after commit. No production/main/DB changes. PIQ-7 QA environment/Auth/migration/backup acceptance and 0/9 owner acceptance stay pending.

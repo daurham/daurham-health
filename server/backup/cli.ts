@@ -1,8 +1,9 @@
-import { readFile, writeFile } from 'node:fs/promises'
+import { readFile } from 'node:fs/promises'
 import process from 'node:process'
 import { applyRestore, createBackupArchive, inspectRestore, openBackupSql, restoreFailureMessage } from './database.js'
 import { verifyBackupArchive } from './format.js'
 import { BACKUP_TABLES } from './inventory.js'
+import { writeVerifiedPrivateBackup } from './private-file.js'
 
 function line(text = ''): void {
   process.stdout.write(`${text}\n`)
@@ -25,11 +26,7 @@ async function create(): Promise<void> {
   const file = pathArg()
   const sql = await openBackupSql()
   const bytes = await createBackupArchive(sql, 'full')
-  await writeFile(file, bytes)
-  const verified = verifyBackupArchive(bytes)
-  if (verified.errors.length > 0) {
-    fail(verified.errors.join('\n'))
-  }
+  const verified = await writeVerifiedPrivateBackup(file, bytes)
   const counts = BACKUP_TABLES.map((definition) => ({
     name: definition.name,
     rows: verified.tables[definition.name]?.length ?? 0,

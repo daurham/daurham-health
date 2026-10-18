@@ -12,7 +12,7 @@ Authentication is not in the backup. After a restore, sign in with the existing 
 npm run backup:create -- ./backups/health-2026-09-22.health-backup.zip
 ```
 
-The command reads the configured Health database, writes the archive, and verifies it before it exits.
+The command verifies the archive **before** saving it, creates a new file with owner-only read/write permissions (`0600` on Unix), and refuses to overwrite an existing file or symbolic link. Choose a fresh filename each time. The directory must already exist. A full archive contains private health data; restricted local permissions are **not encryption**. Keep backups in encrypted storage, protect transfers, and follow an appropriate retention plan.
 
 ## Verify
 
