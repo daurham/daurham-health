@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { LATEST_SCHEMA_MIGRATION } from '../server/backup/inventory.js'
 import { independentlyVerifiedEmptyRoot, REQUIRED_EMPTY_OWNER_TABLES,
   type PiqIndependentRootEvidence } from '../server/piq-neon-root-provenance.js'
 import { reviewPiqPreviewSafety, type PiqNeonBranchEvidence } from '../server/piq-preview-preflight.js'
@@ -14,8 +15,8 @@ const proof: PiqIndependentRootEvidence = {
   initialSql: { source: 'neon_sql', projectId: 'qa-new-project', branchId: 'br-new-root',
     publicTableCount: 0, authUserCount: 0, authSessionCount: 0 },
   migratedSql: { source: 'neon_sql', projectId: 'qa-new-project', branchId: 'br-new-root',
-    migrationCount: 56, migrationSequenceValid: true,
-    lastMigration: '0056_primary_goal_intent_events.sql',
+    migrationCount: Number(LATEST_SCHEMA_MIGRATION.slice(0, 4)), migrationSequenceValid: true,
+    lastMigration: LATEST_SCHEMA_MIGRATION,
     ownerTableCounts: Object.fromEntries(REQUIRED_EMPTY_OWNER_TABLES.map(t => [t, 0])) as
       PiqIndependentRootEvidence['migratedSql']['ownerTableCounts'],
     authUserCount: 0, authSessionCount: 0 },
@@ -45,7 +46,7 @@ describe('PIQ independently verified new-project root provenance', () => {
 
   it('rejects any empty-database or seeded-owner evidence anomaly', () => {
     expect(verdict({ proof: { ...proof, initialSql: { ...proof.initialSql, publicTableCount: 1 } } })).toBe(false)
-    expect(verdict({ proof: { ...proof, migratedSql: { ...proof.migratedSql, migrationCount: 55 } } })).toBe(false)
+    expect(verdict({ proof: { ...proof, migratedSql: { ...proof.migratedSql, migrationCount: Number(LATEST_SCHEMA_MIGRATION.slice(0, 4)) - 1 } } })).toBe(false)
     expect(verdict({ proof: { ...proof, migratedSql: { ...proof.migratedSql, migrationSequenceValid: false } } })).toBe(false)
     expect(verdict({ proof: { ...proof, migratedSql: { ...proof.migratedSql, ownerTableCounts: {
       ...proof.migratedSql.ownerTableCounts, nutrition_entries: 1,

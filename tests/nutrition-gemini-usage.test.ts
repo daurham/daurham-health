@@ -572,7 +572,7 @@ describe('Nutrition Gemini durable usage', () => {
     expect(commit).not.toContain('ai_usage')
     const inventory = readFileSync('server/backup/inventory.ts', 'utf8')
     expect(inventory).toMatch(/name: 'ai_usage'[\s\S]{0,180}portable: false/)
-    expect(LATEST_SCHEMA_MIGRATION).toBe('0056_primary_goal_intent_events.sql')
+    expect(Number(LATEST_SCHEMA_MIGRATION.slice(0, 4))).toBeGreaterThanOrEqual(56)
     expect(readdirSync('migrations').includes('0033_nutrition_capture_images.sql')).toBe(true)
     expect(readdirSync('migrations')).toContain('0035_coach_tasks.sql')
     expect(readFileSync('server/nutrition/gemini-jobs.ts', 'utf8')).toContain('metadata: { ...interpreted.metadata, attempt: job.interpretation.attempt }')

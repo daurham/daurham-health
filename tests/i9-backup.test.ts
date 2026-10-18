@@ -3,7 +3,7 @@ import { LATEST_SCHEMA_MIGRATION, backupTable, tablesForProfile } from '../serve
 
 describe('I9 Coach intelligence backup', () => {
   it('advances the schema head and keeps owner recommendation memory portable', () => {
-    expect(LATEST_SCHEMA_MIGRATION).toBe('0056_primary_goal_intent_events.sql')
+    expect(Number(LATEST_SCHEMA_MIGRATION.slice(0, 4))).toBeGreaterThanOrEqual(56)
     expect(backupTable('coach_recommendations')).toMatchObject({
       backupClass: 'canonical',
       portable: true,

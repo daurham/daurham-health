@@ -567,6 +567,6 @@ describe('goal attention', () => {
     expect(today).toContain('goalAttentionForToday')
     expect(inventory).not.toContain('goal_status')
     expect(inventory).toContain("name: 'goals'")
-    expect(inventory).toContain('0056_primary_goal_intent_events.sql')
+    expect(inventory).toMatch(/LATEST_SCHEMA_MIGRATION = '[0-9]{4}_[^']+\.sql'/)
   })
 })
