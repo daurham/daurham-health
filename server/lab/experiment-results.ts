@@ -153,7 +153,7 @@ export const EXPERIMENT_CONTEXT_REVISION_SQL = [
   'FROM experiment_results r',
   'JOIN experiment_result_comparison_snapshots s ON s.experiment_result_id = r.id',
   'WHERE r.id = $1::uuid AND s.snapshot_fingerprint = $2::text',
-].join('\\n')
+].join('\n')
 
 export async function getExperimentResult(id: string) {
   const sql = await getSql()
