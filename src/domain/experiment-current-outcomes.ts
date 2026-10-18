@@ -11,7 +11,7 @@ export type CurrentOutcomeComparison = {
   state: 'available' | 'unavailable'
   reason: 'current_records' | 'not_ready' | 'unsupported_outcome' |
     'changed_coverage' | 'ambiguous_recording' | 'inconsistent_sleep_source' |
-    'source_unavailable'
+    'source_unavailable' | 'source_values_changed' | 'source_values_unverified'
   asOf: string
   baselineWindow: {start:string;end:string} | null
   followUpWindow: {start:string;end:string} | null
@@ -122,5 +122,25 @@ export function currentOutcomeComparisonCopy(result: CurrentOutcomeComparison): 
       return 'Sleep measurements cannot be compared across missing or changed recording sources.'
     case 'source_unavailable':
       return 'The current source observations could not be loaded. The saved result is unchanged.'
+    case 'source_values_changed':
+      return 'The original recorded values no longer match the sealed values at finalization. Before/after numbers are withheld until reviewed.'
+    case 'source_values_unverified':
+      return 'The original result lacks a verified source-value seal, or current observations cannot be sealed. A historical before/after value comparison cannot be confirmed.'
   }
+}
+
+/** Keep legacy or drifted source values out of the historical comparison UI.
+ * The immutable result still exists; this gate affects the current projection.
+ */
+export function verifyCurrentOutcomeSourceSeal(
+  comparison: CurrentOutcomeComparison,
+  originalSeal: string | null | undefined,
+  currentSeal: string | null,
+): CurrentOutcomeComparison {
+  if (comparison.state !== 'available') return comparison
+  const reason: CurrentOutcomeComparison['reason'] =
+    !originalSeal || !currentSeal ? 'source_values_unverified'
+      : originalSeal !== currentSeal ? 'source_values_changed' : 'current_records'
+  return reason === 'current_records' ? comparison :
+    unavailableCurrentComparison(reason,comparison.asOf)
 }
