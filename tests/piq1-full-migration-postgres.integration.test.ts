@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import pg from 'pg'
 import {readFileSync} from 'node:fs'
-import {EXPERIMENT_FINALIZATION_SOURCE_DIGEST_SQL, EXPERIMENT_FINALIZATION_SOURCE_CAS_EXPRESSION, EXPERIMENT_BODY_SOURCE_SQL, EXPERIMENT_SUPPLEMENT_STATUS_SOURCE_SQL, EXPERIMENT_SUPPLEMENT_SCHEDULE_SOURCE_SQL} from '../server/lab/experiment-results.js'
+import {EXPERIMENT_FINALIZATION_SOURCE_DIGEST_SQL, EXPERIMENT_FINALIZATION_SOURCE_CAS_EXPRESSION, EXPERIMENT_BODY_SOURCE_SQL, EXPERIMENT_SUPPLEMENT_STATUS_SOURCE_SQL, EXPERIMENT_SUPPLEMENT_SCHEDULE_SOURCE_SQL, EXPERIMENT_FEEDBACK_SOURCE_DIGEST_SQL, EXPERIMENT_FEEDBACK_SOURCE_CAS_EXPRESSION} from '../server/lab/experiment-results.js'
 import type { Sql } from '../server/db.js'
 import { inspectMigrations } from '../server/migrate.js'
 import { assessMigrationHistory, readMigrationHistory } from '../server/migration-history.js'
@@ -12,7 +12,7 @@ import { readMaintenanceDecisionSnapshot, isMaintenanceDecisionRevisionCurrent }
 import { activeCalorieDecisionInRevision, dueFollowUps, requireCurrentCalorieRecommendation, surfaceDraft, writeCoachRecommendationResponse, writeCoachRecommendationOutcome } from '../server/intelligence/coach-intelligence.js'
 import { randomUUID } from 'node:crypto'
 import { experimentEvidenceFingerprint } from '../src/domain/experiment-results.js'
-import { OWNER_OUTCOME_FEEDBACK_INSERT_SQL, OWNER_OUTCOME_FEEDBACK_HISTORY_SQL } from '../server/lab/outcome-feedback.js'
+import { OWNER_OUTCOME_FEEDBACK_INSERT_SQL, OWNER_OUTCOME_FEEDBACK_HISTORY_SQL, buildOwnerFeedbackVerifiedInsertSql } from '../server/lab/outcome-feedback.js'
 import { reviewFeedbackHistory } from '../src/domain/experiment-evidence-memory.js'
 import { parseExperimentComparisonSnapshot } from '../src/domain/experiment-comparison-snapshot.js'
 import { readPrimaryGoalIntent, savePrimaryGoalIntent } from '../server/goals/primary-intent.js'
@@ -1133,9 +1133,19 @@ describe.skipIf(!url)('PIQ-1.1 full numbered migration chain and backup on isola
       // 0060: An explicitly owner-confirmed follow-up is append-only. The
       // write uses a single SQL CAS against original recorded evidence and
       // owner implementation revision/date, not an optimistic UI check alone.
-      const feedback1 = await client.query(OWNER_OUTCOME_FEEDBACK_INSERT_SQL, [
+      // New feedback compares the exact source projection in the INSERT
+      // snapshot. The separate JS value-seal gate has synthetic unit tests.
+      const feedbackSourceScope:[string,string,string,boolean,boolean,string]=[
+        '2026-09-28','2026-10-07','2026-10-18',false,true,'America/Phoenix',
+      ]
+      const feedbackSourceDigest=String((await client.query(
+        EXPERIMENT_FEEDBACK_SOURCE_DIGEST_SQL,feedbackSourceScope)).rows[0].digest)
+      const guardedFeedbackSql=buildOwnerFeedbackVerifiedInsertSql(
+        EXPERIMENT_FEEDBACK_SOURCE_CAS_EXPRESSION)
+      const feedback1 = await client.query(guardedFeedbackSql, [
         resultId, randomUUID(), 0, 'recorded', 'other_changes',
         'Fictional travel during follow-up', hash, 1, '2026-10-05',
+        ...feedbackSourceScope, feedbackSourceDigest,
       ])
       expect(feedback1.rowCount).toBe(1)
       expect(Number(feedback1.rows[0]?.version)).toBe(1)
@@ -1143,6 +1153,30 @@ describe.skipIf(!url)('PIQ-1.1 full numbered migration chain and backup on isola
         resultId, randomUUID(), 0, 'recorded', 'none_reported', null, hash, 1, '2026-10-05',
       ])
       expect(stale.rowCount).toBe(0)
+      // Correction after validation but before the write must fail the
+      // guarded INSERT in PostgreSQL itself, with the saved audit untouched.
+      await client.query(
+        "INSERT INTO sleep_nightly_summaries (sleep_date,timezone,logical_source_key,source_name,start_at,end_at,total_sleep_minutes,observation_status,analysis_eligible,stage_analysis_eligible,selection_reason,calculation_version) VALUES ('2026-10-06','America/Phoenix','feedback-watch','Synthetic','2026-10-06T04:00:00Z','2026-10-06T11:00:00Z',420,'analysis_eligible',true,false,'source_priority','piq-test')",
+      )
+      const changedFeedbackDigest=String((await client.query(
+        EXPERIMENT_FEEDBACK_SOURCE_DIGEST_SQL,feedbackSourceScope)).rows[0].digest)
+      expect(changedFeedbackDigest).not.toBe(feedbackSourceDigest)
+      const staleSourceFeedback=await client.query(guardedFeedbackSql,[
+        resultId,randomUUID(),1,'revised','none_reported',null,hash,1,'2026-10-05',
+        ...feedbackSourceScope,feedbackSourceDigest,
+      ])
+      expect(staleSourceFeedback.rowCount).toBe(0)
+      // An otherwise valid current digest still permits the SQL write.
+      // Isolate this optional revision so subsequent audit assertions remain
+      // about the original version-1 event.
+      await client.query('SAVEPOINT tested_fresh_source_feedback')
+      const freshSourceFeedback=await client.query(guardedFeedbackSql,[
+        resultId,randomUUID(),1,'revised','none_reported',null,hash,1,'2026-10-05',
+        ...feedbackSourceScope,changedFeedbackDigest,
+      ])
+      expect(freshSourceFeedback.rowCount).toBe(1)
+      await client.query('ROLLBACK TO SAVEPOINT tested_fresh_source_feedback')
+      await client.query('RELEASE SAVEPOINT tested_fresh_source_feedback')
       await rejectsSafely(
         "UPDATE experiment_outcome_feedback_events SET owner_note = 'changed' WHERE experiment_result_id=$1",
         [resultId], 'P0001',

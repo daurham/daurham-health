@@ -3,7 +3,7 @@ import { getSql, type Sql } from '../db.js'
 import { currentHealthDate } from '../health-time.js'
 import { HttpError } from '../http.js'
 import { experimentEvidenceFingerprint } from '../../src/domain/experiment-results.js'
-import { parseExperimentComparisonSnapshot, type ImplementationProvenance } from '../../src/domain/experiment-comparison-snapshot.js'
+import { parseExperimentComparisonSnapshot, type ExperimentComparisonSnapshot, type ImplementationProvenance } from '../../src/domain/experiment-comparison-snapshot.js'
 import {
   parseOutcomeFeedbackSubmission, reviewOutcomeFeedbackReadiness,
   type OutcomeFeedbackEvent, type OutcomeFeedbackReadiness,
@@ -78,6 +78,20 @@ export const OWNER_OUTCOME_FEEDBACK_INSERT_SQL = [
   'RETURNING version',
 ].join('\n')
 
+/** Verified record/revision uses the existing version/implementation CAS
+ * with a second check on the current source projection at INSERT snapshot.
+ * Avoid a static module cycle by accepting the canonical SQL expression.
+ */
+export function buildOwnerFeedbackVerifiedInsertSql(sourceCasExpression:string):string {
+  if(!sourceCasExpression.startsWith('md5(')||sourceCasExpression.includes(';'))
+    throw new Error('Invalid feedback source CAS expression')
+  const delimiter='\nON CONFLICT'
+  if(!OWNER_OUTCOME_FEEDBACK_INSERT_SQL.includes(delimiter))
+    throw new Error('Feedback insert SQL shape changed')
+  return OWNER_OUTCOME_FEEDBACK_INSERT_SQL.replace(delimiter,
+    '\n AND ('+sourceCasExpression+' = $16::text)\nON CONFLICT')
+}
+
 export const OWNER_OUTCOME_FEEDBACK_HISTORY_SQL = [
   'SELECT version,action,unlogged_factors AS "unloggedFactors", owner_note AS "ownerNote",',
   ' comparison_fingerprint AS "comparisonFingerprint", recorded_at::text AS "recordedAt"',
@@ -121,6 +135,7 @@ export async function readOwnerOutcomeFeedback(sql: Sql, resultId: string, today
   snapshotFingerprint: string | null
   currentRevision: number
   currentDate: string | null
+  verifiedSnapshot:ExperimentComparisonSnapshot|null
 }> {
   const rows = await sql.query(OWNER_OUTCOME_FEEDBACK_GATE_SQL, [resultId]) as DbGate[]
   const record = rows[0]
@@ -156,6 +171,7 @@ export async function readOwnerOutcomeFeedback(sql: Sql, resultId: string, today
     snapshotFingerprint: record.snapshot_fingerprint,
     currentRevision: record.current_revision ?? 0,
     currentDate: record.current_date,
+    verifiedSnapshot:verified===true?snapshot:null,
   }
 }
 
@@ -163,7 +179,8 @@ export async function submitOwnerOutcomeFeedback(resultId: string, body: unknown
   const parsed = parseOutcomeFeedbackSubmission(body)
   if ('error' in parsed) throw new HttpError(400, parsed.error)
   const sql = await getSql()
-  const state = await readOwnerOutcomeFeedback(sql, resultId, await currentHealthDate())
+  const today=await currentHealthDate()
+  const state = await readOwnerOutcomeFeedback(sql, resultId, today)
   if (state.history.status === 'unavailable') throw new HttpError(409, 'Feedback history could not be verified. Refresh before changing feedback.')
   const version = state.latest?.version ?? 0
   if (parsed.expectedVersion !== version) throw new HttpError(409, 'Feedback changed. Refresh before saving.')
@@ -175,9 +192,23 @@ export async function submitOwnerOutcomeFeedback(resultId: string, body: unknown
   }
   if (!state.snapshotFingerprint) throw new HttpError(409, 'The result lacks a saved comparison snapshot.')
   const action = parsed.action === 'withdraw' ? 'withdrawn' : version === 0 ? 'recorded' : 'revised'
-  const written = await sql.query(OWNER_OUTCOME_FEEDBACK_INSERT_SQL, [
+  // Withdrawal must remain available after source corrections. Recorded or
+  // revised feedback instead requires matching prespecified eligible values
+  // and an INSERT-time digest CAS. Lazy import avoids the Lab module cycle.
+  const sourceModule=parsed.action==='record'?await import('./experiment-results.js'):null
+  const sourceGuard=sourceModule&&state.verifiedSnapshot
+    ? await sourceModule.verifySavedExperimentFeedbackEvidence(sql,state.verifiedSnapshot,today)
+    : null
+  if(parsed.action==='record'&&!sourceGuard)
+    throw new HttpError(409,
+      'Saved outcome evidence changed or could not be verified. Review the experiment before adding feedback.')
+  const query=sourceModule
+    ? buildOwnerFeedbackVerifiedInsertSql(sourceModule.EXPERIMENT_FEEDBACK_SOURCE_CAS_EXPRESSION)
+    : OWNER_OUTCOME_FEEDBACK_INSERT_SQL
+  const written = await sql.query(query, [
     resultId,randomUUID(),version,action,parsed.unloggedFactors,parsed.ownerNote,
     state.snapshotFingerprint,state.currentRevision,state.currentDate,
+    ...(sourceGuard?[...sourceGuard.scope,sourceGuard.digest]:[]),
   ])
   if (written.length !== 1) throw new HttpError(409, 'The experiment or feedback changed. Refresh and try again.')
   return { recorded: true, version: version + 1, action }
