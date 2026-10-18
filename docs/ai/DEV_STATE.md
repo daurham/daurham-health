@@ -989,3 +989,25 @@ in `docs/ai/PIQ4_QA_CREDENTIAL_SETUP.md`.
 
 No production/Main changes, production health data reads, migrations,
 production account copying, paid AI calls, or personal health QA.
+
+
+## 2026-10-18 — PIQ-6.5 linked-goal / Health Profile write-time CAS (green; development only)
+
+Commit `2f5d50dacc07a4ed67439e666887a0bb86495a5a` passed full
+GitHub branch Actions 39151422885 (TypeScript, ESLint, 2,713 tests,
+Vite build), and real isolated PostgreSQL 16 run 39151422876
+(31/31 integration tests). The existing immutable experiment result
+INSERT now compares read-time evidence to the same SQL-statement
+projection of private `EXPERIMENT_CONTEXT_SIGNATURE_SQL` revision
+metadata for profile and linked goal/version/lifecycle. Synthetic
+two-session test mutations reject stale profile, goal-link and
+goal-status changes. No notes, clinical text, goal target values,
+new migration or AI/model calls were added. `main`, live production,
+production migrations and owner data remain untouched.
+
+This remains PostgreSQL READ COMMITTED statement-snapshot CAS, not
+serializable transaction isolation or evidence of intervention effect.
+The historical evidence-memory ranking gate stays disabled. PIQ-7
+independent preview DB/Auth, release/rollback, mobile owner QA and
+formal owner acceptance are outstanding (0/9). Next review: staging
+query cost / statement timing and post-finalization source drift.
