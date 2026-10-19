@@ -42,9 +42,9 @@ type LabelCaptureProps = {
   jobId?: string | null
   onClose: () => void
   onBack: () => void
-  onLogged: (entry: NutritionEntry, food: NutritionFood) => void
-  onSavedFood?: (food: NutritionFood) => void
-  onDiscarded?: () => void
+  onLogged: (entry: NutritionEntry, food: NutritionFood, captureJobId: string | null) => void
+  onSavedFood?: (food: NutritionFood, captureJobId: string | null) => void
+  onDiscarded?: (captureJobId: string | null) => void
   purpose?: 'log' | 'recipe'
 }
 
@@ -193,14 +193,14 @@ export function LabelCaptureSheet({ date, jobId, onClose, onBack, onLogged, onSa
 
   async function discardCapture() {
     if (!activeJobId) {
-      onDiscarded?.()
+      onDiscarded?.(activeJobId)
       onClose()
       return
     }
     setError(null)
     try {
       await dismissNutritionLabelJob(activeJobId)
-      onDiscarded?.()
+      onDiscarded?.(activeJobId)
       onClose()
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Could not dismiss this capture.')
@@ -378,8 +378,8 @@ function LabelReviewSheet({
   onClose: () => void
   onBack: () => void
   onDiscard?: () => void
-  onLogged: (entry: NutritionEntry, food: NutritionFood) => void
-  onSavedFood?: (food: NutritionFood) => void
+  onLogged: (entry: NutritionEntry, food: NutritionFood, captureJobId: string | null) => void
+  onSavedFood?: (food: NutritionFood, captureJobId: string | null) => void
   purpose?: 'log' | 'recipe'
 }) {
   const [draft, setDraft] = useState(() => draftFromCandidate(candidate))
@@ -462,10 +462,10 @@ function LabelReviewSheet({
         catalogKind: draft.barcode.trim() ? 'packaged' : 'custom',
       })
       if (!log || !saved.entry) {
-        onSavedFood?.(saved.food)
+        onSavedFood?.(saved.food, jobId)
         return
       }
-      onLogged(saved.entry, saved.food)
+      onLogged(saved.entry, saved.food, jobId)
     } catch (caught) {
       if (caught instanceof BarcodeLookupClientError && caught.fields.length > 0) {
         setErrors(caught.fields)

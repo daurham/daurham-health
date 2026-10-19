@@ -36,6 +36,7 @@ import {
 import { DayCompletenessCard } from './DayCompletenessCard'
 import { LabelCaptureSheet } from './LabelCapture'
 import { MealCaptureSheet } from './MealCapture'
+import { withoutResolvedCapture } from './pending-capture'
 import {
   adjacentNutritionDates,
   formatNutritionDayLabel,
@@ -540,23 +541,23 @@ export function NutritionPage() {
           jobId={panel.jobId}
           onClose={() => setPanel(null)}
           onBack={() => setPanel(null)}
-          onDiscarded={() => {
-            setCaptures((current) => current.filter((job) => job.id !== panel.jobId))
+          onDiscarded={(captureJobId) => {
+            setCaptures((current) => withoutResolvedCapture(current, captureJobId, panel.jobId))
             setPanel(null)
           }}
-          onLogged={(entry, food) => {
+          onLogged={(entry, food, captureJobId) => {
             resource.replaceData((current) => {
               const entries = [...current.entries.filter((item) => item.id !== entry.id), entry]
               return { ...current, entries, totals: nutritionDayTotals(entries), quality: nutritionDayQuality(entries) }
             })
             prependRecent(food)
-            setCaptures((current) => current.filter((job) => job.id !== panel.jobId))
+            setCaptures((current) => withoutResolvedCapture(current, captureJobId, panel.jobId))
             setPanel(null)
           }}
-          onSavedFood={(food) => {
+          onSavedFood={(food, captureJobId) => {
             prependRecent(food)
             setNotice('Saved to My Foods without logging.')
-            setCaptures((current) => current.filter((job) => job.id !== panel.jobId))
+            setCaptures((current) => withoutResolvedCapture(current, captureJobId, panel.jobId))
             setPanel(null)
           }}
         />
@@ -569,23 +570,23 @@ export function NutritionPage() {
           recipes={day?.quickAdd.recipes}
           onClose={() => setPanel(null)}
           onBack={() => setPanel(null)}
-          onDiscarded={() => {
-            setCaptures((current) => current.filter((job) => job.id !== panel.jobId))
+          onDiscarded={(captureJobId) => {
+            setCaptures((current) => withoutResolvedCapture(current, captureJobId, panel.jobId))
             setPanel(null)
           }}
-          onSavedFood={(food) => {
+          onSavedFood={(food, captureJobId) => {
             prependRecent(food)
             setNotice('Saved to My Foods without logging.')
-            setCaptures((current) => current.filter((job) => job.id !== panel.jobId))
+            setCaptures((current) => withoutResolvedCapture(current, captureJobId, panel.jobId))
             setPanel(null)
           }}
-          onLogged={(entries) => {
+          onLogged={(entries, captureJobId) => {
             resource.replaceData((current) => {
               const ids = new Set(entries.map((item) => item.id))
               const next = [...current.entries.filter((item) => !ids.has(item.id)), ...entries]
               return { ...current, entries: next, totals: nutritionDayTotals(next), quality: nutritionDayQuality(next) }
             })
-            setCaptures((current) => current.filter((job) => job.id !== panel.jobId))
+            setCaptures((current) => withoutResolvedCapture(current, captureJobId, panel.jobId))
             setPanel(null)
           }}
         />

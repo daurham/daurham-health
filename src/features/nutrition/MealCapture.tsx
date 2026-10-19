@@ -63,9 +63,9 @@ type MealCaptureProps = {
   recipes?: NutritionFood[]
   onClose: () => void
   onBack: () => void
-  onLogged: (entries: NutritionEntry[]) => void
-  onSavedFood?: (food: NutritionFood) => void
-  onDiscarded?: () => void
+  onLogged: (entries: NutritionEntry[], captureJobId: string | null) => void
+  onSavedFood?: (food: NutritionFood, captureJobId: string | null) => void
+  onDiscarded?: (captureJobId: string | null) => void
 }
 
 export function MealCaptureSheet({ date, jobId, onClose, onBack, onLogged, onSavedFood, onDiscarded }: MealCaptureProps) {
@@ -287,14 +287,14 @@ export function MealCaptureSheet({ date, jobId, onClose, onBack, onLogged, onSav
 
   async function discardCapture() {
     if (!activeJobId) {
-      onDiscarded?.()
+      onDiscarded?.(activeJobId)
       onClose()
       return
     }
     setError(null)
     try {
       await dismissNutritionMealJob(activeJobId)
-      onDiscarded?.()
+      onDiscarded?.(activeJobId)
       onClose()
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Could not dismiss this capture.')
@@ -582,8 +582,8 @@ function MealEstimateSheet({
   onClose: () => void
   onBack: () => void
   onDiscard?: () => void
-  onLogged: (entries: NutritionEntry[]) => void
-  onSavedFood?: (food: NutritionFood) => void
+  onLogged: (entries: NutritionEntry[], captureJobId: string | null) => void
+  onSavedFood?: (food: NutritionFood, captureJobId: string | null) => void
 }) {
   const [name, setName] = useState(candidate.name)
   const [meal, setMeal] = useState<(typeof NUTRITION_MEALS)[number] | ''>('')
@@ -646,7 +646,7 @@ function MealEstimateSheet({
         if (!reusable) {
           throw new Error('Could not save this AI meal to Pantry.')
         }
-        onSavedFood?.(reusable)
+        onSavedFood?.(reusable, jobId)
         return
       }
       const saved = await commitNutritionMealReview({
@@ -663,7 +663,7 @@ function MealEstimateSheet({
         sodiumMg: values.sodiumMg,
         portionScale: scale,
       })
-      onLogged(saved.entries)
+      onLogged(saved.entries, jobId)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : log ? 'Could not save meal' : 'Could not save food')
     } finally {
