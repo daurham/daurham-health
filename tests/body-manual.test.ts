@@ -8,6 +8,8 @@ import {
   FULL_CIRCUMFERENCE_KEYS,
   MANUAL_BODY_METRICS,
   manualSessionIsEditable,
+  parseCircumferenceText,
+  convertCircumferenceInput,
   parseManualCreate,
   parseManualPatch,
 } from '../src/domain/body-manual.ts'
@@ -73,6 +75,46 @@ describe('manual body catalog and units', () => {
     expect(displayValueForMetric('cm', inchesToCentimeters(10)).value).toBe(centimetersToInches(inchesToCentimeters(10)))
     expect(displayValueForMetric('cm', 2.54)).toMatchObject({ value: 1, unit: 'in' })
     expect(displayValueForMetric('percent', 18.5)).toMatchObject({ value: 18.5, unit: '%' })
+  })
+
+  it('accepts precise inch fractions and keeps centimeter decimals separate', () => {
+    const actual = parseManualCreate({
+      metrics: [
+        { key: 'waist_circumference', value: '37 1/4', unit: 'in' },
+        { key: 'hip_circumference', value: '38-1/16', unit: 'in' },
+        { key: 'chest_circumference', value: '40½', unit: 'in' },
+        { key: 'neck_circumference', value: '1/8', unit: 'in' },
+        { key: 'left_upper_arm_circumference', value: '34.25', unit: 'cm' },
+      ],
+    }, NOW)
+    expect(actual.metrics.map(m => m.value)).toEqual([
+      inchesToCentimeters(37.25),
+      inchesToCentimeters(38.0625),
+      inchesToCentimeters(40.5),
+      inchesToCentimeters(0.125),
+      34.25,
+    ])
+    const update = parseManualPatch({
+      metrics: [{ key: 'waist_circumference', value: '37⅝', unit: 'in' }],
+    }, NOW)
+    expect(update.metrics[0]?.value).toBe(inchesToCentimeters(37.625))
+    expect(parseCircumferenceText('37 1/4', 'in')).toBe(37.25)
+    expect(convertCircumferenceInput('37 1/4', 'in', 'cm')).toBe('94.615')
+    expect(convertCircumferenceInput('94.615', 'cm', 'in')).toBe('37.25')
+    expect(convertCircumferenceInput('', 'cm', 'in')).toBe('')
+    expect(convertCircumferenceInput('oops', 'in', 'cm')).toBeNull()
+    expect(parseCircumferenceText('37 1/4', 'cm')).toBeNull()
+    for (const invalid of ['1/0', '1/129', '1/2/3', '37 2/1', '1/2lb', '37.2 1/4']) {
+      expect(() => parseManualCreate({ metrics: [
+        { key: 'waist_circumference', value: invalid, unit: 'in' },
+      ] }, NOW), invalid).toThrow(/number or inch fraction/)
+    }
+    expect(() => parseManualCreate({ metrics: [
+      { key: 'waist_circumference', value: '37 1/4', unit: 'cm' },
+    ] }, NOW)).toThrow(/must be a number/)
+    expect(() => parseManualCreate({ metrics: [
+      { key: 'weight', value: '180 1/2', unit: 'lb' },
+    ] }, NOW)).toThrow(/must be a number/)
   })
 
   it('rejects invalid manual values and keeps a partial set', () => {

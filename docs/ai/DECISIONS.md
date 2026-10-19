@@ -1042,3 +1042,8 @@ An archive-format unit test or Lab-only row replay is not adequate proof of seed
 ## Decision: every owner-schema table and column must be explicitly included in full backup inventory (PIQ-7, 2026-10-18)
 
 A successful synthetic full restore only confirms parity for what the backup inventory already knows; it cannot detect newly migrated owner-data columns or tables excluded from the archive unintentionally. Compare `information_schema.columns` of the fully migrated, disposable CI schema against the complete full-backup inventory, ignoring only `schema_migrations` (restore target must already match its history). Reject both SQL additions missing from inventory and stale inventory declarations, with rollback-only schema-drift mutation coverage. This is a CI release safeguard without production runtime scan cost. No actual owner records, Auth-provider tables, or real backup recovery are attested by a catalog comparison.
+
+
+## PIQ8 small Body measurement UX — retain exact circumference meaning (2026-10-18)
+
+Keep canonical stored circumference units as cm and historical API payload shape unchanged. On manual entry, allow individual circumference fields to choose in or cm; inch fields accept mixed tape fractions, while cm, weight and percentage remain decimal. Reject malformed or zero-denominator fractions, never coerce incomplete edits to zero, convert a *filled* value when the owner switches units rather than reinterpreting its numeric text, and retain precision to at least 1/16-inch when opening an edit. Shared deterministic parser is authoritative on client and server; unit selection is a UI concern. Existing imported measurements remain read-only. This is deferred UI polish, not a reason to unlock PIQ APIs or promote production.

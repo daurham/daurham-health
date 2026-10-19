@@ -1,82 +1,34 @@
-# PIQ-4 — isolated preview credential handoff (safe; release still blocked)
+# PIQ — isolated Preview QA credential and release handoff
 
-**Status (2026-10-17): PREVIEW AUTH/DB SETTINGS PREPARED, NOT CONNECTED.**
-This page is a non-secret operator checklist. Never copy production
-Health database credentials, owner login secrets, or actual health data.
+**Status: QA schema migrated and isolated Preview DB URL configured; Auth and live acceptance remain blocked.**
+Verified 2026-10-18. This guide deliberately contains **no credentials** and grants no authority to unlock Health APIs.
 
-## Confirmed infrastructure
+## What is complete
 
-- QA Neon project: `daurham-health-piq-isolated-qa`
-  (`lively-wave-25801832`); new root `br-crimson-cloud-akrf5kuo`,
-  database `neondb`, PostgreSQL 18; 56/56 migrations.
-- QA Auth uses `better_auth`, with distinct auth provider project and
-  HTTPS endpoint from existing Health production.
-- One disposable QA Auth record was created in this QA project only,
-  ID `2420a606-0f6e-46e4-8aab-65a39e25f6e3`,
-  address `piq.qa.20261017@example.com`, **which is deliberately
-  non-deliverable and is not a working interactive login**. It has
-  no known password, and there are no Auth sessions.
-- The PIQ Vercel project is `prj_KNUk1CcJbYjQbSkADSHSuynhpZJU`;
-  the *only* configured scope for the 37 QA environment variables is
-  Preview, branch `piq/00-baseline-20261014`.
-- QA Auth URL, disposable owner ID, independently sourced QA vs.
-  production endpoint host metadata, project/branch metadata, runtime
-  DB/Auth check flags, and SHA-pinning were created branch-only.
-- `DATABASE_URL`, related credential aliases, and
-  `NEON_AUTH_COOKIE_SECRET` are deliberately **invalid, QA-only
-  placeholders**, not production values. The tool did not permit
-  automated credential handoff, and this fail-closed override prevents
-  the PIQ branch from silently inheriting production credentials at
-  its next deployment.
-- All PIQ preview API routes remain locked with
-  `PIQ_PREVIEW_OWNER_API_LOCKED` (HTTP 503). Do not change this
-  without a separate code review and explicit release authorization.
+- Isolated Neon QA project `lively-wave-25801832`, root branch `br-crimson-cloud-akrf5kuo` (`main` **inside QA Neon only**), database `neondb`, PostgreSQL **18.6**, exact migrations **0001–0060**.
+- Atomic, user-approved upgrade of migrations `0057`–`0060` succeeded; the four new provenance tables and immutable event/snapshot triggers exist, with zero rows.
+- Inventory-only SQL audit: **76 non-seeded app tables have zero rows**. Four migration-seeded app tables have 70 total rows. This is **not** a provider Auth-directory audit.
+- Vercel project `daurham-health` (`prj_KNUk1CcJbYjQbSkADSHSuynhpZJU`) has **37** branch-scoped Preview variables for `piq/00-baseline-20261014`.
+- The Preview-branch **`DATABASE_URL` was replaced** directly with the independent QA pooled URI after verifying project, branch, database, endpoint, TLS and distinct production endpoint metadata. Never paste or repeat it.
+- Both database and Auth binding enforcement flags are `true`. Static checks do not prove the effective deployed credentials or live SQL session.
+- Isolated `better_auth` Neon Auth exists. Its QA-only redirect allowlist now contains `https://daurham-health-git-piq-00-baseline-20261014-daurhams-projects.vercel.app`.
+- Prior baseline preview deployment `ef00fa0` reported READY. For any **subsequent** commit, repin `HEALTH_PIQ_EXPECTED_PREVIEW_SHA` to that reviewed branch commit; a READY deployment alone is not runtime qualification.
 
-## Credential setup for a future approved QA rehearsal
+## Unresolved safeguards — do not bypass
 
-1. In the **new** Neon project `lively-wave-25801832`, open
-   **Connect**, select root branch `main` and database `neondb`,
-   and obtain its **pooled** PostgreSQL connection URI. Confirm the
-   host belongs to the QA compute, *not* the existing production
-   endpoint. Do not paste the URI into chat, Markdown, GitHub, a
-   screenshot, or the regular application environment.
-2. In Vercel project `daurham-health` → Settings →
-   Environment Variables, find the **branch-scoped Preview entry**
-   for `DATABASE_URL` scoped exclusively to
-   `piq/00-baseline-20261014`. Replace its invalid sentinel with
-   the QA pooled URI. Do **not** edit the global Preview/Production
-   entry, any `main` environment, or an unrelated project.
-   Other `DATABASE_*` credential aliases deliberately remain
-   invalid until their use is audited; the current app's
-   `server/db.ts` uses `DATABASE_URL`.
-3. Generate an independent 32-byte-or-stronger random secret using
-   a trusted local password generator (e.g. Node crypto randomBytes);
-   replace only the **branch-scoped Preview** value of
-   `NEON_AUTH_COOKIE_SECRET`. Never use the production cookie
-   secret or paste the new value into chat or code.
-4. **Do not enable API access or sign in yet.** The initial
-   `example.com` disposable user cannot receive sign-in mail
-   and has no known password. A reachable user must eventually
-   register through isolated QA Auth in an authorized controlled
-   rehearsal; its verified unique auth user ID must replace
-   `HEALTH_OWNER_USER_ID` and
-   `HEALTH_PIQ_PREVIEW_TEST_OWNER_USER_ID`. It must differ from
-   the production owner. Verify the owner comparison with
-   independently obtained production owner ID, not a fabricated
-   identifier.
-5. Deploy the exact reviewed PIQ Git SHA to **Preview only**, then
-   update branch-scoped `HEALTH_PIQ_EXPECTED_PREVIEW_SHA` to match.
-   Read-only inspect that effective runtime `DATABASE_URL` maps to
-   the independent Neon QA project, and `NEON_AUTH_BASE_URL`
-   maps to the separate QA Auth project, with both binding enforcement
-   flags `true`. Do not print credentials in logs.
-6. Repeat empty owner-row checks (except controlled QA test rows),
-   test backup/rollback and actual owner/Auth routing in an isolated
-   approved environment. Only after explicit user sign-off and a
-   reviewed code change may the PIQ API hard lock be relaxed for
-   mobile acceptance. No production merge or production migration.
+- **Cookie secret:** Preview-only `NEON_AUTH_COOKIE_SECRET` has **not** been replaced with a verified independent strong secret. Its existing value must be treated as placeholder/not-ready. Automated attempt was blocked; do not retry by exposing secret in chat, logs, GitHub or terminals.
+- **Usable QA owner:** Existing `piq.qa.20261017@example.com` disposable directory record is non-deliverable and has no known password. It cannot be used for owner testing. Create a **working separate QA-only** Auth login through approved procedures; confirm the actual QA Auth user ID, then update the Preview-branch-only `HEALTH_OWNER_USER_ID` and `HEALTH_PIQ_PREVIEW_TEST_OWNER_USER_ID`.
+- **Production-owner identity proof:** `HEALTH_PIQ_PRODUCTION_OWNER_USER_ID` is missing. An operator must independently obtain and verify it without exposing owner credentials, health data, or sessions. It must differ from the QA identity; do **not** manufacture an ID. Reading production owner metadata requires an approved source/path.
+- **Vercel deployment access:** authenticated deployment API inspection was denied **403** by the connection's deployment protection. Reauthorize the Vercel connection to the exact project and team before live HTTP checks; **do not disable deployment protection**.
+- **Redeploy:** after credential changes, rebuild the **PIQ Preview branch only** so the effective runtime environment receives them. Confirm SHA pin, 503 hardlock, and independently sourced QA DB/Auth identity. Do not promote to Production.
+- **API hardlock:** every recognized PIQ owner/Auth/Health API must keep returning `PIQ_PREVIEW_OWNER_API_LOCKED` with **503** and `Cache-Control: no-store` until a separate approved unlock change after complete isolation proof. No environment-only unlock exists.
+- **Owner acceptance:** 0/9 completed. The synthetic PG16/PG18 recovery, rollback, schema coverage, and migration tests are not owner acceptance.
 
-**Failure mode:** missing, invalid, stale, or mismatched connections
-keep the preview blocked. Merely seeing Vercel's READY status, green
-GitHub CI, matching project host, or a successful QA Auth user
-creation does not mean the user API is safe or functional.
+## Next safe operator steps
+
+1. In **Vercel → daurham-health → Settings → Environment Variables**, select exclusively `Preview` and Git branch `piq/00-baseline-20261014`. Generate a new independent 32-byte-or-stronger cookie secret in a trusted local password manager and replace **only** that scoped `NEON_AUTH_COOKIE_SECRET`. Do not reuse production; never send secret through chat.
+2. Verify separately sourced production-versus-QA owner Auth identities and provide only the approved **nonsecret matching result** to the release review, while configuring required Preview-only owner ID metadata through secure settings. Existing example.com user is not usable.
+3. Grant the Vercel connector permission to inspect this exact deployment project/team. Check Auth trusted origins and DB binding against provider metadata. Update SHA pin to the exact new commit **before** redeploy; retain the PIQ API hard lock.
+4. Only with new explicit approval, rehearse end-to-end QA login, owner-safe recovery and mobile acceptance, then review a narrow code change to unlock the owner APIs. No `main` or production migration is authorized.
+
+Never confuse the **QA project's root branch named `main`** with the GitHub `main` branch or production Neon project. A schema migration, a CI run, a trusted Auth origin or a READY Preview is not a sufficient release grant.

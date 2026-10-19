@@ -556,7 +556,10 @@ function valuesFromSession(session: BodyMeasurementSession | null): Record<strin
       continue
     }
     const display = ownerInputNumber(metric.unit, metric.value)
-    values[metric.key] = String(Math.round(display * 10) / 10)
+    // One decimal place loses 1/8 and 1/16-inch measurements on edit.
+    // Retain tape-measure precision without changing stored canonical units.
+    const precision = definition.family === 'circumference' ? 10000 : 10
+    values[metric.key] = String(Math.round(display * precision) / precision)
   }
   values.comparability = session.comparability
   if (session.notes) {

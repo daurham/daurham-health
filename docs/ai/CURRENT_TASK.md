@@ -1,60 +1,40 @@
-# Current task
+# Current task — PIQ release qualification and small deferred polish
 
-## I0–I10 integrated rollout
+## Actual working branch
 
-### Status
+- Branch: `piq/00-baseline-20261014`. **Do not promote `main`.**
+- Latest fully green baseline before the circumference-input patch: `ef00fa0953f740944e8674e7a066782d26bb82cc`.
+- Repository schema head: **0060_experiment_outcome_feedback_events.sql**.
+- PostgreSQL 16/18 isolated CI at baseline: **42/42 each**. Full baseline validation: **2,742 passed, 43 skipped; TypeScript, ESLint, build passed**.
+- Master plan: `docs/ai/HEALTH_INTELLIGENCE_QUALITY_MASTER_PLAN.md`; ongoing evidence: `docs/ai/PIQ_PROGRESS.md`. Treat older I0–I10 notes as historical, not current release instructions.
 
-The numbered intelligence roadmap is complete through I10 and the combined stack is now exposed on:
+## QA state (read-only verified 2026-10-18)
 
-`validate-i0-i10`
+- Separately provisioned Neon QA project: `lively-wave-25801832`, root `br-crimson-cloud-akrf5kuo`, database `neondb`, PostgreSQL 18.6.
+- QA migrations **60/60** after explicitly authorized atomic application of 0057–0060. All four new provenance tables and immutable triggers exist. None was populated by migration.
+- Read-only counts: **76 non-seeded application tables have 0 rows**; the four seeded tables retain **70 migration seed rows**. Auth directory is separate from these app-table counts.
+- Preview Vercel project: `prj_KNUk1CcJbYjQbSkADSHSuynhpZJU`, 37 branch-scoped Preview-only entries.
+- `DATABASE_URL` was updated directly from the verified isolated QA Neon endpoint; `HEALTH_DB_BINDING_ENFORCE` and `HEALTH_AUTH_BINDING_ENFORCE` are `true`. The effective deployed runtime connection has **not** been independently tested.
+- QA Neon Auth uses `better_auth`; the PIQ branch's stable Preview origin was added and verified as trusted **only for QA Auth**.
+- `NEON_AUTH_COOKIE_SECRET` was **not successfully replaced**; its QA-only secure value and independence from production still require operator setup.
+- `HEALTH_PIQ_PRODUCTION_OWNER_USER_ID` is absent. No independently verified production owner comparison has happened. Existing disposable example.com QA Auth user is **not a working login**.
+- One baseline Vercel Preview deployment was READY with the exact `ef00fa0` SHA; Vercel protected-deployment inspection returned 403. Preview must be rebuilt after new environment changes.
+- The **PIQ owner API hard 503 lock remains mandatory**. Do not weaken it for developer convenience.
+- Formal iPhone/iPad owner acceptance: **0/9**. This is not production-release approval.
 
-Last fully validated application commit:
+## Task under implementation
 
-`eac16edaa595929b51ec942e402acbd2c7378ee1`
+Deferred small PIQ polish: accept centimeter and inch circumference measurements, including precise mixed and standalone inch fractions; safely convert a filled value on unit switches; prevent edit-path one-decimal truncation. No SQL migration, no new data model, no extra AI budget. Test and run application CI on exact new commit before marking validated. Preserve all PIQ API restrictions.
 
-Repository schema head:
+## Remaining release operations (separate authorization gates)
 
-`0049_passive_recovery_clinical_context.sql`
+1. Complete owner-managed **QA-only** cookie secret and usable test Auth account, and independently compare QA versus production owner identity through an approved metadata process. Do **not** read/copy production health records, credentials or sessions.
+2. Confirm expected commit pin and rebuild only the **Preview** deployment after configuration changes; verify effective Auth/DB endpoints with an authenticated operator. Vercel deployment protection 403 must be resolved without disabling protection.
+3. Recheck owner-data emptiness after QA Auth setup; rehearse owner-authorized backup, restore and isolation with fictional records. Existing synthetic PG16/18 tests are green but cannot replace this.
+4. Obtain separate owner approval before changing the hard PIQ 503 API lock. Perform real mobile/answer-quality QA (9 checks) and record results before any production migration or `main` merge.
 
-`main` has not been promoted.
+## Nonnegotiables
 
-## Integrated validation — green
-
-GitHub Actions run `37579440908` passed the complete branch validation matrix:
-
-- `npm ci`
-- `npx tsc -b`
-- `npx eslint .`
-- `npm test`
-- `npm run build`
-- 1,479 Vitest tests passed
-- Vercel preview deployment completed successfully
-
-The integrated pass also fixed compatibility issues found only after I0–I10 were exercised together, including stale migration-head contracts, backup fixture evolution, Health Profile test inputs, Training substitution semantics, Weekly Coach target-change wording guards, Nutrition source assertions, and the legacy Stretch SQL test fixture.
-
-## Database rollout gate
-
-Production migration state has not yet been verified or changed.
-
-A temporary read-only GitHub Actions probe attempted to run `npm run instance:check`, but the repository has no `DATABASE_URL` secret, so the check stopped before opening a database connection.
-
-The connected Neon tooling is currently unscoped and requires the Health project's non-secret Neon project ID. The connected Vercel tooling cannot currently read project environment metadata under the project's team scope.
-
-No production migration has been executed from this validation work.
-
-## Next operation
-
-1. Resolve production database access using either the existing Health Neon project ID or an approved database connection path.
-2. Run the read-only `npm run instance:check` equivalent and compare `schema_migrations` with repository migrations through `0049`.
-3. Test any pending migrations against a Neon branch / production-like copy before applying them to the production database.
-4. Apply only the pending migrations after explicit approval.
-5. Re-run the instance readiness check.
-6. Perform owner mobile QA on Today, Training, Health Profile/Settings, Coach, Weekly Coach, Ask Health, and Personal Lab handoff.
-7. Promote the validated stack to `main` only when database readiness and owner QA are green.
-
-## Guardrails
-
-- Do not promote `main` before the database migration gate is resolved.
-- Do not copy Health data between owners.
-- Do not enable unverified overnight vitals.
-- Keep Personal Lab experiment creation owner-reviewed; deterministic server logic may prefill title/rationale only.
+- No production or `main` change without separate user approval; no production health data, credentials, or Auth sessions copied into QA.
+- Treat blank or placeholder QA secrets as **blocked**. Never log DB URL, cookie secret, owner ID or personal health data.
+- Don't use “~91% complete” as a release metric; report CI validation, provider readiness, and owner acceptance independently.

@@ -358,28 +358,82 @@ function parseMetricItem(item: unknown): { planned: PlannedManualMetric; staged:
   if (!definition) {
     throw new BodyInputError('Unknown measurement')
   }
-  const parsed = parseNumericInput(record.value)
-  if (parsed.kind === 'blank') {
+  const basic = parseNumericInput(record.value)
+  if (basic.kind === 'blank') {
     return null
   }
-  if (parsed.kind === 'invalid') {
-    throw new BodyInputError(`${definition.label} must be a number`)
-  }
   const unit = normalizeInputUnit(record.unit, definition)
-  assertRange(definition, parsed.value)
+  const parsed = definition.family === 'circumference' && typeof record.value === 'string'
+    ? parseCircumferenceText(record.value, unit as 'in' | 'cm')
+    : basic.kind === 'number' ? basic.value : null
+  if (parsed === null) {
+    throw new BodyInputError(definition.family === 'circumference' && unit === 'in'
+      ? `${definition.label} must be a number or inch fraction`
+      : `${definition.label} must be a number`)
+  }
+  assertRange(definition, parsed)
   return {
     planned: {
       key: definition.key,
-      value: toCanonical(definition, unit, parsed.value),
+      value: toCanonical(definition, unit, parsed),
       unit: definition.canonicalUnit,
       valueKind: 'manual',
     },
     staged: {
       key: definition.key,
-      value: parsed.value,
+      value: parsed,
       unit,
     },
   }
+}
+
+/**
+ * Tape-measure input is inches only: 37 1/4, 37-1/4, 1/8 and 37.25.
+ * Centimeters (and mass/percentage) stay decimal. Preserve full precision
+ * until conversion to canonical centimeters; never truncate 1/16 inches.
+ * A null result is invalid input, not an empty measurement.
+ */
+export function parseCircumferenceText(value: string, unit: 'in' | 'cm'): number | null {
+  const text = value.trim()
+  if (!text) return null
+  if (unit === 'in') {
+    // Keyboard and pasted typographic fractions are common on mobile.
+    const fractions: Record<string, string> = {
+      '¼': '1/4', '½': '1/2', '¾': '3/4',
+      '⅛': '1/8', '⅜': '3/8', '⅝': '5/8', '⅞': '7/8',
+    }
+    const normalized = text.replace(/[¼½¾⅛⅜⅝⅞]/g, char => ' ' + fractions[char])
+      .replace(/\s+/g, ' ').trim()
+    const mixed = /^(\d+)(?: |-)(\d+)\/(\d+)$/.exec(normalized)
+    const simple = /^(\d+)\/(\d+)$/.exec(normalized)
+    const candidate = mixed ?? simple
+    if (candidate) {
+      const whole = mixed ? Number(candidate[1]) : 0
+      const numerator = Number(candidate[mixed ? 2 : 1])
+      const denominator = Number(candidate[mixed ? 3 : 2])
+      if (denominator < 1 || denominator > 128 || numerator >= denominator) return null
+      const number = whole + numerator / denominator
+      return Number.isFinite(number) ? number : null
+    }
+  }
+  // Reject stray slash/mixed syntax in centimeters rather than
+  // interpreting it as an arithmetic expression with surprising results.
+  if (text.includes('/') || /[¼½¾⅛⅜⅝⅞]/.test(text)) return null
+  const number = Number(text)
+  return Number.isFinite(number) ? number : null
+}
+
+export function convertCircumferenceInput(
+  value: string,
+  from: 'in' | 'cm',
+  to: 'in' | 'cm',
+): string | null {
+  if (!value.trim()) return ''
+  const parsed = parseCircumferenceText(value, from)
+  if (parsed === null) return null
+  const converted = from === to ? parsed :
+    from === 'in' ? inchesToCentimeters(parsed) : centimetersToInches(parsed)
+  return String(Math.round(converted * 10000) / 10000)
 }
 
 function parseNumericInput(value: unknown): { kind: 'blank' } | { kind: 'invalid' } | { kind: 'number'; value: number } {

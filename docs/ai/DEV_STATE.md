@@ -1268,3 +1268,8 @@ Synthetic PG16 and PG18 real-SQL backup: two independently migrated disposable l
 ## 2026-10-18 — PIQ-7 schema-to-backup inventory drift gate
 
 Added pure backup catalog coverage audit, exercised against actual fully migrated local PG16 and PG18 schemas. CI fails if migration-added public tables or columns are absent from full Health backup inventory, or if inventory references missing schema names. Negative tests create and roll back a synthetic new table/column and prove detection, without touching production/QA. The separately isolated QA root (0056) was checked using metadata-only public table/column names: no inventory omissions in the 0056 schema. Real backup recovery, owner Auth isolation, QA migration and owner acceptance remain separately gated.
+
+
+## 2026-10-18 — PIQ release gate and deferred Body unit UX (validation pending)
+
+The isolated QA project is at migration 0060 (PG18.6); 76 nonseeded app tables still empty, 70 migration seed records. Branch-only Vercel DATABASE_URL updated using verified QA Neon endpoint; exact-preview SHA needs upkeep after each new push; branch QA Auth trusted preview alias. QA cookie secret remains blocked, no real QA owner login or independent production owner identity, Vercel deployment protection denies runtime verification. PIQ owner API 503 hardlock must remain. Working patch supports Body circumference cm/in select, inch fractions and precise edit roundtrip; no data model or migration changes. CURRENT_TASK and QA handoff refreshed from obsolete I10/0049 state. This checkpoint does not authorize production/main promotion or owner testing (0/9).

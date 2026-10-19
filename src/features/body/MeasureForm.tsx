@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useId, useMemo, useState } from 'react'
 import {
   FULL_CIRCUMFERENCE_KEYS,
   MANUAL_BODY_METRICS,
+  convertCircumferenceInput,
   metricDefinition,
   parseManualCreate,
 } from '@/domain/body-manual'
@@ -32,6 +33,7 @@ export function MeasureForm({
 }) {
   const [mode, setMode] = useState<MeasurePreset>(preset)
   const [values, setValues] = useState<Record<string, string>>(initialValues)
+  const [inputUnits, setInputUnits] = useState<Record<string, 'in' | 'cm'>>({})
   const [customKeys, setCustomKeys] = useState<string[]>(initialCustomKeys)
   const [notes, setNotes] = useState(initialValues.notes ?? '')
   const [comparability, setComparability] = useState<'usual' | 'different_conditions' | 'unknown'>(
@@ -41,13 +43,28 @@ export function MeasureForm({
 
   const fields = useMemo(() => fieldsFor(mode, customKeys), [mode, customKeys])
 
+  function changeCircumferenceUnit(key: string, unit: 'in' | 'cm') {
+    const previous = inputUnits[key] ?? 'in'
+    if (previous === unit) return
+    const converted = convertCircumferenceInput(values[key] ?? '', previous, unit)
+    if (converted === null) {
+      setError(`${metricDefinition(key)?.label ?? 'Measurement'}: finish entering the value before switching units`)
+      return
+    }
+    setValues(current => ({ ...current, [key]: converted }))
+    setInputUnits(current => ({ ...current, [key]: unit }))
+    setError(null)
+  }
+
   async function save() {
     const metrics = fields.map((key) => {
       const definition = metricDefinition(key)
       return {
         key,
         value: values[key] ?? '',
-        unit: definition?.manualInputUnits[0] ?? '',
+        unit: definition?.family === 'circumference'
+          ? (inputUnits[key] ?? 'in')
+          : (definition?.manualInputUnits[0] ?? ''),
       }
     })
     try {
@@ -111,6 +128,8 @@ export function MeasureForm({
         fields={fields}
         values={values}
         focusKey={focusKey}
+        unitForKey={key => inputUnits[key] ?? 'in'}
+        onUnitChange={changeCircumferenceUnit}
         onChange={(key, value) => setValues((current) => ({ ...current, [key]: value }))}
       />
       <label className="block text-sm">
@@ -163,11 +182,15 @@ function FieldGroups({
   fields,
   values,
   focusKey,
+  unitForKey,
+  onUnitChange,
   onChange,
 }: {
   fields: readonly string[]
   values: Record<string, string>
   focusKey: string | null
+  unitForKey: (key: string) => 'in' | 'cm'
+  onUnitChange: (key: string, unit: 'in' | 'cm') => void
   onChange: (key: string, value: string) => void
 }) {
   const remaining = new Set(fields)
@@ -200,7 +223,9 @@ function FieldGroups({
           <NumberField
             key={key}
             label={definition.label}
-            unit={definition.ownerDisplayUnit}
+            unit={definition.family === 'circumference' ? unitForKey(key) : definition.ownerDisplayUnit}
+            allowUnitSelection={definition.family === 'circumference'}
+            onUnitChange={(unit) => onUnitChange(key, unit)}
             value={values[key] ?? ''}
             autoFocus={focusKey === key}
             onChange={(value) => onChange(key, value)}
@@ -212,12 +237,13 @@ function FieldGroups({
           <legend className="text-sm font-medium text-zinc-800">{block.label}</legend>
           <div className="mt-1 grid grid-cols-2 gap-3">
             {block.keys.map((item) => {
-              const definition = metricDefinition(item.key)
               return (
                 <NumberField
                   key={item.key}
                   label={item.side}
-                  unit={definition?.ownerDisplayUnit ?? 'in'}
+                  unit={unitForKey(item.key)}
+                  allowUnitSelection={true}
+                  onUnitChange={(unit) => onUnitChange(item.key, unit)}
                   value={values[item.key] ?? ''}
                   autoFocus={focusKey === item.key}
                   onChange={(value) => onChange(item.key, value)}
@@ -234,28 +260,48 @@ function FieldGroups({
 function NumberField({
   label,
   unit,
+  allowUnitSelection,
   value,
   autoFocus,
   onChange,
+  onUnitChange,
 }: {
   label: string
   unit: string
+  allowUnitSelection: boolean
   value: string
   autoFocus: boolean
   onChange: (value: string) => void
+  onUnitChange: (unit: 'in' | 'cm') => void
 }) {
+  const inputId = useId()
   return (
-    <label className="block text-sm">
-      <span className="text-zinc-600">
-        {label} <span className="text-zinc-400">{unit}</span>
-      </span>
-      <input
-        className={`${fieldClass} mt-1`}
-        inputMode="decimal"
-        autoFocus={autoFocus}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      />
-    </label>
+    <div className="block text-sm">
+      <label htmlFor={inputId} className="text-zinc-600">
+        {label} {!allowUnitSelection ? <span className="text-zinc-400">{unit}</span> : null}
+      </label>
+      <div className="mt-1 flex min-w-0 gap-2">
+        <input
+          id={inputId}
+          className={fieldClass}
+          inputMode={allowUnitSelection && unit === 'in' ? 'text' : 'decimal'}
+          placeholder={allowUnitSelection && unit === 'in' ? 'e.g. 37 1/4' : undefined}
+          autoFocus={autoFocus}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+        />
+        {allowUnitSelection ? (
+          <select
+            aria-label={`Unit for ${label}`}
+            className="min-h-11 shrink-0 rounded-md border border-zinc-300 bg-white px-2 text-base text-zinc-900"
+            value={unit}
+            onChange={(event) => onUnitChange(event.target.value as 'in' | 'cm')}
+          >
+            <option value="in">in</option>
+            <option value="cm">cm</option>
+          </select>
+        ) : null}
+      </div>
+    </div>
   )
 }
