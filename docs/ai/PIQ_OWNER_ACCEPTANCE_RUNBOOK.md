@@ -1,6 +1,38 @@
 # PIQ controlled owner acceptance and release runbook
 
-**State: PREPARED, NOT RUN.** Work branch: piq/00-baseline-20261014. No owner approval, database migration, production release or actual iPhone tests are implied by this document. All nine PIQ program phases remain unaccepted.
+
+## CURRENT RELEASE SNAPSHOT — 2026-10-19 (supersedes older statuses below)
+
+**Owner acceptance is still blocked.** The often-reported **0/9** is a high-level *PIQ phase acceptance* counter, **not** nine mobile acceptance steps. The owner/device scenarios below are A1–A10; PIQ8 adds P1–P4. None has been manually signed off.
+
+| Gate | Verified current state | Remaining constraint |
+| --- | --- | --- |
+| Development code | `piq/00-baseline-20261014` with full-application CI per exact commit | A `READY` Preview does not count as owner acceptance |
+| Isolated QA PostgreSQL | Separate Neon project `lively-wave-25801832`, root `br-crimson-cloud-akrf5kuo`, `neondb`, PG 18.6, **60/60 migrations** | This is not the production DB and must never receive copied owner records |
+| QA application content | Inventory-only check found **76 non-seeded app tables empty**, with 70 legitimate migration seeds across four tables | Does not certify external Auth users/sessions or encrypted backup recovery |
+| QA Vercel Preview | Project `prj_KNUk1CcJbYjQbSkADSHSuynhpZJU`; only the PIQ Git branch has the 37 Preview QA overrides; QA `DATABASE_URL` configured | New deployment's effective DB connection and protected API responses **not** attested |
+| QA Auth | Separate Neon `better_auth`; exact PIQ Preview branch origin added to its trusted origins | Current test identity has no usable sign-in; cookie secret replacement unverified; independently checked production-versus-QA owner IDs still missing |
+| Release hard stop | PIQ owner/Auth/Health endpoints have a deliberate **503 API hard lock** in the development branch | Do not remove lock without a separate explicit user authorization after safe runtime isolation evidence |
+| Restore proof | PG16/18 synthetic fresh-schema export, mid-restore failure rollback, full table parity, and backup inventory/DDL drift checks | Not an approved restore of real owner data or encrypted/offsite disaster recovery |
+| Owner-device acceptance | **Not run** on iPhone or iPad | First prove Auth/DB isolation and explicitly authorize narrowly scoped owner testing |
+
+**Do not follow older instructions below that say the independent QA root is only at 0056, credentials are all placeholders, or the candidate parent-data preview is safe for login.** Those dated notes document earlier investigations and are retained for traceability, not as the current plan. The correct QA target is the independent project above—not the parent-data child in the production Neon project. Do not migrate the independently upgraded QA root again.
+
+### Additional PIQ8 real-device smoke checks (not part of the 0/9 phase count)
+
+Run only after the authenticated isolated QA environment has independently passed its isolation gates. These are **pending**, not inferred from Vitest or Vercel READY status.
+
+| ID | Owner action on a disposable QA profile | Acceptance condition |
+| --- | --- | --- |
+| P1 — Body dimensions | Enter `31 1/2 in`, `31.5 in`, `31½ in` and `80.01 cm`; switch units; save and reopen all 12 circumference fields on narrow iPhone Safari | Same canonical physical value; no 1/16-inch truncation, lost draft or unintended weight/percentage change; usable at 320–390 px |
+| P2 — Prestige themes | From unlocked QA levels 20–23, inspect new theme previews, light/dark mode, focus and reload, XP wallet unchanged | Unlocks only at intended XP thresholds; selected theme persists; readable cards and charts without flashing or spending XP |
+| P3 — Settings disclosures | Open `/settings` ordinarily, then `#theme-studio`, `#trend-colors`, `#health-profile`, `#ai-usage` and an Ask Health owner-note correction link | All top-level topics start collapsed unless explicitly targeted; deep link opens correct topic; no lost in-progress draft or focus trap |
+| P4 — Approved photo queues | Approve Nutrition Meal and Label photos, save one meal only to Pantry, approve a Training photo; refresh and revisit Today and source pages | Only *persisted* approved job disappears from active queues permanently, no duplicate canonical log or ghost card; failed/unapproved jobs stay recoverable |
+
+**Record only case IDs, PASS/FAIL, tested device/build SHA and non-sensitive defect references.** Never attach raw photos, body values, health prompts or account secrets to the repository.
+
+
+**State: PREPARED, NOT RUN.** Work branch: piq/00-baseline-20261014. The current QA-only migration occurred under explicit approval; no production migration, owner login or iPhone/iPad acceptance is implied. Phase-owner acceptance remains unconfirmed (0/9).
 
 ## What automated validation already proves
 
@@ -57,4 +89,4 @@ After a safe target and identity are verified, the owner selects a small number 
 - [ ] Owner reviewed genuine answer quality, safety and AI spending
 - [ ] Owner separately approved exact migrations, merge and deployment actions
 
-**No sign-off is granted by writing this checklist.** PIQ-8 finishing polish remains deferred.
+**No sign-off is granted by writing this checklist.** PIQ8 polish has development implementations, but owner mobile acceptance and the core PIQ7 release gate remain pending. PIQ8 is not a substitute for core intelligence acceptance.
