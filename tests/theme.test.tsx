@@ -199,15 +199,23 @@ describe('theme shells', () => {
   })
 
   it('offers mode, Theme Studio, unlocks, and trend personalization in Settings', () => {
-    const html = renderToStaticMarkup(
-      <MemoryRouter>
+    const renderSettings = (path: string) => renderToStaticMarkup(
+      <MemoryRouter initialEntries={[path]}>
         <SettingsPage />
       </MemoryRouter>,
     )
+    const collapsed = renderSettings('/settings')
+    // PIQ8: panels intentionally do not mount until opened. Theme controls
+    // stay present after deep-linking, and trend controls remain separate.
+    expect(collapsed).toContain('Theme Studio')
+    expect(collapsed).toContain('Trend Colors')
+    expect(collapsed).not.toContain('Color mode')
+    expect(collapsed).not.toContain('Theme packs')
+    const html = renderSettings('/settings#theme-studio')
     expect(html).toContain('Theme Studio')
     expect(html).toContain('Color mode')
     expect(html).toContain('Theme packs')
-    expect(html).toContain('Personalize trend colors')
+    expect(renderSettings('/settings#trend-colors')).toContain('Personalize trend colors')
     expect(html).toContain('Switch to dark mode')
     expect(html).toContain('Switch to light mode')
     expect(html).toContain('Use system appearance')
@@ -220,7 +228,7 @@ describe('theme shells', () => {
     expect(html).toContain('min-w-0')
     expect(html).not.toContain('overflow-x-auto')
     expect(html).not.toContain('flex-nowrap')
-    expect(html.match(/aria-pressed=/g)?.length ?? 0).toBeGreaterThan(THEME_MODE_PREFERENCES.length + HEALTH_PALETTES.length)
+    expect(html.match(/aria-pressed=/g)?.length ?? 0).toBeGreaterThanOrEqual(THEME_MODE_PREFERENCES.length + HEALTH_PALETTES.length)
     expect(html).toContain('Data &amp; Backup')
     expect(readFileSync('src/features/settings/SettingsPage.tsx', 'utf8')).not.toContain("classList.contains('dark')")
     expect(readFileSync('src/features/settings/SettingsPage.tsx', 'utf8')).not.toContain('>Save<')
