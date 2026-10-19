@@ -7,6 +7,7 @@ import { assertPiqPostgresFixtureTarget, assertPiqPostgresFixtureSession } from 
 import { inspectMigrations } from '../server/migrate.js'
 import { assessMigrationHistory, readMigrationHistory } from '../server/migration-history.js'
 import { LATEST_SCHEMA_MIGRATION, backupTable } from '../server/backup/inventory.js'
+import { auditBackupInventoryColumns } from '../server/backup/schema-coverage.js'
 import { buildBackupArchive, restoreStatements, verifyBackupArchive, planRestore, type BackupRow } from '../server/backup/format.js'
 import { restoreDestinationGuardStatements,assertBackupMigrationHistory } from '../server/backup/database.js'
 import { getNutritionDayCompleteness, saveNutritionDayCompleteness } from '../server/nutrition/day-completeness.js'
@@ -1884,5 +1885,51 @@ describe.skipIf(!url)('PIQ-1.1 full numbered migration chain and backup on isola
       expect((await client.query('SELECT count(*)::int AS total FROM experiment_results WHERE experiment_id=$1',[experimentId])).rows[0].total).toBe(1)
     }finally{await second.end()}
   },40_000)
+
+  it('PIQ-7: every migrated public table and column is covered by the full backup inventory', async () => {
+    // The same schema-backed fixture used by our recovery tests is migrated
+    // through 0060. Catalog-only queries cannot touch personal data.
+    const catalogQuery = `
+      SELECT table_name, column_name
+      FROM information_schema.columns
+      WHERE table_schema = current_schema()
+      ORDER BY table_name, ordinal_position
+    `
+    const actual = (await client.query(catalogQuery)).rows as Array<{
+      table_name: string; column_name: string
+    }>
+    expect(auditBackupInventoryColumns(actual)).toEqual({
+      unlistedTables: [], unlistedColumns: [],
+      missingTables: [], missingColumns: [],
+    })
+
+    // Mutation test: prove that adding a new owner table and a new column
+    // makes this gate fail. The transaction is always rolled back; production
+    // migrations and the backup format itself remain unchanged.
+    await client.query('BEGIN')
+    try {
+      await client.query('CREATE TABLE piq_unlisted_owner_context (id uuid PRIMARY KEY)')
+      await client.query('ALTER TABLE health_profile ADD COLUMN piq_unlisted_test_context text')
+      const changed = (await client.query(catalogQuery)).rows as Array<{
+        table_name: string; column_name: string
+      }>
+      expect(auditBackupInventoryColumns(changed)).toEqual({
+        unlistedTables: ['piq_unlisted_owner_context'],
+        unlistedColumns: ['health_profile.piq_unlisted_test_context'],
+        missingTables: [],
+        missingColumns: [],
+      })
+    } finally {
+      await client.query('ROLLBACK')
+    }
+    expect(auditBackupInventoryColumns(
+      (await client.query(catalogQuery)).rows as Array<{
+        table_name: string; column_name: string
+      }>,
+    )).toEqual({
+      unlistedTables: [], unlistedColumns: [],
+      missingTables: [], missingColumns: [],
+    })
+  })
 
 })

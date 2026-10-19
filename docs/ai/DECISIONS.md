@@ -1037,3 +1037,8 @@ Do not infer safe upgrade of persistent QA from a clean 0001–0060 migration re
 ## Decision: full backup recovery must exercise actual SQL transaction service (PIQ-7, 2026-10-18)
 
 An archive-format unit test or Lab-only row replay is not adequate proof of seeded table replacement, transaction rollback and entire Health table inventory preservation. Use two independently migrated schemas in the guarded disposable local PostgreSQL fixture, run the actual createBackupArchive and applyRestore services, compare all canonical backed-up rows after restore, force mid-restore PostgreSQL failure and verify rollback, and reject a second merge attempt. Passing PG16/18 does not replace an owner-authorized isolated Neon recovery rehearsal or encrypted retention review.
+
+
+## Decision: every owner-schema table and column must be explicitly included in full backup inventory (PIQ-7, 2026-10-18)
+
+A successful synthetic full restore only confirms parity for what the backup inventory already knows; it cannot detect newly migrated owner-data columns or tables excluded from the archive unintentionally. Compare `information_schema.columns` of the fully migrated, disposable CI schema against the complete full-backup inventory, ignoring only `schema_migrations` (restore target must already match its history). Reject both SQL additions missing from inventory and stale inventory declarations, with rollback-only schema-drift mutation coverage. This is a CI release safeguard without production runtime scan cost. No actual owner records, Auth-provider tables, or real backup recovery are attested by a catalog comparison.

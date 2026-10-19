@@ -88,3 +88,8 @@ Owner Health data includes protocol identity, immutable protocol versions, measu
 ## PIQ-7 synthetic full recovery regression (development; CI pending)
 
 On disposable local PostgreSQL 16 and 18, the development suite exercises Health full archive creation, manifest verification, a separately migrated empty destination, transaction rollback on injected SQL failure, recovery of the full backed-up inventory, and refusal to restore into an occupied destination. Only fictional owner information is used. This is not an authorized restoration of a production archive, offsite encryption validation, or deployment approval.
+
+
+## CI backup inventory coverage (PIQ-7)
+
+The isolated real-PostgreSQL test matrix compares the fully migrated application schema to the full backup inventory table-by-table and column-by-column. If a later migration adds a public Health table or column without also registering it for full recovery, CI fails. `schema_migrations` is excluded intentionally; authentication tables reside outside the owner backup. This detects potential missing coverage but is not a live runtime or actual-owner-backup attestation.

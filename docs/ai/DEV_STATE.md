@@ -1263,3 +1263,8 @@ Added tests/piq7-incremental-upgrade-postgres.integration.test.ts to the dedicat
 ## 2026-10-18 — PIQ-7 complete source-to-fresh-destination backup/restore suite (CI pending)
 
 Synthetic PG16 and PG18 real-SQL backup: two independently migrated disposable localhost-only schemas, fictional owner/profile/nutrition/Lab provenance, full checksum/table inventory, mid-restore transaction failure rollback, successful archive content parity and second restore refusal. Calls the actual Health service rather than simulating insert plan only. No persistent QA Neon, production, auth records, offsite encryption or owner acceptance. Exact SHA workflows must be checked before green.
+
+
+## 2026-10-18 — PIQ-7 schema-to-backup inventory drift gate
+
+Added pure backup catalog coverage audit, exercised against actual fully migrated local PG16 and PG18 schemas. CI fails if migration-added public tables or columns are absent from full Health backup inventory, or if inventory references missing schema names. Negative tests create and roll back a synthetic new table/column and prove detection, without touching production/QA. The separately isolated QA root (0056) was checked using metadata-only public table/column names: no inventory omissions in the 0056 schema. Real backup recovery, owner Auth isolation, QA migration and owner acceptance remain separately gated.
