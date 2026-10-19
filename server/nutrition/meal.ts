@@ -33,6 +33,7 @@ import {
   getFood,
   insertEntryWithId,
   listEntriesByMealGroup,
+  mapEntryRow,
 } from './queries.js'
 import { NUTRITION_USER_CONTEXT_MAX, NutritionInterpretError, normalizeUserContext, parseNutritionProvider } from '../../src/domain/nutrition/interpret.js'
 import { parseMealClarificationAnswers, resolveMealClarificationContext } from '../../src/domain/nutrition/meal-clarifications.js'
@@ -42,7 +43,6 @@ import {
   getLabelJobRecord,
   type NutritionCaptureJobRecord,
   listOutstandingLabelJobs,
-  recordLabelJobCommitted,
   recordLabelJobCreated,
   recordLabelJobStatus,
   requeueCaptureJob,
@@ -64,6 +64,92 @@ export const CLAIM_MEAL_GROUP_SQL = `INSERT INTO source_record_links (
          ) VALUES ($1,$2,NULL,$3,$4,$5,$6,$7::jsonb)
          ON CONFLICT (source_id, external_fingerprint) DO NOTHING
          RETURNING entity_id`
+
+
+/**
+ * First-time Meal Photo logging must share a single atomic commit boundary
+ * with Pantry-only approval. The row lock serializes the two paths; source
+ * links and one-or-many entries exist only if this request wins first.
+ * Legacy food-description logging intentionally stays on its existing path.
+ */
+export const ATOMIC_MEAL_PHOTO_LOG_SQL = `WITH eligible_capture AS MATERIALIZED (
+  SELECT home_ai_job_id
+  FROM nutrition_capture_jobs
+  WHERE home_ai_job_id = $1 AND capture_kind = 'meal_photo' AND status = 'completed'
+  FOR UPDATE
+), claimed_link AS (
+  INSERT INTO source_record_links (
+    id, source_id, import_job_id, external_id, external_fingerprint,
+    entity_type, entity_id, source_payload
+  )
+  SELECT $3::uuid, $2::uuid, NULL, $1, $4, $5, $6::uuid, $7::jsonb
+  FROM eligible_capture
+  ON CONFLICT (source_id, external_fingerprint) DO NOTHING
+  RETURNING entity_id
+), created_entries AS (
+  INSERT INTO nutrition_entries (
+    id, log_date, consumed_at, timezone, meal, food_id, food_name, brand,
+    serving_quantity, serving_unit, grams, calories, protein, carbs, fat,
+    fiber, sodium, source_kind, notes, meal_group_id
+  )
+  SELECT row.id, row.log_date, row.consumed_at, row.timezone, row.meal,
+         row.food_id, row.food_name, row.brand, row.serving_quantity,
+         row.serving_unit, row.grams, row.calories, row.protein, row.carbs,
+         row.fat, row.fiber, row.sodium, row.source_kind, row.notes,
+         row.meal_group_id
+  FROM jsonb_to_recordset($8::jsonb) AS row (
+    id uuid, log_date date, consumed_at timestamptz, timezone text,
+    meal text, food_id uuid, food_name text, brand text,
+    serving_quantity numeric, serving_unit text, grams numeric,
+    calories numeric, protein numeric, carbs numeric, fat numeric,
+    fiber numeric, sodium numeric, source_kind text, notes text,
+    meal_group_id uuid
+  )
+  JOIN claimed_link ON true
+  RETURNING *
+), finalized_capture AS (
+  UPDATE nutrition_capture_jobs
+  SET status = 'committed', food_id = $9::uuid, entry_id = $10::uuid,
+      failure_message = NULL, committed_at = now(), updated_at = now()
+  WHERE home_ai_job_id = $1 AND capture_kind = 'meal_photo'
+    AND status = 'completed'
+    AND EXISTS (SELECT 1 FROM created_entries)
+  RETURNING home_ai_job_id
+)
+SELECT entry.* FROM created_entries entry JOIN finalized_capture ON true`
+
+const ATOMIC_MEAL_ENTRY_KEYS = [
+  'id', 'log_date', 'consumed_at', 'timezone', 'meal', 'food_id',
+  'food_name', 'brand', 'serving_quantity', 'serving_unit', 'grams',
+  'calories', 'protein', 'carbs', 'fat', 'fiber', 'sodium',
+  'source_kind', 'notes', 'meal_group_id',
+] as const
+
+function atomicMealEntryJson(values: unknown[][]): string {
+  return JSON.stringify(values.map(value =>
+    Object.fromEntries(ATOMIC_MEAL_ENTRY_KEYS.map((key, index) => [key, value[index] ?? null])),
+  ))
+}
+
+async function commitPhotoEntriesAtomic(input: {
+  jobId: string
+  entityType: string
+  entityId: string
+  payload: Record<string, unknown>
+  values: unknown[][]
+}): Promise<NutritionEntry[]> {
+  const sql = await getSql()
+  const sourceId = await mealPhotoSourceId()
+  const first = input.values[0]
+  if (!first) throw new HttpError(400, 'Include at least one reviewed food')
+  const rows = await sql.query(ATOMIC_MEAL_PHOTO_LOG_SQL, [
+    input.jobId, sourceId, randomUUID(), nutritionMealJobFingerprint(input.jobId),
+    input.entityType, input.entityId, JSON.stringify(input.payload),
+    atomicMealEntryJson(input.values), first[5] ?? null, first[0],
+  ]) as Array<Record<string, unknown>>
+  const order = new Map(input.values.map((value, index) => [String(value[0]), index]))
+  return rows.map(mapEntryRow).sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0))
+}
 
 function isJpeg(bytes: Uint8Array): boolean {
   return bytes.length >= 2 && bytes[0] === JPEG_MAGIC[0] && bytes[1] === JPEG_MAGIC[1]
@@ -671,7 +757,7 @@ async function findMealGroupByFingerprint(jobId: string): Promise<string | null>
   return rows[0]?.entity_id ?? null
 }
 
-async function insertLoggedEntry(input: {
+function loggedEntryValues(input: {
   id: string
   logDate: string
   timezone: string
@@ -683,7 +769,7 @@ async function insertLoggedEntry(input: {
   mealGroupId: string
   sourceKind?: NutritionEntry['sourceKind']
   notes?: string
-}): Promise<NutritionEntry> {
+}): unknown[] {
   const snapshot = input.grams != null
     ? mealComponentSnapshot(input.food, { quantity: input.quantity, grams: input.grams })
     : snapshotFromDefinition(
@@ -697,7 +783,7 @@ async function insertLoggedEntry(input: {
         },
         { quantity: input.quantity },
       )
-  return insertEntryWithId([
+  return [
     input.id,
     input.logDate,
     null,
@@ -714,10 +800,15 @@ async function insertLoggedEntry(input: {
     snapshot.carbs,
     snapshot.fat,
     snapshot.fiber,
+    null,
     input.sourceKind ?? 'photo_ai',
     input.notes ?? 'Reviewed from meal photo.',
     input.mealGroupId,
-  ])
+  ]
+}
+
+async function insertLoggedEntry(input: Parameters<typeof loggedEntryValues>[0]): Promise<NutritionEntry> {
+  return insertEntryWithId(loggedEntryValues(input))
 }
 
 export async function commitNutritionMeal(body: unknown): Promise<{ entries: NutritionEntry[]; mealGroupId: string }> {
@@ -783,7 +874,7 @@ export async function commitNutritionMeal(body: unknown): Promise<{ entries: Nut
         components: input.components,
       })
     : null
-  if (descriptionFingerprint) {
+  if (descriptionFingerprint && !jobId) {
     const existingGroup = await findGroupByFingerprint(await sourceIdByKey('health_app'), descriptionFingerprint)
     if (existingGroup) {
       const entries = await listEntriesByMealGroup(existingGroup)
@@ -794,7 +885,7 @@ export async function commitNutritionMeal(body: unknown): Promise<{ entries: Nut
   }
   const mealGroupId = randomUUID()
 
-  if (descriptionFingerprint) {
+  if (descriptionFingerprint && !jobId) {
     const sql = await getSql()
     const sourceId = await sourceIdByKey('health_app')
     const claimed = (await sql.query(CLAIM_MEAL_GROUP_SQL, [
@@ -815,83 +906,51 @@ export async function commitNutritionMeal(body: unknown): Promise<{ entries: Nut
     }
   }
 
-  if (jobId) {
-    const sql = await getSql()
-    const sourceId = await mealPhotoSourceId()
-    const claimed = (await sql.query(CLAIM_MEAL_GROUP_SQL, [
-      randomUUID(),
-      sourceId,
-      jobId,
-      nutritionMealJobFingerprint(jobId),
-      NUTRITION_MEAL_GROUP_ENTITY,
-      mealGroupId,
-      JSON.stringify({ captureKind: NUTRITION_MEAL_CAPTURE_KIND, reviewed: true, pipeline: 'nutrition-meal-v1' }),
-    ])) as Array<{ entity_id: string }>
-    const claimedId = claimed[0]?.entity_id
-    if (claimedId && claimedId !== mealGroupId) {
-      const entries = await listEntriesByMealGroup(claimedId)
-      if (entries.length > 0) {
-        return { entries, mealGroupId: claimedId }
-      }
-    }
-  }
 
   const entries: NutritionEntry[] = []
+  const prepared: unknown[][] = []
+  const save = async (details: Parameters<typeof loggedEntryValues>[0]) => {
+    if (jobId) prepared.push(loggedEntryValues(details))
+    else entries.push(await insertLoggedEntry(details))
+  }
   if (input.recipeFoodId) {
     const recipe = await getFood(input.recipeFoodId)
-    if (!recipe) {
-      throw new HttpError(404, 'Recipe not found')
-    }
-    entries.push(
-      await insertLoggedEntry({
-        id: randomUUID(),
-        logDate: resolved.logDate,
-        timezone,
-        meal,
-        food: recipe,
-        quantity: input.recipeQuantity && input.recipeQuantity > 0 ? input.recipeQuantity : 1,
-        unit: recipe.servingUnit,
-        grams: null,
-        mealGroupId,
-      }),
-    )
+    if (!recipe) throw new HttpError(404, 'Recipe not found')
+    await save({
+      id: randomUUID(), logDate: resolved.logDate, timezone, meal, food: recipe,
+      quantity: input.recipeQuantity && input.recipeQuantity > 0 ? input.recipeQuantity : 1,
+      unit: recipe.servingUnit, grams: null, mealGroupId,
+    })
   }
-
   for (const component of input.components) {
-    if (!component.included || !component.foodId) {
-      continue
-    }
-    if (input.recipeFoodId && component.foodId === input.recipeFoodId) {
-      continue
-    }
+    if (!component.included || !component.foodId) continue
+    if (input.recipeFoodId && component.foodId === input.recipeFoodId) continue
     const food = await getFood(component.foodId)
-    if (!food) {
-      throw new HttpError(404, `Food not found for ${component.proposedName}`)
-    }
+    if (!food) throw new HttpError(404, `Food not found for ${component.proposedName}`)
     const quantity = component.quantity != null && component.quantity > 0 ? component.quantity : 1
-    entries.push(
-      await insertLoggedEntry({
-        id: randomUUID(),
-        logDate: resolved.logDate,
-        timezone,
-        meal,
-        food,
-        quantity,
-        unit: component.unit || food.servingUnit,
-        grams: component.grams,
-        mealGroupId,
-        sourceKind: described ? 'manual' : 'photo_ai',
-        notes: described ? 'Reviewed from a food description.' : 'Reviewed from meal photo.',
-      }),
-    )
+    await save({
+      id: randomUUID(), logDate: resolved.logDate, timezone, meal, food,
+      quantity, unit: component.unit || food.servingUnit, grams: component.grams,
+      mealGroupId, sourceKind: described ? 'manual' : 'photo_ai',
+      notes: described ? 'Reviewed from a food description.' : 'Reviewed from meal photo.',
+    })
   }
-
-  if (entries.length === 0) {
+  if (entries.length === 0 && prepared.length === 0) {
     throw new HttpError(400, 'Include at least one food, or use a saved recipe.')
   }
-
   if (jobId) {
-    await recordLabelJobCommitted(jobId, entries[0]!.foodId ?? entries[0]!.id, entries[0]!.id)
+    const committed = await commitPhotoEntriesAtomic({
+      jobId, entityType: NUTRITION_MEAL_GROUP_ENTITY, entityId: mealGroupId,
+      payload: { captureKind: NUTRITION_MEAL_CAPTURE_KIND, reviewed: true, pipeline: 'nutrition-meal-v1' },
+      values: prepared,
+    })
+    if (committed.length === prepared.length) return { entries: committed, mealGroupId }
+    const racedGroup = await findMealGroupByFingerprint(jobId)
+    if (racedGroup) {
+      const racedEntries = await listEntriesByMealGroup(racedGroup)
+      if (racedEntries.length > 0) return { entries: racedEntries, mealGroupId: racedGroup }
+    }
+    throw new HttpError(409, 'That meal capture has already been finalized elsewhere')
   }
 
   return { entries, mealGroupId }
@@ -952,62 +1011,35 @@ export async function commitNutritionMealEstimate(body: unknown): Promise<{ entr
     timezone: input.timezone ?? NUTRITION_CONFIG.calendarTimeZone,
   })
   const entryId = randomUUID()
-  if (jobId) {
-    const sql = await getSql()
-    const sourceId = await mealPhotoSourceId()
-    const claimed = (await sql.query(CLAIM_MEAL_GROUP_SQL, [
-      randomUUID(),
-      sourceId,
-      jobId,
-      nutritionMealJobFingerprint(jobId),
-      'nutrition_entry',
-      entryId,
-      JSON.stringify({
-        source: 'meal_photo_ai',
-        provider: 'gemini',
-        model,
-        estimated: true,
-        reviewed: true,
-        userAdjusted: mealEstimateUserAdjusted(baseline, reviewed),
-        aiEstimate: baseline,
-        reviewedValues: reviewed,
-        portionScale: input.portionScale ?? 1,
-      }),
-    ])) as Array<{ entity_id: string }>
-    const claimedId = claimed[0]?.entity_id
-    if (claimedId && claimedId !== entryId) {
-      const raced = await getEntry(claimedId)
-      if (raced) {
-        return { entries: [raced] }
-      }
-    }
-  }
-
-  const entry = await insertEntryWithId([
-    entryId,
-    resolved.logDate,
-    null,
+  const values: unknown[] = [
+    entryId, resolved.logDate, null,
     input.timezone ?? NUTRITION_CONFIG.calendarTimeZone,
-    input.meal ?? null,
-    null,
-    input.name.trim(),
-    null,
-    1,
-    'meal',
-    null,
-    reviewed.calories,
-    reviewed.proteinGrams,
-    reviewed.carbsGrams,
-    reviewed.fatGrams,
-    reviewed.fiberGrams,
-    reviewed.sodiumMg,
-    'photo_ai',
-    'Reviewed from meal photo estimate.',
-    null,
-  ])
+    input.meal ?? null, null, input.name.trim(), null,
+    1, 'meal', null, reviewed.calories, reviewed.proteinGrams,
+    reviewed.carbsGrams, reviewed.fatGrams, reviewed.fiberGrams,
+    reviewed.sodiumMg, 'photo_ai', 'Reviewed from meal photo estimate.', null,
+  ]
   if (jobId) {
-    await recordLabelJobCommitted(jobId, null, entry.id)
+    const committed = await commitPhotoEntriesAtomic({
+      jobId, entityType: 'nutrition_entry', entityId: entryId,
+      payload: {
+        source: 'meal_photo_ai', provider: 'gemini', model,
+        estimated: true, reviewed: true,
+        userAdjusted: mealEstimateUserAdjusted(baseline, reviewed),
+        aiEstimate: baseline, reviewedValues: reviewed,
+        portionScale: input.portionScale ?? 1,
+      },
+      values: [values],
+    })
+    if (committed.length === 1) return { entries: committed }
+    // A concurrent successful retry may have finalized first. Recover its
+    // canonical entry, never create a second entry or overwrite Pantry.
+    const raced = await findCommittedLabelEntry(jobId)
+    const existing = raced ? await getEntry(raced.entryId) : null
+    if (existing) return { entries: [existing] }
+    throw new HttpError(409, 'That meal capture has already been finalized elsewhere')
   }
+  const entry = await insertEntryWithId(values)
   return { entries: [entry] }
 }
 
