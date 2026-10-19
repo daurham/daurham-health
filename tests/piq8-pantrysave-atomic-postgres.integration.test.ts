@@ -41,7 +41,7 @@ describe.skipIf(!url)('PIQ-8 atomic Pantry first-save on isolated real PostgreSQ
     await a.query(later.slice(from,to))
     source=String((await a.query("SELECT id FROM data_sources WHERE key='health_app'")).rows[0].id)
   },35000)
-  beforeEach(async()=>{if(url)await a.query('TRUNCATE nutrition_capture_jobs,source_record_links,nutrition_foods')})
+  beforeEach(async()=>{if(url)await a.query('TRUNCATE nutrition_capture_jobs,source_record_links,nutrition_entries,nutrition_foods')})
   afterAll(async()=>{if(!url)return;await b.end();await a.query('DROP SCHEMA '+schema+' CASCADE');await a.end()})
 
   it('two concurrent different approvals commit one capture and one food/link',async()=>{
