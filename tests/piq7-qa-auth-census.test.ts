@@ -41,6 +41,14 @@ describe('PIQ-7 isolated QA Neon Auth aggregate-only census', () => {
     expect(result.ownerQaAuthorized).toBe(false)
   })
 
+  it('does not call a user without the documented account row a known fixture', () => {
+    // A user-only row cannot establish the identity of the previously
+    // inspected fixture (which has exactly one non-password Auth account).
+    const result = review({ census: { ...census, accountCount: 0 } })
+    expect(result.classification).toBe('operator_review_required')
+    expect(result.ownerQaAuthorized).toBe(false)
+  })
+
   it('rejects missing, untrusted or wrong QA targets', () => {
     expect(review({ census: null }).blockers).toContain('EVIDENCE_MISSING_OR_WRONG_TARGET')
     expect(review({ expectedProjectId: 'production' }).classification).toBe('unverified')
