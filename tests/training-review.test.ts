@@ -273,6 +273,12 @@ describe('cross-device pending reviews', () => {
     const service = source('server/training/service.ts')
     expect(service).toContain('recordTranscriptionJobCommitted')
     expect(service).toContain('findSessionIdByHomeAiJob')
+    const createImportedSession = service.split('export async function createImportedSession(')[1]?.split('export async function listSessions(')[0]
+    expect(createImportedSession).toContain('...buildSessionInsertQueries(sql, prepared).slice(1)')
+    expect(createImportedSession).toContain('sql.query(COMMIT_IMPORTED_WORKOUT_JOB_SQL')
+    expect(createImportedSession?.indexOf('sql.query(COMMIT_IMPORTED_WORKOUT_JOB_SQL'))
+      .toBeGreaterThan(createImportedSession?.indexOf('...buildSessionInsertQueries(sql, prepared).slice(1)') ?? -1)
+    expect(createImportedSession?.split('const claimedId =')[1]).not.toContain('recordTranscriptionJobCommitted')
     const store = source('server/training/job-store.ts')
     expect(store).toContain('ON CONFLICT (home_ai_job_id)')
     expect(RECORD_TRANSCRIPTION_JOB_CREATED_SQL).toContain("WHERE workout_transcription_jobs.status <> 'committed'")

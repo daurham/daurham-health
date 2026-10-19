@@ -63,7 +63,7 @@ import { HttpError } from '../http.js'
 import type { HomeAiClient } from '../integrations/home-ai/client.js'
 import { getHomeAiClient } from '../integrations/home-ai/client.js'
 import { recordTranscriptionJobCommitted } from './job-store.js'
-import { CLAIM_AND_INSERT_WORKOUT_SQL } from './commit-sql.js'
+import { CLAIM_AND_INSERT_WORKOUT_SQL, COMMIT_IMPORTED_WORKOUT_JOB_SQL } from './commit-sql.js'
 
 const TABLES_UNAVAILABLE = 'Training tables are not available. Apply pending migrations.'
 
@@ -727,6 +727,15 @@ export async function createImportedSession(
         prepared.sessionName,
       ]),
       ...buildSessionInsertQueries(sql, prepared).slice(1),
+      // The saved workout and its pending-photo queue state commit together.
+      // A failed status update must roll back the canonical session as well.
+      sql.query(COMMIT_IMPORTED_WORKOUT_JOB_SQL, [
+        jobId,
+        prepared.sessionId,
+        sourceId,
+        homeAiJobFingerprint(jobId),
+        WORKOUT_SESSION_ENTITY,
+      ]),
     ])
   } catch (error) {
     if (asMissingRelation(error)) {
@@ -749,7 +758,6 @@ export async function createImportedSession(
   }
 
   const claimedId = (await findSessionIdByHomeAiJob(jobId)) ?? prepared.sessionId
-  await recordTranscriptionJobCommitted(jobId, claimedId).catch(() => undefined)
   return getSession(claimedId)
 }
 

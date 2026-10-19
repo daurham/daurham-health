@@ -22,6 +22,8 @@ import { readPrimaryGoalIntent, savePrimaryGoalIntent } from '../server/goals/pr
 import { getHealthProfile, putHealthProfile } from '../server/profile/service.js'
 import { PERFORMED_STRENGTH_EXERCISES_SQL } from '../server/training/plan-service.js'
 import { RECORD_TRANSCRIPTION_JOB_CREATED_SQL, RECORD_TRANSCRIPTION_JOB_STATUS_SQL } from '../server/training/job-store.js'
+import { COMMIT_IMPORTED_WORKOUT_JOB_SQL } from '../server/training/commit-sql.js'
+import { homeAiJobFingerprint, WORKOUT_SESSION_ENTITY, HOME_AI_SOURCE_KEY } from '../src/domain/training-transcription.js'
 import { buildTrainingWeekQualification, buildTrainingRoutineCredits, type PerformedExerciseEvidence } from '../src/domain/training-qualification.js'
 import { buildTrainingProgressSummary } from '../src/domain/training-progress-summary.js'
 import {
@@ -147,6 +149,62 @@ describe.skipIf(!url)('PIQ-1.1 full numbered migration chain and backup on isola
     try { await client.query('DROP SCHEMA IF EXISTS piq_full_chain CASCADE') }
     finally { await client.end() }
   }, 30_000)
+
+  it('PIQ-1: workout save and pending-photo completion are atomic, including rollback on failure', async () => {
+    await client.query('BEGIN')
+    try {
+      const jobId = randomUUID()
+      const sessionId = randomUUID()
+      const fingerprint = homeAiJobFingerprint(jobId)
+      const source = await client.query('SELECT id::text AS id FROM data_sources WHERE key = $1', [HOME_AI_SOURCE_KEY])
+      expect(source.rows).toHaveLength(1)
+      const sourceId = String(source.rows[0].id)
+      const sessionSql = "INSERT INTO workout_sessions (id, workout_date, session_type, source_kind) VALUES ($1::uuid, '2026-10-14', 'programmed', 'imported_candidate')"
+      const linkSql = `INSERT INTO source_record_links
+        (source_id, external_id, external_fingerprint, entity_type, entity_id)
+        VALUES ($1::uuid, $2, $3, $4, $5::uuid)`
+      const args = [jobId, sessionId, sourceId, fingerprint, WORKOUT_SESSION_ENTITY]
+      await client.query(RECORD_TRANSCRIPTION_JOB_CREATED_SQL, [jobId, 'reviewed-photo.jpg'])
+
+      // The final status statement must refuse an orphan/unlinked session,
+      // causing a real PostgreSQL transaction to roll back its canonical insert.
+      await client.query('SAVEPOINT unlinked_capture')
+      await client.query(sessionSql, [sessionId])
+      await expect(client.query(COMMIT_IMPORTED_WORKOUT_JOB_SQL, args))
+        .rejects.toMatchObject({ code: '22012' })
+      await client.query('ROLLBACK TO SAVEPOINT unlinked_capture')
+      const noSession = await client.query('SELECT id FROM workout_sessions WHERE id = $1', [sessionId])
+      expect(noSession.rowCount).toBe(0)
+      const pending = await client.query(
+        'SELECT status, workout_session_id FROM workout_transcription_jobs WHERE home_ai_job_id = $1', [jobId],
+      )
+      expect(pending.rows[0]).toMatchObject({ status: 'queued', workout_session_id: null })
+
+      // Successful canonical link + workout creation finalize the job in the
+      // same transaction. A later provider poll cannot bring it back.
+      await client.query(sessionSql, [sessionId])
+      await client.query(linkSql, [sourceId, jobId, fingerprint, WORKOUT_SESSION_ENTITY, sessionId])
+      const finalized = await client.query(COMMIT_IMPORTED_WORKOUT_JOB_SQL, args)
+      expect(finalized.rows[0].finalized).toBe(1)
+      const saved = await client.query(
+        'SELECT status, workout_session_id::text AS session_id FROM workout_transcription_jobs WHERE home_ai_job_id = $1',
+        [jobId],
+      )
+      expect(saved.rows[0]).toMatchObject({ status: 'committed', session_id: sessionId })
+      await client.query(RECORD_TRANSCRIPTION_JOB_STATUS_SQL, [jobId, 'failed', 'late error'])
+      const stillCommitted = await client.query(
+        'SELECT status, failure_message FROM workout_transcription_jobs WHERE home_ai_job_id = $1', [jobId],
+      )
+      expect(stillCommitted.rows[0]).toMatchObject({ status: 'committed', failure_message: null })
+      const outstanding = await client.query(
+        "SELECT count(*)::int AS count FROM workout_transcription_jobs WHERE status <> 'committed' AND home_ai_job_id = $1",
+        [jobId],
+      )
+      expect(outstanding.rows[0].count).toBe(0)
+    } finally {
+      await client.query('ROLLBACK')
+    }
+  })
 
   it('PIQ-1: late Home-AI callbacks leave committed workout captures completely unchanged', async () => {
     await client.query('BEGIN')
