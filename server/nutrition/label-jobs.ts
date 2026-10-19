@@ -124,6 +124,22 @@ export async function recordLabelJobCreated(input: {
   )
 }
 
+/**
+ * An asynchronous provider result is an observation, not permission to
+ * rewrite an approved capture. Lock/conditional predicate serializes with
+ * first-time Meal Photo Log/Pantry's row-locked atomic finalization.
+ * The same rule applies to approved labels: label Pantry → Log remains
+ * handled by the distinct explicit approval path.
+ */
+export const RECORD_CAPTURE_PROVIDER_STATUS_SQL = `UPDATE nutrition_capture_jobs
+       SET status = $2,
+           failure_message = CASE WHEN $2 = 'failed' THEN $3 ELSE NULL END,
+           candidate_json = CASE
+             WHEN $4::jsonb IS NULL THEN candidate_json ELSE $4::jsonb
+           END,
+           updated_at = now()
+       WHERE home_ai_job_id = $1 AND status <> 'committed'`
+
 export async function recordLabelJobStatus(input: {
   jobId: string
   status: 'queued' | 'processing' | 'completed' | 'failed'
@@ -136,19 +152,7 @@ export async function recordLabelJobStatus(input: {
   const sql = await getSql()
   await queryOrUnavailable(() =>
     sql.query(
-      `UPDATE nutrition_capture_jobs
-       SET status = CASE WHEN status = 'committed' THEN status ELSE $2 END,
-           failure_message = CASE
-             WHEN $2 = 'failed' THEN $3
-             WHEN status = 'committed' THEN failure_message
-             ELSE NULL
-           END,
-           candidate_json = CASE
-             WHEN $4::jsonb IS NULL THEN candidate_json
-             ELSE $4::jsonb
-           END,
-           updated_at = now()
-       WHERE home_ai_job_id = $1`,
+      RECORD_CAPTURE_PROVIDER_STATUS_SQL,
       [input.jobId, input.status, input.failureMessage ?? null, input.candidate ? JSON.stringify(input.candidate) : null],
     ),
   )
@@ -354,6 +358,14 @@ export async function claimCaptureJob(jobId: string): Promise<boolean> {
   return (rows as unknown[]).length > 0
 }
 
+export const FINISH_CAPTURE_INTERPRETATION_SQL = `UPDATE nutrition_capture_jobs
+       SET status = $2,
+           failure_message = CASE WHEN $2 = 'failed' THEN $3 ELSE NULL END,
+           candidate_json = CASE WHEN $4::jsonb IS NULL THEN candidate_json ELSE $4::jsonb END,
+           interpretation = COALESCE(interpretation, '{}'::jsonb) || $5::jsonb,
+           updated_at = now()
+       WHERE home_ai_job_id = $1 AND status <> 'committed'`
+
 export async function finishCaptureInterpretation(input: {
   jobId: string
   status: 'completed' | 'failed'
@@ -364,13 +376,7 @@ export async function finishCaptureInterpretation(input: {
   const sql = await getSql()
   await queryOrUnavailable(() =>
     sql.query(
-      `UPDATE nutrition_capture_jobs
-       SET status = CASE WHEN status = 'committed' THEN status ELSE $2 END,
-           failure_message = CASE WHEN $2 = 'failed' THEN $3 ELSE NULL END,
-           candidate_json = CASE WHEN $4::jsonb IS NULL THEN candidate_json ELSE $4::jsonb END,
-           interpretation = COALESCE(interpretation, '{}'::jsonb) || $5::jsonb,
-           updated_at = now()
-       WHERE home_ai_job_id = $1`,
+      FINISH_CAPTURE_INTERPRETATION_SQL,
       [
         input.jobId,
         input.status,

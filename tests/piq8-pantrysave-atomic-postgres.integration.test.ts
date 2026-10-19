@@ -3,7 +3,10 @@ import { readFileSync } from 'node:fs'
 import { beforeAll, afterAll, beforeEach, describe, expect, it } from 'vitest'
 import pg from 'pg'
 import { ATOMIC_PANTRY_CAPTURE_SAVE_SQL as SAVE } from '../server/nutrition/recipe-ingredients.js'
-import { RECORD_CAPTURE_COMMITTED_SQL } from '../server/nutrition/label-jobs.js'
+import {
+  RECORD_CAPTURE_COMMITTED_SQL, RECORD_CAPTURE_PROVIDER_STATUS_SQL,
+  FINISH_CAPTURE_INTERPRETATION_SQL,
+} from '../server/nutrition/label-jobs.js'
 import { ATOMIC_MEAL_PHOTO_LOG_SQL as LOG } from '../server/nutrition/meal.js'
 import { assertPiqPostgresFixtureTarget, assertPiqPostgresFixtureSession } from '../server/piq-postgres-fixture.js'
 
@@ -122,6 +125,54 @@ describe.skipIf(!url)('PIQ-8 atomic Pantry first-save on isolated real PostgreSQ
     await a.query("INSERT INTO nutrition_entries(id,log_date,timezone,food_id,food_name,serving_quantity,serving_unit,calories,source_kind) VALUES($1,'2026-10-01','America/Phoenix',$2,'Fictional label',1,'serving',100,'photo_ai')",[entryId,foodId])
     expect((await b.query(RECORD_CAPTURE_COMMITTED_SQL,[id,foodId,entryId])).rows).toHaveLength(1)
     expect((await a.query('SELECT entry_id FROM nutrition_capture_jobs WHERE home_ai_job_id=$1',[id])).rows[0].entry_id).toBe(entryId)
+  })
+
+  it('delayed provider status and interpretation cannot mutate a committed Pantry photo',async()=>{
+    const id=await init()
+    const won=await a.query(SAVE,params(id,'synthetic-immutable','Fictional immutable food'))
+    expect(won.rows).toHaveLength(1)
+    const previous=(await a.query(
+      'SELECT status, food_id, entry_id, candidate_json, interpretation, failure_message, updated_at FROM nutrition_capture_jobs WHERE home_ai_job_id=$1',[id],
+    )).rows[0]
+    // Provider reports a stale completion, a stale failure and a delayed
+    // model candidate, all after explicit owner approval.
+    for(const status of ['completed','failed'] as const) {
+      expect((await b.query(RECORD_CAPTURE_PROVIDER_STATUS_SQL,
+        [id,status,'stale provider failure',JSON.stringify({unapproved:'overwrite'})])).rows)
+        .toHaveLength(0)
+    }
+    expect((await b.query(FINISH_CAPTURE_INTERPRETATION_SQL,
+      [id,'failed','late failure',JSON.stringify({unapproved:'late'}),JSON.stringify({attempt:99})],
+    )).rows).toHaveLength(0)
+    const current=(await a.query(
+      'SELECT status, food_id, entry_id, candidate_json, interpretation, failure_message, updated_at FROM nutrition_capture_jobs WHERE home_ai_job_id=$1',[id],
+    )).rows[0]
+    expect(current).toEqual(previous)
+    expect(await count('nutrition_foods')).toBe(1)
+    expect(await count('source_record_links')).toBe(1)
+  })
+
+  it('provider updates still work for an unfinished capture and stop after an approved label',async()=>{
+    const id=await init()
+    const candidate={calories:123,fictional:true}
+    await a.query(RECORD_CAPTURE_PROVIDER_STATUS_SQL,
+      [id,'completed',null,JSON.stringify(candidate)])
+    const updated=(await a.query('SELECT status,candidate_json FROM nutrition_capture_jobs WHERE home_ai_job_id=$1',[id])).rows[0]
+    expect(updated).toMatchObject({status:'completed',candidate_json:candidate})
+    await b.query(FINISH_CAPTURE_INTERPRETATION_SQL,
+      [id,'completed',null,null,JSON.stringify({provider:'synthetic',attempt:1})])
+    const interpreted=(await a.query('SELECT interpretation FROM nutrition_capture_jobs WHERE home_ai_job_id=$1',[id])).rows[0]
+    expect(interpreted.interpretation).toMatchObject({provider:'synthetic',attempt:1})
+    // A committed label may still have a later explicit Log Food transition,
+    // but unsolicited provider analysis must not rewrite its reviewed state.
+    await a.query("UPDATE nutrition_capture_jobs SET capture_kind='nutrition_label',status='committed' WHERE home_ai_job_id=$1",[id])
+    expect((await b.query(FINISH_CAPTURE_INTERPRETATION_SQL,
+      [id,'failed','not accepted',JSON.stringify({late:true}),JSON.stringify({attempt:2})])).rows)
+      .toHaveLength(0)
+    const final=(await a.query('SELECT status,candidate_json,interpretation FROM nutrition_capture_jobs WHERE home_ai_job_id=$1',[id])).rows[0]
+    expect(final.status).toBe('committed')
+    expect(final.candidate_json).toEqual(candidate)
+    expect(final.interpretation).toMatchObject({provider:'synthetic',attempt:1})
   })
 
   it('atomic estimate log wins cleanly and is idempotent after finalization',async()=>{
