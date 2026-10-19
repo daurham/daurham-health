@@ -9,7 +9,7 @@ import {
   type LibraryExercise,
 } from '../src/domain/training-transcription.ts'
 import { prepareManualSession } from '../server/training/service.ts'
-import { CLAIM_AND_INSERT_WORKOUT_SQL } from '../server/training/commit-sql.ts'
+import { CLAIM_AND_INSERT_WORKOUT_SQL, COMMIT_IMPORTED_WORKOUT_JOB_SQL } from '../server/training/commit-sql.ts'
 import { RECORD_TRANSCRIPTION_JOB_CREATED_SQL, RECORD_TRANSCRIPTION_JOB_STATUS_SQL } from '../server/training/job-store.ts'
 import { getTranscriptionJob } from '../server/training/transcription.ts'
 import type { HomeAiClient } from '../server/integrations/home-ai/client.ts'
@@ -263,6 +263,17 @@ describe('imported commit reuse', () => {
     expect(payload).not.toHaveProperty('image')
     expect(payload.originating_source).toBe('workout_image')
     expect(payload.interpreter).toBe('home_ai')
+  })
+})
+
+describe('atomic workout photo commit', () => {
+  it('requires a canonical source-linked session before finalizing its review job', () => {
+    expect(COMMIT_IMPORTED_WORKOUT_JOB_SQL).toContain('UPDATE workout_transcription_jobs')
+    expect(COMMIT_IMPORTED_WORKOUT_JOB_SQL).toContain("status = 'committed'")
+    expect(COMMIT_IMPORTED_WORKOUT_JOB_SQL).toContain('JOIN workout_sessions')
+    expect(COMMIT_IMPORTED_WORKOUT_JOB_SQL).toContain('link.external_fingerprint = $4')
+    expect(COMMIT_IMPORTED_WORKOUT_JOB_SQL).toContain('link.entity_id = $2::uuid')
+    expect(COMMIT_IMPORTED_WORKOUT_JOB_SQL).toContain('SELECT 1 / COUNT(*)::int')
   })
 })
 
