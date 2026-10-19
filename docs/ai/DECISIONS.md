@@ -1032,3 +1032,8 @@ An isolated PostgreSQL 16 fixture does not establish compatibility with the sepa
 ## Decision: staged migration safety requires testing populated 0056 prefix (PIQ-7, 2026-10-18)
 
 Do not infer safe upgrade of persistent QA from a clean 0001–0060 migration replay. Rehearse 56→60 with fictional existing Health and Lab data in a dedicated local-only schema, transactional migration filename recording, forced partial-DDL rollback, original-row preservation and absence of invented owner confirmations. Test newer immutability constraints. This supplements but does not authorize QA or production migrations and does not establish runtime Auth/DB isolation, full restore or owner release acceptance.
+
+
+## Decision: full backup recovery must exercise actual SQL transaction service (PIQ-7, 2026-10-18)
+
+An archive-format unit test or Lab-only row replay is not adequate proof of seeded table replacement, transaction rollback and entire Health table inventory preservation. Use two independently migrated schemas in the guarded disposable local PostgreSQL fixture, run the actual createBackupArchive and applyRestore services, compare all canonical backed-up rows after restore, force mid-restore PostgreSQL failure and verify rollback, and reject a second merge attempt. Passing PG16/18 does not replace an owner-authorized isolated Neon recovery rehearsal or encrypted retention review.

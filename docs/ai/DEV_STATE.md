@@ -1258,3 +1258,8 @@ Read-only provider metadata and SQL on the separate QA root confirmed PostgreSQL
 ## 2026-10-18 — PIQ-7.2b staged 0056→0060 upgrade verification (CI pending)
 
 Added tests/piq7-incremental-upgrade-postgres.integration.test.ts to the dedicated localhost piq_fixture PG16+PG18 workflow. On a separate disposable schema it applies first 56 real migrations, seeds a fictional Health Profile and Lab result, verifies pending exact prefix, proves failed 0057 DDL/history transaction leaves no partial schema, then applies 57–60. It asserts old records survive, no owner claims are backfilled and new append-only triggers work. All fictional new-event writes are rolled back. QA Neon and production remain untouched; authorization, Auth/DB runtime binding, recovery and owner acceptance 0/9 remain gating.
+
+
+## 2026-10-18 — PIQ-7 complete source-to-fresh-destination backup/restore suite (CI pending)
+
+Synthetic PG16 and PG18 real-SQL backup: two independently migrated disposable localhost-only schemas, fictional owner/profile/nutrition/Lab provenance, full checksum/table inventory, mid-restore transaction failure rollback, successful archive content parity and second restore refusal. Calls the actual Health service rather than simulating insert plan only. No persistent QA Neon, production, auth records, offsite encryption or owner acceptance. Exact SHA workflows must be checked before green.
