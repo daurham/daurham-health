@@ -102,7 +102,9 @@ describe('PIQ-4.1 preview QA static fail-closed isolation preflight',()=>{
     expect(blocked({},fakeChild)).toContain('NEON_PREVIEW_NOT_INDEPENDENT_ROOT')
     expect(blocked({}, {...branch,parentId:'br-synthetic-prod'}))
       .toContain('NEON_PREVIEW_NOT_INDEPENDENT_ROOT')
-    expect(blocked({}, {...branch,parentId:null})).not.toContain('NEON_PREVIEW_NOT_INDEPENDENT_ROOT')
+    expect(reviewPiqPreviewSafety({env,neonBranch:{...branch,parentId:null}})).toEqual({
+      status:'configuration_eligible_for_manual_attestation',blockers:[],
+    })
   })
   it('never lets matching endpoints bypass missing runtime enforcement',()=>{
     expect(blocked({HEALTH_AUTH_BINDING_ENFORCE:'false'}))
