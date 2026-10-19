@@ -1,3 +1,10 @@
+## 2026-10-18 — PIQ-7 empty-branch isolation fail-closed fix IN REVIEW
+
+- Offline PIQ Preview metadata and static preflight previously allowed an `initSource: empty` QA branch to reach `configuration_eligible_for_manual_attestation` / `metadata_consistent_not_authorized` **without proving the QA Neon project differs from production**. Distinct branch IDs are insufficient: a fresh empty branch *inside* production is not independent QA.
+- Both reviewers now require a separately known production Neon **project ID**, and reject when either the expected QA project or independently reported Neon QA branch project matches production. New fixed enum blockers; no URLs, credentials or owner IDs returned. Existing guards for distinct branch, Auth, runtime API 503 lock and manual approval remain unchanged.
+- Synthetic regression coverage for missing production project, same-project empty QA branch, lying expected project and normal independent-project case. No migration, Vercel/Neon change or runtime unlock.
+- Source/test CI and merge into PIQ integration pending. **0/9 owner accepted**; runtime Auth/cookie/binding attestation, operator QA login, backup/recovery and owner mobile acceptance remain blocked.
+
 ## 2026-10-18 — PIQ-7 exact-SHA PostgreSQL CI coverage in review
 
 - Development-only PR changes `.github/workflows/piq1-postgres.yml` to run isolated PostgreSQL 16/18 for **all code, API, server, client, test, migration, configuration, and dependency changes** pushed to `piq/00-baseline-20261014`. The old explicit per-file allowlist omitted `server/piq-qa-auth-census.ts`, Pantry saves, and other PIQ work; they only received application CI. PG verification remains two disposable localhost fixtures, not Neon/production. Docs-only commits deliberately do not trigger extra PG compute.
