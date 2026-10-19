@@ -65,6 +65,51 @@ const INSERT_FOOD_WITH_ID_SQL = `INSERT INTO nutrition_foods (
 ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
 RETURNING *`
 
+/**
+ * One SQL statement atomically holds the completed capture lock, claims the
+ * canonical fingerprint, inserts its food and commits the Pantry-only job.
+ * A concurrent first-time approval or Log Meal that wins the capture status
+ * cannot leave behind a new Pantry link/food from a rejected save.
+ *
+ * This path applies ONLY to a new food for a real Meal Photo capture.
+ * Generic AI food saves and reuses retain their existing behavior.
+ */
+export const ATOMIC_PANTRY_CAPTURE_SAVE_SQL = `WITH eligible_capture AS MATERIALIZED (
+  SELECT home_ai_job_id
+  FROM nutrition_capture_jobs
+  WHERE home_ai_job_id = $1 AND capture_kind = $2 AND status = 'completed'
+  FOR UPDATE
+), claimed_link AS (
+  INSERT INTO source_record_links (
+    id, source_id, import_job_id, external_id, external_fingerprint,
+    entity_type, entity_id, source_payload
+  )
+  SELECT $3::uuid, $4::uuid, NULL, $5, $6, $7, $8::uuid, $9::jsonb
+  FROM eligible_capture
+  ON CONFLICT (source_id, external_fingerprint) DO NOTHING
+  RETURNING entity_id
+), created_food AS (
+  INSERT INTO nutrition_foods (
+    id, name, brand, barcode, catalog_kind, serving_quantity, serving_unit,
+    serving_grams, calories, protein, carbs, fat, fiber, sodium,
+    source_kind, is_staple, notes
+  )
+  SELECT entity_id, $10, NULL, NULL, 'ingredient', $11, $12,
+         $13, $14, $15, $16, $17, $18, $19, 'description_ai', false, NULL
+  FROM claimed_link
+  RETURNING *
+), finalized_capture AS (
+  UPDATE nutrition_capture_jobs jobs
+  SET status = 'committed', food_id = food.id, entry_id = NULL,
+      failure_message = NULL, committed_at = now(), updated_at = now()
+  FROM created_food food
+  WHERE jobs.home_ai_job_id = $1 AND jobs.capture_kind = $2
+    AND jobs.status = 'completed'
+  RETURNING jobs.home_ai_job_id
+)
+SELECT food.* FROM created_food food
+JOIN finalized_capture ON true`
+
 function parseOr400<T>(schema: z.ZodType<T>, body: unknown, fallback: string): T {
   const parsed = schema.safeParse(body)
   if (!parsed.success) {
@@ -336,6 +381,36 @@ export async function saveAiReusableFood(body: unknown) {
     servingUnit: input.servingUnit,
     servingGrams: input.servingGrams ?? null,
   })
+  if (requested.jobId) {
+    // A status check before insertion is not sufficient: Log Meal or another
+    // Pantry approval can commit in the gap between independent HTTP queries.
+    // The row lock + dependent data-modifying CTEs make the FIRST save atomic.
+    try {
+      const sql = await getSql()
+      const rows = await sql.query(ATOMIC_PANTRY_CAPTURE_SAVE_SQL, [
+        requested.jobId, NUTRITION_MEAL_CAPTURE_KIND,
+        randomUUID(), sourceId, fingerprint, fingerprint,
+        NUTRITION_FOOD_ENTITY, foodId, JSON.stringify(payload),
+        input.name, input.servingQuantity, input.servingUnit,
+        input.servingGrams ?? null, input.calories,
+        input.protein ?? null, input.carbs ?? null, input.fat ?? null,
+        input.fiber ?? null, input.sodium ?? null,
+      ]) as Array<Record<string, unknown>>
+      if (rows[0]) return { food: mapFoodRow(rows[0]), reused: false }
+      // A concurrent identical approval can legitimately win the claim.
+      // Only reuse it if its job finalization agrees with this fingerprint.
+      const raced = await findFoodByFingerprint(sourceId, fingerprint)
+      if (raced) {
+        await markMealPhotoSavedToPantry(requested.jobId, raced.id)
+        return { food: raced, reused: true }
+      }
+      throw new HttpError(409, 'Meal capture has already been finalized elsewhere')
+    } catch (error) {
+      if (uniqueFoodConflict(error)) throw new HttpError(409, 'A food with this name already exists')
+      throw error
+    }
+  }
+
   const claimedId = await claimFoodLink({
     sourceId,
     externalId: fingerprint,

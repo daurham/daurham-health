@@ -31,6 +31,7 @@ const state = vi.hoisted(() => ({
   texts: [] as string[],
   params: [] as unknown[][],
   inserts: 0,
+  concurrentLogBeforeAtomic: false,
   links: [] as StoredLink[],
   mealCapture: null as null | {
     id: string; status: 'completed' | 'committed'; foodId: string | null; entryId: string | null
@@ -42,6 +43,32 @@ vi.mock('../server/db.ts', () => ({
     query: async (text: string, params: unknown[] = []) => {
       state.texts.push(text)
       state.params.push(params)
+      if (text.includes('WITH eligible_capture AS MATERIALIZED')) {
+        if (state.concurrentLogBeforeAtomic && state.mealCapture?.id === params[0]) {
+          state.concurrentLogBeforeAtomic = false
+          state.mealCapture = { ...state.mealCapture, status: 'committed',
+            foodId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+            entryId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' }
+        }
+        if (state.mealCapture?.id !== params[0] || state.mealCapture.status !== 'completed') {
+          return []
+        }
+        if (state.links.some(link => link.fingerprint === params[5])) return []
+        const row = foodRow([
+          params[7], params[9], null, null, 'ingredient',
+          params[10], params[11], params[12], params[13], params[14],
+          params[15], params[16], params[17], params[18], 'description_ai', false, null,
+        ])
+        state.links.push({
+          fingerprint: String(params[5]), externalId: String(params[4]),
+          entityId: String(params[7]), entityType: String(params[6]),
+          payload: String(params[8]), food: row,
+        })
+        state.inserts += 1
+        state.mealCapture = { ...state.mealCapture, status: 'committed',
+          foodId: String(params[7]), entryId: null }
+        return [row]
+      }
       if (text.includes('SELECT capture_kind, status FROM nutrition_capture_jobs')) {
         return state.mealCapture?.id === params[0]
           ? [{ capture_kind: 'meal_photo', status: state.mealCapture.status }] : []
@@ -192,6 +219,7 @@ describe('recipe ingredient creation', () => {
     state.params = []
     state.links = []
     state.inserts = 0
+    state.concurrentLogBeforeAtomic = false
     state.mealCapture = null
   })
 
@@ -318,6 +346,7 @@ describe('recipe ingredient creation', () => {
     const input = aiBody({ name: 'Synthetic meal', jobId })
     const saved = await saveAiReusableFood(input)
     expect(saved.reused).toBe(false)
+    expect(state.texts.filter(text => text.includes('WITH eligible_capture AS MATERIALIZED'))).toHaveLength(1)
     expect(state.mealCapture).toEqual({
       id: jobId, status: 'committed', foodId: saved.food.id, entryId: null,
     })
@@ -343,6 +372,21 @@ describe('recipe ingredient creation', () => {
     expect(state.links).toHaveLength(initialLinks)
     expect(state.mealCapture).toEqual({
       id: jobId, status: 'committed', foodId: initialFoodId, entryId: null,
+    })
+  })
+
+  it('does not create a Pantry food/link when a concurrent Log Meal commits first', async () => {
+    const jobId = '11111111-1111-4111-8111-111111111111'
+    state.mealCapture = { id: jobId, status: 'completed', foodId: null, entryId: null }
+    // Simulate Log Meal winning after the initial status read but before
+    // the atomic PostgreSQL statement can acquire the capture row lock.
+    state.concurrentLogBeforeAtomic = true
+    await expect(saveAiReusableFood(aiBody({ name: 'Race test meal', jobId })))
+      .rejects.toMatchObject({ statusCode: 409 })
+    expect(state.inserts).toBe(0)
+    expect(state.links).toHaveLength(0)
+    expect(state.mealCapture).toMatchObject({
+      status: 'committed', entryId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
     })
   })
 

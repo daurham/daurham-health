@@ -69,4 +69,4 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx vitest run tests/piq1-nutrition-postgres.integration.test.ts tests/piq1-full-migration-postgres.integration.test.ts tests/piq7-incremental-upgrade-postgres.integration.test.ts tests/piq7-full-recovery-postgres.integration.test.ts
+      - run: npx vitest run tests/piq1-nutrition-postgres.integration.test.ts tests/piq1-full-migration-postgres.integration.test.ts tests/piq7-incremental-upgrade-postgres.integration.test.ts tests/piq7-full-recovery-postgres.integration.test.ts tests/piq8-pantrysave-atomic-postgres.integration.test.ts
