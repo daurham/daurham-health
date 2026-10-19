@@ -61,6 +61,5 @@ not silently relax either.
    rehearse backup/restore before owner mobile QA. No release or protected
    login testing before separate owner authorization.
 
-**CI validation of this new source/test checkpoint is pending until the matching
-GitHub Actions run reports success.** Production stays unchanged, schema head
+**Exact feature SHA CI [39203800556](https://github.com/daurham/daurham-health/actions/runs/39203800556) PASSED** and **exact integration merge SHA CI [39204168866](https://github.com/daurham/daurham-health/actions/runs/39204168866) PASSED**: 2,762 Vitest tests passed / 43 skipped; TypeScript, ESLint and build green. PR #32 merged **only to PIQ development** as `cbca33f9fcd3555626ae24a2a35b09de73b713eb`. The expected Preview SHA pin is stale at `91f8eef5b`, most recent inspected READY preview at `044332d8`; neither authorizes runtime QA. Production stays unchanged, schema head
 0060, 0/9 PIQ phases formally owner-accepted.
