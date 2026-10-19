@@ -1,3 +1,9 @@
+## 2026-10-19 — critical capture source/entry first-writer atomicity (in CI)
+
+- Independent logging of meal photo source link and Nutrition entries followed by a separate capture commit previously permitted food-log or group entries to remain after a concurrent Pantry-first approval rejected late finalization. Both Meal Photo pathways now stage reviewed snapshot rows and submit one dependent Postgres CTE statement with `FOR UPDATE` capture eligibility, fingerprint claim, one-or-many entry insert and conditional finalization, sharing the same capture lock used by existing atomic Pantry-first approval. Lost/replayed photo log claims resolve to the original canonical entry/group when present and otherwise fail closed. No-photo food-description saves follow their existing workflow.
+- Corrects earlier multi-component insertion values to include explicit SQL sodium placeholder so all 20 target entry columns are aligned; any invalid entry rolls back the entire statement. Real disposable PostgreSQL 16/18 fixtures validate entry-only, competing first saves, multi-component groups and atomic constraint rollback. CI pending, no release/owner acceptance. This is a data-integrity task escalated to PIQ-1 under master-plan scope.
+- No production migration, live health read/write, change to provider budgets, Preview access, owner auth, QA Neon, or main deployment.
+
 ## PIQ-8 review correction — estimated Meal Photo commit foreign key
 
 The previously silent estimated-Meal-Photo commit passed an `entry.id` into
