@@ -208,6 +208,28 @@ export const THEME_PACKS: readonly ThemePack[] = [
     unlockLevel: 20,
     preview: { canvas: '#f5f3fa', surface: '#fdfcff', accent: '#6750ad', secondary: '#b84f8d', reward: '#d5aa38' },
   },
+
+  {
+    id: 'astral-ascension',
+    label: 'Astral Ascension',
+    flavor: 'Charged electric blue, aurora teal, and luminous starfire.',
+    unlockLevel: 21,
+    preview: { canvas: '#f1f8fd', surface: '#ffffff', accent: '#185faf', secondary: '#008f98', reward: '#e3a529' },
+  },
+  {
+    id: 'eclipse-sovereign',
+    label: 'Eclipse Sovereign',
+    flavor: 'Cosmic crimson, shadow violet, and molten copper.',
+    unlockLevel: 22,
+    preview: { canvas: '#faf3f7', surface: '#fffcfe', accent: '#a32c68', secondary: '#633b9e', reward: '#db9b39' },
+  },
+  {
+    id: 'prismatic-apex',
+    label: 'Prismatic Apex',
+    flavor: 'Iridescent violet, turquoise lightning, and radiant gold.',
+    unlockLevel: 23,
+    preview: { canvas: '#f7f4ff', surface: '#fefcff', accent: '#6546c7', secondary: '#008f9d', reward: '#d49a19' },
+  },
 ] as const
 
 export const PALETTE_LABELS = Object.fromEntries(

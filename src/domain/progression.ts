@@ -20,6 +20,9 @@ export const PROGRESSION_THEME_UNLOCKS = [
   { id: 'abyss-knight', level: 18 },
   { id: 'republic-red', level: 19 },
   { id: 'cosmic-instinct', level: 20 },
+  { id: 'astral-ascension', level: 21 },
+  { id: 'eclipse-sovereign', level: 22 },
+  { id: 'prismatic-apex', level: 23 },
 ] as const
 
 export type ProgressionThemeId = (typeof PROGRESSION_THEME_UNLOCKS)[number]['id']

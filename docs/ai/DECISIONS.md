@@ -1052,3 +1052,8 @@ Keep canonical stored circumference units as cm and historical API payload shape
 ## PIQ8 deferred Settings UX — collapsed by default with explicit deep-link exceptions (2026-10-18)
 
 A very long Settings page must not force users to scroll through expanded Profile, AI Usage, Theme, Trends, Integrations and backup content. Use native `<details>/<summary>` disclosure for all nine sections with keyboard support; initialize collapsed, mount child sections only after expansion, and auto-expand a requested hash target or Ask Health owner-note correction handoff. Do not persist disclosure state as health data or silently remove existing form/save behavior. This UI-only step cannot justify bypassing the PIQ preview 503 lock or changing production data.
+
+
+## PIQ8 prestige theme unlocks remain visual-only (2026-10-18)
+
+Raise late-game theme ceiling to Level 23 with three new palette IDs. Ensure theme allowlists agree across progression model, Theme Studio catalog, browser prepaint bootstrap, and light/dark CSS; never charge wallet XP to unlock. Preserve the existing level thresholds and all current palette IDs. No external copyrighted assets, inaccessible text/glow substitutions, added runtime services, or migrations.

@@ -48,5 +48,12 @@ describe('H4 Lifetime XP progression', () => {
     expect(progressionThemeUnlocked('cosmic-instinct', 10449)).toBe(false)
     expect(progressionThemeUnlocked('cosmic-instinct', 10450)).toBe(true)
     expect(progressionState(3850).nextThemeUnlock).toMatchObject({ id: 'crimson-surge', level: 13 })
+    for (const { id, level } of PROGRESSION_THEME_UNLOCKS.slice(-3)) {
+      const threshold = xpThresholdForLevel(level)
+      expect(progressionThemeUnlocked(id, threshold - 1)).toBe(false)
+      expect(progressionThemeUnlocked(id, threshold)).toBe(true)
+      expect(progressionState(threshold - 1).nextThemeUnlock?.id).toBe(id)
+    }
+    expect(progressionState(xpThresholdForLevel(23)).nextThemeUnlock).toBeNull()
   })
 })

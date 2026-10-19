@@ -115,10 +115,13 @@ describe('theme preference', () => {
   it('keeps mode and palette independent and allowlisted', () => {
     expect(THEME_MODE_PREFERENCES).toEqual(['system', 'light', 'dark'])
     expect(HEALTH_PALETTES.slice(0, 5)).toEqual(['classic', 'forest', 'ocean', 'sunset', 'plum'])
-    expect(HEALTH_PALETTES).toHaveLength(24)
+    expect(HEALTH_PALETTES).toHaveLength(27)
     expect(HEALTH_PALETTES).toContain('aura')
     expect(HEALTH_PALETTES).toContain('silver-instinct')
     expect(HEALTH_PALETTES).toContain('cosmic-instinct')
+    for (const id of ['astral-ascension', 'eclipse-sovereign', 'prismatic-apex']) {
+      expect(HEALTH_PALETTES).toContain(id)
+    }
     const storage = memoryStorage({ 'health-theme': 'nope', 'health-palette': 'rainbow' })
     expect(readThemePreference(storage)).toBe('system')
     expect(readPalettePreference(storage)).toBe('classic')

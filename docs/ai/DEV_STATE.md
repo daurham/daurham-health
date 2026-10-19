@@ -1283,3 +1283,8 @@ Settings' nine long sections are collapsed by default with native keyboard-opera
 ## 2026-10-19 — PIQ8 completed photo pending-card cleanup (CI pending)
 
 Diagnosed a likely cause of approved photo captures lingering on Nutrition: a freshly launched meal or label capture has `panel.jobId` absent because the actual persisted photo job is created inside the sheet. Approval/discard callbacks filtered only by `panel.jobId`, so the completed card survived, and capture polling stops after jobs leave queued/processing. Forward the *actual* job ID from Meal/Label review on log, save-only, and discard to the parent, and remove the matching pending card, with fallback for a reopened pending card and no clearing of unrelated jobs. Added deterministic job-resolution regression and callback-wiring assertions. No SQL migration, provider AI calls, production data, or PIQ API unlock. Requires exact-SHA full CI and eventual mobile owner verification before marking UX accepted.
+
+
+## 2026-10-18 — PIQ8 three prestige palettes (CI pending)
+
+Three distinct unlockable palettes at Levels 21–23 with light/dark CSS, Theme Studio previews, bootstrap allowlist and progression regression tests. No migrations/model calls. QA preview hardlock and 0/9 owner acceptance remain unchanged.

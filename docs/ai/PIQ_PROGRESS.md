@@ -4177,3 +4177,9 @@ Settings' nine long sections are collapsed by default with native keyboard-opera
 ## 2026-10-19 — PIQ8 completed photo pending-card cleanup (CI pending)
 
 Diagnosed a likely cause of approved photo captures lingering on Nutrition: a freshly launched meal or label capture has `panel.jobId` absent because the actual persisted photo job is created inside the sheet. Approval/discard callbacks filtered only by `panel.jobId`, so the completed card survived, and capture polling stops after jobs leave queued/processing. Forward the *actual* job ID from Meal/Label review on log, save-only, and discard to the parent, and remove the matching pending card, with fallback for a reopened pending card and no clearing of unrelated jobs. Added deterministic job-resolution regression and callback-wiring assertions. No SQL migration, provider AI calls, production data, or PIQ API unlock. Requires exact-SHA full CI and eventual mobile owner verification before marking UX accepted.
+
+
+
+## 2026-10-18 — PIQ8 final prestige themes (validation pending)
+
+Added three Level 21–23 unlocks above the existing 20 levels: Astral Ascension (electric blue/aurora), Eclipse Sovereign (crimson/ultraviolet), and Prismatic Apex (iridescent violet/teal/gold). Their light and dark palettes include explicit readable foreground/background tokens, distinct hero glows and XP styles with no external assets or runtime model calls. Updated the progression allowlist, Theme Studio pack previews, pre-render `index.html` palette allowlist (prevents flash/revert on reload), and unit tests for theme catalog/level thresholds; current progress, wallet XP rewards, purchases and older themes are unchanged. No migration or production/main changes. Validate exact-SHA CI before treating as ready; owner QA and API lock unchanged.

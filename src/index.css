@@ -911,6 +911,111 @@ html.dark[data-health-palette='cosmic-instinct'] {
   --health-hero-gradient: radial-gradient(circle at 18% 0%, rgb(104 210 225 / 0.17), transparent 32%), radial-gradient(circle at 88% 12%, rgb(225 143 193 / 0.15), transparent 31%), linear-gradient(135deg, rgb(182 164 238 / 0.17), transparent 70%);
 }
 
+/* PIQ8 final prestige tiers. All three work in Light and Dark mode:
+   glow decorates surfaces, never replaces readable text contrast. */
+:is(
+  html[data-health-palette='astral-ascension'],
+  html[data-health-palette='eclipse-sovereign'],
+  html[data-health-palette='prismatic-apex']
+) {
+  --health-accent-fg: #ffffff;
+  --health-canvas: #f5f5fa;
+  --health-surface: #fdfcff;
+  --health-surface-raised: #ffffff;
+  --health-surface-soft: #f1eef8;
+  --health-border: #d9d6e5;
+  --health-border-strong: #aca6c7;
+  --health-text: #20202f;
+  --health-text-muted: #5e6271;
+  --health-text-faint: #83889a;
+  --health-reward: #aa710f;
+  --health-reward-muted: #fcf1d2;
+}
+:is(
+  html.dark[data-health-palette='astral-ascension'],
+  html.dark[data-health-palette='eclipse-sovereign'],
+  html.dark[data-health-palette='prismatic-apex']
+) {
+  --health-accent-fg: #171522;
+  --health-canvas: #0e1020;
+  --health-surface: #1b1d30;
+  --health-surface-raised: #22263e;
+  --health-surface-soft: #2a2e47;
+  --health-border: #39405c;
+  --health-border-strong: #5f6c91;
+  --health-text: #f5f4ff;
+  --health-text-muted: #c5cbe3;
+  --health-text-faint: #a1aac9;
+  --health-reward: #f2c76d;
+  --health-reward-muted: #484027;
+}
+html[data-health-palette='astral-ascension'] {
+  --health-accent: #185faf;
+  --health-accent-muted: #deedfa;
+  --health-accent-secondary: #008f98;
+  --health-glow: rgb(38 131 214 / 0.30);
+  --health-hero-gradient: radial-gradient(circle at 8% 10%, rgb(0 173 188 / 0.19), transparent 34%), radial-gradient(circle at 91% 15%, rgb(109 84 224 / 0.19), transparent 34%), linear-gradient(125deg, rgb(30 95 175 / 0.20), transparent 72%);
+}
+html.dark[data-health-palette='astral-ascension'] {
+  --health-accent: #86c4ff;
+  --health-accent-muted: #233958;
+  --health-accent-secondary: #69e9e5;
+  --health-glow: rgb(78 187 248 / 0.40);
+  --health-hero-gradient: radial-gradient(circle at 8% 10%, rgb(0 225 230 / 0.23), transparent 34%), radial-gradient(circle at 91% 15%, rgb(167 111 255 / 0.22), transparent 36%), linear-gradient(125deg, rgb(60 99 204 / 0.26), transparent 74%);
+}
+html[data-health-palette='eclipse-sovereign'] {
+  --health-accent: #a32c68;
+  --health-accent-muted: #f7e1eb;
+  --health-accent-secondary: #633b9e;
+  --health-glow: rgb(180 47 109 / 0.30);
+  --health-hero-gradient: radial-gradient(circle at 90% 8%, rgb(231 132 63 / 0.20), transparent 33%), radial-gradient(circle at 16% 5%, rgb(123 58 177 / 0.17), transparent 33%), linear-gradient(130deg, rgb(163 44 104 / 0.15), transparent 76%);
+}
+html.dark[data-health-palette='eclipse-sovereign'] {
+  --health-accent: #ffa4cc;
+  --health-accent-muted: #51233c;
+  --health-accent-secondary: #cb9bff;
+  --health-glow: rgb(255 115 169 / 0.40);
+  --health-hero-gradient: radial-gradient(circle at 90% 8%, rgb(255 139 76 / 0.22), transparent 33%), radial-gradient(circle at 16% 5%, rgb(156 76 240 / 0.23), transparent 35%), linear-gradient(130deg, rgb(200 61 131 / 0.24), transparent 76%);
+}
+html[data-health-palette='prismatic-apex'] {
+  --health-accent: #6546c7;
+  --health-accent-muted: #ede6fc;
+  --health-accent-secondary: #008f9d;
+  --health-glow: rgb(131 86 219 / 0.34);
+  --health-hero-gradient: conic-gradient(from 230deg at 92% 16%, rgb(4 165 175 / 0.13), rgb(147 82 232 / 0.19), rgb(250 177 58 / 0.14), transparent 63%), radial-gradient(circle at 15% 10%, rgb(102 80 215 / 0.18), transparent 38%);
+}
+html.dark[data-health-palette='prismatic-apex'] {
+  --health-accent: #bba1ff;
+  --health-accent-muted: #3b2c61;
+  --health-accent-secondary: #76f3f1;
+  --health-glow: rgb(170 115 255 / 0.45);
+  --health-hero-gradient: conic-gradient(from 230deg at 92% 16%, rgb(4 233 226 / 0.23), rgb(181 106 255 / 0.26), rgb(248 183 63 / 0.21), transparent 68%), radial-gradient(circle at 15% 10%, rgb(137 94 232 / 0.23), transparent 40%);
+}
+:is(
+  html[data-health-palette='astral-ascension'],
+  html[data-health-palette='eclipse-sovereign'],
+  html[data-health-palette='prismatic-apex']
+) .app-shell {
+  background-image: var(--health-hero-gradient);
+  background-repeat: no-repeat;
+  background-size: 100% min(38rem, 60vh);
+  background-attachment: fixed;
+}
+:is(
+  html[data-health-palette='astral-ascension'],
+  html[data-health-palette='eclipse-sovereign'],
+  html[data-health-palette='prismatic-apex']
+) .xp-badge {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--health-reward) 12%, transparent), 0 0 28px -6px var(--health-glow);
+}
+:is(
+  html[data-health-palette='astral-ascension'],
+  html[data-health-palette='eclipse-sovereign'],
+  html[data-health-palette='prismatic-apex']
+) .health-hero-surface {
+  box-shadow: 0 18px 46px -30px var(--health-glow);
+}
+
 .health-hero-surface {
   background:
     var(--health-hero-gradient),
