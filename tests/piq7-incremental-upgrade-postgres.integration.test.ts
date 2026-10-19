@@ -62,7 +62,7 @@ describe.skipIf(!url)('PIQ-7 staged QA 0056-to-0060 PostgreSQL upgrade', () => {
       [versionId, protocolId],
     )
     await client.query(
-      "INSERT INTO experiments (id,title,question,origin,status,protocol_version_id,window_start,window_end,source_id) VALUES ($1,'Fictional historical experiment','Was a synthetic observation recorded?','owner_created','completed',$2,$3::date,$4::date,$5)",
+      "INSERT INTO experiments (id,title,question,origin,status,origin_kind,protocol_version_id,window_start,window_end,source_id) VALUES ($1,'Fictional historical experiment','Was a synthetic observation recorded?','owner_created','completed','owner_created',$2,$3::date,$4::date,$5)",
       [experimentId, versionId, firstDate, endDate, source],
     )
     await client.query(
