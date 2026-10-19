@@ -276,20 +276,11 @@ function NumberField({
 }) {
   const inputId = useId()
   return (
-    <div className="block text-sm">
-      <label htmlFor={inputId} className="text-zinc-600">
-        {label} {!allowUnitSelection ? <span className="text-zinc-400">{unit}</span> : null}
-      </label>
-      <div className="mt-1 flex min-w-0 gap-2">
-        <input
-          id={inputId}
-          className={fieldClass}
-          inputMode={allowUnitSelection && unit === 'in' ? 'text' : 'decimal'}
-          placeholder={allowUnitSelection && unit === 'in' ? 'e.g. 37 1/4' : undefined}
-          autoFocus={autoFocus}
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-        />
+    <div className="block min-w-0 text-sm">
+      <div className="flex min-w-0 items-center justify-between gap-2">
+        <label htmlFor={inputId} className="text-zinc-600">
+          {label} {!allowUnitSelection ? <span className="text-zinc-400">{unit}</span> : null}
+        </label>
         {allowUnitSelection ? (
           <select
             aria-label={`Unit for ${label}`}
@@ -302,6 +293,15 @@ function NumberField({
           </select>
         ) : null}
       </div>
+      <input
+        id={inputId}
+        className={`${fieldClass} mt-1 min-w-0`}
+        inputMode={allowUnitSelection && unit === 'in' ? 'text' : 'decimal'}
+        placeholder={allowUnitSelection && unit === 'in' ? 'e.g. 37 1/4' : undefined}
+        autoFocus={autoFocus}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      />
     </div>
   )
 }
