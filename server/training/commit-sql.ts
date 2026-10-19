@@ -34,3 +34,27 @@ SELECT
   $24
 FROM claimed
 `.trim()
+
+
+/** Persist queue completion inside the SAME transaction as canonical workout,
+ * exercises and source link. A separate best-effort status update can strand
+ * a saved photo on Today/Training as an outstanding review. The linked session
+ * must be created in this transaction before the job may be marked committed.
+ */
+export const COMMIT_IMPORTED_WORKOUT_JOB_SQL = `
+UPDATE workout_transcription_jobs AS job
+   SET status = 'committed',
+       workout_session_id = $2::uuid,
+       failure_message = NULL,
+       updated_at = now()
+ WHERE job.home_ai_job_id = $1
+   AND job.status <> 'committed'
+   AND EXISTS (
+     SELECT 1 FROM source_record_links AS link
+     JOIN workout_sessions AS saved ON saved.id = link.entity_id
+     WHERE link.source_id = $3::uuid
+       AND link.external_fingerprint = $4
+       AND link.entity_type = $5
+       AND link.entity_id = $2::uuid
+   )
+`.trim()
