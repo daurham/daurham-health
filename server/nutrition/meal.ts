@@ -758,6 +758,15 @@ export async function commitNutritionMeal(body: unknown): Promise<{ entries: Nut
         return { entries, mealGroupId: existingGroup }
       }
     }
+    // Pantry-only approval is a terminal outcome for this capture.
+    // It must not be repurposed to log a meal from a stale review sheet.
+    const stored = await getLabelJobRecord(jobId)
+    if (!stored || stored.captureKind !== NUTRITION_MEAL_CAPTURE_KIND) {
+      throw new HttpError(404, mealFailureMessage('JOB_NOT_FOUND'), undefined, 'JOB_NOT_FOUND')
+    }
+    if (stored.status === 'committed') {
+      throw new HttpError(409, 'That meal capture has already been saved to Pantry.')
+    }
   }
 
   const resolved = resolveEntryLogDate({
@@ -882,7 +891,7 @@ export async function commitNutritionMeal(body: unknown): Promise<{ entries: Nut
   }
 
   if (jobId) {
-    await recordLabelJobCommitted(jobId, entries[0]!.foodId ?? entries[0]!.id, entries[0]!.id).catch(() => undefined)
+    await recordLabelJobCommitted(jobId, entries[0]!.foodId ?? entries[0]!.id, entries[0]!.id)
   }
 
   return { entries, mealGroupId }
@@ -920,6 +929,9 @@ export async function commitNutritionMealEstimate(body: unknown): Promise<{ entr
       if (existing) {
         return { entries: [existing] }
       }
+      // Saved-to-Pantry photo is terminal; do not create a second Nutrition
+      // entry or overwrite its immutable capture association.
+      throw new HttpError(409, 'That meal capture has already been finalized.')
     }
     const estimate = stored.candidate ? tryMealEstimate(stored.candidate) : null
     if (estimate) {
@@ -994,7 +1006,7 @@ export async function commitNutritionMealEstimate(body: unknown): Promise<{ entr
     null,
   ])
   if (jobId) {
-    await recordLabelJobCommitted(jobId, entry.id, entry.id).catch(() => undefined)
+    await recordLabelJobCommitted(jobId, null, entry.id)
   }
   return { entries: [entry] }
 }

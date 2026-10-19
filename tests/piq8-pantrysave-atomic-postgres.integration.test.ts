@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { beforeAll, afterAll, beforeEach, describe, expect, it } from 'vitest'
 import pg from 'pg'
 import { ATOMIC_PANTRY_CAPTURE_SAVE_SQL as SAVE } from '../server/nutrition/recipe-ingredients.js'
+import { RECORD_CAPTURE_COMMITTED_SQL } from '../server/nutrition/label-jobs.js'
 import { assertPiqPostgresFixtureTarget, assertPiqPostgresFixtureSession } from '../server/piq-postgres-fixture.js'
 
 const url=process.env.PIQ_POSTGRES_URL
@@ -65,6 +66,47 @@ describe.skipIf(!url)('PIQ-8 atomic Pantry first-save on isolated real PostgreSQ
     expect((await b.query(SAVE,params(id,'synthetic-c','Synthetic blocked'))).rows).toHaveLength(0)
     expect(await count('nutrition_foods')).toBe(0)
     expect(await count('source_record_links')).toBe(0)
+  })
+
+  it('delayed Log Meal cannot overwrite a committed Pantry-only capture',async()=>{
+    const id=await init()
+    const pantryId=randomUUID()
+    const delayedEntryId=randomUUID()
+    // Foods referenced by capture must exist; no Nutrition entry is required
+    // for a Pantry-only commitment.
+    await a.query("INSERT INTO nutrition_foods(id,name,catalog_kind,serving_quantity,serving_unit,calories,source_kind) VALUES($1,'Fictional Pantry','ingredient',1,'serving',100,'description_ai')",[pantryId])
+    await a.query("UPDATE nutrition_capture_jobs SET status='committed',food_id=$2,entry_id=NULL WHERE home_ai_job_id=$1",[id,pantryId])
+    const rejected=await b.query(RECORD_CAPTURE_COMMITTED_SQL,[id,pantryId,delayedEntryId])
+    expect(rejected.rows).toHaveLength(0)
+    const stored=(await a.query('SELECT status,food_id,entry_id FROM nutrition_capture_jobs WHERE home_ai_job_id=$1',[id])).rows[0]
+    expect(stored).toMatchObject({status:'committed',food_id:pantryId,entry_id:null})
+    // Identical lost-response retry is harmless and leaves the association.
+    expect((await b.query(RECORD_CAPTURE_COMMITTED_SQL,[id,pantryId,null])).rows).toHaveLength(1)
+    expect((await a.query('SELECT entry_id FROM nutrition_capture_jobs WHERE home_ai_job_id=$1',[id])).rows[0].entry_id).toBeNull()
+  })
+
+  it('commits an estimate with an entry ID but no nutrition food FK',async()=>{
+    const id=await init()
+    const entryId=randomUUID()
+    await a.query("INSERT INTO nutrition_entries(id,log_date,timezone,food_name,serving_quantity,serving_unit,calories,source_kind) VALUES($1,'2026-10-01','America/Phoenix','Fictional estimate',1,'meal',200,'photo_ai')",[entryId])
+    expect((await b.query(RECORD_CAPTURE_COMMITTED_SQL,[id,null,entryId])).rows).toHaveLength(1)
+    const saved=(await a.query('SELECT status,food_id,entry_id FROM nutrition_capture_jobs WHERE home_ai_job_id=$1',[id])).rows[0]
+    expect(saved).toMatchObject({status:'committed',food_id:null,entry_id:entryId})
+    // Original estimated-entry response may be retried safely.
+    expect((await b.query(RECORD_CAPTURE_COMMITTED_SQL,[id,null,entryId])).rows).toHaveLength(1)
+    // A subsequent changed estimate cannot replace this committed entry.
+    expect((await b.query(RECORD_CAPTURE_COMMITTED_SQL,[id,null,randomUUID()])).rows).toHaveLength(0)
+  })
+
+  it('a label Pantry save can still transition to logged, unlike Meal Photo',async()=>{
+    const id=randomUUID()
+    const foodId=randomUUID()
+    const entryId=randomUUID()
+    await a.query("INSERT INTO nutrition_foods(id,name,catalog_kind,serving_quantity,serving_unit,calories,source_kind) VALUES($1,'Fictional label','packaged',1,'serving',100,'photo_ai')",[foodId])
+    await a.query("INSERT INTO nutrition_capture_jobs(home_ai_job_id,capture_kind,status,food_id) VALUES($1,'nutrition_label','committed',$2)",[id,foodId])
+    await a.query("INSERT INTO nutrition_entries(id,log_date,timezone,food_id,food_name,serving_quantity,serving_unit,calories,source_kind) VALUES($1,'2026-10-01','America/Phoenix',$2,'Fictional label',1,'serving',100,'photo_ai')",[entryId,foodId])
+    expect((await b.query(RECORD_CAPTURE_COMMITTED_SQL,[id,foodId,entryId])).rows).toHaveLength(1)
+    expect((await a.query('SELECT entry_id FROM nutrition_capture_jobs WHERE home_ai_job_id=$1',[id])).rows[0].entry_id).toBe(entryId)
   })
 
   it('a food-name uniqueness conflict rolls back the fingerprint claim',async()=>{
