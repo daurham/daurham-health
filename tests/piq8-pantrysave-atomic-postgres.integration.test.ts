@@ -51,7 +51,7 @@ describe.skipIf(!url)('PIQ-8 atomic Pantry first-save on isolated real PostgreSQ
     await b.query('SET search_path TO '+schema+',public')
     for(const name of ['0001_health_foundation.sql','0008_nutrition.sql',
       '0010_nutrition_capture_jobs.sql','0011_nutrition_meal_photo.sql',
-      '0027_nutrition_food_ai_source.sql']) await a.query(contents(name))
+      '0015_nutrition_gemini.sql','0027_nutrition_food_ai_source.sql']) await a.query(contents(name))
     const later=contents('0034_nutrition_micros_goal_archive.sql')
     const from=later.indexOf('ALTER TABLE nutrition_foods')
     const to=later.indexOf('ALTER TABLE nutrition_targets',from)
