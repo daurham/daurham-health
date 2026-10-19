@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { LATEST_SCHEMA_MIGRATION } from '../server/backup/inventory.js'
+import { BACKUP_TABLES, LATEST_SCHEMA_MIGRATION } from '../server/backup/inventory.js'
 import { independentlyVerifiedEmptyRoot, REQUIRED_EMPTY_OWNER_TABLES,
   type PiqIndependentRootEvidence } from '../server/piq-neon-root-provenance.js'
 import { reviewPiqPreviewSafety, type PiqNeonBranchEvidence } from '../server/piq-preview-preflight.js'
@@ -19,6 +19,8 @@ const proof: PiqIndependentRootEvidence = {
     lastMigration: LATEST_SCHEMA_MIGRATION,
     ownerTableCounts: Object.fromEntries(REQUIRED_EMPTY_OWNER_TABLES.map(t => [t, 0])) as
       PiqIndependentRootEvidence['migratedSql']['ownerTableCounts'],
+    nonSeededTableCounts: Object.fromEntries(BACKUP_TABLES.filter(t => !t.seeded)
+      .map(t => [t.name, 0])),
     authUserCount: 0, authSessionCount: 0 },
   auth: { source: 'neon_auth_api', projectId: 'qa-new-project', branchId: 'br-new-root',
     provider: 'better_auth', qaAuthProjectId: 'qa-auth', productionAuthProjectId: 'prod-auth' },
@@ -52,6 +54,31 @@ describe('PIQ independently verified new-project root provenance', () => {
       ...proof.migratedSql.ownerTableCounts, nutrition_entries: 1,
     } } } })).toBe(false)
     expect(verdict({ proof: { ...proof, migratedSql: { ...proof.migratedSql, authUserCount: 1 } } })).toBe(false)
+  })
+
+  it('requires a census of ALL non-seeded application tables, not only 13 owner sentinels', () => {
+    const clean = proof.migratedSql.nonSeededTableCounts
+    expect(BACKUP_TABLES.filter(table => !table.seeded).length).toBeGreaterThan(REQUIRED_EMPTY_OWNER_TABLES.length)
+    expect(verdict()).toBe(true)
+    // A Pantry food or unreviewed capture can contain personal data even when
+    // the original 13 monitored owner tables all report zero rows.
+    for (const name of ['nutrition_foods', 'nutrition_meal_photo_jobs']) {
+      if (!Object.prototype.hasOwnProperty.call(clean, name)) continue
+      expect(verdict({ proof: { ...proof, migratedSql: {
+        ...proof.migratedSql, nonSeededTableCounts: { ...clean, [name]: 1 },
+      } } })).toBe(false)
+    }
+    const withoutOne = { ...clean }
+    delete withoutOne.nutrition_foods
+    expect(verdict({ proof: { ...proof, migratedSql: {
+      ...proof.migratedSql, nonSeededTableCounts: withoutOne,
+    } } })).toBe(false)
+    expect(verdict({ proof: { ...proof, migratedSql: {
+      ...proof.migratedSql, nonSeededTableCounts: { ...clean, invented_table: 0 },
+    } } })).toBe(false)
+    expect(verdict({ proof: { ...proof, migratedSql: {
+      ...proof.migratedSql, nonSeededTableCounts: {},
+    } } })).toBe(false)
   })
 
   it('rejects missing, shared, or mismatched Auth identities', () => {
