@@ -18,4 +18,4 @@ Full GitHub application validation **PASSED** on source/test commit `6596230f2ac
 
 ## Next exact action
 
-Review and merge [PR #31](https://github.com/daurham/daurham-health/pull/31) into the PIQ **development** integration branch only, not `main`; verify the resulting integration ref and validation. Record its merged SHA before later release work. Then resume PIQ-7 isolated Auth/DB runtime binding preflight; note a QA Auth user now exists so the earlier zero-user empty-root gate is not satisfied.
+[PR #31](https://github.com/daurham/daurham-health/pull/31) is MERGED into PIQ development at `7cb3d5f0f8c5906cd330461ee88bdf19c2437f0d`; exact integration [CI 39201933212](https://github.com/daurham/daurham-health/actions/runs/39201933212) passed (2,755 tests, 43 skipped, TypeScript, lint, build). Next: PIQ-7 safe QA Auth-user provenance and actual protected Preview runtime DB/Auth binding, then backup/restore and owner mobile acceptance. Keep `main` unchanged. Then resume PIQ-7 isolated Auth/DB runtime binding preflight; note a QA Auth user now exists so the earlier zero-user empty-root gate is not satisfied.

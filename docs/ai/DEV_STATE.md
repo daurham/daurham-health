@@ -1,3 +1,11 @@
+## 2026-10-18 — PIQ-8 Pantry retry PR #31 merged; integration CI GREEN
+
+- Actual development integration merge `7cb3d5f0f8c5906cd330461ee88bdf19c2437f0d`: [PR #31](https://github.com/daurham/daurham-health/pull/31) closed/merged into `piq/00-baseline-20261014`; production `main` unchanged at `dbc3fcb68324d75d30a96132b725456ec7e45d49` (Vercel `health.daurham.com` READY, independently inspected).
+- [Exact merge CI 39201933212](https://github.com/daurham/daurham-health/actions/runs/39201933212) **SUCCESS**: 2,755 passed / 43 skipped (368 passing / 4 skipped files), TypeScript, ESLint, Vite production build. First implementation SHA `6596230` separately passed [39201396578](https://github.com/daurham/daurham-health/actions/runs/39201396578). No isolated-PostgreSQL workflow on **this** merge SHA; release gate requires an exact release SHA PG run when appropriate.
+- A committed Meal Photo saved only to Pantry now checks original committed fingerprint and food identity before any new writes on a changed retry. Synthetic regression proves failed retry does not add link/food or alter original committed association; exact retry still succeeds. Scope: sequential post-commit retries; a concurrent initial approval still has a known potential race and needs a separately designed transactional boundary.
+- No new migration, production data access, Gemini spend, production merge/deployment, or PIQ owner API 503 unlock. Documentation-only checkpoint commit is not another application validation.
+- **Next:** PIQ-7 safe operator attestation of current isolated QA Auth user provenance (1 user, 0 sessions), runtime Vercel Preview → QA Neon and Auth binding/cookie isolation with protection kept, then restore/backups and owner mobile acceptance. QA schema 60/60 and 76 application tables empty do not clear Auth identity gate. Formal PIQ owner acceptance **0/9**. Exact production migration state and safe approved release still blocked.
+
 ## 2026-10-18 PIQ-8 Meal Photo Pantry altered retry fail-closed (PR #31)
 
 - Engineering branch `piq/08-pantrysave-idempotency-20261018`, source/test commit `6596230f2ac807568bd1689deeba17a5fe4edeb0`; [GitHub Actions 39201396578](https://github.com/daurham/daurham-health/actions/runs/39201396578) SUCCESS: TypeScript, ESLint, production build, 2,755 Vitest tests passed / 43 skipped.
