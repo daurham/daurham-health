@@ -58,6 +58,28 @@ function mapRow(row: Record<string, unknown>): TranscriptionJobRecord {
   }
 }
 
+/** Completed workout captures are immutable to delayed Home-AI creation/poll callbacks.
+ * Predicate guards (not a CASE on status alone) also preserve filename,
+ * failure detail, and updated_at after a verified commit.
+ */
+export const RECORD_TRANSCRIPTION_JOB_CREATED_SQL = `
+  INSERT INTO workout_transcription_jobs (home_ai_job_id, status, source_filename)
+  VALUES ($1, 'queued', $2)
+  ON CONFLICT (home_ai_job_id) DO UPDATE
+    SET status = 'queued',
+        source_filename = COALESCE(EXCLUDED.source_filename, workout_transcription_jobs.source_filename),
+        updated_at = now()
+  WHERE workout_transcription_jobs.status <> 'committed'
+`.trim()
+
+export const RECORD_TRANSCRIPTION_JOB_STATUS_SQL = `
+  UPDATE workout_transcription_jobs
+  SET status = $2,
+      failure_message = CASE WHEN $2 = 'failed' THEN $3 ELSE NULL END,
+      updated_at = now()
+  WHERE home_ai_job_id = $1 AND status <> 'committed'
+`.trim()
+
 export async function recordTranscriptionJobCreated(input: {
   jobId: string
   filename: string | null
@@ -68,15 +90,7 @@ export async function recordTranscriptionJobCreated(input: {
   const sql = await getSql()
   await queryOrUnavailable(() =>
     sql.query(
-      `INSERT INTO workout_transcription_jobs (home_ai_job_id, status, source_filename)
-       VALUES ($1, 'queued', $2)
-       ON CONFLICT (home_ai_job_id) DO UPDATE
-         SET status = CASE
-           WHEN workout_transcription_jobs.status = 'committed' THEN workout_transcription_jobs.status
-           ELSE 'queued'
-         END,
-         source_filename = COALESCE(EXCLUDED.source_filename, workout_transcription_jobs.source_filename),
-         updated_at = now()`,
+      RECORD_TRANSCRIPTION_JOB_CREATED_SQL,
       [input.jobId, input.filename],
     ),
   )
@@ -93,18 +107,7 @@ export async function recordTranscriptionJobStatus(input: {
   const sql = await getSql()
   await queryOrUnavailable(() =>
     sql.query(
-      `UPDATE workout_transcription_jobs
-       SET status = CASE
-             WHEN status = 'committed' THEN status
-             ELSE $2
-           END,
-           failure_message = CASE
-             WHEN $2 = 'failed' THEN $3
-             WHEN status = 'committed' THEN failure_message
-             ELSE NULL
-           END,
-           updated_at = now()
-       WHERE home_ai_job_id = $1`,
+      RECORD_TRANSCRIPTION_JOB_STATUS_SQL,
       [input.jobId, input.status, input.failureMessage ?? null],
     ),
   )
