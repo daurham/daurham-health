@@ -43,7 +43,6 @@ import {
   getLabelJobRecord,
   type NutritionCaptureJobRecord,
   listOutstandingLabelJobs,
-  recordLabelJobCommitted,
   recordLabelJobCreated,
   recordLabelJobStatus,
   requeueCaptureJob,
