@@ -283,3 +283,8 @@ lock until separately approved owner QA gate.
 ## 2026-10-18 — QA engine parity for release candidate (CI pending)
 
 The isolated Neon QA root is PostgreSQL 18.6; read-only SQL still reports 56 migrations applied through 0056. CI's prior isolated database job ran PostgreSQL 16 only. The PIQ development branch now has a two-version PostgreSQL 16/18 disposable fixture matrix with all 60 migrations, nutrition and Lab integration regression. Both versions and full application CI must be green on the exact candidate SHA before concluding engine compatibility; neither substitutes for approval to migrate the persistent QA root 0057–0060. Existing preview owner API 503 lock, invalid placeholder secrets, read-only metadata gate and 0/9 formal owner acceptance are unchanged. No new Vercel deployment, Neon write, production migration or Main promotion was done.
+
+
+## 2026-10-18 — incremental 0056→0060 migration CI fixture added (CI pending)
+
+The release candidate now runs an additional isolated PostgreSQL 16/18 suite that upgrades a populated fictional 0056 schema to 0060, verifies the existing rows survive, failed DDL+history does not partly commit, no owner attestations appear merely from migration, and immutable new feedback structures behave as designed. This does not migrate the persistent isolated QA database, currently at 0056. Maintain API lock and approval requirements.

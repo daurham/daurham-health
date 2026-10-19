@@ -1027,3 +1027,8 @@ Settings can choose full or portable ZIP by size, but both options must derive f
 ## Decision: test PIQ migration and recovery fixtures on the QA database major version (PIQ-7, 2026-10-18)
 
 An isolated PostgreSQL 16 fixture does not establish compatibility with the separate Neon QA database running PostgreSQL 18. Before moving the persistent QA schema from 0056 to 0060 or approving any release, replay all repository migrations and run the existing real-SQL regression suite against disposable PG18 as well as PG16. Run two independent localhost fixtures as a CI matrix with fail-fast disabled; do not point these destructive fixtures at Neon or any persistent instance. Green matrix is still not proof of persistent QA isolation, full restore, Vercel runtime binding or owner acceptance.
+
+
+## Decision: staged migration safety requires testing populated 0056 prefix (PIQ-7, 2026-10-18)
+
+Do not infer safe upgrade of persistent QA from a clean 0001–0060 migration replay. Rehearse 56→60 with fictional existing Health and Lab data in a dedicated local-only schema, transactional migration filename recording, forced partial-DDL rollback, original-row preservation and absence of invented owner confirmations. Test newer immutability constraints. This supplements but does not authorize QA or production migrations and does not establish runtime Auth/DB isolation, full restore or owner release acceptance.

@@ -1253,3 +1253,8 @@ The owner-only backup export now generates full and portable options from one mi
 ## 2026-10-18 — PIQ-7 PostgreSQL 16 + 18 CI parity (CI pending)
 
 Read-only provider metadata and SQL on the separate QA root confirmed PostgreSQL 18.6, 56 ordered applied migration-history rows through 0056. Before this patch the isolated all-60-migration fixture tested only PG16. Workflow now runs the identical dedicated local synthetic integration suite in independent PG16 and PG18 GitHub job matrix, with fail-fast disabled so both produce evidence. Candidate dual-major validation is required for green PG CI. No persistent QA migration, credentials, copied owner records, production/main or model calls. Release gates still outstanding (QA 0057–0060, independent runtime Auth/DB isolation, recovery, iOS UAT, owner 0/9 acceptance).
+
+
+## 2026-10-18 — PIQ-7.2b staged 0056→0060 upgrade verification (CI pending)
+
+Added tests/piq7-incremental-upgrade-postgres.integration.test.ts to the dedicated localhost piq_fixture PG16+PG18 workflow. On a separate disposable schema it applies first 56 real migrations, seeds a fictional Health Profile and Lab result, verifies pending exact prefix, proves failed 0057 DDL/history transaction leaves no partial schema, then applies 57–60. It asserts old records survive, no owner claims are backfilled and new append-only triggers work. All fictional new-event writes are rolled back. QA Neon and production remain untouched; authorization, Auth/DB runtime binding, recovery and owner acceptance 0/9 remain gating.

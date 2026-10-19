@@ -21,6 +21,7 @@ on:
       - 'src/domain/weekly-coach/build.ts'
       - 'src/domain/nutrition/day-completeness.ts'
       - 'tests/piq1-*.integration.test.ts'
+      - 'tests/piq7-incremental-upgrade-postgres.integration.test.ts'
       - 'tests/piq6-finalization-*.test.ts'
       - 'tests/piq6-feedback-source-cas.test.ts'
       # Changes to release qualification itself require a fresh exact-SHA
@@ -72,4 +73,4 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx vitest run tests/piq1-nutrition-postgres.integration.test.ts tests/piq1-full-migration-postgres.integration.test.ts
+      - run: npx vitest run tests/piq1-nutrition-postgres.integration.test.ts tests/piq1-full-migration-postgres.integration.test.ts tests/piq7-incremental-upgrade-postgres.integration.test.ts
