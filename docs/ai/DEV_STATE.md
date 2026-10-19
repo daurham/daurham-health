@@ -1288,3 +1288,8 @@ Diagnosed a likely cause of approved photo captures lingering on Nutrition: a fr
 ## 2026-10-18 — PIQ8 three prestige palettes (CI pending)
 
 Three distinct unlockable palettes at Levels 21–23 with light/dark CSS, Theme Studio previews, bootstrap allowlist and progression regression tests. No migrations/model calls. QA preview hardlock and 0/9 owner acceptance remain unchanged.
+
+
+## 2026-10-19 — Persist Pantry-only Meal Photo approval (CI pending)
+
+Additional regression revealed that meal-photo AI review saved to Pantry without a Nutrition log did not mark its capture job committed, so the card could reappear after refresh. The reusable-food API now accepts a *strictly optional* meal-photo job ID only for the save-only path. The server checks the job kind/status before creating a food, creates or reuses the canonical food as before, and atomically changes an eligible completed photo job to committed with `food_id` and null `entry_id`. A concurrent meal log cannot be overwritten, and retries for the same saved meal/job are idempotent. Original capture remains available rather than being deleted. Generic description saves and regular meal logging remain unchanged. Added mocked SQL tests for commit, retry and malformed/orphan ID no-write. No migration, owner data, paid AI requests, QA 503 unlock, or production promotion. Requires exact-SHA CI and mobile acceptance.

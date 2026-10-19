@@ -502,6 +502,7 @@ export async function saveAiReusableFood(input: {
   model?: string | null
   originalCalories: number
   adjusted: boolean
+  jobId?: string
 }): Promise<{ food: NutritionFood; reused: boolean }> {
   return parseOk(
     await healthFetch('/api/nutrition/recipe-foods', {

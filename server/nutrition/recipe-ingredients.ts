@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
 import {
   NUTRITION_FOOD_ENTITY,
+  NUTRITION_MEAL_CAPTURE_KIND,
   USDA_FOODDATA_SOURCE_KEY,
   descriptionFoodFingerprint,
   descriptionFoodProvenance,
@@ -13,6 +14,7 @@ import {
 import { HttpError } from '../http.js'
 import { getSql } from '../db.js'
 import { mapFoodRow } from './queries.js'
+import { findCommittedLabelFood } from './label-jobs.js'
 import { createUsdaFdcProvider, type UsdaFoodCandidate, type UsdaPortion } from './providers/usda-fdc.js'
 
 export type UsdaFoodLookup = {
@@ -47,6 +49,8 @@ const aiFoodSchema = z.object({
   model: z.string().max(80).nullable().optional(),
   originalCalories: z.number().min(0),
   adjusted: z.boolean(),
+  // Only a reviewed Meal Photo saved to Pantry supplies a capture job ID.
+  jobId: z.uuid().optional(),
 })
 
 const CLAIM_FOOD_LINK_SQL = `INSERT INTO source_record_links (
@@ -232,8 +236,48 @@ export async function saveUsdaReusableFood(body: unknown, provider: UsdaFoodLook
   return { food, reused: false }
 }
 
+/**
+ * Pantry-only approval must durably resolve the originating Meal Photo job;
+ * hiding the card in React alone would allow it to reappear on reload.
+ * Check the capture kind/status before inserting food, then use a conditional
+ * update so a concurrent "Log Meal" cannot lose its linked entry ID.
+ */
+async function assertMealPhotoReadyForPantry(jobId: string | undefined): Promise<void> {
+  if (!jobId) return
+  const sql = await getSql()
+  const rows = await sql.query(
+    'SELECT capture_kind, status FROM nutrition_capture_jobs WHERE home_ai_job_id = $1',
+    [jobId],
+  ) as Array<{ capture_kind: string; status: string }>
+  const job = rows[0]
+  if (job?.capture_kind !== NUTRITION_MEAL_CAPTURE_KIND ||
+      (job.status !== 'completed' && job.status !== 'committed')) {
+    throw new HttpError(409, 'Meal capture is not ready to save to Pantry')
+  }
+}
+
+async function markMealPhotoSavedToPantry(jobId: string | undefined, foodId: string): Promise<void> {
+  if (!jobId) return
+  const sql = await getSql()
+  const rows = await sql.query(
+    `UPDATE nutrition_capture_jobs
+     SET status = 'committed', food_id = $2::uuid, entry_id = NULL,
+         failure_message = NULL, committed_at = now(), updated_at = now()
+     WHERE home_ai_job_id = $1 AND capture_kind = $3 AND status = 'completed'
+     RETURNING home_ai_job_id`,
+    [jobId, foodId, NUTRITION_MEAL_CAPTURE_KIND],
+  ) as unknown[]
+  if (rows.length > 0) return
+  // Safe retry after a lost response: never rewrite a different food or an
+  // existing logged entry when the job was already committed.
+  const committed = await findCommittedLabelFood(jobId)
+  if (committed?.foodId === foodId && committed.entryId === null) return
+  throw new HttpError(409, 'Meal capture has already been finalized elsewhere')
+}
+
 export async function saveAiReusableFood(body: unknown) {
   const requested = parseOr400(aiFoodSchema, body, 'Invalid reusable food')
+  await assertMealPhotoReadyForPantry(requested.jobId)
   const input = parseOr400(
     nutritionFoodCreateSchema,
     {
@@ -263,6 +307,7 @@ export async function saveAiReusableFood(body: unknown) {
   const sourceId = await sourceIdByKey('health_app')
   const existing = await findFoodByFingerprint(sourceId, fingerprint)
   if (existing) {
+    await markMealPhotoSavedToPantry(requested.jobId, existing.id)
     return { food: existing, reused: true }
   }
   const foodId = randomUUID()
@@ -291,6 +336,7 @@ export async function saveAiReusableFood(body: unknown) {
   if (!claimedId) {
     const raced = await findFoodByFingerprint(sourceId, fingerprint)
     if (raced) {
+      await markMealPhotoSavedToPantry(requested.jobId, raced.id)
       return { food: raced, reused: true }
     }
     throw new HttpError(409, 'A food with this description already exists')
@@ -320,6 +366,7 @@ export async function saveAiReusableFood(body: unknown) {
     if (!food) {
       throw new HttpError(500, 'Food insert failed')
     }
+    await markMealPhotoSavedToPantry(requested.jobId, food.id)
     return { food, reused: false }
   } catch (error) {
     if (uniqueFoodConflict(error)) {

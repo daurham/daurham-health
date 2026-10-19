@@ -32,6 +32,9 @@ const state = vi.hoisted(() => ({
   params: [] as unknown[][],
   inserts: 0,
   links: [] as StoredLink[],
+  mealCapture: null as null | {
+    id: string; status: 'completed' | 'committed'; foodId: string | null; entryId: string | null
+  },
 }))
 
 vi.mock('../server/db.ts', () => ({
@@ -39,6 +42,21 @@ vi.mock('../server/db.ts', () => ({
     query: async (text: string, params: unknown[] = []) => {
       state.texts.push(text)
       state.params.push(params)
+      if (text.includes('SELECT capture_kind, status FROM nutrition_capture_jobs')) {
+        return state.mealCapture?.id === params[0]
+          ? [{ capture_kind: 'meal_photo', status: state.mealCapture.status }] : []
+      }
+      if (text.includes('UPDATE nutrition_capture_jobs') && text.includes("status = 'completed'")) {
+        if (state.mealCapture?.id === params[0] && state.mealCapture.status === 'completed') {
+          state.mealCapture = { ...state.mealCapture, status: 'committed', foodId: String(params[1]), entryId: null }
+          return [{ home_ai_job_id: params[0] }]
+        }
+        return []
+      }
+      if (text.includes('SELECT food_id, entry_id FROM nutrition_capture_jobs')) {
+        return state.mealCapture?.status === 'committed' && state.mealCapture.id === params[0]
+          ? [{ food_id: state.mealCapture.foodId, entry_id: state.mealCapture.entryId }] : []
+      }
       if (text.includes('FROM data_sources')) {
         return [{ id: params[0] === 'usda_fooddata_central' ? 'source-usda' : 'source-health' }]
       }
@@ -174,6 +192,7 @@ describe('recipe ingredient creation', () => {
     state.params = []
     state.links = []
     state.inserts = 0
+    state.mealCapture = null
   })
 
   it('keeps the recipe draft when a source flow is cancelled', () => {
@@ -291,6 +310,30 @@ describe('recipe ingredient creation', () => {
     expect(JSON.stringify(payload)).not.toContain('photo')
     expect(state.texts.some((text) => text.includes('nutrition_entries'))).toBe(false)
     expect(state.inserts).toBe(1)
+  })
+
+  it('marks a Pantry-only Meal Photo committed without creating a nutrition entry or deleting provenance', async () => {
+    const jobId = '11111111-1111-4111-8111-111111111111'
+    state.mealCapture = { id: jobId, status: 'completed', foodId: null, entryId: null }
+    const input = aiBody({ name: 'Synthetic meal', jobId })
+    const saved = await saveAiReusableFood(input)
+    expect(saved.reused).toBe(false)
+    expect(state.mealCapture).toEqual({
+      id: jobId, status: 'committed', foodId: saved.food.id, entryId: null,
+    })
+    expect(state.texts.some(text => text.includes('DELETE FROM nutrition_capture_jobs'))).toBe(false)
+    expect(state.texts.some(text => text.includes('INSERT INTO nutrition_entries'))).toBe(false)
+    const retried = await saveAiReusableFood(input)
+    expect(retried.reused).toBe(true)
+    expect(state.inserts).toBe(1)
+  })
+
+  it('rejects a fabricated capture ID before mutating Pantry', async () => {
+    await expect(saveAiReusableFood(aiBody({
+      jobId: '22222222-2222-4222-8222-222222222222',
+    }))).rejects.toMatchObject({ statusCode: 409 })
+    expect(state.inserts).toBe(0)
+    expect(state.links).toHaveLength(0)
   })
 
   it('rejects an invalid reusable food and leaves the draft unchanged', async () => {

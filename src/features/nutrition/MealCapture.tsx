@@ -631,6 +631,8 @@ function MealEstimateSheet({
             model: candidate.model ?? null,
             originalCalories: baseline.calories,
             adjusted: reviewEdited || scale !== 1,
+            // The separate Log Meal endpoint finalizes logged captures.
+            jobId: !log ? jobId ?? undefined : undefined,
           })).food
         } catch (caught) {
           const duplicate = caught instanceof Error && /already exists/i.test(caught.message)
