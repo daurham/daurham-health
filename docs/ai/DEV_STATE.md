@@ -1,3 +1,19 @@
+## 2026-10-19 — PIQ-8 late job-created callback freeze (feature CI pending)
+
+- `recordLabelJobCreated` previously preserved `status='committed'` on an
+  upsert conflict, but still changed `source_filename`, `user_context` and
+  `updated_at` on an owner-approved capture. That bypassed the new guards
+  for the two late provider-result callbacks.
+- Conditional PostgreSQL upsert now updates a conflicting capture only while
+  `status <> 'committed'`; both new first-time job creation and unfinished
+  retry/queue behavior are unchanged. Existing committed Label Pantry → Log
+  transitions are unaffected.
+- Added two real isolated PG16/18 tests covering late callback immutability
+  and preapproval retry behavior, with no owner health rows.
+- This is a development-only bounded patch. Full feature CI and exact merge
+  SHA PG16/18/app validation are pending; no QA or production deployment,
+  migrations, credentials, API unlock or phase acceptance authorized.
+
 ## 2026-10-19 — PIQ-8 late provider response after capture approval (engineering CI pending)
 
 - Audit: both background nutrition capture update paths preserved `status='committed'` but could still overwrite `candidate_json`, `failure_message`, `interpretation` or `updated_at` when late Home-AI/Gemini responses returned *after* owner-approved Pantry or Log Meal. Approved review state must remain immutable to unsolicited provider results.

@@ -87,6 +87,26 @@ function asInterpretation(value: unknown): InterpretationMetadata {
   }
 }
 
+/**
+ * A late job-created callback may arrive after an owner has approved a
+ * capture. Its conflict retry must not rewrite approved filename, user
+ * context, provider, status, or updated_at. The conditional upsert locks the
+ * capture row and serializes with atomic first-time Pantry/Log finalization.
+ * Before approval, the original retry/requeue behavior remains unchanged.
+ */
+export const RECORD_CAPTURE_JOB_CREATED_SQL = `INSERT INTO nutrition_capture_jobs (
+         home_ai_job_id, capture_kind, status, source_filename, provider, user_context
+       )
+       VALUES ($1, $2, 'queued', $3, $4, $5)
+       ON CONFLICT (home_ai_job_id) DO UPDATE
+         SET status = 'queued',
+             source_filename = COALESCE(EXCLUDED.source_filename, nutrition_capture_jobs.source_filename),
+             user_context = COALESCE(EXCLUDED.user_context, nutrition_capture_jobs.user_context),
+             provider = COALESCE(nutrition_capture_jobs.provider, EXCLUDED.provider),
+             updated_at = now()
+         WHERE nutrition_capture_jobs.status <> 'committed'
+       RETURNING home_ai_job_id`
+
 export async function recordLabelJobCreated(input: {
   jobId: string
   filename: string | null
@@ -100,19 +120,7 @@ export async function recordLabelJobCreated(input: {
   const sql = await getSql()
   await queryOrUnavailable(() =>
     sql.query(
-      `INSERT INTO nutrition_capture_jobs (
-         home_ai_job_id, capture_kind, status, source_filename, provider, user_context
-       )
-       VALUES ($1, $2, 'queued', $3, $4, $5)
-       ON CONFLICT (home_ai_job_id) DO UPDATE
-         SET status = CASE
-           WHEN nutrition_capture_jobs.status = 'committed' THEN nutrition_capture_jobs.status
-           ELSE 'queued'
-         END,
-         source_filename = COALESCE(EXCLUDED.source_filename, nutrition_capture_jobs.source_filename),
-         user_context = COALESCE(EXCLUDED.user_context, nutrition_capture_jobs.user_context),
-         provider = COALESCE(nutrition_capture_jobs.provider, EXCLUDED.provider),
-         updated_at = now()`,
+      RECORD_CAPTURE_JOB_CREATED_SQL,
       [
         input.jobId,
         input.captureKind ?? NUTRITION_LABEL_CAPTURE_KIND,
