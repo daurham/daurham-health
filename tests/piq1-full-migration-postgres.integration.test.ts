@@ -21,6 +21,7 @@ import { parseExperimentComparisonSnapshot } from '../src/domain/experiment-comp
 import { readPrimaryGoalIntent, savePrimaryGoalIntent } from '../server/goals/primary-intent.js'
 import { getHealthProfile, putHealthProfile } from '../server/profile/service.js'
 import { PERFORMED_STRENGTH_EXERCISES_SQL } from '../server/training/plan-service.js'
+import { RECORD_TRANSCRIPTION_JOB_CREATED_SQL, RECORD_TRANSCRIPTION_JOB_STATUS_SQL } from '../server/training/job-store.js'
 import { buildTrainingWeekQualification, buildTrainingRoutineCredits, type PerformedExerciseEvidence } from '../src/domain/training-qualification.js'
 import { buildTrainingProgressSummary } from '../src/domain/training-progress-summary.js'
 import {
@@ -146,6 +147,60 @@ describe.skipIf(!url)('PIQ-1.1 full numbered migration chain and backup on isola
     try { await client.query('DROP SCHEMA IF EXISTS piq_full_chain CASCADE') }
     finally { await client.end() }
   }, 30_000)
+
+  it('PIQ-1: late Home-AI callbacks leave committed workout captures completely unchanged', async () => {
+    await client.query('BEGIN')
+    try {
+      const jobId = randomUUID()
+      const activeId = randomUUID()
+      const session = await client.query(
+        "INSERT INTO workout_sessions (workout_date, session_type, source_kind) VALUES ('2026-10-14', 'programmed', 'manual') RETURNING id::text AS id",
+      )
+      const sessionId = String(session.rows[0].id)
+      const committedAt = '2026-10-14T12:30:00.000Z'
+      await client.query(RECORD_TRANSCRIPTION_JOB_CREATED_SQL, [jobId, 'original-sheet.jpg'])
+      await client.query(
+        "UPDATE workout_transcription_jobs SET status = 'committed', workout_session_id = $2::uuid, failure_message = NULL, updated_at = $3::timestamptz WHERE home_ai_job_id = $1",
+        [jobId, sessionId, committedAt],
+      )
+
+      // Home-AI can report a delayed job-created callback, failure, and a
+      // processing poll after the owner has already committed the workout.
+      await client.query(RECORD_TRANSCRIPTION_JOB_CREATED_SQL, [jobId, 'late-sheet.jpg'])
+      await client.query(RECORD_TRANSCRIPTION_JOB_STATUS_SQL, [jobId, 'failed', 'late provider error'])
+      await client.query(RECORD_TRANSCRIPTION_JOB_STATUS_SQL, [jobId, 'processing', null])
+      const captured = await client.query(
+        "SELECT status, source_filename, failure_message, workout_session_id::text AS session_id, updated_at FROM workout_transcription_jobs WHERE home_ai_job_id = $1",
+        [jobId],
+      )
+      expect(captured.rows[0]).toMatchObject({
+        status: 'committed', source_filename: 'original-sheet.jpg',
+        failure_message: null, session_id: sessionId,
+      })
+      expect(captured.rows[0].updated_at.toISOString()).toBe(committedAt)
+      const pending = await client.query(
+        "SELECT count(*)::int AS count FROM workout_transcription_jobs WHERE home_ai_job_id = $1 AND status <> 'committed'",
+        [jobId],
+      )
+      expect(pending.rows[0].count).toBe(0)
+
+      // Normal unfinished jobs still transition, replace draft metadata and
+      // clear obsolete failure details when the provider recovers.
+      await client.query(RECORD_TRANSCRIPTION_JOB_CREATED_SQL, [activeId, 'early-sheet.jpg'])
+      await client.query(RECORD_TRANSCRIPTION_JOB_STATUS_SQL, [activeId, 'failed', 'temporary failure'])
+      await client.query(RECORD_TRANSCRIPTION_JOB_CREATED_SQL, [activeId, 'resumed-sheet.jpg'])
+      await client.query(RECORD_TRANSCRIPTION_JOB_STATUS_SQL, [activeId, 'processing', null])
+      const inProgress = await client.query(
+        'SELECT status, source_filename, failure_message FROM workout_transcription_jobs WHERE home_ai_job_id = $1',
+        [activeId],
+      )
+      expect(inProgress.rows[0]).toMatchObject({
+        status: 'processing', source_filename: 'resumed-sheet.jpg', failure_message: null,
+      })
+    } finally {
+      await client.query('ROLLBACK')
+    }
+  })
 
   it('applied each migration exactly once without creating historical owner confirmations', async () => {
     const history = await client.query('SELECT filename FROM schema_migrations ORDER BY filename')
