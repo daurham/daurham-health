@@ -62,8 +62,8 @@ describe('PIQ independently verified new-project root provenance', () => {
     expect(verdict()).toBe(true)
     // A Pantry food or unreviewed capture can contain personal data even when
     // the original 13 monitored owner tables all report zero rows.
-    for (const name of ['nutrition_foods', 'nutrition_meal_photo_jobs']) {
-      if (!Object.prototype.hasOwnProperty.call(clean, name)) continue
+    for (const name of ['nutrition_foods', 'import_jobs']) {
+      expect(Object.prototype.hasOwnProperty.call(clean, name)).toBe(true)
       expect(verdict({ proof: { ...proof, migratedSql: {
         ...proof.migratedSql, nonSeededTableCounts: { ...clean, [name]: 1 },
       } } })).toBe(false)
