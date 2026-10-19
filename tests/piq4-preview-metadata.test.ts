@@ -28,6 +28,7 @@ const args = {
   expectedNeonProjectId: 'project-synthetic',
   expectedNeonBranchId: 'br-empty-preview',
   productionNeonBranchId: 'br-production',
+  productionNeonProjectId: 'production-project-synthetic',
   candidate: github,
   deployment: deployed,
   neonBranch: neon,
@@ -133,6 +134,22 @@ describe('PIQ-4 read-only, exact-SHA preview metadata gate', () => {
       .toContain('DEPLOYMENT_NOT_READY')
     expect(check({ deployment: null }).blockers).toContain('DEPLOYMENT_METADATA_UNAVAILABLE')
     expect(check({ expectedRef: 'main' }).blockers).toContain('CANDIDATE_REF_NOT_PIQ')
+  })
+
+  it('refuses same-project QA previews even if the provider calls them empty', () => {
+    expect(check({ productionNeonProjectId: '' }).blockers)
+      .toContain('NEON_PRODUCTION_PROJECT_UNVERIFIED')
+    expect(check({ productionNeonProjectId: 'project-synthetic' }).blockers)
+      .toContain('NEON_PREVIEW_PROJECT_IS_PRODUCTION')
+    expect(check({ expectedNeonProjectId: 'production-project-synthetic',
+      neonBranch: { ...neon, projectId: 'production-project-synthetic' } }).blockers)
+      .toContain('NEON_PREVIEW_PROJECT_IS_PRODUCTION')
+    expect(check({ neonBranch: {
+      ...neon, projectId: 'production-project-synthetic',
+    } }).blockers).toEqual(expect.arrayContaining([
+      'NEON_PREVIEW_PROJECT_IS_PRODUCTION', 'NEON_PROJECT_OR_BRANCH_MISMATCH',
+    ]))
+    expect(check().status).toBe('metadata_consistent_not_authorized')
   })
 
   it('blocks inherited owner data and mismatch in provider-verified branch identity', () => {

@@ -33,6 +33,8 @@ export type PiqPreviewBlocker =
   | 'OWNER_IDS_MISSING_OR_NOT_ISOLATED'
   | 'NEON_METADATA_UNAVAILABLE'
   | 'NEON_PROJECT_OR_BRANCH_MISMATCH'
+  | 'NEON_PRODUCTION_PROJECT_UNVERIFIED'
+  | 'NEON_PROJECT_IS_PRODUCTION'
   | 'PREVIEW_BRANCH_IS_PRODUCTION'
   | 'PARENT_DATA_CLONE'
   | 'DATA_ORIGIN_NOT_INDEPENDENTLY_EMPTY'
@@ -125,7 +127,16 @@ export function reviewPiqPreviewSafety(input: {
   } else {
     const expectedProject = present(env.HEALTH_PIQ_EXPECTED_NEON_PROJECT_ID)
     const expectedBranch = present(env.HEALTH_PIQ_EXPECTED_PREVIEW_BRANCH_ID)
+    const productionProject = present(env.HEALTH_PIQ_PRODUCTION_NEON_PROJECT_ID)
     const productionBranch = present(env.HEALTH_PIQ_PRODUCTION_BRANCH_ID)
+    // A distinct branch in the production PROJECT is not independent QA,
+    // even if Neon labels that branch's creation source as 'empty'. Require
+    // independently sourced production project metadata, not an env fallback.
+    if (!productionProject) blockers.push('NEON_PRODUCTION_PROJECT_UNVERIFIED')
+    if (productionProject && (expectedProject === productionProject ||
+        neonBranch.projectId === productionProject)) {
+      blockers.push('NEON_PROJECT_IS_PRODUCTION')
+    }
     if (!expectedProject || !expectedBranch || !productionBranch ||
         neonBranch.projectId !== expectedProject ||
         neonBranch.branchId !== expectedBranch) {

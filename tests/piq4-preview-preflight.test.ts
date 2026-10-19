@@ -31,6 +31,7 @@ const env:NodeJS.ProcessEnv={
   HEALTH_PIQ_PREVIEW_TEST_OWNER_USER_ID:'qa-disposable-owner',
   HEALTH_PIQ_PRODUCTION_OWNER_USER_ID:'prod-owner-not-qa',
   HEALTH_PIQ_EXPECTED_NEON_PROJECT_ID:'project-synthetic',
+  HEALTH_PIQ_PRODUCTION_NEON_PROJECT_ID:'production-project-synthetic',
   HEALTH_PIQ_EXPECTED_PREVIEW_BRANCH_ID:'br-synthetic-qa',
   HEALTH_PIQ_PRODUCTION_BRANCH_ID:'br-synthetic-prod',
 }
@@ -68,6 +69,22 @@ describe('PIQ-4.1 preview QA static fail-closed isolation preflight',()=>{
       .toContain('NEON_PROJECT_OR_BRANCH_MISMATCH')
     expect(blocked({}, {...branch,projectId:'different-project'}))
       .toContain('NEON_PROJECT_OR_BRANCH_MISMATCH')
+  })
+  it('requires QA to be in a DIFFERENT Neon project even for provider-reported empty branches',()=>{
+    // Previously a production PROJECT with a different empty branch ID
+    // could satisfy all the static preflight checks.
+    expect(blocked({HEALTH_PIQ_PRODUCTION_NEON_PROJECT_ID:undefined}))
+      .toContain('NEON_PRODUCTION_PROJECT_UNVERIFIED')
+    expect(blocked({HEALTH_PIQ_PRODUCTION_NEON_PROJECT_ID:'project-synthetic'}))
+      .toContain('NEON_PROJECT_IS_PRODUCTION')
+    expect(blocked({HEALTH_PIQ_EXPECTED_NEON_PROJECT_ID:'production-project-synthetic'},
+      {...branch,projectId:'production-project-synthetic'}))
+      .toContain('NEON_PROJECT_IS_PRODUCTION')
+    expect(blocked({HEALTH_PIQ_EXPECTED_NEON_PROJECT_ID:'project-synthetic'},
+      {...branch,projectId:'production-project-synthetic'}))
+      .toContain('NEON_PROJECT_IS_PRODUCTION')
+    expect(reviewPiqPreviewSafety({env,neonBranch:branch}).status)
+      .toBe('configuration_eligible_for_manual_attestation')
   })
   it('never lets matching endpoints bypass missing runtime enforcement',()=>{
     expect(blocked({HEALTH_AUTH_BINDING_ENFORCE:'false'}))

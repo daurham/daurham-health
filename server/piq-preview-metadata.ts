@@ -57,6 +57,8 @@ export type PiqPreviewMetadataBlocker =
   | 'DEPLOYMENT_NOT_READY'
   | 'NEON_METADATA_UNAVAILABLE'
   | 'NEON_PROJECT_OR_BRANCH_MISMATCH'
+  | 'NEON_PRODUCTION_PROJECT_UNVERIFIED'
+  | 'NEON_PREVIEW_PROJECT_IS_PRODUCTION'
   | 'NEON_PREVIEW_BRANCH_IS_PRODUCTION'
   | 'NEON_PREVIEW_PARENT_IS_PRODUCTION'
   | 'NEON_PARENT_DATA_CLONE'
@@ -167,9 +169,20 @@ export function reviewPiqPreviewMetadata(input: {
     if (deployment.state !== 'READY') blockers.push('DEPLOYMENT_NOT_READY')
   }
 
+  // A QA branch inside the production project is never an isolated new root.
+  // This must hold even when Neon's creation-source metadata is 'empty'.
+  // Missing production project provenance cannot be treated as a match.
+  const productionProjectId = input.productionNeonProjectId?.trim() ?? ''
+  if (!productionProjectId) blockers.push('NEON_PRODUCTION_PROJECT_UNVERIFIED')
+  if (productionProjectId && input.expectedNeonProjectId === productionProjectId) {
+    blockers.push('NEON_PREVIEW_PROJECT_IS_PRODUCTION')
+  }
   if (!neonBranch || neonBranch.source !== 'neon_api') {
     blockers.push('NEON_METADATA_UNAVAILABLE')
   } else {
+    if (productionProjectId && neonBranch.projectId === productionProjectId) {
+      blockers.push('NEON_PREVIEW_PROJECT_IS_PRODUCTION')
+    }
     if (!input.expectedNeonProjectId || !input.expectedNeonBranchId ||
         neonBranch.projectId !== input.expectedNeonProjectId ||
         neonBranch.branchId !== input.expectedNeonBranchId) {
