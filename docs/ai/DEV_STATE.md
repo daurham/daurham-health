@@ -1,3 +1,10 @@
+## 2026-10-18 — PIQ-7 root/ref lineage review (new feature branch, CI pending)
+
+- Static PIQ preview preflight now requires a plausible `piq/` Git ref in addition to matching configured DB/Auth expected refs. Previously, both expected variables could be erroneously set to `main` or a feature branch, letting an unapproved ref appear configuration-eligible despite a correct SHA pin. Fixed enum-only blocker, no leaked credentials.
+- Both independent Neon metadata reviewers now treat **any parent branch** as non-independent QA lineage, even when the provider-reported creation source is `empty`. Previous checks explicitly refused parents equal to production but silently accepted an unrelated parent on an `empty` child. Root-only reviews are safer until an independent parent/sanitization attestation exists.
+- Synthetic regression tests cover ref spoofing, unrelated parent, production parent and valid independent root. No changes to runtime API hardlock, Auth, migrations, Vercel/Neon, secrets, owner's data, GitHub `main`, or production.
+- Feature app CI, development-only PR merge, exact merge SHA application and PostgreSQL 16/18 CI remain to be checked. PIQ release owner acceptance **0/9**; protected runtime binding/cookie/working QA owner and mobile QA still blocked.
+
 ## 2026-10-18 — PIQ-7 empty-branch isolation fail-closed fix IN REVIEW
 
 - Offline PIQ Preview metadata and static preflight previously allowed an `initSource: empty` QA branch to reach `configuration_eligible_for_manual_attestation` / `metadata_consistent_not_authorized` **without proving the QA Neon project differs from production**. Distinct branch IDs are insufficient: a fresh empty branch *inside* production is not independent QA.

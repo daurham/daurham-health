@@ -152,6 +152,17 @@ describe('PIQ-4 read-only, exact-SHA preview metadata gate', () => {
     expect(check().status).toBe('metadata_consistent_not_authorized')
   })
 
+  it('does not qualify provider-reported empty child branches from other parents', () => {
+    const otherChild = {...neon, parentId: 'br-unrelated-qa'}
+    const r=check({neonBranch:otherChild})
+    expect(r.status).toBe('blocked')
+    expect(r.blockers).toContain('NEON_PREVIEW_NOT_INDEPENDENT_ROOT')
+    expect(r.blockers).not.toContain('NEON_PREVIEW_PARENT_IS_PRODUCTION')
+    expect(check({neonBranch:{...neon,parentId:'br-production'}}).blockers)
+      .toContain('NEON_PREVIEW_NOT_INDEPENDENT_ROOT')
+    expect(check().status).toBe('metadata_consistent_not_authorized')
+  })
+
   it('blocks inherited owner data and mismatch in provider-verified branch identity', () => {
     const cloned = {
       ...neon, parentId: 'br-production', initSource: 'parent-data',

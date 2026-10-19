@@ -86,6 +86,26 @@ describe('PIQ-4.1 preview QA static fail-closed isolation preflight',()=>{
     expect(reviewPiqPreviewSafety({env,neonBranch:branch}).status)
       .toBe('configuration_eligible_for_manual_attestation')
   })
+  it('requires a PIQ Git ref even if both expected binding refs agree with an unapproved ref',()=>{
+    for (const ref of ['main', 'feature/synthetic-other', '', 'piq/']) {
+      expect(blocked({
+        VERCEL_GIT_COMMIT_REF: ref,
+        HEALTH_DB_PREVIEW_GIT_REF: ref,
+        HEALTH_AUTH_PREVIEW_GIT_REF: ref,
+      })).toContain('PIQ_PREVIEW_REF_NOT_ALLOWED')
+    }
+    expect(reviewPiqPreviewSafety({env,neonBranch:branch}).status)
+      .toBe('configuration_eligible_for_manual_attestation')
+  })
+  it('rejects supposedly empty branches with ANY parent, not only a production parent',()=>{
+    const fakeChild={...branch,parentId:'br-synthetic-unrelated-parent'}
+    expect(blocked({},fakeChild)).toContain('NEON_PREVIEW_NOT_INDEPENDENT_ROOT')
+    expect(blocked({}, {...branch,parentId:'br-synthetic-prod'}))
+      .toContain('NEON_PREVIEW_NOT_INDEPENDENT_ROOT')
+    expect(reviewPiqPreviewSafety({env,neonBranch:{...branch,parentId:null}})).toEqual({
+      status:'configuration_eligible_for_manual_attestation',blockers:[],
+    })
+  })
   it('never lets matching endpoints bypass missing runtime enforcement',()=>{
     expect(blocked({HEALTH_AUTH_BINDING_ENFORCE:'false'}))
       .toContain('RUNTIME_GUARDS_NOT_ENFORCED')
