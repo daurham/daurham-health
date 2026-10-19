@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { deriveRoutineRotation } from '../src/domain/training-blocks.ts'
 import type { TrainingPlanView } from '../src/domain/training-plan.ts'
 import { TrainingRotationPreview } from '../src/features/training/TrainingRotationPreview.tsx'
+import { HEALTH_PALETTES } from '../src/theme.ts'
 
 const routines = [
   { routineCode: 'A', target: 6 },
@@ -68,12 +69,13 @@ describe('theme-rich responsive routine progress', () => {
     expect(html).toContain('role="status"')
   })
 
-  it('has all 24 palettes in light and dark without hardcoded routine colors', () => {
+  it('covers every registered palette in light and dark without hardcoded routine colors', () => {
     const css = readFileSync('src/index.css', 'utf8')
     const light = new Set([...css.matchAll(/html\[data-health-palette='([^']+)'\]/g)].map((hit) => hit[1]))
     const dark = new Set([...css.matchAll(/html\.dark\[data-health-palette='([^']+)'\]/g)].map((hit) => hit[1]))
-    expect(light.size).toBe(24)
-    expect(dark).toEqual(light)
+    const registeredPalettes = new Set<string>(HEALTH_PALETTES)
+    expect(light).toEqual(registeredPalettes)
+    expect(dark).toEqual(registeredPalettes)
     const component = readFileSync('src/features/training/TrainingRotationPreview.tsx', 'utf8')
     expect(component).toContain('var(--chart-ink)')
     expect(component).toContain('var(--chart-secondary)')
