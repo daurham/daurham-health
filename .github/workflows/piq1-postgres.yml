@@ -4,38 +4,28 @@ on:
     branches:
       - piq/00-baseline-20261014
     paths:
-      # Any new numbered migration or Lab/feedback write must exercise real
-      # PostgreSQL. Exact-SHA preview eligibility also requires this workflow.
+      # PIQ candidate's exact SHA must receive both full-app CI and real
+      # PostgreSQL 16/18 migrations/recovery CI after ANY source or fixture
+      # change on the PIQ integration branch. Narrow per-file allowlists
+      # silently missed new modules, Pantry changes and Auth safety tests.
+      # Docs-only checkpoints intentionally do not re-run 2 PG service jobs;
+      # make the final release candidate a source/CI change when required.
       - '.github/workflows/piq1-postgres.yml'
+      - '.github/workflows/validation.yml'
+      - 'api/**'
+      - 'server/**'
+      - 'src/**'
+      - 'tests/**'
       - 'migrations/**'
-      - 'server/lab/**'
-      - 'server/backup/**'
-      - 'server/profile/service.ts'
-      - 'server/nutrition/day-completeness.ts'
-      - 'server/nutrition/maintenance-eligibility.ts'
-      - 'server/weekly-coach/load.ts'
-      - 'server/migrate.ts'
-      - 'server/migration-history.ts'
-      - 'server/migration-preflight.ts'
-      - 'src/domain/health-profile.ts'
-      - 'src/domain/weekly-coach/build.ts'
-      - 'src/domain/nutrition/day-completeness.ts'
-      - 'tests/piq1-*.integration.test.ts'
-      - 'tests/piq7-incremental-upgrade-postgres.integration.test.ts'
-      - 'tests/piq7-full-recovery-postgres.integration.test.ts'
-      - 'tests/piq6-finalization-*.test.ts'
-      - 'tests/piq6-feedback-source-cas.test.ts'
-      # Changes to release qualification itself require a fresh exact-SHA
-      # Postgres run, not just a passing full app workflow on an older SHA.
-      - 'server/piq-preview-metadata.ts'
-      - 'server/piq-postgres-fixture.ts'
-      - 'tests/piq7-postgres-fixture-guard.test.ts'
-      - 'tests/piq4-preview-metadata.test.ts'
-      - 'tests/piq4-neon-root-provenance.test.ts'
-      - 'tests/piq7-preview-private-routes.test.ts'
-      - 'tests/piq-release-migration-preflight.test.ts'
-      - 'tests/piq1-weekly-completeness.test.ts'
-      - 'tests/piq1-maintenance-eligibility-baseline.test.ts'
+      - 'scripts/**'
+      - 'public/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'index.html'
+      - 'vite.config.*'
+      - 'vitest.config.*'
+      - 'tsconfig*.json'
+      - 'vercel.json'
   workflow_dispatch:
 
 jobs:

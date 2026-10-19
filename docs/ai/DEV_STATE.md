@@ -1,3 +1,10 @@
+## 2026-10-18 — PIQ-7 exact-SHA PostgreSQL CI coverage in review
+
+- Development-only PR changes `.github/workflows/piq1-postgres.yml` to run isolated PostgreSQL 16/18 for **all code, API, server, client, test, migration, configuration, and dependency changes** pushed to `piq/00-baseline-20261014`. The old explicit per-file allowlist omitted `server/piq-qa-auth-census.ts`, Pantry saves, and other PIQ work; they only received application CI. PG verification remains two disposable localhost fixtures, not Neon/production. Docs-only commits deliberately do not trigger extra PG compute.
+- Prevents known-fixture classification when the account record is absent: the observed independent QA fixture had exactly one user and **one account** (zero stored password credentials), not zero accounts. Still never authorizes QA login or relaxes the hard API lock.
+- Adds synthetic regression and a workflow route guard verifying code coverage, 16/18 matrix, local fixture, and no production branch trigger. **CI results and merge SHA pending**; no change to Vercel/Neon settings, production `main`, migrations, release authorization or Auth credentials.
+- Next after passing feature/app CI: merge only into PIQ integration, verify **both full application CI and isolated PG CI at the merge SHA**, then stop before runtime QA access, cookie/owner setup or release.
+
 ## 2026-10-18 — PIQ-7 QA Auth census merged; exact integration CI GREEN
 
 - [PR #32](https://github.com/daurham/daurham-health/pull/32) merged to **PIQ development only**, exact merge `cbca33f9fcd3555626ae24a2a35b09de73b713eb`; [merge GitHub Actions 39204168866](https://github.com/daurham/daurham-health/actions/runs/39204168866) **SUCCESS**: 2,762 passed, 43 skipped, 369 test files passed / 4 skipped, TypeScript, ESLint and build. Feature SHA `63b1406` independently passed [39203800556](https://github.com/daurham/daurham-health/actions/runs/39203800556).

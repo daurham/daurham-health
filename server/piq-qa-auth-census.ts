@@ -79,7 +79,7 @@ export function reviewPiqQaAuthCensus(input: {
     return result('empty_directory')
   }
   if (census.userCount === 1 && census.documentedFictionalUserCount === 1 &&
-      census.accountCount <= 1 && census.verifiedUserCount === 0 &&
+      census.accountCount === 1 && census.verifiedUserCount === 0 &&
       census.passwordAccountCount === 0) {
     return result('documented_fixture_only')
   }
