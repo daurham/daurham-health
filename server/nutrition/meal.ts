@@ -73,7 +73,7 @@ export const CLAIM_MEAL_GROUP_SQL = `INSERT INTO source_record_links (
  * links and one-or-many entries exist only if this request wins first.
  * Legacy food-description logging intentionally stays on its existing path.
  */
-export const ATOMIC_MEAL_PHOTO_LOG_SQL = \`WITH eligible_capture AS MATERIALIZED (
+export const ATOMIC_MEAL_PHOTO_LOG_SQL = `WITH eligible_capture AS MATERIALIZED (
   SELECT home_ai_job_id
   FROM nutrition_capture_jobs
   WHERE home_ai_job_id = $1 AND capture_kind = 'meal_photo' AND status = 'completed'
@@ -117,7 +117,7 @@ export const ATOMIC_MEAL_PHOTO_LOG_SQL = \`WITH eligible_capture AS MATERIALIZED
     AND EXISTS (SELECT 1 FROM created_entries)
   RETURNING home_ai_job_id
 )
-SELECT entry.* FROM created_entries entry JOIN finalized_capture ON true\`
+SELECT entry.* FROM created_entries entry JOIN finalized_capture ON true`
 
 const ATOMIC_MEAL_ENTRY_KEYS = [
   'id', 'log_date', 'consumed_at', 'timezone', 'meal', 'food_id',
