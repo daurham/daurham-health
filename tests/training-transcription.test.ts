@@ -10,6 +10,7 @@ import {
 } from '../src/domain/training-transcription.ts'
 import { prepareManualSession } from '../server/training/service.ts'
 import { CLAIM_AND_INSERT_WORKOUT_SQL } from '../server/training/commit-sql.ts'
+import { RECORD_TRANSCRIPTION_JOB_CREATED_SQL, RECORD_TRANSCRIPTION_JOB_STATUS_SQL } from '../server/training/job-store.ts'
 import { getTranscriptionJob } from '../server/training/transcription.ts'
 import type { HomeAiClient } from '../server/integrations/home-ai/client.ts'
 import { buildManualWorkoutPayload, draftFromTranscription } from '../src/features/training/draft.ts'
@@ -262,6 +263,20 @@ describe('imported commit reuse', () => {
     expect(payload).not.toHaveProperty('image')
     expect(payload.originating_source).toBe('workout_image')
     expect(payload.interpreter).toBe('home_ai')
+  })
+})
+
+describe('committed workout capture protection', () => {
+  it('never changes a committed job through late creation or provider status callbacks', () => {
+    expect(RECORD_TRANSCRIPTION_JOB_CREATED_SQL).toMatch(
+      /ON CONFLICT \(home_ai_job_id\) DO UPDATE[\s\S]*WHERE workout_transcription_jobs\.status <> 'committed'/,
+    )
+    expect(RECORD_TRANSCRIPTION_JOB_STATUS_SQL).toMatch(
+      /UPDATE workout_transcription_jobs[\s\S]*WHERE home_ai_job_id = \$1 AND status <> 'committed'/,
+    )
+    expect(RECORD_TRANSCRIPTION_JOB_CREATED_SQL).toContain('source_filename = COALESCE')
+    expect(RECORD_TRANSCRIPTION_JOB_STATUS_SQL).toContain('failure_message = CASE')
+    expect(RECORD_TRANSCRIPTION_JOB_CREATED_SQL).not.toContain("WHEN workout_transcription_jobs.status = 'committed'")
   })
 })
 
