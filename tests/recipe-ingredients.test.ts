@@ -328,6 +328,24 @@ describe('recipe ingredient creation', () => {
     expect(state.inserts).toBe(1)
   })
 
+  it('rejects an altered retry of a committed Meal Photo before writing another Pantry food', async () => {
+    const jobId = '11111111-1111-4111-8111-111111111111'
+    state.mealCapture = { id: jobId, status: 'completed', foodId: null, entryId: null }
+    const saved = await saveAiReusableFood(aiBody({ name: 'Original meal', jobId }))
+    const initialFoodId = saved.food.id
+    const initialLinks = state.links.length
+    const initialInserts = state.inserts
+
+    await expect(saveAiReusableFood(aiBody({
+      name: 'Modified meal', text: 'a different meal', calories: 190, jobId,
+    }))).rejects.toMatchObject({ statusCode: 409 })
+    expect(state.inserts).toBe(initialInserts)
+    expect(state.links).toHaveLength(initialLinks)
+    expect(state.mealCapture).toEqual({
+      id: jobId, status: 'committed', foodId: initialFoodId, entryId: null,
+    })
+  })
+
   it('rejects a fabricated capture ID before mutating Pantry', async () => {
     await expect(saveAiReusableFood(aiBody({
       jobId: '22222222-2222-4222-8222-222222222222',
