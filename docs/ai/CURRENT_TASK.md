@@ -24,6 +24,8 @@
 
 ## Task under implementation
 
+**Current UI polish:** all nine Settings sections are native accessible disclosures collapsed by default, with deep-link and Ask Health correction auto-opening. Exact commit validation remains pending; no production/QA API unlock.
+
 Deferred small PIQ polish: accept centimeter and inch circumference measurements, including precise mixed and standalone inch fractions; safely convert a filled value on unit switches; prevent edit-path one-decimal truncation. No SQL migration, no new data model, no extra AI budget. Test and run application CI on exact new commit before marking validated. Preserve all PIQ API restrictions.
 
 ## Remaining release operations (separate authorization gates)

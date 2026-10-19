@@ -34,6 +34,7 @@ import {
 } from '@/lib'
 import type { AppleHealthPreview } from '@/domain/apple-health/preview'
 import { HealthProfileSection } from './HealthProfileSection'
+import { SettingsAccordion } from './SettingsAccordion'
 import { readOwnerNoteReviewState } from '@/domain/ask-health/owner-note-review'
 import { AiUsageSection } from './AiUsageSection'
 import {
@@ -450,6 +451,7 @@ export function SettingsPage() {
   }
 
   const job = status?.job
+  const ownerNoteDraft = readOwnerNoteReviewState(location.state)
 
   return (
     <section className="space-y-8">
@@ -458,11 +460,23 @@ export function SettingsPage() {
         <p className="mt-1 text-sm text-zinc-600">Owner data sources. Apple Health is not a primary Health destination.</p>
       </div>
 
-      <HealthProfileSection ownerNoteDraft={readOwnerNoteReviewState(location.state)} />
-      <AiUsageSection />
-      <AppearanceSection />
-      <TrendColorsSection />
+      <SettingsAccordion id="health-profile-settings" title="Health Profile" summary="Measurements, physiology, and private owner context." hash={location.hash} hashTargets={["health-profile","owner-note-review","profile-physiology-sex","profile-height-feet","profile-height-inches"]} forceOpen={ownerNoteDraft != null}>
+      <HealthProfileSection ownerNoteDraft={ownerNoteDraft} />
+      </SettingsAccordion>
 
+      <SettingsAccordion id="ai-usage-settings" title="AI Usage" summary="Budgets, request costs, and model activity." hash={location.hash} hashTargets={["ai-usage"]}>
+      <AiUsageSection />
+      </SettingsAccordion>
+
+      <SettingsAccordion id="appearance-settings" title="Theme Studio" summary="Appearance, color mode, and unlockable themes." hash={location.hash} hashTargets={["theme-studio"]}>
+      <AppearanceSection />
+      </SettingsAccordion>
+
+      <SettingsAccordion id="trends-settings" title="Trend Colors" summary="Choose how your personal trend directions appear." hash={location.hash} hashTargets={["trend-colors"]}>
+      <TrendColorsSection />
+      </SettingsAccordion>
+
+      <SettingsAccordion id="supplements-settings" title="Supplements" summary="Manage schedules and dose history." hash={location.hash}>
       <section className="space-y-3 rounded-lg border border-zinc-200 bg-white p-4">
         <h2 className="text-base font-semibold">Supplements</h2>
         <p className="text-sm text-zinc-600">
@@ -472,7 +486,9 @@ export function SettingsPage() {
           Manage supplements
         </Link>
       </section>
+      </SettingsAccordion>
 
+      <SettingsAccordion id="goals-settings" title="Goals" summary="Manage your selected health targets." hash={location.hash}>
       <section className="space-y-3 rounded-lg border border-zinc-200 bg-white p-4">
         <h2 className="text-base font-semibold">Goals</h2>
         <p className="text-sm text-zinc-600">Targets you chose to pursue. Progress estimates and reminders are not part of this page.</p>
@@ -480,7 +496,9 @@ export function SettingsPage() {
           Open goals
         </Link>
       </section>
+      </SettingsAccordion>
 
+      <SettingsAccordion id="data-quality-settings" title="Data Quality" summary="Review missing, unusual, or inconsistent records." hash={location.hash}>
       <section className="space-y-3 rounded-lg border border-zinc-200 bg-white p-4">
         <h2 className="text-base font-semibold">Data Quality</h2>
         <p className="text-sm text-zinc-600">
@@ -490,7 +508,9 @@ export function SettingsPage() {
           Review data quality
         </Link>
       </section>
+      </SettingsAccordion>
 
+      <SettingsAccordion id="backup-settings" title="Data & Backup" summary="Export a private copy of your Health data." hash={location.hash}>
       <section className="space-y-3 rounded-lg border border-zinc-200 bg-white p-4">
         <h2 className="text-base font-semibold">Data & Backup</h2>
         <p className="text-sm text-zinc-600">This export contains private health information.</p>
@@ -509,7 +529,9 @@ export function SettingsPage() {
           {exporting ? 'Preparing export…' : 'Export my Health data'}
         </button>
       </section>
+      </SettingsAccordion>
 
+      <SettingsAccordion id="data-sources-settings" title="Data sources" summary="Apple Health connections, archives, and imports." hash={location.hash}>
       <section className="space-y-4 rounded-lg border border-zinc-200 bg-white p-4">
         <div>
           <h2 className="text-base font-semibold">Data sources</h2>
@@ -598,6 +620,9 @@ export function SettingsPage() {
           </div>
         ) : null}
       </section>
+      </SettingsAccordion>
+
+
     </section>
   )
 }

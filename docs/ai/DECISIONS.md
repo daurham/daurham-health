@@ -1047,3 +1047,8 @@ A successful synthetic full restore only confirms parity for what the backup inv
 ## PIQ8 small Body measurement UX — retain exact circumference meaning (2026-10-18)
 
 Keep canonical stored circumference units as cm and historical API payload shape unchanged. On manual entry, allow individual circumference fields to choose in or cm; inch fields accept mixed tape fractions, while cm, weight and percentage remain decimal. Reject malformed or zero-denominator fractions, never coerce incomplete edits to zero, convert a *filled* value when the owner switches units rather than reinterpreting its numeric text, and retain precision to at least 1/16-inch when opening an edit. Shared deterministic parser is authoritative on client and server; unit selection is a UI concern. Existing imported measurements remain read-only. This is deferred UI polish, not a reason to unlock PIQ APIs or promote production.
+
+
+## PIQ8 deferred Settings UX — collapsed by default with explicit deep-link exceptions (2026-10-18)
+
+A very long Settings page must not force users to scroll through expanded Profile, AI Usage, Theme, Trends, Integrations and backup content. Use native `<details>/<summary>` disclosure for all nine sections with keyboard support; initialize collapsed, mount child sections only after expansion, and auto-expand a requested hash target or Ask Health owner-note correction handoff. Do not persist disclosure state as health data or silently remove existing form/save behavior. This UI-only step cannot justify bypassing the PIQ preview 503 lock or changing production data.
