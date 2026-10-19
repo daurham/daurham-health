@@ -54,7 +54,7 @@ Then confirm row counts in the destination match the dry-run list. Derived sleep
 
 - Passwords, sessions, API keys, and the Apple Health ingest token
 - Photos that exist only on Home-AI disk
-- A Settings download may be a portable export when the full archive is large. Portable exports omit raw samples, raw sleep intervals, capture jobs, and database source-link ids. A USDA food in that export still includes its provider key, FoodData Central id, and serving fingerprint. Use the CLI archive for disaster recovery.
+- A Settings download may be a portable export when the full archive is large. Full and portable formats are derived from **one** consistent read-only database snapshot with the same creation timestamp; the fallback does not issue another full-table database read. Portable exports omit raw samples, raw sleep intervals, capture jobs, and database source-link ids. A USDA food in that export still includes its provider key, FoodData Central id, and serving fingerprint. Use the CLI archive for disaster recovery.
 
 Settings → Data & Backup downloads a private copy for the signed-in owner. The machine ingest token cannot read it.
 

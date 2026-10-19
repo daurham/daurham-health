@@ -1243,3 +1243,8 @@ CLI `backup:create` now validates its full archive *before* saving, uses exclusi
 ## 2026-10-18 — PIQ-7 private backup atomic name publication (CI pending)
 
 CLI backup:create writes the verified full archive into a random private same-directory temporary file, flushes it, and uses an exclusive hard link to expose only complete bytes without overwriting. The temporary entry is removed on ordinary success/error. Synthetic tests cover invalid input, owner-only mode, existing output, symlink, concurrent writers and no temporary leftovers. Hardlink-incompatible filesystems fail rather than degrade. Crashes can leave private partial files; encryption/directory durability are not guaranteed. No database/API/migration/owner/provider/production changes. Await exact-SHA full and PG CI. PIQ-7 and owner acceptance 0/9 remain pending.
+
+
+## 2026-10-18 — PIQ-7 owner Settings export uses one snapshot (CI pending)
+
+The owner-only backup export now generates full and portable options from one migration-checked readBackupTables repeatable-read transaction. A large full archive no longer triggers another entire database read at a different point in time. Preserves size threshold, table selection, archive format and existing full-CLI path. Synthetic regression verifies the single transaction, source parity, time zone, portable exclusion and incorrect schema rejection. No Auth, migration, production or paid-model changes. Await exact-SHA full and isolated PG CI and formal release gates.

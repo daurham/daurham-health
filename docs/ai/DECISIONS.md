@@ -1017,3 +1017,8 @@ Full health backup CLI output is sensitive even when authentication credentials 
 ## Decision: publish full CLI backup files only after complete private writes (PIQ-7, 2026-10-18)
 
 Restrictive permissions do not prevent usable-looking truncated archives after interrupted writes. Preserve full archive format; verify first, write unguessable same-directory owner-only temporary file, flush, then atomically publish using exclusive hard-link rather than overwriting rename. Clean up temporary entries on ordinary errors. This is not encryption or a guarantee of crash-durable directory metadata; hardlink-incompatible filesystems fail closed. Test concurrent writers, conflicts and archive integrity. Development-only safeguarding does not authorize a production release.
+
+
+## Decision: full-to-portable owner export fallback must not re-read records (PIQ-7, 2026-10-18)
+
+Settings can choose full or portable ZIP by size, but both options must derive from one consistent repeatable-read source snapshot and one creation timestamp. Do not scan every owner table a second time after measuring the first archive; this increases Neon cost and can mix two source moments. Preserve existing portable omissions, threshold, archive format and schema check. Reusing a snapshot is not runtime DB/Auth isolation nor encrypted backup/recovery evidence; those release gates remain independent.

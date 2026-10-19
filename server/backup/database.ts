@@ -151,16 +151,45 @@ export async function createBackupArchive(
   })
 }
 
+type BackupDatabaseSnapshot = Awaited<ReturnType<typeof readBackupTables>>
+
+/** A full-to-portable fallback must never re-read canonical owner data.
+ * Both ZIP formats are projections of one migration-checked repeatable-read
+ * snapshot and share a single creation timestamp.
+ *
+ * The limit is injectable for a bounded synthetic fallback test without
+ * allocating megabytes of pretend clinical records.
+ */
+export function ownerExportFromSnapshot(
+  snapshot: BackupDatabaseSnapshot,
+  calendarTimezone?: string,
+  createdAt = new Date().toISOString(),
+  fullLimitBytes = PORTABLE_EXPORT_BYTE_LIMIT,
+): { bytes: Uint8Array; profile: BackupProfile } {
+  if (snapshot.schemaMigration !== LATEST_SCHEMA_MIGRATION) {
+    throw new Error('Backup requires ' + LATEST_SCHEMA_MIGRATION + ' schema')
+  }
+  const archive = (profile: BackupProfile) => buildBackupArchive({
+    profile,
+    createdAt,
+    schemaMigration: snapshot.schemaMigration,
+    appVersionOrCommit: appVersion,
+    calendarTimezone,
+    rowsByTable: snapshot.rowsByTable,
+  })
+  const full = archive('full')
+  if (full.byteLength <= fullLimitBytes) {
+    return { bytes: full, profile: 'full' }
+  }
+  return { bytes: archive('portable'), profile: 'portable' }
+}
+
 export async function createOwnerExport(
   sql: Sql,
   calendarTimezone?: string,
 ): Promise<{ bytes: Uint8Array; profile: BackupProfile }> {
-  const full = await createBackupArchive(sql, 'full', new Date().toISOString(), calendarTimezone)
-  if (full.byteLength <= PORTABLE_EXPORT_BYTE_LIMIT) {
-    return { bytes: full, profile: 'full' }
-  }
-  const portable = await createBackupArchive(sql, 'portable', new Date().toISOString(), calendarTimezone)
-  return { bytes: portable, profile: 'portable' }
+  const snapshot = await readBackupTables(sql)
+  return ownerExportFromSnapshot(snapshot, calendarTimezone)
 }
 
 export async function inspectRestore(sql: Sql, bytes: Uint8Array): Promise<{ verified: ReturnType<typeof verifyBackupArchive>; plan: RestorePlan }> {
