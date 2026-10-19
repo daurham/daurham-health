@@ -1,3 +1,11 @@
+## 2026-10-18 PIQ-8 Meal Photo Pantry altered retry fail-closed (PR #31)
+
+- Engineering branch `piq/08-pantrysave-idempotency-20261018`, source/test commit `6596230f2ac807568bd1689deeba17a5fe4edeb0`; [GitHub Actions 39201396578](https://github.com/daurham/daurham-health/actions/runs/39201396578) SUCCESS: TypeScript, ESLint, production build, 2,755 Vitest tests passed / 43 skipped.
+- In `saveAiReusableFood`, a capture already marked committed now verifies its originally committed food identity and fingerprint before any new Pantry link/food write. Changed or logged-entry capture retries return HTTP 409 without creating another Pantry record; exact retries reuse the original food.
+- Regression: `tests/recipe-ingredients.test.ts` proves an altered retry does not increment food inserts or source links or change the original capture association. A previously existing exact-retry test remains green. Sequential-retry integrity only: concurrent first-time capture finalization can still race and may need a future atomic approach.
+- [PR #31](https://github.com/daurham/daurham-health/pull/31) targets **development** branch `piq/00-baseline-20261014`; record actual merge SHA and integration CI after merge. No new migration, production merge/deployment, owner records, provider spend or 503 API unlock. PIQ owner phase acceptance remains 0/9.
+- Remaining PIQ-7 QA blocker: one unverified QA Auth user (zero sessions) exists despite 76 empty non-seeded QA application tables; runtime DB/Auth binding, QA cookie isolation and protected preview login unverified. Do not remove QA API lock or assert release readiness. Next: integrate reviewed fix, then safe read-only QA Auth/isolation attestation.
+
 ## 2026-10-17 PIQ-6.3 overlap review verified, further outcome gates open
 
 - CI 39067558828 SUCCESS for app commit 857512bd74e93cc1fbbf059a0ca877f401b46498 (2,606 passed/30 skipped, 343 files passed/2 skipped, TS, ESLint, build). No new migration; read-only Change Ledger source queries for verified linked Lab observation windows. None-recorded explicitly does not rule out unlogged confounders; unavailable fails closed.

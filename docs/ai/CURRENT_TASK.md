@@ -1,3 +1,5 @@
+> **Latest implementation checkpoint (2026-10-18 Phoenix):** Separate branch `piq/08-pantrysave-idempotency-20261018` is correcting a committed Meal Photo Pantry retry that could create a second food before raising 409. Adds fail-fast committed-job identity check plus a no-side-effects regression. Full application CI succeeded on implementation commit `6596230` (run 39201396578; 2,755 passing / 43 skipped, TypeScript, lint and build green). Merge PR #31 into `piq/00-baseline-20261014`. No production promotion or PIQ 503 unlock; post-merge development CI/QA remains required. See `docs/ai/PIQ8_PANTRY_RETRY_CHECKPOINT.md`. The older "task under implementation" below predates newer PIQ-8 changes and is retained for release history; consult the latest verified integration branch before acting.
+
 # Current task — PIQ release qualification and small deferred polish
 
 ## Actual working branch

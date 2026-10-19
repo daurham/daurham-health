@@ -242,8 +242,8 @@ export async function saveUsdaReusableFood(body: unknown, provider: UsdaFoodLook
  * Check the capture kind/status before inserting food, then use a conditional
  * update so a concurrent "Log Meal" cannot lose its linked entry ID.
  */
-async function assertMealPhotoReadyForPantry(jobId: string | undefined): Promise<void> {
-  if (!jobId) return
+async function assertMealPhotoReadyForPantry(jobId: string | undefined): Promise<'completed' | 'committed' | null> {
+  if (!jobId) return null
   const sql = await getSql()
   const rows = await sql.query(
     'SELECT capture_kind, status FROM nutrition_capture_jobs WHERE home_ai_job_id = $1',
@@ -254,6 +254,7 @@ async function assertMealPhotoReadyForPantry(jobId: string | undefined): Promise
       (job.status !== 'completed' && job.status !== 'committed')) {
     throw new HttpError(409, 'Meal capture is not ready to save to Pantry')
   }
+  return job.status
 }
 
 async function markMealPhotoSavedToPantry(jobId: string | undefined, foodId: string): Promise<void> {
@@ -277,7 +278,7 @@ async function markMealPhotoSavedToPantry(jobId: string | undefined, foodId: str
 
 export async function saveAiReusableFood(body: unknown) {
   const requested = parseOr400(aiFoodSchema, body, 'Invalid reusable food')
-  await assertMealPhotoReadyForPantry(requested.jobId)
+  const captureStatus = await assertMealPhotoReadyForPantry(requested.jobId)
   const input = parseOr400(
     nutritionFoodCreateSchema,
     {
@@ -306,6 +307,15 @@ export async function saveAiReusableFood(body: unknown) {
   })
   const sourceId = await sourceIdByKey('health_app')
   const existing = await findFoodByFingerprint(sourceId, fingerprint)
+  // A committed capture is immutable. A changed retry must never create a
+  // second Pantry food/link before the finalization conflict is detected.
+  if (captureStatus === 'committed' && requested.jobId) {
+    const committed = await findCommittedLabelFood(requested.jobId)
+    if (!existing || !committed || committed.entryId !== null || committed.foodId !== existing.id) {
+      throw new HttpError(409, 'Meal capture has already been finalized elsewhere')
+    }
+    return { food: existing, reused: true }
+  }
   if (existing) {
     await markMealPhotoSavedToPantry(requested.jobId, existing.id)
     return { food: existing, reused: true }
