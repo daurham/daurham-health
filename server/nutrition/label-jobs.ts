@@ -154,6 +154,28 @@ export async function recordLabelJobStatus(input: {
   )
 }
 
+// Meal Photo finalization is immutable once committed. Nutrition labels are
+// intentionally different: saving a label to Pantry, then logging it later,
+// is a supported transition. Keep that path compatible while preventing a
+// delayed Log Meal from overwriting an already Pantry-finalized Meal Photo.
+export const RECORD_CAPTURE_COMMITTED_SQL = `UPDATE nutrition_capture_jobs
+       SET status = 'committed',
+           food_id = $2::uuid,
+           entry_id = $3::uuid,
+           failure_message = NULL,
+           committed_at = COALESCE(committed_at, now()),
+           updated_at = now()
+       WHERE home_ai_job_id = $1
+         AND (
+           capture_kind = 'nutrition_label'
+           OR status <> 'committed'
+           OR (
+             food_id = $2::uuid
+             AND entry_id IS NOT DISTINCT FROM $3::uuid
+           )
+         )
+       RETURNING home_ai_job_id`
+
 export async function recordLabelJobCommitted(
   jobId: string,
   foodId: string,
@@ -163,19 +185,12 @@ export async function recordLabelJobCommitted(
     return
   }
   const sql = await getSql()
-  await queryOrUnavailable(() =>
-    sql.query(
-      `UPDATE nutrition_capture_jobs
-       SET status = 'committed',
-           food_id = $2::uuid,
-           entry_id = $3::uuid,
-           failure_message = NULL,
-           committed_at = now(),
-           updated_at = now()
-       WHERE home_ai_job_id = $1`,
-      [jobId, foodId, entryId],
-    ),
-  )
+  const updated = await queryOrUnavailable(() =>
+    sql.query(RECORD_CAPTURE_COMMITTED_SQL, [jobId, foodId, entryId]),
+  ) as unknown[]
+  if (updated.length === 0) {
+    throw new HttpError(409, 'That capture has already been finalized elsewhere')
+  }
 }
 
 const CAPTURE_JOB_COLUMNS = `home_ai_job_id, capture_kind, status, source_filename, failure_message, candidate_json, created_at, updated_at, committed_at, user_context, provider, (image_bytes IS NOT NULL) AS image_stored, interpretation`

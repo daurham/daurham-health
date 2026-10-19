@@ -1,3 +1,10 @@
+## 2026-10-19 — PIQ-8 Meal Photo finalization first-writer-wins (feature CI pending)
+
+- Audit found `recordLabelJobCommitted` unconditionally overwrote an already-committed Meal Photo association, and both Meal Photo Log paths silently suppressed finalization conflicts. A late Log Meal could therefore rewrite a previously saved-to-Pantry job even after the atomic Pantry-first fix.
+- Commit SQL now refuses a different existing **Meal Photo** commitment, allows an exact idempotent replay, while retaining **Nutrition Label**'s intentional Pantry-then-Log transition. Both Meal Log service paths reject an already Pantry-finalized capture before writing; later finalization conflicts are now surfaced rather than swallowed.
+- Added real PG16/18 regression checks for late Log Meal vs Pantry and label transition. **Residual race:** if a Log Meal starts before a concurrent Pantry winner, its nontransactional Nutrition entry/source-link may already be written when the capture-finalization CAS rejects it; eliminating that orphan requires a larger atomic Log Meal plan. Do not claim full end-to-end first-writer-wins for entry writes.
+- No production or QA Neon mutation, API 503 unlock, migration or main promotion. Feature/merged exact-SHA CI pending; formal PIQ acceptance 0/9.
+
 ## 2026-10-18 — PIQ-7 root/ref lineage review (new feature branch, CI pending)
 
 - Static PIQ preview preflight now requires a plausible `piq/` Git ref in addition to matching configured DB/Auth expected refs. Previously, both expected variables could be erroneously set to `main` or a feature branch, letting an unapproved ref appear configuration-eligible despite a correct SHA pin. Fixed enum-only blocker, no leaked credentials.
