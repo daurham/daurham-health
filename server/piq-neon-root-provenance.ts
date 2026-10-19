@@ -1,4 +1,4 @@
-import { LATEST_SCHEMA_MIGRATION } from './backup/inventory.js'
+import { BACKUP_TABLES, LATEST_SCHEMA_MIGRATION } from './backup/inventory.js'
 
 /**
  * Independent new-project root provenance. This is an OFFLINE review of
@@ -43,6 +43,8 @@ export type PiqIndependentRootEvidence = {
     migrationSequenceValid: boolean
     lastMigration: string
     ownerTableCounts: Record<(typeof REQUIRED_EMPTY_OWNER_TABLES)[number], number>
+    /** Every non-seeded public app table, sourced from the catalog at one QA SQL snapshot. */
+    nonSeededTableCounts: Record<string, number>
     authUserCount: number
     authSessionCount: number
   }
@@ -101,6 +103,18 @@ export function independentlyVerifiedEmptyRoot(input: {
       migratedSql.migrationSequenceValid !== true ||
       migratedSql.migrationCount !== Number(LATEST_SCHEMA_MIGRATION.slice(0, 4)) ||
       migratedSql.lastMigration !== LATEST_SCHEMA_MIGRATION) return false
+
+  // The 13 historically tracked sensitive tables are NOT exhaustive. A photo
+  // job, pantry record, operational import or newly introduced table may also
+  // contain private data. Require a complete catalog-backed census rather
+  // than accepting a clean shortlist as proof that the QA root is empty.
+  // Inventory/schema drift is independently checked by the PostgreSQL CI gate.
+  const requiredEmptyTables = BACKUP_TABLES.filter((table) => !table.seeded)
+    .map((table) => table.name)
+  const counts = migratedSql.nonSeededTableCounts
+  if (!counts || Object.keys(counts).length !== requiredEmptyTables.length ||
+      !requiredEmptyTables.every((name) =>
+        Object.prototype.hasOwnProperty.call(counts, name) && counts[name] === 0)) return false
 
   return REQUIRED_EMPTY_OWNER_TABLES.every((name) =>
     migratedSql.ownerTableCounts?.[name] === 0)
