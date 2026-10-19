@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { HttpError } from '../server/http.ts'
 import { parseManualWorkoutRequest } from '../server/training/service.ts'
 import { CLAIM_AND_INSERT_WORKOUT_SQL } from '../server/training/commit-sql.ts'
-import { DISMISS_TRANSCRIPTION_JOB_SQL } from '../server/training/job-store.ts'
+import { DISMISS_TRANSCRIPTION_JOB_SQL, RECORD_TRANSCRIPTION_JOB_CREATED_SQL, RECORD_TRANSCRIPTION_JOB_STATUS_SQL } from '../server/training/job-store.ts'
 import {
   DraftValidationError,
   buildManualWorkoutPayload,
@@ -275,7 +275,8 @@ describe('cross-device pending reviews', () => {
     expect(service).toContain('findSessionIdByHomeAiJob')
     const store = source('server/training/job-store.ts')
     expect(store).toContain('ON CONFLICT (home_ai_job_id)')
-    expect(store).toContain("WHEN workout_transcription_jobs.status = 'committed'")
+    expect(RECORD_TRANSCRIPTION_JOB_CREATED_SQL).toContain("WHERE workout_transcription_jobs.status <> 'committed'")
+    expect(RECORD_TRANSCRIPTION_JOB_STATUS_SQL).toContain("AND status <> 'committed'")
   })
 })
 
