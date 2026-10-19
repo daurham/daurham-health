@@ -61,6 +61,7 @@ export type PiqPreviewMetadataBlocker =
   | 'NEON_PREVIEW_PROJECT_IS_PRODUCTION'
   | 'NEON_PREVIEW_BRANCH_IS_PRODUCTION'
   | 'NEON_PREVIEW_PARENT_IS_PRODUCTION'
+  | 'NEON_PREVIEW_NOT_INDEPENDENT_ROOT'
   | 'NEON_PARENT_DATA_CLONE'
   | 'NEON_EMPTY_ORIGIN_UNVERIFIED'
 
@@ -192,6 +193,9 @@ export function reviewPiqPreviewMetadata(input: {
         neonBranch.branchId === input.productionNeonBranchId) {
       blockers.push('NEON_PREVIEW_BRANCH_IS_PRODUCTION')
     }
+    // Creation-source 'empty' is not sufficient if the Neon API reports
+    // an inherited parent. Require a genuine independently sourced root.
+    if (neonBranch.parentId !== null) blockers.push('NEON_PREVIEW_NOT_INDEPENDENT_ROOT')
     if (neonBranch.parentId !== null &&
         neonBranch.parentId === input.productionNeonBranchId) {
       blockers.push('NEON_PREVIEW_PARENT_IS_PRODUCTION')

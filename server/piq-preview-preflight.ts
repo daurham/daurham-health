@@ -23,6 +23,7 @@ export type PiqNeonBranchEvidence = {
 
 export type PiqPreviewBlocker =
   | 'NOT_PREVIEW'
+  | 'PIQ_PREVIEW_REF_NOT_ALLOWED'
   | 'DATABASE_BINDING_NOT_VERIFIED'
   | 'PREVIEW_DATABASE_CREDENTIALS_NOT_READY'
   | 'AUTH_BINDING_NOT_VERIFIED'
@@ -36,6 +37,7 @@ export type PiqPreviewBlocker =
   | 'NEON_PRODUCTION_PROJECT_UNVERIFIED'
   | 'NEON_PROJECT_IS_PRODUCTION'
   | 'PREVIEW_BRANCH_IS_PRODUCTION'
+  | 'NEON_PREVIEW_NOT_INDEPENDENT_ROOT'
   | 'PARENT_DATA_CLONE'
   | 'DATA_ORIGIN_NOT_INDEPENDENTLY_EMPTY'
 
@@ -92,6 +94,12 @@ export function reviewPiqPreviewSafety(input: {
   const { env, neonBranch } = input
   const blockers: PiqPreviewBlocker[] = []
   if (env.VERCEL_ENV !== 'preview') blockers.push('NOT_PREVIEW')
+  // Binding checks compare against configuration, which can be mistaken too.
+  // A Preview ref must itself be a PIQ development ref; matching a mistaken
+  // 'main' or feature ref in both expected config keys is not enough.
+  if (!/^piq\/[a-z0-9][a-z0-9/._-]*$/i.test(present(env.VERCEL_GIT_COMMIT_REF))) {
+    blockers.push('PIQ_PREVIEW_REF_NOT_ALLOWED')
+  }
   if (assessDatabaseBinding(env).status !== 'verified') blockers.push('DATABASE_BINDING_NOT_VERIFIED')
   if (!previewDatabaseCredentialsReady(env.DATABASE_URL)) {
     blockers.push('PREVIEW_DATABASE_CREDENTIALS_NOT_READY')
@@ -142,6 +150,9 @@ export function reviewPiqPreviewSafety(input: {
         neonBranch.branchId !== expectedBranch) {
       blockers.push('NEON_PROJECT_OR_BRANCH_MISMATCH')
     }
+    // Even an 'empty' *child* branch has inherited root lineage that this
+    // review has not independently attested. Only independent roots qualify.
+    if (neonBranch.parentId !== null) blockers.push('NEON_PREVIEW_NOT_INDEPENDENT_ROOT')
     if (!neonBranch.branchId || neonBranch.branchId === productionBranch ||
         (neonBranch.parentId != null && neonBranch.parentId === productionBranch)) {
       blockers.push('PREVIEW_BRANCH_IS_PRODUCTION')
