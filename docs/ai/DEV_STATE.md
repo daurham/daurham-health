@@ -1,3 +1,14 @@
+## PIQ-8 review correction — estimated Meal Photo commit foreign key
+
+The previously silent estimated-Meal-Photo commit passed an `entry.id` into
+`nutrition_capture_jobs.food_id` (which references `nutrition_foods`), so
+the FK could reject it with no user-visible error. This task makes only
+`foodId` nullable in `recordLabelJobCommitted`, commits estimate captures
+with `food_id=NULL`, returns committed entries when their `food_id` is NULL,
+and uses null-safe comparison for immutable exact retries. Real PostgreSQL
+regression verifies first commit, same retry, changed retry rejection.
+No migrations. Implementation CI pending.
+
 ## 2026-10-19 — PIQ-8 Meal Photo finalization first-writer-wins (feature CI pending)
 
 - Audit found `recordLabelJobCommitted` unconditionally overwrote an already-committed Meal Photo association, and both Meal Photo Log paths silently suppressed finalization conflicts. A late Log Meal could therefore rewrite a previously saved-to-Pantry job even after the atomic Pantry-first fix.

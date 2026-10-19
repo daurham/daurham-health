@@ -170,7 +170,7 @@ export const RECORD_CAPTURE_COMMITTED_SQL = `UPDATE nutrition_capture_jobs
            capture_kind = 'nutrition_label'
            OR status <> 'committed'
            OR (
-             food_id = $2::uuid
+             food_id IS NOT DISTINCT FROM $2::uuid
              AND entry_id IS NOT DISTINCT FROM $3::uuid
            )
          )
@@ -178,7 +178,7 @@ export const RECORD_CAPTURE_COMMITTED_SQL = `UPDATE nutrition_capture_jobs
 
 export async function recordLabelJobCommitted(
   jobId: string,
-  foodId: string,
+  foodId: string | null,
   entryId: string | null,
 ): Promise<void> {
   if (!isHomeAiJobId(jobId)) {
@@ -275,7 +275,7 @@ export async function findCommittedLabelFood(
   return { foodId: row.food_id, entryId: row.entry_id ?? null }
 }
 
-export async function findCommittedLabelEntry(jobId: string): Promise<{ foodId: string; entryId: string } | null> {
+export async function findCommittedLabelEntry(jobId: string): Promise<{ foodId: string | null; entryId: string } | null> {
   const sql = await getSql()
   const rows = await queryOrUnavailable(() =>
     sql.query(
@@ -285,10 +285,10 @@ export async function findCommittedLabelEntry(jobId: string): Promise<{ foodId: 
     ),
   )
   const row = (rows as Array<{ food_id?: string; entry_id?: string }>)[0]
-  if (!row?.food_id || !row.entry_id) {
+  if (!row?.entry_id) {
     return null
   }
-  return { foodId: row.food_id, entryId: row.entry_id }
+  return { foodId: row.food_id ?? null, entryId: row.entry_id }
 }
 
 export async function saveCaptureImage(input: {

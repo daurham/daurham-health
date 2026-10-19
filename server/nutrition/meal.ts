@@ -1006,7 +1006,7 @@ export async function commitNutritionMealEstimate(body: unknown): Promise<{ entr
     null,
   ])
   if (jobId) {
-    await recordLabelJobCommitted(jobId, entry.id, entry.id)
+    await recordLabelJobCommitted(jobId, null, entry.id)
   }
   return { entries: [entry] }
 }

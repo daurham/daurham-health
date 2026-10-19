@@ -205,6 +205,18 @@ describe('meal portions, totals, and grouping', () => {
   })
 })
 
+describe('Meal Photo terminal capture write safety', () => {
+  it('keeps estimated entry-only commit and surfaces terminal save conflicts', () => {
+    const source = readFileSync('server/nutrition/meal.ts', 'utf8')
+    const capture = readFileSync('server/nutrition/label-jobs.ts', 'utf8')
+    expect(source).toContain('await recordLabelJobCommitted(jobId, null, entry.id)')
+    expect(source).not.toMatch(/recordLabelJobCommitted\([^\n]+\)\.catch\(\(\) => undefined\)/)
+    expect(source).toContain("throw new HttpError(409, 'That meal capture has already been saved to Pantry.')")
+    expect(capture).toContain('food_id IS NOT DISTINCT FROM $2::uuid')
+    expect(capture).toContain("capture_kind = 'nutrition_label'")
+  })
+})
+
 describe('meal photo jobs routing and provenance', () => {
   it('uses a dedicated meal namespace, claims a group fingerprint, and stays off label/workout prompts', () => {
     expect(matchHealthApiRoute('/api/nutrition/meal/jobs')).toBe('nutrition-meal-jobs')

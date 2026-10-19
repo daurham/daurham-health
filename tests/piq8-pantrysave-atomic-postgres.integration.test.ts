@@ -85,6 +85,19 @@ describe.skipIf(!url)('PIQ-8 atomic Pantry first-save on isolated real PostgreSQ
     expect((await a.query('SELECT entry_id FROM nutrition_capture_jobs WHERE home_ai_job_id=$1',[id])).rows[0].entry_id).toBeNull()
   })
 
+  it('commits an estimate with an entry ID but no nutrition food FK',async()=>{
+    const id=await init()
+    const entryId=randomUUID()
+    await a.query("INSERT INTO nutrition_entries(id,log_date,timezone,food_name,serving_quantity,serving_unit,calories,source_kind) VALUES($1,'2026-10-01','America/Phoenix','Fictional estimate',1,'meal',200,'photo_ai')",[entryId])
+    expect((await b.query(RECORD_CAPTURE_COMMITTED_SQL,[id,null,entryId])).rows).toHaveLength(1)
+    const saved=(await a.query('SELECT status,food_id,entry_id FROM nutrition_capture_jobs WHERE home_ai_job_id=$1',[id])).rows[0]
+    expect(saved).toMatchObject({status:'committed',food_id:null,entry_id:entryId})
+    // Original estimated-entry response may be retried safely.
+    expect((await b.query(RECORD_CAPTURE_COMMITTED_SQL,[id,null,entryId])).rows).toHaveLength(1)
+    // A subsequent changed estimate cannot replace this committed entry.
+    expect((await b.query(RECORD_CAPTURE_COMMITTED_SQL,[id,null,randomUUID()])).rows).toHaveLength(0)
+  })
+
   it('a label Pantry save can still transition to logged, unlike Meal Photo',async()=>{
     const id=randomUUID()
     const foodId=randomUUID()
