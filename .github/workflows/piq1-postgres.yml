@@ -38,11 +38,19 @@ on:
 
 jobs:
   verify:
+    # Persistent isolated QA Neon uses PostgreSQL 18; exercise that major
+    # alongside v16 before considering any existing 0057–0060 migrations.
+    # Both jobs use independent disposable localhost PostgreSQL fixtures.
+    name: verify-pg-${{ matrix.postgres-version }}
     runs-on: ubuntu-22.04
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        postgres-version: ['16', '18']
     services:
       postgres:
-        image: postgres:16
+        image: postgres:${{ matrix.postgres-version }}
         env:
           POSTGRES_USER: piq
           POSTGRES_PASSWORD: piq-fixture-only

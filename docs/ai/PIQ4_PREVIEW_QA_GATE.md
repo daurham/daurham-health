@@ -278,3 +278,8 @@ production changes. GitHub CI/test/build and Vercel exact-SHA preview
 are validation prerequisites, not release approval. Mobile owner
 acceptance remains 0/9. Next: verify full branch CI; do not relax the
 lock until separately approved owner QA gate.
+
+
+## 2026-10-18 — QA engine parity for release candidate (CI pending)
+
+The isolated Neon QA root is PostgreSQL 18.6; read-only SQL still reports 56 migrations applied through 0056. CI's prior isolated database job ran PostgreSQL 16 only. The PIQ development branch now has a two-version PostgreSQL 16/18 disposable fixture matrix with all 60 migrations, nutrition and Lab integration regression. Both versions and full application CI must be green on the exact candidate SHA before concluding engine compatibility; neither substitutes for approval to migrate the persistent QA root 0057–0060. Existing preview owner API 503 lock, invalid placeholder secrets, read-only metadata gate and 0/9 formal owner acceptance are unchanged. No new Vercel deployment, Neon write, production migration or Main promotion was done.

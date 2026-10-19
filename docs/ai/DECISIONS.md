@@ -1022,3 +1022,8 @@ Restrictive permissions do not prevent usable-looking truncated archives after i
 ## Decision: full-to-portable owner export fallback must not re-read records (PIQ-7, 2026-10-18)
 
 Settings can choose full or portable ZIP by size, but both options must derive from one consistent repeatable-read source snapshot and one creation timestamp. Do not scan every owner table a second time after measuring the first archive; this increases Neon cost and can mix two source moments. Preserve existing portable omissions, threshold, archive format and schema check. Reusing a snapshot is not runtime DB/Auth isolation nor encrypted backup/recovery evidence; those release gates remain independent.
+
+
+## Decision: test PIQ migration and recovery fixtures on the QA database major version (PIQ-7, 2026-10-18)
+
+An isolated PostgreSQL 16 fixture does not establish compatibility with the separate Neon QA database running PostgreSQL 18. Before moving the persistent QA schema from 0056 to 0060 or approving any release, replay all repository migrations and run the existing real-SQL regression suite against disposable PG18 as well as PG16. Run two independent localhost fixtures as a CI matrix with fail-fast disabled; do not point these destructive fixtures at Neon or any persistent instance. Green matrix is still not proof of persistent QA isolation, full restore, Vercel runtime binding or owner acceptance.

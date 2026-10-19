@@ -1248,3 +1248,8 @@ CLI backup:create writes the verified full archive into a random private same-di
 ## 2026-10-18 — PIQ-7 owner Settings export uses one snapshot (CI pending)
 
 The owner-only backup export now generates full and portable options from one migration-checked readBackupTables repeatable-read transaction. A large full archive no longer triggers another entire database read at a different point in time. Preserves size threshold, table selection, archive format and existing full-CLI path. Synthetic regression verifies the single transaction, source parity, time zone, portable exclusion and incorrect schema rejection. No Auth, migration, production or paid-model changes. Await exact-SHA full and isolated PG CI and formal release gates.
+
+
+## 2026-10-18 — PIQ-7 PostgreSQL 16 + 18 CI parity (CI pending)
+
+Read-only provider metadata and SQL on the separate QA root confirmed PostgreSQL 18.6, 56 ordered applied migration-history rows through 0056. Before this patch the isolated all-60-migration fixture tested only PG16. Workflow now runs the identical dedicated local synthetic integration suite in independent PG16 and PG18 GitHub job matrix, with fail-fast disabled so both produce evidence. Candidate dual-major validation is required for green PG CI. No persistent QA migration, credentials, copied owner records, production/main or model calls. Release gates still outstanding (QA 0057–0060, independent runtime Auth/DB isolation, recovery, iOS UAT, owner 0/9 acceptance).
