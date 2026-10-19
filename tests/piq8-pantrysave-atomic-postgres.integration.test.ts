@@ -5,7 +5,7 @@ import pg from 'pg'
 import { ATOMIC_PANTRY_CAPTURE_SAVE_SQL as SAVE } from '../server/nutrition/recipe-ingredients.js'
 import {
   RECORD_CAPTURE_COMMITTED_SQL, RECORD_CAPTURE_PROVIDER_STATUS_SQL,
-  FINISH_CAPTURE_INTERPRETATION_SQL,
+  FINISH_CAPTURE_INTERPRETATION_SQL, RECORD_CAPTURE_JOB_CREATED_SQL,
 } from '../server/nutrition/label-jobs.js'
 import { ATOMIC_MEAL_PHOTO_LOG_SQL as LOG } from '../server/nutrition/meal.js'
 import { assertPiqPostgresFixtureTarget, assertPiqPostgresFixtureSession } from '../server/piq-postgres-fixture.js'
@@ -125,6 +125,42 @@ describe.skipIf(!url)('PIQ-8 atomic Pantry first-save on isolated real PostgreSQ
     await a.query("INSERT INTO nutrition_entries(id,log_date,timezone,food_id,food_name,serving_quantity,serving_unit,calories,source_kind) VALUES($1,'2026-10-01','America/Phoenix',$2,'Fictional label',1,'serving',100,'photo_ai')",[entryId,foodId])
     expect((await b.query(RECORD_CAPTURE_COMMITTED_SQL,[id,foodId,entryId])).rows).toHaveLength(1)
     expect((await a.query('SELECT entry_id FROM nutrition_capture_jobs WHERE home_ai_job_id=$1',[id])).rows[0].entry_id).toBe(entryId)
+  })
+
+  it('late job-created callback cannot rewrite an owner-approved Meal Photo',async()=>{
+    const id=await init()
+    expect((await a.query(SAVE,params(id,'fictional-late-create','Fictional final Pantry'))).rows).toHaveLength(1)
+    const snapshot=(await a.query(
+      'SELECT status,source_filename,user_context,provider,food_id,entry_id,candidate_json,interpretation,updated_at FROM nutrition_capture_jobs WHERE home_ai_job_id=$1',[id],
+    )).rows[0]
+    const late=await b.query(RECORD_CAPTURE_JOB_CREATED_SQL,
+      [id,'meal_photo','stale-unapproved-name.png','gemini','stale-unapproved-context'])
+    expect(late.rows).toHaveLength(0)
+    const after=(await a.query(
+      'SELECT status,source_filename,user_context,provider,food_id,entry_id,candidate_json,interpretation,updated_at FROM nutrition_capture_jobs WHERE home_ai_job_id=$1',[id],
+    )).rows[0]
+    expect(after).toEqual(snapshot)
+    expect(await count('nutrition_foods')).toBe(1)
+    expect(await count('source_record_links')).toBe(1)
+  })
+
+  it('job-created retries preserve queued behavior before approval, then freeze label review',async()=>{
+    const id=await init()
+    expect((await b.query(RECORD_CAPTURE_JOB_CREATED_SQL,
+      [id,'nutrition_label','pending-name.jpg','gemini','fictional pending context'])).rows).toHaveLength(1)
+    const before=(await a.query('SELECT status,source_filename,user_context,provider FROM nutrition_capture_jobs WHERE home_ai_job_id=$1',[id])).rows[0]
+    expect(before).toMatchObject({status:'queued',source_filename:'pending-name.jpg',
+      user_context:'fictional pending context',provider:'gemini'})
+    await a.query("UPDATE nutrition_capture_jobs SET status='committed' WHERE home_ai_job_id=$1",[id])
+    const snapshot=(await a.query(
+      'SELECT status,source_filename,user_context,provider,updated_at FROM nutrition_capture_jobs WHERE home_ai_job_id=$1',[id],
+    )).rows[0]
+    expect((await b.query(RECORD_CAPTURE_JOB_CREATED_SQL,
+      [id,'nutrition_label','late-label.jpg','home_ai','late-label-context'])).rows).toHaveLength(0)
+    const after=(await a.query(
+      'SELECT status,source_filename,user_context,provider,updated_at FROM nutrition_capture_jobs WHERE home_ai_job_id=$1',[id],
+    )).rows[0]
+    expect(after).toEqual(snapshot)
   })
 
   it('delayed provider status and interpretation cannot mutate a committed Pantry photo',async()=>{
