@@ -28,6 +28,11 @@ on:
       - 'vercel.json'
   workflow_dispatch:
 
+# Save Actions minutes when successive PIQ merges supersede a candidate.
+concurrency:
+  group: piq-postgres-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   verify:
     # Persistent isolated QA Neon uses PostgreSQL 18; exercise that major
