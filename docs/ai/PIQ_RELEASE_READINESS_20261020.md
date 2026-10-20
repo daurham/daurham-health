@@ -41,3 +41,14 @@
 Continue **read-only** metadata qualification and release document reconciliation. The first gate requiring a future operator action is permissioned access to actual Vercel Preview deployment metadata; until the correct serving SHA/DB/Auth can be independently attested, do not request owner mobile testing, modify persistent QA/prod rows, remove the 503 hardlock, deploy, or merge `main`.
 
 The final validated code candidate above is **frozen** pending release gates. Fix newly reproduced correctness defects on separate PIQ branches only. The earlier user-reported Nutrition Label delete-persistence fix ([PR #47](https://github.com/daurham/daurham-health/pull/47)), Pantry→Log atomic transition ([PR #48](https://github.com/daurham/daurham-health/pull/48)), and first-time label atomic save ([PR #49](https://github.com/daurham/daurham-health/pull/49)) are **automated-development validated but not live-owner accepted**.
+
+## 4. Follow-up: permissioned Vercel deployment metadata (2026-10-19 Phoenix)
+
+The previously blocked deployment-identity lookup was repeated read-only using the connected Vercel project and deployment metadata endpoints, **without** changing the Preview API lock, secrets, aliases, owner data or environment variables.
+
+- Project `daurham-health` resolves as `prj_KNUk1CcJbYjQbSkADSHSuynhpZJU` under the `daurhams-projects` account; these are provider-returned identifiers, not inferred deployment targets.
+- Deployment `dpl_DwZhZ1EaYNq6PJcm7piXdyBcuRef` is **READY**, on `piq/00-baseline-20261014`, at exact validated code SHA `6c487e659a184c0706a28cbe16820eeee7ae98d5`. This closes the *existence / source identity* part of release blocker 1 for that immutable deployment only, not process isolation or functional QA.
+- The newer **READY** deployment `dpl_4oJ1pgq4tP3JqCysCe2AhEPorREN` is on the same branch at `335f0c2116377cc91b66132c8a3a8c6980f4e240` with a docs-only `[skip ci]` message. Vercel reports the **same branch alias** for both deployment records, so the effective alias must be treated as potentially serving the newer docs-only SHA; immutable deployment URL and branch alias are not interchangeable release evidence.
+- Project SSO/deployment protection is enabled for non-custom domains. No protected application route, owner login, effective runtime database/Auth binding or cookie secret has been exercised or attested. No unlock is justified.
+
+**Revised smallest next gate:** use the immutable validated-code deployment ID to read-only inspect effective Preview configuration and, only through an approved safe identity attestation method, demonstrate the process connects to the independent QA project/Auth tenant. Resolve the Preview expected-SHA mismatch against the *serving* deployment without blindly changing it. Until then owner acceptance remains **0/9**, and `main`/Production remain unchanged.
