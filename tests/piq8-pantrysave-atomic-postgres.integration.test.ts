@@ -8,6 +8,7 @@ import {
   FINISH_CAPTURE_INTERPRETATION_SQL, RECORD_CAPTURE_JOB_CREATED_SQL,
 } from '../server/nutrition/label-jobs.js'
 import { ATOMIC_MEAL_PHOTO_LOG_SQL as LOG } from '../server/nutrition/meal.js'
+import { ATOMIC_LABEL_PANTRY_TO_LOG_SQL as LABEL_LOG } from '../server/nutrition/label-atomic.js'
 import { assertPiqPostgresFixtureTarget, assertPiqPostgresFixtureSession } from '../server/piq-postgres-fixture.js'
 
 const url=process.env.PIQ_POSTGRES_URL
@@ -17,6 +18,7 @@ const a=new pg.Client({connectionString:url??fallback})
 const b=new pg.Client({connectionString:url??fallback})
 let source=''
 let mealSource=''
+let labelSource=''
 const schema='piq_meal_atomic'
 const contents=(s:string)=>readFileSync('migrations/'+s,'utf8')
 const params=(job:string,fp:string,name:string)=>[
@@ -59,6 +61,7 @@ describe.skipIf(!url)('PIQ-8 atomic Pantry first-save on isolated real PostgreSQ
     await a.query(later.slice(from,to))
     source=String((await a.query("SELECT id FROM data_sources WHERE key='health_app'")).rows[0].id)
     mealSource=String((await a.query("SELECT id FROM data_sources WHERE key='meal_photo'")).rows[0].id)
+    labelSource=String((await a.query("SELECT id FROM data_sources WHERE key='nutrition_label'")).rows[0].id)
   },35000)
   beforeEach(async()=>{if(url)await a.query('TRUNCATE nutrition_capture_jobs,source_record_links,nutrition_entries,nutrition_foods')})
   afterAll(async()=>{if(!url)return;await b.end();await a.query('DROP SCHEMA '+schema+' CASCADE');await a.end()})
@@ -312,4 +315,66 @@ describe.skipIf(!url)('PIQ-8 atomic Pantry first-save on isolated real PostgreSQ
     expect(await count('source_record_links')).toBe(0)
     expect((await a.query('SELECT status FROM nutrition_capture_jobs WHERE home_ai_job_id=$1',[id])).rows[0].status).toBe('completed')
   })
+
+  it('label Pantry -> Log commits capture, fingerprint and daily entry together',async()=>{
+    const job=randomUUID(),foodId=randomUUID(),entryId=randomUUID()
+    await a.query("INSERT INTO nutrition_foods(id,name,catalog_kind,serving_quantity,serving_unit,calories,source_kind) VALUES($1,'Fictional label Pantry','packaged',1,'serving',120,'photo_ai')",[foodId])
+    await a.query("INSERT INTO nutrition_capture_jobs(home_ai_job_id,capture_kind,status,food_id) VALUES($1,'nutrition_label','committed',$2)",[job,foodId])
+    const params=[job,foodId,labelSource,randomUUID(),'nutrition-label-v1-job:'+job,entryId,'{}',JSON.stringify(logged(entryId,foodId,null,'Fictional label Pantry'))]
+    const result=await b.query(LABEL_LOG,params)
+    expect(result.rows).toHaveLength(1)
+    expect(result.rows[0].entry_id).toBe(entryId)
+    expect((await a.query('SELECT entry_id::text AS entry_id FROM nutrition_capture_jobs WHERE home_ai_job_id=$1',[job])).rows[0].entry_id).toBe(entryId)
+    expect(await count('nutrition_entries')).toBe(1)
+    expect(await count('source_record_links')).toBe(1)
+    expect((await a.query('SELECT count(*)::int AS n FROM nutrition_foods')).rows[0].n).toBe(1)
+    expect((await b.query(LABEL_LOG,params)).rows).toHaveLength(0)
+    expect(await count('nutrition_entries')).toBe(1)
+  })
+
+  it('label Pantry -> Log races choose one first writer and never duplicate the daily entry',async()=>{
+    const job=randomUUID(),foodId=randomUUID()
+    await a.query("INSERT INTO nutrition_foods(id,name,catalog_kind,serving_quantity,serving_unit,calories,source_kind) VALUES($1,'Race label Pantry','packaged',1,'serving',120,'photo_ai')",[foodId])
+    await a.query("INSERT INTO nutrition_capture_jobs(home_ai_job_id,capture_kind,status,food_id) VALUES($1,'nutrition_label','committed',$2)",[job,foodId])
+    const run=(entryId:string)=>[
+      job,foodId,labelSource,randomUUID(),'nutrition-label-v1-job:'+job,
+      entryId,'{}',JSON.stringify(logged(entryId,foodId,null,'Race label Pantry')),
+    ]
+    const [left,right]=await Promise.all([
+      a.query(LABEL_LOG,run(randomUUID())),
+      b.query(LABEL_LOG,run(randomUUID())),
+    ])
+    expect([left.rows.length,right.rows.length].sort()).toEqual([0,1])
+    expect(await count('nutrition_entries')).toBe(1)
+    expect(await count('source_record_links')).toBe(1)
+  })
+
+  it('label Pantry -> Log invalid entry rolls back the source claim and keeps Pantry-only state',async()=>{
+    const job=randomUUID(),foodId=randomUUID(),entryId=randomUUID()
+    await a.query("INSERT INTO nutrition_foods(id,name,catalog_kind,serving_quantity,serving_unit,calories,source_kind) VALUES($1,'Invalid label Pantry','packaged',1,'serving',120,'photo_ai')",[foodId])
+    await a.query("INSERT INTO nutrition_capture_jobs(home_ai_job_id,capture_kind,status,food_id) VALUES($1,'nutrition_label','committed',$2)",[job,foodId])
+    const invalid={...logged(entryId,foodId,null,'Invalid label Pantry'),calories:-9}
+    await expect(b.query(LABEL_LOG,[
+      job,foodId,labelSource,randomUUID(),'nutrition-label-v1-job:'+job,
+      entryId,'{}',JSON.stringify(invalid),
+    ])).rejects.toMatchObject({code:'23514'})
+    expect(await count('nutrition_entries')).toBe(0)
+    expect(await count('source_record_links')).toBe(0)
+    const capture=(await a.query('SELECT status,food_id,entry_id FROM nutrition_capture_jobs WHERE home_ai_job_id=$1',[job])).rows[0]
+    expect(capture).toMatchObject({status:'committed',food_id:foodId,entry_id:null})
+  })
+
+  it('owner-deleted label entry cannot be resurrected by an old Pantry-to-Log request',async()=>{
+    const job=randomUUID(),foodId=randomUUID(),entryId=randomUUID()
+    await a.query("INSERT INTO nutrition_foods(id,name,catalog_kind,serving_quantity,serving_unit,calories,source_kind) VALUES($1,'Deleted label Pantry','packaged',1,'serving',120,'photo_ai')",[foodId])
+    await a.query("INSERT INTO nutrition_capture_jobs(home_ai_job_id,capture_kind,status,food_id,interpretation) VALUES($1,'nutrition_label','committed',$2,jsonb_build_object('ownerDeletedEntryId',$3::text))",[job,foodId,randomUUID()])
+    const out=await b.query(LABEL_LOG,[
+      job,foodId,labelSource,randomUUID(),'nutrition-label-v1-job:'+job,
+      entryId,'{}',JSON.stringify(logged(entryId,foodId,null,'Deleted label Pantry')),
+    ])
+    expect(out.rows).toHaveLength(0)
+    expect(await count('nutrition_entries')).toBe(0)
+    expect(await count('source_record_links')).toBe(0)
+  })
+
 })

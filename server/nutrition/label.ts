@@ -25,6 +25,7 @@ import { HttpError, parseMultipart, type ApiRequest } from '../http.js'
 import type { HomeAiClient } from '../integrations/home-ai/client.js'
 import { getHomeAiClient } from '../integrations/home-ai/client.js'
 import { getSql } from '../db.js'
+import { ATOMIC_LABEL_PANTRY_TO_LOG_SQL } from './label-atomic.js'
 import { lookupNutritionBarcode } from './service.js'
 import {
   getEntry,
@@ -525,7 +526,7 @@ export async function commitNutritionLabel(body: unknown): Promise<{
       } else if (!shouldLog && food) {
         return { food, entry: null }
       } else if (shouldLog && food) {
-        return createLabelEntry({ input, food, jobId })
+        return createLabelEntry({ input, food, jobId, atomicPantryToLog: true })
       }
     }
     const existing = await findEntryByFingerprint(jobId)
@@ -652,6 +653,7 @@ async function createLabelEntry(input: {
   input: ReturnType<typeof commitNutritionLabelRequestSchema.parse>
   food: NutritionFood
   jobId?: string
+  atomicPantryToLog?: boolean
   snapshotSource?: {
     calories: number
     protein: number | null
@@ -681,6 +683,47 @@ async function createLabelEntry(input: {
   const snapshot = snapshotFromDefinition(snapshotSource, { quantity: logQuantity })
 
   const entryId = randomUUID()
+
+  if (input.atomicPantryToLog && jobId) {
+    const sql = await getSql()
+    const sourceId = await nutritionLabelSourceId()
+    const entryFields = [
+      'id', 'log_date', 'consumed_at', 'timezone', 'meal', 'food_id',
+      'food_name', 'brand', 'serving_quantity', 'serving_unit', 'grams',
+      'calories', 'protein', 'carbs', 'fat', 'fiber', 'sodium',
+      'source_kind', 'notes', 'meal_group_id',
+    ] as const
+    const entryValues = [
+      entryId, resolved.logDate, null,
+      request.timezone ?? NUTRITION_CONFIG.calendarTimeZone,
+      null, food.id, food.name, food.brand, logQuantity, food.servingUnit,
+      snapshot.grams, snapshot.calories, snapshot.protein,
+      snapshot.carbs, snapshot.fat, snapshot.fiber, snapshot.sodium,
+      'photo_ai', null, null,
+    ]
+    const entryJson = Object.fromEntries(entryFields.map((key, index) => [key, entryValues[index] ?? null]))
+    const saved = await sql.query(ATOMIC_LABEL_PANTRY_TO_LOG_SQL, [
+      jobId, food.id, sourceId, randomUUID(), nutritionLabelJobFingerprint(jobId),
+      entryId, JSON.stringify({ pipeline: 'nutrition-label-v1', reviewed: true, basis: request.basis }),
+      JSON.stringify(entryJson),
+    ]) as Array<{ entry_id: string }>
+    if (saved[0]) {
+      const entry = await getEntry(saved[0].entry_id)
+      if (entry) return { food, entry }
+    }
+    // Concurrent retry: reconcile the first committed association. Never
+    // create an orphan daily entry or re-log a deliberately deleted one.
+    const current = await findCommittedLabelFood(jobId)
+    if (current?.entryDeleted) {
+      throw new HttpError(409, 'This label log was deleted. Log a new Pantry entry if desired.', undefined, 'CAPTURE_ENTRY_DELETED')
+    }
+    if (current?.foodId === food.id && current.entryId) {
+      const entry = await getEntry(current.entryId)
+      if (entry) return { food, entry }
+    }
+    throw new HttpError(409, 'That scanned label was already finalized elsewhere')
+  }
+
   const linkId = randomUUID()
   if (jobId) {
     const sql = await getSql()
