@@ -98,8 +98,9 @@ describe.skipIf(!url)('PIQ-8 atomic Pantry first-save on isolated real PostgreSQ
     expect(rejected.rows).toHaveLength(0)
     const stored=(await a.query('SELECT status,food_id,entry_id FROM nutrition_capture_jobs WHERE home_ai_job_id=$1',[id])).rows[0]
     expect(stored).toMatchObject({status:'committed',food_id:pantryId,entry_id:null})
-    // Identical lost-response retry is harmless and leaves the association.
-    expect((await b.query(RECORD_CAPTURE_COMMITTED_SQL,[id,pantryId,null])).rows).toHaveLength(1)
+    // Label-only completion cannot mutate a Meal Photo, even on a replay.
+    // Its atomic Pantry/Log path already owns idempotent Meal Photo retries.
+    expect((await b.query(RECORD_CAPTURE_COMMITTED_SQL,[id,pantryId,null])).rows).toHaveLength(0)
     expect((await a.query('SELECT entry_id FROM nutrition_capture_jobs WHERE home_ai_job_id=$1',[id])).rows[0].entry_id).toBeNull()
   })
 
@@ -107,11 +108,13 @@ describe.skipIf(!url)('PIQ-8 atomic Pantry first-save on isolated real PostgreSQ
     const id=await init()
     const entryId=randomUUID()
     await a.query("INSERT INTO nutrition_entries(id,log_date,timezone,food_name,serving_quantity,serving_unit,calories,source_kind) VALUES($1,'2026-10-01','America/Phoenix','Fictional estimate',1,'meal',200,'photo_ai')",[entryId])
-    expect((await b.query(RECORD_CAPTURE_COMMITTED_SQL,[id,null,entryId])).rows).toHaveLength(1)
+    // A Label finalizer must not turn an uncommitted Meal Photo into a label.
+    expect((await b.query(RECORD_CAPTURE_COMMITTED_SQL,[id,null,entryId])).rows).toHaveLength(0)
     const saved=(await a.query('SELECT status,food_id,entry_id FROM nutrition_capture_jobs WHERE home_ai_job_id=$1',[id])).rows[0]
-    expect(saved).toMatchObject({status:'committed',food_id:null,entry_id:entryId})
-    // Original estimated-entry response may be retried safely.
-    expect((await b.query(RECORD_CAPTURE_COMMITTED_SQL,[id,null,entryId])).rows).toHaveLength(1)
+    expect(saved).toMatchObject({status:'completed',food_id:null,entry_id:null})
+    // The Label finalizer cannot accept either the original or a changed
+    // estimate; the Meal Photo log/estimate transaction owns these writes.
+    expect((await b.query(RECORD_CAPTURE_COMMITTED_SQL,[id,null,entryId])).rows).toHaveLength(0)
     // A subsequent changed estimate cannot replace this committed entry.
     expect((await b.query(RECORD_CAPTURE_COMMITTED_SQL,[id,null,randomUUID()])).rows).toHaveLength(0)
   })
@@ -125,6 +128,33 @@ describe.skipIf(!url)('PIQ-8 atomic Pantry first-save on isolated real PostgreSQ
     await a.query("INSERT INTO nutrition_entries(id,log_date,timezone,food_id,food_name,serving_quantity,serving_unit,calories,source_kind) VALUES($1,'2026-10-01','America/Phoenix',$2,'Fictional label',1,'serving',100,'photo_ai')",[entryId,foodId])
     expect((await b.query(RECORD_CAPTURE_COMMITTED_SQL,[id,foodId,entryId])).rows).toHaveLength(1)
     expect((await a.query('SELECT entry_id FROM nutrition_capture_jobs WHERE home_ai_job_id=$1',[id])).rows[0].entry_id).toBe(entryId)
+  })
+
+  it('label completion preserves Pantry-to-Log but rejects changed approved food or entry identities',async()=>{
+    const id=randomUUID(),foodId=randomUUID(),otherFood=randomUUID()
+    const entryId=randomUUID(),otherEntry=randomUUID()
+    await a.query("INSERT INTO nutrition_foods(id,name,catalog_kind,serving_quantity,serving_unit,calories,source_kind) VALUES($1,'Fictional Label A','packaged',1,'serving',100,'photo_ai'),($2,'Fictional Label B','packaged',1,'serving',120,'photo_ai')",[foodId,otherFood])
+    await a.query("INSERT INTO nutrition_entries(id,log_date,timezone,food_id,food_name,serving_quantity,serving_unit,calories,source_kind) VALUES($1,'2026-10-01','America/Phoenix',$3,'Fictional Label A',1,'serving',100,'photo_ai'),($2,'2026-10-01','America/Phoenix',$3,'Fictional Label A',1,'serving',100,'photo_ai')",[entryId,otherEntry,foodId])
+    await a.query("INSERT INTO nutrition_capture_jobs(home_ai_job_id,capture_kind,status) VALUES($1,'nutrition_label','completed')",[id])
+    expect((await b.query(RECORD_CAPTURE_COMMITTED_SQL,[id,foodId,null])).rows).toHaveLength(1)
+    expect((await b.query(RECORD_CAPTURE_COMMITTED_SQL,[id,otherFood,null])).rows).toHaveLength(0)
+    expect((await b.query(RECORD_CAPTURE_COMMITTED_SQL,[id,foodId,entryId])).rows).toHaveLength(1)
+    // A lost-response retry is idempotent; different food/entry or removing
+    // an existing log must not overwrite the owner's approved association.
+    expect((await b.query(RECORD_CAPTURE_COMMITTED_SQL,[id,foodId,entryId])).rows).toHaveLength(1)
+    expect((await b.query(RECORD_CAPTURE_COMMITTED_SQL,[id,foodId,otherEntry])).rows).toHaveLength(0)
+    expect((await b.query(RECORD_CAPTURE_COMMITTED_SQL,[id,otherFood,entryId])).rows).toHaveLength(0)
+    expect((await b.query(RECORD_CAPTURE_COMMITTED_SQL,[id,foodId,null])).rows).toHaveLength(0)
+    const saved=(await a.query('SELECT status,food_id,entry_id FROM nutrition_capture_jobs WHERE home_ai_job_id=$1',[id])).rows[0]
+    expect(saved).toMatchObject({status:'committed',food_id:foodId,entry_id:entryId})
+  })
+
+  it('refuses to convert an uncommitted Meal Photo into a Label via forged capture id',async()=>{
+    const id=await init(),foodId=randomUUID()
+    await a.query("INSERT INTO nutrition_foods(id,name,catalog_kind,serving_quantity,serving_unit,calories,source_kind) VALUES($1,'Fictional Cross-Kind','custom',1,'serving',80,'photo_ai')",[foodId])
+    expect((await b.query(RECORD_CAPTURE_COMMITTED_SQL,[id,foodId,null])).rows).toHaveLength(0)
+    const snapshot=(await a.query('SELECT capture_kind,status,food_id,entry_id FROM nutrition_capture_jobs WHERE home_ai_job_id=$1',[id])).rows[0]
+    expect(snapshot).toMatchObject({capture_kind:'meal_photo',status:'completed',food_id:null,entry_id:null})
   })
 
   it('late job-created callback cannot rewrite an owner-approved Meal Photo',async()=>{
