@@ -73,7 +73,9 @@ describe('pending workout-photo review reconciliation', () => {
     updates.refresh()
     await Promise.resolve()
     updates.refresh()
-    await Promise.resolve()
+    // The rejected fetch travels through the promise .then().catch() chain.
+    // Flush queued microtasks without advancing the 1-second retry timer.
+    await vi.advanceTimersByTimeAsync(0)
     expect(onJobs).toHaveBeenCalledTimes(1)
     expect(onJobs).toHaveBeenLastCalledWith(original)
     expect(onError).toHaveBeenLastCalledWith('Temporary connection failure')
