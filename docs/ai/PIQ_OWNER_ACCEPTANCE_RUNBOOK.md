@@ -1,3 +1,5 @@
+> **2026-10-19 Phoenix / 2026-10-20 UTC release snapshot:** Latest code candidate `6c487e659a184c0706a28cbe16820eeee7ae98d5` passed exact-SHA [application CI](https://github.com/daurham/daurham-health/actions/runs/39359003775) and [isolated PostgreSQL 16/18 CI](https://github.com/daurham/daurham-health/actions/runs/39359003848). Read-only independent QA Neon migration head is 60/60. Later Vercel read-only PIQ Preview env inventory confirms the formerly missing secret and owner-comparison **keys are present**, but does **not** attest values or runtime. The expected Preview SHA differs from latest validated code, while actual Vercel deployment responses remain unavailable (403 scoped, empty unscoped). Thus the release/owner runbook below remains **NOT RUN**; 0/9 formal PIQ phases and A1–A10/P1–P4 device checks are all unsigned. Do not disable the Preview 503 lock or promote Production. Refer to [PIQ_RELEASE_READINESS_20261020.md](./PIQ_RELEASE_READINESS_20261020.md) for one current, consolidated handoff instead of redoing credential setup.
+
 # PIQ controlled owner acceptance and release runbook
 
 
