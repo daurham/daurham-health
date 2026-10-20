@@ -511,6 +511,11 @@ export async function commitNutritionLabel(body: unknown): Promise<{
     }
     const committed = await findCommittedLabelFood(jobId)
     if (committed) {
+      // Deleting a scanned entry is the owner's durable decision, not an
+      // invitation for an old photo-review request to recreate the log.
+      if (shouldLog && committed.entryDeleted) {
+        throw new HttpError(409, 'This scanned food-log entry was deleted. Log the Pantry food again as a new entry if desired.', undefined, 'CAPTURE_ENTRY_DELETED')
+      }
       const food = await getFood(committed.foodId)
       if (committed.entryId) {
         const entry = await getEntry(committed.entryId)
@@ -705,6 +710,9 @@ async function createLabelEntry(input: {
         const racedFood = raced.foodId ? await getFood(raced.foodId) : food
         return { food: racedFood ?? food, entry: raced }
       }
+      // A prior source claim without a surviving entry is a deleted or
+      // interrupted capture. Never create an orphan entry on a retry.
+      throw new HttpError(409, 'That scanned label was already finalized. Log the Pantry food as a fresh entry.', undefined, 'CAPTURE_ENTRY_DELETED')
     }
   }
 
