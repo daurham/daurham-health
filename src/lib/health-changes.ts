@@ -11,10 +11,22 @@ export function isReviewQueueMutation(url: string, method: string): boolean {
   } catch {
     return false
   }
-  const queuePath = '/api/training/transcription/jobs/'
-  const jobPath = path.startsWith(queuePath) ? path.slice(queuePath.length) : ''
-  return (method.toUpperCase() === 'POST' && path === '/api/training/transcription/jobs')
-    || (method.toUpperCase() === 'DELETE' && jobPath.length > 0 && !jobPath.includes('/'))
+  const verb = method.toUpperCase()
+  const workoutQueue = '/api/training/transcription/jobs/'
+  const workoutJob = path.startsWith(workoutQueue) ? path.slice(workoutQueue.length) : ''
+  if (verb === 'POST' && path === '/api/training/transcription/jobs') return true
+  if (verb === 'DELETE' && workoutJob.length > 0 && !workoutJob.includes('/')) return true
+  if (verb === 'POST' && path === '/api/nutrition/label/commit') return true
+
+  // Only label/meal photo queue creation, dismissal, or reanalysis should
+  // refresh attention cards. Ordinary Nutrition edits use canonical notices.
+  const parts = path.split('/').filter(Boolean)
+  if (parts[0] !== 'api' || parts[1] !== 'nutrition'
+      || (parts[2] !== 'meal' && parts[2] !== 'label')
+      || parts[3] !== 'jobs') return false
+  if (verb === 'POST' && parts.length === 4) return true
+  if (verb === 'DELETE' && parts.length === 5 && parts[4]) return true
+  return verb === 'POST' && parts.length === 6 && !!parts[4] && parts[5] === 'reanalyze'
 }
 
 export function isCoachRelevantMutation(url: string, method: string): boolean {
