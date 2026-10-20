@@ -25,7 +25,7 @@ import { HttpError, parseMultipart, type ApiRequest } from '../http.js'
 import type { HomeAiClient } from '../integrations/home-ai/client.js'
 import { getHomeAiClient } from '../integrations/home-ai/client.js'
 import { getSql } from '../db.js'
-import { ATOMIC_LABEL_PANTRY_TO_LOG_SQL } from './label-atomic.js'
+import { ATOMIC_LABEL_INITIAL_COMMIT_SQL, ATOMIC_LABEL_PANTRY_TO_LOG_SQL } from './label-atomic.js'
 import { lookupNutritionBarcode } from './service.js'
 import {
   getEntry,
@@ -471,6 +471,136 @@ function uniqueConflict(error: unknown): boolean {
   )
 }
 
+
+/**
+ * A scanned label's FIRST save is a single database statement. We resolve
+ * user-editable food and serving decisions before it, but only the capture
+ * row lock winner can write the food, entry, provenance and completion state.
+ * Legacy requests without a capture job keep the old manual-food route.
+ */
+async function commitInitialLabelCaptureAtomic(options: {
+  jobId: string
+  shouldLog: boolean
+  action: 'create' | 'log_existing' | 'update_and_log'
+  existingFoodId: string | null
+  request: ReturnType<typeof commitNutritionLabelRequestSchema.parse>
+  barcode: string | null
+}): Promise<{ food: NutritionFood; entry: NutritionEntry | null }> {
+  const { jobId, shouldLog, action, existingFoodId, request, barcode } = options
+  const existingFood = existingFoodId ? await getFood(existingFoodId) : null
+  if (action !== 'create' && !existingFood) {
+    throw new HttpError(404, 'Food not found')
+  }
+  const foodId = action === 'create' ? randomUUID() : existingFoodId!
+  const entryId = randomUUID()
+  const name = action === 'log_existing' ? existingFood!.name : request.productName.trim()
+  const brand = action === 'log_existing' ? existingFood!.brand : request.brand?.trim() || null
+  const servingUnit = action === 'log_existing' ? existingFood!.servingUnit : request.servingUnit.trim()
+  const nutrients = action === 'log_existing'
+    ? {
+        calories: existingFood!.calories,
+        protein: existingFood!.protein,
+        carbs: existingFood!.carbs,
+        fat: existingFood!.fat,
+        fiber: existingFood!.fiber,
+        sodium: existingFood!.sodium ?? null,
+        servingGrams: existingFood!.servingGrams,
+      }
+    : {
+        calories: request.calories,
+        protein: request.proteinGrams ?? null,
+        carbs: request.carbsGrams ?? null,
+        fat: request.fatGrams ?? null,
+        fiber: request.fiberGrams ?? null,
+        sodium: request.sodiumMg ?? null,
+        servingGrams: request.servingGrams ?? null,
+      }
+  const logQuantity = request.logQuantity ?? 1
+  const snapshot = snapshotFromDefinition(nutrients, { quantity: logQuantity })
+  const date = resolveEntryLogDate({
+    logDate: request.logDate,
+    consumedAt: null,
+    timezone: request.timezone ?? NUTRITION_CONFIG.calendarTimeZone,
+  })
+  const reviewedFood = {
+    name: request.productName.trim(),
+    brand: request.brand?.trim() || null,
+    barcode,
+    catalog_kind: request.catalogKind ?? (barcode ? 'packaged' : 'custom'),
+    serving_quantity: request.servingQuantity,
+    serving_unit: request.servingUnit.trim(),
+    serving_grams: request.servingGrams ?? null,
+    calories: request.calories,
+    protein: request.proteinGrams ?? null,
+    carbs: request.carbsGrams ?? null,
+    fat: request.fatGrams ?? null,
+    fiber: request.fiberGrams ?? null,
+    sodium: request.sodiumMg ?? null,
+  }
+  const reviewedEntry = {
+    id: entryId,
+    log_date: date.logDate,
+    consumed_at: null,
+    timezone: request.timezone ?? NUTRITION_CONFIG.calendarTimeZone,
+    meal: null,
+    food_id: foodId,
+    food_name: name,
+    brand,
+    serving_quantity: logQuantity,
+    serving_unit: servingUnit,
+    grams: snapshot.grams,
+    calories: snapshot.calories,
+    protein: snapshot.protein,
+    carbs: snapshot.carbs,
+    fat: snapshot.fat,
+    fiber: snapshot.fiber,
+    sodium: snapshot.sodium,
+    source_kind: 'photo_ai',
+    notes: null,
+    meal_group_id: null,
+  }
+  const sql = await getSql()
+  const sourceId = await nutritionLabelSourceId()
+  // The first Pantry-only claim does not consume the later Log fingerprint.
+  const fingerprint = nutritionLabelJobFingerprint(jobId) + (shouldLog ? '' : ':pantry')
+  const params = [
+    jobId, action, shouldLog, existingFoodId, foodId,
+    entryId, sourceId, randomUUID(), fingerprint,
+    JSON.stringify({ pipeline: 'nutrition-label-v1', reviewed: true, basis: request.basis }),
+    JSON.stringify(reviewedFood),
+    JSON.stringify(reviewedEntry),
+  ]
+  const rows = await sql.query(ATOMIC_LABEL_INITIAL_COMMIT_SQL, params) as Array<{
+    food_id: string
+    entry_id: string | null
+  }>
+  const winner = rows[0]
+  if (winner) {
+    const food = await getFood(winner.food_id)
+    const entry = winner.entry_id ? await getEntry(winner.entry_id) : null
+    if (food && (!shouldLog || entry)) return { food, entry }
+    throw new HttpError(500, 'Label saved but could not be retrieved. Reopen your Nutrition page.')
+  }
+  // The concurrent loser must reconcile the winner instead of replaying
+  // their stale food edits or creating another daily log entry.
+  const committed = await findCommittedLabelFood(jobId)
+  if (committed?.entryDeleted && shouldLog) {
+    throw new HttpError(409, 'This scanned entry was deleted. Log a new Pantry entry if desired.', undefined, 'CAPTURE_ENTRY_DELETED')
+  }
+  if (committed) {
+    const food = await getFood(committed.foodId)
+    if (food && committed.entryId) {
+      const entry = await getEntry(committed.entryId)
+      if (entry) return { food, entry }
+    }
+    if (food && !shouldLog) return { food, entry: null }
+    if (food && shouldLog) {
+      return createLabelEntry({ input: request, food, jobId, atomicPantryToLog: true })
+    }
+  }
+  throw new HttpError(409, 'This scanned label was already finalized elsewhere. Refresh the review.')
+}
+
 export async function commitNutritionLabel(body: unknown): Promise<{
   food: NutritionFood
   entry: NutritionEntry | null
@@ -553,6 +683,22 @@ export async function commitNutritionLabel(body: unknown): Promise<{
     throw new HttpError(plan.status, plan.message)
   }
 
+  if (jobId) {
+    try {
+      return await commitInitialLabelCaptureAtomic({
+        jobId, shouldLog, action: plan.type,
+        existingFoodId: plan.type === 'create' ? null : plan.foodId,
+        request: input, barcode,
+      })
+    } catch (error) {
+      if (uniqueConflict(error) && barcode) {
+        throw new HttpError(409, 'Existing Health food found. Log using the existing food or update it from the label.')
+      }
+      throw error
+    }
+  }
+
+  // Preserve non-photo/manual callers without a verified capture job.
   let food: NutritionFood | null = null
   if (plan.type === 'log_existing') {
     food = await getFood(plan.foodId)
