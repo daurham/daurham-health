@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createPendingReviewRefresh } from '../src/features/training/pending-review-refresh.ts'
+import { createPendingReviewRefresh } from '../src/lib/pending-review-refresh.ts'
 
 type Review = { id: string; status: 'queued' | 'processing' | 'completed' | 'failed' }
 
