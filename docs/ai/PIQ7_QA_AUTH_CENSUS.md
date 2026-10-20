@@ -1,5 +1,7 @@
 # PIQ-7 QA Auth directory: counts-only evidence and release boundaries
 
+> **Current read-only QA Auth recheck (2026-10-19/20) — supersedes the historical figures in this document:** Neon QA `neon_auth` aggregate counts are now **2 users, 2 accounts, 1 account with password credentials, 1 session, 1 unexpired session, zero verified users, and zero users or sessions older than the independent QA root**. Read-only comparison of provider metadata confirms the QA and Production `better_auth` integrations have distinct provider project IDs; identifiers were not printed. **Do not assume** this session belongs to the documented fixture or is safe for owner testing; only operator-approved attribution can establish that. **Do not revoke/delete it automatically.** Full QA public-table census is 76/76 non-seeded app tables exactly empty; it does not prove historical initial-empty-root SQL or deployed runtime bindings. Production health and Auth records were never read; no session content/token/email was retrieved. No Auth, DB, env, deployment or API-lock changes occurred. PIQ owner acceptance stays **0/9**.
+
 **2026-10-18 Phoenix · Development branch only · No authorization to log in or release.**
 
 ## Provider-backed read-only observation
