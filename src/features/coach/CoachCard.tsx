@@ -293,7 +293,7 @@ export function CoachCard({ state, pending, error, onState }: {
     setNotice(null)
     try {
       const next = await respondCoachRecommendation(item.id, response, item.responseAt, item.contextRevision, feedbackReason)
-      setIntelligence({ sourceState: state, value: next })
+      setIntelligence(state ? { sourceState: state, value: next } : null)
       if (response === 'do_this') {
         setNotice('Your reported start was saved. This does not verify a plan change; Coach will ask for your impression after seven days.')
       } else if (response === 'not_now') {
@@ -304,7 +304,7 @@ export function CoachCard({ state, pending, error, onState }: {
     } catch (caught) {
       if (caught instanceof CoachApiError && (caught.status === 409 || caught.status === 428)) {
         try {
-          setIntelligence({ sourceState: state, value: await fetchCoachIntelligence() })
+          setIntelligence(state ? { sourceState: state, value: await fetchCoachIntelligence() } : null)
           setNotice('Coach changed in another tab. Review the updated recommendation before deciding.')
         } catch {
           setActionError('Could not refresh Coach. Reopen the page before responding.')
@@ -320,12 +320,12 @@ export function CoachCard({ state, pending, error, onState }: {
     setActionError(null)
     setNotice(null)
     try {
-      setIntelligence({ sourceState: state, value: await recordCoachRecommendationOutcome(item.id, outcome, item.responseAt) })
+      setIntelligence(state ? { sourceState: state, value: await recordCoachRecommendationOutcome(item.id, outcome, item.responseAt) } : null)
       setNotice('Outcome saved. Coach will use that feedback as recommendation memory.')
     } catch (caught) {
       if (caught instanceof CoachApiError && (caught.status === 409 || caught.status === 428)) {
         try {
-          setIntelligence({ sourceState: state, value: await fetchCoachIntelligence() })
+          setIntelligence(state ? { sourceState: state, value: await fetchCoachIntelligence() } : null)
           setNotice('The follow-up changed. Review the current Coach state before responding.')
         } catch {
           setActionError('Could not refresh Coach. Reopen the page before responding.')
