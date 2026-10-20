@@ -7,6 +7,8 @@ import {
   coachWeek,
   evidenceLabel,
   generalDailyCandidates,
+  coachContextTagsForTrainingIntent,
+  coachDailyTrainingTaskConflictsWithRest,
   manualRuleByKey,
   rankCoachCandidates,
   type CoachCandidate,
@@ -303,27 +305,25 @@ async function loadCurrentStretch(sql: Sql, date: string): Promise<CoachTaskRow 
   return rows[0] ?? null
 }
 
-async function ensureStretch(sql: Sql, date: string, now: Date): Promise<void> {
+async function ensureStretch(sql: Sql, date: string, now: Date, input: CoachCandidateInputs): Promise<void> {
   const current = await loadCurrentStretch(sql, date)
   if (current?.status === 'offered' || current?.status === 'active') return
-  const [observations, history, goalResult, context] = await Promise.all([
+  const [observations, history] = await Promise.all([
     loadStretchObservations(sql, addCalendarDays(date, -STRETCH_CONFIG.baselineDays), date, now),
     loadStretchHistory(sql, date),
-    listGoals(),
-    getDailyContext(date),
   ])
   const candidates = stretchCandidates({
     date,
     observations,
     history,
-    goals: goalResult.goals.map((goal) => ({
+    goals: input.goals.map((goal) => ({
       id: goal.id,
       kind: goal.goalKind,
       status: goal.status,
       exerciseDefinitionId: goal.selector?.exerciseDefinitionId ?? null,
       trainingMinDistanceM: goal.selector?.trainingMinDistanceM ?? null,
     })),
-    contextTags: context?.tags ?? [],
+    contextTags: coachContextTagsForTrainingIntent(input.context?.tags ?? [], input.trainingPlan.today?.effectiveIntent),
   })
   const candidate = candidates[0]
   if (!candidate) return
@@ -679,7 +679,9 @@ async function dailyCandidates(date: string, input: CoachCandidateInputs): Promi
     })
   }
 
-  return [...candidates, ...generalDailyCandidates(date, context?.tags ?? [])]
+  return [...candidates, ...generalDailyCandidates(
+    date, coachContextTagsForTrainingIntent(context?.tags ?? [], trainingPlan.today?.effectiveIntent),
+  )]
 }
 
 async function insertCandidate(sql: Sql, candidate: CoachCandidate): Promise<CoachTaskRow | null> {
@@ -1258,19 +1260,18 @@ async function expireInapplicableDailyTrainingTask(
   sql: Sql,
   date: string,
   candidates: readonly CoachCandidate[],
+  todayIntent: string | null | undefined,
 ): Promise<void> {
   const existing = await loadTaskForPeriod(sql, 'daily_quest', date)
   if (
     !existing ||
-    existing.status !== 'active' ||
-    !existing.rule_key.startsWith('goal:training-session:')
-  ) {
-    return
+    existing.status !== 'active'
+  ) return
+  if (candidates.some((candidate) => candidate.ruleKey === existing.rule_key)) return
+  if (existing.rule_key.startsWith('goal:training-session:') ||
+      coachDailyTrainingTaskConflictsWithRest(existing.rule_key, todayIntent)) {
+    await expireTask(sql, existing)
   }
-  if (candidates.some((candidate) => candidate.ruleKey === existing.rule_key)) {
-    return
-  }
-  await expireTask(sql, existing)
 }
 
 async function reconcile(sql: Sql, today: string, now: Date, timezone: string) {
@@ -1418,10 +1419,10 @@ export async function ensureCoach(now = new Date()): Promise<CoachState> {
   const [recent, candidateInput] = await Promise.all([recentRules(sql, date), candidateInputs(date)])
   const weekly = await weeklyCandidates(date, candidateInput)
   const daily = await dailyCandidates(date, candidateInput)
-  await expireInapplicableDailyTrainingTask(sql, date, daily)
+  await expireInapplicableDailyTrainingTask(sql, date, daily, candidateInput.trainingPlan.today?.effectiveIntent)
   await ensurePeriodTask(sql, 'weekly_focus', week.start, weekly, [], date)
   await ensurePeriodTask(sql, 'daily_quest', date, daily, recent, date)
-  await ensureStretch(sql, date, now)
+  await ensureStretch(sql, date, now, candidateInput)
   await reconcile(sql, date, now, timezone)
   return currentState(sql, date, now, timezone)
 }

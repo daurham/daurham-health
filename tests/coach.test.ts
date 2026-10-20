@@ -4,6 +4,8 @@ import {
   coachPeriodFingerprint,
   coachWeek,
   generalDailyCandidates,
+  coachContextTagsForTrainingIntent,
+  coachDailyTrainingTaskConflictsWithRest,
   rankCoachCandidates,
   repetitionPenalty,
   type CoachCandidate,
@@ -89,5 +91,23 @@ describe('general Daily Quest registry safety', () => {
     expect(keys).toContain('manual:yoga:10m')
     expect(keys).toContain('manual:hike:20m')
     expect(keys).not.toContain('manual:shadow-boxing:10m')
+  })
+})
+
+describe('T17: Training Plan rest does not demand an exercise quest for XP', () => {
+  it('suppresses both moderate and low-intensity exercise while preserving nonphysical choices', () => {
+    const rest = generalDailyCandidates('2026-10-19', coachContextTagsForTrainingIntent([], 'rest'))
+    expect(rest.some(item => item.domain === 'training')).toBe(false)
+    expect(rest.some(item => item.domain !== 'training')).toBe(true)
+    expect(generalDailyCandidates('2026-10-19', coachContextTagsForTrainingIntent([], 'flexible'))
+      .some(item => item.domain === 'training')).toBe(true)
+    expect(coachContextTagsForTrainingIntent(['rest_day'], 'rest')).toEqual(['rest_day'])
+  })
+  it('identifies old exercise XP work for retirement without hiding unrelated quests', () => {
+    expect(coachDailyTrainingTaskConflictsWithRest('manual:jumping-jacks:100', 'rest')).toBe(true)
+    expect(coachDailyTrainingTaskConflictsWithRest('manual:yoga:10m', 'rest')).toBe(true)
+    expect(coachDailyTrainingTaskConflictsWithRest('goal:training-session:x', 'rest')).toBe(true)
+    expect(coachDailyTrainingTaskConflictsWithRest('manual:meal-prep:protein', 'rest')).toBe(false)
+    expect(coachDailyTrainingTaskConflictsWithRest('manual:yoga:10m', 'training_preferred')).toBe(false)
   })
 })

@@ -34,6 +34,17 @@ import {
 } from './api'
 import { coachDateLabel, formatStretchValue, isCurrentResolvedCoachTask, pendingStretchAcknowledgement } from './presentation'
 
+/** Hide advice fetched for another Coach snapshot or an unverified reload. */
+export function currentCoachIntelligence(
+  state: CoachState | null,
+  pending: boolean | undefined,
+  error: string | null | undefined,
+  snapshot: { sourceState: CoachState; value: CoachIntelligenceState } | null,
+): CoachIntelligenceState | null {
+  if (!state || pending || error || !snapshot || snapshot.sourceState !== state) return null
+  return snapshot.value
+}
+
 function progressText(task: CoachTaskView): string | null {
   const progress = task.progress
   if (!progress?.label) return null
@@ -107,7 +118,7 @@ export function CoachCard({ state, pending, error, onState }: {
   const [actionPending, setActionPending] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const [xpNotice, setXpNotice] = useState<number | null>(null)
-  const [intelligence, setIntelligence] = useState<CoachIntelligenceState | null>(null)
+  const [intelligence, setIntelligence] = useState<{ sourceState: CoachState; value: CoachIntelligenceState } | null>(null)
   const [intelligenceError, setIntelligenceError] = useState<string | null>(null)
   const celebrationTimerRef = useRef<number | null>(null)
   const previousTaskStatusesRef = useRef<Map<string, CoachTaskView['status']> | null>(null)
@@ -133,7 +144,7 @@ export function CoachCard({ state, pending, error, onState }: {
     setIntelligenceError(null)
     fetchCoachIntelligence()
       .then((next) => {
-        if (!cancelled) setIntelligence(next)
+        if (!cancelled) setIntelligence({ sourceState: state, value: next })
       })
       .catch((caught: unknown) => {
         if (!cancelled) setIntelligenceError(caught instanceof Error ? caught.message : 'Coach intelligence is unavailable.')
@@ -179,7 +190,10 @@ export function CoachCard({ state, pending, error, onState }: {
     if (document.activeElement instanceof HTMLElement) returnFocusRef.current = document.activeElement
   }
 
-  if (!state && !error) return pending ? (
+  const displayedIntelligence = currentCoachIntelligence(state, pending, error, intelligence)
+
+  // Do not expose old quests during reload or after its failure.
+  if (pending) return (
     <section className="min-h-56 overflow-hidden rounded-xl border border-zinc-200 bg-white" aria-label="Loading Coach" aria-busy="true">
       <div className="px-3 pb-2 pt-3">
         <div className="h-3 w-14 animate-pulse rounded bg-zinc-200" />
@@ -198,8 +212,8 @@ export function CoachCard({ state, pending, error, onState }: {
         ))}
       </div>
     </section>
-  ) : null
-  if (!state) return (
+  )
+  if (!state || error) return (
     <section className="rounded-lg border border-zinc-200 bg-white p-3">
       <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Coach</h2>
       <p className="mt-1 text-sm text-zinc-600">{error ?? 'Coach is unavailable.'}</p>
@@ -214,7 +228,7 @@ export function CoachCard({ state, pending, error, onState }: {
   const pendingAck = pendingStretchAcknowledgement(state, acknowledgedStretchId)
   const visibleStretch = stretch && (stretch.status === 'active' || stretch.status === 'offered' || isCurrentResolvedCoachTask(stretch, state.date)) ? stretch : null
   const missions = [daily, visibleStretch, weekly].filter((task): task is CoachTaskView => task != null)
-  const visibleCount = missions.length + labItems.length + labOverflow + (intelligence ? 1 : 0)
+  const visibleCount = missions.length + labItems.length + labOverflow + (displayedIntelligence ? 1 : 0)
   if (visibleCount === 0 && !notice && !actionError && !intelligenceError) return null
 
   function celebrateIfCompleted(task: CoachTaskView, next: CoachState) {
@@ -279,7 +293,7 @@ export function CoachCard({ state, pending, error, onState }: {
     setNotice(null)
     try {
       const next = await respondCoachRecommendation(item.id, response, item.responseAt, item.contextRevision, feedbackReason)
-      setIntelligence(next)
+      setIntelligence({ sourceState: state, value: next })
       if (response === 'do_this') {
         setNotice('Your reported start was saved. This does not verify a plan change; Coach will ask for your impression after seven days.')
       } else if (response === 'not_now') {
@@ -290,7 +304,7 @@ export function CoachCard({ state, pending, error, onState }: {
     } catch (caught) {
       if (caught instanceof CoachApiError && (caught.status === 409 || caught.status === 428)) {
         try {
-          setIntelligence(await fetchCoachIntelligence())
+          setIntelligence({ sourceState: state, value: await fetchCoachIntelligence() })
           setNotice('Coach changed in another tab. Review the updated recommendation before deciding.')
         } catch {
           setActionError('Could not refresh Coach. Reopen the page before responding.')
@@ -306,12 +320,12 @@ export function CoachCard({ state, pending, error, onState }: {
     setActionError(null)
     setNotice(null)
     try {
-      setIntelligence(await recordCoachRecommendationOutcome(item.id, outcome, item.responseAt))
+      setIntelligence({ sourceState: state, value: await recordCoachRecommendationOutcome(item.id, outcome, item.responseAt) })
       setNotice('Outcome saved. Coach will use that feedback as recommendation memory.')
     } catch (caught) {
       if (caught instanceof CoachApiError && (caught.status === 409 || caught.status === 428)) {
         try {
-          setIntelligence(await fetchCoachIntelligence())
+          setIntelligence({ sourceState: state, value: await fetchCoachIntelligence() })
           setNotice('The follow-up changed. Review the current Coach state before responding.')
         } catch {
           setActionError('Could not refresh Coach. Reopen the page before responding.')
@@ -389,9 +403,9 @@ export function CoachCard({ state, pending, error, onState }: {
           ))}
         </div>
 
-        {intelligence ? (
+        {displayedIntelligence ? (
           <CoachIntelligencePanel
-            state={intelligence}
+            state={displayedIntelligence}
             pending={actionPending}
             onResponse={(item, response, reason) => void respondToRecommendation(item, response, reason)}
             onOutcome={(id, outcome) => void recordRecommendationOutcome(id, outcome)}

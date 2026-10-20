@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { coachContextTagsForTrainingIntent } from '../src/domain/coach.ts'
 import {
   STRETCH_SUPPRESSING_TAGS,
   rankStretchCandidates,
@@ -164,5 +165,12 @@ describe('Stretch deterministic context suppression', () => {
 
   it('uses the existing exact vocabulary and allows unlisted context without a readiness claim', () => {
     expect(stretchCandidates({ date: DATE, observations: observations(), history: [], contextTags: ['travel'] })).toHaveLength(1)
+  })
+})
+
+describe('T17: rest-day intent suppresses new Stretch exercise offers', () => {
+  it('does not require a separate Daily Context rest-day entry', () => {
+    expect(stretchCandidates({ date: DATE, observations: observations(), history: [],
+      contextTags: coachContextTagsForTrainingIntent([], 'rest') })).toEqual([])
   })
 })

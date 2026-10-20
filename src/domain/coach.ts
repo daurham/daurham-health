@@ -366,6 +366,21 @@ export function rankCoachCandidates(
   })
 }
 
+/** A planned rest day also suppresses physical Coach work. */
+export function coachContextTagsForTrainingIntent(
+  tags: readonly DailyContextTagKey[], todayIntent: string | null | undefined,
+): DailyContextTagKey[] {
+  return todayIntent === 'rest' && !tags.includes('rest_day') ? [...tags, 'rest_day'] : [...tags]
+}
+
+/** Retire physical XP quests when the owner moves a day to rest. */
+export function coachDailyTrainingTaskConflictsWithRest(
+  ruleKey: string, todayIntent: string | null | undefined,
+): boolean {
+  if (todayIntent !== 'rest') return false
+  return ruleKey.startsWith('goal:training-session:') || manualRuleByKey(ruleKey)?.training != null
+}
+
 export function generalDailyCandidates(
   date: string,
   contextTags: readonly DailyContextTagKey[],
