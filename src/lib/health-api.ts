@@ -1,4 +1,4 @@
-import { isCoachRelevantMutation, notifyHealthDataChanged } from './health-changes'
+import { isCoachRelevantMutation, isReviewQueueMutation, notifyHealthDataChanged, notifyHealthReviewQueueChanged } from './health-changes'
 import { notifyRewardStateChanged } from './reward-events'
 
 export const OWNER_AUTH_REQUIRED = 'health:owner-auth-required'
@@ -34,6 +34,7 @@ export async function healthFetch(input: RequestInfo | URL, init?: RequestInit):
   const method = init?.method ?? (typeof Request !== 'undefined' && input instanceof Request ? input.method : 'GET')
   const url = requestUrl(input)
   if (response.ok && isCoachRelevantMutation(url, method)) notifyHealthDataChanged()
+  if (response.ok && isReviewQueueMutation(url, method)) notifyHealthReviewQueueChanged()
   if (
     response.ok
     && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method.toUpperCase())
