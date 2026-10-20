@@ -25,6 +25,7 @@ import {
   type NutritionMealJobResponse,
 } from '../../src/domain/nutrition/index.js'
 import { HttpError, parseMultipart, type ApiRequest } from '../http.js'
+import { assertReviewNotFinalized } from '../reviews/finalized-review.js'
 import type { HomeAiClient } from '../integrations/home-ai/client.js'
 import { getHomeAiClient } from '../integrations/home-ai/client.js'
 import { getSql } from '../db.js'
@@ -489,6 +490,9 @@ export async function getNutritionMealJob(jobId: string, client?: HomeAiClient):
     throw new HttpError(400, mealFailureMessage('INVALID_JOB_ID'))
   }
   const stored = await getLabelJobRecord(jobId)
+  // Meal Photo saves are terminal; unlike a Label Pantry save, there is no
+  // legitimate subsequent review-to-log step for a committed meal capture.
+  if (stored?.captureKind === 'meal_photo') assertReviewNotFinalized(stored.status, 'meal')
   if (stored?.provider === 'gemini') {
     const ready = await advanceGeminiCapture(stored)
     return mealResponseFromRecord(ready)

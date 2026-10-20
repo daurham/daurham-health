@@ -3,6 +3,8 @@ import { normalizeUserContext, parseNutritionProvider } from '../../src/domain/n
 import { mealFailureMessage } from '../../src/domain/nutrition/meal.js'
 import { dismissNutritionMealJob, getNutritionMealImage, getNutritionMealJob, reanalyzeNutritionMeal } from '../nutrition/meal.js'
 import { withOwnerAuth } from '../auth/with-owner.js'
+import { getLabelJobRecord } from '../nutrition/label-jobs.js'
+import { assertReviewNotFinalized } from '../reviews/finalized-review.js'
 import {
   handleApiError,
   HttpError,
@@ -110,7 +112,12 @@ export default withOwnerAuth(async function nutritionMealJobHandler(req: ApiRequ
       sendJson(res, 405, { error: 'Method not allowed' })
       return
     }
-    sendJson(res, 200, await getNutritionMealJob(parsed))
+    const result = await getNutritionMealJob(parsed)
+    // Prevent in-flight Home-AI responses from resurfacing a capture that
+    // another request committed while its detail was being read.
+    const current = await getLabelJobRecord(parsed)
+    if (current?.captureKind === 'meal_photo') assertReviewNotFinalized(current.status, 'meal')
+    sendJson(res, 200, result)
   } catch (error) {
     handleApiError(res, error)
   }

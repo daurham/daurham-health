@@ -386,7 +386,9 @@ export async function fetchPendingNutritionCaptures(): Promise<PendingNutritionC
 }
 
 export async function fetchNutritionMealJob(jobId: string): Promise<NutritionMealJobResponse> {
-  return parseBarcodeResponse(await healthFetch(`/api/nutrition/meal/jobs/${jobId}`))
+  // Meal detail errors carry capture-specific codes (including an already
+  // committed review), not barcode lookup errors.
+  return parseMealAction(await healthFetch(`/api/nutrition/meal/jobs/${jobId}`))
 }
 
 export async function dismissNutritionMealJob(jobId: string): Promise<void> {

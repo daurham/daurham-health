@@ -1,5 +1,7 @@
 import { z } from 'zod'
 import { dismissTranscriptionJob, getTranscriptionJob } from '../training/transcription.js'
+import { getTranscriptionJobRecord } from '../training/job-store.js'
+import { assertReviewNotFinalized } from '../reviews/finalized-review.js'
 import { HOME_AI_JOB_ID_RE } from '../../src/domain/training-transcription.js'
 import { withOwnerAuth } from '../auth/with-owner.js'
 import {
@@ -33,7 +35,13 @@ export default withOwnerAuth(async function transcriptionJobHandler(req: ApiRequ
       sendJson(res, 405, { error: 'Method not allowed' })
       return
     }
-    sendJson(res, 200, await getTranscriptionJob(parsed.data))
+    // A stale direct link must not revive a committed draft or use Home-AI
+    // as the source of truth after a verified canonical save.
+    assertReviewNotFinalized((await getTranscriptionJobRecord(parsed.data))?.status, 'workout')
+    const result = await getTranscriptionJob(parsed.data)
+    // Cover a commit racing an in-flight provider GET.
+    assertReviewNotFinalized((await getTranscriptionJobRecord(parsed.data))?.status, 'workout')
+    sendJson(res, 200, result)
   } catch (error) {
     handleApiError(res, error)
   }

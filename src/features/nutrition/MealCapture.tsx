@@ -118,7 +118,9 @@ export function MealCaptureSheet({ date, jobId, onClose, onBack, onLogged, onSav
           return
         }
         if (caught instanceof MealClientError) {
-          setError(mealFailureMessage(caught.code))
+          setError(caught.code === 'CAPTURE_ALREADY_SAVED'
+            ? 'This meal photo is already saved. Return to Nutrition to view your logged meal.'
+            : mealFailureMessage(caught.code))
           setErrorCode(caught.code)
         } else {
           setError('Meal analysis is temporarily unavailable.')
@@ -345,7 +347,7 @@ export function MealCaptureSheet({ date, jobId, onClose, onBack, onLogged, onSav
                 </button>
               )}
             </>
-          ) : errorCode !== 'UNSUPPORTED' ? (
+          ) : errorCode !== 'UNSUPPORTED' && errorCode !== 'CAPTURE_ALREADY_SAVED' ? (
             <button type="button" className={primaryClass} onClick={() => setPhase('pick')}>
               Use another photo
             </button>
@@ -353,7 +355,7 @@ export function MealCaptureSheet({ date, jobId, onClose, onBack, onLogged, onSav
           <button type="button" className={secondaryClass + ' w-full'} onClick={() => setManual(true)}>
             Build meal manually
           </button>
-          {activeJobId ? (
+          {activeJobId && errorCode !== 'CAPTURE_ALREADY_SAVED' ? (
             <button type="button" className={secondaryClass + ' w-full'} onClick={() => void discardCapture()}>
               Discard capture
             </button>

@@ -206,9 +206,20 @@ export async function fetchTranscriptionJobs(): Promise<PendingTranscriptionJob[
   return transcriptionJobListResponseSchema.parse(await response.json()).jobs
 }
 
+export class WorkoutReviewAlreadySavedError extends Error {
+  constructor() {
+    super('This workout photo was already saved. Return to Training to view the workout.')
+    this.name = 'WorkoutReviewAlreadySavedError'
+  }
+}
+
 export async function fetchTranscriptionJob(jobId: string): Promise<TranscriptionJobResponse> {
   const response = await healthFetch(`/api/training/transcription/jobs/${jobId}`)
   if (!response.ok) {
+    if (response.status === 409) {
+      const body = await response.clone().json().catch(() => null) as { code?: string } | null
+      if (body?.code === 'CAPTURE_ALREADY_SAVED') throw new WorkoutReviewAlreadySavedError()
+    }
     throw new Error(await readApiError(response))
   }
   return transcriptionJobResponseSchema.parse(await response.json())
