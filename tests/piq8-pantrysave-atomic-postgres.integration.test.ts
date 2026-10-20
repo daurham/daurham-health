@@ -486,7 +486,9 @@ describe.skipIf(!url)('PIQ-8 atomic Pantry first-save on isolated real PostgreSQ
 
   it('first-time create barcode/food uniqueness failure leaves capture uncommitted and no fingerprint',async()=>{
     const job=await initLabel()
-    await a.query("INSERT INTO nutrition_foods(name,catalog_kind,serving_quantity,serving_unit,calories,source_kind) VALUES('Synthetic First Label','packaged',1,'serving',120,'manual')")
+    // The name+brand+catalog uniqueness index treats a different brand as
+    // a separate product; match the reviewed brand to exercise 23505.
+    await a.query("INSERT INTO nutrition_foods(name,brand,catalog_kind,serving_quantity,serving_unit,calories,source_kind) VALUES('Synthetic First Label','Fictional','packaged',1,'serving',120,'manual')")
     await expect(b.query(LABEL_INITIAL,firstArgs(job,'create',true))).rejects.toMatchObject({code:'23505'})
     expect(await count('nutrition_foods')).toBe(1)
     expect(await count('nutrition_entries')).toBe(0)
