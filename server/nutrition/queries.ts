@@ -286,7 +286,30 @@ export const UPDATE_ENTRY_SQL = `UPDATE nutrition_entries SET
          WHERE id = $1
          RETURNING ${ENTRY_COLUMNS}`
 
-export const DELETE_ENTRY_SQL = `DELETE FROM nutrition_entries WHERE id = $1 RETURNING id`
+/** A scanned food-log entry may be referenced by nutrition_capture_jobs.entry_id.
+ * Detach it in the very same PostgreSQL statement as DELETE, retaining an
+ * owner-deletion tombstone so an old scan/retry cannot re-log the same capture.
+ * The Pantry food and unrelated entries remain untouched.
+ */
+export const DELETE_ENTRY_SQL = `
+WITH detached_capture AS (
+  UPDATE nutrition_capture_jobs
+     SET entry_id = NULL,
+         interpretation = jsonb_set(
+           COALESCE(interpretation, '{}'::jsonb),
+           '{ownerDeletedEntryId}',
+           to_jsonb($1::text),
+           true
+         ),
+         updated_at = now()
+   WHERE entry_id = $1::uuid
+   RETURNING home_ai_job_id
+),
+deleted_entry AS (
+  DELETE FROM nutrition_entries WHERE id = $1::uuid RETURNING id
+)
+SELECT id FROM deleted_entry
+`
 
 export const TARGET_FOR_DATE_SQL = `SELECT id, effective_from, calories_target, protein_target, carbs_target, fat_target, fiber_target, sodium_target, created_at, updated_at
          FROM nutrition_targets
