@@ -4,7 +4,8 @@ import { sessionIntentLabel, trainingSessionDisplayName, type WorkoutSessionSumm
 import type { PendingTranscriptionJob } from '@/domain/training-transcription'
 import { fetchPublicInstanceConfig, interactiveCardClass, ListPlaceholder, primaryButtonClass, secondaryButtonClass } from '@/lib'
 import { fetchSessions, fetchTranscriptionJobs } from './api'
-import { subscribeHealthDataChanges } from '@/lib/health-changes'
+import { subscribeHealthDataChanges, subscribeHealthReviewQueueChanges } from '@/lib/health-changes'
+import { createPendingReviewRefresh } from './pending-review-refresh'
 import { formatWorkoutDate } from './format'
 import { TrainingPlanCard } from './TrainingPlanCard'
 
@@ -13,6 +14,7 @@ const POLL_MS = 4000
 export function TrainingPage() {
   const [sessions, setSessions] = useState<WorkoutSessionSummary[]>([])
   const [jobs, setJobs] = useState<PendingTranscriptionJob[]>([])
+  const [jobsError, setJobsError] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [photoImportAvailable, setPhotoImportAvailable] = useState(false)
@@ -63,36 +65,24 @@ export function TrainingPage() {
   useEffect(() => {
     if (!photoImportAvailable) {
       setJobs([])
+      setJobsError(false)
       return
     }
-    let cancelled = false
-    let timer: number | undefined
-
-    async function loadJobs() {
-      try {
-        const next = await fetchTranscriptionJobs()
-        if (cancelled) {
-          return
-        }
-        setJobs(next)
-        if (next.some((job) => job.status === 'queued' || job.status === 'processing')) {
-          timer = window.setTimeout(() => {
-            void loadJobs()
-          }, POLL_MS)
-        }
-      } catch {
-        if (!cancelled) {
-          setJobs([])
-        }
-      }
-    }
-
-    void loadJobs()
+    const reviews = createPendingReviewRefresh<PendingTranscriptionJob>({
+      fetchJobs: fetchTranscriptionJobs,
+      onJobs: setJobs,
+      onError: (message) => setJobsError(message !== null),
+      pollMs: POLL_MS,
+    })
+    // Completed/failed reviews stop polling, but a successful save, focus,
+    // page restoration or another tab can still remove a committed review.
+    reviews.refresh()
+    const unsubscribeHealth = subscribeHealthDataChanges(reviews.refresh, { revalidateOnFocus: true })
+    const unsubscribeQueue = subscribeHealthReviewQueueChanges(reviews.refresh)
     return () => {
-      cancelled = true
-      if (timer) {
-        window.clearTimeout(timer)
-      }
+      unsubscribeHealth()
+      unsubscribeQueue()
+      reviews.stop()
     }
   }, [photoImportAvailable])
 
@@ -133,6 +123,11 @@ export function TrainingPage() {
         </p>
       ) : null}
 
+      {jobsError ? (
+        <p role="status" className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+          Pending photo reviews could not be refreshed. Showing the last known list; retrying automatically.
+        </p>
+      ) : null}
       {jobs.length > 0 ? <PendingReviewsCard jobs={jobs} /> : null}
 
       <div>
