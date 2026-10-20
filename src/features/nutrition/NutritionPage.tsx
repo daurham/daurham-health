@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { CorrectionReturnBanner } from '@/features/ask-health/CorrectionReturnBanner'
-import { subscribeHealthDataChanges } from '@/lib/health-changes'
+import { subscribeHealthDataChanges, subscribeHealthReviewQueueChanges } from '@/lib/health-changes'
+import { createPendingReviewRefresh } from '@/lib/pending-review-refresh'
 import {
   nutritionDayQuality,
   nutritionDayQualityLabel,
@@ -85,6 +86,7 @@ export function NutritionPage() {
   const [notice, setNotice] = useState<string | null>(null)
   const [undo, setUndo] = useState<NutritionEntry | null>(null)
   const [captures, setCaptures] = useState<PendingNutritionCapture[]>([])
+  const [capturesError, setCapturesError] = useState(false)
   // The atomic resource owns freshness generations. Keep a current reference
   // without resubscribing whenever unrelated Nutrition UI state changes.
   const refreshResource = useRef(resource)
@@ -132,36 +134,22 @@ export function NutritionPage() {
   }, [day, panel, params, setParams])
 
   useEffect(() => {
-    let cancelled = false
-    let timer: number | undefined
-
-    async function loadCaptures() {
-      try {
-        const next = await fetchPendingNutritionCaptures()
-        if (cancelled) {
-          return
-        }
-        setCaptures(next)
-        if (next.some((job) => job.status === 'queued' || job.status === 'processing')) {
-          timer = window.setTimeout(() => {
-            void loadCaptures()
-          }, 4000)
-        }
-      } catch {
-        if (!cancelled) {
-          setCaptures([])
-        }
-      }
-    }
-
-    void loadCaptures()
+    const reviews = createPendingReviewRefresh<PendingNutritionCapture>({
+      fetchJobs: fetchPendingNutritionCaptures,
+      onJobs: setCaptures,
+      onError: (message) => setCapturesError(message !== null),
+    })
+    reviews.refresh()
+    // Completed review cards stop polling. A save, dismissal, other tab,
+    // browser focus or connectivity recovery still needs a fresh server list.
+    const unsubscribeHealth = subscribeHealthDataChanges(reviews.refresh, { revalidateOnFocus: true })
+    const unsubscribeQueue = subscribeHealthReviewQueueChanges(reviews.refresh)
     return () => {
-      cancelled = true
-      if (timer) {
-        window.clearTimeout(timer)
-      }
+      unsubscribeHealth()
+      unsubscribeQueue()
+      reviews.stop()
     }
-  }, [date, panel])
+  }, [])
 
   function requestDate(next: string) {
     setIntentDate(next)
@@ -408,6 +396,11 @@ export function NutritionPage() {
         </p>
       ) : null}
 
+      {capturesError ? (
+        <p role="status" className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+          Pending nutrition captures could not be refreshed. Showing the last known list; retrying automatically.
+        </p>
+      ) : null}
       {captures.length > 0 ? (
         <PendingCapturesCard
           jobs={captures}

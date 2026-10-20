@@ -1,4 +1,4 @@
-/** Reconciles the server-authoritative workout-photo review queue.
+/** Reconciles a server-authoritative pending review queue.
  * Completion/commit is not inferred locally; only a fresh GET can remove a
  * pending card. Focus, cross-tab hints and successful owner mutations can
  * preempt a poll without allowing an older in-flight GET to restore stale jobs.

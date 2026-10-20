@@ -54,6 +54,16 @@ describe('pending review hints are not Coach evidence', () => {
     expect(isReviewQueueMutation('/api/training/transcription/jobs/a-valid-id/extra', 'DELETE')).toBe(false)
     expect(isReviewQueueMutation('/api/training/transcription/jobs', 'GET')).toBe(false)
     expect(isReviewQueueMutation('/api/training/transcription/commit', 'POST')).toBe(false)
+    for (const capture of ['label', 'meal']) {
+      expect(isReviewQueueMutation(`/api/nutrition/${capture}/jobs`, 'POST')).toBe(true)
+      expect(isReviewQueueMutation(`/api/nutrition/${capture}/jobs/fixture`, 'DELETE')).toBe(true)
+      expect(isReviewQueueMutation(`/api/nutrition/${capture}/jobs/fixture/reanalyze`, 'POST')).toBe(true)
+      expect(isReviewQueueMutation(`/api/nutrition/${capture}/jobs/fixture/image`, 'GET')).toBe(false)
+    }
+    expect(isReviewQueueMutation('/api/nutrition/label/commit', 'POST')).toBe(true)
+    expect(isCoachRelevantMutation('/api/nutrition/label/commit', 'POST')).toBe(false)
+    expect(isReviewQueueMutation('/api/nutrition/meal/commit', 'POST')).toBe(false)
+    expect(isReviewQueueMutation('/api/nutrition/entries', 'POST')).toBe(false)
     expect(isCoachRelevantMutation('/api/training/transcription/jobs', 'POST')).toBe(false)
     expect(isCoachRelevantMutation('/api/training/transcription/jobs/a-valid-id', 'DELETE')).toBe(false)
   })

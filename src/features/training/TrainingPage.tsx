@@ -5,7 +5,7 @@ import type { PendingTranscriptionJob } from '@/domain/training-transcription'
 import { fetchPublicInstanceConfig, interactiveCardClass, ListPlaceholder, primaryButtonClass, secondaryButtonClass } from '@/lib'
 import { fetchSessions, fetchTranscriptionJobs } from './api'
 import { subscribeHealthDataChanges, subscribeHealthReviewQueueChanges } from '@/lib/health-changes'
-import { createPendingReviewRefresh } from './pending-review-refresh'
+import { createPendingReviewRefresh } from '@/lib/pending-review-refresh'
 import { formatWorkoutDate } from './format'
 import { TrainingPlanCard } from './TrainingPlanCard'
 
