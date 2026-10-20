@@ -375,9 +375,11 @@ export async function fetchNutritionMealJobs(): Promise<PendingNutritionCapture[
 }
 
 export async function fetchPendingNutritionCaptures(): Promise<PendingNutritionCapture[]> {
+  // A failed label/meal endpoint must not masquerade as an empty queue:
+  // the UI keeps its last known cards and retries on connectivity recovery.
   const [labels, meals] = await Promise.all([
-    fetchNutritionLabelJobs().catch(() => [] as PendingNutritionCapture[]),
-    fetchNutritionMealJobs().catch(() => [] as PendingNutritionCapture[]),
+    fetchNutritionLabelJobs(),
+    fetchNutritionMealJobs(),
   ])
   return [...labels, ...meals].sort((left, right) => right.createdAt.localeCompare(left.createdAt))
 }
