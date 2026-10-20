@@ -1,5 +1,21 @@
 /** Canonical successful owner mutations invalidate Training, Today and Coach; drafts/ensures do not. */
 export const HEALTH_DATA_CHANGED = 'health:data-changed'
+/** Review-queue hints change Today/Training cards, not canonical Coach evidence. */
+export const HEALTH_REVIEW_QUEUE_CHANGED = 'health:review-queue-changed'
+
+/** Queue-only state is visible on Today and Training but is not Coach evidence. */
+export function isReviewQueueMutation(url: string, method: string): boolean {
+  let path: string
+  try {
+    path = new URL(url, 'http://health.local').pathname
+  } catch {
+    return false
+  }
+  const queuePath = '/api/training/transcription/jobs/'
+  const jobPath = path.startsWith(queuePath) ? path.slice(queuePath.length) : ''
+  return (method.toUpperCase() === 'POST' && path === '/api/training/transcription/jobs')
+    || (method.toUpperCase() === 'DELETE' && jobPath.length > 0 && !jobPath.includes('/'))
+}
 
 export function isCoachRelevantMutation(url: string, method: string): boolean {
   if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(method.toUpperCase())) return false
@@ -38,8 +54,8 @@ function openChangeChannel(): BroadcastChannel | null {
   try {
     const channel = new window.BroadcastChannel(HEALTH_CHANGE_CHANNEL)
     channel.addEventListener('message', (event: MessageEvent<unknown>) => {
-      if (event.data === HEALTH_DATA_CHANGED) {
-        window.dispatchEvent(new Event(HEALTH_DATA_CHANGED))
+      if (event.data === HEALTH_DATA_CHANGED || event.data === HEALTH_REVIEW_QUEUE_CHANGED) {
+        window.dispatchEvent(new Event(event.data))
       }
     })
     changeChannel = channel
@@ -54,6 +70,34 @@ export function notifyHealthDataChanged(): void {
   if (typeof window === 'undefined') return
   window.dispatchEvent(new Event(HEALTH_DATA_CHANGED))
   openChangeChannel()?.postMessage(HEALTH_DATA_CHANGED)
+}
+
+/** Notify all open owner tabs that an unsaved review was queued or dismissed.
+ * Never invalidates Coach's canonical analysis or includes an owner identifier.
+ */
+export function notifyHealthReviewQueueChanged(): void {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new Event(HEALTH_REVIEW_QUEUE_CHANGED))
+  openChangeChannel()?.postMessage(HEALTH_REVIEW_QUEUE_CHANGED)
+}
+
+/** Only re-fetch review cards; do not trigger Coach/Goal analysis. */
+export function subscribeHealthReviewQueueChanges(refresh: () => void): () => void {
+  if (typeof window === 'undefined') return () => undefined
+  openChangeChannel()
+  let timer: ReturnType<typeof setTimeout> | null = null
+  const changed = () => {
+    if (timer !== null) return
+    timer = setTimeout(() => {
+      timer = null
+      refresh()
+    }, 0)
+  }
+  window.addEventListener(HEALTH_REVIEW_QUEUE_CHANGED, changed)
+  return () => {
+    window.removeEventListener(HEALTH_REVIEW_QUEUE_CHANGED, changed)
+    if (timer !== null) clearTimeout(timer)
+  }
 }
 
 /** Coalesce successful mutations, cross-tab notifications and optional

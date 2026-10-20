@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { healthFetch } from '../src/lib/health-api.ts'
-import { isCoachRelevantMutation, notifyHealthDataChanged, subscribeHealthDataChanges } from '../src/lib/health-changes.ts'
+import { isCoachRelevantMutation, isReviewQueueMutation, notifyHealthDataChanged, notifyHealthReviewQueueChanged, subscribeHealthDataChanges, subscribeHealthReviewQueueChanges } from '../src/lib/health-changes.ts'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -44,6 +44,65 @@ describe('canonical mutations invalidate Coach', () => {
   it('handles absolute URLs, query dates, and lowercase methods', () => {
     expect(isCoachRelevantMutation('https://health.example/api/nutrition/entries?date=2026-09-29', 'patch')).toBe(true)
     expect(isCoachRelevantMutation('http://[invalid', 'POST')).toBe(false)
+  })
+})
+
+describe('pending review hints are not Coach evidence', () => {
+  it('classifies only review creation and a single review dismissal', () => {
+    expect(isReviewQueueMutation('/api/training/transcription/jobs', 'POST')).toBe(true)
+    expect(isReviewQueueMutation('/api/training/transcription/jobs/a-valid-id', 'delete')).toBe(true)
+    expect(isReviewQueueMutation('/api/training/transcription/jobs/a-valid-id/extra', 'DELETE')).toBe(false)
+    expect(isReviewQueueMutation('/api/training/transcription/jobs', 'GET')).toBe(false)
+    expect(isReviewQueueMutation('/api/training/transcription/commit', 'POST')).toBe(false)
+    expect(isCoachRelevantMutation('/api/training/transcription/jobs', 'POST')).toBe(false)
+    expect(isCoachRelevantMutation('/api/training/transcription/jobs/a-valid-id', 'DELETE')).toBe(false)
+  })
+
+  it('refreshes queue cards after successful create/dismiss but leaves Coach alone', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('window', new EventTarget())
+    const responses = [
+      new Response(null, { status: 201 }),
+      new Response(null, { status: 409 }),
+      new Response(null, { status: 204 }),
+      new Response(null, { status: 201 }),
+    ]
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => responses.shift()))
+    const reviews = vi.fn()
+    const canonical = vi.fn()
+    const stopReview = subscribeHealthReviewQueueChanges(reviews)
+    const stopCanonical = subscribeHealthDataChanges(canonical)
+    await healthFetch('/api/training/transcription/jobs', { method: 'POST' })
+    await healthFetch('/api/training/transcription/jobs/id', { method: 'DELETE' })
+    await healthFetch('/api/training/transcription/jobs/id', { method: 'DELETE' })
+    vi.runAllTimers()
+    expect(reviews).toHaveBeenCalledTimes(1)
+    expect(canonical).not.toHaveBeenCalled()
+    await healthFetch('/api/training/transcription/commit', { method: 'POST' })
+    vi.runAllTimers()
+    expect(reviews).toHaveBeenCalledTimes(1)
+    expect(canonical).toHaveBeenCalledTimes(1)
+    stopReview()
+    stopCanonical()
+  })
+
+  it('coalesces and cancels queue events independently of canonical data changes', () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('window', new EventTarget())
+    const reviews = vi.fn()
+    const coach = vi.fn()
+    const stopReview = subscribeHealthReviewQueueChanges(reviews)
+    const stopCoach = subscribeHealthDataChanges(coach)
+    notifyHealthReviewQueueChanged()
+    notifyHealthReviewQueueChanged()
+    vi.runAllTimers()
+    expect(reviews).toHaveBeenCalledTimes(1)
+    expect(coach).not.toHaveBeenCalled()
+    notifyHealthReviewQueueChanged()
+    stopReview()
+    vi.runAllTimers()
+    expect(reviews).toHaveBeenCalledTimes(1)
+    stopCoach()
   })
 })
 
