@@ -178,12 +178,15 @@ export const RECORD_CAPTURE_COMMITTED_SQL = `UPDATE nutrition_capture_jobs
            committed_at = COALESCE(committed_at, now()),
            updated_at = now()
        WHERE home_ai_job_id = $1
+         AND capture_kind = 'nutrition_label'
          AND (
-           capture_kind = 'nutrition_label'
-           OR status <> 'committed'
+           status <> 'committed'
            OR (
+             -- Label Pantry -> Log is the only permitted committed transition.
+             -- A response-lost retry must never replace the approved food
+             -- or overwrite a previously logged entry with a different one.
              food_id IS NOT DISTINCT FROM $2::uuid
-             AND entry_id IS NOT DISTINCT FROM $3::uuid
+             AND (entry_id IS NULL OR entry_id IS NOT DISTINCT FROM $3::uuid)
            )
          )
        RETURNING home_ai_job_id`
