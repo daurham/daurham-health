@@ -280,8 +280,7 @@ export async function findCommittedLabelFood(
     sql.query(
       `SELECT food_id, entry_id, (interpretation ? 'ownerDeletedEntryId') AS entry_deleted
          FROM nutrition_capture_jobs
-        WHERE home_ai_job_id = $1 AND capture_kind = 'nutrition_label'
-          AND status = 'committed' AND food_id IS NOT NULL`,
+        WHERE home_ai_job_id = $1 AND status = 'committed' AND food_id IS NOT NULL`,
       [jobId],
     ),
   )
