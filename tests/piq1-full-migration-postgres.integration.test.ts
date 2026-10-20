@@ -23,6 +23,7 @@ import { getHealthProfile, putHealthProfile } from '../server/profile/service.js
 import { PERFORMED_STRENGTH_EXERCISES_SQL } from '../server/training/plan-service.js'
 import { RECORD_TRANSCRIPTION_JOB_CREATED_SQL, RECORD_TRANSCRIPTION_JOB_STATUS_SQL } from '../server/training/job-store.js'
 import { COMMIT_IMPORTED_WORKOUT_JOB_SQL } from '../server/training/commit-sql.js'
+import { DELETE_ENTRY_SQL } from '../server/nutrition/queries.js'
 import { homeAiJobFingerprint, WORKOUT_SESSION_ENTITY, HOME_AI_SOURCE_KEY } from '../src/domain/training-transcription.js'
 import { buildTrainingWeekQualification, buildTrainingRoutineCredits, type PerformedExerciseEvidence } from '../src/domain/training-qualification.js'
 import { buildTrainingProgressSummary } from '../src/domain/training-progress-summary.js'
@@ -149,6 +150,79 @@ describe.skipIf(!url)('PIQ-1.1 full numbered migration chain and backup on isola
     try { await client.query('DROP SCHEMA IF EXISTS piq_full_chain CASCADE') }
     finally { await client.end() }
   }, 30_000)
+
+  it('PIQ-8: deleting a scanned label entry detaches its blocking FK, preserves Pantry and cannot resurrect the day log', async () => {
+    await client.query('BEGIN')
+    try {
+      const jobId = randomUUID(), foodId = randomUUID(), entryId = randomUUID()
+      const manualId = randomUUID()
+      await client.query(
+        "INSERT INTO nutrition_foods(id,name,catalog_kind,serving_quantity,serving_unit,calories,source_kind) VALUES($1,'Synthetic labeled food','packaged',1,'serving',140,'photo_ai')",
+        [foodId],
+      )
+      await client.query(
+        "INSERT INTO nutrition_entries(id,log_date,timezone,food_id,food_name,serving_quantity,serving_unit,calories,source_kind) VALUES($1,'2026-10-19','America/Phoenix',$2,'Synthetic labeled food',1,'serving',140,'photo_ai')",
+        [entryId,foodId],
+      )
+      await client.query(
+        "INSERT INTO nutrition_entries(id,log_date,timezone,food_name,serving_quantity,serving_unit,calories,source_kind) VALUES($1,'2026-10-19','America/Phoenix','Unrelated synthetic entry',1,'serving',70,'manual')",
+        [manualId],
+      )
+      await client.query(
+        "INSERT INTO nutrition_capture_jobs(home_ai_job_id,capture_kind,status,food_id,entry_id) VALUES($1,'nutrition_label','committed',$2,$3)",
+        [jobId,foodId,entryId],
+      )
+      const ref = await client.query("SELECT id FROM data_sources WHERE key='nutrition_label'")
+      expect(ref.rows).toHaveLength(1)
+      await client.query(
+        "INSERT INTO source_record_links(source_id,external_id,external_fingerprint,entity_type,entity_id) VALUES($1,$2,$3,'nutrition_entry',$4::uuid)",
+        [ref.rows[0].id,jobId,'nutrition-label-v1-job:'+jobId,entryId],
+      )
+
+      // This foreign key blocked the old DELETE and the optimistic UI then
+      // restored the apparently undeletable food log entry.
+      await client.query('SAVEPOINT old_delete_fails')
+      await expect(client.query('DELETE FROM nutrition_entries WHERE id=$1', [entryId]))
+        .rejects.toMatchObject({code:'23503'})
+      await client.query('ROLLBACK TO SAVEPOINT old_delete_fails')
+
+      const deleted = await client.query(DELETE_ENTRY_SQL,[entryId])
+      expect(deleted.rows).toHaveLength(1)
+      const state = await client.query(
+        "SELECT status,food_id::text,entry_id,interpretation->>'ownerDeletedEntryId' AS owner_deleted_entry_id FROM nutrition_capture_jobs WHERE home_ai_job_id=$1",
+        [jobId],
+      )
+      expect(state.rows[0]).toMatchObject({
+        status:'committed',food_id:foodId,entry_id:null,owner_deleted_entry_id:entryId,
+      })
+      expect((await client.query('SELECT id FROM nutrition_entries WHERE id=$1',[entryId])).rows).toHaveLength(0)
+      expect((await client.query('SELECT id FROM nutrition_entries WHERE id=$1',[manualId])).rows).toHaveLength(1)
+      expect((await client.query('SELECT id FROM nutrition_foods WHERE id=$1',[foodId])).rows).toHaveLength(1)
+      const provenance=await client.query(
+        "SELECT entity_id FROM source_record_links WHERE external_fingerprint=$1",
+        ['nutrition-label-v1-job:'+jobId],
+      )
+      expect(provenance.rows).toHaveLength(1) // Previous import identity remains claimed.
+      expect((await client.query(DELETE_ENTRY_SQL,[entryId])).rows).toHaveLength(0)
+    } finally {
+      await client.query('ROLLBACK')
+    }
+  })
+
+  it('PIQ-8: deleting a non-photo food entry leaves unrelated history untouched', async () => {
+    await client.query('BEGIN')
+    try {
+      const entryId = randomUUID()
+      await client.query(
+        "INSERT INTO nutrition_entries(id,log_date,timezone,food_name,serving_quantity,serving_unit,calories,source_kind) VALUES($1,'2026-10-19','America/Phoenix','Synthetic manual item',1,'serving',80,'manual')",
+        [entryId],
+      )
+      expect((await client.query(DELETE_ENTRY_SQL,[entryId])).rows).toHaveLength(1)
+      expect((await client.query('SELECT id FROM nutrition_entries WHERE id=$1',[entryId])).rows).toHaveLength(0)
+    } finally {
+      await client.query('ROLLBACK')
+    }
+  })
 
   it('PIQ-1: workout save and pending-photo completion are atomic, including rollback on failure', async () => {
     await client.query('BEGIN')

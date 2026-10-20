@@ -274,20 +274,21 @@ export async function refreshOutstandingLabelJobs(client?: HomeAiClient): Promis
 
 export async function findCommittedLabelFood(
   jobId: string,
-): Promise<{ foodId: string; entryId: string | null } | null> {
+): Promise<{ foodId: string; entryId: string | null; entryDeleted: boolean } | null> {
   const sql = await getSql()
   const rows = await queryOrUnavailable(() =>
     sql.query(
-      `SELECT food_id, entry_id FROM nutrition_capture_jobs
-       WHERE home_ai_job_id = $1 AND status = 'committed' AND food_id IS NOT NULL`,
+      `SELECT food_id, entry_id, (interpretation ? 'ownerDeletedEntryId') AS entry_deleted
+         FROM nutrition_capture_jobs
+        WHERE home_ai_job_id = $1 AND status = 'committed' AND food_id IS NOT NULL`,
       [jobId],
     ),
   )
-  const row = (rows as Array<{ food_id?: string; entry_id?: string | null }>)[0]
+  const row = (rows as Array<{ food_id?: string; entry_id?: string | null; entry_deleted?: boolean }>)[0]
   if (!row?.food_id) {
     return null
   }
-  return { foodId: row.food_id, entryId: row.entry_id ?? null }
+  return { foodId: row.food_id, entryId: row.entry_id ?? null, entryDeleted: row.entry_deleted === true }
 }
 
 export async function findCommittedLabelEntry(jobId: string): Promise<{ foodId: string | null; entryId: string } | null> {
