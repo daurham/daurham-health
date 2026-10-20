@@ -8,7 +8,7 @@ import {
   FINISH_CAPTURE_INTERPRETATION_SQL, RECORD_CAPTURE_JOB_CREATED_SQL,
 } from '../server/nutrition/label-jobs.js'
 import { ATOMIC_MEAL_PHOTO_LOG_SQL as LOG } from '../server/nutrition/meal.js'
-import { ATOMIC_LABEL_PANTRY_TO_LOG_SQL as LABEL_LOG } from '../server/nutrition/label-atomic.js'
+import { ATOMIC_LABEL_INITIAL_COMMIT_SQL as LABEL_INITIAL, ATOMIC_LABEL_PANTRY_TO_LOG_SQL as LABEL_LOG } from '../server/nutrition/label-atomic.js'
 import { assertPiqPostgresFixtureTarget, assertPiqPostgresFixtureSession } from '../server/piq-postgres-fixture.js'
 
 const url=process.env.PIQ_POSTGRES_URL
@@ -373,6 +373,134 @@ describe.skipIf(!url)('PIQ-8 atomic Pantry first-save on isolated real PostgreSQ
       entryId,'{}',JSON.stringify(logged(entryId,foodId,null,'Deleted label Pantry')),
     ])
     expect(out.rows).toHaveLength(0)
+    expect(await count('nutrition_entries')).toBe(0)
+    expect(await count('source_record_links')).toBe(0)
+  })
+
+  const approvedFood=(name:string)=>({
+    name,brand:'Fictional',barcode:null,catalog_kind:'packaged',
+    serving_quantity:1,serving_unit:'serving',serving_grams:45,
+    calories:180,protein:8,carbs:20,fat:7,fiber:2,sodium:120,
+  })
+  const firstArgs=(job:string,mode:'create'|'log_existing'|'update_and_log',log:boolean,
+    opts:{foodId?:string;entryId?:string;name?:string;calories?:number}={})=>{
+    const foodId=opts.foodId??randomUUID(),entryId=opts.entryId??randomUUID()
+    const food={...approvedFood(opts.name??'Synthetic First Label'),calories:opts.calories??180}
+    const entry={...logged(entryId,foodId,null,food.name),calories:opts.calories??180}
+    return [job,mode,log,mode==='create'?null:foodId,foodId,entryId,
+      labelSource,randomUUID(),'nutrition-label-v1-job:'+job+(log?'':':pantry'),
+      '{}',JSON.stringify(food),JSON.stringify(entry)]
+  }
+  const initLabel=async()=>{
+    const job=randomUUID()
+    await a.query("INSERT INTO nutrition_capture_jobs(home_ai_job_id,capture_kind,status) VALUES($1,'nutrition_label','completed')",[job])
+    return job
+  }
+
+  it('initial label create plus daily log is one first-writer transaction',async()=>{
+    const job=await initLabel(),entryId=randomUUID()
+    const params=firstArgs(job,'create',true,{entryId})
+    const first=await b.query(LABEL_INITIAL,params)
+    expect(first.rows).toHaveLength(1)
+    expect(first.rows[0].entry_id).toBe(entryId)
+    expect(await count('nutrition_foods')).toBe(1)
+    expect(await count('nutrition_entries')).toBe(1)
+    expect(await count('source_record_links')).toBe(1)
+    const capture=(await a.query('SELECT status,food_id::text,entry_id::text FROM nutrition_capture_jobs WHERE home_ai_job_id=$1',[job])).rows[0]
+    expect(capture).toMatchObject({status:'committed',food_id:first.rows[0].food_id,entry_id:entryId})
+    expect((await b.query(LABEL_INITIAL,params)).rows).toHaveLength(0)
+    expect(await count('nutrition_foods')).toBe(1)
+    expect(await count('nutrition_entries')).toBe(1)
+  })
+
+  it('two concurrent initial approvals choose one winner, including different reviewed foods',async()=>{
+    const job=await initLabel()
+    const [left,right]=await Promise.all([
+      a.query(LABEL_INITIAL,firstArgs(job,'create',true,{name:'Fictional First Winner'})),
+      b.query(LABEL_INITIAL,firstArgs(job,'create',true,{name:'Fictional Second Winner'})),
+    ])
+    expect([left.rows.length,right.rows.length].sort()).toEqual([0,1])
+    expect(await count('nutrition_foods')).toBe(1)
+    expect(await count('nutrition_entries')).toBe(1)
+    expect(await count('source_record_links')).toBe(1)
+  })
+
+  it('initial Pantry-only claim leaves canonical label fingerprint available for future Log Food',async()=>{
+    const job=await initLabel(),params=firstArgs(job,'create',false)
+    const saved=await b.query(LABEL_INITIAL,params)
+    expect(saved.rows).toHaveLength(1)
+    expect(saved.rows[0].entry_id).toBeNull()
+    expect(await count('nutrition_foods')).toBe(1)
+    expect(await count('nutrition_entries')).toBe(0)
+    const fingerprint=(await a.query('SELECT external_fingerprint,entity_type FROM source_record_links')).rows[0]
+    expect(fingerprint).toEqual({
+      external_fingerprint:'nutrition-label-v1-job:'+job+':pantry',entity_type:'nutrition_food',
+    })
+    const foodId=saved.rows[0].food_id,entryId=randomUUID()
+    const loggedEntry=logged(entryId,foodId,null,'Synthetic First Label')
+    const loggedNow=await b.query(LABEL_LOG,[
+      job,foodId,labelSource,randomUUID(),'nutrition-label-v1-job:'+job,
+      entryId,'{}',JSON.stringify(loggedEntry),
+    ])
+    expect(loggedNow.rows).toHaveLength(1)
+    expect(await count('nutrition_entries')).toBe(1)
+    expect(await count('source_record_links')).toBe(2)
+  })
+
+  it('initial log_existing writes a snapshot and leaves the Pantry food unchanged',async()=>{
+    const job=await initLabel(),foodId=randomUUID()
+    await a.query("INSERT INTO nutrition_foods(id,name,catalog_kind,serving_quantity,serving_unit,calories,source_kind) VALUES($1,'Existing Fictional', 'packaged',1,'serving',175,'manual')",[foodId])
+    const updated=await b.query(LABEL_INITIAL,firstArgs(job,'log_existing',true,{foodId,name:'Existing Fictional'}))
+    expect(updated.rows).toHaveLength(1)
+    expect(updated.rows[0].food_id).toBe(foodId)
+    expect(await count('nutrition_foods')).toBe(1)
+    expect(await count('nutrition_entries')).toBe(1)
+    expect((await a.query('SELECT calories FROM nutrition_foods WHERE id=$1',[foodId])).rows[0].calories).toBe('175')
+  })
+
+  it('update_and_log rolls back existing-food edits and source claim on an invalid daily entry',async()=>{
+    const job=await initLabel(),foodId=randomUUID()
+    await a.query("INSERT INTO nutrition_foods(id,name,catalog_kind,serving_quantity,serving_unit,calories,source_kind) VALUES($1,'Original Fictional','packaged',1,'serving',140,'manual')",[foodId])
+    const p=firstArgs(job,'update_and_log',true,{foodId,name:'Modified Fictional'})
+    const invalid=JSON.parse(String(p[11]));invalid.calories=-7;p[11]=JSON.stringify(invalid)
+    await expect(b.query(LABEL_INITIAL,p)).rejects.toMatchObject({code:'23514'})
+    expect(await count('nutrition_entries')).toBe(0)
+    expect(await count('source_record_links')).toBe(0)
+    const after=(await a.query('SELECT name,calories FROM nutrition_foods WHERE id=$1',[foodId])).rows[0]
+    expect(after.name).toBe('Original Fictional')
+    expect(after.calories).toBe('140')
+    expect((await a.query('SELECT status FROM nutrition_capture_jobs WHERE home_ai_job_id=$1',[job])).rows[0].status).toBe('completed')
+  })
+
+  it('update_and_log updates the Pantry definition and records one finalized entry',async()=>{
+    const job=await initLabel(),foodId=randomUUID()
+    await a.query("INSERT INTO nutrition_foods(id,name,catalog_kind,serving_quantity,serving_unit,calories,source_kind) VALUES($1,'Original Fictional','packaged',1,'serving',140,'manual')",[foodId])
+    const done=await b.query(LABEL_INITIAL,firstArgs(job,'update_and_log',true,{foodId,name:'Updated Fictional'}))
+    expect(done.rows).toHaveLength(1)
+    expect(done.rows[0].food_id).toBe(foodId)
+    expect((await a.query('SELECT name,calories FROM nutrition_foods WHERE id=$1',[foodId])).rows[0])
+      .toMatchObject({name:'Updated Fictional',calories:'180'})
+    expect(await count('nutrition_entries')).toBe(1)
+    expect(await count('source_record_links')).toBe(1)
+  })
+
+  it('first-time create barcode/food uniqueness failure leaves capture uncommitted and no fingerprint',async()=>{
+    const job=await initLabel()
+    await a.query("INSERT INTO nutrition_foods(name,catalog_kind,serving_quantity,serving_unit,calories,source_kind) VALUES('Synthetic First Label','packaged',1,'serving',120,'manual')")
+    await expect(b.query(LABEL_INITIAL,firstArgs(job,'create',true))).rejects.toMatchObject({code:'23505'})
+    expect(await count('nutrition_foods')).toBe(1)
+    expect(await count('nutrition_entries')).toBe(0)
+    expect(await count('source_record_links')).toBe(0)
+    expect((await a.query('SELECT status FROM nutrition_capture_jobs WHERE home_ai_job_id=$1',[job])).rows[0].status).toBe('completed')
+  })
+
+  it('first-time label save refuses a mismatched capture kind and owner deletion tombstone',async()=>{
+    const mealJob=await init(),labelJob=await initLabel()
+    const blocked=await b.query(LABEL_INITIAL,firstArgs(mealJob,'create',true))
+    expect(blocked.rows).toHaveLength(0)
+    await a.query("UPDATE nutrition_capture_jobs SET interpretation=jsonb_build_object('ownerDeletedEntryId','deleted') WHERE home_ai_job_id=$1",[labelJob])
+    expect((await b.query(LABEL_INITIAL,firstArgs(labelJob,'create',true))).rows).toHaveLength(0)
+    expect(await count('nutrition_foods')).toBe(0)
     expect(await count('nutrition_entries')).toBe(0)
     expect(await count('source_record_links')).toBe(0)
   })
