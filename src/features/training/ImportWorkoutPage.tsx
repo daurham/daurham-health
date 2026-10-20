@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-do
 import type { ReviewFieldError } from '@/domain/paper-load'
 import type { TranscriptionGuidance, TranscriptionJobResponse } from '@/domain/training-transcription'
 import { isHomeAiJobId } from '@/domain/training-transcription'
-import { commitImportedSession, createTranscriptionJob, dismissTranscriptionJob, fetchTranscriptionJob } from './api'
+import { WorkoutReviewAlreadySavedError, commitImportedSession, createTranscriptionJob, dismissTranscriptionJob, fetchTranscriptionJob } from './api'
 import { WorkoutEditor } from './WorkoutEditor'
 import {
   DraftValidationError,
@@ -109,6 +109,11 @@ export function ImportWorkoutPage() {
         }
       } catch (caught) {
         if (cancelled) {
+          return
+        }
+        if (caught instanceof WorkoutReviewAlreadySavedError) {
+          setFailure(caught.message)
+          setPollError(null)
           return
         }
         setPollError(caught instanceof Error ? caught.message : 'Could not check analysis status')
