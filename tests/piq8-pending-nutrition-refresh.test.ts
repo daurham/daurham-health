@@ -39,7 +39,8 @@ describe('PIQ-8 Nutrition pending capture refresh', () => {
   it('only notifies review cards after an AI food actually saves from a photo job', async () => {
     vi.useFakeTimers()
     vi.stubGlobal('window', new EventTarget())
-    const fetchMock = vi.fn().mockResolvedValue(
+    // A Response body is one-shot: each independent save has a new body.
+    const fetchMock = vi.fn().mockImplementation(async () =>
       new Response(JSON.stringify({ food: { id: 'saved' }, reused: false }), { status: 201 }),
     )
     vi.stubGlobal('fetch', fetchMock)
