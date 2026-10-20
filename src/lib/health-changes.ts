@@ -3,6 +3,19 @@ export const HEALTH_DATA_CHANGED = 'health:data-changed'
 /** Review-queue hints change Today/Training cards, not canonical Coach evidence. */
 export const HEALTH_REVIEW_QUEUE_CHANGED = 'health:review-queue-changed'
 
+/** Queue-only state is visible on Today and Training but is not Coach evidence. */
+export function isReviewQueueMutation(url: string, method: string): boolean {
+  let path: string
+  try {
+    path = new URL(url, 'http://health.local').pathname
+  } catch {
+    return false
+  }
+  return (method.toUpperCase() === 'POST' && path === '/api/training/transcription/jobs')
+    || (method.toUpperCase() === 'DELETE'
+      && /^\\/api\\/training\\/transcription\\/jobs\\/[^/]+$/.test(path))
+}
+
 export function isCoachRelevantMutation(url: string, method: string): boolean {
   if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(method.toUpperCase())) return false
   let path: string
