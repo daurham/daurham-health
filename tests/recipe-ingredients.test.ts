@@ -80,9 +80,9 @@ vi.mock('../server/db.ts', () => ({
         }
         return []
       }
-      if (text.includes('SELECT food_id, entry_id FROM nutrition_capture_jobs')) {
+      if (text.includes("AS entry_deleted") && text.includes('FROM nutrition_capture_jobs')) {
         return state.mealCapture?.status === 'committed' && state.mealCapture.id === params[0]
-          ? [{ food_id: state.mealCapture.foodId, entry_id: state.mealCapture.entryId }] : []
+          ? [{ food_id: state.mealCapture.foodId, entry_id: state.mealCapture.entryId, entry_deleted: false }] : []
       }
       if (text.includes('FROM data_sources')) {
         return [{ id: params[0] === 'usda_fooddata_central' ? 'source-usda' : 'source-health' }]
