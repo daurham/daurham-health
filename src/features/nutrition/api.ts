@@ -20,6 +20,7 @@ import type {
   DescriptionEstimateCandidate,
 } from '@/domain/nutrition'
 import { healthFetch, readApiError } from '@/lib'
+import { notifyHealthReviewQueueChanged } from '@/lib/health-changes'
 import type { ReviewFieldError } from '@/domain/paper-load'
 
 export type NutritionDayPayload = {
@@ -506,13 +507,17 @@ export async function saveAiReusableFood(input: {
   adjusted: boolean
   jobId?: string
 }): Promise<{ food: NutritionFood; reused: boolean }> {
-  return parseOk(
+  const saved = await parseOk<{ food: NutritionFood; reused: boolean }>(
     await healthFetch('/api/nutrition/recipe-foods', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
     }),
   )
+  // Only an AI food saved from a photo job may complete a pending review.
+  // Ordinary manually added foods do not invalidate review queues.
+  if (input.jobId) notifyHealthReviewQueueChanged()
+  return saved
 }
 
 export async function describeFoodText(text: string, provider?: 'gemini' | 'home_ai'): Promise<FoodDescriptionReview> {
