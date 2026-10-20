@@ -266,6 +266,9 @@ export async function getNutritionLabelJob(
     throw new HttpError(400, labelFailureMessage('INVALID_JOB_ID'))
   }
   const stored = await getLabelJobRecord(jobId)
+  if (stored && stored.captureKind !== NUTRITION_LABEL_CAPTURE_KIND) {
+    throw new HttpError(404, labelFailureMessage('JOB_NOT_FOUND'), undefined, 'JOB_NOT_FOUND')
+  }
   if (stored?.provider === 'gemini') {
     const ready = await advanceGeminiCapture(stored)
     return await labelResponseFromRecord(ready)
@@ -500,6 +503,12 @@ export async function commitNutritionLabel(body: unknown): Promise<{
 
   const jobId = input.jobId
   if (jobId) {
+    // A Meal Photo capture cannot be reused as a Label Pantry/Log workflow.
+    // Require the persisted owner capture before any food or entry mutation.
+    const capture = await getLabelJobRecord(jobId)
+    if (!capture || capture.captureKind !== NUTRITION_LABEL_CAPTURE_KIND) {
+      throw new HttpError(404, labelFailureMessage('JOB_NOT_FOUND'), undefined, 'JOB_NOT_FOUND')
+    }
     const committed = await findCommittedLabelFood(jobId)
     if (committed) {
       const food = await getFood(committed.foodId)
