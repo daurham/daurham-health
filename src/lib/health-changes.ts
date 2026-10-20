@@ -11,9 +11,10 @@ export function isReviewQueueMutation(url: string, method: string): boolean {
   } catch {
     return false
   }
+  const queuePath = '/api/training/transcription/jobs/'
+  const jobPath = path.startsWith(queuePath) ? path.slice(queuePath.length) : ''
   return (method.toUpperCase() === 'POST' && path === '/api/training/transcription/jobs')
-    || (method.toUpperCase() === 'DELETE'
-      && /^\\/api\\/training\\/transcription\\/jobs\\/[^/]+$/.test(path))
+    || (method.toUpperCase() === 'DELETE' && jobPath.length > 0 && !jobPath.includes('/'))
 }
 
 export function isCoachRelevantMutation(url: string, method: string): boolean {
