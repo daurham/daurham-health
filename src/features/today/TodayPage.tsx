@@ -41,7 +41,7 @@ import { ensureCoach } from '@/features/coach/api'
 import type { CoachState } from '@/domain/coach'
 import type { GoalControlState } from '@/domain/goal-control'
 import { todayShouldReloadAfterNutrition, type TodayNutritionOutcome } from './nutrition-refresh'
-import { notifyHealthDataChanged, subscribeHealthDataChanges } from '@/lib/health-changes'
+import { notifyHealthDataChanged, subscribeHealthDataChanges, subscribeHealthReviewQueueChanges } from '@/lib/health-changes'
 import { addHydrationEvent } from '@/features/daily-signals'
 import { DAILY_PARTICIPATION_XP } from '@/domain/rewards'
 import { fetchGoalControl } from '@/features/goal-control/api'
@@ -114,8 +114,11 @@ export function TodayPage() {
       void loadCoach()
       void loadGoalControl()
     }, { revalidateOnFocus: true })
+    // Queued/dismissed photo reviews change Today attention, not Coach truth.
+    const unsubscribeReviews = subscribeHealthReviewQueueChanges(() => retryToday.current())
     return () => {
       unsubscribe()
+      unsubscribeReviews()
       ++coach.generation
       ++goals.generation
     }
