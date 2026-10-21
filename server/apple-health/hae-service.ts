@@ -12,13 +12,14 @@ import { INSERT_APPLE_HEALTH_JOB_SQL, UPDATE_APPLE_HEALTH_JOB_SQL } from './quer
 import { latestHaeSleepStatus } from './hae-sleep-service.js'
 import { latestHaeWorkoutStatus, type HaeWorkoutSyncChannel } from './hae-workout-service.js'
 import { LATEST_HAE_STRATEGY_SQL } from './hae-sleep-sql.js'
-import { HAE_COMMIT_BATCH, HAE_SOURCE_SQL, LATEST_ACTIVITY_DAY_SQL, buildHaeDailyStatement } from './hae-sql.js'
+import { HAE_COMMIT_BATCH, HAE_SOURCE_SQL, LATEST_ACTIVITY_DAY_SQL, buildHaeDailyStatement, tallyHaeDailyResults } from './hae-sql.js'
 
 export type HaeIngestResult = {
   accepted: true
   daysSeen: number
   daysInserted: number
   daysUpdated: number
+  daysUnchanged: number
   metricsApplied: HaeParseResult['metricsApplied']
   ignoredMetrics: string[]
   ignoredDistanceCount: number
@@ -133,26 +134,24 @@ export async function ingestHealthAutoExport(input: {
 
     let daysInserted = 0
     let daysUpdated = 0
+    let daysUnchanged = 0
     for (let offset = 0; offset < parsed.days.length; offset += HAE_COMMIT_BATCH) {
       const chunk = parsed.days.slice(offset, offset + HAE_COMMIT_BATCH)
       const statements = chunk.map((day) => buildHaeDailyStatement({ sourceId, jobId, day }))
       const results = (await sql.transaction(
         statements.map((statement) => sql.query(statement.sql, statement.params)),
       )) as Array<Array<{ inserted: boolean }>>
-      for (const rows of results) {
-        if (rows[0]?.inserted) {
-          daysInserted += 1
-        } else {
-          daysUpdated += 1
-        }
-      }
+      const counts = tallyHaeDailyResults(results)
+      daysInserted += counts.inserted
+      daysUpdated += counts.updated
+      daysUnchanged += counts.unchanged
     }
 
     await sql.query(UPDATE_APPLE_HEALTH_JOB_SQL, [
       jobId,
       'completed',
       daysInserted,
-      daysUpdated,
+      daysUpdated + daysUnchanged,
       parsed.ignoredDistanceCount,
       parsed.days.length,
       0,
@@ -164,6 +163,7 @@ export async function ingestHealthAutoExport(input: {
       daysSeen: parsed.days.length,
       daysInserted,
       daysUpdated,
+      daysUnchanged,
       metricsApplied: parsed.metricsApplied,
       ignoredMetrics: parsed.ignoredMetrics.map((metric) => metric.name),
       ignoredDistanceCount: parsed.ignoredDistanceCount,

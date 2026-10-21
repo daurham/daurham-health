@@ -73,6 +73,7 @@ export default async function appleHealthSyncHandler(req: ApiRequest, res: ApiRe
             daysSeen: activity.daysSeen,
             daysInserted: activity.daysInserted,
             daysUpdated: activity.daysUpdated,
+            daysUnchanged: activity.daysUnchanged,
             metricsApplied: activity.metricsApplied,
             ignoredMetrics: activity.ignoredMetrics,
           }

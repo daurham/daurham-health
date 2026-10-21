@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import apiHandler from '../api/index.ts'
 import { matchHealthApiRoute } from '../server/dispatch.ts'
 import appleHealthSyncHandler from '../server/handlers/apple-health-sync.ts'
-import { UPSERT_HAE_DAILY_SQL, buildHaeDailyStatement, haeDailyFingerprint } from '../server/apple-health/hae-sql.ts'
+import { UPSERT_HAE_DAILY_SQL, buildHaeDailyStatement, haeDailyFingerprint, tallyHaeDailyResults } from '../server/apple-health/hae-sql.ts'
 import { syncTokensMatch } from '../server/apple-health/sync-auth.ts'
 import {
   HAE_STEP_NORMALIZATION,
@@ -210,6 +210,17 @@ describe('Health Auto Export daily upsert', () => {
     expect(update).toContain('COALESCE(EXCLUDED.resting_heart_rate_bpm, activity_daily_summaries.resting_heart_rate_bpm)')
     expect(update).not.toContain('walking_running_distance')
     expect(UPSERT_HAE_DAILY_SQL).not.toContain('activity_samples')
+  })
+
+  it('avoids unchanged-row rewrites without ignoring late measurement or evidence corrections', () => {
+    const update = UPSERT_HAE_DAILY_SQL.split('DO UPDATE SET')[1] ?? ''
+    expect(update).toContain('WHERE activity_daily_summaries.steps_count IS DISTINCT FROM COALESCE(EXCLUDED.steps_count')
+    expect(update).toContain('activity_daily_summaries.evidence IS DISTINCT FROM')
+    expect(update).toContain('activity_daily_summaries.calculation_version IS DISTINCT FROM')
+    expect(update).not.toContain('activity_daily_summaries.import_job_id IS DISTINCT FROM')
+    expect(update).not.toContain('walking_running_distance_m = EXCLUDED')
+    expect(tallyHaeDailyResults([[{ inserted: true }], [{ inserted: false }], [], []]))
+      .toEqual({ inserted: 1, updated: 1, unchanged: 2 })
   })
 
   it('keeps a repeated rolling window on the same day keys', () => {
