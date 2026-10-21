@@ -998,8 +998,8 @@ html.dark[data-health-palette='prismatic-apex'] {
 ) .app-shell {
   background-image: var(--health-hero-gradient);
   background-repeat: no-repeat;
-  background-size: 100% min(38rem, 60vh);
-  background-attachment: fixed;
+  background-size: 100% 100%;
+  background-attachment: scroll;
 }
 :is(
   html[data-health-palette='astral-ascension'],
@@ -1084,8 +1084,8 @@ html.dark[data-health-palette='prismatic-apex'] {
 ) .app-shell {
   background-image: var(--health-hero-gradient);
   background-repeat: no-repeat;
-  background-size: 100% min(34rem, 54vh);
-  background-attachment: fixed;
+  background-size: 100% 100%;
+  background-attachment: scroll;
 }
 
 :is(
