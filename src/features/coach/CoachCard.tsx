@@ -45,6 +45,20 @@ export function currentCoachIntelligence(
   return snapshot.value
 }
 
+/** Keep the old panel's height during revalidation without allowing stale advice to be acted on. */
+export function coachIntelligencePresentation(
+  state: CoachState | null,
+  pending: boolean | undefined,
+  error: string | null | undefined,
+  intelligenceError: string | null,
+  snapshot: { sourceState: CoachState; value: CoachIntelligenceState } | null,
+): { value: CoachIntelligenceState | null; stale: boolean } {
+  const current = currentCoachIntelligence(state, pending, error, snapshot)
+  if (current) return { value: current, stale: false }
+  if (!state || error || intelligenceError || !snapshot) return { value: null, stale: false }
+  return { value: snapshot.value, stale: true }
+}
+
 function progressText(task: CoachTaskView): string | null {
   const progress = task.progress
   if (!progress?.label) return null
@@ -190,7 +204,8 @@ export function CoachCard({ state, pending, error, onState }: {
     if (document.activeElement instanceof HTMLElement) returnFocusRef.current = document.activeElement
   }
 
-  const displayedIntelligence = currentCoachIntelligence(state, pending, error, intelligence)
+  const { value: displayedIntelligence, stale: guidanceStale } = coachIntelligencePresentation(state, pending, error, intelligenceError, intelligence)
+  const guidanceLoading = !!state && !intelligence && !intelligenceError
 
   // Do not expose old quests during reload or after its failure.
   if (pending && !state) return (
@@ -228,7 +243,7 @@ export function CoachCard({ state, pending, error, onState }: {
   const pendingAck = pendingStretchAcknowledgement(state, acknowledgedStretchId)
   const visibleStretch = stretch && (stretch.status === 'active' || stretch.status === 'offered' || isCurrentResolvedCoachTask(stretch, state.date)) ? stretch : null
   const missions = [daily, visibleStretch, weekly].filter((task): task is CoachTaskView => task != null)
-  const visibleCount = missions.length + labItems.length + labOverflow + (displayedIntelligence ? 1 : 0)
+  const visibleCount = missions.length + labItems.length + labOverflow + (displayedIntelligence || guidanceLoading ? 1 : 0)
   if (visibleCount === 0 && !notice && !actionError && !intelligenceError) return null
 
   function celebrateIfCompleted(task: CoachTaskView, next: CoachState) {
@@ -370,7 +385,7 @@ export function CoachCard({ state, pending, error, onState }: {
 
   return (
     <>
-      <section className="min-h-56 overflow-hidden rounded-xl border border-zinc-200 bg-white" aria-label="Coach">
+      <section className="min-h-56 overflow-hidden rounded-xl border border-zinc-200 bg-white" aria-label="Coach" aria-busy={pending || guidanceStale} inert={pending ? true : undefined}>
         <div className="flex items-center justify-between gap-3 px-3 pb-2 pt-3">
           <div>
             <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Coach</h2>
@@ -404,12 +419,25 @@ export function CoachCard({ state, pending, error, onState }: {
         </div>
 
         {displayedIntelligence ? (
-          <CoachIntelligencePanel
-            state={displayedIntelligence}
-            pending={actionPending}
-            onResponse={(item, response, reason) => void respondToRecommendation(item, response, reason)}
-            onOutcome={(id, outcome) => void recordRecommendationOutcome(id, outcome)}
-          />
+          <div className="relative" aria-busy={guidanceStale}>
+            <div inert={guidanceStale ? true : undefined} aria-hidden={guidanceStale || undefined}
+              className={guidanceStale ? 'pointer-events-none opacity-50' : undefined}>
+              <CoachIntelligencePanel
+                state={displayedIntelligence}
+                pending={actionPending || guidanceStale}
+                onResponse={(item, response, reason) => void respondToRecommendation(item, response, reason)}
+                onOutcome={(id, outcome) => void recordRecommendationOutcome(id, outcome)}
+              />
+            </div>
+            {guidanceStale ? <span className="sr-only" role="status">Refreshing Coach guidance</span> : null}
+          </div>
+        ) : guidanceLoading ? (
+          <section className="min-h-48 border-t border-zinc-100 px-3 py-3" aria-label="Loading Coach guidance" aria-busy="true">
+            <div className="h-3 w-20 animate-pulse rounded bg-zinc-200" />
+            <div className="mt-3 h-4 w-3/4 animate-pulse rounded bg-zinc-100" />
+            <div className="mt-3 h-3 w-full animate-pulse rounded bg-zinc-100" />
+            <div className="mt-2 h-3 w-2/3 animate-pulse rounded bg-zinc-100" />
+          </section>
         ) : intelligenceError ? (
           <p className="border-t border-zinc-100 px-3 py-2 text-xs text-zinc-500">{intelligenceError}</p>
         ) : null}

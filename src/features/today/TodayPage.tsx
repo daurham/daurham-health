@@ -43,6 +43,8 @@ import type { GoalControlState } from '@/domain/goal-control'
 import { todayShouldReloadAfterNutrition, type TodayNutritionOutcome } from './nutrition-refresh'
 import { notifyHealthDataChanged, subscribeHealthDataChanges, subscribeHealthReviewQueueChanges } from '@/lib/health-changes'
 import { addHydrationEvent } from '@/features/daily-signals'
+import type { HydrationEvent } from '@/domain/daily-signals'
+import { applyTodayHydrationEvent } from './hydration-update'
 import { DAILY_PARTICIPATION_XP } from '@/domain/rewards'
 import { fetchGoalControl } from '@/features/goal-control/api'
 import { GoalControlCard } from '@/features/goal-control/GoalControlCard'
@@ -162,6 +164,7 @@ export function TodayPage() {
               view={view}
               onNutritionChanged={notifyHealthDataChanged}
               onSupplementsChanged={notifyHealthDataChanged}
+              onWaterLogged={(event) => resource.replaceData((current) => applyTodayHydrationEvent(current, event))}
               coach={coach}
               coachPending={coachPending}
               coachError={coachError}
@@ -197,6 +200,7 @@ export function TodayBoard({
   view,
   onNutritionChanged,
   onSupplementsChanged,
+  onWaterLogged,
   coach,
   coachPending,
   coachError,
@@ -208,6 +212,7 @@ export function TodayBoard({
   view: TodayViewModel
   onNutritionChanged?: () => void
   onSupplementsChanged?: () => void
+  onWaterLogged?: (event: HydrationEvent) => void
   coach?: CoachState | null
   coachPending?: boolean
   coachError?: string | null
@@ -253,7 +258,7 @@ export function TodayBoard({
         />
       ) : null}
 
-      <DailyCheckInCard view={view} />
+      <DailyCheckInCard view={view} onWaterLogged={onWaterLogged} />
 
       {view.pendingItems.length > 0 || view.goalAttention.length > 0 ? (
         <section className="rounded-lg border border-warning/30 bg-amber-50 px-3 py-2.5">
@@ -379,7 +384,7 @@ function LabCard({ view }: { view: TodayViewModel }) {
   )
 }
 
-function DailyCheckInCard({ view }: { view: TodayViewModel }) {
+function DailyCheckInCard({ view, onWaterLogged }: { view: TodayViewModel; onWaterLogged?: (event: HydrationEvent) => void }) {
   const readOnly = useDemoReadOnly()
   const prefix = useAppPathPrefix()
   const signals = view.dailySignals ?? todayDailySignalsFromDay(null)
@@ -406,7 +411,8 @@ function DailyCheckInCard({ view }: { view: TodayViewModel }) {
     setBusyAmount(amountOz)
     setError(null)
     try {
-      await addHydrationEvent(view.date, amountOz)
+      const event = await addHydrationEvent(view.date, amountOz)
+      onWaterLogged?.(event)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not log water.')
     } finally {

@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
 import type { CoachState, CoachTaskView } from '../src/domain/coach.ts'
-import { CoachCard, CoachInbox, currentCoachIntelligence } from '../src/features/coach/CoachCard.tsx'
+import { CoachCard, CoachInbox, currentCoachIntelligence, coachIntelligencePresentation } from '../src/features/coach/CoachCard.tsx'
 import type { CoachIntelligenceState } from '../src/domain/coach-intelligence.ts'
 import { formatStretchValue, pendingStretchAcknowledgement, selectPrimaryCoachItem, selectPrimaryCoachTask } from '../src/features/coach/presentation.ts'
 import type { CoachLabItem } from '../src/domain/coach-lab.ts'
@@ -414,13 +414,32 @@ describe('T08: a logged workout cannot leave stale actionable Coach advice', () 
     expect(currentCoachIntelligence(after, false, null, snapshot)).toBeNull()
     expect(currentCoachIntelligence(before, false, 'Refresh failed', snapshot)).toBeNull()
   })
-  it('never renders the old exercise quest during reload or failure', () => {
+  it('keeps Coach geometry stable during background refresh, but prevents stale interactions', () => {
     const before = state()
     const loading = renderToStaticMarkup(<MemoryRouter><CoachCard state={before} pending onState={() => undefined} /></MemoryRouter>)
-    expect(loading).toContain('Loading Coach')
-    expect(loading).not.toContain('100 jumping jacks')
+    expect(loading).toContain('100 jumping jacks')
+    expect(loading).toContain('inert=""')
+    expect(loading).toContain('aria-busy="true"')
     const failed = renderToStaticMarkup(<MemoryRouter><CoachCard state={before} error="Refresh failed" onState={() => undefined} /></MemoryRouter>)
     expect(failed).toContain('Refresh failed')
     expect(failed).not.toContain('100 jumping jacks')
+  })
+
+  it('reserves Coach intelligence panel geometry while refusing stale actionable guidance', () => {
+    const before = state(), after = state({ dailyQuest: null })
+    const value = {} as CoachIntelligenceState
+    const snapshot = { sourceState: before, value }
+    expect(coachIntelligencePresentation(before, false, null, null, snapshot))
+      .toEqual({ value, stale: false })
+    expect(coachIntelligencePresentation(before, true, null, null, snapshot))
+      .toEqual({ value, stale: true })
+    expect(coachIntelligencePresentation(after, false, null, null, snapshot))
+      .toEqual({ value, stale: true })
+    expect(coachIntelligencePresentation(after, false, 'Refresh failed', null, snapshot))
+      .toEqual({ value: null, stale: false })
+    expect(coachIntelligencePresentation(after, false, null, 'Intelligence failed', snapshot))
+      .toEqual({ value: null, stale: false })
+    const markup = renderToStaticMarkup(<MemoryRouter><CoachCard state={after} onState={() => undefined} /></MemoryRouter>)
+    expect(markup).toContain('Loading Coach guidance')
   })
 })
