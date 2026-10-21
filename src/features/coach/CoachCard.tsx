@@ -193,7 +193,7 @@ export function CoachCard({ state, pending, error, onState }: {
   const displayedIntelligence = currentCoachIntelligence(state, pending, error, intelligence)
 
   // Do not expose old quests during reload or after its failure.
-  if (pending) return (
+  if (pending && !state) return (
     <section className="min-h-56 overflow-hidden rounded-xl border border-zinc-200 bg-white" aria-label="Loading Coach" aria-busy="true">
       <div className="px-3 pb-2 pt-3">
         <div className="h-3 w-14 animate-pulse rounded bg-zinc-200" />
