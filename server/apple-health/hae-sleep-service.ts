@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import { SLEEP_INTERVAL_ENTITY } from '../../src/domain/apple-health/config.js'
+import { SLEEP_NIGHT_CALCULATION_VERSION } from '../../src/domain/sleep/config.js'
 import {
+  canReuseHaeSleepMaterialization,
   commitSleepIngest,
   parseHealthAutoExportSleep,
   planHaeSleepReconciliation,
@@ -20,6 +22,7 @@ import {
   DELETE_HAE_SLEEP_INTERVALS_SQL,
   DELETE_SLEEP_LINKS_SQL,
   HAE_SLEEP_STRATEGY,
+  HAE_SLEEP_REUSE_STATS_SQL,
   LATEST_HAE_STRATEGY_SQL,
   LATEST_SLEEP_NIGHT_SQL,
   INSERT_HAE_SLEEP_INTERVAL_SQL,
@@ -221,6 +224,47 @@ async function persistSleepSegments(input: {
   }
 }
 
+async function reusableSleepNightStats(input: {
+  sourceId: string
+  jobId: string
+  timezone: string
+  intervalsInserted: number
+  intervalsUpdated: number
+  intervalsRemoved: number
+}): Promise<Pick<HaeSleepIngestResult, 'nightsInserted' | 'nightsUpdated' | 'nightsUnchanged' | 'analysisEligible' | 'partialObservations' | 'inBedOnly'> | null> {
+  if (input.intervalsInserted !== 0 || input.intervalsUpdated !== 0 || input.intervalsRemoved !== 0) {
+    return null
+  }
+  const sql = await getSql()
+  const rows = (await sql.query(HAE_SLEEP_REUSE_STATS_SQL, [
+    input.sourceId, HAE_SLEEP_STRATEGY, input.jobId, SLEEP_NIGHT_CALCULATION_VERSION, input.timezone,
+  ])) as Array<{
+    prior_completed_with_version: boolean
+    current_nights: number
+    outdated_nights: number
+    analysis_eligible: number
+    partial_observations: number
+    in_bed_only: number
+  }>
+  const stats = rows[0]
+  if (!stats || !canReuseHaeSleepMaterialization({
+    ...input,
+    priorCompletedWithVersion: stats.prior_completed_with_version,
+    currentNights: stats.current_nights,
+    outdatedNights: stats.outdated_nights,
+  })) {
+    return null
+  }
+  return {
+    nightsInserted: 0,
+    nightsUpdated: 0,
+    nightsUnchanged: stats.current_nights,
+    analysisEligible: stats.analysis_eligible,
+    partialObservations: stats.partial_observations,
+    inBedOnly: stats.in_bed_only,
+  }
+}
+
 export async function ingestHealthAutoExportSleep(input: { payload: unknown }): Promise<HaeSleepIngestResult> {
   const timezone = (await getInstanceConfig()).calendarTimeZone
   const parsed = parseHealthAutoExportSleep(input.payload)
@@ -253,7 +297,12 @@ export async function ingestHealthAutoExportSleep(input: { payload: unknown }): 
     ])
     const result = await commitSleepIngest({
       persist: () => persistSleepSegments({ sourceId, jobId, segments: parsed.segments }),
-      materialize: async () => syncSleepNightlySummaries(await resolveAppleHealthSourceId(), timezone),
+      materialize: async (persisted) => (await reusableSleepNightStats({
+        sourceId,
+        jobId,
+        timezone,
+        ...persisted,
+      })) ?? syncSleepNightlySummaries(await resolveAppleHealthSourceId(), timezone),
     })
     await sql.query(UPDATE_APPLE_HEALTH_JOB_SQL, [
       jobId,
@@ -272,6 +321,7 @@ export async function ingestHealthAutoExportSleep(input: { payload: unknown }): 
         nightsInserted: result.nightsInserted,
         nightsUpdated: result.nightsUpdated,
         nightsUnchanged: result.nightsUnchanged,
+        materializationVersion: SLEEP_NIGHT_CALCULATION_VERSION,
         reconciliation: 'exclusive_hae_owned_window',
       }),
     ])

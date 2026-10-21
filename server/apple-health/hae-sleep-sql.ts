@@ -81,6 +81,26 @@ export const DELETE_SLEEP_LINKS_SQL = `DELETE FROM source_record_links
 
 export { SLEEP_INTERVAL_ENTITY }
 
+/** Only aggregate metadata crosses the wire on the unchanged-import fast path. */
+export const HAE_SLEEP_REUSE_STATS_SQL = `SELECT
+  COALESCE((
+    SELECT job.status = 'completed'
+       AND job.metadata->>'materializationVersion' = $4
+    FROM import_jobs AS job
+    WHERE job.source_id = $1::uuid
+      AND job.metadata->>'strategy' = $2
+      AND job.id <> $3::uuid
+    ORDER BY job.imported_at DESC, job.id DESC
+    LIMIT 1
+  ), false) AS prior_completed_with_version,
+  COUNT(*)::int AS current_nights,
+  COUNT(*) FILTER (WHERE calculation_version IS DISTINCT FROM $4)::int AS outdated_nights,
+  COUNT(*) FILTER (WHERE analysis_eligible)::int AS analysis_eligible,
+  COUNT(*) FILTER (WHERE observation_status = 'partial_observation')::int AS partial_observations,
+  COUNT(*) FILTER (WHERE observation_status = 'in_bed_only')::int AS in_bed_only
+FROM sleep_nightly_summaries
+WHERE timezone = $5`
+
 export const LATEST_HAE_STRATEGY_SQL = `SELECT imported_at, status
          FROM import_jobs
          WHERE source_id = $1

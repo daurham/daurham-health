@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
+  canReuseHaeSleepMaterialization,
   commitSleepIngest,
   diffSleepNights,
   mapHaeSleepValue,
@@ -16,6 +17,7 @@ import {
   classifySleepIntervals,
   sleepNightCandidates,
   sleepNightlySummariesFromDecisions,
+  stableSleepNightPayload,
   type SleepIntervalRow,
 } from '../src/domain/sleep/index.ts'
 import { parseWallClockInTimeZone } from '../src/domain/time.ts'
@@ -219,6 +221,55 @@ describe('Health Auto Export sleep reconciliation', () => {
     const changed = diffSleepNights([night], [{ sleepDate: '2026-09-22', payload: '{"total":430}' }])
     expect(changed.nightsUpdated).toBe(1)
     expect(changed.changedDates).toEqual(['2026-09-22'])
+  })
+
+  it('compares reordered jsonb evidence without treating unchanged nights as updates', () => {
+    const night = sleepNightlySummariesFromDecisions(
+      arbitrateSleepNights(sleepNightCandidates(classifySleepIntervals([
+        row('09/21/2026 23:00:00', '09/22/2026 06:00:00', 'asleep', "Jacob's Apple Watch"),
+      ]))),
+    )[0]
+    expect(night).toBeDefined()
+    if (!night) return
+    const reordered = {
+      ...night,
+      evidence: Object.fromEntries(
+        Object.entries(night.evidence).reverse().map(([key, value]) =>
+          [key, Array.isArray(value)
+            ? value.map((entry) => entry && typeof entry === 'object'
+              ? Object.fromEntries(Object.entries(entry).reverse()) : entry)
+            : value],
+        ),
+      ) as typeof night.evidence,
+    }
+    const previous = stableSleepNightPayload(reordered)
+    const next = stableSleepNightPayload(night)
+    expect(previous).toBe(next)
+    expect(diffSleepNights([{ sleepDate: night.sleepDate, payload: previous }],
+      [{ sleepDate: night.sleepDate, payload: next }]).nightsUnchanged).toBe(1)
+    expect(stableSleepNightPayload({ ...night, totalSleepMinutes: (night.totalSleepMinutes ?? 0) + 5 }))
+      .not.toBe(next)
+  })
+
+  it('reuses materialization only for complete version-matched unchanged imports', () => {
+    const safe = {
+      intervalsInserted: 0, intervalsUpdated: 0, intervalsRemoved: 0,
+      priorCompletedWithVersion: true, currentNights: 1649, outdatedNights: 0,
+    }
+    expect(canReuseHaeSleepMaterialization(safe)).toBe(true)
+    expect(canReuseHaeSleepMaterialization({ ...safe, intervalsInserted: 1 })).toBe(false)
+    expect(canReuseHaeSleepMaterialization({ ...safe, intervalsRemoved: 1 })).toBe(false)
+    expect(canReuseHaeSleepMaterialization({ ...safe, intervalsUpdated: 1 })).toBe(false)
+    expect(canReuseHaeSleepMaterialization({ ...safe, priorCompletedWithVersion: false })).toBe(false)
+    expect(canReuseHaeSleepMaterialization({ ...safe, currentNights: 0 })).toBe(false)
+    expect(canReuseHaeSleepMaterialization({ ...safe, outdatedNights: 1 })).toBe(false)
+  })
+
+  it('provides persisted changes to the nightly materializer', async () => {
+    expect(await commitSleepIngest({
+      persist: async () => ({ intervalsInserted: 2 }),
+      materialize: async (raw) => ({ seenInsertions: raw.intervalsInserted }),
+    })).toEqual({ intervalsInserted: 2, seenInsertions: 2 })
   })
 
   it('does not report success when nightly materialization fails', async () => {

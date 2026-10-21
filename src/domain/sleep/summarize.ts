@@ -119,10 +119,23 @@ export function sleepNightlySummariesFromDecisions(
     .filter((item): item is SleepNightlySummary => item != null)
 }
 
+// Postgres jsonb reorders object keys. Compare semantic content, not JSON serialization order.
+function canonicalSleepPayload(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(canonicalSleepPayload)
+  }
+  if (value !== null && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, item]) => [key, canonicalSleepPayload(item)]),
+    )
+  }
+  return typeof value === 'number' ? Math.round(value * 1_000_000) / 1_000_000 : value
+}
+
 export function stableSleepNightPayload(night: SleepNightlySummary): string {
-  return JSON.stringify(sleepNightSemanticPayload(night), (_key, value: unknown) =>
-    typeof value === 'number' ? Math.round(value * 1_000_000) / 1_000_000 : value,
-  )
+  return JSON.stringify(canonicalSleepPayload(sleepNightSemanticPayload(night)))
 }
 
 export function sleepNightSemanticPayload(night: SleepNightlySummary): Record<string, unknown> {

@@ -209,6 +209,23 @@ export function planHaeSleepReconciliation(
   return { insertKeys, matchedIds, removeIds }
 }
 
+/** Reuse is safe only after a successful, version-matched materialization and an unchanged ingest. */
+export function canReuseHaeSleepMaterialization(input: {
+  intervalsInserted: number
+  intervalsUpdated: number
+  intervalsRemoved: number
+  priorCompletedWithVersion: boolean
+  currentNights: number
+  outdatedNights: number
+}): boolean {
+  return input.intervalsInserted === 0 &&
+    input.intervalsUpdated === 0 &&
+    input.intervalsRemoved === 0 &&
+    input.priorCompletedWithVersion &&
+    input.currentNights > 0 &&
+    input.outdatedNights === 0
+}
+
 export type SleepNightDiff = {
   nightsInserted: number
   nightsUpdated: number
@@ -252,11 +269,11 @@ export class SleepMaterializationError extends Error {
 
 export async function commitSleepIngest<TRaw extends Record<string, unknown>, TNights extends Record<string, unknown>>(input: {
   persist: () => Promise<TRaw>
-  materialize: () => Promise<TNights>
+  materialize: (raw: TRaw) => Promise<TNights>
 }): Promise<TRaw & TNights> {
   const raw = await input.persist()
   try {
-    const nights = await input.materialize()
+    const nights = await input.materialize(raw)
     return { ...raw, ...nights }
   } catch (error) {
     if (error instanceof SleepMaterializationError) {
