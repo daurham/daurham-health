@@ -21,6 +21,7 @@ import {
   type SleepIntervalRow,
 } from '../src/domain/sleep/index.ts'
 import { parseWallClockInTimeZone } from '../src/domain/time.ts'
+import { buildHaeSleepLinkBatch, HAE_SLEEP_LINK_BATCH } from '../server/apple-health/hae-sleep-sql.ts'
 
 function payload(metrics: unknown[]) {
   return { data: { metrics } }
@@ -270,6 +271,21 @@ describe('Health Auto Export sleep reconciliation', () => {
       persist: async () => ({ intervalsInserted: 2 }),
       materialize: async (raw) => ({ seenInsertions: raw.intervalsInserted }),
     })).toEqual({ intervalsInserted: 2, seenInsertions: 2 })
+  })
+
+  it('batches matched interval provenance without changing claim identity', () => {
+    const claims = [
+      { linkId: 'link-a', fingerprint: 'semantic-a', entityId: 'xml-a', logicalSourceKey: 'apple_watch' },
+      { linkId: 'link-b', fingerprint: 'semantic-b', entityId: 'hae-b', logicalSourceKey: 'circular' },
+    ]
+    const statement = buildHaeSleepLinkBatch({ sourceId: 'source', jobId: 'job', claims })
+    expect(statement.params).toEqual([
+      'source', 'job', 'sleep_interval',
+      ['link-a', 'link-b'], ['semantic-a', 'semantic-b'], ['xml-a', 'hae-b'], ['apple_watch', 'circular'],
+    ])
+    expect(statement.sql).toContain('ON CONFLICT (source_id, external_fingerprint) DO NOTHING')
+    expect(statement.sql).toContain("'matchedExisting', true")
+    expect(HAE_SLEEP_LINK_BATCH).toBeGreaterThan(1)
   })
 
   it('does not report success when nightly materialization fails', async () => {

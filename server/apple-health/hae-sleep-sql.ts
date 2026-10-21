@@ -63,6 +63,43 @@ SELECT
 FROM claimed
 RETURNING id`
 
+/** Avoid one database round-trip per matched interval in a rolling sync. */
+export const HAE_SLEEP_LINK_BATCH = 400
+
+export const LINK_EXISTING_SLEEP_BATCH_SQL = `INSERT INTO source_record_links (
+  id, source_id, import_job_id, external_id, external_fingerprint,
+  entity_type, entity_id, source_payload
+)
+SELECT incoming.link_id, $1::uuid, $2::uuid, NULL, incoming.fingerprint,
+       $3, incoming.entity_id,
+       jsonb_build_object(
+         'transport', 'health_auto_export',
+         'logicalSourceKey', incoming.logical_source_key,
+         'matchedExisting', true
+       )
+FROM unnest($4::uuid[], $5::text[], $6::uuid[], $7::text[])
+  AS incoming(link_id, fingerprint, entity_id, logical_source_key)
+ON CONFLICT (source_id, external_fingerprint) DO NOTHING`
+
+export function buildHaeSleepLinkBatch(input: {
+  sourceId: string
+  jobId: string
+  claims: readonly { linkId: string; fingerprint: string; entityId: string; logicalSourceKey: string }[]
+}): { sql: string; params: unknown[] } {
+  return {
+    sql: LINK_EXISTING_SLEEP_BATCH_SQL,
+    params: [
+      input.sourceId,
+      input.jobId,
+      SLEEP_INTERVAL_ENTITY,
+      input.claims.map((claim) => claim.linkId),
+      input.claims.map((claim) => claim.fingerprint),
+      input.claims.map((claim) => claim.entityId),
+      input.claims.map((claim) => claim.logicalSourceKey),
+    ],
+  }
+}
+
 export const LINK_EXISTING_SLEEP_SQL = `INSERT INTO source_record_links (
            id, source_id, import_job_id, external_id, external_fingerprint,
            entity_type, entity_id, source_payload

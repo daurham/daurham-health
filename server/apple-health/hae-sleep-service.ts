@@ -26,7 +26,8 @@ import {
   LATEST_HAE_STRATEGY_SQL,
   LATEST_SLEEP_NIGHT_SQL,
   INSERT_HAE_SLEEP_INTERVAL_SQL,
-  LINK_EXISTING_SLEEP_SQL,
+  HAE_SLEEP_LINK_BATCH,
+  buildHaeSleepLinkBatch,
   MATCH_SLEEP_INTERVALS_SQL,
   SLEEP_LINK_OWNERSHIP_SQL,
   WINDOW_SLEEP_INTERVALS_SQL,
@@ -199,21 +200,21 @@ async function persistSleepSegments(input: {
       inserted += 1
     }
   }
-  for (const id of plan.matchedIds) {
-    const row = existing.find((item) => item.id === id)
+  const existingById = new Map(existing.map((item) => [item.id, item]))
+  const claims = plan.matchedIds.flatMap((id) => {
+    const row = existingById.get(id)
     const segment = row ? segmentsByKey.get(row.semanticKey) : undefined
-    if (!row || !segment) {
-      continue
-    }
-    await sql.query(LINK_EXISTING_SLEEP_SQL, [
-      randomUUID(),
-      input.sourceId,
-      input.jobId,
-      segment.semanticKey,
-      SLEEP_INTERVAL_ENTITY,
-      row.id,
-      JSON.stringify({ transport: 'health_auto_export', logicalSourceKey: segment.logicalSourceKey, matchedExisting: true }),
-    ])
+    return row && segment
+      ? [{ linkId: randomUUID(), fingerprint: segment.semanticKey, entityId: row.id, logicalSourceKey: segment.logicalSourceKey }]
+      : []
+  })
+  for (let offset = 0; offset < claims.length; offset += HAE_SLEEP_LINK_BATCH) {
+    const statement = buildHaeSleepLinkBatch({
+      sourceId: input.sourceId,
+      jobId: input.jobId,
+      claims: claims.slice(offset, offset + HAE_SLEEP_LINK_BATCH),
+    })
+    await sql.query(statement.sql, statement.params)
   }
   return {
     intervalsSeen: input.segments.length,
