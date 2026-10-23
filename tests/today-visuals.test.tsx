@@ -54,7 +54,9 @@ describe('Today visual command center', () => {
     expect(html.indexOf('YOUR HEALTH, IN FOCUS')).toBeLessThan(html.indexOf('Daily Essentials'))
     expect(html.indexOf('Nutrition')).toBeLessThan(html.indexOf('Daily Essentials'))
     expect(html).toContain('Daily Essentials')
-    expect(html).toContain('Supplements')
+    // An owner without a supplement schedule should not see a fictional tile.
+    expect(html).not.toContain('>Supplements<')
+    expect(readFileSync('src/features/today/TodayPage.tsx', 'utf8')).toContain('<SupplementsCard view={view}')
     expect(html).toContain('Daily Log')
     expect(html).toContain('Stress')
     expect(html).toContain('Bowel')
