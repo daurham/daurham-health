@@ -2,27 +2,30 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import type { TodayViewModel } from '@/domain/today'
 import { ThemeWorldScene } from './ThemeWorldScene'
-import { worldStage, worldMoodForHour, isHydrationGoalMet } from './theme-worlds'
+import { worldStage, worldMoodForHour, isHydrationGoalMet, readWorldStageChoice, resolveWorldStageChoice, WORLD_STAGE_CHANGE_EVENT } from './theme-worlds'
 import { useRewardSummary } from '@/features/rewards/useRewardSummary'
 import { prefixedPath, useAppPathPrefix, useDemoReadOnly } from '@/lib/app-prefix'
 import { addHydrationEvent } from '@/features/daily-signals'
 import type { HydrationEvent } from '@/domain/daily-signals'
 import { progressionState } from '@/domain/progression'
+import { fallbackDailyQuote, loadDailyQuote } from './daily-quote'
 import { readPalettePreference, themePackUnlockLevel, type HealthPalette } from '@/theme'
 
-/** A useful first action over collectible art; the remaining shortcuts use
- * existing Today APIs. No additional network calls for art or daily metrics. */
+/** Scenic daily encouragement; nutrition, hydration, and training remain one tap away.
+ * The image is the focal point; nothing waits for a quote API to render.
+ */
 export function TodayScenicHero({
-  view, featuredAction, onAddFood, onWaterLogged,
+  view, onAddFood, onWaterLogged,
 }: {
   view: TodayViewModel
-  featuredAction?: ReactNode
   onAddFood?: () => void
   onWaterLogged?: (event: HydrationEvent) => void
 }) {
   const readOnly = useDemoReadOnly()
   const prefix = useAppPathPrefix()
   const [mood, setMood] = useState(() => worldMoodForHour(new Date().getHours()))
+  const [dailyQuote, setDailyQuote] = useState(() => fallbackDailyQuote(view.date))
+  const [, setStageRevision] = useState(0)
   const [waterBusy, setWaterBusy] = useState(false)
   const [waterError, setWaterError] = useState<string | null>(null)
   useEffect(() => {
@@ -31,19 +34,30 @@ export function TodayScenicHero({
     window.addEventListener('focus', update)
     return () => { document.removeEventListener('visibilitychange', update); window.removeEventListener('focus', update) }
   }, [])
+  useEffect(() => {
+    const controller = new AbortController()
+    setDailyQuote(fallbackDailyQuote(view.date))
+    void loadDailyQuote(view.date, controller.signal).then((quote) => {
+      if (!controller.signal.aborted) setDailyQuote(quote)
+    })
+    return () => controller.abort()
+  }, [view.date])
+  useEffect(() => {
+    const refresh = () => setStageRevision((revision) => revision + 1)
+    window.addEventListener(WORLD_STAGE_CHANGE_EVENT, refresh)
+    window.addEventListener('storage', refresh)
+    return () => {
+      window.removeEventListener(WORLD_STAGE_CHANGE_EVENT, refresh)
+      window.removeEventListener('storage', refresh)
+    }
+  }, [])
   const { summary } = useRewardSummary(!readOnly)
   const palette: HealthPalette = typeof localStorage === 'undefined' ? 'classic' : readPalettePreference(localStorage)
   const currentLevel = progressionState(summary?.lifetimeXp ?? 0).level
-  const stage = worldStage(themePackUnlockLevel(palette), currentLevel)
+  const highestStage = worldStage(themePackUnlockLevel(palette), currentLevel)
+  const stage = resolveWorldStageChoice(readWorldStageChoice(typeof localStorage === 'undefined' ? null : localStorage, palette), highestStage)
   const hydration = view.dailySignals?.hydration
   const hydrated = isHydrationGoalMet(hydration?.totalOz, hydration?.goalOz)
-  const waterLabel = hydration?.totalOz == null ? 'Water not logged'
-    : Math.round(hydration.totalOz) + (hydration.goalOz && hydration.goalOz > 0 ? ' / ' + Math.round(hydration.goalOz) : '') + ' oz water'
-  const calories = view.nutrition.totals?.calories
-  const caloriesLabel = calories?.status === 'available' && calories.value != null && Number.isFinite(calories.value)
-    ? Math.round(calories.value).toLocaleString('en-US') + ' kcal logged'
-    : 'Food not logged'
-  const lastSession = view.training.sessions[0]
   const checkInHref = prefixedPath(prefix, '/check-in?date=' + view.date)
   const nutritionHref = prefixedPath(prefix, '/nutrition?date=' + view.date)
 
@@ -63,25 +77,12 @@ export function TodayScenicHero({
 
   return (
     <section className="today-command-center" aria-label="Today quick actions">
-      <div className="today-scenic-hero" aria-label="Your next action">
+      <div className="today-scenic-hero" aria-label="Daily encouragement">
         <ThemeWorldScene palette={palette} stage={stage} completed={view.training.logged} hydrated={hydrated} mood={mood} />
         <div className="today-scenic-content">
-          <p className="today-scenic-eyebrow">{view.training.logged ? 'TRAINING LOGGED TODAY' : 'Next in rotation · optional'}</p>
-          {view.training.logged ? (
-            <div className="today-command-next">
-              <h2 className="today-scenic-heading">{lastSession?.name ?? 'Workout complete'}</h2>
-              <p className="today-command-meta">Your workout is recorded. Recovery or more activity is your choice.</p>
-              {lastSession ? <Link className="today-command-primary" to={prefixedPath(prefix, '/training/' + lastSession.id)}>View workout <span aria-hidden="true">→</span></Link> : null}
-            </div>
-          ) : (
-            featuredAction ?? (
-              <div className="today-command-next">
-                <h2 className="today-scenic-heading">Your training options</h2>
-                <Link className="today-command-primary" to={prefixedPath(prefix, '/training')}>Open training <span aria-hidden="true">→</span></Link>
-              </div>
-            )
-          )}
-          <p className="today-command-snapshot">{caloriesLabel} <span aria-hidden="true">·</span> {waterLabel}</p>
+          <p className="today-scenic-eyebrow">TODAY'S PERSPECTIVE</p>
+          <blockquote className="today-scenic-quote">“{dailyQuote.quote}”</blockquote>
+          <p className="today-scenic-attribution">— {dailyQuote.author}</p>
         </div>
       </div>
       <nav className="today-command-shortcuts" data-has-supplements={view.supplements ? 'yes' : 'no'} aria-label="Quick logging">

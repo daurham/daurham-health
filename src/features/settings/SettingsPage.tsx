@@ -1,6 +1,6 @@
 import { useEffect, useState, type CSSProperties } from 'react'
 import { ThemeWorldScene } from '@/features/today/ThemeWorldScene'
-import { worldStage, worldNextStageLevel, type WorldStage } from '@/features/today/theme-worlds'
+import { worldStage, worldNextStageLevel, readWorldStageChoice, resolveWorldStageChoice, writeWorldStageChoice, type WorldStage, type WorldStageChoice } from '@/features/today/theme-worlds'
 import { Link, useLocation } from 'react-router-dom'
 import { parseAppleHealthFile, previewAppleHealth } from '@/domain/apple-health'
 import { formatCalendarRange } from '@/domain/calendar-format'
@@ -100,12 +100,17 @@ function ThemeWorldPreview({ pack, label, resolvedMode, stage }: {
 function AppearanceSection() {
   const [mode, setMode] = useState<ThemeModePreference>(storedMode)
   const [palette, setPalette] = useState<HealthPalette>(storedPalette)
+  const [stageChoice, setStageChoice] = useState<WorldStageChoice>(() => readWorldStageChoice(typeof localStorage === 'undefined' ? null : localStorage, storedPalette()))
   const [systemDark, setSystemDark] = useState(prefersDark)
   const { summary } = useRewardSummary(true)
   const progression = progressionState(summary?.lifetimeXp ?? 0)
   const resolvedMode = resolveTheme(mode, systemDark)
   const activePack = themePack(palette)
   const nextPack = summary && progression.nextThemeUnlock ? themePack(progression.nextThemeUnlock.id) : null
+  const maximumStage = worldStage(activePack.unlockLevel, progression.level)
+  const selectedStage = resolveWorldStageChoice(stageChoice, maximumStage)
+  const worldStages = ['base', 'awakened', 'ascended'] as const
+  const worldStageIndex = worldStages.indexOf(maximumStage)
 
   useEffect(() => {
     if (typeof window.matchMedia !== 'function') return
@@ -122,7 +127,9 @@ function AppearanceSection() {
         return
       }
       setMode(storedMode())
-      setPalette(storedPalette())
+      const nextPalette = storedPalette()
+      setPalette(nextPalette)
+      setStageChoice(readWorldStageChoice(localStorage, nextPalette))
     }
     window.addEventListener('storage', onStorage)
     return () => window.removeEventListener('storage', onStorage)
@@ -157,10 +164,37 @@ function AppearanceSection() {
 
       <div className="grid gap-3 sm:grid-cols-2" aria-label="Theme world gallery">
         <ThemeWorldPreview pack={activePack} label="Your current world" resolvedMode={resolvedMode}
-          stage={worldStage(activePack.unlockLevel, progression.level)} />
+          stage={selectedStage} />
         {nextPack ? (
           <ThemeWorldPreview pack={nextPack} label={'Next unlock · Level ' + nextPack.unlockLevel} resolvedMode={resolvedMode} stage="base" />
         ) : null}
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-sm font-medium text-zinc-700">Illustration phase</p>
+        <p className="text-xs text-zinc-600">Revisit an earned look anytime. Auto follows your newest unlocked phase; your XP never changes.</p>
+        <div className="grid grid-cols-4 gap-2" aria-label="Selected world illustration phase">
+          {(['latest', ...worldStages] as const).map((choice) => {
+            const unlocked = choice === 'latest' || worldStages.indexOf(choice) <= worldStageIndex
+            const name = choice === 'latest' ? 'Auto' : choice === 'base' ? 'Base' : choice === 'awakened' ? 'Awakened' : 'Ascended'
+            return (
+              <button key={choice} type="button"
+                aria-pressed={stageChoice === choice}
+                aria-label={unlocked ? 'Show ' + name + ' illustration phase' : name + ' illustration phase is not unlocked'}
+                disabled={!unlocked}
+                onClick={() => {
+                  writeWorldStageChoice(localStorage, palette, choice)
+                  setStageChoice(choice)
+                }}
+                className={[
+                  'min-w-0 rounded-lg border px-1.5 py-2.5 text-xs font-semibold sm:text-sm',
+                  stageChoice === choice ? 'border-accent bg-accent-muted text-accent' : 'border-zinc-200 bg-white text-zinc-700',
+                  !unlocked ? 'cursor-not-allowed opacity-40' : 'hover:border-accent',
+                ].join(' ')}
+              >{name}</button>
+            )
+          })}
+        </div>
       </div>
 
       <div className="space-y-2">
@@ -215,6 +249,7 @@ function AppearanceSection() {
                   animateThemeChange()
                   paint()
                   setPalette(pack.id)
+                  setStageChoice(readWorldStageChoice(localStorage, pack.id))
                 }}
                 className={[
                   'motion-pressable min-w-0 overflow-hidden rounded-xl border p-0 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
@@ -232,7 +267,7 @@ function AppearanceSection() {
                   } as CSSProperties}
                   aria-hidden="true"
                 >
-                  <ThemeWorldScene palette={pack.id} stage={worldStage(pack.unlockLevel, progression.level, unlocked)} />
+                  <ThemeWorldScene palette={pack.id} stage={selected ? selectedStage : worldStage(pack.unlockLevel, progression.level, unlocked)} />
                 </div>
                 <div className="bg-white p-3">
                   <div className="flex items-center justify-between gap-2">
@@ -244,7 +279,7 @@ function AppearanceSection() {
                   <p className="mt-1 text-xs leading-5 text-zinc-600">{pack.flavor}</p>
                   <div className="theme-world-steps" aria-label={pack.label + ' illustration progression'}>
                     {(['base', 'awakened', 'ascended'] as const).map((stage) => (
-                      <span key={stage} data-current={unlocked && worldStage(pack.unlockLevel, progression.level) === stage ? 'true' : 'false'}>
+                      <span key={stage} data-current={unlocked && (selected ? selectedStage : worldStage(pack.unlockLevel, progression.level)) === stage ? 'true' : 'false'}>
                         <span className="theme-world-step-image"><ThemeWorldScene palette={pack.id} stage={stage} /></span>
                         <small>{stage === 'base' ? 'Base' : stage === 'awakened' ? 'Awakened' : 'Ascended'}</small>
                       </span>

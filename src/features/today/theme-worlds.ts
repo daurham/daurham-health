@@ -41,6 +41,26 @@ export function worldStage(unlockLevel: number | null, currentLevel: number, unl
   const levelsEarned = Math.max(0, currentLevel - floor)
   return levelsEarned >= 5 ? 'ascended' : levelsEarned >= 2 ? 'awakened' : 'base'
 }
+/** Replay previously earned phases without changing the user's XP or theme unlocks. */
+export type WorldStageChoice = WorldStage | 'latest'
+export const WORLD_STAGE_CHANGE_EVENT = 'health-world-stage-change'
+const WORLD_STAGE_CHOICE_KEY = 'health-world-stage:'
+const STAGE_RANK: Record<WorldStage, number> = { base: 0, awakened: 1, ascended: 2 }
+
+export function readWorldStageChoice(storage: Pick<Storage, 'getItem'> | null, palette: HealthPalette): WorldStageChoice {
+  try {
+    const saved = storage?.getItem(WORLD_STAGE_CHOICE_KEY + palette)
+    return saved === 'base' || saved === 'awakened' || saved === 'ascended' ? saved : 'latest'
+  } catch { return 'latest' }
+}
+export function resolveWorldStageChoice(choice: WorldStageChoice, maximum: WorldStage): WorldStage {
+  return choice === 'latest' ? maximum : STAGE_RANK[choice] <= STAGE_RANK[maximum] ? choice : maximum
+}
+export function writeWorldStageChoice(storage: Pick<Storage, 'setItem'>, palette: HealthPalette, choice: WorldStageChoice): void {
+  storage.setItem(WORLD_STAGE_CHOICE_KEY + palette, choice)
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event(WORLD_STAGE_CHANGE_EVENT))
+}
+
 export function worldNextStageLevel(unlockLevel: number | null, stage: WorldStage): number | null {
   const floor = unlockLevel ?? 1
   return stage === 'base' ? floor + 2 : stage === 'awakened' ? floor + 5 : null

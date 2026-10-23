@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { THEME_PACKS } from '../src/theme.ts'
 import { ThemeWorldScene } from '../src/features/today/ThemeWorldScene.tsx'
-import { WORLD_SCENE_ROW, WORLD_SCENE_IMAGES, worldSceneImage, worldStage, worldNextStageLevel, isHydrationGoalMet } from '../src/features/today/theme-worlds.ts'
+import { WORLD_SCENE_ROW, WORLD_SCENE_IMAGES, worldSceneImage, worldStage, worldNextStageLevel, isHydrationGoalMet, readWorldStageChoice, resolveWorldStageChoice, writeWorldStageChoice } from '../src/features/today/theme-worlds.ts'
 
 describe('Premium theme-world progression', () => {
   it('maps every theme to an independent, valid, and optimized WebP scene', () => {
@@ -51,6 +51,21 @@ describe('Premium theme-world progression', () => {
     expect(worldNextStageLevel(10, 'awakened')).toBe(15)
     expect(worldNextStageLevel(10, 'ascended')).toBeNull()
   })
+  it('can replay earlier earned phases while leaving the unlock ceiling intact', () => {
+    const data = new Map<string, string>()
+    const storage = {
+      getItem: (key: string) => data.get(key) ?? null,
+      setItem: (key: string, value: string) => { data.set(key, value) },
+    }
+    expect(readWorldStageChoice(storage, 'spartan')).toBe('latest')
+    writeWorldStageChoice(storage, 'spartan', 'base')
+    expect(readWorldStageChoice(storage, 'spartan')).toBe('base')
+    expect(readWorldStageChoice(storage, 'bonfire')).toBe('latest')
+    expect(resolveWorldStageChoice('base', 'ascended')).toBe('base')
+    expect(resolveWorldStageChoice('ascended', 'base')).toBe('base')
+    expect(resolveWorldStageChoice('latest', 'awakened')).toBe('awakened')
+  })
+
   it('renders three visual states without altering health or XP data', () => {
     const html = renderToStaticMarkup(<ThemeWorldScene palette="bonfire" stage="ascended" completed />)
     expect(html).toContain('data-world-palette="bonfire"')

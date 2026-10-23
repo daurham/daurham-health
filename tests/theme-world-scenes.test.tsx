@@ -60,7 +60,7 @@ describe('Collectible theme scenes', () => {
 
   it('removes duplicate hero date while retaining the dashboard page date', () => {
     const hero = renderToStaticMarkup(<MemoryRouter><TodayScenicHero view={buildTodayView(sources)} /></MemoryRouter>)
-    expect(hero).toContain('Your training options')
+    expect(hero).toContain('today-scenic-quote')
     expect(hero).toContain('Quick logging')
     expect(hero).not.toContain('Make today count.')
     expect(hero).not.toContain('Thursday, Oct 22')

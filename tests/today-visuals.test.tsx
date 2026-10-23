@@ -39,8 +39,9 @@ describe('Today visual command center', () => {
   it('renders token-driven scenery and retains text equivalents', () => {
     const view = buildTodayView(emptySources())
     const html = renderToStaticMarkup(React.createElement(MemoryRouter, null, React.createElement(TodayScenicHero, { view })))
-    expect(html).toContain('Next in rotation · optional')
-    expect(html).toContain('Your training options')
+    expect(html).toContain('PERSPECTIVE')
+    expect(html).toContain('today-scenic-quote')
+    expect(html).not.toContain('Start planned workout')
     expect(html).not.toContain('Make today count.')
     expect(html).toContain('world-scene-art')
     expect(html).toContain('data-world-palette=')
@@ -52,7 +53,7 @@ describe('Today visual command center', () => {
 
   it('prioritizes action cards, and keeps daily essentials and stress visible', () => {
     const html = renderBoard()
-    expect(html.indexOf('Next in rotation · optional')).toBeLessThan(html.indexOf('Daily Essentials'))
+    expect(html.indexOf('today-scenic-quote')).toBeLessThan(html.indexOf('Daily Essentials'))
     expect(html.indexOf('Nutrition')).toBeLessThan(html.indexOf('Daily Essentials'))
     expect(html).toContain('Daily Essentials')
     // An owner without a supplement schedule should not see a fictional tile.
@@ -65,6 +66,7 @@ describe('Today visual command center', () => {
     expect(html).toContain('+8 oz')
     expect(html).toContain('/training/new?type=ad_hoc')
     expect(html).toContain('Add food')
+    expect(html).not.toContain('today-command-primary')
     expect(html).toContain('Add context')
   })
 

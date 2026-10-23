@@ -51,8 +51,6 @@ import { GoalControlCard } from '@/features/goal-control/GoalControlCard'
 import { TodayScenicHero, TodayDomainIcon } from './TodayVisuals'
 import { TodayWeekBars } from './TodayWeekBars'
 import { formatCalendarRange as weekRangeLabel } from '@/domain/calendar-format'
-import { fetchTrainingPlan } from '@/features/training/api'
-import type { TrainingPlanView } from '@/domain/training-plan'
 
 function formatCount(value: number): string {
   return Math.round(value).toLocaleString('en-US')
@@ -243,7 +241,6 @@ export function TodayBoard({
     <div className="space-y-4">
       <TodayScenicHero
         view={view}
-        featuredAction={<NextRoutineAction />}
         onAddFood={readOnly ? undefined : () => setFoodOpenSignal((value) => value + 1)}
         onWaterLogged={onWaterLogged}
       />
@@ -868,51 +865,6 @@ function NutritionTotals({
   )
 }
 
-/** Start the existing flexible rotation, without treating any calendar day as mandatory. */
-/** Reuses the existing training-plan request; only the scenic command center
- * mounts this action, so no duplicate plan fetch or extra dashboard reflow. */
-function NextRoutineAction() {
-  const readOnly = useDemoReadOnly()
-  const prefix = useAppPathPrefix()
-  const [plan, setPlan] = useState<TrainingPlanView | null>(null)
-  useEffect(() => {
-    if (readOnly) return
-    let mounted = true
-    let generation = 0
-    const refresh = () => {
-      const request = ++generation
-      void fetchTrainingPlan().then((value) => {
-        if (mounted && request === generation) setPlan(value)
-      }).catch(() => undefined)
-    }
-    refresh()
-    const unsubscribe = subscribeHealthDataChanges(refresh)
-    return () => {
-      mounted = false
-      generation += 1
-      unsubscribe()
-    }
-  }, [readOnly])
-  const next = plan?.configured ? plan.nextSession : null
-  return (
-    <div className="today-command-next">
-      <h2 className="today-scenic-heading">{next?.available ? next.name : 'Train when you feel ready'}</h2>
-      <p className="today-command-meta">{next?.available ? 'Your next routine is ready whenever you are.' : 'Your schedule stays flexible.'}</p>
-      <div className="today-command-training-links">
-        <Link
-          to={next?.available && next.templateId && !readOnly
-            ? prefixedPath(prefix, '/training/new?template=' + encodeURIComponent(next.templateId))
-            : prefixedPath(prefix, '/training')}
-          className="today-command-primary"
-        >
-          {next?.available && next.templateId && !readOnly ? 'Start planned workout' : 'Training options'}
-          <span aria-hidden="true">→</span>
-        </Link>
-        {!readOnly ? <Link to={prefixedPath(prefix, '/training/new?type=ad_hoc')} className="today-command-secondary">Ad-hoc</Link> : null}
-      </div>
-    </div>
-  )
-}
 
 function TrainingCard({ view }: { view: TodayViewModel }) {
   const prefix = useAppPathPrefix()
