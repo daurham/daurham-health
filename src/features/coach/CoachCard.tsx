@@ -208,7 +208,11 @@ export function CoachCard({ state, pending, error, onState }: {
   // Empty Coach state must remain quiet: awaiting optional intelligence alone
   // is not an actionable mission and should not insert an empty-height panel.
   const hasVisibleCoachWork = !!state && (
-    !!state.dailyQuest || !!state.weeklyFocus || !!state.stretchQuest ||
+    !!state.dailyQuest || !!state.weeklyFocus ||
+    (!!state.stretchQuest && (
+      state.stretchQuest.status === 'active' || state.stretchQuest.status === 'offered' ||
+      isCurrentResolvedCoachTask(state.stretchQuest, state.date)
+    )) ||
     (state.labItems?.length ?? 0) > 0 || (state.labOverflowCount ?? 0) > 0
   )
   const guidanceLoading = hasVisibleCoachWork && !intelligence && !intelligenceError
