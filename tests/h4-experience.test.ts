@@ -12,12 +12,15 @@ describe('H4 experience-system source contract', () => {
   const css = readFileSync('src/index.css', 'utf8')
   const inventory = readFileSync('server/backup/inventory.ts', 'utf8')
 
-  it('puts Nutrition before Coach and Training in the Today first-load hierarchy', () => {
+  it('keeps Nutrition and Training as first actions, then Activity, Daily Essentials and Coach', () => {
     const board = today.slice(today.indexOf('export function TodayBoard'), today.indexOf('function LabCard'))
+    expect(board.indexOf('<TodayScenicHero')).toBeGreaterThan(-1)
     expect(board.indexOf('<NutritionCard')).toBeGreaterThan(-1)
-    expect(board.indexOf('<NutritionCard')).toBeLessThan(board.indexOf('<CoachCard'))
-    expect(board.indexOf('<CoachCard')).toBeLessThan(board.indexOf('<TrainingCard'))
-    expect(board).toContain('md:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)]')
+    expect(board.indexOf('<NutritionCard')).toBeLessThan(board.indexOf('<TrainingCard'))
+    expect(board.indexOf('<TrainingCard')).toBeLessThan(board.indexOf('<ActivityCard'))
+    expect(board.indexOf('<ActivityCard')).toBeLessThan(board.indexOf('Daily Essentials'))
+    expect(board.indexOf('Daily Essentials')).toBeLessThan(board.indexOf('<CoachCard'))
+    expect(board).toContain('lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]')
     expect(today).toContain('<Card title="Nutrition" hero>')
     expect(today).not.toContain('<div className="flex justify-end">\n        <AskHealthLink')
   })
