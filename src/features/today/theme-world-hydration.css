@@ -1,0 +1,24 @@
+/* The goal-triggered highlight uses the active theme's secondary color. */
+.world-scene-hydration {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 23% 10% at 79% 77%, color-mix(in srgb, var(--health-accent-secondary) 52%, transparent), transparent 78%),
+    radial-gradient(ellipse 35% 11% at 81% 85%, color-mix(in srgb, var(--health-accent-secondary) 40%, transparent), transparent 78%);
+  transition: opacity 400ms ease;
+}
+.world-scene[data-world-hydrated="yes"] .world-scene-hydration { opacity: .68; }
+@keyframes world-hydration-reveal {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: .68; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .world-scene[data-world-hydrated="yes"] .world-scene-hydration {
+    animation: world-hydration-reveal 650ms ease-out 1 both;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .world-scene-hydration { animation: none; transition: none; }
+}
