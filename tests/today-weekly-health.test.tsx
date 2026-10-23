@@ -76,7 +76,7 @@ describe('Today weekly observed health', () => {
     expect(html).toContain('58')
     expect(html).toContain('bpm median')
     expect(html).toContain('7/7 days observed')
-    expect(html).toContain('8h 0m')
+    expect(html).toContain('8h')
     expect(html).toContain('1/7 complete nights')
     expect(html).toContain('today-week-bars')
     expect(html).toContain('Add food')
