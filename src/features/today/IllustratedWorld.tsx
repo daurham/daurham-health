@@ -74,8 +74,8 @@ export function worldMoodAtHour(hour: number): WorldMood {
 
 function browserPalette(): HealthPalette {
   if (typeof document === 'undefined') return 'classic'
-  const value = document.documentElement.dataset.healthPalette
-  return isHealthPalette(value ?? null) ? value : 'classic'
+  const value = document.documentElement.dataset.healthPalette ?? null
+  return isHealthPalette(value) ? value : 'classic'
 }
 
 export function useSelectedWorldPalette(): HealthPalette {
