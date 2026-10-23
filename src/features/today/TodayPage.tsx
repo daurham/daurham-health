@@ -49,6 +49,8 @@ import { DAILY_PARTICIPATION_XP } from '@/domain/rewards'
 import { fetchGoalControl } from '@/features/goal-control/api'
 import { GoalControlCard } from '@/features/goal-control/GoalControlCard'
 import { TodayScenicHero, TodayDomainIcon } from './TodayVisuals'
+import { fetchTrainingPlan } from '@/features/training/api'
+import type { TrainingPlanView } from '@/domain/training-plan'
 
 function formatCount(value: number): string {
   return Math.round(value).toLocaleString('en-US')
@@ -839,11 +841,58 @@ function NutritionTotals({
   )
 }
 
+/** Start the existing flexible rotation, without treating any calendar day as mandatory. */
+function NextRoutineAction() {
+  const readOnly = useDemoReadOnly()
+  const prefix = useAppPathPrefix()
+  const [plan, setPlan] = useState<TrainingPlanView | null>(null)
+  useEffect(() => {
+    if (readOnly) return
+    let mounted = true
+    let generation = 0
+    const refresh = () => {
+      const request = ++generation
+      void fetchTrainingPlan().then((value) => {
+        if (mounted && request === generation) setPlan(value)
+      }).catch(() => undefined)
+    }
+    refresh()
+    const unsubscribe = subscribeHealthDataChanges(refresh)
+    return () => {
+      mounted = false
+      generation += 1
+      unsubscribe()
+    }
+  }, [readOnly])
+
+  if (readOnly) return null
+  const next = plan?.configured ? plan.nextSession : null
+  return (
+    <div className="mt-3 min-h-32 rounded-xl bg-accent-muted/50 p-3">
+      <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Next in rotation · optional</p>
+      {next?.available && next.templateId ? (
+        <>
+          <p className="mt-1 font-semibold text-zinc-900">{next.name}</p>
+          <Link to={prefixedPath(prefix, '/training/new?template=' + encodeURIComponent(next.templateId))}
+            className="motion-pressable mt-2 inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-accent px-3 text-center text-sm font-semibold text-accent-fg">
+            Start {next.name}
+          </Link>
+        </>
+      ) : (
+        <Link to={prefixedPath(prefix, '/training/plan')} className="mt-2 inline-flex min-h-11 items-center text-sm font-medium text-accent">
+          {plan ? 'View training plan' : 'Loading your rotation…'}
+        </Link>
+      )}
+    </div>
+  )
+}
+
 function TrainingCard({ view }: { view: TodayViewModel }) {
   const prefix = useAppPathPrefix()
   const readOnly = useDemoReadOnly()
   return (
     <Card title="Training">
+      <div className="space-y-3">
       {view.training.logged ? (
         <ul className="space-y-3">
           {view.training.sessions.map((session) => (
@@ -870,6 +919,8 @@ function TrainingCard({ view }: { view: TodayViewModel }) {
           )}
         </>
       )}
+        <NextRoutineAction />
+      </div>
     </Card>
   )
 }
