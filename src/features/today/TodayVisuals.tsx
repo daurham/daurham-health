@@ -40,7 +40,7 @@ export function TodayScenicHero({
   const waterLabel = hydration?.totalOz == null ? 'Water not logged'
     : Math.round(hydration.totalOz) + (hydration.goalOz && hydration.goalOz > 0 ? ' / ' + Math.round(hydration.goalOz) : '') + ' oz water'
   const calories = view.nutrition.totals?.calories
-  const caloriesLabel = calories?.status === 'available'
+  const caloriesLabel = calories?.status === 'available' && calories.value != null && Number.isFinite(calories.value)
     ? Math.round(calories.value).toLocaleString('en-US') + ' kcal logged'
     : 'Food not logged'
   const lastSession = view.training.sessions[0]
