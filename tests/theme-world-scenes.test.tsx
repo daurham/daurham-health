@@ -47,7 +47,7 @@ describe('Collectible theme scenes', () => {
     const progress = THEME_PACKS.filter(p => p.unlockLevel != null)
     expect(progress).toHaveLength(HEALTH_PALETTES.length - 5)
     for (const p of progress) {
-      expect(css).toContain("data-scene-palette='" + p.id + "'")
+      expect(css).toContain("data-preview-palette='" + p.id + "'")
     }
     expect(css).toContain('var(--health-accent-secondary)')
     expect(css).toContain('.today-world-onepiece')
