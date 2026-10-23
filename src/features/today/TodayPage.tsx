@@ -48,6 +48,9 @@ import { applyTodayHydrationEvent } from './hydration-update'
 import { DAILY_PARTICIPATION_XP } from '@/domain/rewards'
 import { fetchGoalControl } from '@/features/goal-control/api'
 import { GoalControlCard } from '@/features/goal-control/GoalControlCard'
+import { TodayHero } from '@/components/TodayHero'
+import { fetchTrainingPlan } from '@/features/training/api'
+import type { TrainingPlanView } from '@/domain/training-plan'
 
 function formatCount(value: number): string {
   return Math.round(value).toLocaleString('en-US')
@@ -234,31 +237,22 @@ export function TodayBoard({
   }
 
   return (
-    <div className="space-y-3">
-      <div className="grid items-start gap-3 md:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)]">
+    <div className="space-y-5">
+      <TodayHero date={formatWeekdayCalendarDate(view.date)} />
+      <div className="grid items-start gap-3 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
         <NutritionCard view={view} onNutritionChanged={onNutritionChanged} />
-        <div className="space-y-3">
-          {onCoachState ? (
-            <CoachCard
-              state={coach ?? null}
-              pending={coachPending}
-              error={coachError}
-              onState={onCoachState}
-            />
-          ) : null}
-          <TrainingCard view={view} />
-        </div>
+        <TrainingCard view={view} />
       </div>
-
-      {goalControl || goalControlPending || goalControlError ? (
-        <GoalControlCard
-          state={goalControl ?? null}
-          pending={goalControlPending}
-          error={goalControlError}
-        />
-      ) : null}
-
-      <DailyCheckInCard view={view} onWaterLogged={onWaterLogged} />
+      <section className="space-y-3" aria-labelledby="today-essentials-heading">
+        <div className="flex items-center justify-between gap-2">
+          <h2 id="today-essentials-heading" className="text-lg font-semibold tracking-tight text-zinc-900">Daily Essentials</h2>
+          <span className="text-xs text-zinc-500">Quick daily actions</span>
+        </div>
+        <div className="grid items-start gap-3 lg:grid-cols-2">
+          <DailyCheckInCard view={view} onWaterLogged={onWaterLogged} />
+          <SupplementsCard view={view} onChanged={onSupplementsChanged} />
+        </div>
+      </section>
 
       {view.pendingItems.length > 0 || view.goalAttention.length > 0 ? (
         <section className="rounded-lg border border-warning/30 bg-amber-50 px-3 py-2.5">
@@ -282,12 +276,22 @@ export function TodayBoard({
         </section>
       ) : null}
 
-      <SupplementsCard view={view} onChanged={onSupplementsChanged} />
-      <div className="grid items-start gap-3 md:grid-cols-3">
-        <ActivityCard view={view} />
-        <SleepCard view={view} />
-        <BodyCard view={view} />
-      </div>
+      <section className="space-y-3" aria-labelledby="today-trends-heading">
+        <h2 id="today-trends-heading" className="text-lg font-semibold tracking-tight text-zinc-900">Health at a glance</h2>
+        <div className="grid items-start gap-3 md:grid-cols-3">
+          <ActivityCard view={view} />
+          <SleepCard view={view} />
+          <BodyCard view={view} />
+        </div>
+      </section>
+      {onCoachState ? (
+        <section className="space-y-3" aria-label="Health coach">
+          <CoachCard state={coach ?? null} pending={coachPending} error={coachError} onState={onCoachState} />
+        </section>
+      ) : null}
+      {goalControl || goalControlPending || goalControlError ? (
+        <GoalControlCard state={goalControl ?? null} pending={goalControlPending} error={goalControlError} />
+      ) : null}
       <LabCard view={view} />
       {view.changedItems.length > 0 ? (
         <section className="rounded-lg border border-zinc-200 bg-white p-4">
@@ -536,9 +540,9 @@ function SupplementsCard({ view, onChanged }: { view: TodayViewModel; onChanged?
   }
 
   return (
-    <section className="min-w-0 rounded-lg border border-zinc-200 bg-white p-4">
+    <section className="today-panel min-w-0 p-4 sm:p-5">
       <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Supplements <span className="ml-1 text-reward">+{DAILY_PARTICIPATION_XP.supplements} XP/day</span></h2>
+        <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-zinc-600"><span className="today-panel-icon" aria-hidden="true">✦</span>Supplements <span className="ml-1 text-reward">+{DAILY_PARTICIPATION_XP.supplements} XP/day</span></h2>
         <div className="flex items-center gap-2">
           <p className="text-sm text-zinc-600">{summary.kind === 'complete' ? `✓ ${summaryText}` : summaryText}</p>
           {resolved ? (
@@ -626,8 +630,11 @@ function SupplementsCard({ view, onChanged }: { view: TodayViewModel; onChanged?
 
 function Card({ title, children, hero = false }: { title: string; children: ReactNode; hero?: boolean }) {
   return (
-    <section className={hero ? 'health-hero-surface health-raised-surface min-w-0 rounded-xl border border-zinc-200 p-4 sm:p-5' : 'min-w-0 rounded-lg border border-zinc-200 bg-white p-4'}>
-      <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{title}</h2>
+    <section className={hero ? 'today-panel today-panel--featured min-w-0 p-4 sm:p-5' : 'today-panel min-w-0 p-4'}>
+      <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-zinc-600">
+        <span className="today-panel-icon" aria-hidden="true">{({ Nutrition: '◉', Training: '◆', Activity: '↗', Sleep: '☾', Body: '◇' } as Record<string, string>)[title] ?? '•'}</span>
+        {title}
+      </h2>
       <div className="mt-2 text-sm text-zinc-800">{children}</div>
     </section>
   )
