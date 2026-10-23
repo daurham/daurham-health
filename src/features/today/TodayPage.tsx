@@ -846,37 +846,80 @@ function NutritionTotals({
   )
 }
 
+function NextRoutineAction() {
+  const readOnly = useDemoReadOnly()
+  const prefix = useAppPathPrefix()
+  const [plan, setPlan] = useState<TrainingPlanView | null>(null)
+  useEffect(() => {
+    if (readOnly) return
+    let mounted = true
+    let generation = 0
+    const refresh = () => {
+      const request = ++generation
+      void fetchTrainingPlan().then((value) => {
+        if (mounted && request === generation) setPlan(value)
+      }).catch(() => undefined)
+    }
+    refresh()
+    const unsubscribe = subscribeHealthDataChanges(refresh)
+    return () => {
+      mounted = false
+      generation += 1
+      unsubscribe()
+    }
+  }, [readOnly])
+  if (readOnly) return null
+  const next = plan?.configured ? plan.nextSession : null
+  return (
+    <div className="min-h-24 rounded-xl bg-accent-muted/55 p-3">
+      <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Next in rotation · optional</p>
+      {next?.available && next.templateId ? (
+        <>
+          <p className="mt-1 font-semibold text-zinc-900">{next.name}</p>
+          <Link
+            to={prefixedPath(prefix, '/training/new?template=' + encodeURIComponent(next.templateId))}
+            className="motion-pressable mt-2 inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-accent px-3 text-sm font-semibold text-accent-fg"
+          >
+            Start {next.name}
+          </Link>
+        </>
+      ) : (
+        <Link to={prefixedPath(prefix, '/training/plan')} className="mt-2 inline-flex min-h-11 items-center text-sm font-medium text-accent">
+          {plan ? 'View training plan' : 'Loading your rotation…'}
+        </Link>
+      )}
+    </div>
+  )
+}
+
 function TrainingCard({ view }: { view: TodayViewModel }) {
   const prefix = useAppPathPrefix()
   const readOnly = useDemoReadOnly()
   return (
     <Card title="Training">
-      {view.training.logged ? (
-        <ul className="space-y-3">
-          {view.training.sessions.map((session) => (
-            <li key={session.id}>
-              <p className="text-lg font-semibold tracking-tight text-zinc-900">{session.name}</p>
-              <p className="text-sm text-zinc-500">{sessionIntentLabel(session.sessionType)}</p>
-              <p className="text-zinc-600">
-                {countLabel(session.exerciseCount, 'exercise', 'exercises')} · {countLabel(session.workingSetCount, 'working set', 'working sets')}
-              </p>
-              <div className="mt-2">
-                <QuietAction to={prefixedPath(prefix, `/training/${session.id}`)}>View workout</QuietAction>
-              </div>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <>
-          <p>No training session logged today</p>
-          {readOnly ? null : (
-            <div className="mt-3 flex flex-wrap gap-2">
-              <PrimaryAction to={prefixedPath(prefix, '/training/new')}>Log workout</PrimaryAction>
-              <QuietAction to={prefixedPath(prefix, '/training/new?type=ad_hoc')}>Ad-hoc workout</QuietAction>
-            </div>
-          )}
-        </>
-      )}
+      <div className="space-y-3">
+        {view.training.logged ? (
+          <ul className="space-y-3">
+            {view.training.sessions.map((session) => (
+              <li key={session.id}>
+                <p className="text-lg font-semibold tracking-tight text-zinc-900">{session.name}</p>
+                <p className="text-sm text-zinc-500">{sessionIntentLabel(session.sessionType)}</p>
+                <p className="text-zinc-600">
+                  {countLabel(session.exerciseCount, 'exercise', 'exercises')} · {countLabel(session.workingSetCount, 'working set', 'working sets')}
+                </p>
+                <QuietAction to={prefixedPath(prefix, '/training/' + session.id)}>View workout</QuietAction>
+              </li>
+            ))}
+          </ul>
+        ) : <p className="text-sm text-zinc-600">No training session logged today</p>}
+        <NextRoutineAction />
+        {readOnly ? null : (
+          <div className="flex flex-wrap gap-2">
+            <PrimaryAction to={prefixedPath(prefix, '/training/new')}>Log workout</PrimaryAction>
+            <QuietAction to={prefixedPath(prefix, '/training/new?type=ad_hoc')}>Ad-hoc workout</QuietAction>
+          </div>
+        )}
+      </div>
     </Card>
   )
 }
