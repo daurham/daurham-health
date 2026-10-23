@@ -1576,3 +1576,12 @@ html:is([data-health-palette='wasteland'], [data-health-palette='vault-neon']) .
 @media (prefers-reduced-motion: reduce) {
   .today-progress-fill { transition: none; }
 }
+
+/* Seven completed-day summaries — shared between resting HR and sleep. */
+.today-week-summary { border-top: 1px solid var(--health-border); padding-top: .85rem; }
+.today-week-bars { display: grid; grid-template-columns: repeat(7, minmax(0,1fr)); gap: .25rem; align-items: end; margin-top: .75rem; }
+.today-week-bar-col { min-width: 0; text-align: center; }
+.today-week-bar-track { height: 3.1rem; display: flex; flex-direction: column; justify-content: end; align-items: stretch; border-radius: .25rem; background: var(--health-surface-soft); overflow: hidden; }
+.today-week-bar-fill { width: 100%; border-radius: .2rem .2rem 0 0; background: linear-gradient(0deg,var(--health-accent),var(--health-accent-secondary)); opacity: .85; }
+.today-week-bar-missing { display: block; width: 100%; border-top: 1px dashed var(--health-border-strong); }
+.today-week-bar-day { display: block; overflow: hidden; white-space: nowrap; font-size: .57rem; color: var(--health-text-faint); margin-top: .25rem; }

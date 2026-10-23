@@ -49,6 +49,8 @@ import { DAILY_PARTICIPATION_XP } from '@/domain/rewards'
 import { fetchGoalControl } from '@/features/goal-control/api'
 import { GoalControlCard } from '@/features/goal-control/GoalControlCard'
 import { TodayScenicHero, TodayDomainIcon } from './TodayVisuals'
+import { TodayWeekBars } from './TodayWeekBars'
+import { formatCalendarRange as weekRangeLabel } from '@/domain/calendar-format'
 import { fetchTrainingPlan } from '@/features/training/api'
 import type { TrainingPlanView } from '@/domain/training-plan'
 
@@ -973,6 +975,22 @@ function ActivityCard({ view }: { view: TodayViewModel }) {
       ) : (
         <p>No activity data received yet today.</p>
       )}
+      <div className="today-week-summary mt-3">
+        <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Resting HR · 7 completed days</p>
+        {activity.weeklyRestingHeartRate.value != null ? (
+          <>
+            <p className="mt-1 text-xl font-semibold tracking-tight text-zinc-900">{formatCount(activity.weeklyRestingHeartRate.value)} <span className="text-sm font-normal text-zinc-500">bpm median</span></p>
+            <p className="text-xs text-zinc-500">{activity.weeklyRestingHeartRate.observedDays}/7 days observed · {weekRangeLabel(activity.weeklyRestingHeartRate.start, activity.weeklyRestingHeartRate.end)}</p>
+            {activity.weeklyRestingHeartRate.changeBpm != null ? (
+              <p className="mt-1 text-xs text-zinc-600">
+                {activity.weeklyRestingHeartRate.changeBpm === 0 ? 'Unchanged from previous week' :
+                  (activity.weeklyRestingHeartRate.changeBpm > 0 ? '+' : '−') + formatCount(Math.abs(activity.weeklyRestingHeartRate.changeBpm)) + ' bpm vs previous week'}
+              </p>
+            ) : <p className="mt-1 text-xs text-zinc-500">Weekly comparison needs 4 observed days in each week.</p>}
+            <TodayWeekBars points={activity.weeklyRestingHeartRate.points} label="Resting heart rate daily summaries for the last 7 completed days" unit="bpm" reference={100} />
+          </>
+        ) : <p className="mt-2 text-sm text-zinc-600">No resting HR summaries for the last seven completed days.</p>}
+      </div>
       <div className="mt-2">
         <QuietAction to={prefixedPath(useAppPathPrefix(), '/progress/activity')}>View activity</QuietAction>
       </div>
@@ -1007,6 +1025,14 @@ function SleepCard({ view }: { view: TodayViewModel }) {
             {formatCalendarDate(sleep.latestComplete.date)} · {formatSleepDuration(sleep.latestComplete.minutes)}
           </p>
           {sleep.latestComplete.sourceName ? <p>{sleep.latestComplete.sourceName}</p> : null}
+        </div>
+      ) : null}
+      {sleep.weekly.value != null ? (
+        <div className="today-week-summary mt-3">
+          <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Last 7 completed nights</p>
+          <p className="mt-1 text-xl font-semibold tracking-tight text-zinc-900">{formatSleepDuration(sleep.weekly.value)} <span className="text-sm font-normal text-zinc-500">average</span></p>
+          <p className="text-xs text-zinc-500">{sleep.weekly.observedDays}/7 complete nights · {weekRangeLabel(sleep.weekly.start, sleep.weekly.end)}</p>
+          <TodayWeekBars points={sleep.weekly.points} label="Complete sleep hours across the last 7 nights" unit="minutes" reference={540} />
         </div>
       ) : null}
       <div className="mt-2 flex flex-wrap gap-3">
