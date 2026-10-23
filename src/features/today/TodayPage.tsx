@@ -228,6 +228,7 @@ export function TodayBoard({
 }) {
   const prefix = useAppPathPrefix()
   const readOnly = useDemoReadOnly()
+  const [foodOpenSignal, setFoodOpenSignal] = useState(0)
   const { goals: trendGoals, pending: trendGoalsPending } = useActiveTrendGoals(!readOnly)
   const storedTrendPreferences = useTrendPreferences()
   const trendPreferences = readOnly || trendGoalsPending ? DEFAULT_TREND_PREFERENCES : storedTrendPreferences
@@ -240,9 +241,14 @@ export function TodayBoard({
 
   return (
     <div className="space-y-4">
-      <TodayScenicHero view={view} />
+      <TodayScenicHero
+        view={view}
+        featuredAction={<NextRoutineAction />}
+        onAddFood={readOnly ? undefined : () => setFoodOpenSignal((value) => value + 1)}
+        onWaterLogged={onWaterLogged}
+      />
       <div className="grid items-stretch gap-3 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
-        <NutritionCard view={view} onNutritionChanged={onNutritionChanged} />
+        <NutritionCard view={view} onNutritionChanged={onNutritionChanged} openSignal={foodOpenSignal} />
         <TrainingCard view={view} />
       </div>
       <section className="today-essentials" aria-labelledby="today-essentials-heading">
@@ -710,9 +716,11 @@ function NutrientMeter({
 function NutritionCard({
   view,
   onNutritionChanged,
+  openSignal = 0,
 }: {
   view: TodayViewModel
   onNutritionChanged?: () => void
+  openSignal?: number
 }) {
   const nutrition = view.nutrition
   const readOnly = useDemoReadOnly()
@@ -726,7 +734,7 @@ function NutritionCard({
       )}
       <div className="mt-3 flex flex-wrap items-center gap-x-4">
         {readOnly ? null : (
-          <TodayAddFoodAction date={view.date} onChanged={onNutritionChanged} />
+          <TodayAddFoodAction date={view.date} onChanged={onNutritionChanged} openSignal={openSignal} />
         )}
         <QuietAction to={dateHref}>View nutrition</QuietAction>
       </div>
@@ -734,7 +742,7 @@ function NutritionCard({
   )
 }
 
-function TodayAddFoodAction({ date, onChanged }: { date: string; onChanged?: () => void }) {
+function TodayAddFoodAction({ date, onChanged, openSignal = 0 }: { date: string; onChanged?: () => void; openSignal?: number }) {
   const [open, setOpen] = useState(false)
   const [editingFood, setEditingFood] = useState<NutritionFood | null>(null)
   const [sheetVersion, setSheetVersion] = useState(0)
@@ -744,7 +752,7 @@ function TodayAddFoodAction({ date, onChanged }: { date: string; onChanged?: () 
     recipes: NutritionFood[]
   }>({ recents: [], staples: [], recipes: [] })
 
-  async function openSheet() {
+  const openSheet = useCallback(async () => {
     setOpen(true)
     try {
       const day = await fetchNutritionDay(date)
@@ -752,7 +760,11 @@ function TodayAddFoodAction({ date, onChanged }: { date: string; onChanged?: () 
     } catch {
       setQuickAdd({ recents: [], staples: [], recipes: [] })
     }
-  }
+  }, [date])
+
+  useEffect(() => {
+    if (openSignal > 0) void openSheet()
+  }, [openSignal, openSheet])
 
   function closeSheet() {
     setOpen(false)
@@ -857,6 +869,8 @@ function NutritionTotals({
 }
 
 /** Start the existing flexible rotation, without treating any calendar day as mandatory. */
+/** Reuses the existing training-plan request; only the scenic command center
+ * mounts this action, so no duplicate plan fetch or extra dashboard reflow. */
 function NextRoutineAction() {
   const readOnly = useDemoReadOnly()
   const prefix = useAppPathPrefix()
@@ -879,25 +893,23 @@ function NextRoutineAction() {
       unsubscribe()
     }
   }, [readOnly])
-
-  if (readOnly) return null
   const next = plan?.configured ? plan.nextSession : null
   return (
-    <div className="mt-3 min-h-32 rounded-xl bg-accent-muted/50 p-3">
-      <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Next in rotation · optional</p>
-      {next?.available && next.templateId ? (
-        <>
-          <p className="mt-1 font-semibold text-zinc-900">{next.name}</p>
-          <Link to={prefixedPath(prefix, '/training/new?template=' + encodeURIComponent(next.templateId))}
-            className="motion-pressable mt-2 inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-accent px-3 text-center text-sm font-semibold text-accent-fg">
-            Start {next.name}
-          </Link>
-        </>
-      ) : (
-        <Link to={prefixedPath(prefix, '/training/plan')} className="mt-2 inline-flex min-h-11 items-center text-sm font-medium text-accent">
-          {plan ? 'View training plan' : 'Loading your rotation…'}
+    <div className="today-command-next">
+      <h2 className="today-scenic-heading">{next?.available ? next.name : 'Train when you feel ready'}</h2>
+      <p className="today-command-meta">{next?.available ? 'Your next routine is ready whenever you are.' : 'Your schedule stays flexible.'}</p>
+      <div className="today-command-training-links">
+        <Link
+          to={next?.available && next.templateId && !readOnly
+            ? prefixedPath(prefix, '/training/new?template=' + encodeURIComponent(next.templateId))
+            : prefixedPath(prefix, '/training')}
+          className="today-command-primary"
+        >
+          {next?.available && next.templateId && !readOnly ? 'Start planned workout' : 'Training options'}
+          <span aria-hidden="true">→</span>
         </Link>
-      )}
+        {!readOnly ? <Link to={prefixedPath(prefix, '/training/new?type=ad_hoc')} className="today-command-secondary">Ad-hoc</Link> : null}
+      </div>
     </div>
   )
 }
@@ -922,7 +934,6 @@ function TrainingCard({ view }: { view: TodayViewModel }) {
             ))}
           </ul>
         ) : <p>No training session logged today</p>}
-        <NextRoutineAction />
         {readOnly || view.training.logged ? null : (
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <PrimaryAction to={prefixedPath(prefix, '/training/new')}>Log workout</PrimaryAction>

@@ -1,4 +1,5 @@
 import React from 'react'
+import { MemoryRouter } from 'react-router-dom'
 import { readFileSync } from 'node:fs'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
@@ -58,11 +59,13 @@ describe('Collectible theme scenes', () => {
   })
 
   it('removes duplicate hero date while retaining the dashboard page date', () => {
-    const hero = renderToStaticMarkup(<TodayScenicHero view={buildTodayView(sources)} />)
-    expect(hero).toContain('Make today count.')
+    const hero = renderToStaticMarkup(<MemoryRouter><TodayScenicHero view={buildTodayView(sources)} /></MemoryRouter>)
+    expect(hero).toContain('Your training options')
+    expect(hero).toContain('Quick logging')
+    expect(hero).not.toContain('Make today count.')
     expect(hero).not.toContain('Thursday, Oct 22')
-    expect(hero).toContain('today-world-motto')
-    expect(readFileSync('src/features/today/TodayPage.tsx','utf8')).toContain('TodayScenicHero view={view}')
+    expect(hero).toContain('today-command-shortcuts')
+    expect(readFileSync('src/features/today/TodayPage.tsx','utf8')).toContain('<TodayScenicHero')
     expect(readFileSync('src/features/settings/SettingsPage.tsx','utf8')).toContain('Theme world gallery')
   })
 })

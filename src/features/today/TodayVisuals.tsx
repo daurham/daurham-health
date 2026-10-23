@@ -1,16 +1,30 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { Link } from 'react-router-dom'
 import type { TodayViewModel } from '@/domain/today'
 import { ThemeWorldScene } from './ThemeWorldScene'
 import { worldStage, worldMoodForHour, isHydrationGoalMet } from './theme-worlds'
 import { useRewardSummary } from '@/features/rewards/useRewardSummary'
-import { useDemoReadOnly } from '@/lib/app-prefix'
+import { prefixedPath, useAppPathPrefix, useDemoReadOnly } from '@/lib/app-prefix'
+import { addHydrationEvent } from '@/features/daily-signals'
+import type { HydrationEvent } from '@/domain/daily-signals'
 import { progressionState } from '@/domain/progression'
 import { readPalettePreference, themePackUnlockLevel, type HealthPalette } from '@/theme'
 
-/** Purely decorative, token-driven artwork. No external image requests or AI calls. */
-export function TodayScenicHero({ view }: { view: TodayViewModel }) {
+/** A useful first action over collectible art; the remaining shortcuts use
+ * existing Today APIs. No additional network calls for art or daily metrics. */
+export function TodayScenicHero({
+  view, featuredAction, onAddFood, onWaterLogged,
+}: {
+  view: TodayViewModel
+  featuredAction?: ReactNode
+  onAddFood?: () => void
+  onWaterLogged?: (event: HydrationEvent) => void
+}) {
   const readOnly = useDemoReadOnly()
+  const prefix = useAppPathPrefix()
   const [mood, setMood] = useState(() => worldMoodForHour(new Date().getHours()))
+  const [waterBusy, setWaterBusy] = useState(false)
+  const [waterError, setWaterError] = useState<string | null>(null)
   useEffect(() => {
     const update = () => setMood(worldMoodForHour(new Date().getHours()))
     document.addEventListener('visibilitychange', update)
@@ -23,25 +37,80 @@ export function TodayScenicHero({ view }: { view: TodayViewModel }) {
   const stage = worldStage(themePackUnlockLevel(palette), currentLevel)
   const hydration = view.dailySignals?.hydration
   const hydrated = isHydrationGoalMet(hydration?.totalOz, hydration?.goalOz)
+  const waterLabel = hydration?.totalOz == null ? 'Water not logged'
+    : Math.round(hydration.totalOz) + (hydration.goalOz && hydration.goalOz > 0 ? ' / ' + Math.round(hydration.goalOz) : '') + ' oz water'
+  const calories = view.nutrition.totals?.calories
+  const caloriesLabel = calories?.status === 'available'
+    ? Math.round(calories.value).toLocaleString('en-US') + ' kcal logged'
+    : 'Food not logged'
+  const lastSession = view.training.sessions[0]
+  const checkInHref = prefixedPath(prefix, '/check-in?date=' + view.date)
+  const nutritionHref = prefixedPath(prefix, '/nutrition?date=' + view.date)
+
+  async function logWater() {
+    if (waterBusy || readOnly) return
+    setWaterBusy(true)
+    setWaterError(null)
+    try {
+      const event = await addHydrationEvent(view.date, 8)
+      onWaterLogged?.(event)
+    } catch (cause) {
+      setWaterError(cause instanceof Error ? cause.message : 'Water could not be logged.')
+    } finally {
+      setWaterBusy(false)
+    }
+  }
+
   return (
-    <section className="today-scenic-hero" aria-label="Today's health overview">
-      <ThemeWorldScene palette={palette} stage={stage} completed={view.training.logged} hydrated={hydrated} mood={mood} />
-      <div className="today-scenic-content">
-        <p className="today-scenic-eyebrow">YOUR HEALTH, IN FOCUS</p>
-        <h2 className="today-scenic-heading">Make today count.</h2>
-        <p className="today-scenic-description">Your daily tracking and next steps, all in one place.</p>
-        <p className="today-world-motto" aria-hidden="true">
-          <span className="today-world-motto-onepiece">Set your course.</span>
-          <span className="today-world-motto-bonfire">Keep the ember alive.</span>
-          <span className="today-world-motto-dragon">Rise beyond your limits.</span>
-          <span className="today-world-motto-leaf">Grow stronger, one day at a time.</span>
-          <span className="today-world-motto-gunships">Stay on mission.</span>
-          <span className="today-world-motto-fleet">Across the stars.</span>
-          <span className="today-world-motto-ringworld">Finish the fight.</span>
-          <span className="today-world-motto-wasteland">Keep moving forward.</span>
-          <span className="today-world-motto-prestige">The next horizon is yours.</span>
-        </p>
+    <section className="today-command-center" aria-label="Today quick actions">
+      <div className="today-scenic-hero" aria-label="Your next action">
+        <ThemeWorldScene palette={palette} stage={stage} completed={view.training.logged} hydrated={hydrated} mood={mood} />
+        <div className="today-scenic-content">
+          <p className="today-scenic-eyebrow">{view.training.logged ? 'TRAINING LOGGED TODAY' : 'NEXT IN ROTATION · OPTIONAL'}</p>
+          {view.training.logged ? (
+            <div className="today-command-next">
+              <h2 className="today-scenic-heading">{lastSession?.name ?? 'Workout complete'}</h2>
+              <p className="today-command-meta">Your workout is recorded. Recovery or more activity is your choice.</p>
+              {lastSession ? <Link className="today-command-primary" to={prefixedPath(prefix, '/training/' + lastSession.id)}>View workout <span aria-hidden="true">→</span></Link> : null}
+            </div>
+          ) : (
+            featuredAction ?? (
+              <div className="today-command-next">
+                <h2 className="today-scenic-heading">Your training options</h2>
+                <Link className="today-command-primary" to={prefixedPath(prefix, '/training')}>Open training <span aria-hidden="true">→</span></Link>
+              </div>
+            )
+          )}
+          <p className="today-command-snapshot">{caloriesLabel} <span aria-hidden="true">·</span> {waterLabel}</p>
+        </div>
       </div>
+      <nav className="today-command-shortcuts" aria-label="Quick logging">
+        {readOnly ? (
+          <Link to={nutritionHref} className="today-command-shortcut">
+            <TodayDomainIcon domain="nutrition" /><span>Nutrition</span>
+          </Link>
+        ) : (
+          <button type="button" onClick={onAddFood} disabled={!onAddFood} className="today-command-shortcut">
+            <TodayDomainIcon domain="nutrition" /><span>Add food</span>
+          </button>
+        )}
+        {readOnly ? (
+          <Link to={checkInHref} className="today-command-shortcut">
+            <TodayDomainIcon domain="hydration" /><span>Water</span>
+          </Link>
+        ) : (
+          <button type="button" disabled={waterBusy} onClick={() => void logWater()} className="today-command-shortcut">
+            <TodayDomainIcon domain="hydration" /><span>{waterBusy ? 'Logging…' : '+8 oz water'}</span>
+          </button>
+        )}
+        <Link to={checkInHref} className="today-command-shortcut">
+          <TodayDomainIcon domain="wellness" /><span>Check-in</span>
+        </Link>
+        <Link to={prefixedPath(prefix, '/supplements')} className="today-command-shortcut">
+          <TodayDomainIcon domain="supplements" /><span>Supplements</span>
+        </Link>
+      </nav>
+      {waterError ? <p className="today-command-error" role="alert">{waterError}</p> : null}
     </section>
   )
 }
