@@ -19,7 +19,7 @@ describe('Today scene families and daily priorities', () => {
     const css = readFileSync('src/index.css', 'utf8')
     expect(hero).toContain('world-scene-art')
     expect(hero).toContain('data-world-palette=')
-    expect(hero).toContain('/theme/worlds/bonfire.webp')
+    expect(hero).toContain('/theme/worlds/bonfire-v2.webp')
     expect(css).toContain('background-size: cover;')
     expect(css).toContain("data-health-palette='grand-line'")
     expect(css).toContain("data-health-palette='cosmic-instinct'")
