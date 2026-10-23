@@ -1,5 +1,6 @@
 import { useEffect, useState, type CSSProperties } from 'react'
-import { ThemeWorldArtwork } from '@/features/today/ThemeWorldArtwork'
+import { ThemeWorldScene } from '@/features/today/ThemeWorldScene'
+import { worldStage, worldNextStageLevel, type WorldStage } from '@/features/today/theme-worlds'
 import { Link, useLocation } from 'react-router-dom'
 import { parseAppleHealthFile, previewAppleHealth } from '@/domain/apple-health'
 import { formatCalendarRange } from '@/domain/calendar-format'
@@ -66,10 +67,11 @@ function prefersDark(): boolean {
 }
 
 /** A scenic teaser uses the same artwork as Today without selecting a locked pack. */
-function ThemeWorldPreview({ pack, label, resolvedMode }: {
+function ThemeWorldPreview({ pack, label, resolvedMode, stage }: {
   pack: ThemePack
   label: string
   resolvedMode: 'light' | 'dark'
+  stage: WorldStage
 }) {
   const dark = resolvedMode === 'dark'
   const surface = dark ? '#191b23' : pack.preview.surface
@@ -85,7 +87,7 @@ function ThemeWorldPreview({ pack, label, resolvedMode }: {
   } as CSSProperties
   return (
     <div className="theme-world-preview" data-scene-palette={pack.id} style={style}>
-      <ThemeWorldArtwork palette={pack.id} />
+      <ThemeWorldScene palette={pack.id} stage={stage} />
       <div className="theme-world-preview-copy">
         <p className="theme-world-preview-label">{label}</p>
         <p className="theme-world-preview-name">{pack.label}</p>
@@ -154,9 +156,10 @@ function AppearanceSection() {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2" aria-label="Theme world gallery">
-        <ThemeWorldPreview pack={activePack} label="Your current world" resolvedMode={resolvedMode} />
+        <ThemeWorldPreview pack={activePack} label="Your current world" resolvedMode={resolvedMode}
+          stage={worldStage(activePack.unlockLevel, progression.level)} />
         {nextPack ? (
-          <ThemeWorldPreview pack={nextPack} label={'Next unlock · Level ' + nextPack.unlockLevel} resolvedMode={resolvedMode} />
+          <ThemeWorldPreview pack={nextPack} label={'Next unlock · Level ' + nextPack.unlockLevel} resolvedMode={resolvedMode} stage="base" />
         ) : null}
       </div>
 
@@ -229,7 +232,7 @@ function AppearanceSection() {
                   } as CSSProperties}
                   aria-hidden="true"
                 >
-                  <ThemeWorldArtwork palette={pack.id} />
+                  <ThemeWorldScene palette={pack.id} stage={worldStage(pack.unlockLevel, progression.level, unlocked)} />
                 </div>
                 <div className="bg-white p-3">
                   <div className="flex items-center justify-between gap-2">
@@ -239,6 +242,20 @@ function AppearanceSection() {
                     </span>
                   </div>
                   <p className="mt-1 text-xs leading-5 text-zinc-600">{pack.flavor}</p>
+                  <div className="theme-world-steps" aria-label={pack.label + ' illustration progression'}>
+                    {(['base', 'awakened', 'ascended'] as const).map((stage) => (
+                      <span key={stage} data-current={unlocked && worldStage(pack.unlockLevel, progression.level) === stage ? 'true' : 'false'}>
+                        <span className="theme-world-step-image"><ThemeWorldScene palette={pack.id} stage={stage} /></span>
+                        <small>{stage === 'base' ? 'Base' : stage === 'awakened' ? 'Awakened' : 'Ascended'}</small>
+                      </span>
+                    ))}
+                  </div>
+                  <p className="theme-world-unlock-note">
+                    {unlocked ? (
+                      worldNextStageLevel(pack.unlockLevel, worldStage(pack.unlockLevel, progression.level)) == null
+                        ? 'Fully evolved' : 'Next evolution at level ' + worldNextStageLevel(pack.unlockLevel, worldStage(pack.unlockLevel, progression.level))
+                    ) : 'Unlock at level ' + pack.unlockLevel}
+                  </p>
                 </div>
               </button>
             )

@@ -1931,3 +1931,140 @@ html[data-health-palette='prismatic-apex'] .today-world-motto { display: block; 
 .theme-world-preview-detail { color: var(--health-text-muted); font-size: .7rem; }
 .theme-world-preview--tile { height: 5.5rem; }
 .theme-world-preview--tile .today-scene-art { width: 105%; }
+
+
+/* Premium theme worlds: one locally bundled artwork atlas, never a screenshot
+   of UI. Base is quiet and desaturated. Permanent XP stages reveal themed hues.
+   Finite optional daily celebrations add light without punishing missed goals. */
+.world-scene {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: var(--health-surface-raised);
+  --world-saturation: 0.02;
+  --world-accent-opacity: 0.07;
+  --world-brightness: .81;
+}
+.world-scene-art {
+  position: absolute;
+  inset: 0;
+  background-image: url('/theme/worlds-v1.webp');
+  background-repeat: no-repeat;
+  background-size: auto 800%;
+  filter: grayscale(1) saturate(var(--world-saturation)) brightness(var(--world-brightness)) contrast(1.08);
+  transition: filter 450ms ease;
+}
+.world-scene-tint {
+  position: absolute;
+  inset: 0;
+  opacity: var(--world-accent-opacity);
+  background: linear-gradient(125deg, transparent 22%, var(--health-accent-secondary) 70%, var(--health-accent));
+  mix-blend-mode: color;
+  transition: opacity 450ms ease;
+}
+.world-scene-horizon {
+  position: absolute; inset: 0;
+  opacity: 0;
+  background: radial-gradient(ellipse at 77% 67%, color-mix(in srgb, var(--health-accent) 55%, transparent), transparent 49%);
+  transition: opacity 450ms ease;
+}
+.world-scene-glints { position: absolute; inset: 0; opacity: 0; }
+.world-scene-glints i {
+  position: absolute; width: 3px; height: 3px; border-radius: 50%;
+  background: var(--health-reward); box-shadow: 0 0 9px var(--health-accent);
+}
+.world-scene-glints i:nth-child(1) { left: 63%; top: 31%; }
+.world-scene-glints i:nth-child(2) { left: 74%; top: 54%; }
+.world-scene-glints i:nth-child(3) { left: 90%; top: 23%; }
+.world-scene-glints i:nth-child(4) { left: 81%; top: 71%; }
+.world-scene[data-world-stage="awakened"] {
+  --world-saturation: .55;
+  --world-accent-opacity: .26;
+  --world-brightness: .91;
+}
+.world-scene[data-world-stage="ascended"] {
+  --world-saturation: 1;
+  --world-accent-opacity: .40;
+  --world-brightness: 1;
+}
+.world-scene[data-world-stage="awakened"] .world-scene-art { filter: grayscale(.53) saturate(.78) brightness(var(--world-brightness)); }
+.world-scene[data-world-stage="ascended"] .world-scene-art { filter: grayscale(.10) saturate(1.12) brightness(var(--world-brightness)); }
+.world-scene[data-world-stage="awakened"] .world-scene-horizon { opacity: .18; }
+.world-scene[data-world-stage="ascended"] .world-scene-horizon { opacity: .43; }
+.world-scene[data-world-stage="ascended"] .world-scene-glints { opacity: .8; }
+.world-scene[data-world-celebrating="yes"] .world-scene-horizon { opacity: .57; }
+.world-scene[data-world-celebrating="yes"] .world-scene-glints { opacity: 1; }
+/* Source illustrations come from deliberately restrained scenic concept art.
+   Palette accent is a distinct overlay, not a deceptive colorized photo. */
+@keyframes world-reward-glow {
+  0%, 100% { opacity: .18; transform: scale(1); }
+  50% { opacity: .8; transform: scale(1.035); }
+}
+@keyframes world-reward-drift {
+  0% { opacity: 0; transform: translateY(4px); }
+  25% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-9px); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .world-scene[data-world-celebrating="yes"] .world-scene-horizon {
+    animation: world-reward-glow 3s ease-in-out 2;
+  }
+  .world-scene[data-world-celebrating="yes"] .world-scene-glints i {
+    animation: world-reward-drift 3s ease-in-out 2;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .world-scene, .world-scene * { transition: none !important; animation: none !important; }
+}
+.today-scenic-hero > .world-scene { z-index: 0; }
+.today-scenic-hero::after { z-index: 1; }
+.today-scenic-content { z-index: 2; }
+.today-scenic-hero .world-scene-art { background-position-x: 65% !important; }
+.theme-world-preview > .world-scene { z-index: 0; border-radius: inherit; }
+.theme-world-preview .world-scene-art { background-position-x: 62% !important; }
+.theme-world-preview--tile .world-scene-art { background-position-x: center !important; }
+.theme-world-steps {
+  display: flex; justify-content: flex-end; align-items: start; gap: .4rem;
+  margin-top: .55rem;
+}
+.theme-world-steps > span { flex: 0 1 4.3rem; min-width: 0; color: var(--health-text-muted); text-align: center; font-size: .57rem; }
+.theme-world-step-image { display: block; height: 1.45rem; position: relative; overflow: hidden; border-radius: .32rem; border: 1px solid var(--health-border); }
+.theme-world-steps small { display:block; font-size:inherit; margin-top:.13rem; }
+.theme-world-steps [data-current="true"] .theme-world-step-image { outline: 1px solid var(--health-accent); outline-offset: 1px; }
+.theme-world-preview:not(.theme-world-preview--tile) { min-height: 9rem; }
+.theme-world-preview--tile { height: 6.8rem; }
+.theme-world-preview--tile .world-scene-art { background-position-x: center !important; }
+.theme-world-unlock-note { font-size: .68rem; color: var(--health-text-muted); margin-top: .35rem; }
+
+
+/* Passive daypart lighting affects imagery only; content contrast is unchanged.
+   Today's local device clock is sampled on mount/focus (no polling). */
+.world-scene::after {
+  content: '';
+  position: absolute; inset: 0;
+  pointer-events: none;
+  background: #17253b; opacity: 0;
+}
+.world-scene[data-world-mood="night"]::after { opacity: .26; }
+.world-scene[data-world-mood="daybreak"]::after {
+  background: var(--health-reward); opacity: .07;
+}
+.world-scene[data-world-mood="day"]::after { opacity: 0; }
+.world-scene[data-world-mood="dusk"]::after { opacity: .10; }
+
+/* The Spartan world is a ringworld silhouette instead of borrowing the
+   Clone Legion gunship artwork. Theme colors still own both ring edges. */
+.world-scene[data-world-palette="spartan"]::before,
+.world-scene[data-world-palette="mjolnir-night"]::before {
+  content: '';
+  position: absolute;
+  z-index: 1;
+  width: 52%; height: 66%;
+  right: 8%; top: -15%;
+  border: clamp(3px, .6vw, 7px) solid var(--health-accent-secondary);
+  border-radius: 50%;
+  transform: rotate(-23deg);
+  opacity: .40;
+  pointer-events: none;
+}
