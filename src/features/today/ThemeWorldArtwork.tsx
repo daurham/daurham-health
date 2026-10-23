@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { HealthPalette } from '@/theme'
 
 /** Decorative vector silhouettes share the active theme's semantic palette.
  * No images, fonts, network requests, or runtime AI generation.
@@ -37,10 +37,10 @@ export function sceneMoodForDate(date: string): { mood: 'daybreak' | 'dusk' | 'm
   }
 }
 
-export function ThemeWorldArtwork({ date }: { date?: string }) {
+export function ThemeWorldArtwork({ date, palette }: { date?: string; palette?: HealthPalette }) {
   const { mood, rare } = sceneMoodForDate(date ?? '2026-10-22')
   return <svg className="today-scene-art" viewBox="0 0 1000 320" preserveAspectRatio="xMidYMid slice"
-    aria-hidden="true" focusable="false" data-scene-mood={mood} data-scene-rare={rare ? 'yes' : 'no'}>
+    aria-hidden="true" focusable="false" data-scene-mood={mood} data-scene-rare={palette ? 'no' : rare ? 'yes' : 'no'} data-preview-palette={palette}>
     <circle className="today-scene-orb" cx="786" cy="92" r="60" />
     <g className="today-scene-stars">
       <circle cx="660" cy="42" r="3" /><circle cx="906" cy="38" r="2.5" />
