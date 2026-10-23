@@ -27,3 +27,12 @@ export function worldNextStageLevel(unlockLevel: number | null, stage: WorldStag
   const floor = unlockLevel ?? 1
   return stage === 'base' ? floor + 2 : stage === 'awakened' ? floor + 5 : null
 }
+
+export type WorldMood = 'daybreak' | 'day' | 'dusk' | 'night'
+/** Device-local presentation only; does not infer mood from health data. */
+export function worldMoodForHour(hour: number): WorldMood {
+  if (hour >= 5 && hour < 10) return 'daybreak'
+  if (hour >= 10 && hour < 17) return 'day'
+  if (hour >= 17 && hour < 21) return 'dusk'
+  return 'night'
+}
