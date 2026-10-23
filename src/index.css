@@ -1609,8 +1609,12 @@ html:is([data-health-palette='wasteland'], [data-health-palette='vault-neon']) .
 .today-week-bar-missing { display: block; width: 100%; border-top: 1px dashed var(--health-border-strong); }
 .today-week-bar-day { display: block; overflow: hidden; white-space: nowrap; font-size: .57rem; color: var(--health-text-faint); margin-top: .25rem; }
 
-/* Four scenery families: all artwork fills/strokes resolve to the active theme.
-   The separate light/dark mode palettes supply contrast and atmosphere. */
+
+/* Immersive theme worlds. One composition per franchise group: original vector
+   environment artwork, colored solely by the selected semantic theme palette. */
+.today-world { display: none; }
+.today-world-motto { display: none; margin-top: .65rem; font-size: .74rem; font-weight: 650; color: var(--health-accent); letter-spacing: .025em; }
+.today-world-motto span { display: none; }
 .today-scene-cosmos, .today-scene-wasteland { display: none; }
 .today-cosmos-haze { fill: var(--health-accent-secondary); opacity: .11; }
 .today-cosmos-halo { fill: var(--health-accent); opacity: .18; }
@@ -1622,398 +1626,293 @@ html:is([data-health-palette='wasteland'], [data-health-palette='vault-neon']) .
 .today-wasteland-distant { fill: var(--health-accent-secondary); opacity: .26; }
 .today-wasteland-ruins { fill: var(--health-accent); opacity: .28; }
 .today-wasteland-foreground { fill: var(--health-accent); opacity: .35; }
-html:is(
-  [data-health-palette='aura'], [data-health-palette='saiyan-dawn'], [data-health-palette='super-saiyan-gold'],
-  [data-health-palette='spartan'], [data-health-palette='namek-sky'], [data-health-palette='clone-legion'],
-  [data-health-palette='silver-instinct'], [data-health-palette='crimson-surge'], [data-health-palette='mjolnir-night'],
-  [data-health-palette='republic-red'], [data-health-palette='cosmic-instinct'], [data-health-palette='astral-ascension'],
-  [data-health-palette='eclipse-sovereign'], [data-health-palette='prismatic-apex']
-) .today-scene-land,
-html:is([data-health-palette='wasteland'],[data-health-palette='vault-neon']) .today-scene-land { display: none; }
-html:is(
-  [data-health-palette='aura'], [data-health-palette='saiyan-dawn'], [data-health-palette='super-saiyan-gold'],
-  [data-health-palette='spartan'], [data-health-palette='namek-sky'], [data-health-palette='clone-legion'],
-  [data-health-palette='silver-instinct'], [data-health-palette='crimson-surge'], [data-health-palette='mjolnir-night'],
-  [data-health-palette='republic-red'], [data-health-palette='cosmic-instinct'], [data-health-palette='astral-ascension'],
-  [data-health-palette='eclipse-sovereign'], [data-health-palette='prismatic-apex']
-) .today-scene-cosmos { display: initial; }
-html:is([data-health-palette='wasteland'],[data-health-palette='vault-neon']) .today-scene-wasteland { display: initial; }
-
-/*
- * Collectible scenic worlds. All visual geometry is vector, and fill/stroke
- * inherit existing color packs via semantic tokens. Preview tiles share this
- * scene mapping without changing the owner's selected palette or XP.
- */
-.today-world { display: none; }
-.world-ink { fill: var(--health-accent); opacity: .56; }
-.world-mid { fill: var(--health-accent-secondary); opacity: .44; }
-.world-glint { fill: var(--health-accent-muted); opacity: .72; }
-.world-line { fill: none; stroke: var(--health-accent-secondary); stroke-width: 3; opacity: .7; stroke-linecap: round; stroke-linejoin: round; }
-.world-highlight { fill: var(--health-reward); opacity: .8; }
-.world-foreground { fill: var(--health-accent); opacity: .3; }
-.world-mist { fill: var(--health-accent-secondary); opacity: .14; }
-.world-moon-haze { fill: var(--health-accent-secondary); opacity: .17; }
-.world-moon { fill: var(--health-accent-secondary); opacity: .3; }
-.world-fire-halo { fill: var(--health-reward); opacity: .25; }
-.world-fire { fill: var(--health-reward); opacity: .82; }
-.world-fire-core { fill: var(--health-accent-muted); opacity: .85; }
-.world-spark { fill: var(--health-reward); opacity: .7; }
-.world-dragon-outline {
-  fill: none; stroke: var(--health-accent); opacity: .63;
-  stroke-width: 29; stroke-linecap: round; stroke-linejoin: round;
-}
-.world-dragon-spine {
-  fill: none; stroke: var(--health-accent-secondary); opacity: .34;
-  stroke-width: 8; stroke-linecap: round; stroke-linejoin: round;
-}
-.world-carvings path:first-child { fill: var(--health-accent-secondary); opacity: .54; }
-.world-carvings path:last-child {
-  fill: none; stroke: var(--health-accent); stroke-width: 3;
-  stroke-linecap: round; opacity: .68;
-}
-.world-ring { fill: none; stroke: var(--health-accent-secondary); stroke-width: 17; opacity: .38; }
-.world-ring-glint { fill: none; stroke: var(--health-accent-muted); stroke-width: 3; opacity: .9; }
+.world-ink { fill: var(--health-accent); opacity: .70; }
+.world-mid { fill: var(--health-accent-secondary); opacity: .42; }
+.world-glint { fill: var(--health-accent-secondary); opacity: .65; }
+.world-foreground { fill: var(--health-accent); opacity: .50; }
+.world-mist { fill: var(--health-accent-secondary); opacity: .15; }
+.world-line { fill: none; stroke: var(--health-accent-secondary); stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; opacity: .67; }
+.world-highlight { fill: var(--health-reward); opacity: .9; }
+.world-fire-halo { fill: var(--health-glow); opacity: .82; }
+.world-fire { fill: var(--health-accent); opacity: .9; }
+.world-fire-core { fill: var(--health-reward); opacity: .9; }
+.world-spark { fill: var(--health-reward); opacity: .8; }
+.world-moon-haze { fill: var(--health-accent-secondary); opacity: .11; }
+.world-moon { fill: var(--health-accent-secondary); opacity: .32; }
+.world-dragon-outline { fill: none; stroke: var(--health-accent); stroke-width: 20; stroke-linecap: round; stroke-linejoin: round; opacity: .67; }
+.world-dragon-spine { fill: none; stroke: var(--health-accent-secondary); stroke-width: 3.5; stroke-linecap: round; opacity: .67; }
+.world-carvings path:first-child { fill: var(--health-accent); opacity: .52; }
+.world-carvings path:last-child { fill: none; stroke: var(--health-accent-secondary); stroke-width: 3; opacity: .75; }
+.world-ring { fill: none; stroke: var(--health-accent); stroke-width: 19; opacity: .43; }
+.world-ring-glint { fill: none; stroke: var(--health-accent-secondary); stroke-width: 3; opacity: .72; }
 .today-scene-rare { opacity: 0; }
-.today-scene-art[data-scene-rare='yes'] .today-scene-rare { opacity: .75; }
-.world-rare-comet,.world-rare-star {
-  fill: none; stroke: var(--health-accent-secondary); stroke-width: 3; stroke-linecap: round;
-}
-.today-scene-art[data-scene-mood='daybreak'] .world-moon-haze { opacity: .26; }
-.today-scene-art[data-scene-mood='moonlit'] .world-moon { opacity: .51; }
-.today-scene-art[data-scene-mood='moonlit'] .world-mist { opacity: .22; }
-.today-scene-art[data-scene-mood='moonlit'] .world-fire-halo { opacity: .38; }
+.world-rare-comet, .world-rare-star { fill: none; stroke: var(--health-reward); stroke-width: 3; stroke-linecap: round; opacity: .9; }
+.today-scene-art[data-scene-rare='yes'] .today-scene-rare { opacity: 1; }
+.today-scene-art[data-scene-mood='moonlit'] .world-moon { opacity: .56; }
+.today-scene-art[data-scene-mood='daybreak'] .world-mist { opacity: .23; }
+.today-scene-art[data-scene-mood='dusk'] .world-moon-haze { opacity: .18; }
 
-/* Theme mapping: bespoke scene replaces shared mountains/cosmos. Ocean scenes
- * retain their layered waves; Fallout keeps the original distant wasteland. */
-html[data-health-palette='grand-line'] .today-scenic-hero .today-scene-land,
-.theme-world-preview[data-scene-palette='grand-line'] .today-scene-land,
-html[data-health-palette='sun-god'] .today-scenic-hero .today-scene-land,
-.theme-world-preview[data-scene-palette='sun-god'] .today-scene-land,
-html[data-health-palette='bonfire'] .today-scenic-hero .today-scene-land,
-.theme-world-preview[data-scene-palette='bonfire'] .today-scene-land,
-html[data-health-palette='abyss-knight'] .today-scenic-hero .today-scene-land,
-.theme-world-preview[data-scene-palette='abyss-knight'] .today-scene-land,
-html[data-health-palette='saiyan-dawn'] .today-scenic-hero .today-scene-land,
-.theme-world-preview[data-scene-palette='saiyan-dawn'] .today-scene-land,
-html[data-health-palette='super-saiyan-gold'] .today-scenic-hero .today-scene-land,
-.theme-world-preview[data-scene-palette='super-saiyan-gold'] .today-scene-land,
-html[data-health-palette='namek-sky'] .today-scenic-hero .today-scene-land,
-.theme-world-preview[data-scene-palette='namek-sky'] .today-scene-land,
-html[data-health-palette='silver-instinct'] .today-scenic-hero .today-scene-land,
-.theme-world-preview[data-scene-palette='silver-instinct'] .today-scene-land,
-html[data-health-palette='crimson-surge'] .today-scenic-hero .today-scene-land,
-.theme-world-preview[data-scene-palette='crimson-surge'] .today-scene-land,
-html[data-health-palette='cosmic-instinct'] .today-scenic-hero .today-scene-land,
-.theme-world-preview[data-scene-palette='cosmic-instinct'] .today-scene-land,
-html[data-health-palette='hidden-leaf'] .today-scenic-hero .today-scene-land,
-.theme-world-preview[data-scene-palette='hidden-leaf'] .today-scene-land,
-html[data-health-palette='sage-storm'] .today-scenic-hero .today-scene-land,
-.theme-world-preview[data-scene-palette='sage-storm'] .today-scene-land,
-html[data-health-palette='clone-legion'] .today-scenic-hero .today-scene-land,
-.theme-world-preview[data-scene-palette='clone-legion'] .today-scene-land,
-html[data-health-palette='republic-red'] .today-scenic-hero .today-scene-land,
-.theme-world-preview[data-scene-palette='republic-red'] .today-scene-land,
-html[data-health-palette='spartan'] .today-scenic-hero .today-scene-land,
-.theme-world-preview[data-scene-palette='spartan'] .today-scene-land,
-html[data-health-palette='mjolnir-night'] .today-scenic-hero .today-scene-land,
-.theme-world-preview[data-scene-palette='mjolnir-night'] .today-scene-land,
-html[data-health-palette='wasteland'] .today-scenic-hero .today-scene-land,
-.theme-world-preview[data-scene-palette='wasteland'] .today-scene-land,
-html[data-health-palette='vault-neon'] .today-scenic-hero .today-scene-land,
-.theme-world-preview[data-scene-palette='vault-neon'] .today-scene-land,
-html[data-health-palette='astral-ascension'] .today-scenic-hero .today-scene-land,
-.theme-world-preview[data-scene-palette='astral-ascension'] .today-scene-land,
-html[data-health-palette='eclipse-sovereign'] .today-scenic-hero .today-scene-land,
-.theme-world-preview[data-scene-palette='eclipse-sovereign'] .today-scene-land,
-html[data-health-palette='prismatic-apex'] .today-scenic-hero .today-scene-land,
-.theme-world-preview[data-scene-palette='prismatic-apex'] .today-scene-land,
-html[data-health-palette='bonfire'] .today-scenic-hero .today-scene-sea,
-.theme-world-preview[data-scene-palette='bonfire'] .today-scene-sea,
-html[data-health-palette='abyss-knight'] .today-scenic-hero .today-scene-sea,
-.theme-world-preview[data-scene-palette='abyss-knight'] .today-scene-sea,
-html[data-health-palette='saiyan-dawn'] .today-scenic-hero .today-scene-sea,
-.theme-world-preview[data-scene-palette='saiyan-dawn'] .today-scene-sea,
-html[data-health-palette='super-saiyan-gold'] .today-scenic-hero .today-scene-sea,
-.theme-world-preview[data-scene-palette='super-saiyan-gold'] .today-scene-sea,
-html[data-health-palette='namek-sky'] .today-scenic-hero .today-scene-sea,
-.theme-world-preview[data-scene-palette='namek-sky'] .today-scene-sea,
-html[data-health-palette='silver-instinct'] .today-scenic-hero .today-scene-sea,
-.theme-world-preview[data-scene-palette='silver-instinct'] .today-scene-sea,
-html[data-health-palette='crimson-surge'] .today-scenic-hero .today-scene-sea,
-.theme-world-preview[data-scene-palette='crimson-surge'] .today-scene-sea,
-html[data-health-palette='cosmic-instinct'] .today-scenic-hero .today-scene-sea,
-.theme-world-preview[data-scene-palette='cosmic-instinct'] .today-scene-sea,
-html[data-health-palette='hidden-leaf'] .today-scenic-hero .today-scene-sea,
-.theme-world-preview[data-scene-palette='hidden-leaf'] .today-scene-sea,
-html[data-health-palette='sage-storm'] .today-scenic-hero .today-scene-sea,
-.theme-world-preview[data-scene-palette='sage-storm'] .today-scene-sea,
-html[data-health-palette='clone-legion'] .today-scenic-hero .today-scene-sea,
-.theme-world-preview[data-scene-palette='clone-legion'] .today-scene-sea,
-html[data-health-palette='republic-red'] .today-scenic-hero .today-scene-sea,
-.theme-world-preview[data-scene-palette='republic-red'] .today-scene-sea,
-html[data-health-palette='spartan'] .today-scenic-hero .today-scene-sea,
-.theme-world-preview[data-scene-palette='spartan'] .today-scene-sea,
-html[data-health-palette='mjolnir-night'] .today-scenic-hero .today-scene-sea,
-.theme-world-preview[data-scene-palette='mjolnir-night'] .today-scene-sea,
-html[data-health-palette='wasteland'] .today-scenic-hero .today-scene-sea,
-.theme-world-preview[data-scene-palette='wasteland'] .today-scene-sea,
-html[data-health-palette='vault-neon'] .today-scenic-hero .today-scene-sea,
-.theme-world-preview[data-scene-palette='vault-neon'] .today-scene-sea,
-html[data-health-palette='astral-ascension'] .today-scenic-hero .today-scene-sea,
-.theme-world-preview[data-scene-palette='astral-ascension'] .today-scene-sea,
-html[data-health-palette='eclipse-sovereign'] .today-scenic-hero .today-scene-sea,
-.theme-world-preview[data-scene-palette='eclipse-sovereign'] .today-scene-sea,
-html[data-health-palette='prismatic-apex'] .today-scenic-hero .today-scene-sea,
-.theme-world-preview[data-scene-palette='prismatic-apex'] .today-scene-sea,
-html[data-health-palette='grand-line'] .today-scenic-hero .today-scene-cosmos,
-.theme-world-preview[data-scene-palette='grand-line'] .today-scene-cosmos,
-html[data-health-palette='sun-god'] .today-scenic-hero .today-scene-cosmos,
-.theme-world-preview[data-scene-palette='sun-god'] .today-scene-cosmos,
-html[data-health-palette='bonfire'] .today-scenic-hero .today-scene-cosmos,
-.theme-world-preview[data-scene-palette='bonfire'] .today-scene-cosmos,
-html[data-health-palette='abyss-knight'] .today-scenic-hero .today-scene-cosmos,
-.theme-world-preview[data-scene-palette='abyss-knight'] .today-scene-cosmos,
-html[data-health-palette='saiyan-dawn'] .today-scenic-hero .today-scene-cosmos,
-.theme-world-preview[data-scene-palette='saiyan-dawn'] .today-scene-cosmos,
-html[data-health-palette='super-saiyan-gold'] .today-scenic-hero .today-scene-cosmos,
-.theme-world-preview[data-scene-palette='super-saiyan-gold'] .today-scene-cosmos,
-html[data-health-palette='namek-sky'] .today-scenic-hero .today-scene-cosmos,
-.theme-world-preview[data-scene-palette='namek-sky'] .today-scene-cosmos,
-html[data-health-palette='silver-instinct'] .today-scenic-hero .today-scene-cosmos,
-.theme-world-preview[data-scene-palette='silver-instinct'] .today-scene-cosmos,
-html[data-health-palette='crimson-surge'] .today-scenic-hero .today-scene-cosmos,
-.theme-world-preview[data-scene-palette='crimson-surge'] .today-scene-cosmos,
-html[data-health-palette='cosmic-instinct'] .today-scenic-hero .today-scene-cosmos,
-.theme-world-preview[data-scene-palette='cosmic-instinct'] .today-scene-cosmos,
-html[data-health-palette='hidden-leaf'] .today-scenic-hero .today-scene-cosmos,
-.theme-world-preview[data-scene-palette='hidden-leaf'] .today-scene-cosmos,
-html[data-health-palette='sage-storm'] .today-scenic-hero .today-scene-cosmos,
-.theme-world-preview[data-scene-palette='sage-storm'] .today-scene-cosmos,
-html[data-health-palette='clone-legion'] .today-scenic-hero .today-scene-cosmos,
-.theme-world-preview[data-scene-palette='clone-legion'] .today-scene-cosmos,
-html[data-health-palette='republic-red'] .today-scenic-hero .today-scene-cosmos,
-.theme-world-preview[data-scene-palette='republic-red'] .today-scene-cosmos,
-html[data-health-palette='spartan'] .today-scenic-hero .today-scene-cosmos,
-.theme-world-preview[data-scene-palette='spartan'] .today-scene-cosmos,
-html[data-health-palette='mjolnir-night'] .today-scenic-hero .today-scene-cosmos,
-.theme-world-preview[data-scene-palette='mjolnir-night'] .today-scene-cosmos,
-html[data-health-palette='wasteland'] .today-scenic-hero .today-scene-cosmos,
-.theme-world-preview[data-scene-palette='wasteland'] .today-scene-cosmos,
-html[data-health-palette='vault-neon'] .today-scenic-hero .today-scene-cosmos,
-.theme-world-preview[data-scene-palette='vault-neon'] .today-scene-cosmos,
-html[data-health-palette='astral-ascension'] .today-scenic-hero .today-scene-cosmos,
-.theme-world-preview[data-scene-palette='astral-ascension'] .today-scene-cosmos,
-html[data-health-palette='eclipse-sovereign'] .today-scenic-hero .today-scene-cosmos,
-.theme-world-preview[data-scene-palette='eclipse-sovereign'] .today-scene-cosmos,
-html[data-health-palette='prismatic-apex'] .today-scenic-hero .today-scene-cosmos,
-.theme-world-preview[data-scene-palette='prismatic-apex'] .today-scene-cosmos,
-html[data-health-palette='grand-line'] .today-scenic-hero .today-scene-wasteland,
-.theme-world-preview[data-scene-palette='grand-line'] .today-scene-wasteland,
-html[data-health-palette='sun-god'] .today-scenic-hero .today-scene-wasteland,
-.theme-world-preview[data-scene-palette='sun-god'] .today-scene-wasteland,
-html[data-health-palette='bonfire'] .today-scenic-hero .today-scene-wasteland,
-.theme-world-preview[data-scene-palette='bonfire'] .today-scene-wasteland,
-html[data-health-palette='abyss-knight'] .today-scenic-hero .today-scene-wasteland,
-.theme-world-preview[data-scene-palette='abyss-knight'] .today-scene-wasteland,
-html[data-health-palette='saiyan-dawn'] .today-scenic-hero .today-scene-wasteland,
-.theme-world-preview[data-scene-palette='saiyan-dawn'] .today-scene-wasteland,
-html[data-health-palette='super-saiyan-gold'] .today-scenic-hero .today-scene-wasteland,
-.theme-world-preview[data-scene-palette='super-saiyan-gold'] .today-scene-wasteland,
-html[data-health-palette='namek-sky'] .today-scenic-hero .today-scene-wasteland,
-.theme-world-preview[data-scene-palette='namek-sky'] .today-scene-wasteland,
-html[data-health-palette='silver-instinct'] .today-scenic-hero .today-scene-wasteland,
-.theme-world-preview[data-scene-palette='silver-instinct'] .today-scene-wasteland,
-html[data-health-palette='crimson-surge'] .today-scenic-hero .today-scene-wasteland,
-.theme-world-preview[data-scene-palette='crimson-surge'] .today-scene-wasteland,
-html[data-health-palette='cosmic-instinct'] .today-scenic-hero .today-scene-wasteland,
-.theme-world-preview[data-scene-palette='cosmic-instinct'] .today-scene-wasteland,
-html[data-health-palette='hidden-leaf'] .today-scenic-hero .today-scene-wasteland,
-.theme-world-preview[data-scene-palette='hidden-leaf'] .today-scene-wasteland,
-html[data-health-palette='sage-storm'] .today-scenic-hero .today-scene-wasteland,
-.theme-world-preview[data-scene-palette='sage-storm'] .today-scene-wasteland,
-html[data-health-palette='clone-legion'] .today-scenic-hero .today-scene-wasteland,
-.theme-world-preview[data-scene-palette='clone-legion'] .today-scene-wasteland,
-html[data-health-palette='republic-red'] .today-scenic-hero .today-scene-wasteland,
-.theme-world-preview[data-scene-palette='republic-red'] .today-scene-wasteland,
-html[data-health-palette='spartan'] .today-scenic-hero .today-scene-wasteland,
-.theme-world-preview[data-scene-palette='spartan'] .today-scene-wasteland,
-html[data-health-palette='mjolnir-night'] .today-scenic-hero .today-scene-wasteland,
-.theme-world-preview[data-scene-palette='mjolnir-night'] .today-scene-wasteland,
-html[data-health-palette='astral-ascension'] .today-scenic-hero .today-scene-wasteland,
-.theme-world-preview[data-scene-palette='astral-ascension'] .today-scene-wasteland,
-html[data-health-palette='eclipse-sovereign'] .today-scenic-hero .today-scene-wasteland,
-.theme-world-preview[data-scene-palette='eclipse-sovereign'] .today-scene-wasteland,
-html[data-health-palette='prismatic-apex'] .today-scenic-hero .today-scene-wasteland,
-.theme-world-preview[data-scene-palette='prismatic-apex'] .today-scene-wasteland { display: none; }
-html[data-health-palette='bonfire'] .today-scenic-hero .today-scene-orb,
-.theme-world-preview[data-scene-palette='bonfire'] .today-scene-orb,
-html[data-health-palette='abyss-knight'] .today-scenic-hero .today-scene-orb,
-.theme-world-preview[data-scene-palette='abyss-knight'] .today-scene-orb,
-html[data-health-palette='saiyan-dawn'] .today-scenic-hero .today-scene-orb,
-.theme-world-preview[data-scene-palette='saiyan-dawn'] .today-scene-orb,
-html[data-health-palette='super-saiyan-gold'] .today-scenic-hero .today-scene-orb,
-.theme-world-preview[data-scene-palette='super-saiyan-gold'] .today-scene-orb,
-html[data-health-palette='namek-sky'] .today-scenic-hero .today-scene-orb,
-.theme-world-preview[data-scene-palette='namek-sky'] .today-scene-orb,
-html[data-health-palette='silver-instinct'] .today-scenic-hero .today-scene-orb,
-.theme-world-preview[data-scene-palette='silver-instinct'] .today-scene-orb,
-html[data-health-palette='crimson-surge'] .today-scenic-hero .today-scene-orb,
-.theme-world-preview[data-scene-palette='crimson-surge'] .today-scene-orb,
-html[data-health-palette='cosmic-instinct'] .today-scenic-hero .today-scene-orb,
-.theme-world-preview[data-scene-palette='cosmic-instinct'] .today-scene-orb,
-html[data-health-palette='hidden-leaf'] .today-scenic-hero .today-scene-orb,
-.theme-world-preview[data-scene-palette='hidden-leaf'] .today-scene-orb,
-html[data-health-palette='sage-storm'] .today-scenic-hero .today-scene-orb,
-.theme-world-preview[data-scene-palette='sage-storm'] .today-scene-orb,
-html[data-health-palette='clone-legion'] .today-scenic-hero .today-scene-orb,
-.theme-world-preview[data-scene-palette='clone-legion'] .today-scene-orb,
-html[data-health-palette='republic-red'] .today-scenic-hero .today-scene-orb,
-.theme-world-preview[data-scene-palette='republic-red'] .today-scene-orb,
-html[data-health-palette='spartan'] .today-scenic-hero .today-scene-orb,
-.theme-world-preview[data-scene-palette='spartan'] .today-scene-orb,
-html[data-health-palette='mjolnir-night'] .today-scenic-hero .today-scene-orb,
-.theme-world-preview[data-scene-palette='mjolnir-night'] .today-scene-orb,
-html[data-health-palette='wasteland'] .today-scenic-hero .today-scene-orb,
-.theme-world-preview[data-scene-palette='wasteland'] .today-scene-orb,
-html[data-health-palette='vault-neon'] .today-scenic-hero .today-scene-orb,
-.theme-world-preview[data-scene-palette='vault-neon'] .today-scene-orb,
-html[data-health-palette='astral-ascension'] .today-scenic-hero .today-scene-orb,
-.theme-world-preview[data-scene-palette='astral-ascension'] .today-scene-orb,
-html[data-health-palette='eclipse-sovereign'] .today-scenic-hero .today-scene-orb,
-.theme-world-preview[data-scene-palette='eclipse-sovereign'] .today-scene-orb,
-html[data-health-palette='prismatic-apex'] .today-scenic-hero .today-scene-orb,
-.theme-world-preview[data-scene-palette='prismatic-apex'] .today-scene-orb { opacity: 0; }
-html[data-health-palette='grand-line'] .today-scenic-hero .today-world-onepiece,
-.theme-world-preview[data-scene-palette='grand-line'] .today-world-onepiece,
-html[data-health-palette='sun-god'] .today-scenic-hero .today-world-onepiece,
-.theme-world-preview[data-scene-palette='sun-god'] .today-world-onepiece { display: initial; }
+html[data-health-palette='grand-line'] .today-scene-land,
+html[data-health-palette='sun-god'] .today-scene-land,
+html[data-health-palette='bonfire'] .today-scene-land,
+html[data-health-palette='abyss-knight'] .today-scene-land,
+html[data-health-palette='saiyan-dawn'] .today-scene-land,
+html[data-health-palette='super-saiyan-gold'] .today-scene-land,
+html[data-health-palette='namek-sky'] .today-scene-land,
+html[data-health-palette='silver-instinct'] .today-scene-land,
+html[data-health-palette='crimson-surge'] .today-scene-land,
+html[data-health-palette='cosmic-instinct'] .today-scene-land,
+html[data-health-palette='hidden-leaf'] .today-scene-land,
+html[data-health-palette='sage-storm'] .today-scene-land,
+html[data-health-palette='clone-legion'] .today-scene-land,
+html[data-health-palette='republic-red'] .today-scene-land,
+html[data-health-palette='spartan'] .today-scene-land,
+html[data-health-palette='mjolnir-night'] .today-scene-land,
+html[data-health-palette='wasteland'] .today-scene-land,
+html[data-health-palette='vault-neon'] .today-scene-land,
+html[data-health-palette='astral-ascension'] .today-scene-land,
+html[data-health-palette='eclipse-sovereign'] .today-scene-land,
+html[data-health-palette='prismatic-apex'] .today-scene-land,
+.theme-world-preview .today-scene-land { display: none; }
+html[data-health-palette='saiyan-dawn'] .today-scene-orb,
+html[data-health-palette='super-saiyan-gold'] .today-scene-orb,
+html[data-health-palette='namek-sky'] .today-scene-orb,
+html[data-health-palette='silver-instinct'] .today-scene-orb,
+html[data-health-palette='crimson-surge'] .today-scene-orb,
+html[data-health-palette='cosmic-instinct'] .today-scene-orb,
+html[data-health-palette='clone-legion'] .today-scene-orb,
+html[data-health-palette='republic-red'] .today-scene-orb,
+html[data-health-palette='spartan'] .today-scene-orb,
+html[data-health-palette='mjolnir-night'] .today-scene-orb,
+html[data-health-palette='astral-ascension'] .today-scene-orb,
+html[data-health-palette='eclipse-sovereign'] .today-scene-orb,
+html[data-health-palette='prismatic-apex'] .today-scene-orb,
+html[data-health-palette='bonfire'] .today-scene-orb,
+html[data-health-palette='abyss-knight'] .today-scene-orb,
+html[data-health-palette='hidden-leaf'] .today-scene-orb,
+html[data-health-palette='sage-storm'] .today-scene-orb,
+html[data-health-palette='wasteland'] .today-scene-orb,
+html[data-health-palette='vault-neon'] .today-scene-orb,
+.theme-world-preview .today-scene-orb { opacity: 0; }
+html[data-health-palette='ocean'] .today-scene-sea,
+html[data-health-palette='grand-line'] .today-scene-sea,
+html[data-health-palette='sun-god'] .today-scene-sea { display: initial; }
+.theme-world-preview svg[data-preview-palette='ocean'] .today-scene-sea,
+.theme-world-preview svg[data-preview-palette='grand-line'] .today-scene-sea,
+.theme-world-preview svg[data-preview-palette='sun-god'] .today-scene-sea { display: initial; }
+html[data-health-palette='aura'] .today-scene-cosmos,
+.theme-world-preview svg[data-preview-palette='aura'] .today-scene-cosmos { display: initial; }
+html[data-health-palette='wasteland'] .today-scene-wasteland,
+html[data-health-palette='vault-neon'] .today-scene-wasteland,
+.theme-world-preview svg[data-preview-palette='wasteland'] .today-scene-wasteland,
+.theme-world-preview svg[data-preview-palette='vault-neon'] .today-scene-wasteland { display: initial; }
+html[data-health-palette='saiyan-dawn'] .today-scene-stars,
+html[data-health-palette='super-saiyan-gold'] .today-scene-stars,
+html[data-health-palette='namek-sky'] .today-scene-stars,
+html[data-health-palette='silver-instinct'] .today-scene-stars,
+html[data-health-palette='crimson-surge'] .today-scene-stars,
+html[data-health-palette='cosmic-instinct'] .today-scene-stars,
+html[data-health-palette='clone-legion'] .today-scene-stars,
+html[data-health-palette='republic-red'] .today-scene-stars,
+html[data-health-palette='spartan'] .today-scene-stars,
+html[data-health-palette='mjolnir-night'] .today-scene-stars,
+html[data-health-palette='astral-ascension'] .today-scene-stars,
+html[data-health-palette='eclipse-sovereign'] .today-scene-stars,
+html[data-health-palette='prismatic-apex'] .today-scene-stars,
+html[data-health-palette='aura'] .today-scene-stars { opacity: .8; }
+.theme-world-preview svg[data-preview-palette='saiyan-dawn'] .today-scene-stars,
+.theme-world-preview svg[data-preview-palette='super-saiyan-gold'] .today-scene-stars,
+.theme-world-preview svg[data-preview-palette='namek-sky'] .today-scene-stars,
+.theme-world-preview svg[data-preview-palette='silver-instinct'] .today-scene-stars,
+.theme-world-preview svg[data-preview-palette='crimson-surge'] .today-scene-stars,
+.theme-world-preview svg[data-preview-palette='cosmic-instinct'] .today-scene-stars,
+.theme-world-preview svg[data-preview-palette='clone-legion'] .today-scene-stars,
+.theme-world-preview svg[data-preview-palette='republic-red'] .today-scene-stars,
+.theme-world-preview svg[data-preview-palette='spartan'] .today-scene-stars,
+.theme-world-preview svg[data-preview-palette='mjolnir-night'] .today-scene-stars,
+.theme-world-preview svg[data-preview-palette='astral-ascension'] .today-scene-stars,
+.theme-world-preview svg[data-preview-palette='eclipse-sovereign'] .today-scene-stars,
+.theme-world-preview svg[data-preview-palette='prismatic-apex'] .today-scene-stars,
+.theme-world-preview svg[data-preview-palette='aura'] .today-scene-stars { opacity: .8; }
 
-html[data-health-palette='bonfire'] .today-scenic-hero .today-world-bonfire,
-.theme-world-preview[data-scene-palette='bonfire'] .today-world-bonfire,
-html[data-health-palette='abyss-knight'] .today-scenic-hero .today-world-bonfire,
-.theme-world-preview[data-scene-palette='abyss-knight'] .today-world-bonfire { display: initial; }
+html[data-health-palette='grand-line'] .today-world-onepiece,
+html[data-health-palette='sun-god'] .today-world-onepiece,
+.theme-world-preview svg[data-preview-palette='grand-line'] .today-world-onepiece,
+.theme-world-preview svg[data-preview-palette='sun-god'] .today-world-onepiece { display: initial; }
 
-html[data-health-palette='saiyan-dawn'] .today-scenic-hero .today-world-dragon,
-.theme-world-preview[data-scene-palette='saiyan-dawn'] .today-world-dragon,
-html[data-health-palette='super-saiyan-gold'] .today-scenic-hero .today-world-dragon,
-.theme-world-preview[data-scene-palette='super-saiyan-gold'] .today-world-dragon,
-html[data-health-palette='namek-sky'] .today-scenic-hero .today-world-dragon,
-.theme-world-preview[data-scene-palette='namek-sky'] .today-world-dragon,
-html[data-health-palette='silver-instinct'] .today-scenic-hero .today-world-dragon,
-.theme-world-preview[data-scene-palette='silver-instinct'] .today-world-dragon,
-html[data-health-palette='crimson-surge'] .today-scenic-hero .today-world-dragon,
-.theme-world-preview[data-scene-palette='crimson-surge'] .today-world-dragon,
-html[data-health-palette='cosmic-instinct'] .today-scenic-hero .today-world-dragon,
-.theme-world-preview[data-scene-palette='cosmic-instinct'] .today-world-dragon { display: initial; }
+html[data-health-palette='bonfire'] .today-world-bonfire,
+html[data-health-palette='abyss-knight'] .today-world-bonfire,
+.theme-world-preview svg[data-preview-palette='bonfire'] .today-world-bonfire,
+.theme-world-preview svg[data-preview-palette='abyss-knight'] .today-world-bonfire { display: initial; }
 
-html[data-health-palette='hidden-leaf'] .today-scenic-hero .today-world-leaf,
-.theme-world-preview[data-scene-palette='hidden-leaf'] .today-world-leaf,
-html[data-health-palette='sage-storm'] .today-scenic-hero .today-world-leaf,
-.theme-world-preview[data-scene-palette='sage-storm'] .today-world-leaf { display: initial; }
+html[data-health-palette='saiyan-dawn'] .today-world-dragon,
+html[data-health-palette='super-saiyan-gold'] .today-world-dragon,
+html[data-health-palette='namek-sky'] .today-world-dragon,
+html[data-health-palette='silver-instinct'] .today-world-dragon,
+html[data-health-palette='crimson-surge'] .today-world-dragon,
+html[data-health-palette='cosmic-instinct'] .today-world-dragon,
+.theme-world-preview svg[data-preview-palette='saiyan-dawn'] .today-world-dragon,
+.theme-world-preview svg[data-preview-palette='super-saiyan-gold'] .today-world-dragon,
+.theme-world-preview svg[data-preview-palette='namek-sky'] .today-world-dragon,
+.theme-world-preview svg[data-preview-palette='silver-instinct'] .today-world-dragon,
+.theme-world-preview svg[data-preview-palette='crimson-surge'] .today-world-dragon,
+.theme-world-preview svg[data-preview-palette='cosmic-instinct'] .today-world-dragon { display: initial; }
 
-html[data-health-palette='clone-legion'] .today-scenic-hero .today-world-gunships,
-.theme-world-preview[data-scene-palette='clone-legion'] .today-world-gunships { display: initial; }
+html[data-health-palette='hidden-leaf'] .today-world-leaf,
+html[data-health-palette='sage-storm'] .today-world-leaf,
+.theme-world-preview svg[data-preview-palette='hidden-leaf'] .today-world-leaf,
+.theme-world-preview svg[data-preview-palette='sage-storm'] .today-world-leaf { display: initial; }
 
-html[data-health-palette='republic-red'] .today-scenic-hero .today-world-fleet,
-.theme-world-preview[data-scene-palette='republic-red'] .today-world-fleet { display: initial; }
+html[data-health-palette='clone-legion'] .today-world-gunships,
+.theme-world-preview svg[data-preview-palette='clone-legion'] .today-world-gunships { display: initial; }
 
-html[data-health-palette='spartan'] .today-scenic-hero .today-world-ringworld,
-.theme-world-preview[data-scene-palette='spartan'] .today-world-ringworld,
-html[data-health-palette='mjolnir-night'] .today-scenic-hero .today-world-ringworld,
-.theme-world-preview[data-scene-palette='mjolnir-night'] .today-world-ringworld { display: initial; }
+html[data-health-palette='republic-red'] .today-world-fleet,
+.theme-world-preview svg[data-preview-palette='republic-red'] .today-world-fleet { display: initial; }
 
-html[data-health-palette='wasteland'] .today-scenic-hero .today-world-wasteland-detail,
-.theme-world-preview[data-scene-palette='wasteland'] .today-world-wasteland-detail,
-html[data-health-palette='vault-neon'] .today-scenic-hero .today-world-wasteland-detail,
-.theme-world-preview[data-scene-palette='vault-neon'] .today-world-wasteland-detail { display: initial; }
+html[data-health-palette='spartan'] .today-world-ringworld,
+html[data-health-palette='mjolnir-night'] .today-world-ringworld,
+.theme-world-preview svg[data-preview-palette='spartan'] .today-world-ringworld,
+.theme-world-preview svg[data-preview-palette='mjolnir-night'] .today-world-ringworld { display: initial; }
 
-html[data-health-palette='astral-ascension'] .today-scenic-hero .today-world-prestige,
-.theme-world-preview[data-scene-palette='astral-ascension'] .today-world-prestige,
-html[data-health-palette='eclipse-sovereign'] .today-scenic-hero .today-world-prestige,
-.theme-world-preview[data-scene-palette='eclipse-sovereign'] .today-world-prestige,
-html[data-health-palette='prismatic-apex'] .today-scenic-hero .today-world-prestige,
-.theme-world-preview[data-scene-palette='prismatic-apex'] .today-world-prestige { display: initial; }
-.theme-world-preview[data-scene-palette='ocean'] .today-scene-land { display: none; }
-.theme-world-preview[data-scene-palette='ocean'] .today-scene-sea { display: initial; }
-.theme-world-preview[data-scene-palette='aura'] .today-scene-land { display: none; }
-.theme-world-preview[data-scene-palette='aura'] .today-scene-cosmos { display: initial; }
-.theme-world-preview[data-scene-palette='grand-line'] .today-scene-sea,
-.theme-world-preview[data-scene-palette='sun-god'] .today-scene-sea { display: initial; }
-.theme-world-preview[data-scene-palette='wasteland'] .today-scene-wasteland,
-.theme-world-preview[data-scene-palette='vault-neon'] .today-scene-wasteland { display: initial; }
+html[data-health-palette='wasteland'] .today-world-wasteland-detail,
+html[data-health-palette='vault-neon'] .today-world-wasteland-detail,
+.theme-world-preview svg[data-preview-palette='wasteland'] .today-world-wasteland-detail,
+.theme-world-preview svg[data-preview-palette='vault-neon'] .today-world-wasteland-detail { display: initial; }
 
-.today-world-motto { margin-top: .65rem; color: var(--health-accent); font-size: .75rem; font-weight: 700; letter-spacing: .015em; }
-.today-world-motto span { display: none; }
+html[data-health-palette='astral-ascension'] .today-world-prestige,
+html[data-health-palette='eclipse-sovereign'] .today-world-prestige,
+html[data-health-palette='prismatic-apex'] .today-world-prestige,
+.theme-world-preview svg[data-preview-palette='astral-ascension'] .today-world-prestige,
+.theme-world-preview svg[data-preview-palette='eclipse-sovereign'] .today-world-prestige,
+.theme-world-preview svg[data-preview-palette='prismatic-apex'] .today-world-prestige { display: initial; }
+
 html[data-health-palette='grand-line'] .today-world-motto-onepiece,
-html[data-health-palette='sun-god'] .today-world-motto-onepiece { display: inline; }
+html[data-health-palette='sun-god'] .today-world-motto-onepiece { display: initial; }
+html[data-health-palette='grand-line'] .today-world-motto,
+html[data-health-palette='sun-god'] .today-world-motto { display: block; }
 
 html[data-health-palette='bonfire'] .today-world-motto-bonfire,
-html[data-health-palette='abyss-knight'] .today-world-motto-bonfire { display: inline; }
+html[data-health-palette='abyss-knight'] .today-world-motto-bonfire { display: initial; }
+html[data-health-palette='bonfire'] .today-world-motto,
+html[data-health-palette='abyss-knight'] .today-world-motto { display: block; }
 
 html[data-health-palette='saiyan-dawn'] .today-world-motto-dragon,
 html[data-health-palette='super-saiyan-gold'] .today-world-motto-dragon,
 html[data-health-palette='namek-sky'] .today-world-motto-dragon,
 html[data-health-palette='silver-instinct'] .today-world-motto-dragon,
 html[data-health-palette='crimson-surge'] .today-world-motto-dragon,
-html[data-health-palette='cosmic-instinct'] .today-world-motto-dragon { display: inline; }
+html[data-health-palette='cosmic-instinct'] .today-world-motto-dragon { display: initial; }
+html[data-health-palette='saiyan-dawn'] .today-world-motto,
+html[data-health-palette='super-saiyan-gold'] .today-world-motto,
+html[data-health-palette='namek-sky'] .today-world-motto,
+html[data-health-palette='silver-instinct'] .today-world-motto,
+html[data-health-palette='crimson-surge'] .today-world-motto,
+html[data-health-palette='cosmic-instinct'] .today-world-motto { display: block; }
 
 html[data-health-palette='hidden-leaf'] .today-world-motto-leaf,
-html[data-health-palette='sage-storm'] .today-world-motto-leaf { display: inline; }
+html[data-health-palette='sage-storm'] .today-world-motto-leaf { display: initial; }
+html[data-health-palette='hidden-leaf'] .today-world-motto,
+html[data-health-palette='sage-storm'] .today-world-motto { display: block; }
 
-html[data-health-palette='clone-legion'] .today-world-motto-gunships { display: inline; }
+html[data-health-palette='clone-legion'] .today-world-motto-gunships { display: initial; }
+html[data-health-palette='clone-legion'] .today-world-motto { display: block; }
 
-html[data-health-palette='republic-red'] .today-world-motto-fleet { display: inline; }
+html[data-health-palette='republic-red'] .today-world-motto-fleet { display: initial; }
+html[data-health-palette='republic-red'] .today-world-motto { display: block; }
 
 html[data-health-palette='spartan'] .today-world-motto-ringworld,
-html[data-health-palette='mjolnir-night'] .today-world-motto-ringworld { display: inline; }
+html[data-health-palette='mjolnir-night'] .today-world-motto-ringworld { display: initial; }
+html[data-health-palette='spartan'] .today-world-motto,
+html[data-health-palette='mjolnir-night'] .today-world-motto { display: block; }
 
-html[data-health-palette='wasteland'] .today-world-motto-wasteland-detail,
-html[data-health-palette='vault-neon'] .today-world-motto-wasteland-detail { display: inline; }
+html[data-health-palette='wasteland'] .today-world-motto-wasteland,
+html[data-health-palette='vault-neon'] .today-world-motto-wasteland { display: initial; }
+html[data-health-palette='wasteland'] .today-world-motto,
+html[data-health-palette='vault-neon'] .today-world-motto { display: block; }
 
 html[data-health-palette='astral-ascension'] .today-world-motto-prestige,
 html[data-health-palette='eclipse-sovereign'] .today-world-motto-prestige,
-html[data-health-palette='prismatic-apex'] .today-world-motto-prestige { display: inline; }
+html[data-health-palette='prismatic-apex'] .today-world-motto-prestige { display: initial; }
+html[data-health-palette='astral-ascension'] .today-world-motto,
+html[data-health-palette='eclipse-sovereign'] .today-world-motto,
+html[data-health-palette='prismatic-apex'] .today-world-motto { display: block; }
 
-/* Bounded, very low-amplitude ambient motion. Never runs continuously.
-   No animation on unlocked rewards, health data, or every app re-render. */
-@keyframes world-boat-settle {
-  0%, 100% { transform: translateY(0) rotate(0deg); }
-  50% { transform: translateY(2px) rotate(.3deg); }
+/* Consciously bounded motion adds life without continuous battery-consuming effects. */
+@keyframes today-world-bob { 0%, 100% { translate: 0 0; } 50% { translate: 0 -3px; } }
+@keyframes today-world-ember { 0%, 100% { opacity: .5; } 50% { opacity: 1; } }
+@keyframes today-world-breathe { 0%, 100% { opacity: .14; } 50% { opacity: .24; } }
+.today-scenic-hero .world-boat { animation: today-world-bob 7s ease-in-out 2; }
+.today-scenic-hero .world-embers { animation: today-world-ember 4s ease-in-out 3; }
+.today-scenic-hero .world-moon-haze { animation: today-world-breathe 9s ease-in-out 2; }
+.today-scenic-hero .world-fly { animation: today-world-bob 8s ease-in-out 2; }
+.today-scenic-hero .today-scene-rare { transition: opacity .5s ease; }
+
+/* The exact same inline art appears as a collectible preview. Preview palette
+   CSS variables are scoped to the swatch, never applied to the whole page. */
+.theme-world-preview {
+  position: relative; isolation: isolate; overflow: hidden; height: 6.25rem;
+  background: radial-gradient(circle at 82% 30%, color-mix(in srgb,var(--health-accent-secondary) 28%,transparent),transparent 55%),
+    linear-gradient(115deg,var(--health-surface-raised),color-mix(in srgb,var(--health-accent) 25%,var(--health-surface-raised)));
 }
-@keyframes world-ember-breathe {
-  0%, 100% { opacity: .58; }
-  50% { opacity: 1; }
-}
-@keyframes world-vessel-drift {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-2px); }
-}
-@media (prefers-reduced-motion: no-preference) {
-  .today-scenic-hero .world-boat { transform-origin: 745px 260px; animation: world-boat-settle 6s ease-in-out 2; }
-  .today-scenic-hero .world-embers { animation: world-ember-breathe 4s ease-in-out 2; }
-  .today-scenic-hero .world-vessel { animation: world-vessel-drift 8s ease-in-out 2; }
+.theme-world-preview .today-scene-art { width: 100%; height: 100%; opacity: .95; }
+.theme-world-preview .today-scene-orb { opacity: .25; }
+.theme-world-preview .today-scene-land { display: initial; }
+.theme-world-preview .today-scene-sea { display: none; }
+.theme-world-preview .today-scene-stars { opacity: 0; }
+.theme-world-preview .today-scene-rare { opacity: 0; }
+.theme-world-preview svg[data-preview-palette='grand-line'] .today-scene-land,
+.theme-world-preview svg[data-preview-palette='sun-god'] .today-scene-land,
+.theme-world-preview svg[data-preview-palette='bonfire'] .today-scene-land,
+.theme-world-preview svg[data-preview-palette='abyss-knight'] .today-scene-land,
+.theme-world-preview svg[data-preview-palette='saiyan-dawn'] .today-scene-land,
+.theme-world-preview svg[data-preview-palette='super-saiyan-gold'] .today-scene-land,
+.theme-world-preview svg[data-preview-palette='namek-sky'] .today-scene-land,
+.theme-world-preview svg[data-preview-palette='silver-instinct'] .today-scene-land,
+.theme-world-preview svg[data-preview-palette='crimson-surge'] .today-scene-land,
+.theme-world-preview svg[data-preview-palette='cosmic-instinct'] .today-scene-land,
+.theme-world-preview svg[data-preview-palette='hidden-leaf'] .today-scene-land,
+.theme-world-preview svg[data-preview-palette='sage-storm'] .today-scene-land,
+.theme-world-preview svg[data-preview-palette='clone-legion'] .today-scene-land,
+.theme-world-preview svg[data-preview-palette='republic-red'] .today-scene-land,
+.theme-world-preview svg[data-preview-palette='spartan'] .today-scene-land,
+.theme-world-preview svg[data-preview-palette='mjolnir-night'] .today-scene-land,
+.theme-world-preview svg[data-preview-palette='wasteland'] .today-scene-land,
+.theme-world-preview svg[data-preview-palette='vault-neon'] .today-scene-land,
+.theme-world-preview svg[data-preview-palette='astral-ascension'] .today-scene-land,
+.theme-world-preview svg[data-preview-palette='eclipse-sovereign'] .today-scene-land,
+.theme-world-preview svg[data-preview-palette='prismatic-apex'] .today-scene-land { display: none; }
+.theme-world-preview svg[data-preview-palette='ocean'] .today-scene-land,
+.theme-world-preview svg[data-preview-palette='grand-line'] .today-scene-land,
+.theme-world-preview svg[data-preview-palette='sun-god'] .today-scene-land { display: none; }
+.theme-world-preview svg[data-preview-palette='saiyan-dawn'] .today-scene-orb,
+.theme-world-preview svg[data-preview-palette='super-saiyan-gold'] .today-scene-orb,
+.theme-world-preview svg[data-preview-palette='namek-sky'] .today-scene-orb,
+.theme-world-preview svg[data-preview-palette='silver-instinct'] .today-scene-orb,
+.theme-world-preview svg[data-preview-palette='crimson-surge'] .today-scene-orb,
+.theme-world-preview svg[data-preview-palette='cosmic-instinct'] .today-scene-orb,
+.theme-world-preview svg[data-preview-palette='clone-legion'] .today-scene-orb,
+.theme-world-preview svg[data-preview-palette='republic-red'] .today-scene-orb,
+.theme-world-preview svg[data-preview-palette='spartan'] .today-scene-orb,
+.theme-world-preview svg[data-preview-palette='mjolnir-night'] .today-scene-orb,
+.theme-world-preview svg[data-preview-palette='astral-ascension'] .today-scene-orb,
+.theme-world-preview svg[data-preview-palette='eclipse-sovereign'] .today-scene-orb,
+.theme-world-preview svg[data-preview-palette='prismatic-apex'] .today-scene-orb,
+.theme-world-preview svg[data-preview-palette='bonfire'] .today-scene-orb,
+.theme-world-preview svg[data-preview-palette='abyss-knight'] .today-scene-orb,
+.theme-world-preview svg[data-preview-palette='hidden-leaf'] .today-scene-orb,
+.theme-world-preview svg[data-preview-palette='sage-storm'] .today-scene-orb,
+.theme-world-preview svg[data-preview-palette='wasteland'] .today-scene-orb,
+.theme-world-preview svg[data-preview-palette='vault-neon'] .today-scene-orb { opacity: 0; }
+.theme-world-preview--locked::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, color-mix(in srgb,var(--health-surface-raised) 40%,transparent)); pointer-events: none; }
+.theme-next-world .theme-world-preview { height: 7.75rem; border-radius: .8rem; }
+@media (max-width: 430px) {
+  .today-world-motto { font-size: .7rem; margin-top: .45rem; }
+  .today-scene-art { opacity: .86; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .today-world, .today-world *, .today-scene-rare { animation: none !important; transition: none !important; }
-}
-
-/* Theme Studio shows the unlocked world and the upcoming world using identical
- * silhouettes. It's a preview, never a means of selecting a locked palette. */
-.theme-world-preview {
-  position: relative; isolation: isolate; overflow: hidden;
-  min-height: 126px; border-radius: .9rem; border: 1px solid var(--health-border);
-  background: linear-gradient(117deg, var(--health-surface-raised), color-mix(in srgb, var(--health-accent-secondary) 28%, var(--health-surface-raised)));
-}
-.theme-world-preview .today-scene-art { width: 100%; opacity: .95; }
-.theme-world-preview::after {
-  content: ''; position: absolute; inset: 0; pointer-events: none;
-  background: linear-gradient(90deg, var(--health-surface-raised) 0%, color-mix(in srgb, var(--health-surface-raised) 88%, transparent) 46%, transparent 95%);
-}
-.theme-world-preview-copy { position: relative; z-index: 1; padding: 1rem; max-width: 65%; }
-.theme-world-preview-label { color: var(--health-accent); font-size: .63rem; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
-.theme-world-preview-name { margin-top: .3rem; color: var(--health-text); font-weight: 800; font-size: 1.15rem; }
-.theme-world-preview-detail { margin-top: .35rem; color: var(--health-text-muted); font-size: .7rem; }
-@media (max-width: 430px) {
-  .today-world-motto { font-size: .7rem; }
-  .theme-world-preview .today-scene-art { width: 115%; }
+  .today-scenic-hero .world-boat,
+  .today-scenic-hero .world-embers,
+  .today-scenic-hero .world-moon-haze,
+  .today-scenic-hero .world-fly { animation: none; }
+  .today-scenic-hero .today-scene-rare { transition: none; }
 }
