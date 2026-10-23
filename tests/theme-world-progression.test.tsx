@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { THEME_PACKS } from '../src/theme.ts'
 import { ThemeWorldScene } from '../src/features/today/ThemeWorldScene.tsx'
-import { WORLD_SCENE_ROW, worldStage, worldNextStageLevel } from '../src/features/today/theme-worlds.ts'
+import { WORLD_SCENE_ROW, worldStage, worldNextStageLevel, isHydrationGoalMet } from '../src/features/today/theme-worlds.ts'
 
 describe('Premium theme-world progression', () => {
   it('has a real optimized asset and maps every existing theme to one of eight distinct environments', () => {
@@ -31,6 +31,19 @@ describe('Premium theme-world progression', () => {
     expect(html).toContain('world-scene-art')
     expect(html).not.toContain('<img')
   })
+  it('only rewards completed, positive hydration goals', () => {
+    expect(isHydrationGoalMet(64, 64)).toBe(true)
+    expect(isHydrationGoalMet(70, 64)).toBe(true)
+    expect(isHydrationGoalMet(63, 64)).toBe(false)
+    expect(isHydrationGoalMet(null, 64)).toBe(false)
+    expect(isHydrationGoalMet(64, null)).toBe(false)
+    expect(isHydrationGoalMet(0, 0)).toBe(false)
+    expect(isHydrationGoalMet(Number.NaN, 64)).toBe(false)
+    const html = renderToStaticMarkup(<ThemeWorldScene palette="bonfire" hydrated />)
+    expect(html).toContain('data-world-hydrated="yes"')
+    expect(html).toContain('world-scene-hydration')
+  })
+
   it('keeps motion finite and accessible and avoids runtime image generation', () => {
     const css = readFileSync('src/index.css','utf8')
     expect(css).toContain("url('/theme/worlds-v1.webp')")
