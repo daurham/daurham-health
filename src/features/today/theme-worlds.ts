@@ -1,13 +1,13 @@
 import type { HealthPalette } from '@/theme'
 
-/** Stable scene selection; every environment now lives in its own 720x124 WebP.
- * Keeping the existing index preserves every franchise-to-world association. */
+/** Stable scene selection across premium world art; each optimized WebP is
+ * 1600×533 so iPhone high-density displays remain crisp. */
 export const WORLD_SCENE_ROW: Record<HealthPalette, number> = {
   classic: 6, forest: 1, ocean: 0, sunset: 0, plum: 7,
   aura: 7, 'saiyan-dawn': 3, 'grand-line': 0, 'hidden-leaf': 1,
-  'super-saiyan-gold': 3, spartan: 7, 'namek-sky': 3, wasteland: 4,
+  'super-saiyan-gold': 3, spartan: 8, 'namek-sky': 3, wasteland: 4,
   bonfire: 6, 'clone-legion': 2, 'silver-instinct': 3, 'crimson-surge': 3,
-  'sun-god': 0, 'sage-storm': 1, 'mjolnir-night': 7, 'vault-neon': 4,
+  'sun-god': 0, 'sage-storm': 1, 'mjolnir-night': 8, 'vault-neon': 4,
   'abyss-knight': 6, 'republic-red': 5, 'cosmic-instinct': 3,
   'astral-ascension': 7, 'eclipse-sovereign': 7, 'prismatic-apex': 7,
 }
@@ -15,14 +15,15 @@ export const WORLD_SCENE_ROW: Record<HealthPalette, number> = {
 /** Isolated images guarantee that no neighboring scene can bleed into a card,
  * even when CSS sizes change between Today, theme tiles and tiny previews. */
 export const WORLD_SCENE_IMAGES = [
-  '/theme/worlds/grand-line.webp',
-  '/theme/worlds/hidden-leaf.webp',
-  '/theme/worlds/clone-legion.webp',
-  '/theme/worlds/dragon.webp',
-  '/theme/worlds/wasteland.webp',
-  '/theme/worlds/republic-red.webp',
-  '/theme/worlds/bonfire.webp',
-  '/theme/worlds/astral.webp',
+  '/theme/worlds/grand-line-v2.webp',
+  '/theme/worlds/hidden-leaf-v2.webp',
+  '/theme/worlds/clone-legion-v2.webp',
+  '/theme/worlds/dragon-v2.webp',
+  '/theme/worlds/wasteland-v2.webp',
+  '/theme/worlds/republic-red-v2.webp',
+  '/theme/worlds/bonfire-v2.webp',
+  '/theme/worlds/astral-v2.webp',
+  '/theme/worlds/halo-v2.webp',
 ] as const
 
 export function worldSceneImage(palette: HealthPalette): string {
