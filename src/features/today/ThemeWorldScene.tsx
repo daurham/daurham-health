@@ -2,7 +2,7 @@ import type { CSSProperties } from 'react'
 import type { HealthPalette } from '@/theme'
 import { WORLD_SCENE_ROW, type WorldMood, type WorldStage } from './theme-worlds'
 
-export function ThemeWorldScene({ palette, stage = 'base', completed = false, mood = 'dusk', className = '' }: {
+export function ThemeWorldScene({ palette, stage = 'base', completed = false, hydrated = false, mood = 'dusk', className = '' }: {
   palette: HealthPalette
   stage?: WorldStage
   completed?: boolean
