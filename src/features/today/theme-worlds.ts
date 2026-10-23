@@ -5,9 +5,9 @@ import type { HealthPalette } from '@/theme'
 export const WORLD_SCENE_ROW: Record<HealthPalette, number> = {
   classic: 6, forest: 1, ocean: 0, sunset: 0, plum: 7,
   aura: 7, 'saiyan-dawn': 3, 'grand-line': 0, 'hidden-leaf': 1,
-  'super-saiyan-gold': 3, spartan: 2, 'namek-sky': 3, wasteland: 4,
+  'super-saiyan-gold': 3, spartan: 7, 'namek-sky': 3, wasteland: 4,
   bonfire: 6, 'clone-legion': 2, 'silver-instinct': 3, 'crimson-surge': 3,
-  'sun-god': 0, 'sage-storm': 1, 'mjolnir-night': 2, 'vault-neon': 4,
+  'sun-god': 0, 'sage-storm': 1, 'mjolnir-night': 7, 'vault-neon': 4,
   'abyss-knight': 6, 'republic-red': 5, 'cosmic-instinct': 3,
   'astral-ascension': 7, 'eclipse-sovereign': 7, 'prismatic-apex': 7,
 }
