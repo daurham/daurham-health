@@ -19,11 +19,12 @@ export function ThemeWorldScene({ palette, stage = 'base', completed = false, hy
   return (
     <div className={['world-scene', className].filter(Boolean).join(' ')}
       data-world-palette={palette} data-world-stage={stage}
-      data-world-celebrating={completed ? 'yes' : 'no'} data-world-mood={mood}
+      data-world-celebrating={completed ? 'yes' : 'no'} data-world-hydrated={hydrated ? 'yes' : 'no'} data-world-mood={mood}
       aria-hidden="true">
       <div className="world-scene-art" style={backgroundStyle} />
       <div className="world-scene-tint" />
       <div className="world-scene-horizon" />
+      <div className="world-scene-hydration" />
       <div className="world-scene-glints"><i /><i /><i /><i /></div>
     </div>
   )
