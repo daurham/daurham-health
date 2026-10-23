@@ -2068,3 +2068,16 @@ html[data-health-palette='prismatic-apex'] .today-world-motto { display: block; 
   opacity: .40;
   pointer-events: none;
 }
+
+/* A handful of the source exports contained a thin dark separator along their
+   upper edge. Clip only that edge within those isolated assets; do not enlarge
+   other worlds or reintroduce sprite row sampling. This is a one-time CSS trim. */
+.world-scene:is(
+  [data-world-art-row="2"],
+  [data-world-art-row="3"],
+  [data-world-art-row="4"],
+  [data-world-art-row="5"]
+) .world-scene-art {
+  background-size: auto 116%;
+  background-position-y: bottom;
+}
