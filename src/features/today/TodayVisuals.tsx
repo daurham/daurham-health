@@ -3,7 +3,8 @@ import type { TodayViewModel } from '@/domain/today'
 import { ThemeWorldScene } from './ThemeWorldScene'
 import { worldStage } from './theme-worlds'
 import { useRewardSummary } from '@/features/rewards/useRewardSummary'
-import { useDemoReadOnly } from '@/lib'
+import { useDemoReadOnly } from '@/lib/app-prefix'
+import { progressionState } from '@/domain/progression'
 import { readPalettePreference, themePackUnlockLevel, type HealthPalette } from '@/theme'
 
 /** Purely decorative, token-driven artwork. No external image requests or AI calls. */
@@ -11,7 +12,7 @@ export function TodayScenicHero({ view }: { view: TodayViewModel }) {
   const readOnly = useDemoReadOnly()
   const { summary } = useRewardSummary(!readOnly)
   const palette: HealthPalette = typeof localStorage === 'undefined' ? 'classic' : readPalettePreference(localStorage)
-  const currentLevel = summary?.level ?? 1
+  const currentLevel = progressionState(summary?.lifetimeXp ?? 0).level
   const stage = worldStage(themePackUnlockLevel(palette), currentLevel)
   return (
     <section className="today-scenic-hero" aria-label="Today's health overview">
