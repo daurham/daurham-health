@@ -241,6 +241,10 @@ export function TodayBoard({
         <NutritionCard view={view} onNutritionChanged={onNutritionChanged} />
         <TrainingCard view={view} />
       </div>
+      <div className="grid items-start gap-3 sm:grid-cols-2">
+        <ActivityCard view={view} />
+        <SleepCard view={view} />
+      </div>
       <section className="today-essentials" aria-labelledby="today-essentials-heading">
         <h2 id="today-essentials-heading" className="today-essentials-title">Daily Essentials</h2>
         <div className="grid items-start gap-3 md:grid-cols-2">
@@ -288,9 +292,7 @@ export function TodayBoard({
         </section>
       ) : null}
 
-      <div className="grid items-start gap-3 md:grid-cols-3">
-        <ActivityCard view={view} />
-        <SleepCard view={view} />
+      <div className="grid items-start gap-3">
         <BodyCard view={view} />
       </div>
       <LabCard view={view} />
