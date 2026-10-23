@@ -84,7 +84,7 @@ export function TodayScenicHero({
           <p className="today-command-snapshot">{caloriesLabel} <span aria-hidden="true">·</span> {waterLabel}</p>
         </div>
       </div>
-      <nav className="today-command-shortcuts" aria-label="Quick logging">
+      <nav className="today-command-shortcuts" data-has-supplements={view.supplements ? 'yes' : 'no'} aria-label="Quick logging">
         {readOnly ? (
           <Link to={nutritionHref} className="today-command-shortcut">
             <TodayDomainIcon domain="nutrition" /><span>Nutrition</span>

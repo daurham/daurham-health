@@ -39,6 +39,6 @@ describe('Today daily essentials refinement', () => {
     const source = readFileSync('src/features/today/TodayPage.tsx', 'utf8')
     expect(source).toContain('fetchTrainingPlan()')
     expect(source).toContain('/training/new?template=')
-    expect(source).toContain('Next in rotation · optional')
+    expect(readFileSync('src/features/today/TodayVisuals.tsx', 'utf8')).toContain('Next in rotation · optional')
   })
 })

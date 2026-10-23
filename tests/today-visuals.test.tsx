@@ -38,9 +38,10 @@ function renderBoard(readOnly = false): string {
 describe('Today visual command center', () => {
   it('renders token-driven scenery and retains text equivalents', () => {
     const view = buildTodayView(emptySources())
-    const html = renderToStaticMarkup(React.createElement(TodayScenicHero, { view }))
-    expect(html).toContain('YOUR HEALTH, IN FOCUS')
-    expect(html).toContain('Make today count.')
+    const html = renderToStaticMarkup(React.createElement(MemoryRouter, null, React.createElement(TodayScenicHero, { view })))
+    expect(html).toContain('Next in rotation · optional')
+    expect(html).toContain('Your training options')
+    expect(html).not.toContain('Make today count.')
     expect(html).toContain('world-scene-art')
     expect(html).toContain('data-world-palette=')
     expect(html).not.toContain('https://')
@@ -51,11 +52,12 @@ describe('Today visual command center', () => {
 
   it('prioritizes action cards, and keeps daily essentials and stress visible', () => {
     const html = renderBoard()
-    expect(html.indexOf('YOUR HEALTH, IN FOCUS')).toBeLessThan(html.indexOf('Daily Essentials'))
+    expect(html.indexOf('Next in rotation · optional')).toBeLessThan(html.indexOf('Daily Essentials'))
     expect(html.indexOf('Nutrition')).toBeLessThan(html.indexOf('Daily Essentials'))
     expect(html).toContain('Daily Essentials')
     // An owner without a supplement schedule should not see a fictional tile.
     expect(html).not.toContain('>Supplements<')
+    expect(html).toContain('today-command-shortcuts')
     expect(readFileSync('src/features/today/TodayPage.tsx', 'utf8')).toContain('<SupplementsCard view={view}')
     expect(html).toContain('Daily Log')
     expect(html).toContain('Stress')

@@ -2205,6 +2205,7 @@ html[data-health-palette='prismatic-apex'] .today-world-motto { display: block; 
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: .45rem;
 }
+.today-command-shortcuts[data-has-supplements="no"] { grid-template-columns: repeat(3, minmax(0,1fr)); }
 .today-command-shortcut {
   min-width: 0;
   min-height: 4.05rem;
