@@ -6,8 +6,8 @@ describe('progression theme background coverage', () => {
 
   it('uses a nontransparent semantic-color wash beneath each progression theme scene', () => {
     // Both standard and late-game theme groups share the same full-height fill.
-    expect(css.match(/background-image:\\s*var\\(--health-hero-gradient\\),\\s*linear-gradient\\(/g)).toHaveLength(2)
-    expect(css.match(/color-mix\\(in srgb, var\\(--health-accent-secondary\\) 8%, var\\(--health-canvas\\)\\)/g)).toHaveLength(2)
+    expect(css.match(/background-image:\s*var\(--health-hero-gradient\),\s*linear-gradient\(/g)).toHaveLength(2)
+    expect(css.match(/color-mix\(in srgb, var\(--health-accent-secondary\) 8%, var\(--health-canvas\)\)/g)).toHaveLength(2)
     expect(css.match(/background-size: 100% 100%/g)?.length).toBeGreaterThanOrEqual(2)
     expect(css).toContain("html[data-health-palette='grand-line']")
     expect(css).toContain("html[data-health-palette='astral-ascension']")
