@@ -1916,3 +1916,18 @@ html[data-health-palette='prismatic-apex'] .today-world-motto { display: block; 
   .today-scenic-hero .world-fly { animation: none; }
   .today-scenic-hero .today-scene-rare { transition: none; }
 }
+
+
+/* World unlock gallery: labels stay outside the artwork's negative space and
+   foreground colors are scoped independently from the selected app palette. */
+.theme-world-preview:not(.theme-world-preview--tile) { height: 9rem; border: 1px solid var(--health-border); border-radius: .85rem; }
+.theme-world-preview-copy {
+  position: absolute; inset: auto 0 0; z-index: 2; padding: 1.6rem .8rem .65rem;
+  background: linear-gradient(0deg, var(--health-surface-raised), color-mix(in srgb,var(--health-surface-raised) 80%,transparent) 58%, transparent);
+  pointer-events: none;
+}
+.theme-world-preview-label { color: var(--health-accent); font-size: .64rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.theme-world-preview-name { color: var(--health-text); margin-top: .18rem; font-size: 1rem; font-weight: 750; }
+.theme-world-preview-detail { color: var(--health-text-muted); font-size: .7rem; }
+.theme-world-preview--tile { height: 5.5rem; }
+.theme-world-preview--tile .today-scene-art { width: 105%; }
