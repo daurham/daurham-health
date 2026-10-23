@@ -1,7 +1,7 @@
 import type { CSSProperties } from 'react'
 import './theme-world-hydration.css'
 import type { HealthPalette } from '@/theme'
-import { worldSceneImage, type WorldMood, type WorldStage } from './theme-worlds'
+import { worldSceneImage, worldSceneFocus, type WorldMood, type WorldStage } from './theme-worlds'
 
 export function ThemeWorldScene({ palette, stage = 'base', completed = false, hydrated = false, mood = 'dusk', className = '' }: {
   palette: HealthPalette
@@ -20,6 +20,7 @@ export function ThemeWorldScene({ palette, stage = 'base', completed = false, hy
     <div className={['world-scene', className].filter(Boolean).join(' ')}
       data-world-palette={palette} data-world-stage={stage}
       data-world-celebrating={completed ? 'yes' : 'no'} data-world-hydrated={hydrated ? 'yes' : 'no'} data-world-mood={mood}
+      data-world-focus={worldSceneFocus(palette)}
       aria-hidden="true">
       <div className="world-scene-art" style={backgroundStyle} />
       <div className="world-scene-tint" />

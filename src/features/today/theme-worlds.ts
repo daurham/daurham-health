@@ -30,6 +30,22 @@ export function worldSceneImage(palette: HealthPalette): string {
   return WORLD_SCENE_IMAGES[WORLD_SCENE_ROW[palette]]
 }
 
+/** Art direction only. The DBZ packs share the dragon illustration, whose
+ * head sits near the right edge of the 1600x533 source image. Other worlds
+ * retain their original focal positioning and image composition. */
+const DRAGON_PALETTES: ReadonlySet<HealthPalette> = new Set([
+  'saiyan-dawn',
+  'super-saiyan-gold',
+  'namek-sky',
+  'silver-instinct',
+  'crimson-surge',
+  'cosmic-instinct',
+])
+
+export function worldSceneFocus(palette: HealthPalette): 'dragon' | 'default' {
+  return DRAGON_PALETTES.has(palette) ? 'dragon' : 'default'
+}
+
 export type WorldStage = 'base' | 'awakened' | 'ascended'
 
 /** Permanent evolution follows the existing level/XP economy, never spendable XP.

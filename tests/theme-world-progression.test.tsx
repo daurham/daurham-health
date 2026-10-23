@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { THEME_PACKS } from '../src/theme.ts'
 import { ThemeWorldScene } from '../src/features/today/ThemeWorldScene.tsx'
-import { WORLD_SCENE_ROW, WORLD_SCENE_IMAGES, worldSceneImage, worldStage, worldNextStageLevel, isHydrationGoalMet, readWorldStageChoice, resolveWorldStageChoice, writeWorldStageChoice } from '../src/features/today/theme-worlds.ts'
+import { WORLD_SCENE_ROW, WORLD_SCENE_IMAGES, worldSceneImage, worldSceneFocus, worldStage, worldNextStageLevel, isHydrationGoalMet, readWorldStageChoice, resolveWorldStageChoice, writeWorldStageChoice } from '../src/features/today/theme-worlds.ts'
 
 describe('Premium theme-world progression', () => {
   it('maps every theme to an independent, valid, and optimized WebP scene', () => {
@@ -33,6 +33,27 @@ describe('Premium theme-world progression', () => {
       expect(renderToStaticMarkup(<ThemeWorldScene palette={pack.id} />)).toContain(worldSceneImage(pack.id))
     }
   })
+  it('keeps a dragon-only scene crop with Shenron in view on narrow heroes', () => {
+    const dragonPacks = ['saiyan-dawn', 'super-saiyan-gold', 'namek-sky',
+      'silver-instinct', 'crimson-surge', 'cosmic-instinct'] as const
+    for (const palette of dragonPacks) {
+      expect(worldSceneFocus(palette)).toBe('dragon')
+      expect(worldSceneImage(palette)).toBe('/theme/worlds/v2/dragon.webp')
+      const rendered = renderToStaticMarkup(<ThemeWorldScene palette={palette} />)
+      expect(rendered).toContain('data-world-focus="dragon"')
+    }
+    for (const pack of THEME_PACKS.filter((pack) => !dragonPacks.includes(pack.id as typeof dragonPacks[number]))) {
+      expect(worldSceneFocus(pack.id)).toBe('default')
+      expect(renderToStaticMarkup(<ThemeWorldScene palette={pack.id} />)).toContain('data-world-focus="default"')
+    }
+    const css = readFileSync('src/index.css', 'utf8')
+    expect(css).toContain('.today-scenic-hero .world-scene[data-world-focus="dragon"] .world-scene-art')
+    expect(css).toContain('background-position-x: 100% !important;')
+    expect(css).toContain('.theme-world-preview--tile .world-scene[data-world-focus="dragon"]')
+    expect(css).toContain('background-size: cover;')
+    expect(css).not.toContain('background-size: 132% auto')
+  })
+
   it('uses the iconic Halo ring scene only for Halo-related packs', () => {
     expect(worldSceneImage('spartan')).toBe('/theme/worlds/v2/halo.webp')
     expect(worldSceneImage('mjolnir-night')).toBe('/theme/worlds/v2/halo.webp')

@@ -2037,6 +2037,33 @@ html[data-health-palette='prismatic-apex'] .today-world-motto { display: block; 
 .theme-world-preview--tile .world-scene-art { background-position-x: center !important; }
 .theme-world-unlock-note { font-size: .68rem; color: var(--health-text-muted); margin-top: .35rem; }
 
+/* The shared 65% hero crop cuts off the dragon's head (x~85% of the source)
+ * on tall mobile cards. Position the DBZ scenes against the right edge to
+ * reveal the dragon's face and moon while preserving the bottom quote.
+ *
+ * Keep cover: fixed image width percentages (e.g. 132% auto) are too short
+ * for the tall mobile hero and can leave empty bands above/below the art.
+ * Only the six dragon packs get these overrides; Halo and other worlds do not.
+ */
+.today-scenic-hero .world-scene[data-world-focus="dragon"] .world-scene-art {
+  background-position-x: 96% !important;
+  background-position-y: 40%;
+  background-size: cover;
+}
+.theme-world-preview .world-scene[data-world-focus="dragon"] .world-scene-art {
+  background-position-x: 94% !important;
+  background-position-y: 38%;
+}
+.theme-world-preview--tile .world-scene[data-world-focus="dragon"] .world-scene-art {
+  background-position-x: 96% !important;
+  background-position-y: 36%;
+}
+@media (max-width: 600px) {
+  .today-scenic-hero .world-scene[data-world-focus="dragon"] .world-scene-art {
+    background-position-x: 100% !important;
+    background-position-y: 38%;
+  }
+}
 
 /* Passive daypart lighting affects imagery only; content contrast is unchanged.
    Today's local device clock is sampled on mount/focus (no polling). */
