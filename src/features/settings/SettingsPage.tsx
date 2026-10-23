@@ -85,7 +85,7 @@ function ThemeWorldPreview({ pack, label, resolvedMode }: {
   } as CSSProperties
   return (
     <div className="theme-world-preview" data-scene-palette={pack.id} style={style}>
-      <ThemeWorldArtwork />
+      <ThemeWorldArtwork palette={pack.id} />
       <div className="theme-world-preview-copy">
         <p className="theme-world-preview-label">{label}</p>
         <p className="theme-world-preview-name">{pack.label}</p>
@@ -219,21 +219,17 @@ function AppearanceSection() {
                 ].join(' ')}
               >
                 <div
-                  className="h-20 border-b border-black/5 p-3"
+                  className="theme-world-preview theme-world-preview--tile border-b border-black/5"
                   style={{
-                    background:
-                      resolvedMode === 'dark'
-                        ? 'radial-gradient(circle at 82% 12%, ' + pack.preview.secondary + '38, transparent 46%), linear-gradient(135deg, #11151b, ' + pack.preview.accent + '45)'
-                        : 'radial-gradient(circle at 82% 12%, ' + pack.preview.secondary + '22, transparent 46%), linear-gradient(135deg, ' + pack.preview.canvas + ', ' + pack.preview.surface + ')',
-                    boxShadow: pack.unlockLevel == null ? undefined : 'inset 0 0 28px ' + pack.preview.accent + (resolvedMode === 'dark' ? '20' : '12'),
-                  }}
+                    '--health-accent': pack.preview.accent,
+                    '--health-accent-secondary': pack.preview.secondary,
+                    '--health-surface-raised': resolvedMode === 'dark' ? '#191b23' : pack.preview.surface,
+                    '--health-reward': pack.preview.reward,
+                    '--health-glow': pack.preview.secondary + '42',
+                  } as CSSProperties}
                   aria-hidden="true"
                 >
-                  <div className="flex h-full items-end gap-2">
-                    <span className="h-9 w-9 rounded-lg shadow-sm" style={{ background: pack.preview.accent }} />
-                    <span className="h-7 w-7 rounded-full" style={{ background: pack.preview.secondary }} />
-                    <span className="ml-auto h-5 w-12 rounded-full" style={{ background: pack.preview.reward }} />
-                  </div>
+                  <ThemeWorldArtwork palette={pack.id} />
                 </div>
                 <div className="bg-white p-3">
                   <div className="flex items-center justify-between gap-2">
