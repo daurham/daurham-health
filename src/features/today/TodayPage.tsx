@@ -431,7 +431,7 @@ function DailyCheckInCard({ view, onWaterLogged }: { view: TodayViewModel; onWat
     <section className="today-metric-card">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="today-metric-heading"><TodayDomainIcon domain="hydration" />Hydration &amp; Check-in</h2>
+          <h2 className="today-metric-heading"><TodayDomainIcon domain="hydration" />Hydration &amp; Daily Log</h2>
           <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-zinc-700">
             <span>Water {signals.hydration.tracked && signals.hydration.totalOz != null
               ? `${Math.round(signals.hydration.totalOz)}`
