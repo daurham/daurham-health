@@ -6,6 +6,7 @@ export function ThemeWorldScene({ palette, stage = 'base', completed = false, mo
   palette: HealthPalette
   stage?: WorldStage
   completed?: boolean
+  hydrated?: boolean
   mood?: WorldMood
   className?: string
 }) {
