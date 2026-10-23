@@ -256,7 +256,7 @@ describe('theme shells', () => {
     expect(css).toContain('--health-reward:')
     expect(css).toContain('--health-hero-gradient:')
     expect(css).toContain('.app-shell')
-    expect(css).toContain('background-image: var(--health-hero-gradient)')
+    expect(css).toMatch(/background-image:\s*var\(--health-hero-gradient\),/)
     expect(css.match(/--health-danger:/g)).toHaveLength(2)
     expect(css.match(/--health-warning:/g)).toHaveLength(2)
     expect(css.match(/--health-success:/g)).toHaveLength(2)
