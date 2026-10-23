@@ -425,60 +425,73 @@ function DailyCheckInCard({ view, onWaterLogged }: { view: TodayViewModel; onWat
   }
 
   return (
-    <section className="rounded-lg border border-zinc-200 bg-white p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-info">Daily Log</h2>
-          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-zinc-700">
-            <span>Water {signals.hydration.tracked && signals.hydration.totalOz != null
-              ? `${Math.round(signals.hydration.totalOz)}`
-              : '—'}{signals.hydration.goalOz != null ? ` / ${signals.hydration.goalOz} oz` : ' oz'}</span>
-            <span>Bowel {bowelText}</span>
-            <span>Energy {signals.wellness.energy ?? '—'}{signals.wellness.energy != null ? '/5' : ''}</span>
-            <span>Hunger {signals.wellness.hunger ?? '—'}{signals.wellness.hunger != null ? '/5' : ''}</span>
-            <span>Soreness {signals.wellness.soreness ?? '—'}{signals.wellness.soreness != null ? '/5' : ''}</span>
-          </div>
-          {waterProgress ? (
-            <div className="mt-2" role="progressbar" aria-label="Today's water goal progress"
-              aria-valuemin={0} aria-valuemax={100}
-              aria-valuenow={Math.min(100, waterProgress.progressPercent)}>
-              <div className="h-2 overflow-hidden rounded-full bg-zinc-200">
-                <div className="h-full rounded-full bg-info" style={{
-                  width: `${Math.min(100, waterProgress.progressPercent)}%`,
-                }} />
-              </div>
-              <p className="mt-1 text-xs text-zinc-600">{waterProgress.progressPercent}% of daily water goal</p>
-            </div>
-          ) : null}
-          {view.context.recorded ? (
-            <p className="mt-2 text-sm text-zinc-600">
-              Context: {view.context.tags.length > 0 ? view.context.tags.map(dailyContextTagLabel).join(' · ') : view.context.note ?? 'Recorded'}
-            </p>
-          ) : null}
-        </div>
+    <section className="today-panel min-w-0 p-4 sm:p-5">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-zinc-600">
+          <span className="today-panel-icon" aria-hidden="true">◈</span>Daily Log
+        </h2>
         {readOnly ? null : <Link to={checkInHref} className={quietButtonClass}>Open</Link>}
       </div>
-      {readOnly ? null : (
-        <div className="mt-3 flex flex-wrap gap-2">
-          {[8, 16, 24].map((amount) => (
-            <button
-              key={amount}
-              type="button"
-              disabled={busyAmount != null}
-              className={quietButtonClass}
-              onClick={() => void quickWater(amount)}
-            >
-              {busyAmount === amount ? 'Logging…' : `+${amount} oz`}
-            </button>
-          ))}
-          <Link to={checkInHref} className={quietButtonClass}>Bowel / wellness</Link>
-          <Link to={contextHref} className={quietButtonClass}>{view.context.recorded ? 'Edit context' : 'Add context'}</Link>
+      <div className="mt-4 rounded-xl bg-accent-muted/55 p-3">
+        <div className="flex flex-wrap items-end justify-between gap-x-3 gap-y-1">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Hydration</p>
+            <p className="mt-1 text-2xl font-bold tracking-tight text-zinc-900">
+              {'Water ' + (signals.hydration.tracked && signals.hydration.totalOz != null ? String(Math.round(signals.hydration.totalOz)) : '—') +
+                (signals.hydration.goalOz != null ? ' / ' + signals.hydration.goalOz + ' oz' : ' oz')}
+            </p>
+          </div>
+          {waterProgress ? <span className="text-sm font-semibold text-accent">{waterProgress.progressPercent}% of goal</span> : null}
         </div>
-      )}
+        {waterProgress ? (
+          <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-zinc-200" role="progressbar" aria-label="Today's water goal progress"
+            aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(100, waterProgress.progressPercent)}>
+            <div className="motion-meter h-full rounded-full bg-accent" style={{ width: String(Math.min(100, waterProgress.progressPercent)) + '%' }} />
+          </div>
+        ) : null}
+        {readOnly ? null : (
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            {[8, 16, 24].map((amount) => (
+              <button key={amount} type="button" disabled={busyAmount != null}
+                className="motion-pressable min-h-11 rounded-lg border border-accent/20 bg-white px-2 text-sm font-semibold text-accent hover:bg-accent-muted disabled:opacity-50"
+                onClick={() => void quickWater(amount)}>
+                {busyAmount === amount ? 'Logging…' : '+' + amount + ' oz'}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      <div className="mt-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm font-semibold text-zinc-900">Daily check-in</p>
+          {readOnly ? null : <Link to={checkInHref} className={quietButtonClass}>Edit ratings</Link>}
+        </div>
+        <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {([
+            ['Energy', signals.wellness.energy],
+            ['Stress', signals.wellness.stress],
+            ['Hunger', signals.wellness.hunger],
+            ['Soreness', signals.wellness.soreness],
+          ] as const).map(([name, value]) => (
+            <div key={name} className="rounded-lg bg-zinc-50 px-2 py-2.5 text-center">
+              <span className="block text-xs text-zinc-500">{name}</span>
+              <span className="mt-1 block text-sm font-bold text-zinc-900">{name + ' ' + (value == null ? '—' : value + '/5')}</span>
+            </div>
+          ))}
+        </div>
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm text-zinc-700">{'Bowel ' + bowelText}</p>
+          {readOnly ? null : <Link to={checkInHref} className={quietButtonClass}>Bowel / wellness</Link>}
+        </div>
+        {view.context.recorded ? (
+          <p className="mt-2 text-sm text-zinc-600">
+            Context: {view.context.tags.length > 0 ? view.context.tags.map(dailyContextTagLabel).join(' · ') : view.context.note ?? 'Recorded'}
+          </p>
+        ) : null}
+        {readOnly ? null : <Link to={contextHref} className={quietButtonClass}>{view.context.recorded ? 'Edit context' : 'Add context'}</Link>}
+      </div>
       {error ? <p className="mt-2 text-sm text-red-700">{error}</p> : null}
-      {empty ? (
-        <p className="mt-2 text-xs text-zinc-500">Nothing tracked yet. Missing is not treated as zero.</p>
-      ) : null}
+      {empty ? <p className="mt-2 text-xs text-zinc-500">Nothing tracked yet. Missing is not treated as zero.</p> : null}
     </section>
   )
 }
