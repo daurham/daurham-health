@@ -1483,3 +1483,96 @@ html:not([data-health-palette='classic']) .xp-badge {
     transform: none;
   }
 }
+
+
+/* Today command center — reusable theme-first presentation. The illustrations
+   use palette semantic tokens, never image URLs or per-theme hex assets. */
+.today-scenic-hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  min-height: 188px;
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--health-border);
+  border-radius: 1.25rem;
+  background:
+    radial-gradient(circle at 86% 22%, var(--health-glow), transparent 46%),
+    linear-gradient(117deg, var(--health-surface-raised), var(--health-accent-muted));
+  box-shadow: 0 10px 30px -25px var(--health-glow);
+}
+.today-scene-art {
+  position: absolute;
+  width: 84%;
+  height: 100%;
+  inset: 0 0 0 auto;
+  opacity: 0.9;
+  pointer-events: none;
+}
+.today-scene-orb { fill: var(--health-accent-secondary); opacity: .28; }
+.today-scene-stars { fill: var(--health-accent-secondary); opacity: 0; }
+.today-scene-ridge-back { fill: var(--health-accent-secondary); opacity: .22; }
+.today-scene-ridge-front { fill: var(--health-accent); opacity: .23; }
+.today-scene-sea { display: none; }
+.today-scene-wave-back { fill: var(--health-accent-secondary); opacity: .38; }
+.today-scene-wave-front { fill: var(--health-accent); opacity: .3; }
+html:is([data-health-palette='ocean'], [data-health-palette='grand-line'], [data-health-palette='sun-god']) .today-scene-land { display: none; }
+html:is([data-health-palette='ocean'], [data-health-palette='grand-line'], [data-health-palette='sun-god']) .today-scene-sea { display: block; }
+html:is([data-health-palette='aura'], [data-health-palette='saiyan-dawn'], [data-health-palette='super-saiyan-gold'], [data-health-palette='spartan'], [data-health-palette='namek-sky'], [data-health-palette='clone-legion'], [data-health-palette='silver-instinct'], [data-health-palette='cosmic-instinct'], [data-health-palette='astral-ascension'], [data-health-palette='eclipse-sovereign'], [data-health-palette='prismatic-apex'], [data-health-palette='republic-red']) .today-scene-stars { opacity: .8; }
+html:is([data-health-palette='wasteland'], [data-health-palette='vault-neon']) .today-scene-orb { opacity: .48; }
+.today-scenic-hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg, var(--health-surface-raised) 0%, color-mix(in srgb, var(--health-surface-raised) 90%, transparent) 43%, transparent 90%);
+}
+.today-scenic-content { position: relative; z-index: 1; max-width: 28rem; padding: 1.35rem; }
+.today-scenic-eyebrow { color: var(--health-accent); font-size: .7rem; font-weight: 750; letter-spacing: .13em; }
+.today-scenic-heading { margin-top: .45rem; color: var(--health-text); font-size: clamp(1.55rem, 4.5vw, 2.15rem); font-weight: 750; letter-spacing: -.045em; line-height: 1.14; }
+.today-scenic-subtitle { margin-top: .4rem; color: var(--health-text-muted); font-size: .88rem; font-weight: 600; }
+.today-scenic-description { margin-top: .8rem; color: var(--health-text-muted); font-size: .85rem; line-height: 1.45; }
+.today-metric-card {
+  min-width: 0;
+  border: 1px solid var(--health-border);
+  border-radius: 1rem;
+  padding: 1.1rem;
+  background: var(--health-surface-raised);
+  box-shadow: 0 10px 22px -24px var(--health-glow);
+}
+.today-metric-card--hero {
+  background: var(--health-hero-gradient), var(--health-surface-raised);
+}
+.today-metric-heading { display: flex; align-items: center; gap: .55rem; color: var(--health-text-muted); font-size: .77rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.today-domain-icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: .7rem;
+  color: var(--health-accent);
+  background: var(--health-accent-muted);
+}
+.today-domain-icon--hydration { color: var(--health-info); background: color-mix(in srgb, var(--health-info) 15%, var(--health-surface)); }
+.today-domain-icon--wellness { color: var(--health-toward); background: color-mix(in srgb, var(--health-toward) 14%, var(--health-surface)); }
+.today-domain-icon--supplements { color: var(--health-accent-secondary); background: color-mix(in srgb, var(--health-accent-secondary) 17%, var(--health-surface)); }
+.today-progress-track { height: .55rem; overflow: hidden; border-radius: 999px; background: var(--health-surface-soft); }
+.today-progress-fill { height: 100%; max-width: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--health-accent), var(--health-accent-secondary)); transition: width .22s ease; }
+.today-essentials { display: grid; gap: .7rem; }
+.today-essentials-title { font-size: 1.1rem; font-weight: 750; letter-spacing: -.02em; color: var(--health-text); }
+.today-wellness-stat { border-radius: .7rem; background: var(--health-surface-soft); padding: .55rem .4rem; text-align: center; min-width: 0; }
+.today-wellness-stat strong { display: block; margin-top: .25rem; font-size: 1.15rem; line-height: 1.25; color: var(--health-text); }
+.today-wellness-stat span { color: var(--health-text-muted); font-size: .72rem; }
+.today-hero-side-note { color: var(--health-text-muted); font-size: .75rem; }
+@media (max-width: 430px) {
+  .today-scenic-hero { min-height: 175px; }
+  .today-scene-art { width: 97%; opacity: .66; }
+  .today-scenic-content { padding: 1rem; }
+  .today-scenic-description { max-width: 15rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .today-progress-fill { transition: none; }
+}
