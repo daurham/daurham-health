@@ -1,0 +1,38 @@
+import React from 'react'
+import { readFileSync } from 'node:fs'
+import { renderToStaticMarkup } from 'react-dom/server'
+import { MemoryRouter } from 'react-router-dom'
+import { describe, expect, it } from 'vitest'
+import { TodayBoard } from '../src/features/today/TodayPage.tsx'
+import { TodayScenicHero } from '../src/features/today/TodayVisuals.tsx'
+import { buildTodayView, type TodaySources } from '../src/domain/today/view.ts'
+
+const sources: TodaySources = {
+  now: new Date('2026-10-22T18:00:00Z'), activityDays: [], nutritionEntries: [],
+  nutritionTargets: [], trainingToday: [], trainingSessions: [], sleepNights: [],
+  latestCompleteSleep: null, bodyWeights: [], pendingJobs: [],
+}
+
+describe('Today scene families and daily priorities', () => {
+  it('has four independent token-colored scenery families without external assets', () => {
+    const hero = renderToStaticMarkup(<TodayScenicHero view={buildTodayView(sources)} />)
+    const css = readFileSync('src/index.css', 'utf8')
+    for (const family of ['land', 'sea', 'cosmos', 'wasteland']) {
+      expect(hero).toContain('today-scene-' + family)
+    }
+    expect(css).toContain("data-health-palette='grand-line'")
+    expect(css).toContain("data-health-palette='cosmic-instinct'")
+    expect(css).toContain("data-health-palette='wasteland'")
+    expect(css).toContain('var(--health-accent-secondary)')
+    expect(hero).not.toContain('https://')
+  })
+
+  it('keeps essentials before passive history, and suggested workouts before manual alternatives', () => {
+    const html = renderToStaticMarkup(<MemoryRouter><TodayBoard view={buildTodayView(sources)} /></MemoryRouter>)
+    expect(html.indexOf('Daily Essentials')).toBeLessThan(html.indexOf('Health trends'))
+    expect(html.indexOf('Health trends')).toBeLessThan(html.indexOf('Resting HR'))
+    expect(html.indexOf('Next in rotation')).toBeLessThan(html.indexOf('Ad-hoc workout'))
+    expect(html).toContain('Add food')
+    expect(html).toContain('Bowel / wellness')
+  })
+})

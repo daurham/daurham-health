@@ -1585,3 +1585,33 @@ html:is([data-health-palette='wasteland'], [data-health-palette='vault-neon']) .
 .today-week-bar-fill { width: 100%; border-radius: .2rem .2rem 0 0; background: linear-gradient(0deg,var(--health-accent),var(--health-accent-secondary)); opacity: .85; }
 .today-week-bar-missing { display: block; width: 100%; border-top: 1px dashed var(--health-border-strong); }
 .today-week-bar-day { display: block; overflow: hidden; white-space: nowrap; font-size: .57rem; color: var(--health-text-faint); margin-top: .25rem; }
+
+/* Four scenery families: all artwork fills/strokes resolve to the active theme.
+   The separate light/dark mode palettes supply contrast and atmosphere. */
+.today-scene-cosmos, .today-scene-wasteland { display: none; }
+.today-cosmos-haze { fill: var(--health-accent-secondary); opacity: .11; }
+.today-cosmos-halo { fill: var(--health-accent); opacity: .18; }
+.today-cosmos-core { fill: var(--health-accent-secondary); opacity: .48; }
+.today-cosmos-ring { stroke: var(--health-accent); stroke-width: 6; fill: none; opacity: .52; }
+.today-cosmos-horizon { fill: var(--health-accent); opacity: .18; }
+.today-cosmos-streak { stroke: var(--health-accent-secondary); stroke-width: 3; fill: none; stroke-linecap: round; opacity: .56; }
+.today-wasteland-sun { fill: var(--health-accent-secondary); opacity: .3; }
+.today-wasteland-distant { fill: var(--health-accent-secondary); opacity: .26; }
+.today-wasteland-ruins { fill: var(--health-accent); opacity: .28; }
+.today-wasteland-foreground { fill: var(--health-accent); opacity: .35; }
+html:is(
+  [data-health-palette='aura'], [data-health-palette='saiyan-dawn'], [data-health-palette='super-saiyan-gold'],
+  [data-health-palette='spartan'], [data-health-palette='namek-sky'], [data-health-palette='clone-legion'],
+  [data-health-palette='silver-instinct'], [data-health-palette='crimson-surge'], [data-health-palette='mjolnir-night'],
+  [data-health-palette='republic-red'], [data-health-palette='cosmic-instinct'], [data-health-palette='astral-ascension'],
+  [data-health-palette='eclipse-sovereign'], [data-health-palette='prismatic-apex']
+) .today-scene-land,
+html:is([data-health-palette='wasteland'],[data-health-palette='vault-neon']) .today-scene-land { display: none; }
+html:is(
+  [data-health-palette='aura'], [data-health-palette='saiyan-dawn'], [data-health-palette='super-saiyan-gold'],
+  [data-health-palette='spartan'], [data-health-palette='namek-sky'], [data-health-palette='clone-legion'],
+  [data-health-palette='silver-instinct'], [data-health-palette='crimson-surge'], [data-health-palette='mjolnir-night'],
+  [data-health-palette='republic-red'], [data-health-palette='cosmic-instinct'], [data-health-palette='astral-ascension'],
+  [data-health-palette='eclipse-sovereign'], [data-health-palette='prismatic-apex']
+) .today-scene-cosmos { display: initial; }
+html:is([data-health-palette='wasteland'],[data-health-palette='vault-neon']) .today-scene-wasteland { display: initial; }

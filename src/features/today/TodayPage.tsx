@@ -245,15 +245,18 @@ export function TodayBoard({
         <NutritionCard view={view} onNutritionChanged={onNutritionChanged} />
         <TrainingCard view={view} />
       </div>
-      <div className="grid items-start gap-3 sm:grid-cols-2">
-        <ActivityCard view={view} />
-        <SleepCard view={view} />
-      </div>
       <section className="today-essentials" aria-labelledby="today-essentials-heading">
         <h2 id="today-essentials-heading" className="today-essentials-title">Daily Essentials</h2>
         <div className="grid items-start gap-3 md:grid-cols-2">
           <DailyCheckInCard view={view} onWaterLogged={onWaterLogged} />
           <SupplementsCard view={view} onChanged={onSupplementsChanged} />
+        </div>
+      </section>
+      <section className="space-y-3" aria-labelledby="today-trends-heading">
+        <h2 id="today-trends-heading" className="today-essentials-title">Health trends</h2>
+        <div className="grid items-start gap-3 sm:grid-cols-2">
+          <ActivityCard view={view} />
+          <SleepCard view={view} />
         </div>
       </section>
       {onCoachState ? (
@@ -905,33 +908,27 @@ function TrainingCard({ view }: { view: TodayViewModel }) {
   return (
     <Card title="Training">
       <div className="space-y-3">
-      {view.training.logged ? (
-        <ul className="space-y-3">
-          {view.training.sessions.map((session) => (
-            <li key={session.id}>
-              <p className="text-lg font-semibold tracking-tight text-zinc-900">{session.name}</p>
-              <p className="text-sm text-zinc-500">{sessionIntentLabel(session.sessionType)}</p>
-              <p className="text-zinc-600">
-                {countLabel(session.exerciseCount, 'exercise', 'exercises')} · {countLabel(session.workingSetCount, 'working set', 'working sets')}
-              </p>
-              <div className="mt-2">
-                <QuietAction to={prefixedPath(prefix, `/training/${session.id}`)}>View workout</QuietAction>
-              </div>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <>
-          <p>No training session logged today</p>
-          {readOnly ? null : (
-            <div className="mt-3 flex flex-wrap gap-2">
-              <PrimaryAction to={prefixedPath(prefix, '/training/new')}>Log workout</PrimaryAction>
-              <QuietAction to={prefixedPath(prefix, '/training/new?type=ad_hoc')}>Ad-hoc workout</QuietAction>
-            </div>
-          )}
-        </>
-      )}
+        {view.training.logged ? (
+          <ul className="space-y-3">
+            {view.training.sessions.map((session) => (
+              <li key={session.id}>
+                <p className="text-lg font-semibold tracking-tight text-zinc-900">{session.name}</p>
+                <p className="text-sm text-zinc-500">{sessionIntentLabel(session.sessionType)}</p>
+                <p className="text-zinc-600">
+                  {countLabel(session.exerciseCount, 'exercise', 'exercises')} · {countLabel(session.workingSetCount, 'working set', 'working sets')}
+                </p>
+                <QuietAction to={prefixedPath(prefix, '/training/' + session.id)}>View workout</QuietAction>
+              </li>
+            ))}
+          </ul>
+        ) : <p>No training session logged today</p>}
         <NextRoutineAction />
+        {readOnly || view.training.logged ? null : (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <PrimaryAction to={prefixedPath(prefix, '/training/new')}>Log workout</PrimaryAction>
+            <QuietAction to={prefixedPath(prefix, '/training/new?type=ad_hoc')}>Ad-hoc workout</QuietAction>
+          </div>
+        )}
       </div>
     </Card>
   )

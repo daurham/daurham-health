@@ -21,6 +21,20 @@ export function TodayScenicHero({ view }: { view: TodayViewModel }) {
           <path className="today-scene-wave-back" d="M0 228 C120 196 210 258 336 226 S560 190 678 228 S880 252 1000 206 L1000 320 L0 320 Z" />
           <path className="today-scene-wave-front" d="M0 285 C150 251 226 311 374 277 S636 252 758 278 S902 291 1000 257 L1000 320 L0 320 Z" />
         </g>
+        <g className="today-scene-cosmos">
+          <ellipse className="today-cosmos-haze" cx="816" cy="150" rx="220" ry="119" />
+          <circle className="today-cosmos-halo" cx="804" cy="113" r="83" />
+          <circle className="today-cosmos-core" cx="804" cy="113" r="59" />
+          <ellipse className="today-cosmos-ring" cx="804" cy="117" rx="155" ry="36" transform="rotate(-18 804 117)" />
+          <path className="today-cosmos-horizon" d="M390 320 Q624 212 803 287 T1100 238 L1100 320 Z" />
+          <path className="today-cosmos-streak" d="M490 194 Q600 113 693 155 M906 57 L955 13" />
+        </g>
+        <g className="today-scene-wasteland">
+          <circle className="today-wasteland-sun" cx="807" cy="89" r="63" />
+          <path className="today-wasteland-distant" d="M340 270 L471 213 L532 233 L630 168 L690 194 L769 138 L835 191 L947 155 L1000 183 L1000 320 L340 320 Z" />
+          <path className="today-wasteland-ruins" d="M662 279 V187 H689 V216 H711 V158 H731 V192 H761 V234 H791 V180 H812 V268 H827 V218 H845 V279 Z" />
+          <path className="today-wasteland-foreground" d="M280 315 L417 282 L548 296 L661 270 L784 284 L895 259 L1000 282 L1000 320 L280 320 Z" />
+        </g>
       </svg>
       <div className="today-scenic-content">
         <p className="today-scenic-eyebrow">YOUR HEALTH, IN FOCUS</p>
