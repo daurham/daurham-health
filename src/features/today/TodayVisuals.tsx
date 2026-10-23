@@ -66,7 +66,7 @@ export function TodayScenicHero({
       <div className="today-scenic-hero" aria-label="Your next action">
         <ThemeWorldScene palette={palette} stage={stage} completed={view.training.logged} hydrated={hydrated} mood={mood} />
         <div className="today-scenic-content">
-          <p className="today-scenic-eyebrow">{view.training.logged ? 'TRAINING LOGGED TODAY' : 'NEXT IN ROTATION · OPTIONAL'}</p>
+          <p className="today-scenic-eyebrow">{view.training.logged ? 'TRAINING LOGGED TODAY' : 'Next in rotation · optional'}</p>
           {view.training.logged ? (
             <div className="today-command-next">
               <h2 className="today-scenic-heading">{lastSession?.name ?? 'Workout complete'}</h2>
@@ -106,9 +106,11 @@ export function TodayScenicHero({
         <Link to={checkInHref} className="today-command-shortcut">
           <TodayDomainIcon domain="wellness" /><span>Check-in</span>
         </Link>
-        <Link to={prefixedPath(prefix, '/supplements')} className="today-command-shortcut">
-          <TodayDomainIcon domain="supplements" /><span>Supplements</span>
-        </Link>
+        {view.supplements ? (
+          <Link to={prefixedPath(prefix, '/supplements')} className="today-command-shortcut">
+            <TodayDomainIcon domain="supplements" /><span>Supplements</span>
+          </Link>
+        ) : null}
       </nav>
       {waterError ? <p className="today-command-error" role="alert">{waterError}</p> : null}
     </section>
