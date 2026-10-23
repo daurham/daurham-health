@@ -8,26 +8,38 @@ import { WORLD_SCENE_ROW, WORLD_SCENE_IMAGES, worldSceneImage, worldStage, world
 
 describe('Premium theme-world progression', () => {
   it('maps every theme to an independent, valid, and optimized WebP scene', () => {
-    expect(WORLD_SCENE_IMAGES).toHaveLength(8)
-    expect(new Set(WORLD_SCENE_IMAGES).size).toBe(8)
+    expect(WORLD_SCENE_IMAGES).toHaveLength(9)
+    expect(new Set(WORLD_SCENE_IMAGES).size).toBe(9)
     expect(Object.keys(WORLD_SCENE_ROW)).toHaveLength(THEME_PACKS.length)
     let total = 0
     for (const path of WORLD_SCENE_IMAGES) {
-      expect(path.startsWith('/theme/worlds/')).toBe(true)
+      expect(path.startsWith('/theme/worlds/v2/')).toBe(true)
       expect(path.endsWith('.webp')).toBe(true)
       const file = readFileSync('public' + path)
       expect(file.toString('ascii', 0, 4)).toBe('RIFF')
       expect(file.toString('ascii', 8, 12)).toBe('WEBP')
-      expect(file.byteLength).toBeLessThan(16_000)
+      expect(file.byteLength).toBeGreaterThan(30_000)
+      expect(file.byteLength).toBeLessThan(190_000)
+      expect(file.toString('ascii', 12, 16)).toBe('VP8 ')
+      expect(file.readUInt16LE(26) & 0x3fff).toBe(1600)
+      expect(file.readUInt16LE(28) & 0x3fff).toBe(533)
       total += file.byteLength
     }
-    expect(total).toBeLessThan(80_000)
+    expect(total).toBeLessThan(1_300_000)
     for (const pack of THEME_PACKS) {
       expect(WORLD_SCENE_ROW[pack.id]).toBeGreaterThanOrEqual(0)
-      expect(WORLD_SCENE_ROW[pack.id]).toBeLessThan(8)
+      expect(WORLD_SCENE_ROW[pack.id]).toBeLessThan(9)
       expect(WORLD_SCENE_IMAGES).toContain(worldSceneImage(pack.id))
       expect(renderToStaticMarkup(<ThemeWorldScene palette={pack.id} />)).toContain(worldSceneImage(pack.id))
     }
+  })
+  it('uses the iconic Halo ring scene only for Halo-related packs', () => {
+    expect(worldSceneImage('spartan')).toBe('/theme/worlds/v2/halo.webp')
+    expect(worldSceneImage('mjolnir-night')).toBe('/theme/worlds/v2/halo.webp')
+    expect(worldSceneImage('aura')).toBe('/theme/worlds/v2/astral.webp')
+    const css = readFileSync('src/index.css', 'utf8')
+    expect(css).not.toContain('background-size: auto 116%')
+    expect(css).not.toContain('world-scene[data-world-palette="spartan"]::before')
   })
   it('preserves XP unlocks and only upgrades a selected world at fixed later levels', () => {
     expect(worldStage(10, 10)).toBe('base')

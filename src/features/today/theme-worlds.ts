@@ -1,13 +1,13 @@
 import type { HealthPalette } from '@/theme'
 
-/** Stable scene selection; every environment now lives in its own 720x124 WebP.
- * Keeping the existing index preserves every franchise-to-world association. */
+/** Individually exported 1600×533 worlds. Indexed lookup preserves theme associations,
+ * while versioned URLs avoid stale browser caches of the old low-resolution images. */
 export const WORLD_SCENE_ROW: Record<HealthPalette, number> = {
   classic: 6, forest: 1, ocean: 0, sunset: 0, plum: 7,
   aura: 7, 'saiyan-dawn': 3, 'grand-line': 0, 'hidden-leaf': 1,
-  'super-saiyan-gold': 3, spartan: 7, 'namek-sky': 3, wasteland: 4,
+  'super-saiyan-gold': 3, spartan: 8, 'namek-sky': 3, wasteland: 4,
   bonfire: 6, 'clone-legion': 2, 'silver-instinct': 3, 'crimson-surge': 3,
-  'sun-god': 0, 'sage-storm': 1, 'mjolnir-night': 7, 'vault-neon': 4,
+  'sun-god': 0, 'sage-storm': 1, 'mjolnir-night': 8, 'vault-neon': 4,
   'abyss-knight': 6, 'republic-red': 5, 'cosmic-instinct': 3,
   'astral-ascension': 7, 'eclipse-sovereign': 7, 'prismatic-apex': 7,
 }
@@ -15,14 +15,15 @@ export const WORLD_SCENE_ROW: Record<HealthPalette, number> = {
 /** Isolated images guarantee that no neighboring scene can bleed into a card,
  * even when CSS sizes change between Today, theme tiles and tiny previews. */
 export const WORLD_SCENE_IMAGES = [
-  '/theme/worlds/grand-line.webp',
-  '/theme/worlds/hidden-leaf.webp',
-  '/theme/worlds/clone-legion.webp',
-  '/theme/worlds/dragon.webp',
-  '/theme/worlds/wasteland.webp',
-  '/theme/worlds/republic-red.webp',
-  '/theme/worlds/bonfire.webp',
-  '/theme/worlds/astral.webp',
+  '/theme/worlds/v2/grand-line.webp',
+  '/theme/worlds/v2/hidden-leaf.webp',
+  '/theme/worlds/v2/clone-legion.webp',
+  '/theme/worlds/v2/dragon.webp',
+  '/theme/worlds/v2/wasteland.webp',
+  '/theme/worlds/v2/republic-red.webp',
+  '/theme/worlds/v2/bonfire.webp',
+  '/theme/worlds/v2/astral.webp',
+  '/theme/worlds/v2/halo.webp',
 ] as const
 
 export function worldSceneImage(palette: HealthPalette): string {

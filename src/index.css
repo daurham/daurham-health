@@ -2053,31 +2053,5 @@ html[data-health-palette='prismatic-apex'] .today-world-motto { display: block; 
 .world-scene[data-world-mood="day"]::after { opacity: 0; }
 .world-scene[data-world-mood="dusk"]::after { opacity: .10; }
 
-/* The Spartan world is a ringworld silhouette instead of borrowing the
-   Clone Legion gunship artwork. Theme colors still own both ring edges. */
-.world-scene[data-world-palette="spartan"]::before,
-.world-scene[data-world-palette="mjolnir-night"]::before {
-  content: '';
-  position: absolute;
-  z-index: 1;
-  width: 52%; height: 66%;
-  right: 8%; top: -15%;
-  border: clamp(3px, .6vw, 7px) solid var(--health-accent-secondary);
-  border-radius: 50%;
-  transform: rotate(-23deg);
-  opacity: .40;
-  pointer-events: none;
-}
-
-/* A handful of the source exports contained a thin dark separator along their
-   upper edge. Clip only that edge within those isolated assets; do not enlarge
-   other worlds or reintroduce sprite row sampling. This is a one-time CSS trim. */
-.world-scene:is(
-  [data-world-art-row="2"],
-  [data-world-art-row="3"],
-  [data-world-art-row="4"],
-  [data-world-art-row="5"]
-) .world-scene-art {
-  background-size: auto 116%;
-  background-position-y: bottom;
-}
+/* Spartan and Mjolnir now use the fully illustrated ringworld artwork.
+   Do not draw a simplified artificial ellipse over its iconic installation. */
