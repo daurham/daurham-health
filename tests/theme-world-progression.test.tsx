@@ -1,5 +1,5 @@
 import React from 'react'
-import { readFileSync, statSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { THEME_PACKS } from '../src/theme.ts'
