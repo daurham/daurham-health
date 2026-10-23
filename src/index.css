@@ -1483,3 +1483,74 @@ html:not([data-health-palette='classic']) .xp-badge {
     transform: none;
   }
 }
+
+
+/* Today visual foundation: SVG scenery and components use semantic theme colors. */
+.today-hero {
+  position: relative; isolation: isolate; min-height: 205px; overflow: hidden;
+  border: 1px solid var(--health-border); border-radius: 1.35rem;
+  padding: 1.2rem 1.4rem;
+  background: radial-gradient(circle at 85% 10%, color-mix(in srgb, var(--health-accent-secondary) 21%, transparent), transparent 54%), linear-gradient(125deg, var(--health-surface-raised), var(--health-canvas));
+  box-shadow: 0 14px 38px -34px var(--health-glow);
+}
+.today-hero-art {
+  position: absolute; z-index: 0; right: -10%; bottom: -3px;
+  height: 100%; width: 74%; pointer-events: none;
+}
+.today-scene { display: none; }
+.today-scene--ridge { display: initial; }
+html[data-health-palette='ocean'] .today-scene--ridge,
+html[data-health-palette='grand-line'] .today-scene--ridge,
+html[data-health-palette='sun-god'] .today-scene--ridge,
+html[data-health-palette='aura'] .today-scene--ridge,
+html[data-health-palette='saiyan-dawn'] .today-scene--ridge,
+html[data-health-palette='super-saiyan-gold'] .today-scene--ridge,
+html[data-health-palette='spartan'] .today-scene--ridge,
+html[data-health-palette='namek-sky'] .today-scene--ridge,
+html[data-health-palette='clone-legion'] .today-scene--ridge,
+html[data-health-palette='silver-instinct'] .today-scene--ridge,
+html[data-health-palette='crimson-surge'] .today-scene--ridge,
+html[data-health-palette='mjolnir-night'] .today-scene--ridge,
+html[data-health-palette='republic-red'] .today-scene--ridge,
+html[data-health-palette='cosmic-instinct'] .today-scene--ridge,
+html[data-health-palette='astral-ascension'] .today-scene--ridge,
+html[data-health-palette='eclipse-sovereign'] .today-scene--ridge,
+html[data-health-palette='prismatic-apex'] .today-scene--ridge,
+html[data-health-palette='wasteland'] .today-scene--ridge,
+html[data-health-palette='vault-neon'] .today-scene--ridge { display: none; }
+html[data-health-palette='ocean'] .today-scene--ocean,
+html[data-health-palette='grand-line'] .today-scene--ocean,
+html[data-health-palette='sun-god'] .today-scene--ocean { display: initial; }
+html[data-health-palette='aura'] .today-scene--cosmos,
+html[data-health-palette='saiyan-dawn'] .today-scene--cosmos,
+html[data-health-palette='super-saiyan-gold'] .today-scene--cosmos,
+html[data-health-palette='spartan'] .today-scene--cosmos,
+html[data-health-palette='namek-sky'] .today-scene--cosmos,
+html[data-health-palette='clone-legion'] .today-scene--cosmos,
+html[data-health-palette='silver-instinct'] .today-scene--cosmos,
+html[data-health-palette='crimson-surge'] .today-scene--cosmos,
+html[data-health-palette='mjolnir-night'] .today-scene--cosmos,
+html[data-health-palette='republic-red'] .today-scene--cosmos,
+html[data-health-palette='cosmic-instinct'] .today-scene--cosmos,
+html[data-health-palette='astral-ascension'] .today-scene--cosmos,
+html[data-health-palette='eclipse-sovereign'] .today-scene--cosmos,
+html[data-health-palette='prismatic-apex'] .today-scene--cosmos { display: initial; }
+html[data-health-palette='wasteland'] .today-scene--wasteland,
+html[data-health-palette='vault-neon'] .today-scene--wasteland { display: initial; }
+.today-panel {
+  overflow: hidden; border: 1px solid var(--health-border);
+  border-radius: 1.15rem; background: var(--health-surface-raised);
+  box-shadow: 0 12px 30px -28px var(--health-glow);
+}
+.today-panel--featured {
+  background: radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--health-accent) 10%, transparent), transparent 56%), var(--health-surface-raised);
+}
+.today-panel-icon {
+  display: inline-flex; width: 1.95rem; height: 1.95rem;
+  align-items: center; justify-content: center; border-radius: .65rem;
+  background: var(--health-accent-muted); color: var(--health-accent); font-size: 1rem;
+}
+@media (max-width: 400px) {
+  .today-hero { min-height: 195px; padding: 1rem; }
+  .today-hero-art { right: -24%; width: 96%; opacity: .8; }
+}
