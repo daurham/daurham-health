@@ -48,6 +48,7 @@ import { applyTodayHydrationEvent } from './hydration-update'
 import { DAILY_PARTICIPATION_XP } from '@/domain/rewards'
 import { fetchGoalControl } from '@/features/goal-control/api'
 import { GoalControlCard } from '@/features/goal-control/GoalControlCard'
+import { TodayScenicHero, TodayDomainIcon } from './TodayVisuals'
 
 function formatCount(value: number): string {
   return Math.round(value).toLocaleString('en-US')
@@ -234,22 +235,29 @@ export function TodayBoard({
   }
 
   return (
-    <div className="space-y-3">
-      <div className="grid items-start gap-3 md:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)]">
+    <div className="space-y-4">
+      <TodayScenicHero view={view} />
+      <div className="grid items-stretch gap-3 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
         <NutritionCard view={view} onNutritionChanged={onNutritionChanged} />
-        <div className="space-y-3">
-          {onCoachState ? (
-            <CoachCard
-              state={coach ?? null}
-              pending={coachPending}
-              error={coachError}
-              onState={onCoachState}
-            />
-          ) : null}
-          <TrainingCard view={view} />
-        </div>
+        <TrainingCard view={view} />
       </div>
-
+      <section className="today-essentials" aria-labelledby="today-essentials-heading">
+        <h2 id="today-essentials-heading" className="today-essentials-title">Daily Essentials</h2>
+        <div className="grid items-start gap-3 md:grid-cols-2">
+          <DailyCheckInCard view={view} onWaterLogged={onWaterLogged} />
+          <SupplementsCard view={view} onChanged={onSupplementsChanged} />
+        </div>
+      </section>
+      {onCoachState ? (
+        <div className="min-w-0 min-h-40" aria-label="Coach">
+          <CoachCard
+            state={coach ?? null}
+            pending={coachPending}
+            error={coachError}
+            onState={onCoachState}
+          />
+        </div>
+      ) : null}
       {goalControl || goalControlPending || goalControlError ? (
         <GoalControlCard
           state={goalControl ?? null}
@@ -257,8 +265,6 @@ export function TodayBoard({
           error={goalControlError}
         />
       ) : null}
-
-      <DailyCheckInCard view={view} onWaterLogged={onWaterLogged} />
 
       {view.pendingItems.length > 0 || view.goalAttention.length > 0 ? (
         <section className="rounded-lg border border-warning/30 bg-amber-50 px-3 py-2.5">
@@ -282,7 +288,6 @@ export function TodayBoard({
         </section>
       ) : null}
 
-      <SupplementsCard view={view} onChanged={onSupplementsChanged} />
       <div className="grid items-start gap-3 md:grid-cols-3">
         <ActivityCard view={view} />
         <SleepCard view={view} />
@@ -421,10 +426,10 @@ function DailyCheckInCard({ view, onWaterLogged }: { view: TodayViewModel; onWat
   }
 
   return (
-    <section className="rounded-lg border border-zinc-200 bg-white p-4">
+    <section className="today-metric-card">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-info">Daily Log</h2>
+          <h2 className="today-metric-heading"><TodayDomainIcon domain="hydration" />Hydration &amp; Check-in</h2>
           <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-zinc-700">
             <span>Water {signals.hydration.tracked && signals.hydration.totalOz != null
               ? `${Math.round(signals.hydration.totalOz)}`
@@ -433,13 +438,14 @@ function DailyCheckInCard({ view, onWaterLogged }: { view: TodayViewModel; onWat
             <span>Energy {signals.wellness.energy ?? '—'}{signals.wellness.energy != null ? '/5' : ''}</span>
             <span>Hunger {signals.wellness.hunger ?? '—'}{signals.wellness.hunger != null ? '/5' : ''}</span>
             <span>Soreness {signals.wellness.soreness ?? '—'}{signals.wellness.soreness != null ? '/5' : ''}</span>
+            <span>Stress {signals.wellness.stress ?? '—'}{signals.wellness.stress != null ? '/5' : ''}</span>
           </div>
           {waterProgress ? (
             <div className="mt-2" role="progressbar" aria-label="Today's water goal progress"
               aria-valuemin={0} aria-valuemax={100}
               aria-valuenow={Math.min(100, waterProgress.progressPercent)}>
-              <div className="h-2 overflow-hidden rounded-full bg-zinc-200">
-                <div className="h-full rounded-full bg-info" style={{
+              <div className="today-progress-track">
+                <div className="today-progress-fill" style={{
                   width: `${Math.min(100, waterProgress.progressPercent)}%`,
                 }} />
               </div>
@@ -536,9 +542,9 @@ function SupplementsCard({ view, onChanged }: { view: TodayViewModel; onChanged?
   }
 
   return (
-    <section className="min-w-0 rounded-lg border border-zinc-200 bg-white p-4">
+    <section className="today-metric-card">
       <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Supplements <span className="ml-1 text-reward">+{DAILY_PARTICIPATION_XP.supplements} XP/day</span></h2>
+        <h2 className="today-metric-heading"><TodayDomainIcon domain="supplements" />Supplements <span className="ml-1 text-reward">+{DAILY_PARTICIPATION_XP.supplements} XP/day</span></h2>
         <div className="flex items-center gap-2">
           <p className="text-sm text-zinc-600">{summary.kind === 'complete' ? `✓ ${summaryText}` : summaryText}</p>
           {resolved ? (
@@ -625,10 +631,15 @@ function SupplementsCard({ view, onChanged }: { view: TodayViewModel; onChanged?
 }
 
 function Card({ title, children, hero = false }: { title: string; children: ReactNode; hero?: boolean }) {
+  const domain: 'nutrition' | 'training' | 'activity' | 'sleep' | 'body' =
+    title === 'Nutrition' ? 'nutrition' :
+    title === 'Training' ? 'training' :
+    title === 'Activity' ? 'activity' :
+    title === 'Sleep' ? 'sleep' : 'body'
   return (
-    <section className={hero ? 'health-hero-surface health-raised-surface min-w-0 rounded-xl border border-zinc-200 p-4 sm:p-5' : 'min-w-0 rounded-lg border border-zinc-200 bg-white p-4'}>
-      <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{title}</h2>
-      <div className="mt-2 text-sm text-zinc-800">{children}</div>
+    <section className={hero ? 'today-metric-card today-metric-card--hero' : 'today-metric-card'}>
+      <h2 className="today-metric-heading"><TodayDomainIcon domain={domain} />{title}</h2>
+      <div className="mt-3 text-sm text-zinc-800">{children}</div>
     </section>
   )
 }
@@ -665,14 +676,14 @@ function NutrientMeter({
   const width = Math.min(ratio, 1) * 100
   return (
     <div
-      className="mt-1 h-1.5 overflow-hidden rounded-full bg-zinc-200"
+      className="mt-1 today-progress-track"
       role="meter"
       aria-label={label}
       aria-valuemin={0}
       aria-valuemax={target}
       aria-valuenow={consumed}
     >
-      <div className="motion-meter h-full rounded-full bg-accent" style={{ width: `${width}%` }} />
+      <div className="motion-meter today-progress-fill" style={{ width: `${width}%` }} />
     </div>
   )
 }
