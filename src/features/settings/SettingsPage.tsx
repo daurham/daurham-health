@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
+import { ThemeWorldArtwork } from '@/features/today/ThemeWorldArtwork'
 import { Link, useLocation } from 'react-router-dom'
 import { parseAppleHealthFile, previewAppleHealth } from '@/domain/apple-health'
 import { formatCalendarRange } from '@/domain/calendar-format'
@@ -21,6 +22,8 @@ import {
   writePalettePreference,
   writeThemePreference,
   themePackUnlocked,
+  themePack,
+  type ThemePack,
   type HealthPalette,
   type ThemeModePreference,
 } from '@/theme'
@@ -62,6 +65,36 @@ function prefersDark(): boolean {
     : false
 }
 
+/** A scenic teaser uses the same artwork as Today without selecting a locked pack. */
+function ThemeWorldPreview({ pack, label, resolvedMode }: {
+  pack: ThemePack
+  label: string
+  resolvedMode: 'light' | 'dark'
+}) {
+  const dark = resolvedMode === 'dark'
+  const surface = dark ? '#191b23' : pack.preview.surface
+  const style = {
+    '--health-accent': pack.preview.accent,
+    '--health-accent-secondary': pack.preview.secondary,
+    '--health-accent-muted': dark ? '#272a38' : pack.preview.canvas,
+    '--health-surface-raised': surface,
+    '--health-text': dark ? '#f3f4f7' : '#22232a',
+    '--health-text-muted': dark ? '#d3d5df' : '#4b4d58',
+    '--health-border': dark ? '#414450' : '#d7dae0',
+    '--health-reward': pack.preview.reward,
+  } as CSSProperties
+  return (
+    <div className="theme-world-preview" data-scene-palette={pack.id} style={style}>
+      <ThemeWorldArtwork />
+      <div className="theme-world-preview-copy">
+        <p className="theme-world-preview-label">{label}</p>
+        <p className="theme-world-preview-name">{pack.label}</p>
+        <p className="theme-world-preview-detail">A world of its own</p>
+      </div>
+    </div>
+  )
+}
+
 function AppearanceSection() {
   const [mode, setMode] = useState<ThemeModePreference>(storedMode)
   const [palette, setPalette] = useState<HealthPalette>(storedPalette)
@@ -69,6 +102,8 @@ function AppearanceSection() {
   const { summary } = useRewardSummary(true)
   const progression = progressionState(summary?.lifetimeXp ?? 0)
   const resolvedMode = resolveTheme(mode, systemDark)
+  const activePack = themePack(palette)
+  const nextPack = summary && progression.nextThemeUnlock ? themePack(progression.nextThemeUnlock.id) : null
 
   useEffect(() => {
     if (typeof window.matchMedia !== 'function') return
@@ -115,6 +150,13 @@ function AppearanceSection() {
             <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Level {progression.level}</p>
             <XpAmount amount={summary.lifetimeXp} badge={false} className="mt-1 text-sm" label={String(summary.lifetimeXp) + ' lifetime XP'} />
           </div>
+        ) : null}
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2" aria-label="Theme world gallery">
+        <ThemeWorldPreview pack={activePack} label="Your current world" resolvedMode={resolvedMode} />
+        {nextPack ? (
+          <ThemeWorldPreview pack={nextPack} label={'Next unlock · Level ' + nextPack.unlockLevel} resolvedMode={resolvedMode} />
         ) : null}
       </div>
 
