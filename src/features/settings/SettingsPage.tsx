@@ -1,5 +1,5 @@
 import { useEffect, useState, type CSSProperties } from 'react'
-import { ThemeWorldArtwork } from '@/features/today/ThemeWorldArtwork'
+import { IllustratedWorld, worldStageAtLevel, worldNextStageLevel } from '@/features/today/IllustratedWorld'
 import { Link, useLocation } from 'react-router-dom'
 import { parseAppleHealthFile, previewAppleHealth } from '@/domain/apple-health'
 import { formatCalendarRange } from '@/domain/calendar-format'
@@ -66,12 +66,16 @@ function prefersDark(): boolean {
 }
 
 /** A scenic teaser uses the same artwork as Today without selecting a locked pack. */
-function ThemeWorldPreview({ pack, label, resolvedMode }: {
+function ThemeWorldPreview({ pack, label, resolvedMode, currentLevel, locked = false }: {
   pack: ThemePack
   label: string
   resolvedMode: 'light' | 'dark'
+  currentLevel: number
+  locked?: boolean
 }) {
   const dark = resolvedMode === 'dark'
+  const stage = locked ? 'base' : worldStageAtLevel(pack.unlockLevel, currentLevel)
+  const nextStageAt = locked ? null : worldNextStageLevel(pack.unlockLevel, currentLevel)
   const surface = dark ? '#191b23' : pack.preview.surface
   const style = {
     '--health-accent': pack.preview.accent,
@@ -85,11 +89,14 @@ function ThemeWorldPreview({ pack, label, resolvedMode }: {
   } as CSSProperties
   return (
     <div className="theme-world-preview" data-scene-palette={pack.id} style={style}>
-      <ThemeWorldArtwork palette={pack.id} />
+      <IllustratedWorld palette={pack.id} stage={stage} />
       <div className="theme-world-preview-copy">
         <p className="theme-world-preview-label">{label}</p>
         <p className="theme-world-preview-name">{pack.label}</p>
-        <p className="theme-world-preview-detail">A world of its own</p>
+        <p className="theme-world-preview-detail">
+          {locked ? 'Unlock to activate' : stage === 'base' ? 'Base atmosphere' : stage === 'awakened' ? 'Awakened atmosphere' : 'Ascended atmosphere'}
+          {nextStageAt ? ' · next at Level ' + nextStageAt : ''}
+        </p>
       </div>
     </div>
   )
@@ -154,9 +161,9 @@ function AppearanceSection() {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2" aria-label="Theme world gallery">
-        <ThemeWorldPreview pack={activePack} label="Your current world" resolvedMode={resolvedMode} />
+        <ThemeWorldPreview pack={activePack} label="Your current world" resolvedMode={resolvedMode} currentLevel={progression.level} />
         {nextPack ? (
-          <ThemeWorldPreview pack={nextPack} label={'Next unlock · Level ' + nextPack.unlockLevel} resolvedMode={resolvedMode} />
+          <ThemeWorldPreview pack={nextPack} label={'Next unlock · Level ' + nextPack.unlockLevel} resolvedMode={resolvedMode} currentLevel={progression.level} locked />
         ) : null}
       </div>
 
@@ -187,7 +194,7 @@ function AppearanceSection() {
         <div className="flex flex-wrap items-end justify-between gap-2">
           <div>
             <p className="text-sm font-medium text-zinc-700">Theme packs</p>
-            <p className="mt-0.5 text-xs text-zinc-500">Lifetime XP unlocks new packs. Unlocking never spends XP.</p>
+            <p className="mt-0.5 text-xs text-zinc-500">Lifetime XP unlocks new packs. Each world evolves from Base to Awakened (+2 levels) and Ascended (+4 levels). XP is never spent.</p>
           </div>
           {progression.nextThemeUnlock ? (
             <p className="text-xs text-zinc-500">
@@ -229,7 +236,7 @@ function AppearanceSection() {
                   } as CSSProperties}
                   aria-hidden="true"
                 >
-                  <ThemeWorldArtwork palette={pack.id} />
+                  <IllustratedWorld palette={pack.id} stage={unlocked && summary ? worldStageAtLevel(pack.unlockLevel, progression.level) : 'base'} />
                 </div>
                 <div className="bg-white p-3">
                   <div className="flex items-center justify-between gap-2">
@@ -239,6 +246,14 @@ function AppearanceSection() {
                     </span>
                   </div>
                   <p className="mt-1 text-xs leading-5 text-zinc-600">{pack.flavor}</p>
+                  <div className="world-evolution-indicator" aria-label={'Artwork evolution: ' + (unlocked && summary ? worldStageAtLevel(pack.unlockLevel, progression.level) : 'locked at base')}>
+                    {(['base', 'awakened', 'ascended'] as const).map((tier, i) => {
+                      const stage = unlocked && summary ? worldStageAtLevel(pack.unlockLevel, progression.level) : 'base'
+                      const stages = ['base', 'awakened', 'ascended'] as const
+                      return <span key={tier} className={i <= stages.indexOf(stage) && unlocked ? 'world-evolution-indicator__step is-active' : 'world-evolution-indicator__step'}
+                        title={tier[0].toUpperCase() + tier.slice(1)} />
+                    })}
+                  </div>
                 </div>
               </button>
             )
