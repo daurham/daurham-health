@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react'
+import './theme-world-hydration.css'
 import type { HealthPalette } from '@/theme'
 import { WORLD_SCENE_ROW, type WorldMood, type WorldStage } from './theme-worlds'
 
