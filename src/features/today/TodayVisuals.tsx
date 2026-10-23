@@ -1,12 +1,21 @@
 import type { ReactNode } from 'react'
 import type { TodayViewModel } from '@/domain/today'
-import { ThemeWorldArtwork } from './ThemeWorldArtwork'
+import { ThemeWorldScene } from './ThemeWorldScene'
+import { worldStage } from './theme-worlds'
+import { useRewardSummary } from '@/features/rewards/useRewardSummary'
+import { useDemoReadOnly } from '@/lib'
+import { readPalettePreference, themePackUnlockLevel, type HealthPalette } from '@/theme'
 
 /** Purely decorative, token-driven artwork. No external image requests or AI calls. */
 export function TodayScenicHero({ view }: { view: TodayViewModel }) {
+  const readOnly = useDemoReadOnly()
+  const { summary } = useRewardSummary(!readOnly)
+  const palette: HealthPalette = typeof localStorage === 'undefined' ? 'classic' : readPalettePreference(localStorage)
+  const currentLevel = summary?.level ?? 1
+  const stage = worldStage(themePackUnlockLevel(palette), currentLevel)
   return (
     <section className="today-scenic-hero" aria-label="Today's health overview">
-      <ThemeWorldArtwork date={view.date} />
+      <ThemeWorldScene palette={palette} stage={stage} completed={view.training.logged} date={view.date} />
       <div className="today-scenic-content">
         <p className="today-scenic-eyebrow">YOUR HEALTH, IN FOCUS</p>
         <h2 className="today-scenic-heading">Make today count.</h2>
