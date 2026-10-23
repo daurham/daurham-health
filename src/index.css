@@ -2036,3 +2036,19 @@ html[data-health-palette='prismatic-apex'] .today-world-motto { display: block; 
 .theme-world-preview--tile { height: 6.8rem; }
 .theme-world-preview--tile .world-scene-art { background-position-x: center !important; }
 .theme-world-unlock-note { font-size: .68rem; color: var(--health-text-muted); margin-top: .35rem; }
+
+
+/* Passive daypart lighting affects imagery only; content contrast is unchanged.
+   Today's local device clock is sampled on mount/focus (no polling). */
+.world-scene::after {
+  content: '';
+  position: absolute; inset: 0;
+  pointer-events: none;
+  background: #17253b; opacity: 0;
+}
+.world-scene[data-world-mood="night"]::after { opacity: .26; }
+.world-scene[data-world-mood="daybreak"]::after {
+  background: var(--health-reward); opacity: .07;
+}
+.world-scene[data-world-mood="day"]::after { opacity: 0; }
+.world-scene[data-world-mood="dusk"]::after { opacity: .10; }
