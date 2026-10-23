@@ -205,7 +205,13 @@ export function CoachCard({ state, pending, error, onState }: {
   }
 
   const { value: displayedIntelligence, stale: guidanceStale } = coachIntelligencePresentation(state, pending, error, intelligenceError, intelligence)
-  const guidanceLoading = !!state && !intelligence && !intelligenceError
+  // Empty Coach state must remain quiet: awaiting optional intelligence alone
+  // is not an actionable mission and should not insert an empty-height panel.
+  const hasVisibleCoachWork = !!state && (
+    !!state.dailyQuest || !!state.weeklyFocus || !!state.stretchQuest ||
+    (state.labItems?.length ?? 0) > 0 || (state.labOverflowCount ?? 0) > 0
+  )
+  const guidanceLoading = hasVisibleCoachWork && !intelligence && !intelligenceError
 
   // Do not expose old quests during reload or after its failure.
   if (pending && !state) return (
