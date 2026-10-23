@@ -36,3 +36,10 @@ export function worldMoodForHour(hour: number): WorldMood {
   if (hour >= 17 && hour < 21) return 'dusk'
   return 'night'
 }
+
+/** A hydration effect requires a real positive goal and valid observations. */
+export function isHydrationGoalMet(totalOz: number | null | undefined, goalOz: number | null | undefined): boolean {
+  return typeof totalOz === 'number' && Number.isFinite(totalOz)
+    && typeof goalOz === 'number' && Number.isFinite(goalOz)
+    && goalOz > 0 && totalOz >= goalOz
+}
