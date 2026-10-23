@@ -49,6 +49,8 @@ import { DAILY_PARTICIPATION_XP } from '@/domain/rewards'
 import { fetchGoalControl } from '@/features/goal-control/api'
 import { GoalControlCard } from '@/features/goal-control/GoalControlCard'
 import { TodayScenicHero, TodayDomainIcon } from './TodayVisuals'
+import { fetchTrainingPlan } from '@/features/training/api'
+import type { TrainingPlanView } from '@/domain/training-plan'
 
 function formatCount(value: number): string {
   return Math.round(value).toLocaleString('en-US')
@@ -429,60 +431,70 @@ function DailyCheckInCard({ view, onWaterLogged }: { view: TodayViewModel; onWat
 
   return (
     <section className="today-metric-card">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="today-metric-heading"><TodayDomainIcon domain="hydration" />Hydration &amp; Daily Log</h2>
-          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-zinc-700">
-            <span>Water {signals.hydration.tracked && signals.hydration.totalOz != null
-              ? `${Math.round(signals.hydration.totalOz)}`
-              : '—'}{signals.hydration.goalOz != null ? ` / ${signals.hydration.goalOz} oz` : ' oz'}</span>
-            <span>Bowel {bowelText}</span>
-            <span>Energy {signals.wellness.energy ?? '—'}{signals.wellness.energy != null ? '/5' : ''}</span>
-            <span>Hunger {signals.wellness.hunger ?? '—'}{signals.wellness.hunger != null ? '/5' : ''}</span>
-            <span>Soreness {signals.wellness.soreness ?? '—'}{signals.wellness.soreness != null ? '/5' : ''}</span>
-            <span>Stress {signals.wellness.stress ?? '—'}{signals.wellness.stress != null ? '/5' : ''}</span>
-          </div>
-          {waterProgress ? (
-            <div className="mt-2" role="progressbar" aria-label="Today's water goal progress"
-              aria-valuemin={0} aria-valuemax={100}
-              aria-valuenow={Math.min(100, waterProgress.progressPercent)}>
-              <div className="today-progress-track">
-                <div className="today-progress-fill" style={{
-                  width: `${Math.min(100, waterProgress.progressPercent)}%`,
-                }} />
-              </div>
-              <p className="mt-1 text-xs text-zinc-600">{waterProgress.progressPercent}% of daily water goal</p>
-            </div>
-          ) : null}
-          {view.context.recorded ? (
-            <p className="mt-2 text-sm text-zinc-600">
-              Context: {view.context.tags.length > 0 ? view.context.tags.map(dailyContextTagLabel).join(' · ') : view.context.note ?? 'Recorded'}
-            </p>
-          ) : null}
-        </div>
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="today-metric-heading"><TodayDomainIcon domain="hydration" />Hydration &amp; Daily Log</h2>
         {readOnly ? null : <Link to={checkInHref} className={quietButtonClass}>Open</Link>}
       </div>
-      {readOnly ? null : (
-        <div className="mt-3 flex flex-wrap gap-2">
-          {[8, 16, 24].map((amount) => (
-            <button
-              key={amount}
-              type="button"
-              disabled={busyAmount != null}
-              className={quietButtonClass}
-              onClick={() => void quickWater(amount)}
-            >
-              {busyAmount === amount ? 'Logging…' : `+${amount} oz`}
-            </button>
-          ))}
-          <Link to={checkInHref} className={quietButtonClass}>Bowel / wellness</Link>
-          <Link to={contextHref} className={quietButtonClass}>{view.context.recorded ? 'Edit context' : 'Add context'}</Link>
+      <div className="mt-4 rounded-xl bg-accent-muted/50 p-3">
+        <div className="flex flex-wrap items-end justify-between gap-x-3 gap-y-1">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Hydration</p>
+            <p className="mt-1 text-2xl font-bold tracking-tight text-zinc-900">
+              {'Water ' + (signals.hydration.tracked && signals.hydration.totalOz != null ? String(Math.round(signals.hydration.totalOz)) : '—') +
+                (signals.hydration.goalOz != null ? ' / ' + signals.hydration.goalOz + ' oz' : ' oz')}
+            </p>
+          </div>
+          {waterProgress ? <span className="text-sm font-semibold text-accent">{waterProgress.progressPercent}% of goal</span> : null}
         </div>
-      )}
+        {waterProgress ? (
+          <div className="today-progress-track mt-3" role="progressbar" aria-label="Today's water goal progress"
+            aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(100, waterProgress.progressPercent)}>
+            <div className="today-progress-fill" style={{ width: String(Math.min(100, waterProgress.progressPercent)) + '%' }} />
+          </div>
+        ) : null}
+        {readOnly ? null : (
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            {[8, 16, 24].map((amount) => (
+              <button key={amount} type="button" disabled={busyAmount != null}
+                className="motion-pressable min-h-11 rounded-lg border border-accent/20 bg-white px-2 text-sm font-semibold text-accent hover:bg-accent-muted disabled:opacity-50"
+                onClick={() => void quickWater(amount)}>
+                {busyAmount === amount ? 'Logging…' : '+' + amount + ' oz'}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      <div className="mt-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm font-semibold text-zinc-900">Daily check-in</p>
+          {readOnly ? null : <Link to={checkInHref} className={quietButtonClass}>Edit ratings</Link>}
+        </div>
+        <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {([
+            ['Energy', signals.wellness.energy],
+            ['Stress', signals.wellness.stress],
+            ['Hunger', signals.wellness.hunger],
+            ['Soreness', signals.wellness.soreness],
+          ] as const).map(([name, value]) => (
+            <div key={name} className="today-wellness-stat">
+              <span>{name}</span>
+              <strong>{name + ' ' + (value == null ? '—' : value + '/5')}</strong>
+            </div>
+          ))}
+        </div>
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm text-zinc-700">{'Bowel ' + bowelText}</p>
+          {readOnly ? null : <Link to={checkInHref} className={quietButtonClass}>Bowel / wellness</Link>}
+        </div>
+        {view.context.recorded ? (
+          <p className="mt-2 text-sm text-zinc-600">
+            Context: {view.context.tags.length > 0 ? view.context.tags.map(dailyContextTagLabel).join(' · ') : view.context.note ?? 'Recorded'}
+          </p>
+        ) : null}
+        {readOnly ? null : <Link to={contextHref} className={quietButtonClass}>{view.context.recorded ? 'Edit context' : 'Add context'}</Link>}
+      </div>
       {error ? <p className="mt-2 text-sm text-red-700">{error}</p> : null}
-      {empty ? (
-        <p className="mt-2 text-xs text-zinc-500">Nothing tracked yet. Missing is not treated as zero.</p>
-      ) : null}
+      {empty ? <p className="mt-2 text-xs text-zinc-500">Nothing tracked yet. Missing is not treated as zero.</p> : null}
     </section>
   )
 }
@@ -839,11 +851,58 @@ function NutritionTotals({
   )
 }
 
+/** Start the existing flexible rotation, without treating any calendar day as mandatory. */
+function NextRoutineAction() {
+  const readOnly = useDemoReadOnly()
+  const prefix = useAppPathPrefix()
+  const [plan, setPlan] = useState<TrainingPlanView | null>(null)
+  useEffect(() => {
+    if (readOnly) return
+    let mounted = true
+    let generation = 0
+    const refresh = () => {
+      const request = ++generation
+      void fetchTrainingPlan().then((value) => {
+        if (mounted && request === generation) setPlan(value)
+      }).catch(() => undefined)
+    }
+    refresh()
+    const unsubscribe = subscribeHealthDataChanges(refresh)
+    return () => {
+      mounted = false
+      generation += 1
+      unsubscribe()
+    }
+  }, [readOnly])
+
+  if (readOnly) return null
+  const next = plan?.configured ? plan.nextSession : null
+  return (
+    <div className="mt-3 min-h-32 rounded-xl bg-accent-muted/50 p-3">
+      <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Next in rotation · optional</p>
+      {next?.available && next.templateId ? (
+        <>
+          <p className="mt-1 font-semibold text-zinc-900">{next.name}</p>
+          <Link to={prefixedPath(prefix, '/training/new?template=' + encodeURIComponent(next.templateId))}
+            className="motion-pressable mt-2 inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-accent px-3 text-center text-sm font-semibold text-accent-fg">
+            Start {next.name}
+          </Link>
+        </>
+      ) : (
+        <Link to={prefixedPath(prefix, '/training/plan')} className="mt-2 inline-flex min-h-11 items-center text-sm font-medium text-accent">
+          {plan ? 'View training plan' : 'Loading your rotation…'}
+        </Link>
+      )}
+    </div>
+  )
+}
+
 function TrainingCard({ view }: { view: TodayViewModel }) {
   const prefix = useAppPathPrefix()
   const readOnly = useDemoReadOnly()
   return (
     <Card title="Training">
+      <div className="space-y-3">
       {view.training.logged ? (
         <ul className="space-y-3">
           {view.training.sessions.map((session) => (
@@ -870,6 +929,8 @@ function TrainingCard({ view }: { view: TodayViewModel }) {
           )}
         </>
       )}
+        <NextRoutineAction />
+      </div>
     </Card>
   )
 }
