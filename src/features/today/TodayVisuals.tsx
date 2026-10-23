@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import type { TodayViewModel } from '@/domain/today'
 import { ThemeWorldScene } from './ThemeWorldScene'
-import { worldStage, worldMoodForHour } from './theme-worlds'
+import { worldStage, worldMoodForHour, isHydrationGoalMet } from './theme-worlds'
 import { useRewardSummary } from '@/features/rewards/useRewardSummary'
 import { useDemoReadOnly } from '@/lib/app-prefix'
 import { progressionState } from '@/domain/progression'
@@ -21,9 +21,11 @@ export function TodayScenicHero({ view }: { view: TodayViewModel }) {
   const palette: HealthPalette = typeof localStorage === 'undefined' ? 'classic' : readPalettePreference(localStorage)
   const currentLevel = progressionState(summary?.lifetimeXp ?? 0).level
   const stage = worldStage(themePackUnlockLevel(palette), currentLevel)
+  const hydration = view.dailySignals?.hydration
+  const hydrated = isHydrationGoalMet(hydration?.totalOz, hydration?.goalOz)
   return (
     <section className="today-scenic-hero" aria-label="Today's health overview">
-      <ThemeWorldScene palette={palette} stage={stage} completed={view.training.logged} mood={mood} />
+      <ThemeWorldScene palette={palette} stage={stage} completed={view.training.logged} hydrated={hydrated} mood={mood} />
       <div className="today-scenic-content">
         <p className="today-scenic-eyebrow">YOUR HEALTH, IN FOCUS</p>
         <h2 className="today-scenic-heading">Make today count.</h2>
