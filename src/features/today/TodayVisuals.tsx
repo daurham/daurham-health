@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import type { TodayViewModel } from '@/domain/today'
 import { useRewardSummary } from '@/features/rewards/useRewardSummary'
+import { useDemoReadOnly } from '@/lib/app-prefix'
 import { progressionState } from '@/domain/progression'
 import { themePack } from '@/theme'
 import { IllustratedWorld, useSelectedWorldPalette, useWorldMood, worldStageAtLevel } from './IllustratedWorld'
@@ -9,7 +10,8 @@ import { IllustratedWorld, useSelectedWorldPalette, useWorldMood, worldStageAtLe
 export function TodayScenicHero({ view }: { view: TodayViewModel }) {
   const palette = useSelectedWorldPalette()
   const mood = useWorldMood()
-  const { summary } = useRewardSummary(true)
+  const demo = useDemoReadOnly()
+  const { summary } = useRewardSummary(!demo)
   const level = progressionState(summary?.lifetimeXp ?? 0).level
   const stage = summary ? worldStageAtLevel(themePack(palette).unlockLevel, level) : 'base'
   const trained = view.training.logged || view.activity.workouts.length > 0
