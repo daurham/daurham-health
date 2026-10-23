@@ -1933,8 +1933,8 @@ html[data-health-palette='prismatic-apex'] .today-world-motto { display: block; 
 .theme-world-preview--tile .today-scene-art { width: 105%; }
 
 
-/* Premium theme worlds: one locally bundled artwork atlas, never a screenshot
-   of UI. Base is quiet and desaturated. Permanent XP stages reveal themed hues.
+/* Premium theme worlds: individually cropped scene assets prevent atlas row bleed
+   at all mobile and desktop sizes. Permanent XP stages reveal themed hues.
    Finite optional daily celebrations add light without punishing missed goals. */
 .world-scene {
   position: absolute;
@@ -1949,9 +1949,9 @@ html[data-health-palette='prismatic-apex'] .today-world-motto { display: block; 
 .world-scene-art {
   position: absolute;
   inset: 0;
-  background-image: url('/theme/worlds-v1.webp');
   background-repeat: no-repeat;
-  background-size: auto 800%;
+  background-size: cover;
+  background-position: center;
   filter: grayscale(1) saturate(var(--world-saturation)) brightness(var(--world-brightness)) contrast(1.08);
   transition: filter 450ms ease;
 }
@@ -2067,4 +2067,17 @@ html[data-health-palette='prismatic-apex'] .today-world-motto { display: block; 
   transform: rotate(-23deg);
   opacity: .40;
   pointer-events: none;
+}
+
+/* A handful of the source exports contained a thin dark separator along their
+   upper edge. Clip only that edge within those isolated assets; do not enlarge
+   other worlds or reintroduce sprite row sampling. This is a one-time CSS trim. */
+.world-scene:is(
+  [data-world-art-row="2"],
+  [data-world-art-row="3"],
+  [data-world-art-row="4"],
+  [data-world-art-row="5"]
+) .world-scene-art {
+  background-size: auto 116%;
+  background-position-y: bottom;
 }

@@ -1,17 +1,33 @@
 import React from 'react'
-import { readFileSync, statSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { THEME_PACKS } from '../src/theme.ts'
 import { ThemeWorldScene } from '../src/features/today/ThemeWorldScene.tsx'
-import { WORLD_SCENE_ROW, worldStage, worldNextStageLevel, isHydrationGoalMet } from '../src/features/today/theme-worlds.ts'
+import { WORLD_SCENE_ROW, WORLD_SCENE_IMAGES, worldSceneImage, worldStage, worldNextStageLevel, isHydrationGoalMet } from '../src/features/today/theme-worlds.ts'
 
 describe('Premium theme-world progression', () => {
-  it('has a real optimized asset and maps every existing theme to one of eight distinct environments', () => {
-    expect(statSync('public/theme/worlds-v1.webp').size).toBeLessThan(80_000)
+  it('maps every theme to an independent, valid, and optimized WebP scene', () => {
+    expect(WORLD_SCENE_IMAGES).toHaveLength(8)
+    expect(new Set(WORLD_SCENE_IMAGES).size).toBe(8)
     expect(Object.keys(WORLD_SCENE_ROW)).toHaveLength(THEME_PACKS.length)
-    for (const p of THEME_PACKS) expect(WORLD_SCENE_ROW[p.id]).toBeGreaterThanOrEqual(0)
-    for (const row of Object.values(WORLD_SCENE_ROW)) expect(row).toBeLessThan(8)
+    let total = 0
+    for (const path of WORLD_SCENE_IMAGES) {
+      expect(path.startsWith('/theme/worlds/')).toBe(true)
+      expect(path.endsWith('.webp')).toBe(true)
+      const file = readFileSync('public' + path)
+      expect(file.toString('ascii', 0, 4)).toBe('RIFF')
+      expect(file.toString('ascii', 8, 12)).toBe('WEBP')
+      expect(file.byteLength).toBeLessThan(16_000)
+      total += file.byteLength
+    }
+    expect(total).toBeLessThan(80_000)
+    for (const pack of THEME_PACKS) {
+      expect(WORLD_SCENE_ROW[pack.id]).toBeGreaterThanOrEqual(0)
+      expect(WORLD_SCENE_ROW[pack.id]).toBeLessThan(8)
+      expect(WORLD_SCENE_IMAGES).toContain(worldSceneImage(pack.id))
+      expect(renderToStaticMarkup(<ThemeWorldScene palette={pack.id} />)).toContain(worldSceneImage(pack.id))
+    }
   })
   it('preserves XP unlocks and only upgrades a selected world at fixed later levels', () => {
     expect(worldStage(10, 10)).toBe('base')
@@ -46,7 +62,9 @@ describe('Premium theme-world progression', () => {
 
   it('keeps motion finite and accessible and avoids runtime image generation', () => {
     const css = readFileSync('src/index.css','utf8')
-    expect(css).toContain("url('/theme/worlds-v1.webp')")
+    expect(css).toContain('background-size: cover;')
+    expect(css).not.toContain('worlds-v1.webp')
+    expect(css).not.toContain('background-size: auto 800%')
     expect(css).toContain('@media (prefers-reduced-motion: reduce)')
     expect(css).toContain('animation: world-reward-drift 3s ease-in-out 2')
     expect(css).not.toContain('animation-iteration-count: infinite')

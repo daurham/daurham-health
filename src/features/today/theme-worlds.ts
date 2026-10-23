@@ -1,7 +1,7 @@
 import type { HealthPalette } from '@/theme'
 
-/** Indexed vertical atlas: eight 720x124 scenes within one ~50 KB WebP.
- * One HTTP asset and no per-theme image downloads. */
+/** Stable scene selection; every environment now lives in its own 720x124 WebP.
+ * Keeping the existing index preserves every franchise-to-world association. */
 export const WORLD_SCENE_ROW: Record<HealthPalette, number> = {
   classic: 6, forest: 1, ocean: 0, sunset: 0, plum: 7,
   aura: 7, 'saiyan-dawn': 3, 'grand-line': 0, 'hidden-leaf': 1,
@@ -10,6 +10,23 @@ export const WORLD_SCENE_ROW: Record<HealthPalette, number> = {
   'sun-god': 0, 'sage-storm': 1, 'mjolnir-night': 7, 'vault-neon': 4,
   'abyss-knight': 6, 'republic-red': 5, 'cosmic-instinct': 3,
   'astral-ascension': 7, 'eclipse-sovereign': 7, 'prismatic-apex': 7,
+}
+
+/** Isolated images guarantee that no neighboring scene can bleed into a card,
+ * even when CSS sizes change between Today, theme tiles and tiny previews. */
+export const WORLD_SCENE_IMAGES = [
+  '/theme/worlds/grand-line.webp',
+  '/theme/worlds/hidden-leaf.webp',
+  '/theme/worlds/clone-legion.webp',
+  '/theme/worlds/dragon.webp',
+  '/theme/worlds/wasteland.webp',
+  '/theme/worlds/republic-red.webp',
+  '/theme/worlds/bonfire.webp',
+  '/theme/worlds/astral.webp',
+] as const
+
+export function worldSceneImage(palette: HealthPalette): string {
+  return WORLD_SCENE_IMAGES[WORLD_SCENE_ROW[palette]]
 }
 
 export type WorldStage = 'base' | 'awakened' | 'ascended'

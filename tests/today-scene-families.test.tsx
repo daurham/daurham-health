@@ -14,12 +14,13 @@ const sources: TodaySources = {
 }
 
 describe('Today scene families and daily priorities', () => {
-  it('has independent token-colored premium scenery from a single local atlas', () => {
+  it('has independently cropped, token-colored scenery without atlas row bleed', () => {
     const hero = renderToStaticMarkup(<TodayScenicHero view={buildTodayView(sources)} />)
     const css = readFileSync('src/index.css', 'utf8')
     expect(hero).toContain('world-scene-art')
     expect(hero).toContain('data-world-palette=')
-    expect(css).toContain("url('/theme/worlds-v1.webp')")
+    expect(hero).toContain('/theme/worlds/bonfire.webp')
+    expect(css).toContain('background-size: cover;')
     expect(css).toContain("data-health-palette='grand-line'")
     expect(css).toContain("data-health-palette='cosmic-instinct'")
     expect(css).toContain("data-health-palette='wasteland'")
