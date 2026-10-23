@@ -15,7 +15,7 @@ const sources: TodaySources = {
 
 describe('Today scene families and daily priorities', () => {
   it('has independently cropped, token-colored scenery without atlas row bleed', () => {
-    const hero = renderToStaticMarkup(<TodayScenicHero view={buildTodayView(sources)} />)
+    const hero = renderToStaticMarkup(<MemoryRouter><TodayScenicHero view={buildTodayView(sources)} /></MemoryRouter>)
     const css = readFileSync('src/index.css', 'utf8')
     expect(hero).toContain('world-scene-art')
     expect(hero).toContain('data-world-palette=')
@@ -34,6 +34,10 @@ describe('Today scene families and daily priorities', () => {
     expect(html.indexOf('Health trends')).toBeLessThan(html.indexOf('Resting HR'))
     expect(html.indexOf('Next in rotation')).toBeLessThan(html.indexOf('Ad-hoc workout'))
     expect(html).toContain('Add food')
+    expect(html).toContain('+8 oz water')
+    expect(html).toContain('Training options')
+    expect(html).not.toContain('Make today count.')
+    expect((html.match(/today-command-next/g) ?? []).length).toBe(1)
     expect(html).toContain('Bowel / wellness')
   })
 })
