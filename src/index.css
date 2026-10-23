@@ -1,5 +1,12 @@
 @import "tailwindcss";
 
+/* The theme canvas also covers browser overscroll and any area behind the app shell. */
+html, body, #root {
+  min-height: 100%;
+  background-color: var(--health-canvas);
+}
+
+
 @theme {
   --color-accent: var(--health-accent);
   --color-accent-muted: var(--health-accent-muted);
@@ -996,7 +1003,15 @@ html.dark[data-health-palette='prismatic-apex'] {
   html[data-health-palette='eclipse-sovereign'],
   html[data-health-palette='prismatic-apex']
 ) .app-shell {
-  background-image: var(--health-hero-gradient);
+  /* Keep a gentle theme-colored wash through the entire scrollable shell, not
+     only the top of the first radial/linear artwork gradient. */
+  background-image:
+    var(--health-hero-gradient),
+    linear-gradient(
+      160deg,
+      color-mix(in srgb, var(--health-accent) 6%, var(--health-canvas)),
+      color-mix(in srgb, var(--health-accent-secondary) 8%, var(--health-canvas))
+    );
   background-repeat: no-repeat;
   background-size: 100% 100%;
   background-attachment: scroll;
@@ -1082,7 +1097,15 @@ html.dark[data-health-palette='prismatic-apex'] {
   html[data-health-palette='republic-red'],
   html[data-health-palette='cosmic-instinct']
 ) .app-shell {
-  background-image: var(--health-hero-gradient);
+  /* Keep a gentle theme-colored wash through the entire scrollable shell, not
+     only the top of the first radial/linear artwork gradient. */
+  background-image:
+    var(--health-hero-gradient),
+    linear-gradient(
+      160deg,
+      color-mix(in srgb, var(--health-accent) 6%, var(--health-canvas)),
+      color-mix(in srgb, var(--health-accent-secondary) 8%, var(--health-canvas))
+    );
   background-repeat: no-repeat;
   background-size: 100% 100%;
   background-attachment: scroll;
