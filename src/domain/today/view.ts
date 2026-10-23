@@ -1,5 +1,6 @@
 import type { ActivityDailyRow } from '../activity/analytics.js'
 import { activityShortTermChange } from '../activity/analytics.js'
+import { todayWeeklyHealth, type TodayRestingHeartRateWeek, type TodayWeekMetric } from './recent-health.js'
 import { bodyWeightTrend } from '../progress/body-trend.js'
 import { calendarDateFromInstant, calendarDaysBetween } from '../progress/dates.js'
 import { findingsFromBodyWeightTrend } from '../progress/findings.js'
@@ -156,6 +157,7 @@ export type TodayViewModel = {
     activeEnergyKcal: number | null
     exerciseMinutes: number | null
     restingHeartRateBpm: number | null
+    weeklyRestingHeartRate: TodayRestingHeartRateWeek
     updatedAt: string | null
     workouts: TodayActivityWorkout[]
     additionalWorkoutCount: number
@@ -174,6 +176,7 @@ export type TodayViewModel = {
     minutes: number | null
     sourceName: string | null
     latestComplete: { date: string; minutes: number; sourceName: string } | null
+    weekly: TodayWeekMetric
   }
   body: {
     latest: { value: number; unit: string; calendarDate: string; ageDays: number; measuredLabel: string } | null
@@ -332,6 +335,7 @@ export function buildTodayView(sources: TodaySources): TodayViewModel {
   const latest = sources.latestCompleteSleep
   const showLatest = kind === 'none' && latest && latest.sleepDate !== date && latest.analysisEligible && finite(latest.totalSleepMinutes)
   const activityWorkouts = todayActivityWorkouts(sources.activityWorkouts, date, timezone)
+  const weekly = todayWeeklyHealth({ asOf: date, timezone, activityDays: sources.activityDays, sleepNights: sources.sleepNights })
   const change = activityShortTermChange(sources.activityDays, date, date)
   const changedItems: TodayViewModel['changedItems'] = []
   if (change.steps.status === 'available' && change.steps.value.absoluteDelta !== 0) {
@@ -397,6 +401,7 @@ export function buildTodayView(sources: TodaySources): TodayViewModel {
       activeEnergyKcal,
       exerciseMinutes,
       restingHeartRateBpm,
+      weeklyRestingHeartRate: weekly.restingHeartRate,
       updatedAt: activityRow?.updatedAt ?? null,
       workouts: activityWorkouts.workouts,
       additionalWorkoutCount: activityWorkouts.additionalWorkoutCount,
@@ -421,6 +426,7 @@ export function buildTodayView(sources: TodaySources): TodayViewModel {
     },
     sleep: {
       kind,
+      weekly: weekly.sleep,
       minutes: kind === 'none' || !night || !finite(night.totalSleepMinutes) ? null : night.totalSleepMinutes,
       sourceName: kind === 'none' || !night ? null : night.sourceName,
       latestComplete: showLatest && latest && finite(latest.totalSleepMinutes)
