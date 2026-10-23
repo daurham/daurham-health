@@ -1931,3 +1931,113 @@ html[data-health-palette='prismatic-apex'] .today-world-motto { display: block; 
 .theme-world-preview-detail { color: var(--health-text-muted); font-size: .7rem; }
 .theme-world-preview--tile { height: 5.5rem; }
 .theme-world-preview--tile .today-scene-art { width: 105%; }
+
+
+/* Premium collectible artwork: seven cached illustrated environments, one
+   tiny WebP atlas. Crops preserve geometry for hero and theme cards, avoiding
+   the distortion of stretching a single sprite across different aspect ratios.
+   Base remains intentionally subdued. XP stages reveal color, not new API data.
+*/
+.illustrated-world {
+  position: absolute; inset: 0; overflow: hidden; z-index: 0;
+  background: var(--health-surface-raised);
+  pointer-events: none; border-radius: inherit;
+}
+.illustrated-world > span { position: absolute; inset: 0; pointer-events: none; }
+.illustrated-world__image {
+  background-image: url('/theme-worlds/worlds.webp');
+  background-repeat: no-repeat;
+  background-size: auto 700%;
+  background-position: var(--world-focus) var(--world-row);
+  filter: grayscale(1) contrast(.91) brightness(.82);
+  opacity: .88;
+  transition: filter 540ms ease, opacity 540ms ease;
+}
+.illustrated-world[data-world-stage='awakened'] .illustrated-world__image {
+  filter: grayscale(.68) saturate(.92) contrast(.97) brightness(.94);
+  opacity: .96;
+}
+.illustrated-world[data-world-stage='ascended'] .illustrated-world__image {
+  filter: grayscale(.13) saturate(1.12) contrast(1.03) brightness(1.01);
+  opacity: 1;
+}
+.illustrated-world__wash {
+  background: linear-gradient(110deg, color-mix(in srgb, var(--health-accent) 15%, transparent),
+    transparent 55%, color-mix(in srgb, var(--health-accent-secondary) 20%, transparent));
+  mix-blend-mode: color;
+  opacity: .13;
+}
+.illustrated-world[data-world-stage='awakened'] .illustrated-world__wash { opacity: .46; }
+.illustrated-world[data-world-stage='ascended'] .illustrated-world__wash { opacity: .66; }
+.illustrated-world__accent {
+  background: radial-gradient(ellipse at 78% 64%, color-mix(in srgb, var(--health-accent) 65%, transparent), transparent 55%),
+    radial-gradient(ellipse at 91% 18%, color-mix(in srgb, var(--health-accent-secondary) 50%, transparent), transparent 45%);
+  mix-blend-mode: screen; opacity: 0;
+  transition: opacity 540ms ease;
+}
+.illustrated-world[data-world-stage='awakened'] .illustrated-world__accent { opacity: .17; }
+.illustrated-world[data-world-stage='ascended'] .illustrated-world__accent { opacity: .37; }
+.illustrated-world[data-world-trained='yes'] .illustrated-world__accent { opacity: .46; }
+.illustrated-world[data-world-trained='yes'][data-world-stage='ascended'] .illustrated-world__accent { opacity: .6; }
+.illustrated-world__shade {
+  background: linear-gradient(90deg, color-mix(in srgb,var(--health-surface-raised) 95%,transparent) 0%,
+    color-mix(in srgb,var(--health-surface-raised) 90%,transparent) 25%,
+    color-mix(in srgb,var(--health-surface-raised) 50%,transparent) 49%, transparent 83%);
+}
+.theme-world-preview .illustrated-world__shade {
+  background: linear-gradient(0deg, color-mix(in srgb,var(--health-surface-raised) 65%,transparent), transparent 72%);
+}
+.illustrated-world[data-world-mood='daybreak'] .illustrated-world__wash { background-color: rgb(239 190 120 / 6%); }
+.illustrated-world[data-world-mood='dusk'] .illustrated-world__wash { background-color: rgb(175 114 143 / 9%); }
+.illustrated-world[data-world-mood='moonlit'] .illustrated-world__wash { background-color: rgb(45 71 130 / 13%); }
+
+.illustrated-world__stars { opacity: 0; transition: opacity 420ms ease; }
+.illustrated-world__stars i {
+  position: absolute; width: 3px; height: 3px; border-radius: 50%;
+  background: var(--health-accent-secondary);
+  box-shadow: 0 0 10px var(--health-accent-secondary);
+}
+.illustrated-world__stars i:nth-child(1) { inset: 20% auto auto 67%; }
+.illustrated-world__stars i:nth-child(2) { inset: 35% auto auto 83%; }
+.illustrated-world__stars i:nth-child(3) { inset: 14% auto auto 92%; }
+.illustrated-world__stars i:nth-child(4) { inset: 64% auto auto 72%; }
+.illustrated-world__stars i:nth-child(5) { inset: 52% auto auto 95%; }
+.illustrated-world[data-world-stage='ascended'] .illustrated-world__stars,
+.illustrated-world[data-world-trained='yes'] .illustrated-world__stars { opacity: .64; }
+.illustrated-world[data-world-stage='base'][data-world-trained='no'] .illustrated-world__stars { opacity: 0; }
+.illustrated-world[data-world-mood='daylight'] .illustrated-world__stars { opacity: .16; }
+
+@keyframes illustrated-world-awaken {
+  from { opacity: .1; transform: translateY(2px); }
+  to { opacity: .72; transform: translateY(-2px); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .today-scenic-hero .illustrated-world[data-world-trained='yes'] .illustrated-world__stars i,
+  .today-scenic-hero .illustrated-world[data-world-stage='ascended'] .illustrated-world__stars i {
+    animation: illustrated-world-awaken 2.8s ease-in-out 2 alternate;
+  }
+  .today-scenic-hero .illustrated-world__stars i:nth-child(2) { animation-delay: .35s; }
+  .today-scenic-hero .illustrated-world__stars i:nth-child(3) { animation-delay: .7s; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .illustrated-world *, .illustrated-world { animation: none !important; transition: none !important; }
+}
+
+/* The art is always behind readable text, while the theme's secondary accent
+   appears only with unlocked evolution or the optional workout celebration. */
+.today-scenic-hero .illustrated-world { z-index: 0; }
+.today-scenic-hero:has(.illustrated-world)::after { display: none; }
+.theme-world-preview .illustrated-world { border-radius: inherit; }
+.theme-world-preview--tile { height: 7.15rem; }
+.theme-world-preview--tile .illustrated-world { opacity: 1; }
+.theme-world-preview:not(.theme-world-preview--tile) { min-height: 9rem; }
+.world-evolution-indicator { display: flex; gap: 5px; margin-top: .75rem; }
+.world-evolution-indicator__step {
+  width: 29px; height: 3px; border-radius: 100px;
+  background: color-mix(in srgb,var(--health-accent-secondary) 13%,var(--health-border));
+}
+.world-evolution-indicator__step.is-active { background: var(--health-accent); }
+@media (max-width: 390px) {
+  .today-scenic-content { max-width: 83%; }
+  .illustrated-world__shade { background: linear-gradient(90deg,var(--health-surface-raised),color-mix(in srgb,var(--health-surface-raised) 80%,transparent) 65%,transparent); }
+}
