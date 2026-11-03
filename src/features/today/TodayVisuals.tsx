@@ -8,7 +8,8 @@ import { prefixedPath, useAppPathPrefix, useDemoReadOnly } from '@/lib/app-prefi
 import { addHydrationEvent } from '@/features/daily-signals'
 import type { HydrationEvent } from '@/domain/daily-signals'
 import { progressionState } from '@/domain/progression'
-import { fallbackDailyQuote, loadDailyQuote } from './daily-quote'
+import { loadDailyQuote, readCachedDailyQuote, type DailyQuote } from './daily-quote'
+import { useHealthCalendarDay } from './useHealthCalendarDay'
 import { readPalettePreference, themePackUnlockLevel, type HealthPalette } from '@/theme'
 
 /** Scenic daily encouragement; nutrition, hydration, and training remain one tap away.
@@ -24,7 +25,11 @@ export function TodayScenicHero({
   const readOnly = useDemoReadOnly()
   const prefix = useAppPathPrefix()
   const [mood, setMood] = useState(() => worldMoodForHour(new Date().getHours()))
-  const [dailyQuote, setDailyQuote] = useState(() => fallbackDailyQuote(view.date))
+  const quoteDate = useHealthCalendarDay(view.timezone)
+  const [quoteState, setQuoteState] = useState<{ date: string; value: DailyQuote } | null>(() => {
+    const cached = readCachedDailyQuote(quoteDate)
+    return cached ? { date: quoteDate, value: cached } : null
+  })
   const [, setStageRevision] = useState(0)
   const [waterBusy, setWaterBusy] = useState(false)
   const [waterError, setWaterError] = useState<string | null>(null)
@@ -36,12 +41,15 @@ export function TodayScenicHero({
   }, [])
   useEffect(() => {
     const controller = new AbortController()
-    setDailyQuote(fallbackDailyQuote(view.date))
-    void loadDailyQuote(view.date, controller.signal).then((quote) => {
-      if (!controller.signal.aborted) setDailyQuote(quote)
-    })
+    const cached = readCachedDailyQuote(quoteDate)
+    setQuoteState(cached ? { date: quoteDate, value: cached } : null)
+    if (!cached) {
+      void loadDailyQuote(quoteDate, controller.signal).then((value) => {
+        if (!controller.signal.aborted) setQuoteState({ date: quoteDate, value })
+      })
+    }
     return () => controller.abort()
-  }, [view.date])
+  }, [quoteDate])
   useEffect(() => {
     const refresh = () => setStageRevision((revision) => revision + 1)
     window.addEventListener(WORLD_STAGE_CHANGE_EVENT, refresh)
@@ -56,6 +64,7 @@ export function TodayScenicHero({
   const currentLevel = progressionState(summary?.lifetimeXp ?? 0).level
   const highestStage = worldStage(themePackUnlockLevel(palette), currentLevel)
   const stage = resolveWorldStageChoice(readWorldStageChoice(typeof localStorage === 'undefined' ? null : localStorage, palette), highestStage)
+  const dailyQuote = quoteState?.date === quoteDate ? quoteState.value : readCachedDailyQuote(quoteDate)
   const hydration = view.dailySignals?.hydration
   const hydrated = isHydrationGoalMet(hydration?.totalOz, hydration?.goalOz)
   const checkInHref = prefixedPath(prefix, '/check-in?date=' + view.date)
@@ -81,8 +90,8 @@ export function TodayScenicHero({
         <ThemeWorldScene palette={palette} stage={stage} completed={view.training.logged} hydrated={hydrated} mood={mood} />
         <div className="today-scenic-content">
           <p className="today-scenic-eyebrow">TODAY'S PERSPECTIVE</p>
-          <blockquote className="today-scenic-quote">“{dailyQuote.quote}”</blockquote>
-          <p className="today-scenic-attribution">— {dailyQuote.author}</p>
+          <blockquote className="today-scenic-quote">{dailyQuote ? `“${dailyQuote.quote}”` : 'Loading today’s perspective…'}</blockquote>
+          {dailyQuote ? <p className="today-scenic-attribution">— {dailyQuote.author}</p> : null}
         </div>
       </div>
       <nav className="today-command-shortcuts" data-has-supplements={view.supplements ? 'yes' : 'no'} aria-label="Quick logging">

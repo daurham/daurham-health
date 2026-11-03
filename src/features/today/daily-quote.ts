@@ -1,4 +1,4 @@
-/** One small, stable quote per local Health day. External data never blocks Today. */
+/** Stable, practical encouragement for one configured Health day. */
 export type DailyQuote = { quote: string; author: string }
 
 const FALLBACK_QUOTES = [
@@ -25,44 +25,81 @@ const FALLBACK_QUOTES = [
   'Discipline is a way of caring for your future self.',
 ] as const
 
-export function fallbackDailyQuote(date: string): DailyQuote {
+function dateIndex(date: string, count: number): number {
   const key = Number(date.replace(/[^0-9]/g, ''))
-  const index = Number.isFinite(key) ? key % FALLBACK_QUOTES.length : 0
-  return { quote: FALLBACK_QUOTES[index], author: 'Daily reminder' }
+  return Number.isFinite(key) ? key % count : 0
 }
 
-/** Reject unexpectedly long or malformed third-party content before display/caching. */
+export function fallbackDailyQuote(date: string): DailyQuote {
+  return { quote: FALLBACK_QUOTES[dateIndex(date, FALLBACK_QUOTES.length)], author: 'Daily reminder' }
+}
+
+/** Reject malformed, long, or error-message content from the remote service. */
 export function parseRemoteDailyQuote(data: unknown): DailyQuote | null {
   if (!data || typeof data !== 'object') return null
   const item = data as Record<string, unknown>
   if (typeof item.quote !== 'string' || typeof item.author !== 'string') return null
-  const quote = item.quote.trim()
+  const quote = item.quote.trim().replace(/\s+/g, ' ')
   const author = item.author.trim()
   if (quote.length < 22 || quote.length > 155 || author.length < 2 || author.length > 65) return null
   return { quote, author }
 }
 
-const CACHE_PREFIX = 'daurham-health:daily-quote:'
+/** Weed out poetic/archaic aphorisms; prefer modern, actionable motivation. */
+const PRACTICAL_TOPICS = /\b(today|tomorrow|daily|every day|each day|start|started|starting|begin|begins|beginning|keep going|keep trying|try|trying|effort|work|working|practice|habits?|consistency|discipline|progress|improve|improving|learn|learning|goals?|steps?|action|focus|strength|courage|challenges?|perfection|health|commitment|persist|show up)\b/i
+const ARCHAIC_OR_POETIC = /\b(thou|thee|thy|thine|hath|doth|shalt|unto|whilst|wherefore|wings?|rainbows?|clouds?|caterpillar|soul|destiny|fate|heaven|universe|cosmos|miracles?|magic|magical|bliss)\b/i
 
-/** Free public-domain quote endpoint with browser CORS; one request per day/device.
- * When offline or rate-limited, a curated local quote is used instead.
- */
-export async function loadDailyQuote(date: string, signal?: AbortSignal): Promise<DailyQuote> {
-  const fallback = fallbackDailyQuote(date)
-  let storage: Storage | null = null
-  try { if (typeof localStorage !== 'undefined') storage = localStorage } catch { /* unavailable */ }
-  const key = CACHE_PREFIX + date
+export function selectMotivationalDailyQuote(data: unknown, date: string): DailyQuote | null {
+  if (!Array.isArray(data)) return null
+  const eligible = new Map<string, DailyQuote>()
+  for (const item of data) {
+    const quote = parseRemoteDailyQuote(item)
+    if (!quote || quote.quote.length > 140) continue
+    if (!PRACTICAL_TOPICS.test(quote.quote) || ARCHAIC_OR_POETIC.test(quote.quote)) continue
+    if (/^(unknown|anonymous|proverb)$/i.test(quote.author)) continue
+    eligible.set(quote.quote.toLowerCase(), quote)
+  }
+  // Sorting makes selection independent of API ordering and the time of the request.
+  const quotes = [...eligible.values()].sort((a, b) => a.quote.localeCompare(b.quote, 'en'))
+  return quotes.length === 0 ? null : quotes[dateIndex(date, quotes.length)]
+}
+
+// v2 invalidates old cached quotes from Dumb APIs for the current date.
+const CACHE_PREFIX = 'daurham-health:daily-quote:v2:'
+const QUOTES_URL = 'https://motivational-spark-api.vercel.app/api/quotes'
+
+function quoteStorage(): Storage | null {
+  try { return typeof localStorage === 'undefined' ? null : localStorage } catch { return null }
+}
+
+export function readCachedDailyQuote(date: string): DailyQuote | null {
   try {
-    const saved = storage?.getItem(key)
-    if (saved) return parseRemoteDailyQuote(JSON.parse(saved)) ?? fallback
-  } catch { /* invalid cache or private mode */ }
+    const saved = quoteStorage()?.getItem(CACHE_PREFIX + date)
+    return saved ? parseRemoteDailyQuote(JSON.parse(saved)) : null
+  } catch { return null }
+}
+
+/** Once per day/device. API failure falls back to a stable local reminder. */
+export async function loadDailyQuote(date: string, signal?: AbortSignal): Promise<DailyQuote> {
+  const cached = readCachedDailyQuote(date)
+  if (cached) return cached
+  const fallback = fallbackDailyQuote(date)
+  if (signal?.aborted) return fallback
+  const controller = new AbortController()
+  const abort = () => controller.abort()
+  signal?.addEventListener('abort', abort, { once: true })
+  const timeout = setTimeout(abort, 4500)
   let result = fallback
   try {
-    const response = await fetch('https://dumbapis.com/daily/quote', { signal })
-    if (response.ok) result = parseRemoteDailyQuote(await response.json()) ?? fallback
-  } catch { /* offline, aborted or temporarily unavailable */ }
+    const response = await fetch(QUOTES_URL, { signal: controller.signal })
+    if (response.ok) result = selectMotivationalDailyQuote(await response.json(), date) ?? fallback
+  } catch { /* Offline, rate limited, aborted or temporarily unavailable. */ }
+  finally {
+    clearTimeout(timeout)
+    signal?.removeEventListener('abort', abort)
+  }
   if (!signal?.aborted) {
-    try { storage?.setItem(key, JSON.stringify(result)) } catch { /* optional cache */ }
+    try { quoteStorage()?.setItem(CACHE_PREFIX + date, JSON.stringify(result)) } catch { /* optional cache */ }
   }
   return result
 }

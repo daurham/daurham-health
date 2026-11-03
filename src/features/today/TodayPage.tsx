@@ -49,6 +49,8 @@ import { DAILY_PARTICIPATION_XP } from '@/domain/rewards'
 import { fetchGoalControl } from '@/features/goal-control/api'
 import { GoalControlCard } from '@/features/goal-control/GoalControlCard'
 import { TodayScenicHero, TodayDomainIcon } from './TodayVisuals'
+import { useHealthCalendarDay } from './useHealthCalendarDay'
+import { DEFAULT_HEALTH_CALENDAR_TIME_ZONE } from '@/domain/time'
 import { TodayWeekBars } from './TodayWeekBars'
 import { formatCalendarRange as weekRangeLabel } from '@/domain/calendar-format'
 
@@ -71,10 +73,22 @@ export function TodayPage() {
   const load = useCallback((_key: string, signal: AbortSignal) => fetchToday(signal), [])
   const resource = useAtomicKeyedResource({ requestedKey: 'today', load })
   const view = resource.data
+  const healthDay = useHealthCalendarDay(view?.timezone ?? DEFAULT_HEALTH_CALENDAR_TIME_ZONE)
+  const loadedDay = view?.date
+  const lastMidnightRefresh = useRef<string | null>(null)
   const coachRequests = useRef({ generation: 0 })
   const goalControlRequests = useRef({ generation: 0 })
   const retryToday = useRef(resource.retry)
   retryToday.current = resource.retry
+
+  // Today should roll forward without a manual refresh after Health midnight.
+  // Avoid a retry loop when the server is offline or returns stale data.
+  useEffect(() => {
+    if (loadedDay && loadedDay !== healthDay && lastMidnightRefresh.current !== healthDay) {
+      lastMidnightRefresh.current = healthDay
+      retryToday.current()
+    }
+  }, [loadedDay, healthDay])
 
   const loadCoach = useCallback(async () => {
     if (readOnly) return
