@@ -258,10 +258,16 @@ export function TodayBoard({
         onAddFood={readOnly ? undefined : () => setFoodOpenSignal((value) => value + 1)}
         onWaterLogged={onWaterLogged}
       />
-      <div className="grid items-stretch gap-3 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
-        <NutritionCard view={view} onNutritionChanged={onNutritionChanged} openSignal={foodOpenSignal} />
-        <TrainingCard view={view} />
-      </div>
+      <NutritionCard view={view} onNutritionChanged={onNutritionChanged} openSignal={foodOpenSignal} />
+      {onCoachState ? (
+        <CoachCard
+          state={coach ?? null}
+          pending={coachPending}
+          error={coachError}
+          onState={onCoachState}
+        />
+      ) : null}
+      <TrainingCard view={view} />
       <section className="today-essentials" aria-labelledby="today-essentials-heading">
         <h2 id="today-essentials-heading" className="today-essentials-title">Daily Essentials</h2>
         <div className="grid items-start gap-3 md:grid-cols-2">
@@ -276,16 +282,6 @@ export function TodayBoard({
           <SleepCard view={view} />
         </div>
       </section>
-      {onCoachState ? (
-        <div className="min-w-0 min-h-40" aria-label="Coach">
-          <CoachCard
-            state={coach ?? null}
-            pending={coachPending}
-            error={coachError}
-            onState={onCoachState}
-          />
-        </div>
-      ) : null}
       {goalControl || goalControlPending || goalControlError ? (
         <GoalControlCard
           state={goalControl ?? null}

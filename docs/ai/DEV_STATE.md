@@ -1,3 +1,11 @@
+## Today challenge placement
+
+Today displays Nutrition, Coach challenges, then Training in a single column on mobile and desktop.
+
+## 2026-11-04 — Today bottle shortcut
+
+Today’s top quick water action now logs 24 oz and reads “+24 oz water” to match the owner’s bottle. Other hydration increments are unchanged. Validation: water/visual tests pass; targeted lint, TypeScript and production build pass. Three training-section assertions in older Today suites also fail on unmodified main; left outside this patch.
+
 ## 2026-10-19 — PIQ-8 late job-created callback freeze (feature CI pending)
 
 - `recordLabelJobCreated` previously preserved `status='committed'` on an

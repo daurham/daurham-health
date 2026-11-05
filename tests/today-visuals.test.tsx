@@ -63,7 +63,7 @@ describe('Today visual command center', () => {
     expect(html).toContain('Daily Log')
     expect(html).toContain('Stress')
     expect(html).toContain('Bowel')
-    expect(html).toContain('+8 oz')
+    expect(html).toContain('+24 oz')
     expect(html).toContain('/training/new?type=ad_hoc')
     expect(html).toContain('Add food')
     expect(html).not.toContain('today-command-primary')
@@ -72,7 +72,7 @@ describe('Today visual command center', () => {
 
   it('keeps the public demo non-interactive', () => {
     const html = renderBoard(true)
-    expect(html).not.toContain('+8 oz')
+    expect(html).not.toContain('+24 oz')
     expect(html).not.toContain('Add food')
     expect(html).not.toContain('/training/new?type=ad_hoc')
   })

@@ -75,7 +75,7 @@ export function TodayScenicHero({
     setWaterBusy(true)
     setWaterError(null)
     try {
-      const event = await addHydrationEvent(view.date, 8)
+      const event = await addHydrationEvent(view.date, 24)
       onWaterLogged?.(event)
     } catch (cause) {
       setWaterError(cause instanceof Error ? cause.message : 'Water could not be logged.')
@@ -110,7 +110,7 @@ export function TodayScenicHero({
           </Link>
         ) : (
           <button type="button" disabled={waterBusy} onClick={() => void logWater()} className="today-command-shortcut">
-            <TodayDomainIcon domain="hydration" /><span>{waterBusy ? 'Logging…' : '+8 oz water'}</span>
+            <TodayDomainIcon domain="hydration" /><span>{waterBusy ? 'Logging…' : '+24 oz water'}</span>
           </button>
         )}
         <Link to={checkInHref} className="today-command-shortcut">
