@@ -1,3 +1,7 @@
+## 2026-11-05 — Fiber in described meals
+
+Food descriptions retain positive estimated fiber from known ingredients when other ingredients lack estimates. Review identifies ingredients omitted from the fiber total. All-unknown fiber stays blank; fully estimated zero is retained.
+
 ## Today challenge placement
 
 Today displays Nutrition, Coach challenges, then Training in a single column on mobile and desktop.

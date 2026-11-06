@@ -99,6 +99,19 @@ describe('quick described-meal UX', () => {
 })
 
 describe('food description parsing and totals', () => {
+  it('retains estimated fiber from a mixed bowl and distinguishes missing fiber from zero', () => {
+    const items = [
+      { name: 'rolled oats', fiberGrams: 4 }, { name: 'chia seeds', fiberGrams: 4 },
+      { name: 'ground flax', fiberGrams: 0.6 }, { name: 'vanilla protein powder' },
+      { name: 'plain collagen', fiberGrams: 0 }, { name: 'strawberries', fiberGrams: 1 },
+    ]
+    const estimate = (rows: typeof items) => sanitizeDescriptionEstimate({ items: rows }).fiberGrams
+    expect(estimate(items)).toBe(10)
+    expect(estimate([{ name: 'unknown powder' }])).toBeNull()
+    expect(estimate([{ name: 'collagen', fiberGrams: 0 }, { name: 'unknown powder' }])).toBeNull()
+    expect(estimate([{ name: 'collagen', fiberGrams: 0 }])).toBe(0)
+  })
+
   it('extracts the reviewed example and leaves a fractional onion unresolved', () => {
     const parsed = parseFoodDescription('half a lb of wagyu beef, a quarter of diced onion and a cup of broccoli')
     expect(parsed.components.map((item) => [item.proposedName, item.quantity, item.unit, item.preparation])).toEqual([

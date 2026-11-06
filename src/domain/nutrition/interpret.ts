@@ -304,7 +304,7 @@ export function foodDescriptionPrompt(text: string): string {
     'For a weighed mixture (e.g. 340 g rice mixed with beans), treat the weight as the entire mixture, not 340 g of each ingredient. Give one mixture item with a reasonable composition assumption unless separate weights are specified.',
     'When the serving size, cooking method, or mixture ratio is uncertain, make a reasonable everyday assumption and explain it briefly. Do not ask questions before estimating.',
     'Preserve natural units. estimatedGrams is optional supporting evidence. Omit quantity or estimatedGrams if genuinely unknown; never substitute an invented precise measurement.',
-    'Estimate calories, protein, carbs, fat, fiber, and sodium for each useful component. If fiber or sodium cannot be estimated, omit that field rather than using 0.',
+    'Estimate dietary fiber in grams for each stated portion using typical food composition when the exact brand label is unavailable. Use 0 for foods reasonably expected to be fiber-free, such as plain collagen. Omit fiberGrams only when a reasonable estimate is impossible. Explain material brand or portion assumptions. Estimate sodium where possible and omit it when unknown.',
     'Every included item must have nonnegative numerical calories, proteinGrams, carbsGrams, and fatGrams. A missing nutrient is not the same as zero.',
     'Health will sum component estimates. Do not invent a separate authoritative meal total.',
     'Keep assumptions concise (one sentence each); estimates are approximate.',

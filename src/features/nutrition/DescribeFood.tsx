@@ -140,6 +140,8 @@ function DescriptionEstimateSheet({
   const [busy, setBusy] = useState(false)
   const [showDetails, setShowDetails] = useState(false)
 
+  const missingFiberItems = items.filter((item) => item.fiberGrams == null)
+
   function applyScale(next: MealPortionScale) {
     setScale(next)
     setValues(scaleMealEstimate(baseline, next))
@@ -263,6 +265,11 @@ function DescriptionEstimateSheet({
         <p className="mt-2 text-xl font-semibold text-zinc-900">{Math.round(values.calories)} kcal · {Math.round(values.proteinGrams)} g protein</p>
         <p className="mt-1 text-sm text-zinc-600">{Math.round(values.carbsGrams)} g carbs · {Math.round(values.fatGrams)} g fat · {items.length} components</p>
         <p className="mt-1 text-sm text-zinc-600">Fiber: {values.fiberGrams == null ? 'unknown' : Math.round(values.fiberGrams * 10) / 10 + ' g'} · Sodium: {values.sodiumMg == null ? 'unknown' : Math.round(values.sodiumMg) + ' mg'}</p>
+        {missingFiberItems.length > 0 ? (
+          <p className="mt-1 text-sm text-zinc-600">
+            Fiber estimate excludes {missingFiberItems.map((item) => item.name).join(', ')}.
+          </p>
+        ) : null}
         <p className="mt-2 text-xs text-zinc-500">Approximate; unknown weights and mixture ratios are assumptions, not measured facts.</p>
         {current.assumptions[0] || items.some((item) => item.assumption) ? (
           <p className="mt-1 text-xs text-zinc-500">Assuming: {current.assumptions[0] ?? items.find((item) => item.assumption)?.assumption}</p>

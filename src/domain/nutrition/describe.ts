@@ -440,17 +440,18 @@ export function sumDescriptionEstimateItems(items: readonly DescriptionEstimateI
   let proteinGrams = 0
   let carbsGrams = 0
   let fatGrams = 0
-  let fiberGrams: number | null = 0
+  let fiberSum = 0
+  let hasMissingFiber = items.length === 0
   let sodiumMg: number | null = 0
   for (const item of items) {
     calories += item.calories
     proteinGrams += item.proteinGrams
     carbsGrams += item.carbsGrams
     fatGrams += item.fatGrams
-    if (item.fiberGrams == null || fiberGrams == null) {
-      fiberGrams = null
+    if (item.fiberGrams == null) {
+      hasMissingFiber = true
     } else {
-      fiberGrams += item.fiberGrams
+      fiberSum += item.fiberGrams
     }
     if (item.sodiumMg == null || sodiumMg == null) {
       sodiumMg = null
@@ -458,6 +459,7 @@ export function sumDescriptionEstimateItems(items: readonly DescriptionEstimateI
       sodiumMg += item.sodiumMg
     }
   }
+  const fiberGrams = hasMissingFiber && fiberSum === 0 ? null : fiberSum
   return mealEstimateNutrients({ calories, proteinGrams, carbsGrams, fatGrams, fiberGrams, sodiumMg })
 }
 
